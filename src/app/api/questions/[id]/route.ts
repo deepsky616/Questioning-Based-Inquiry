@@ -1,0 +1,110 @@
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const question = await prisma.question.findUnique({
+    where: { id: params.id },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          className: true,
+        },
+      },
+      comments: {
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+
+  if (!question) {
+    return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
+  }
+
+  const userRole = (session.user as any).role;
+  const userId = (session.user as any).id;
+
+  if (!question.isPublic && question.authorId !== userId && userRole !== "TEACHER") {
+    return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
+  }
+
+  return NextResponse.json(question);
+}
+
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userRole = (session.user as any).role;
+  if (userRole !== "TEACHER") {
+    return NextResponse.json({ error: "교사만 수정할 수 있습니다" }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const { closure, cognitive, isPublic } = body;
+
+  const question = await prisma.question.update({
+    where: { id: params.id },
+    data: {
+      ...(closure && { closure }),
+      ...(cognitive && { cognitive }),
+      ...(isPublic !== undefined && { isPublic }),
+    },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          className: true,
+        },
+      },
+    },
+  });
+
+  return NextResponse.json(question);
+}
+
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const userId = (session.user as any).id;
+  const userRole = (session.user as any).role;
+
+  const question = await prisma.question.findUnique({
+    where: { id: params.id },
+  });
+
+  if (!question) {
+    return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
+  }
+
+  if (question.authorId !== userId && userRole !== "TEACHER") {
+    return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
+  }
+
+  await prisma.question.delete({
+    where: { id: params.id },
+  });
+
+  return NextResponse.json({ success: true });
+}
