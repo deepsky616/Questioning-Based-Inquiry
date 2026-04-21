@@ -68,7 +68,7 @@ export default function AskPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey: config.apiKey,
-          model: config.model || "gemini-2.0-flash-exp",
+          model: config.model || "gemini-2.5-flash",
           content,
           context,
         }),
