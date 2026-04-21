@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,11 @@ interface ClassificationResult {
   reasoning: string;
 }
 
+interface ApiConfig {
+  apiKey: string;
+  model: string;
+}
+
 export default function AskPage() {
   const { data: session } = useSession();
   const router = useRouter();
@@ -27,6 +32,14 @@ export default function AskPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ClassificationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [noConfigError, setNoConfigError] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("gemini-config");
+    if (!saved) {
+      setNoConfigError(true);
+    }
+  }, []);
 
   const handleClassify = async () => {
     if (content.length < 10) {
@@ -34,19 +47,42 @@ export default function AskPage() {
       return;
     }
 
-    setIsLoading(true);
+    const saved = localStorage.getItem("gemini-config");
+    if (!saved) {
+      setNoConfigError(true);
+      return;
+    }
+
     try {
+      const config: ApiConfig = JSON.parse(saved);
+      if (!config.apiKey || config.apiKey.length < 10) {
+        setNoConfigError(true);
+        return;
+      }
+
+      setNoConfigError(false);
+      setIsLoading(true);
+
       const res = await fetch("/api/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, context }),
+        body: JSON.stringify({
+          apiKey: config.apiKey,
+          model: config.model || "gemini-2.0-flash-exp",
+          content,
+          context,
+        }),
       });
 
-      if (!res.ok) throw new Error("분류 실패");
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "분류 실패");
+      }
+
       const data = await res.json();
       setResult(data);
-    } catch (error) {
-      alert("분류 중 오류가 발생했습니다");
+    } catch (error: any) {
+      alert(error.message || "분류 중 오류가 발생했습니다");
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +96,15 @@ export default function AskPage() {
       const res = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, context, isPublic }),
+        body: JSON.stringify({
+          content,
+          context,
+          isPublic,
+          closure: result.closure,
+          cognitive: result.cognitive,
+          closureScore: result.closureScore,
+          cognitiveScore: result.cognitiveScore,
+        }),
       });
 
       if (!res.ok) throw new Error("저장 실패");
@@ -83,6 +127,17 @@ export default function AskPage() {
         <h2 className="text-2xl font-bold text-gray-900">질문하기</h2>
         <p className="text-gray-600">질문을 입력하면 유형을 분석해 드립니다</p>
       </div>
+
+      {noConfigError && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <p className="text-yellow-800">
+              Gemini API 설정이 필요합니다.{" "}
+              <a href="/settings" className="underline font-medium">설정 페이지</a>에서 API 키를 입력하고 저장해 주세요.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -112,7 +167,11 @@ export default function AskPage() {
             />
           </div>
 
-          <Button onClick={handleClassify} disabled={isLoading || content.length < 10} className="w-full">
+          <Button
+            onClick={handleClassify}
+            disabled={isLoading || content.length < 10 || noConfigError}
+            className="w-full"
+          >
             {isLoading ? "분석 중..." : "유형 분석하기"}
           </Button>
         </CardContent>

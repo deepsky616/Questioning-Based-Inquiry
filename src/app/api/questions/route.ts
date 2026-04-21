@@ -7,6 +7,10 @@ const createQuestionSchema = z.object({
   content: z.string().min(10).max(500),
   context: z.string().optional(),
   isPublic: z.boolean().optional(),
+  closure: z.string().optional(),
+  cognitive: z.string().optional(),
+  closureScore: z.number().optional(),
+  cognitiveScore: z.number().optional(),
 });
 
 export async function GET(req: Request) {
@@ -81,17 +85,14 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = createQuestionSchema.parse(body);
 
-    const { classifyQuestion } = await import("@/lib/gemini");
-    const classification = await classifyQuestion(data.content, data.context);
-
     const question = await prisma.question.create({
       data: {
         content: data.content,
         context: data.context,
-        closure: classification.closure,
-        cognitive: classification.cognitive,
-        closureScore: classification.closureScore,
-        cognitiveScore: classification.cognitiveScore,
+        closure: data.closure || "open",
+        cognitive: data.cognitive || "factual",
+        closureScore: data.closureScore || 0.5,
+        cognitiveScore: data.cognitiveScore || 0.5,
         isPublic: data.isPublic ?? false,
         authorId: (session.user as any).id,
       },
