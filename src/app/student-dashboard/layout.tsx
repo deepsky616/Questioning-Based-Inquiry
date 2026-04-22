@@ -51,7 +51,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
               </nav>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{(session.user as any)?.name}同学</span>
+              <span className="text-sm text-gray-600">{(session?.user as any)?.name}학생</span>
               <Link href="/student-settings">
                 <Button variant="outline" size="sm">설정</Button>
               </Link>
