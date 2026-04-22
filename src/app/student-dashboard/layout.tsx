@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
-export default function TeacherLayout({ children }: { children: React.ReactNode }) {
+export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const router = useRouter();
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated" && (session?.user as any)?.role !== "TEACHER") {
-      router.push("/dashboard");
+    } else if (status === "authenticated" && (session?.user as any)?.role !== "STUDENT") {
+      router.push("/teacher-dashboard");
     }
   }, [session, status, router]);
 
@@ -36,19 +36,25 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
             <div className="flex items-center space-x-8">
               <h1 className="text-xl font-bold text-primary">Question Lab</h1>
               <nav className="flex space-x-4">
-                <Link href="/teacher/dashboard" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
+                <Link href="/student-dashboard" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
                   대시보드
                 </Link>
-                <Link href="/teacher/students" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
-                  학생관리
+                <Link href="/student-ask" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
+                  질문하기
                 </Link>
-                <Link href="/teacher/questions" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
-                  질문조회
+                <Link href="/student-history" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
+                  내 질문
+                </Link>
+                <Link href="/student-explore" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
+                  탐구
                 </Link>
               </nav>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{(session.user as any)?.name} 선생님</span>
+              <span className="text-sm text-gray-600">{(session.user as any)?.name}同学</span>
+              <Link href="/student-settings">
+                <Button variant="outline" size="sm">설정</Button>
+              </Link>
             </div>
           </div>
         </div>
