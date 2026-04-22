@@ -9,6 +9,7 @@ const registerSchema = z.object({
   name: z.string().min(2),
   role: z.enum(["STUDENT", "TEACHER"]),
   studentId: z.string().optional(),
+  grade: z.string().optional(),
   className: z.string().optional(),
   school: z.string().optional(),
 });
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
         name: data.name,
         role: data.role,
         studentId: data.studentId,
+        grade: data.grade,
         className: data.className,
         school: data.school,
       },

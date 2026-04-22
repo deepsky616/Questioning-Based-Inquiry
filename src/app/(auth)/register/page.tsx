@@ -18,6 +18,7 @@ const registerSchema = z.object({
   name: z.string().min(2, "이름은 2자 이상이어야 합니다"),
   role: z.enum(["STUDENT", "TEACHER"]),
   studentId: z.string().optional(),
+  grade: z.string().optional(),
   className: z.string().optional(),
   school: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -112,9 +113,15 @@ export default function RegisterPage() {
                   <Label htmlFor="studentId">학번</Label>
                   <Input id="studentId" placeholder="2024001" {...register("studentId")} />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="className">반</Label>
-                  <Input id="className" placeholder="1반" {...register("className")} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="grade">학년</Label>
+                    <Input id="grade" placeholder="1" {...register("grade")} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="className">반</Label>
+                    <Input id="className" placeholder="1" {...register("className")} />
+                  </div>
                 </div>
               </>
             )}
