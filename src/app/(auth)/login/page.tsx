@@ -10,6 +10,7 @@ import { z } from "zod";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 const loginSchema = z.object({
@@ -22,8 +23,8 @@ type LoginForm = z.infer<typeof loginSchema>;
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session } = useSession();
   const [error, setError] = useState<string | null>(null);
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const {
     register,
@@ -32,6 +33,18 @@ function LoginForm() {
   } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
+
+  const getRedirectUrl = () => {
+    const callbackUrl = searchParams.get("callbackUrl");
+    if (callbackUrl && callbackUrl !== "/") {
+      return callbackUrl;
+    }
+    const role = (session?.user as any)?.role;
+    if (role === "TEACHER") {
+      return "/teacher-dashboard";
+    }
+    return "/student-dashboard";
+  };
 
   const onSubmit = async (data: LoginForm) => {
     setError(null);
@@ -47,7 +60,8 @@ function LoginForm() {
       return;
     }
 
-    router.push(callbackUrl);
+    const redirectUrl = getRedirectUrl();
+    router.push(redirectUrl);
     router.refresh();
   };
 
