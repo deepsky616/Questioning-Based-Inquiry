@@ -12,6 +12,7 @@ CREATE TABLE users (
     role TEXT NOT NULL CHECK (role IN ('STUDENT', 'TEACHER')),
     grade TEXT,
     class_name TEXT,
+    student_number TEXT,
     school TEXT,
     created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP(3) NOT NULL,

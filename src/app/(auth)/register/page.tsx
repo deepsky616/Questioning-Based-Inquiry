@@ -109,7 +109,7 @@ export default function RegisterPage() {
 
             {role === "STUDENT" && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="grade">학년</Label>
                     <Input id="grade" placeholder="1" {...register("grade")} />
@@ -117,6 +117,10 @@ export default function RegisterPage() {
                   <div className="space-y-2">
                     <Label htmlFor="className">반</Label>
                     <Input id="className" placeholder="1" {...register("className")} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="studentNumber">번호</Label>
+                    <Input id="studentNumber" placeholder="1" {...register("studentNumber")} />
                   </div>
                 </div>
               </>
