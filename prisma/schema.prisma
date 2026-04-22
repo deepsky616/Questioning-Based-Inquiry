@@ -19,7 +19,6 @@ model User {
   name      String   @map("name")
   role      UserRole @map("role")
 
-  studentId String?  @map("student_id")
   grade     String?  @map("grade")
   className String?  @map("class_name")
 

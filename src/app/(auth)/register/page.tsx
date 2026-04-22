@@ -109,10 +109,6 @@ export default function RegisterPage() {
 
             {role === "STUDENT" && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="studentId">학번</Label>
-                  <Input id="studentId" placeholder="2024001" {...register("studentId")} />
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="grade">학년</Label>

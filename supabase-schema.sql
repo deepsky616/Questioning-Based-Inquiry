@@ -10,7 +10,6 @@ CREATE TABLE users (
     password TEXT NOT NULL,
     name TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('STUDENT', 'TEACHER')),
-    student_id TEXT,
     grade TEXT,
     class_name TEXT,
     school TEXT,
