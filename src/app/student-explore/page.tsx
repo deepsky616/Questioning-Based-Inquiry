@@ -45,7 +45,7 @@ export default function ExplorePage() {
   };
 
   const getCognitiveLabel = (c: string) => {
-    const map: Record<string, string> = { factual: "사실적", interpretive: "해석적", evaluative: "평가적" };
+    const map: Record<string, string> = { factual: "사실적 질문", interpretive: "해석적 질문", evaluative: "평가적 질문" };
     return map[c] || c;
   };
 
@@ -88,7 +88,7 @@ export default function ExplorePage() {
                       <p className="text-gray-900">{q.content}</p>
                       <div className="flex gap-2 mt-2">
                         <span className={`text-xs px-2 py-1 rounded ${q.closure === "closed" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}>
-                          {q.closure === "closed" ? "페쇄형" : "개방형"}
+                          {q.closure === "closed" ? "닫힌 질문" : "열린 질문"}
                         </span>
                         <span className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700">
                           {getCognitiveLabel(q.cognitive)}

@@ -117,7 +117,7 @@ export default function AskPage() {
   };
 
   const getCognitiveLabel = (c: string) => {
-    const map: Record<string, string> = { factual: "사실적", interpretive: "해석적", evaluative: "평가적" };
+    const map: Record<string, string> = { factual: "사실적 질문", interpretive: "해석적 질문", evaluative: "평가적 질문" };
     return map[c] || c;
   };
 
@@ -187,7 +187,7 @@ export default function AskPage() {
               <div className="p-4 bg-blue-50 rounded-lg">
                 <div className="text-sm text-gray-600">폐쇄형/개방형</div>
                 <div className="text-xl font-bold text-blue-700">
-                  {result.closure === "closed" ? "페쇄형" : "개방형"}
+                  {result.closure === "closed" ? "닫힌 질문" : "열린 질문"}
                 </div>
                 <div className="text-sm text-gray-500">신뢰도: {Math.round(result.closureScore * 100)}%</div>
               </div>

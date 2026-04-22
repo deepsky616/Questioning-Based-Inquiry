@@ -61,7 +61,7 @@ export default function HistoryPage() {
   };
 
   const getCognitiveLabel = (c: string) => {
-    const map: Record<string, string> = { factual: "사실적", interpretive: "해석적", evaluative: "평가적" };
+    const map: Record<string, string> = { factual: "사실적 질문", interpretive: "해석적 질문", evaluative: "평가적 질문" };
     return map[c] || c;
   };
 
@@ -97,11 +97,11 @@ export default function HistoryPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">전체</SelectItem>
-                <SelectItem value="closed">페쇄형</SelectItem>
-                <SelectItem value="open">개방형</SelectItem>
-                <SelectItem value="factual">사실적</SelectItem>
-                <SelectItem value="interpretive">해석적</SelectItem>
-                <SelectItem value="evaluative">평가적</SelectItem>
+                <SelectItem value="closed">닫힌 질문</SelectItem>
+                <SelectItem value="open">열린 질문</SelectItem>
+                <SelectItem value="factual">사실적 질문</SelectItem>
+                <SelectItem value="interpretive">해석적 질문</SelectItem>
+                <SelectItem value="evaluative">평가적 질문</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -129,7 +129,7 @@ export default function HistoryPage() {
                     </TableCell>
                     <TableCell>
                       <span className={`text-xs px-2 py-1 rounded ${q.closure === "closed" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}>
-                        {q.closure === "closed" ? "페쇄" : "개방"}
+                        {q.closure === "closed" ? "닫힌" : "열린"}
                       </span>
                     </TableCell>
                     <TableCell>
