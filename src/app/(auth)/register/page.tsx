@@ -17,9 +17,9 @@ const registerSchema = z.object({
   confirmPassword: z.string(),
   name: z.string().min(2, "이름은 2자 이상이어야 합니다"),
   role: z.enum(["STUDENT", "TEACHER"]),
-  studentId: z.string().optional(),
   grade: z.string().optional(),
   className: z.string().optional(),
+  studentNumber: z.string().optional(),
   school: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "비밀번호가 일치하지 않습니다",
