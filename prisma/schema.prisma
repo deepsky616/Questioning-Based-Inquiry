@@ -14,47 +14,53 @@ enum UserRole {
 
 model User {
   id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      UserRole
+  email     String   @unique @map("email")
+  password  String   @map("password")
+  name      String   @map("name")
+  role      UserRole @map("role")
 
-  studentId String?
-  className String?
+  studentId String?  @map("student_id")
+  className String?  @map("class_name")
 
-  school    String?
+  school    String?  @map("school")
 
-  questions Question[]
-  comments  Comment[]
+  questions Question[] @relation("QuestionAuthor")
+  comments  Comment[] @relation("CommentAuthor")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
 }
 
 model Question {
   id             String  @id @default(cuid())
-  content        String
-  closure        String
-  cognitive      String
-  closureScore   Float?
-  cognitiveScore Float?
-  context        String?
+  content        String  @map("content")
+  closure        String  @map("closure")
+  cognitive      String  @map("cognitive")
+  closureScore   Float?  @map("closure_score")
+  cognitiveScore Float?  @map("cognitive_score")
+  context        String? @map("context")
 
-  authorId String
-  author   User   @relation(fields: [authorId], references: [id])
-  comments Comment[]
+  authorId String @map("author_id")
+  author   User   @relation("QuestionAuthor", fields: [authorId], references: [id])
+  comments Comment[] @relation("QuestionComments")
 
-  isPublic  Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isPublic  Boolean @default(false) @map("is_public")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("questions")
 }
 
 model Comment {
   id         String   @id @default(cuid())
-  content    String
-  authorId   String
-  author     User     @relation(fields: [authorId], references: [id])
-  questionId String
-  question   Question @relation(fields: [questionId], references: [id])
-  createdAt  DateTime @default(now())
+  content    String   @map("content")
+  authorId   String   @map("author_id")
+  author     User     @relation("CommentAuthor", fields: [authorId], references: [id])
+  questionId String   @map("question_id")
+  question   Question @relation("QuestionComments", fields: [questionId], references: [id])
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("comments")
 }
