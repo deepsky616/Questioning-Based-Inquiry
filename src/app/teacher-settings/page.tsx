@@ -18,9 +18,6 @@ const GEMINI_MODELS = [
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
   { value: "gemini-2.5-flash-exp", label: "Gemini 2.5 Flash (experimental)" },
   { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-  { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-  { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
-  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
 ];
 
 export default function TeacherSettingsPage() {
@@ -28,7 +25,7 @@ export default function TeacherSettingsPage() {
   const user = session?.user as { name?: string; email?: string; school?: string };
 
   const [apiKey, setApiKey] = useState("");
-  const [selectedModel, setSelectedModel] = useState("gemini-2.0-flash");
+  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
   const [currentConfig, setCurrentConfig] = useState<{
     configured: boolean;
     maskedApiKey: string | null;
