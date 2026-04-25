@@ -4,67 +4,138 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState, Suspense } from "react";
-import { useSession } from "next-auth/react";
 import Link from "next/link";
 
-const loginSchema = z.object({
-  email: z.string().email("올바른 이메일 형식이 아닙니다"),
-  password: z.string().min(6, "비밀번호는 6자 이상이어야 합니다"),
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
-
-function LoginForm() {
+function StudentLoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { data: session } = useSession();
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({ school: "", grade: "", className: "", studentNumber: "", password: "" });
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-  });
-
-  const getRedirectUrl = () => {
-    const callbackUrl = searchParams.get("callbackUrl");
-    if (callbackUrl && callbackUrl !== "/") {
-      return callbackUrl;
-    }
-    const role = (session?.user as any)?.role;
-    if (role === "TEACHER") {
-      return "/teacher-dashboard";
-    }
-    return "/student-dashboard";
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setError(null);
   };
 
-  const onSubmit = async (data: LoginForm) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.school || !form.grade || !form.className || !form.studentNumber || !form.password) {
+      setError("모든 항목을 입력해 주세요");
+      return;
+    }
+    setIsSubmitting(true);
     setError(null);
 
     const result = await signIn("credentials", {
-      email: data.email,
-      password: data.password,
+      loginType: "student",
+      school: form.school,
+      grade: form.grade,
+      className: form.className,
+      studentNumber: form.studentNumber,
+      password: form.password,
       redirect: false,
     });
 
+    setIsSubmitting(false);
+    if (result?.error) {
+      setError("학교·학년·반·번호 또는 비밀번호가 올바르지 않습니다");
+      return;
+    }
+    router.push("/student-dashboard");
+    router.refresh();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>}
+      <div className="space-y-2">
+        <Label htmlFor="s-school">학교</Label>
+        <Input id="s-school" name="school" placeholder="한빛초등학교" value={form.school} onChange={handleChange} />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="space-y-2">
+          <Label htmlFor="s-grade">학년</Label>
+          <Input id="s-grade" name="grade" placeholder="3" value={form.grade} onChange={handleChange} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="s-class">반</Label>
+          <Input id="s-class" name="className" placeholder="2" value={form.className} onChange={handleChange} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="s-number">번호</Label>
+          <Input id="s-number" name="studentNumber" placeholder="15" value={form.studentNumber} onChange={handleChange} />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="s-password">비밀번호</Label>
+        <Input id="s-password" name="password" type="password" placeholder="••••" value={form.password} onChange={handleChange} />
+      </div>
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? "로그인 중..." : "학생 로그인"}
+      </Button>
+    </form>
+  );
+}
+
+function TeacherLoginForm() {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({ email: "", password: "" });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.email || !form.password) {
+      setError("이메일과 비밀번호를 입력해 주세요");
+      return;
+    }
+    setIsSubmitting(true);
+    setError(null);
+
+    const result = await signIn("credentials", {
+      loginType: "teacher",
+      email: form.email,
+      password: form.password,
+      redirect: false,
+    });
+
+    setIsSubmitting(false);
     if (result?.error) {
       setError("이메일 또는 비밀번호가 올바르지 않습니다");
       return;
     }
-
-    const redirectUrl = getRedirectUrl();
-    router.push(redirectUrl);
+    router.push("/teacher-dashboard");
     router.refresh();
   };
 
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>}
+      <div className="space-y-2">
+        <Label htmlFor="t-email">이메일</Label>
+        <Input id="t-email" name="email" type="email" placeholder="teacher@school.kr" value={form.email} onChange={handleChange} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="t-password">비밀번호</Label>
+        <Input id="t-password" name="password" type="password" placeholder="••••••" value={form.password} onChange={handleChange} />
+      </div>
+      <Button type="submit" className="w-full" disabled={isSubmitting}>
+        {isSubmitting ? "로그인 중..." : "교사 로그인"}
+      </Button>
+    </form>
+  );
+}
+
+function LoginContent() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-1">
@@ -72,30 +143,24 @@ function LoginForm() {
         <CardDescription className="text-center">질문기반 탐구수업 웹앱</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {error && (
-            <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="email">이메일</Label>
-            <Input id="email" type="email" placeholder="teacher@school.kr" {...register("email")} />
-            {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">비밀번호</Label>
-            <Input id="password" type="password" placeholder="••••••" {...register("password")} />
-            {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-          </div>
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "로그인 중..." : "로그인"}
-          </Button>
-        </form>
+        <Tabs defaultValue="student">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="student">학생 로그인</TabsTrigger>
+            <TabsTrigger value="teacher">교사 로그인</TabsTrigger>
+          </TabsList>
+          <TabsContent value="student">
+            <StudentLoginForm />
+          </TabsContent>
+          <TabsContent value="teacher">
+            <TeacherLoginForm />
+          </TabsContent>
+        </Tabs>
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
         <div className="text-sm text-muted-foreground text-center">
-          계정이 없으신가요?{" "}
+          학생 계정이 없으신가요?{" "}
           <Link href="/register" className="text-primary hover:underline">
-            회원가입
+            학생 회원가입
           </Link>
         </div>
       </CardFooter>
@@ -103,27 +168,11 @@ function LoginForm() {
   );
 }
 
-function LoginFormFallback() {
-  return (
-    <Card className="w-full max-w-md">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl text-center">Question Lab</CardTitle>
-        <CardDescription className="text-center">질문기반 탐구수업 웹앱</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-center p-4">
-          <div className="animate-pulse text-muted-foreground">로딩 중...</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Suspense fallback={<LoginFormFallback />}>
-        <LoginForm />
+      <Suspense fallback={<div className="text-muted-foreground">로딩 중...</div>}>
+        <LoginContent />
       </Suspense>
     </div>
   );

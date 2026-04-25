@@ -20,6 +20,11 @@ const GEMINI_MODELS = [
   { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
 ];
 
+interface BulkStudent {
+  studentNumber: string;
+  name: string;
+}
+
 export default function TeacherSettingsPage() {
   const { data: session } = useSession();
   const user = session?.user as { name?: string; email?: string; school?: string };
@@ -35,6 +40,15 @@ export default function TeacherSettingsPage() {
   const [isTesting, setIsTesting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // 일괄 학생 등록 상태
+  const [bulkSchool, setBulkSchool] = useState("");
+  const [bulkGrade, setBulkGrade] = useState("");
+  const [bulkClass, setBulkClass] = useState("");
+  const [bulkPassword, setBulkPassword] = useState("0000");
+  const [bulkText, setBulkText] = useState("");
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/config")
@@ -108,12 +122,70 @@ export default function TeacherSettingsPage() {
     setIsDeleting(true);
     try {
       await fetch("/api/config", { method: "DELETE" });
-      setCurrentConfig({ configured: false, maskedApiKey: null, model: "gemini-2.0-flash" });
+      setCurrentConfig({ configured: false, maskedApiKey: null, model: "gemini-2.5-flash" });
       setMessage({ type: "success", text: "AI 설정이 삭제됐습니다" });
     } catch {
       setMessage({ type: "error", text: "삭제에 실패했습니다" });
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const parseBulkText = (): BulkStudent[] => {
+    return bulkText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const parts = line.split(/[\t,\s]+/);
+        if (parts.length >= 2) {
+          return { studentNumber: parts[0], name: parts[1] };
+        }
+        return null;
+      })
+      .filter((s): s is BulkStudent => s !== null);
+  };
+
+  const handleBulkRegister = async () => {
+    if (!bulkSchool || !bulkGrade || !bulkClass) {
+      setBulkMessage({ type: "error", text: "학교, 학년, 반을 입력해 주세요" });
+      return;
+    }
+    const students = parseBulkText();
+    if (students.length === 0) {
+      setBulkMessage({ type: "error", text: "학생 목록을 입력해 주세요 (번호 이름 형식)" });
+      return;
+    }
+
+    setIsBulkSaving(true);
+    setBulkMessage(null);
+
+    try {
+      const res = await fetch("/api/students/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          school: bulkSchool,
+          grade: bulkGrade,
+          className: bulkClass,
+          defaultPassword: bulkPassword,
+          students,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBulkMessage({ type: "error", text: data.error || "등록 실패" });
+      } else {
+        setBulkMessage({
+          type: "success",
+          text: `등록 완료: ${data.created}명 신규, ${data.skipped}명 중복 건너뜀${data.errors?.length ? ` / 오류 ${data.errors.length}건` : ""}`,
+        });
+        if (data.created > 0) setBulkText("");
+      }
+    } catch {
+      setBulkMessage({ type: "error", text: "서버 오류가 발생했습니다" });
+    } finally {
+      setIsBulkSaving(false);
     }
   };
 
@@ -143,6 +215,91 @@ export default function TeacherSettingsPage() {
             <div className="space-y-2">
               <Label>소속 학교</Label>
               <Input value={user.school} disabled />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 일괄 학생 등록 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>학생 일괄 등록</CardTitle>
+          <CardDescription>
+            반 학생 전체를 한번에 등록합니다. 기본 비밀번호로 계정이 생성됩니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="bulkSchool">학교</Label>
+              <Input
+                id="bulkSchool"
+                placeholder="한빛초등학교"
+                value={bulkSchool}
+                onChange={(e) => setBulkSchool(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bulkGrade">학년</Label>
+              <Input
+                id="bulkGrade"
+                placeholder="3"
+                value={bulkGrade}
+                onChange={(e) => setBulkGrade(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bulkClass">반</Label>
+              <Input
+                id="bulkClass"
+                placeholder="2"
+                value={bulkClass}
+                onChange={(e) => setBulkClass(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bulkPassword">기본 비밀번호</Label>
+            <Input
+              id="bulkPassword"
+              placeholder="0000"
+              value={bulkPassword}
+              onChange={(e) => setBulkPassword(e.target.value)}
+            />
+            <p className="text-xs text-gray-500">학생들이 처음 로그인할 때 사용할 비밀번호입니다</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bulkText">학생 목록</Label>
+            <textarea
+              id="bulkText"
+              className="w-full min-h-[160px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder={"번호와 이름을 한 줄에 하나씩 입력하세요\n예:\n1 김민준\n2 이서연\n3 박지호"}
+              value={bulkText}
+              onChange={(e) => setBulkText(e.target.value)}
+            />
+            <p className="text-xs text-gray-500">
+              형식: <code className="bg-gray-100 px-1 rounded">번호 이름</code> (탭, 쉼표, 공백 모두 구분자로 사용 가능)
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button onClick={handleBulkRegister} disabled={isBulkSaving}>
+              {isBulkSaving ? "등록 중..." : `${parseBulkText().length}명 일괄 등록`}
+            </Button>
+            {bulkText && (
+              <span className="text-sm text-gray-500">{parseBulkText().length}명 입력됨</span>
+            )}
+          </div>
+
+          {bulkMessage && (
+            <div className={`p-3 rounded-lg text-sm ${
+              bulkMessage.type === "success"
+                ? "bg-green-50 text-green-700 border border-green-200"
+                : "bg-red-50 text-red-700 border border-red-200"
+            }`}>
+              {bulkMessage.text}
             </div>
           )}
         </CardContent>
