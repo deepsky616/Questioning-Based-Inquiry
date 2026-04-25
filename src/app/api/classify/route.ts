@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { fallbackClassification, parseClassificationResponse } from "@/lib/classify";
+import { resolveApiKey } from "@/lib/api-config";
+import { prisma } from "@/lib/db";
 
 const classifySchema = z.object({
-  apiKey: z.string().min(10),
-  model: z.string(),
+  apiKey: z.string().optional(),
+  model: z.string().optional(),
   content: z.string().min(10).max(500),
   context: z.string().optional(),
 });
@@ -35,7 +37,21 @@ const CLASSIFICATION_PROMPT = `당신은 질문 유형 분류 전문가입니다
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { apiKey, model, content, context } = classifySchema.parse(body);
+    const { apiKey: requestApiKey, model: requestModel, content, context } = classifySchema.parse(body);
+
+    // 서버에 저장된 API 키 조회
+    const [serverKeyRecord, serverModelRecord] = await Promise.all([
+      prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
+      prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
+    ]);
+
+    const apiKey = resolveApiKey(requestApiKey, serverKeyRecord?.value);
+    const model = requestModel || serverModelRecord?.value || "gemini-2.0-flash";
+
+    // API 키가 없으면 키워드 기반 fallback 분류
+    if (!apiKey) {
+      return NextResponse.json(fallbackClassification(content));
+    }
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const genModel = genAI.getGenerativeModel({ model });

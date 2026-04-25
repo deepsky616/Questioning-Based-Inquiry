@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,13 +17,7 @@ interface ClassificationResult {
   reasoning: string;
 }
 
-interface ApiConfig {
-  apiKey: string;
-  model: string;
-}
-
 export default function AskPage() {
-  const { data: session } = useSession();
   const router = useRouter();
   const [content, setContent] = useState("");
   const [context, setContext] = useState("");
@@ -32,13 +25,13 @@ export default function AskPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ClassificationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [noConfigError, setNoConfigError] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("gemini-config");
-    if (!saved) {
-      setNoConfigError(true);
-    }
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((data) => setAiConfigured(data.configured))
+      .catch(() => setAiConfigured(false));
   }, []);
 
   const handleClassify = async () => {
@@ -47,31 +40,13 @@ export default function AskPage() {
       return;
     }
 
-    const saved = localStorage.getItem("gemini-config");
-    if (!saved) {
-      setNoConfigError(true);
-      return;
-    }
+    setIsLoading(true);
 
     try {
-      const config: ApiConfig = JSON.parse(saved);
-      if (!config.apiKey || config.apiKey.length < 10) {
-        setNoConfigError(true);
-        return;
-      }
-
-      setNoConfigError(false);
-      setIsLoading(true);
-
       const res = await fetch("/api/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          apiKey: config.apiKey,
-          model: config.model || "gemini-2.5-flash",
-          content,
-          context,
-        }),
+        body: JSON.stringify({ content, context }),
       });
 
       if (!res.ok) {
@@ -81,8 +56,9 @@ export default function AskPage() {
 
       const data = await res.json();
       setResult(data);
-    } catch (error: any) {
-      alert(error.message || "분류 중 오류가 발생했습니다");
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "분류 중 오류가 발생했습니다";
+      alert(msg);
     } finally {
       setIsLoading(false);
     }
@@ -108,8 +84,8 @@ export default function AskPage() {
       });
 
       if (!res.ok) throw new Error("저장 실패");
-      router.push("/history");
-    } catch (error) {
+      router.push("/student-history");
+    } catch {
       alert("저장 중 오류가 발생했습니다");
     } finally {
       setIsSaving(false);
@@ -128,13 +104,20 @@ export default function AskPage() {
         <p className="text-gray-600">질문을 입력하면 유형을 분석해 드립니다</p>
       </div>
 
-      {noConfigError && (
+      {aiConfigured === false && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="p-4">
-            <p className="text-yellow-800">
-              Gemini API 설정이 필요합니다.{" "}
-              <a href="/settings" className="underline font-medium">설정 페이지</a>에서 API 키를 입력하고 저장해 주세요.
+            <p className="text-yellow-800 text-sm">
+              교사가 AI 설정을 아직 등록하지 않았습니다. AI 분류 대신 키워드 기반 분류가 사용됩니다.
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {aiConfigured === true && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="p-4">
+            <p className="text-green-800 text-sm">AI 분류가 활성화됐습니다.</p>
           </CardContent>
         </Card>
       )}
@@ -169,7 +152,7 @@ export default function AskPage() {
 
           <Button
             onClick={handleClassify}
-            disabled={isLoading || content.length < 10 || noConfigError}
+            disabled={isLoading || content.length < 10}
             className="w-full"
           >
             {isLoading ? "분석 중..." : "유형 분석하기"}

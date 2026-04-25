@@ -65,3 +65,12 @@ model Comment {
 
   @@map("comments")
 }
+
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique @map("config_key")
+  value     String   @map("config_value")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_configs")
+}

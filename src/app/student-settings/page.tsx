@@ -1,96 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-const GEMINI_MODELS = [
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { value: "gemini-2.5-flash-exp", label: "Gemini 2.5 Flash (experimental)" },
-  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-  { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
-  { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
-];
-
-interface ApiConfig {
-  apiKey: string;
-  model: string;
-}
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const user = session?.user as any;
+  const user = session?.user as { name?: string; email?: string; role?: string; className?: string };
 
-  const [apiKey, setApiKey] = useState("");
-  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
-  const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+  const [aiModel, setAiModel] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("gemini-config");
-    if (saved) {
-      try {
-        const config: ApiConfig = JSON.parse(saved);
-        setApiKey(config.apiKey || "");
-        setSelectedModel(config.model || "gemini-2.0-flash-exp");
-      } catch {}
-    }
+    fetch("/api/config")
+      .then((r) => r.json())
+      .then((data) => {
+        setAiConfigured(data.configured);
+        setAiModel(data.model);
+      })
+      .catch(() => setAiConfigured(false));
   }, []);
-
-  const handleTest = async () => {
-    if (!apiKey || apiKey.length < 10) {
-      setTestResult({ success: false, message: "API 키를 입력해 주세요 (10자 이상)" });
-      return;
-    }
-
-    setIsTesting(true);
-    setTestResult(null);
-
-    try {
-      const res = await fetch("/api/gemini/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey, model: selectedModel }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        setTestResult({ success: true, message: `연결 성공! 모델: ${selectedModel}` });
-      } else {
-        setTestResult({ success: false, message: data.error || "연결 실패" });
-      }
-    } catch {
-      setTestResult({ success: false, message: "테스트 중 오류가 발생했습니다" });
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
-  const handleSave = () => {
-    const config: ApiConfig = { apiKey, model: selectedModel };
-    localStorage.setItem("gemini-config", JSON.stringify(config));
-    setTestResult({ success: true, message: "설정이 저장되었습니다!" });
-  };
-
-  const isValidApiKey = apiKey.length >= 10;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">설정</h2>
-        <p className="text-gray-600">계정 및 Gemini API를 설정하세요</p>
+        <p className="text-gray-600">계정 정보를 확인하세요</p>
       </div>
 
       <Card>
@@ -123,76 +60,26 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Gemini API 설정</CardTitle>
-          <CardDescription>
-            Google AI Studio에서 API 키를 발급받고 입력하세요
-            <br />
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:underline"
-            >
-              https://aistudio.google.com/app/apikey
-            </a>
-          </CardDescription>
+          <CardTitle>AI 분류 상태</CardTitle>
+          <CardDescription>교사가 설정한 AI를 사용합니다</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">API 키</Label>
-            <Input
-              id="apiKey"
-              type="password"
-              placeholder="AIza..."
-              value={apiKey}
-              onChange={(e) => {
-                setApiKey(e.target.value);
-                setTestResult(null);
-              }}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="model">사용 모델</Label>
-            <Select value={selectedModel} onValueChange={(v) => {
-              setSelectedModel(v);
-              setTestResult(null);
-            }}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {GEMINI_MODELS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleTest}
-              disabled={!isValidApiKey || isTesting}
-            >
-              {isTesting ? "테스트 중..." : "연결 테스트"}
-            </Button>
-            <Button onClick={handleSave} disabled={!isValidApiKey}>
-              저장
-            </Button>
-          </div>
-
-          {testResult && (
-            <div
-              className={`p-3 rounded-lg text-sm ${
-                testResult.success
-                  ? "bg-green-50 text-green-700 border border-green-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}
-            >
-              {testResult.message}
+        <CardContent>
+          {aiConfigured === null && (
+            <p className="text-sm text-gray-500">확인 중...</p>
+          )}
+          {aiConfigured === true && (
+            <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+              <p className="text-sm font-medium text-green-800">AI 분류가 활성화됐습니다</p>
+              {aiModel && (
+                <p className="text-xs text-green-600 mt-0.5">사용 모델: {aiModel}</p>
+              )}
+            </div>
+          )}
+          {aiConfigured === false && (
+            <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+              <p className="text-sm text-yellow-800">
+                교사가 AI 설정을 아직 등록하지 않았습니다. AI 분류 대신 키워드 기반 분류가 사용됩니다.
+              </p>
             </div>
           )}
         </CardContent>
