@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
@@ -51,10 +51,13 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
               </nav>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{(session?.user as any)?.name}학생</span>
+              <span className="text-sm text-gray-600">{(session?.user as { name?: string })?.name} 학생</span>
               <Link href="/student-settings">
                 <Button variant="outline" size="sm">설정</Button>
               </Link>
+              <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
+                로그아웃
+              </Button>
             </div>
           </div>
         </div>

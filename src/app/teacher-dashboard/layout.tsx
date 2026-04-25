@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -48,10 +48,13 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
               </nav>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{(session.user as any)?.name} 선생님</span>
+              <span className="text-sm text-gray-600">{(session.user as { name?: string })?.name} 선생님</span>
               <Link href="/teacher-settings">
                 <Button variant="outline" size="sm">설정</Button>
               </Link>
+              <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
+                로그아웃
+              </Button>
             </div>
           </div>
         </div>
