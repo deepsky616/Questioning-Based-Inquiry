@@ -20,86 +20,157 @@ interface Stats {
   byCognitive: { factual: number; interpretive: number; evaluative: number };
 }
 
+const CLOSURE_STYLE: Record<string, string> = {
+  closed: "bg-blue-100 text-blue-700",
+  open: "bg-green-100 text-green-700",
+};
+const CLOSURE_LABEL: Record<string, string> = { closed: "폐쇄형", open: "개방형" };
+const COGNITIVE_STYLE: Record<string, string> = {
+  factual: "bg-gray-100 text-gray-700",
+  interpretive: "bg-purple-100 text-purple-700",
+  evaluative: "bg-orange-100 text-orange-700",
+};
+const COGNITIVE_LABEL: Record<string, string> = { factual: "사실적", interpretive: "해석적", evaluative: "평가적" };
+
+function Bar({ value, total, color }: { value: number; total: number; color: string }) {
+  const pct = total === 0 ? 0 : Math.round((value / total) * 100);
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs text-gray-500 w-8 text-right">{pct}%</span>
+    </div>
+  );
+}
+
 export default function StudentDashboard() {
   const { data: session } = useSession();
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [stats, setStats] = useState<Stats>({ total: 0, byClosure: { closed: 0, open: 0 }, byCognitive: { factual: 0, interpretive: 0, evaluative: 0 } });
+  const [stats, setStats] = useState<Stats>({
+    total: 0,
+    byClosure: { closed: 0, open: 0 },
+    byCognitive: { factual: 0, interpretive: 0, evaluative: 0 },
+  });
 
   useEffect(() => {
-    fetchQuestions();
-  }, []);
-
-  const fetchQuestions = async () => {
-    const userId = (session?.user as any)?.id;
-    const res = await fetch(`/api/questions?authorId=${userId}`);
-    const data = await res.json();
-    setQuestions(data.slice(0, 5));
-
-    const total = data.length;
-    const byClosure = {
-      closed: data.filter((q: Question) => q.closure === "closed").length,
-      open: data.filter((q: Question) => q.closure === "open").length,
-    };
-    const byCognitive = {
-      factual: data.filter((q: Question) => q.cognitive === "factual").length,
-      interpretive: data.filter((q: Question) => q.cognitive === "interpretive").length,
-      evaluative: data.filter((q: Question) => q.cognitive === "evaluative").length,
-    };
-    setStats({ total, byClosure, byCognitive });
-  };
-
-  const getCognitiveLabel = (c: string) => {
-    const map: Record<string, string> = { factual: "사실적 질문", interpretive: "해석적 질문", evaluative: "평가적 질문" };
-    return map[c] || c;
-  };
+    const userId = (session?.user as { id?: string })?.id;
+    if (!userId) return;
+    fetch(`/api/questions?authorId=${userId}`)
+      .then((r) => r.json())
+      .then((data: Question[]) => {
+        setQuestions(data.slice(0, 5));
+        setStats({
+          total: data.length,
+          byClosure: {
+            closed: data.filter((q) => q.closure === "closed").length,
+            open: data.filter((q) => q.closure === "open").length,
+          },
+          byCognitive: {
+            factual: data.filter((q) => q.cognitive === "factual").length,
+            interpretive: data.filter((q) => q.cognitive === "interpretive").length,
+            evaluative: data.filter((q) => q.cognitive === "evaluative").length,
+          },
+        });
+      })
+      .catch(() => {});
+  }, [session]);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">안녕하세요, {(session?.user as any)?.name}학생!</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            안녕하세요, {(session?.user as { name?: string })?.name} 학생!
+          </h2>
           <p className="text-gray-600">오늘도 좋은 질문을 만들어 보세요</p>
         </div>
-        <Link href="/ask">
+        <Link href="/student-ask">
           <Button size="lg">질문하기</Button>
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">총 질문 수</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">닫힌 질문</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-blue-600">{stats.byClosure.closed}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">열린 질문</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">{stats.byClosure.open}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-500">평가적 질문</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-purple-600">{stats.byCognitive.evaluative}</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* 총 질문 수 */}
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-sm text-gray-500">내가 작성한 총 질문 수</p>
+          <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
+        </CardContent>
+      </Card>
 
+      {/* 분류 1 · 폐쇄형 / 개방형 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">분류 1 · 폐쇄형 / 개방형 질문</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                  <span className="text-sm font-medium">폐쇄형 질문</span>
+                </div>
+                <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
+              </div>
+              <Bar value={stats.byClosure.closed} total={stats.total} color="bg-blue-500" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+                  <span className="text-sm font-medium">개방형 질문</span>
+                </div>
+                <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
+              </div>
+              <Bar value={stats.byClosure.open} total={stats.total} color="bg-green-500" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 분류 2 · 사실적 / 해석적 / 평가적 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 질문</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
+                  <span className="text-sm font-medium">사실적 질문</span>
+                </div>
+                <span className="text-2xl font-bold text-gray-700">{stats.byCognitive.factual}</span>
+              </div>
+              <Bar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
+                  <span className="text-sm font-medium">해석적 질문</span>
+                </div>
+                <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.interpretive}</span>
+              </div>
+              <Bar value={stats.byCognitive.interpretive} total={stats.total} color="bg-purple-500" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
+                  <span className="text-sm font-medium">평가적 질문</span>
+                </div>
+                <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.evaluative}</span>
+              </div>
+              <Bar value={stats.byCognitive.evaluative} total={stats.total} color="bg-orange-500" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 최근 질문 */}
       <Card>
         <CardHeader>
           <CardTitle>최근 질문</CardTitle>
@@ -111,26 +182,24 @@ export default function StudentDashboard() {
               아직 질문이 없습니다. 첫 질문을 작성해 보세요!
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {questions.map((q) => (
-                <div key={q.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex-1">
-                    <p className="text-gray-900 line-clamp-1">{q.content}</p>
-                    <div className="flex gap-2 mt-2">
-                      <span className={`text-xs px-2 py-1 rounded ${q.closure === "closed" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}>
-                        {q.closure === "closed" ? "닫힌 질문" : "열린 질문"}
-                      </span>
-                      <span className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-700">
-                        {getCognitiveLabel(q.cognitive)}
-                      </span>
-                    </div>
+                <div key={q.id} className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-gray-900 line-clamp-1">{q.content}</p>
+                  <div className="flex gap-2 mt-2">
+                    <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
+                      {CLOSURE_LABEL[q.closure]}
+                    </span>
+                    <span className={`text-xs px-2 py-1 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>
+                      {COGNITIVE_LABEL[q.cognitive]}
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           )}
           <div className="mt-4">
-            <Link href="/history">
+            <Link href="/student-history">
               <Button variant="outline">전체 질문 보기</Button>
             </Link>
           </div>
