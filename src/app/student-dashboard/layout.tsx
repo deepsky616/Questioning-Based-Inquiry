@@ -5,6 +5,15 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { PageNav } from "@/components/shared/PageNav";
+
+const STUDENT_PAGES = [
+  { href: "/student-dashboard", label: "대시보드" },
+  { href: "/student-ask", label: "질문하기" },
+  { href: "/student-history", label: "내 질문" },
+  { href: "/student-explore", label: "탐구" },
+  { href: "/student-settings", label: "설정" },
+];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -35,26 +44,20 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-8">
               <h1 className="text-xl font-bold text-primary">Question Lab</h1>
-              <nav className="flex space-x-4">
-                <Link href="/student-dashboard" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
-                  대시보드
-                </Link>
-                <Link href="/student-ask" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
-                  질문하기
-                </Link>
-                <Link href="/student-history" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
-                  내 질문
-                </Link>
-                <Link href="/student-explore" className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium">
-                  탐구
-                </Link>
+              <nav className="flex space-x-1">
+                {STUDENT_PAGES.map((p) => (
+                  <Link
+                    key={p.href}
+                    href={p.href}
+                    className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    {p.label}
+                  </Link>
+                ))}
               </nav>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">{(session?.user as { name?: string })?.name} 학생</span>
-              <Link href="/student-settings">
-                <Button variant="outline" size="sm">설정</Button>
-              </Link>
               <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
                 로그아웃
               </Button>
@@ -62,7 +65,10 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
           </div>
         </div>
       </header>
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {children}
+        <PageNav pages={STUDENT_PAGES} />
+      </main>
     </div>
   );
 }
