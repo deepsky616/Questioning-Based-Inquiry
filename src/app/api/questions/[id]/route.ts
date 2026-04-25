@@ -36,8 +36,8 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  const userRole = (session.user as any).role;
-  const userId = (session.user as any).id;
+  const userRole = (session.user as { id: string; role?: string }).role;
+  const userId = (session.user as { id: string; role?: string }).id;
 
   if (!question.isPublic && question.authorId !== userId && userRole !== "TEACHER") {
     return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
@@ -52,33 +52,38 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userRole = (session.user as any).role;
+  const userRole = (session.user as { role?: string }).role;
   if (userRole !== "TEACHER") {
     return NextResponse.json({ error: "교사만 수정할 수 있습니다" }, { status: 403 });
   }
 
-  const body = await req.json();
-  const { closure, cognitive, isPublic } = body;
+  try {
+    const body = await req.json();
+    const { closure, cognitive, isPublic } = body;
 
-  const question = await prisma.question.update({
-    where: { id: params.id },
-    data: {
-      ...(closure && { closure }),
-      ...(cognitive && { cognitive }),
-      ...(isPublic !== undefined && { isPublic }),
-    },
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          className: true,
+    const question = await prisma.question.update({
+      where: { id: params.id },
+      data: {
+        ...(closure !== undefined && { closure }),
+        ...(cognitive !== undefined && { cognitive }),
+        ...(isPublic !== undefined && { isPublic }),
+      },
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            className: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  return NextResponse.json(question);
+    return NextResponse.json(question);
+  } catch (error) {
+    console.error("Update question error:", error);
+    return NextResponse.json({ error: "질문을 찾을 수 없거나 수정에 실패했습니다" }, { status: 404 });
+  }
 }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
@@ -87,8 +92,8 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userId = (session.user as any).id;
-  const userRole = (session.user as any).role;
+  const userId = (session.user as { id: string; role?: string }).id;
+  const userRole = (session.user as { id: string; role?: string }).role;
 
   const question = await prisma.question.findUnique({
     where: { id: params.id },

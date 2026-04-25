@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { calcTrend, calcStartDate, aggregateByStudent, buildTimeline } from "@/lib/stats-calc";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -8,36 +9,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userRole = (session.user as any).role;
+  const userRole = (session.user as { role?: string }).role;
   if (userRole !== "TEACHER") {
     return NextResponse.json({ error: "교사만 접근할 수 있습니다" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
   const className = searchParams.get("className");
-  const period = searchParams.get("period") || "month";
+  const period = searchParams.get("period") ?? "month";
 
   const now = new Date();
-  let startDate = new Date();
+  const startDate = calcStartDate(period, now);
 
-  switch (period) {
-    case "week":
-      startDate.setDate(now.getDate() - 7);
-      break;
-    case "month":
-      startDate.setMonth(now.getMonth() - 1);
-      break;
-    case "semester":
-      startDate.setMonth(now.getMonth() - 6);
-      break;
-    default:
-      startDate.setMonth(now.getMonth() - 1);
-  }
-
-  const where: any = {
-    createdAt: {
-      gte: startDate,
-    },
+  const where: {
+    createdAt: { gte: Date };
+    author?: { className: string };
+  } = {
+    createdAt: { gte: startDate },
   };
 
   if (className) {
@@ -71,45 +59,41 @@ export async function GET(req: Request) {
     evaluative: questions.filter((q) => q.cognitive === "evaluative").length,
   };
 
-  const studentMap = new Map<string, any>();
-  questions.forEach((q) => {
-    const sid = q.author.id;
-    if (!studentMap.has(sid)) {
-      studentMap.set(sid, {
-        studentId: sid,
+  const midpoint = new Date(startDate.getTime() + (now.getTime() - startDate.getTime()) / 2);
+  const firstHalf = questions.filter((q) => q.createdAt < midpoint);
+  const secondHalf = questions.filter((q) => q.createdAt >= midpoint);
+
+  const byStudentBase = aggregateByStudent(
+    questions.map((q) => ({
+      ...q,
+      closure: q.closure as "closed" | "open",
+      cognitive: q.cognitive as "factual" | "interpretive" | "evaluative",
+      author: {
+        id: q.author.id,
         name: q.author.name,
         className: q.author.className,
-        total: 0,
-        distribution: { closed: 0, open: 0 },
-        cognitiveDistribution: { factual: 0, interpretive: 0, evaluative: 0 },
-      });
-    }
-    const student = studentMap.get(sid);
-    student.total++;
-    student.distribution[q.closure]++;
-    student.cognitiveDistribution[q.cognitive]++;
-  });
+      },
+    }))
+  );
 
-  const byStudent = Array.from(studentMap.values());
-
-  const timelineMap = new Map<string, number>();
-  questions.forEach((q) => {
-    const dateKey = q.createdAt.toISOString().split("T")[0];
-    timelineMap.set(dateKey, (timelineMap.get(dateKey) || 0) + 1);
-  });
-
-  const timeline = Array.from(timelineMap.entries())
-    .map(([date, count]) => ({ date, count }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  const firstHalf = questions.filter((q) => q.createdAt < new Date(startDate.getTime() + (now.getTime() - startDate.getTime()) / 2));
-  const secondHalf = questions.filter((q) => q.createdAt >= new Date(startDate.getTime() + (now.getTime() - startDate.getTime()) / 2));
-
-  byStudent.forEach((student) => {
+  const byStudent = byStudentBase.map((student) => {
     const s1 = firstHalf.filter((q) => q.author.id === student.studentId).length;
     const s2 = secondHalf.filter((q) => q.author.id === student.studentId).length;
-    student.trend = s1 > 0 ? Math.round(((s2 - s1) / s1) * 100) : 0;
+    return { ...student, trend: calcTrend(s1, s2) };
   });
+
+  const timeline = buildTimeline(
+    questions.map((q) => ({
+      ...q,
+      closure: q.closure as "closed" | "open",
+      cognitive: q.cognitive as "factual" | "interpretive" | "evaluative",
+      author: {
+        id: q.author.id,
+        name: q.author.name,
+        className: q.author.className,
+      },
+    }))
+  );
 
   return NextResponse.json({
     total,
