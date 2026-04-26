@@ -42,7 +42,7 @@ export default function AskPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
+  const [selectedSessionId, setSelectedSessionId] = useState<string>("none");
 
   useEffect(() => {
     fetch("/api/config")
@@ -104,7 +104,7 @@ export default function AskPage() {
           cognitive: result.cognitive,
           closureScore: result.closureScore,
           cognitiveScore: result.cognitiveScore,
-          ...(selectedSessionId ? { sessionId: selectedSessionId } : {}),
+          ...(selectedSessionId && selectedSessionId !== "none" ? { sessionId: selectedSessionId } : {}),
         }),
       });
 
@@ -161,7 +161,7 @@ export default function AskPage() {
                   <SelectValue placeholder="세션 없이 질문하기" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">세션 없이 질문하기</SelectItem>
+                  <SelectItem value="none">세션 없이 질문하기</SelectItem>
                   {sessions.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {buildSessionLabel(s.date, s.subject, s.topic)}
