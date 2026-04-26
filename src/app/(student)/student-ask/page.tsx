@@ -30,6 +30,7 @@ interface ClassificationResult {
   closureScore: number;
   cognitiveScore: number;
   reasoning: string;
+  feedback?: string;
 }
 
 export default function AskPage() {
@@ -160,7 +161,7 @@ export default function AskPage() {
                 <SelectTrigger id="session">
                   <SelectValue placeholder="세션 없이 질문하기" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent modal={false}>
                   <SelectItem value="none">세션 없이 질문하기</SelectItem>
                   {sessions.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
@@ -229,6 +230,13 @@ export default function AskPage() {
               <div className="text-sm font-medium text-gray-700">분류 근거</div>
               <p className="text-gray-600 mt-1">{result.reasoning}</p>
             </div>
+
+            {result.feedback && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="text-sm font-medium text-amber-800 mb-1">더 좋은 질문을 위한 제안</div>
+                <p className="text-amber-700">{result.feedback}</p>
+              </div>
+            )}
 
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center space-x-2">

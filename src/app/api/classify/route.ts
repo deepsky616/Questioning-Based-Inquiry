@@ -31,7 +31,8 @@ const CLASSIFICATION_PROMPT = `당신은 질문 유형 분류 전문가입니다
   "cognitive": "factual" 또는 "interpretive" 또는 "evaluative",
   "closureScore": 0.0부터 1.0 사이의 숫자,
   "cognitiveScore": 0.0부터 1.0 사이의 숫자,
-  "reasoning": "분류 근거 50자 이내"
+  "reasoning": "분류 근거 50자 이내",
+  "feedback": "이 질문을 더 좋은 탐구 질문으로 발전시킬 수 있는 구체적인 제안 100자 이내. 잘 된 점은 칭찬하고 개선 방향을 제시한다."
 }`;
 
 export async function POST(req: Request) {

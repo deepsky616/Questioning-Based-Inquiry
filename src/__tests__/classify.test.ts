@@ -62,6 +62,26 @@ describe("fallbackClassification", () => {
     expect(result.reasoning).toBe("키워드 기반 자동 분류");
   });
 
+  it("fallback 분류는 항상 feedback 문자열을 반환한다", () => {
+    const result = fallbackClassification("광합성이 무엇인지 설명해주세요");
+    expect(typeof result.feedback).toBe("string");
+    expect(result.feedback!.length).toBeGreaterThan(0);
+  });
+
+  it("닫힌+사실적 질문이면 개방형으로 바꾸길 권장하는 피드백을 반환한다", () => {
+    const result = fallbackClassification("광합성이 무엇인지 설명해주세요");
+    expect(result.closure).toBe("closed");
+    expect(result.cognitive).toBe("factual");
+    expect(result.feedback).toContain("왜");
+  });
+
+  it("열린+평가적 질문이면 긍정 피드백을 반환한다", () => {
+    const result = fallbackClassification("왜 이 작품에 대해 어떻게 생각해요?");
+    expect(result.closure).toBe("open");
+    expect(result.cognitive).toBe("evaluative");
+    expect(result.feedback).toBeDefined();
+  });
+
   it("평가적 키워드가 있을 때 interpretive로 잘못 분류되지 않는다", () => {
     // "어떻게 생각해"는 평가적이지만 "어떻게"도 포함되어 있어
     // 순서에 따라 interpretive로 잘못 분류될 수 있음
@@ -109,6 +129,20 @@ describe("parseClassificationResponse", () => {
     expect(result!.cognitive).toBe("factual");
     expect(result!.closureScore).toBe(0.8);
     expect(result!.cognitiveScore).toBe(0.7);
+  });
+
+  it("feedback 필드가 있으면 포함해서 반환한다", () => {
+    const text = `{"closure":"closed","cognitive":"factual","closureScore":0.8,"cognitiveScore":0.7,"reasoning":"테스트","feedback":"왜로 시작하면 더 좋은 질문이 됩니다"}`;
+    const result = parseClassificationResponse(text);
+    expect(result).not.toBeNull();
+    expect(result!.feedback).toBe("왜로 시작하면 더 좋은 질문이 됩니다");
+  });
+
+  it("feedback 필드가 없어도 정상 파싱된다", () => {
+    const text = `{"closure":"closed","cognitive":"factual","closureScore":0.8,"cognitiveScore":0.7,"reasoning":"테스트"}`;
+    const result = parseClassificationResponse(text);
+    expect(result).not.toBeNull();
+    expect(result!.feedback).toBeUndefined();
   });
 
   it("마크다운 코드블록 안의 JSON도 파싱한다", () => {

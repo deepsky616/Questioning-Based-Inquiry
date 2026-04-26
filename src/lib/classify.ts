@@ -33,6 +33,7 @@ export function parseClassificationResponse(text: string): ClassificationResult 
       closureScore,
       cognitiveScore,
       reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : "",
+      ...(typeof parsed.feedback === "string" ? { feedback: parsed.feedback } : {}),
     };
   } catch {
     return null;
@@ -89,11 +90,25 @@ export function fallbackClassification(content: string): ClassificationResult {
     }
   }
 
+  const feedbackMap: Record<string, Record<string, string>> = {
+    closed: {
+      factual: "'왜' 또는 '어떻게'로 시작하면 다양한 답이 나오는 열린 질문이 됩니다.",
+      interpretive: "열린 형태로 바꾸면 더 넓은 관점을 탐색할 수 있습니다.",
+      evaluative: "'어떻게 생각하는가?' 형태로 바꾸면 더 풍부한 의견을 이끌어낼 수 있습니다.",
+    },
+    open: {
+      factual: "열린 질문입니다. 이유나 과정을 묻는 방향으로 발전시켜 보세요.",
+      interpretive: "좋은 해석적 질문입니다! 구체적인 비교 대상이나 관점을 추가하면 더욱 풍부해집니다.",
+      evaluative: "훌륭한 평가적 질문입니다! 판단 기준을 명시하면 더 깊은 논의가 가능해집니다.",
+    },
+  };
+
   return {
     closure,
     cognitive,
     closureScore,
     cognitiveScore,
     reasoning: "키워드 기반 자동 분류",
+    feedback: feedbackMap[closure][cognitive],
   };
 }

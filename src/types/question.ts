@@ -39,4 +39,5 @@ export interface ClassificationResult {
   closureScore: number;
   cognitiveScore: number;
   reasoning: string;
+  feedback?: string;
 }
