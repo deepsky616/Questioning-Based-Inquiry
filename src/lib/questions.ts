@@ -47,6 +47,14 @@ export function buildQuestionCreateData(
   };
 }
 
+export function resolveIsPublicFilter(
+  role: string | null | undefined,
+  requested: string | null
+): string | null {
+  if (role === "TEACHER") return null;
+  return requested ?? null;
+}
+
 export function buildQuestionWhereClause(params: {
   authorId?: string | null;
   isPublic?: string | null;

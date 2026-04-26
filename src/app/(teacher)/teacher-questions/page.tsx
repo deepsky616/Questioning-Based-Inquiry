@@ -83,7 +83,7 @@ export default function QuestionsPage() {
 
   const fetchQuestions = useCallback((sessionId: string) => {
     setIsLoading(true);
-    const params = new URLSearchParams({ isPublic: "true" });
+    const params = new URLSearchParams();
     if (sessionId !== "all") params.append("sessionId", sessionId);
     fetch(`/api/questions?${params}`)
       .then((r) => r.json())

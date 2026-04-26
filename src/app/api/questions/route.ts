@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
-import { buildQuestionCreateData, buildQuestionWhereClause } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter } from "@/lib/questions";
 
 const createQuestionSchema = z.object({
   content: z.string().min(10).max(500),
@@ -22,10 +22,11 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
+  const role = (session.user as { role?: string }).role;
 
   const where = buildQuestionWhereClause({
     authorId: searchParams.get("authorId"),
-    isPublic: searchParams.get("isPublic"),
+    isPublic: resolveIsPublicFilter(role, searchParams.get("isPublic")),
     closure: searchParams.get("closure"),
     cognitive: searchParams.get("cognitive"),
     search: searchParams.get("search"),

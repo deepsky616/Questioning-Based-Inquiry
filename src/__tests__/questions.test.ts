@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQuestionCreateData, buildQuestionWhereClause } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter } from "@/lib/questions";
 
 describe("buildQuestionCreateData", () => {
   const baseData = {
@@ -83,5 +83,31 @@ describe("buildQuestionWhereClause", () => {
   it("sessionId가 'all'이면 세션 필터를 추가하지 않는다", () => {
     const where = buildQuestionWhereClause({ sessionId: "all" });
     expect(where.sessionId).toBeUndefined();
+  });
+});
+
+describe("resolveIsPublicFilter", () => {
+  it("교사는 isPublic 필터를 무시한다", () => {
+    expect(resolveIsPublicFilter("TEACHER", "true")).toBeNull();
+  });
+
+  it("교사는 isPublic=false 필터도 무시한다", () => {
+    expect(resolveIsPublicFilter("TEACHER", "false")).toBeNull();
+  });
+
+  it("학생은 isPublic=true 필터를 그대로 적용한다", () => {
+    expect(resolveIsPublicFilter("STUDENT", "true")).toBe("true");
+  });
+
+  it("학생은 isPublic=false 필터를 그대로 적용한다", () => {
+    expect(resolveIsPublicFilter("STUDENT", "false")).toBe("false");
+  });
+
+  it("필터 없이 호출하면 null을 반환한다", () => {
+    expect(resolveIsPublicFilter("STUDENT", null)).toBeNull();
+  });
+
+  it("role이 없으면 필터를 그대로 유지한다", () => {
+    expect(resolveIsPublicFilter(null, "true")).toBe("true");
   });
 });
