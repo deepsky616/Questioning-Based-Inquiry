@@ -47,6 +47,19 @@ export function buildQuestionCreateData(
   };
 }
 
+export function canPatchQuestion(
+  role: string | null | undefined,
+  userId: string,
+  authorId: string,
+  fields: string[]
+): boolean {
+  if (role === "TEACHER") return true;
+  if (role === "STUDENT" && userId === authorId) {
+    return fields.every((f) => f === "isPublic");
+  }
+  return false;
+}
+
 export function resolveIsPublicFilter(
   role: string | null | undefined,
   requested: string | null

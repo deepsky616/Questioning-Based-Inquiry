@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { canPatchQuestion } from "@/lib/questions";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -52,14 +53,25 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userRole = (session.user as { role?: string }).role;
-  if (userRole !== "TEACHER") {
-    return NextResponse.json({ error: "교사만 수정할 수 있습니다" }, { status: 403 });
-  }
+  const userId = (session.user as { id: string; role?: string }).id;
+  const userRole = (session.user as { id: string; role?: string }).role;
 
   try {
     const body = await req.json();
     const { closure, cognitive, isPublic } = body;
+
+    const patchedFields = Object.keys(body).filter((k) =>
+      ["closure", "cognitive", "isPublic"].includes(k)
+    );
+
+    const existing = await prisma.question.findUnique({ where: { id: params.id } });
+    if (!existing) {
+      return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
+    }
+
+    if (!canPatchQuestion(userRole, userId, existing.authorId, patchedFields)) {
+      return NextResponse.json({ error: "수정 권한이 없습니다" }, { status: 403 });
+    }
 
     const question = await prisma.question.update({
       where: { id: params.id },

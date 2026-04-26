@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion } from "@/lib/questions";
 
 describe("buildQuestionCreateData", () => {
   const baseData = {
@@ -109,5 +109,32 @@ describe("resolveIsPublicFilter", () => {
 
   it("role이 없으면 필터를 그대로 유지한다", () => {
     expect(resolveIsPublicFilter(null, "true")).toBe("true");
+  });
+});
+
+describe("canPatchQuestion", () => {
+  it("교사는 어떤 필드든 수정할 수 있다", () => {
+    expect(canPatchQuestion("TEACHER", "t1", "s1", ["closure"])).toBe(true);
+    expect(canPatchQuestion("TEACHER", "t1", "s1", ["isPublic", "closure", "cognitive"])).toBe(true);
+  });
+
+  it("학생은 본인 질문의 isPublic만 수정할 수 있다", () => {
+    expect(canPatchQuestion("STUDENT", "s1", "s1", ["isPublic"])).toBe(true);
+  });
+
+  it("학생은 본인 질문이라도 closure는 수정할 수 없다", () => {
+    expect(canPatchQuestion("STUDENT", "s1", "s1", ["closure"])).toBe(false);
+  });
+
+  it("학생은 본인 질문이라도 cognitive는 수정할 수 없다", () => {
+    expect(canPatchQuestion("STUDENT", "s1", "s1", ["cognitive"])).toBe(false);
+  });
+
+  it("학생은 다른 학생의 질문 isPublic을 수정할 수 없다", () => {
+    expect(canPatchQuestion("STUDENT", "s1", "s2", ["isPublic"])).toBe(false);
+  });
+
+  it("role이 없으면 수정할 수 없다", () => {
+    expect(canPatchQuestion(undefined, "u1", "u1", ["isPublic"])).toBe(false);
   });
 });
