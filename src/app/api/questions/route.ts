@@ -12,6 +12,7 @@ const createQuestionSchema = z.object({
   cognitive: z.string().optional(),
   closureScore: z.number().optional(),
   cognitiveScore: z.number().optional(),
+  sessionId: z.string().optional(),
 });
 
 export async function GET(req: Request) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
+
+interface QuestionSession {
+  id: string;
+  date: string;
+  subject: string;
+  topic: string;
+  teacher: { name: string };
+}
 
 interface Question {
   id: string;
@@ -58,13 +67,55 @@ export default function QuestionsPage() {
   const [correctionCognitive, setCorrectionCognitive] = useState("");
   const [comment, setComment] = useState("");
 
+  // 세션 관련 상태
+  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [sessForm, setSessForm] = useState({ date: "", subject: "", topic: "" });
+  const [isSavingSess, setIsSavingSess] = useState(false);
+  const [sessMsg, setSessMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   useEffect(() => {
     fetch("/api/questions?isPublic=true")
       .then((r) => r.json())
       .then(setQuestions)
       .catch(() => {})
       .finally(() => setIsLoading(false));
+
+    fetch("/api/sessions")
+      .then((r) => r.json())
+      .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
+      .catch(() => {});
   }, []);
+
+  const handleCreateSession = async () => {
+    if (!sessForm.date || !sessForm.subject) {
+      setSessMsg({ type: "error", text: "날짜와 교과는 필수입니다" });
+      return;
+    }
+    setIsSavingSess(true);
+    setSessMsg(null);
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sessForm),
+      });
+      if (!res.ok) throw new Error();
+      const created: QuestionSession = await res.json();
+      setSessions((prev) => sortSessionsDesc([created, ...prev]));
+      setSessForm({ date: "", subject: "", topic: "" });
+      setSessMsg({ type: "success", text: "세션이 추가됐습니다" });
+    } catch {
+      setSessMsg({ type: "error", text: "세션 저장에 실패했습니다" });
+    } finally {
+      setIsSavingSess(false);
+    }
+  };
+
+  const handleDeleteSession = async (id: string) => {
+    if (!confirm("이 세션을 삭제하시겠습니까?")) return;
+    await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+  };
 
   const handleSaveCorrection = async () => {
     if (!selectedQuestion) return;
@@ -154,8 +205,84 @@ export default function QuestionsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">질문 조회</h2>
-        <p className="text-gray-600">학생 질문을 두 가지 분류로 확인하고 수정하세요 · 공개 {questions.length}개</p>
+        <p className="text-gray-600">질문 세션을 설정하고 학생 질문을 확인하세요 · 공개 {questions.length}개</p>
       </div>
+
+      {/* 질문 세션 설정 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">질문 세션 설정</CardTitle>
+          <CardDescription>날짜·교과·주제를 설정하면 학생 질문하기 화면에서 선택할 수 있습니다</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="sess-date">날짜</Label>
+              <Input
+                id="sess-date"
+                type="date"
+                value={sessForm.date}
+                onChange={(e) => setSessForm((p) => ({ ...p, date: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="sess-subject">교과</Label>
+              <Input
+                id="sess-subject"
+                placeholder="예: 과학"
+                value={sessForm.subject}
+                onChange={(e) => setSessForm((p) => ({ ...p, subject: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="sess-topic">주제 (선택)</Label>
+              <Input
+                id="sess-topic"
+                placeholder="예: 지구의 역사"
+                value={sessForm.topic}
+                onChange={(e) => setSessForm((p) => ({ ...p, topic: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button size="sm" onClick={handleCreateSession} disabled={isSavingSess}>
+              {isSavingSess ? "저장 중..." : "세션 추가"}
+            </Button>
+            {sessMsg && (
+              <span className={`text-sm ${sessMsg.type === "success" ? "text-green-700" : "text-red-600"}`}>
+                {sessMsg.text}
+              </span>
+            )}
+          </div>
+
+          {sessions.length > 0 && (
+            <div className="divide-y rounded-lg border mt-2">
+              {sessions.map((s) => {
+                const active = isSessionAvailable(s.date);
+                return (
+                  <div key={s.id} className="flex items-center justify-between px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${active ? "bg-green-500" : "bg-gray-300"}`} />
+                      <span className="text-sm">{buildSessionLabel(s.date, s.subject, s.topic)}</span>
+                      {active && (
+                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">활성</span>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-700 h-7 px-2 text-xs"
+                      onClick={() => handleDeleteSession(s.id)}
+                    >
+                      삭제
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Input
         placeholder="질문 또는 학생 이름으로 검색..."

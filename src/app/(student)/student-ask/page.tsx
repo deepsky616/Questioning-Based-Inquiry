@@ -8,6 +8,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { buildSessionLabel, isSessionAvailable } from "@/lib/sessions";
+
+interface QuestionSession {
+  id: string;
+  date: string;
+  subject: string;
+  topic: string;
+}
 
 interface ClassificationResult {
   closure: string;
@@ -26,12 +41,21 @@ export default function AskPage() {
   const [result, setResult] = useState<ClassificationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
 
   useEffect(() => {
     fetch("/api/config")
       .then((r) => r.json())
       .then((data) => setAiConfigured(data.configured))
       .catch(() => setAiConfigured(false));
+
+    fetch("/api/sessions")
+      .then((r) => r.json())
+      .then((data: QuestionSession[]) =>
+        setSessions(data.filter((s) => isSessionAvailable(s.date)))
+      )
+      .catch(() => {});
   }, []);
 
   const handleClassify = async () => {
@@ -80,6 +104,7 @@ export default function AskPage() {
           cognitive: result.cognitive,
           closureScore: result.closureScore,
           cognitiveScore: result.cognitiveScore,
+          ...(selectedSessionId ? { sessionId: selectedSessionId } : {}),
         }),
       });
 
@@ -128,6 +153,25 @@ export default function AskPage() {
           <CardDescription>탐구하고 싶은 질문을 적어보세요</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {sessions.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="session">수업 세션 선택 (선택)</Label>
+              <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
+                <SelectTrigger id="session">
+                  <SelectValue placeholder="세션 없이 질문하기" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">세션 없이 질문하기</SelectItem>
+                  {sessions.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {buildSessionLabel(s.date, s.subject, s.topic)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="content">질문</Label>
             <Textarea

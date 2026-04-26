@@ -6,6 +6,7 @@ export interface CreateQuestionInput {
   cognitive?: string;
   closureScore?: number;
   cognitiveScore?: number;
+  sessionId?: string;
 }
 
 export interface QuestionCreateData {
@@ -17,6 +18,7 @@ export interface QuestionCreateData {
   cognitiveScore: number;
   isPublic: boolean;
   authorId: string;
+  sessionId?: string;
 }
 
 export interface QuestionWhereClause {
@@ -40,6 +42,7 @@ export function buildQuestionCreateData(
     cognitiveScore: data.cognitiveScore ?? 0.5,
     isPublic: data.isPublic ?? false,
     authorId,
+    ...(data.sessionId ? { sessionId: data.sessionId } : {}),
   };
 }
 

@@ -25,13 +25,27 @@ model User {
 
   school    String?  @map("school")
 
-  questions Question[] @relation("QuestionAuthor")
-  comments  Comment[] @relation("CommentAuthor")
+  questions Question[]       @relation("QuestionAuthor")
+  comments  Comment[]        @relation("CommentAuthor")
+  sessions  QuestionSession[] @relation("SessionTeacher")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model QuestionSession {
+  id        String   @id @default(cuid())
+  date      String   @map("session_date")
+  subject   String   @map("subject")
+  topic     String   @default("") @map("topic")
+  teacherId String   @map("teacher_id")
+  teacher   User     @relation("SessionTeacher", fields: [teacherId], references: [id])
+  questions Question[] @relation("SessionQuestions")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("question_sessions")
 }
 
 model Question {
@@ -42,6 +56,9 @@ model Question {
   closureScore   Float?  @map("closure_score")
   cognitiveScore Float?  @map("cognitive_score")
   context        String? @map("context")
+
+  sessionId String?          @map("session_id")
+  session   QuestionSession? @relation("SessionQuestions", fields: [sessionId], references: [id])
 
   authorId String @map("author_id")
   author   User   @relation("QuestionAuthor", fields: [authorId], references: [id])
