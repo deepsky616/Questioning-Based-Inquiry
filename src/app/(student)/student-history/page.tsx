@@ -54,15 +54,24 @@ export default function HistoryPage() {
   }, [session]);
 
   const togglePublic = async (id: string, currentPublic: boolean) => {
-    await fetch(`/api/questions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isPublic: !currentPublic }),
-    });
-    const userId = (session?.user as { id?: string })?.id;
-    fetch(`/api/questions?authorId=${userId}`)
-      .then((r) => r.json())
-      .then(setQuestions);
+    // 클릭 즉시 반영 (낙관적 업데이트)
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, isPublic: !currentPublic } : q))
+    );
+
+    try {
+      const res = await fetch(`/api/questions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic: !currentPublic }),
+      });
+      if (!res.ok) throw new Error("업데이트 실패");
+    } catch {
+      // 실패 시 원래 상태로 복원
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === id ? { ...q, isPublic: currentPublic } : q))
+      );
+    }
   };
 
   const filtered = questions.filter((q) =>
