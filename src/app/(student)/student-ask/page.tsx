@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,8 @@ interface ClassificationResult {
 
 export default function AskPage() {
   const router = useRouter();
-  const [content, setContent] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [contentLength, setContentLength] = useState(0);
   const [context, setContext] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -59,7 +60,14 @@ export default function AskPage() {
       .catch(() => {});
   }, []);
 
+  const getContent = () => textareaRef.current?.value ?? "";
+
+  const handleTextareaChange = () => {
+    setContentLength(textareaRef.current?.value.length ?? 0);
+  };
+
   const handleClassify = async () => {
+    const content = getContent();
     if (content.length < 10) {
       alert("질문을 10자 이상 입력해 주세요");
       return;
@@ -94,6 +102,7 @@ export default function AskPage() {
 
     setIsSaving(true);
     try {
+      const content = getContent();
       const res = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -176,14 +185,17 @@ export default function AskPage() {
           <div className="space-y-2">
             <Label htmlFor="content">질문</Label>
             <Textarea
+              ref={textareaRef}
               id="content"
               placeholder="예: 왜 밤에는 별이 보이지 않을까?"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              onInput={(e) => setContent((e.target as HTMLTextAreaElement).value)}
+              defaultValue=""
+              onChange={handleTextareaChange}
+              onInput={handleTextareaChange}
+              onCompositionUpdate={handleTextareaChange}
+              onCompositionEnd={handleTextareaChange}
               rows={4}
             />
-            <p className="text-sm text-gray-500 text-right">{content.length}/500</p>
+            <p className="text-sm text-gray-500 text-right">{contentLength}/500</p>
           </div>
 
           <div className="space-y-2">
@@ -198,7 +210,7 @@ export default function AskPage() {
 
           <Button
             onClick={handleClassify}
-            disabled={isLoading || content.length < 10}
+            disabled={isLoading || contentLength < 10}
             className="w-full"
           >
             {isLoading ? "분석 중..." : "유형 분석하기"}
