@@ -373,9 +373,89 @@ export default function QuestionsPage() {
 
       {isLoading ? (
         <div className="text-center py-16 text-gray-400">로딩 중...</div>
+      ) : currentSession ? (
+        /* ── 세션 선택됨: 통합 단일 테이블 ── */
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              전체 질문 목록
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                {filtered.length}개
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filtered.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-sm">
+                {search ? "검색 결과가 없습니다" : "이 세션에 등록된 질문이 없습니다"}
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="w-8">#</TableHead>
+                    <TableHead className="w-28">학생</TableHead>
+                    <TableHead>질문 내용</TableHead>
+                    <TableHead className="w-20 text-center">폐쇄/개방</TableHead>
+                    <TableHead className="w-24 text-center">인지 수준</TableHead>
+                    <TableHead className="w-16 text-center">수정</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((q, i) => (
+                    <TableRow
+                      key={q.id}
+                      className={i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
+                    >
+                      <TableCell className="text-gray-400 text-xs">{i + 1}</TableCell>
+                      <TableCell>
+                        <div className="text-sm font-medium">{q.author.name}</div>
+                        {q.author.className && (
+                          <div className="text-xs text-gray-400">
+                            {q.author.grade && `${q.author.grade}학년 `}
+                            {q.author.className}반
+                            {q.author.studentNumber && ` ${q.author.studentNumber}번`}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm leading-snug whitespace-pre-wrap break-words max-w-md">
+                          {q.content}
+                        </p>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${CLOSURE_STYLE[q.closure]}`}>
+                          {CLOSURE_LABEL[q.closure]}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`text-xs px-2 py-1 rounded font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
+                          {COGNITIVE_LABEL[q.cognitive]}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedQuestion(q);
+                            setCorrectionClosure(q.closure);
+                            setCorrectionCognitive(q.cognitive);
+                          }}
+                        >
+                          수정
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       ) : (
+        /* ── 전체 / 세션없음 조회: 분류별 탭 ── */
         <>
-          {/* 분류 1: 폐쇄형 / 개방형 */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">분류 1 · 폐쇄형 / 개방형 질문</CardTitle>
@@ -396,7 +476,6 @@ export default function QuestionsPage() {
             </CardContent>
           </Card>
 
-          {/* 분류 2: 사실적 / 해석적 / 평가적 */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 질문</CardTitle>
