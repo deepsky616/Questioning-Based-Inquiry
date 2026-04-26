@@ -8,13 +8,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { buildSessionLabel, isSessionAvailable } from "@/lib/sessions";
 
 interface QuestionSession {
@@ -64,6 +57,11 @@ export default function AskPage() {
 
   const handleTextareaChange = () => {
     setContentLength(textareaRef.current?.value.length ?? 0);
+  };
+
+  const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedSessionId(e.target.value);
+    requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const handleClassify = async () => {
@@ -164,25 +162,25 @@ export default function AskPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {sessions.length > 0 && (
-            <div className="space-y-2">
+            <div key="session-select" className="space-y-2">
               <Label htmlFor="session">수업 세션 선택 (선택)</Label>
-              <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
-                <SelectTrigger id="session">
-                  <SelectValue placeholder="세션 없이 질문하기" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">세션 없이 질문하기</SelectItem>
-                  {sessions.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {buildSessionLabel(s.date, s.subject, s.topic)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                id="session"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={selectedSessionId}
+                onChange={handleSessionChange}
+              >
+                <option value="none">세션 없이 질문하기</option>
+                {sessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {buildSessionLabel(s.date, s.subject, s.topic)}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
-          <div className="space-y-2">
+          <div key="content-input" className="space-y-2">
             <Label htmlFor="content">질문</Label>
             <Textarea
               ref={textareaRef}
@@ -198,7 +196,7 @@ export default function AskPage() {
             <p className="text-sm text-gray-500 text-right">{contentLength}/500</p>
           </div>
 
-          <div className="space-y-2">
+          <div key="context-input" className="space-y-2">
             <Label htmlFor="context">맥락 (선택)</Label>
             <Input
               id="context"
