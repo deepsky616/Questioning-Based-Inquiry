@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
 
@@ -40,7 +35,9 @@ interface Question {
   cognitive: string;
   closureScore: number;
   cognitiveScore: number;
-  author: { id: string; name: string; className?: string };
+  sessionId: string | null;
+  session: { id: string; date: string; subject: string; topic: string } | null;
+  author: { id: string; name: string; className?: string; grade?: string; studentNumber?: string };
   isPublic: boolean;
   createdAt: string;
   comments?: Array<{ id: string; content: string; author: { name: string }; createdAt: string }>;
@@ -58,6 +55,15 @@ const COGNITIVE_STYLE: Record<string, string> = {
   evaluative: "bg-orange-100 text-orange-700",
 };
 
+function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className={`flex flex-col items-center px-4 py-2 rounded-lg ${color}`}>
+      <span className="text-lg font-bold">{value}</span>
+      <span className="text-xs mt-0.5">{label}</span>
+    </div>
+  );
+}
+
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,22 +75,36 @@ export default function QuestionsPage() {
 
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState("all");
   const [sessForm, setSessForm] = useState({ date: "", subject: "", topic: "" });
   const [isSavingSess, setIsSavingSess] = useState(false);
   const [sessMsg, setSessMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showSessForm, setShowSessForm] = useState(false);
 
-  useEffect(() => {
-    fetch("/api/questions?isPublic=true")
+  const fetchQuestions = useCallback((sessionId: string) => {
+    setIsLoading(true);
+    const params = new URLSearchParams({ isPublic: "true" });
+    if (sessionId !== "all") params.append("sessionId", sessionId);
+    fetch(`/api/questions?${params}`)
       .then((r) => r.json())
       .then(setQuestions)
       .catch(() => {})
       .finally(() => setIsLoading(false));
+  }, []);
 
+  useEffect(() => {
+    fetchQuestions("all");
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
       .catch(() => {});
-  }, []);
+  }, [fetchQuestions]);
+
+  const handleSessionChange = (val: string) => {
+    setSelectedSessionId(val);
+    setSearch("");
+    fetchQuestions(val);
+  };
 
   const handleCreateSession = async () => {
     if (!sessForm.date || !sessForm.subject) {
@@ -115,6 +135,7 @@ export default function QuestionsPage() {
     if (!confirm("이 세션을 삭제하시겠습니까?")) return;
     await fetch(`/api/sessions/${id}`, { method: "DELETE" });
     setSessions((prev) => prev.filter((s) => s.id !== id));
+    if (selectedSessionId === id) handleSessionChange("all");
   };
 
   const handleSaveCorrection = async () => {
@@ -126,9 +147,7 @@ export default function QuestionsPage() {
     });
     setSelectedQuestion(null);
     setComment("");
-    fetch("/api/questions?isPublic=true")
-      .then((r) => r.json())
-      .then(setQuestions);
+    fetchQuestions(selectedSessionId);
   };
 
   const filtered = questions.filter(
@@ -139,6 +158,8 @@ export default function QuestionsPage() {
 
   const byType = (key: "closure" | "cognitive", value: string) =>
     filtered.filter((q) => q[key] === value);
+
+  const currentSession = sessions.find((s) => s.id === selectedSessionId);
 
   const QuestionTable = ({ list }: { list: Question[] }) =>
     list.length === 0 ? (
@@ -151,9 +172,10 @@ export default function QuestionsPage() {
           <TableRow>
             <TableHead>학생</TableHead>
             <TableHead>질문 내용</TableHead>
+            {selectedSessionId === "all" && <TableHead className="w-36">세션</TableHead>}
             <TableHead className="w-20">폐쇄/개방</TableHead>
             <TableHead className="w-24">인지 수준</TableHead>
-            <TableHead className="w-20">작업</TableHead>
+            <TableHead className="w-16">수정</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -162,12 +184,26 @@ export default function QuestionsPage() {
               <TableCell>
                 <div className="text-sm font-medium">{q.author.name}</div>
                 {q.author.className && (
-                  <div className="text-xs text-gray-400">{q.author.className}</div>
+                  <div className="text-xs text-gray-400">
+                    {q.author.grade && `${q.author.grade}학년 `}{q.author.className}반
+                    {q.author.studentNumber && ` ${q.author.studentNumber}번`}
+                  </div>
                 )}
               </TableCell>
               <TableCell className="max-w-xs">
                 <p className="truncate">{q.content}</p>
               </TableCell>
+              {selectedSessionId === "all" && (
+                <TableCell>
+                  {q.session ? (
+                    <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
+                      {buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400">세션 없음</span>
+                  )}
+                </TableCell>
+              )}
               <TableCell>
                 <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
                   {CLOSURE_LABEL[q.closure]}
@@ -197,145 +233,195 @@ export default function QuestionsPage() {
       </Table>
     );
 
-  if (isLoading) {
-    return <div className="text-center py-16 text-gray-400">로딩 중...</div>;
-  }
-
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">질문 조회</h2>
-        <p className="text-gray-600">질문 세션을 설정하고 학생 질문을 확인하세요 · 공개 {questions.length}개</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">질문 조회</h2>
+          <p className="text-gray-600">세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => { setShowSessForm((v) => !v); setSessMsg(null); }}
+        >
+          {showSessForm ? "세션 설정 닫기" : "세션 설정"}
+        </Button>
       </div>
 
-      {/* 질문 세션 설정 */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">질문 세션 설정</CardTitle>
-          <CardDescription>날짜·교과·주제를 설정하면 학생 질문하기 화면에서 선택할 수 있습니다</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="sess-date">날짜</Label>
-              <Input
-                id="sess-date"
-                type="date"
-                value={sessForm.date}
-                onChange={(e) => setSessForm((p) => ({ ...p, date: e.target.value }))}
-              />
+      {/* 세션 관리 (토글) */}
+      {showSessForm && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">질문 세션 설정</CardTitle>
+            <CardDescription>날짜·교과·주제를 설정하면 학생 질문하기 화면에서 선택할 수 있습니다</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="sess-date">날짜</Label>
+                <Input
+                  id="sess-date"
+                  type="date"
+                  value={sessForm.date}
+                  onChange={(e) => setSessForm((p) => ({ ...p, date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="sess-subject">교과</Label>
+                <Input
+                  id="sess-subject"
+                  placeholder="예: 과학"
+                  value={sessForm.subject}
+                  onChange={(e) => setSessForm((p) => ({ ...p, subject: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="sess-topic">주제 (선택)</Label>
+                <Input
+                  id="sess-topic"
+                  placeholder="예: 지구의 역사"
+                  value={sessForm.topic}
+                  onChange={(e) => setSessForm((p) => ({ ...p, topic: e.target.value }))}
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="sess-subject">교과</Label>
-              <Input
-                id="sess-subject"
-                placeholder="예: 과학"
-                value={sessForm.subject}
-                onChange={(e) => setSessForm((p) => ({ ...p, subject: e.target.value }))}
-              />
+            <div className="flex items-center gap-3">
+              <Button size="sm" onClick={handleCreateSession} disabled={isSavingSess}>
+                {isSavingSess ? "저장 중..." : "세션 추가"}
+              </Button>
+              {sessMsg && (
+                <span className={`text-sm ${sessMsg.type === "success" ? "text-green-700" : "text-red-600"}`}>
+                  {sessMsg.text}
+                </span>
+              )}
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="sess-topic">주제 (선택)</Label>
-              <Input
-                id="sess-topic"
-                placeholder="예: 지구의 역사"
-                value={sessForm.topic}
-                onChange={(e) => setSessForm((p) => ({ ...p, topic: e.target.value }))}
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button size="sm" onClick={handleCreateSession} disabled={isSavingSess}>
-              {isSavingSess ? "저장 중..." : "세션 추가"}
-            </Button>
-            {sessMsg && (
-              <span className={`text-sm ${sessMsg.type === "success" ? "text-green-700" : "text-red-600"}`}>
-                {sessMsg.text}
-              </span>
-            )}
-          </div>
 
-          {sessions.length > 0 && (
-            <div className="divide-y rounded-lg border mt-2">
-              {sessions.map((s) => {
-                const active = isSessionAvailable(s.date);
-                return (
-                  <div key={s.id} className="flex items-center justify-between px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${active ? "bg-green-500" : "bg-gray-300"}`} />
-                      <span className="text-sm">{buildSessionLabel(s.date, s.subject, s.topic)}</span>
-                      {active && (
-                        <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">활성</span>
-                      )}
+            {sessions.length > 0 && (
+              <div className="divide-y rounded-lg border mt-2">
+                {sessions.map((s) => {
+                  const active = isSessionAvailable(s.date);
+                  return (
+                    <div key={s.id} className="flex items-center justify-between px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${active ? "bg-green-500" : "bg-gray-300"}`} />
+                        <span className="text-sm">{buildSessionLabel(s.date, s.subject, s.topic)}</span>
+                        {active && (
+                          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">활성</span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-500 hover:text-red-700 h-7 px-2 text-xs"
+                        onClick={() => handleDeleteSession(s.id)}
+                      >
+                        삭제
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-500 hover:text-red-700 h-7 px-2 text-xs"
-                      onClick={() => handleDeleteSession(s.id)}
-                    >
-                      삭제
-                    </Button>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 세션 선택 필터 */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={selectedSessionId} onValueChange={handleSessionChange}>
+          <SelectTrigger className="w-72">
+            <SelectValue placeholder="세션 선택" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">전체 질문</SelectItem>
+            <SelectItem value="none">세션 없는 질문</SelectItem>
+            {sessions.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {buildSessionLabel(s.date, s.subject, s.topic)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          placeholder="질문 또는 학생 이름 검색..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+        <span className="text-sm text-gray-500 ml-auto">{filtered.length}개</span>
+      </div>
+
+      {/* 세션 선택 시 통계 카드 */}
+      {currentSession && (
+        <Card className="bg-indigo-50 border-indigo-200">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-sm font-semibold text-indigo-800 mb-3">
+              {buildSessionLabel(currentSession.date, currentSession.subject, currentSession.topic)}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <StatBadge label="전체" value={filtered.length} color="bg-white text-gray-700" />
+              <StatBadge label="폐쇄형" value={byType("closure", "closed").length} color="bg-blue-100 text-blue-700" />
+              <StatBadge label="개방형" value={byType("closure", "open").length} color="bg-green-100 text-green-700" />
+              <StatBadge label="사실적" value={byType("cognitive", "factual").length} color="bg-gray-100 text-gray-700" />
+              <StatBadge label="해석적" value={byType("cognitive", "interpretive").length} color="bg-purple-100 text-purple-700" />
+              <StatBadge label="평가적" value={byType("cognitive", "evaluative").length} color="bg-orange-100 text-orange-700" />
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      <Input
-        placeholder="질문 또는 학생 이름으로 검색..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
-      />
+      {isLoading ? (
+        <div className="text-center py-16 text-gray-400">로딩 중...</div>
+      ) : (
+        <>
+          {/* 분류 1: 폐쇄형 / 개방형 */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">분류 1 · 폐쇄형 / 개방형 질문</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="closed">
+                <TabsList>
+                  <TabsTrigger value="closed">
+                    폐쇄형 <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{byType("closure", "closed").length}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="open">
+                    개방형 <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">{byType("closure", "open").length}</span>
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="closed"><QuestionTable list={byType("closure", "closed")} /></TabsContent>
+                <TabsContent value="open"><QuestionTable list={byType("closure", "open")} /></TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
 
-      {/* 분류 1: 폐쇄형 / 개방형 */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">분류 1 · 폐쇄형 / 개방형 질문</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="closed">
-            <TabsList>
-              <TabsTrigger value="closed">
-                폐쇄형 질문 <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{byType("closure", "closed").length}</span>
-              </TabsTrigger>
-              <TabsTrigger value="open">
-                개방형 질문 <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">{byType("closure", "open").length}</span>
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="closed"><QuestionTable list={byType("closure", "closed")} /></TabsContent>
-            <TabsContent value="open"><QuestionTable list={byType("closure", "open")} /></TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* 분류 2: 사실적 / 해석적 / 평가적 */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 질문</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="factual">
-            <TabsList>
-              <TabsTrigger value="factual">
-                사실적 질문 <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">{byType("cognitive", "factual").length}</span>
-              </TabsTrigger>
-              <TabsTrigger value="interpretive">
-                해석적 질문 <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{byType("cognitive", "interpretive").length}</span>
-              </TabsTrigger>
-              <TabsTrigger value="evaluative">
-                평가적 질문 <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{byType("cognitive", "evaluative").length}</span>
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="factual"><QuestionTable list={byType("cognitive", "factual")} /></TabsContent>
-            <TabsContent value="interpretive"><QuestionTable list={byType("cognitive", "interpretive")} /></TabsContent>
-            <TabsContent value="evaluative"><QuestionTable list={byType("cognitive", "evaluative")} /></TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+          {/* 분류 2: 사실적 / 해석적 / 평가적 */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 질문</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="factual">
+                <TabsList>
+                  <TabsTrigger value="factual">
+                    사실적 <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">{byType("cognitive", "factual").length}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="interpretive">
+                    해석적 <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{byType("cognitive", "interpretive").length}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="evaluative">
+                    평가적 <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{byType("cognitive", "evaluative").length}</span>
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="factual"><QuestionTable list={byType("cognitive", "factual")} /></TabsContent>
+                <TabsContent value="interpretive"><QuestionTable list={byType("cognitive", "interpretive")} /></TabsContent>
+                <TabsContent value="evaluative"><QuestionTable list={byType("cognitive", "evaluative")} /></TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* 수정 다이얼로그 */}
       <Dialog open={!!selectedQuestion} onOpenChange={() => setSelectedQuestion(null)}>
@@ -352,6 +438,11 @@ export default function QuestionsPage() {
                   작성자: {selectedQuestion.author.name}
                   {selectedQuestion.author.className && ` (${selectedQuestion.author.className})`}
                 </p>
+                {selectedQuestion.session && (
+                  <p className="text-xs text-indigo-600 mt-1">
+                    세션: {buildSessionLabel(selectedQuestion.session.date, selectedQuestion.session.subject, selectedQuestion.session.topic)}
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

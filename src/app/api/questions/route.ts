@@ -29,26 +29,21 @@ export async function GET(req: Request) {
     closure: searchParams.get("closure"),
     cognitive: searchParams.get("cognitive"),
     search: searchParams.get("search"),
+    sessionId: searchParams.get("sessionId"),
   });
 
   const questions = await prisma.question.findMany({
     where,
     include: {
       author: {
-        select: {
-          id: true,
-          name: true,
-          className: true,
-        },
+        select: { id: true, name: true, className: true, grade: true, studentNumber: true },
+      },
+      session: {
+        select: { id: true, date: true, subject: true, topic: true },
       },
       comments: {
         include: {
-          author: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
+          author: { select: { id: true, name: true } },
         },
       },
     },

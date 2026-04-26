@@ -69,4 +69,19 @@ describe("buildQuestionWhereClause", () => {
     const where = buildQuestionWhereClause({});
     expect(where).toEqual({});
   });
+
+  it("sessionId 필터를 추가한다", () => {
+    const where = buildQuestionWhereClause({ sessionId: "sess-123" });
+    expect(where.sessionId).toBe("sess-123");
+  });
+
+  it("sessionId가 'none'이면 세션 없는 질문만 필터링한다", () => {
+    const where = buildQuestionWhereClause({ sessionId: "none" });
+    expect(where.sessionId).toBeNull();
+  });
+
+  it("sessionId가 'all'이면 세션 필터를 추가하지 않는다", () => {
+    const where = buildQuestionWhereClause({ sessionId: "all" });
+    expect(where.sessionId).toBeUndefined();
+  });
 });

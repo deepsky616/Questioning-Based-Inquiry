@@ -27,6 +27,7 @@ export interface QuestionWhereClause {
   closure?: string;
   cognitive?: string;
   content?: { contains: string; mode: "insensitive" };
+  sessionId?: string | null;
 }
 
 export function buildQuestionCreateData(
@@ -52,6 +53,7 @@ export function buildQuestionWhereClause(params: {
   closure?: string | null;
   cognitive?: string | null;
   search?: string | null;
+  sessionId?: string | null;
 }): QuestionWhereClause {
   const where: QuestionWhereClause = {};
 
@@ -73,6 +75,12 @@ export function buildQuestionWhereClause(params: {
 
   if (params.search) {
     where.content = { contains: params.search, mode: "insensitive" };
+  }
+
+  if (params.sessionId === "none") {
+    where.sessionId = null;
+  } else if (params.sessionId && params.sessionId !== "all") {
+    where.sessionId = params.sessionId;
   }
 
   return where;
