@@ -29,7 +29,8 @@ interface ClassificationResult {
 export default function AskPage() {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [contentLength, setContentLength] = useState(0);
+
+  const [content, setContent] = useState("");
   const [context, setContext] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,19 +54,13 @@ export default function AskPage() {
       .catch(() => {});
   }, []);
 
-  const getContent = () => textareaRef.current?.value ?? "";
-
-  const handleTextareaChange = () => {
-    setContentLength(textareaRef.current?.value.length ?? 0);
-  };
-
   const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedSessionId(e.target.value);
+    // 세션 선택 직후 textarea로 포커스 이동해 바로 입력 가능하게
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const handleClassify = async () => {
-    const content = getContent();
     if (content.length < 10) {
       alert("질문을 10자 이상 입력해 주세요");
       return;
@@ -100,7 +95,6 @@ export default function AskPage() {
 
     setIsSaving(true);
     try {
-      const content = getContent();
       const res = await fetch("/api/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -112,7 +106,7 @@ export default function AskPage() {
           cognitive: result.cognitive,
           closureScore: result.closureScore,
           cognitiveScore: result.cognitiveScore,
-          ...(selectedSessionId && selectedSessionId !== "none" ? { sessionId: selectedSessionId } : {}),
+          ...(selectedSessionId !== "none" ? { sessionId: selectedSessionId } : {}),
         }),
       });
 
@@ -126,7 +120,11 @@ export default function AskPage() {
   };
 
   const getCognitiveLabel = (c: string) => {
-    const map: Record<string, string> = { factual: "사실적 질문", interpretive: "해석적 질문", evaluative: "평가적 질문" };
+    const map: Record<string, string> = {
+      factual: "사실적 질문",
+      interpretive: "해석적 질문",
+      evaluative: "평가적 질문",
+    };
     return map[c] || c;
   };
 
@@ -162,7 +160,7 @@ export default function AskPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {sessions.length > 0 && (
-            <div key="session-select" className="space-y-2">
+            <div className="space-y-2">
               <Label htmlFor="session">수업 세션 선택 (선택)</Label>
               <select
                 id="session"
@@ -180,23 +178,20 @@ export default function AskPage() {
             </div>
           )}
 
-          <div key="content-input" className="space-y-2">
+          <div className="space-y-2">
             <Label htmlFor="content">질문</Label>
             <Textarea
               ref={textareaRef}
               id="content"
               placeholder="예: 왜 밤에는 별이 보이지 않을까?"
-              defaultValue=""
-              onChange={handleTextareaChange}
-              onInput={handleTextareaChange}
-              onCompositionUpdate={handleTextareaChange}
-              onCompositionEnd={handleTextareaChange}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
               rows={4}
             />
-            <p className="text-sm text-gray-500 text-right">{contentLength}/500</p>
+            <p className="text-sm text-gray-500 text-right">{content.length}/500</p>
           </div>
 
-          <div key="context-input" className="space-y-2">
+          <div className="space-y-2">
             <Label htmlFor="context">맥락 (선택)</Label>
             <Input
               id="context"
@@ -208,7 +203,7 @@ export default function AskPage() {
 
           <Button
             onClick={handleClassify}
-            disabled={isLoading || contentLength < 10}
+            disabled={isLoading || content.length < 10}
             className="w-full"
           >
             {isLoading ? "분석 중..." : "유형 분석하기"}
@@ -228,12 +223,18 @@ export default function AskPage() {
                 <div className="text-xl font-bold text-blue-700">
                   {result.closure === "closed" ? "닫힌 질문" : "열린 질문"}
                 </div>
-                <div className="text-sm text-gray-500">신뢰도: {Math.round(result.closureScore * 100)}%</div>
+                <div className="text-sm text-gray-500">
+                  신뢰도: {Math.round(result.closureScore * 100)}%
+                </div>
               </div>
               <div className="p-4 bg-purple-50 rounded-lg">
                 <div className="text-sm text-gray-600">인지적 수준</div>
-                <div className="text-xl font-bold text-purple-700">{getCognitiveLabel(result.cognitive)}</div>
-                <div className="text-sm text-gray-500">신뢰도: {Math.round(result.cognitiveScore * 100)}%</div>
+                <div className="text-xl font-bold text-purple-700">
+                  {getCognitiveLabel(result.cognitive)}
+                </div>
+                <div className="text-sm text-gray-500">
+                  신뢰도: {Math.round(result.cognitiveScore * 100)}%
+                </div>
               </div>
             </div>
 
@@ -244,7 +245,9 @@ export default function AskPage() {
 
             {result.feedback && (
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                <div className="text-sm font-medium text-amber-800 mb-1">더 좋은 질문을 위한 제안</div>
+                <div className="text-sm font-medium text-amber-800 mb-1">
+                  더 좋은 질문을 위한 제안
+                </div>
                 <p className="text-amber-700">{result.feedback}</p>
               </div>
             )}
