@@ -5,7 +5,7 @@ import { z } from "zod";
 import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter } from "@/lib/questions";
 
 const createQuestionSchema = z.object({
-  content: z.string().min(10).max(500),
+  content: z.string().min(1).max(500),
   context: z.string().optional(),
   isPublic: z.boolean().optional(),
   closure: z.string().optional(),

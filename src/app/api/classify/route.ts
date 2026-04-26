@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
 const classifySchema = z.object({
   apiKey: z.string().optional(),
   model: z.string().optional(),
-  content: z.string().min(10).max(500),
+  content: z.string().min(1).max(500),
   context: z.string().optional(),
 });
 

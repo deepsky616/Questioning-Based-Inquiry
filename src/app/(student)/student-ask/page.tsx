@@ -61,8 +61,8 @@ export default function AskPage() {
   };
 
   const handleClassify = async () => {
-    if (content.length < 10) {
-      alert("질문을 10자 이상 입력해 주세요");
+    if (content.trim().length === 0) {
+      alert("질문을 입력해 주세요");
       return;
     }
 
@@ -203,7 +203,7 @@ export default function AskPage() {
 
           <Button
             onClick={handleClassify}
-            disabled={isLoading || content.length < 10}
+            disabled={isLoading || content.trim().length === 0}
             className="w-full"
           >
             {isLoading ? "분석 중..." : "유형 분석하기"}
