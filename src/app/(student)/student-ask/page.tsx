@@ -161,7 +161,7 @@ export default function AskPage() {
                 <SelectTrigger id="session">
                   <SelectValue placeholder="세션 없이 질문하기" />
                 </SelectTrigger>
-                <SelectContent modal={false}>
+                <SelectContent>
                   <SelectItem value="none">세션 없이 질문하기</SelectItem>
                   {sessions.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
@@ -180,6 +180,7 @@ export default function AskPage() {
               placeholder="예: 왜 밤에는 별이 보이지 않을까?"
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              onInput={(e) => setContent((e.target as HTMLTextAreaElement).value)}
               rows={4}
             />
             <p className="text-sm text-gray-500 text-right">{content.length}/500</p>
