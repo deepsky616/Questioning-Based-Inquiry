@@ -64,6 +64,12 @@ export function formatBulkAiSummary(success: number, total: number): string {
   return `${success}개 성공, ${failed}개 실패`;
 }
 
+export function countQuestionsWithComments(
+  questions: Array<{ comments?: Array<unknown> }>
+): number {
+  return questions.filter((q) => (q.comments?.length ?? 0) > 0).length;
+}
+
 export function canCreateComment(role: string | null | undefined, isPublic: boolean): boolean {
   if (role === "TEACHER") return true;
   if (role === "STUDENT" && isPublic) return true;

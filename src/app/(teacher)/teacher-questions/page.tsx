@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
 import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
-import { formatBulkAiSummary } from "@/lib/questions";
+import { formatBulkAiSummary, countQuestionsWithComments } from "@/lib/questions";
 
 interface QuestionSession {
   id: string;
@@ -75,6 +75,9 @@ export default function QuestionsPage() {
   const [isAnalyzingSession, setIsAnalyzingSession] = useState(false);
   const [sessionAnalysis, setSessionAnalysis] = useState<SessionAnalysis | null>(null);
   const [sessionAnalysisError, setSessionAnalysisError] = useState<string | null>(null);
+
+  // 뷰 모드
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
 
   // 일괄 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -355,6 +358,54 @@ export default function QuestionsPage() {
     );
   };
 
+  const QuestionCommentCards = ({ list }: { list: Question[] }) => {
+    if (list.length === 0) return (
+      <div className="text-center py-8 text-gray-400 text-sm">해당하는 질문이 없습니다</div>
+    );
+    return (
+      <div className="space-y-4">
+        {list.map((q) => (
+          <div key={q.id} className="border rounded-xl bg-white overflow-hidden shadow-sm">
+            <div className="px-4 py-3 bg-gray-50 border-b flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <span className="text-sm font-semibold text-gray-900">{q.author.name}</span>
+                  {q.author.className && (
+                    <span className="text-xs text-gray-400">
+                      {q.author.grade && `${q.author.grade}학년 `}{q.author.className}반
+                      {q.author.studentNumber && ` ${q.author.studentNumber}번`}
+                    </span>
+                  )}
+                  <div className="ml-auto flex gap-1.5 shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${CLOSURE_STYLE[q.closure]}`}>
+                      {CLOSURE_LABEL[q.closure]}
+                    </span>
+                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
+                      {COGNITIVE_LABEL[q.cognitive]}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-800 leading-relaxed break-words">{q.content}</p>
+              </div>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {(q.comments?.length ?? 0) === 0 ? (
+                <p className="px-4 py-3 text-xs text-gray-400">아직 댓글이 없습니다</p>
+              ) : (
+                q.comments!.map((c) => (
+                  <div key={c.id} className="px-4 py-2.5 flex gap-3">
+                    <span className="text-xs font-semibold text-indigo-700 shrink-0 pt-0.5">{c.author.name}</span>
+                    <p className="text-xs text-gray-700 leading-relaxed">{c.content}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -471,7 +522,31 @@ export default function QuestionsPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-xs"
         />
-        <span className="text-sm text-gray-500 ml-auto">{filtered.length}개</span>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-sm text-gray-500">{filtered.length}개</span>
+          <div className="flex rounded-md border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => setViewMode("table")}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === "table"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              목록
+            </button>
+            <button
+              onClick={() => setViewMode("cards")}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+                viewMode === "cards"
+                  ? "bg-indigo-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              질문·댓글
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 세션 선택 시 통계 카드 */}
@@ -542,6 +617,62 @@ export default function QuestionsPage() {
 
       {isLoading ? (
         <div className="text-center py-16 text-gray-400">로딩 중...</div>
+      ) : viewMode === "cards" ? (
+        /* ── 카드 뷰: 질문 + 댓글 한눈에 보기 ── */
+        <div className="space-y-8">
+          {filtered.length === 0 ? (
+            <div className="text-center py-16 text-gray-400 text-sm">해당하는 질문이 없습니다</div>
+          ) : selectedSessionId === "all" ? (
+            <>
+              {sessions.map((s) => {
+                const sessionQuestions = filtered.filter((q) => q.sessionId === s.id);
+                if (sessionQuestions.length === 0) return null;
+                return (
+                  <div key={s.id}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-sm font-semibold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full">
+                        {buildSessionLabel(s.date, s.subject, s.topic)}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {sessionQuestions.length}개 질문 · 댓글 있는 질문 {countQuestionsWithComments(sessionQuestions)}개
+                      </span>
+                    </div>
+                    <QuestionCommentCards list={sessionQuestions} />
+                  </div>
+                );
+              })}
+              {(() => {
+                const noSession = filtered.filter((q) => !q.sessionId);
+                if (noSession.length === 0) return null;
+                return (
+                  <div>
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-sm font-semibold text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                        세션 없는 질문
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {noSession.length}개 질문 · 댓글 있는 질문 {countQuestionsWithComments(noSession)}개
+                      </span>
+                    </div>
+                    <QuestionCommentCards list={noSession} />
+                  </div>
+                );
+              })()}
+            </>
+          ) : (
+            /* 특정 세션 또는 세션 없음 */
+            <div>
+              {currentSession && (
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-xs text-gray-400">
+                    댓글 있는 질문 {countQuestionsWithComments(filtered)}개 / 전체 {filtered.length}개
+                  </span>
+                </div>
+              )}
+              <QuestionCommentCards list={filtered} />
+            </div>
+          )}
+        </div>
       ) : currentSession ? (
         /* ── 세션 선택됨: 통합 단일 테이블 ── */
         <Card>

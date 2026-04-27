@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback, validateBulkAiRequest, formatBulkAiSummary } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback, validateBulkAiRequest, formatBulkAiSummary, countQuestionsWithComments } from "@/lib/questions";
 
 describe("buildQuestionCreateData", () => {
   const baseData = {
@@ -209,5 +209,30 @@ describe("formatBulkAiSummary", () => {
   it("모두 실패하면 결과에 0이 포함된다", () => {
     const msg = formatBulkAiSummary(0, 3);
     expect(msg).toContain("0");
+  });
+});
+
+describe("countQuestionsWithComments", () => {
+  it("댓글이 있는 질문 수를 반환한다", () => {
+    const questions = [
+      { comments: [{ id: "c1" }] },
+      { comments: [] },
+      { comments: [{ id: "c2" }, { id: "c3" }] },
+    ];
+    expect(countQuestionsWithComments(questions)).toBe(2);
+  });
+
+  it("모든 질문에 댓글이 없으면 0을 반환한다", () => {
+    const questions = [{ comments: [] }, { comments: [] }];
+    expect(countQuestionsWithComments(questions)).toBe(0);
+  });
+
+  it("comments 필드가 undefined이면 댓글 없는 것으로 처리한다", () => {
+    const questions = [{ comments: undefined }, { comments: [{ id: "c1" }] }];
+    expect(countQuestionsWithComments(questions)).toBe(1);
+  });
+
+  it("질문 목록이 비어있으면 0을 반환한다", () => {
+    expect(countQuestionsWithComments([])).toBe(0);
   });
 });
