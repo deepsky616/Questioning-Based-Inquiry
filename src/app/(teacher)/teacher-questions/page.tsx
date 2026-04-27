@@ -44,6 +44,13 @@ interface Question {
   comments?: Array<{ id: string; content: string; author: { name: string }; createdAt: string }>;
 }
 
+interface SessionAnalysis {
+  summary: string;
+  themes: string[];
+  insights: string;
+  totalQuestions: number;
+}
+
 function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className={`flex flex-col items-center px-4 py-2 rounded-lg ${color}`}>
@@ -64,6 +71,9 @@ export default function QuestionsPage() {
   const [correctionMsg, setCorrectionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSavingCorrection, setIsSavingCorrection] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [isAnalyzingSession, setIsAnalyzingSession] = useState(false);
+  const [sessionAnalysis, setSessionAnalysis] = useState<SessionAnalysis | null>(null);
+  const [sessionAnalysisError, setSessionAnalysisError] = useState<string | null>(null);
 
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
@@ -95,6 +105,8 @@ export default function QuestionsPage() {
   const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);
     setSearch("");
+    setSessionAnalysis(null);
+    setSessionAnalysisError(null);
     fetchQuestions(val);
   };
 
@@ -158,6 +170,28 @@ export default function QuestionsPage() {
       setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : "저장에 실패했습니다" });
     } finally {
       setIsSavingCorrection(false);
+    }
+  };
+
+  const handleAnalyzeSession = async () => {
+    if (!currentSession) return;
+
+    setIsAnalyzingSession(true);
+    setSessionAnalysisError(null);
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/analysis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "AI 세션 분석에 실패했습니다");
+      setSessionAnalysis(data as SessionAnalysis);
+    } catch (err) {
+      setSessionAnalysis(null);
+      setSessionAnalysisError(err instanceof Error ? err.message : "AI 세션 분석에 실패했습니다");
+    } finally {
+      setIsAnalyzingSession(false);
     }
   };
 
@@ -378,6 +412,53 @@ export default function QuestionsPage() {
               <StatBadge label="해석적" value={byType("cognitive", "interpretive").length} color="bg-purple-100 text-purple-700" />
               <StatBadge label="평가적" value={byType("cognitive", "evaluative").length} color="bg-orange-100 text-orange-700" />
             </div>
+            <div className="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isAnalyzingSession}
+                onClick={handleAnalyzeSession}
+                className="border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100"
+              >
+                {isAnalyzingSession ? "분석 중..." : "✦ AI 세션 분석"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {currentSession && (sessionAnalysis || sessionAnalysisError) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">AI 세션 분석 결과</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {sessionAnalysisError ? (
+              <p className="text-sm text-red-600">{sessionAnalysisError}</p>
+            ) : sessionAnalysis ? (
+              <>
+                <div className="rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-800">
+                  {sessionAnalysis.summary}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {sessionAnalysis.themes.map((theme) => (
+                    <span
+                      key={theme}
+                      className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700"
+                    >
+                      {theme}
+                    </span>
+                  ))}
+                </div>
+                <div className="rounded-lg bg-amber-50 p-4">
+                  <p className="text-xs font-semibold text-amber-800">교사 시사점</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950">
+                    {sessionAnalysis.insights}
+                  </p>
+                </div>
+              </>
+            ) : null}
           </CardContent>
         </Card>
       )}

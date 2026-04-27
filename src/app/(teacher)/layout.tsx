@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageNav } from "@/components/shared/PageNav";
+import { getSessionUser } from "@/lib/auth-helpers";
 
 const TEACHER_PAGES = [
   { href: "/teacher-dashboard", label: "대시보드" },
@@ -16,15 +17,16 @@ const TEACHER_PAGES = [
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
+  const user = getSessionUser(session);
   const router = useRouter();
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated" && (session?.user as any)?.role !== "TEACHER") {
+    } else if (status === "authenticated" && user.role !== "TEACHER") {
       router.push("/student-dashboard");
     }
-  }, [session, status, router]);
+  }, [status, user.role, router]);
 
   if (status === "loading") {
     return (
@@ -56,7 +58,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
               </nav>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{(session.user as { name?: string })?.name} 선생님</span>
+              <span className="text-sm text-gray-600">{user.name} 선생님</span>
               <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
                 로그아웃
               </Button>

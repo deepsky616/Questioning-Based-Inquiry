@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { StatBar } from "@/components/shared/StatBar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Stats {
@@ -25,18 +26,6 @@ interface Stats {
     trend: number | null;
   }>;
   timeline: Array<{ date: string; count: number }>;
-}
-
-function Bar({ value, total, color }: { value: number; total: number; color: string }) {
-  const pct = total === 0 ? 0 : Math.round((value / total) * 100);
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs text-gray-500 w-8 text-right">{pct}%</span>
-    </div>
-  );
 }
 
 export default function TeacherDashboard() {
@@ -133,7 +122,7 @@ export default function TeacherDashboard() {
                     </div>
                     <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
                   </div>
-                  <Bar value={stats.byClosure.closed} total={stats.total} color="bg-blue-500" />
+                  <StatBar value={stats.byClosure.closed} total={stats.total} color="bg-blue-500" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -143,7 +132,7 @@ export default function TeacherDashboard() {
                     </div>
                     <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
                   </div>
-                  <Bar value={stats.byClosure.open} total={stats.total} color="bg-green-500" />
+                  <StatBar value={stats.byClosure.open} total={stats.total} color="bg-green-500" />
                 </div>
               </div>
             </CardContent>
@@ -164,7 +153,7 @@ export default function TeacherDashboard() {
                     </div>
                     <span className="text-2xl font-bold text-gray-700">{stats.byCognitive.factual}</span>
                   </div>
-                  <Bar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
+                  <StatBar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -174,7 +163,7 @@ export default function TeacherDashboard() {
                     </div>
                     <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.interpretive}</span>
                   </div>
-                  <Bar value={stats.byCognitive.interpretive} total={stats.total} color="bg-purple-500" />
+                  <StatBar value={stats.byCognitive.interpretive} total={stats.total} color="bg-purple-500" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -184,7 +173,7 @@ export default function TeacherDashboard() {
                     </div>
                     <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.evaluative}</span>
                   </div>
-                  <Bar value={stats.byCognitive.evaluative} total={stats.total} color="bg-orange-500" />
+                  <StatBar value={stats.byCognitive.evaluative} total={stats.total} color="bg-orange-500" />
                 </div>
               </div>
             </CardContent>
