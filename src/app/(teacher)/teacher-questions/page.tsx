@@ -261,6 +261,9 @@ export default function QuestionsPage() {
     filtered.filter((q) => q[key] === value);
 
   const currentSession = sessions.find((s) => s.id === selectedSessionId);
+  const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
+  const previewQuestions = selectedQuestions.slice(0, 3);
+  const hiddenPreviewCount = Math.max(selectedQuestions.length - previewQuestions.length, 0);
 
   const QuestionTable = ({ list }: { list: Question[] }) => {
     const allChecked = list.length > 0 && list.every((q) => selectedIds.has(q.id));
@@ -803,14 +806,48 @@ export default function QuestionsPage() {
               </button>
             </div>
 
+            <div className="flex flex-wrap gap-2">
+              {previewQuestions.map((q) => (
+                <span
+                  key={q.id}
+                  className="max-w-full truncate rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white ring-1 ring-white/20"
+                  title={`${q.author.name}: ${q.content}`}
+                >
+                  {q.author.name}: {q.content.length > 30 ? `${q.content.slice(0, 30)}...` : q.content}
+                </span>
+              ))}
+              {hiddenPreviewCount > 0 && (
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
+                  +{hiddenPreviewCount}개
+                </span>
+              )}
+            </div>
+
             <Button
               onClick={handleBulkAiAnswers}
               disabled={isSendingBulkAi}
-              className="w-full h-11 bg-white text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300 font-semibold"
+              className="h-11 w-full bg-white font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300"
             >
-              {isSendingBulkAi
-                ? `✦ AI 답변 생성 중... (${selectedIds.size}개 질문 처리 중)`
-                : `✦ AI 개별 맞춤 답변 생성 및 전송 (${selectedIds.size}개)`}
+              {isSendingBulkAi ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="h-4 w-4 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
+                    />
+                  </svg>
+                  AI 답변 생성 중... ({selectedIds.size}개 질문 처리 중)
+                </span>
+              ) : (
+                `✦ AI 개별 맞춤 답변 생성 및 전송 (${selectedIds.size}개)`
+              )}
             </Button>
 
             {bulkMsg && (
@@ -822,9 +859,8 @@ export default function QuestionsPage() {
                 }`}
               >
                 {bulkMsg.type === "success" && (
-                  <span className="relative flex h-3 w-3">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
-                    <span className="relative inline-flex h-3 w-3 rounded-full bg-indigo-600" />
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                    ✓
                   </span>
                 )}
                 <span className={showBulkSuccess ? "animate-pulse" : ""}>{bulkMsg.text}</span>
