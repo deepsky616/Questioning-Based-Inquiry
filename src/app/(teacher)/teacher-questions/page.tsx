@@ -78,8 +78,6 @@ export default function QuestionsPage() {
 
   // 일괄 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkComment, setBulkComment] = useState("");
-  const [isSendingBulk, setIsSendingBulk] = useState(false);
   const [isSendingBulkAi, setIsSendingBulkAi] = useState(false);
   const [bulkMsg, setBulkMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showBulkSuccess, setShowBulkSuccess] = useState(false);
@@ -165,35 +163,6 @@ export default function QuestionsPage() {
       setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "AI 답변 생성에 실패했습니다" });
     } finally {
       setIsSendingBulkAi(false);
-    }
-  };
-
-  const handleBulkComment = async () => {
-    const ids = Array.from(selectedIds);
-    if (!bulkComment.trim() || ids.length === 0) return;
-    setIsSendingBulk(true);
-    setBulkMsg(null);
-    try {
-      const res = await fetch("/api/questions/bulk-comments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionIds: ids, content: bulkComment.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setBulkMsg({ type: "success", text: `${data.success}개 질문에 피드백을 전송했습니다` });
-      setShowBulkSuccess(true);
-      setBulkComment("");
-      window.setTimeout(() => {
-        setSelectedIds(new Set());
-        setBulkMsg(null);
-        setShowBulkSuccess(false);
-      }, 1600);
-    } catch (err) {
-      setShowBulkSuccess(false);
-      setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
-    } finally {
-      setIsSendingBulk(false);
     }
   };
 
@@ -811,7 +780,7 @@ export default function QuestionsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 일괄 피드백 패널 */}
+      {/* AI 일괄 답변 패널 */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-indigo-300 bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 px-4 py-4 shadow-2xl">
           <div className="mx-auto max-w-5xl space-y-3">
@@ -821,53 +790,28 @@ export default function QuestionsPage() {
                   {selectedIds.size}
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-white">선택한 질문에 일괄 피드백 전송</p>
-                  <p className="text-xs text-indigo-100">AI가 각 질문을 분석하여 개별 맞춤 답변을 자동 생성합니다</p>
+                  <p className="text-sm font-semibold text-white">AI 개별 맞춤 답변 전송</p>
+                  <p className="text-xs text-indigo-100">각 학생의 질문을 AI가 분석하여 개별 맞춤 답변을 동시에 생성하고 댓글로 전송합니다</p>
                 </div>
               </div>
               <button
                 onClick={clearSelection}
-                className="self-start rounded-md px-2 py-1 text-xs font-medium text-indigo-100 underline-offset-4 hover:bg-white/10 hover:text-white hover:underline sm:self-auto"
+                disabled={isSendingBulkAi}
+                className="self-start rounded-md px-2 py-1 text-xs font-medium text-indigo-100 underline-offset-4 hover:bg-white/10 hover:text-white hover:underline disabled:opacity-40 sm:self-auto"
               >
                 선택 해제
               </button>
             </div>
 
-            {/* AI 개별 답변 버튼 */}
             <Button
               onClick={handleBulkAiAnswers}
-              disabled={isSendingBulkAi || isSendingBulk}
+              disabled={isSendingBulkAi}
               className="w-full h-11 bg-white text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300 font-semibold"
             >
               {isSendingBulkAi
-                ? `AI 개별 답변 생성 중... (${selectedIds.size}개)`
-                : `✦ AI 개별 답변 생성 및 전송 (${selectedIds.size}개)`}
+                ? `✦ AI 답변 생성 중... (${selectedIds.size}개 질문 처리 중)`
+                : `✦ AI 개별 맞춤 답변 생성 및 전송 (${selectedIds.size}개)`}
             </Button>
-
-            {/* 구분선 */}
-            <div className="flex items-center gap-2 text-indigo-200 text-xs">
-              <div className="flex-1 border-t border-indigo-400/50" />
-              <span>또는 동일 내용 수동 전송</span>
-              <div className="flex-1 border-t border-indigo-400/50" />
-            </div>
-
-            {/* 수동 피드백 */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <Textarea
-                placeholder="선택한 모든 질문에 동일하게 전송될 피드백을 입력하세요..."
-                value={bulkComment}
-                onChange={(e) => setBulkComment(e.target.value)}
-                rows={2}
-                className="min-h-[72px] flex-1 resize-none border-white/20 bg-white text-sm shadow-sm placeholder:text-gray-400"
-              />
-              <Button
-                onClick={handleBulkComment}
-                disabled={isSendingBulk || isSendingBulkAi || !bulkComment.trim()}
-                className="h-10 shrink-0 bg-white/20 px-5 text-white shadow-sm hover:bg-white/30 disabled:bg-white/10 disabled:text-indigo-300 border border-white/30"
-              >
-                {isSendingBulk ? "전송 중..." : "일괄 전송"}
-              </Button>
-            </div>
 
             {bulkMsg && (
               <div
