@@ -63,6 +63,7 @@ export default function QuestionsPage() {
   const [comment, setComment] = useState("");
   const [correctionMsg, setCorrectionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSavingCorrection, setIsSavingCorrection] = useState(false);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
@@ -557,9 +558,34 @@ export default function QuestionsPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>코멘트 (선택)</Label>
+                <div className="flex items-center justify-between">
+                  <Label>댓글 (선택)</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isGeneratingAi || !selectedQuestion}
+                    onClick={async () => {
+                      if (!selectedQuestion) return;
+                      setIsGeneratingAi(true);
+                      setCorrectionMsg(null);
+                      try {
+                        const res = await fetch(`/api/questions/${selectedQuestion.id}/ai-answer`, { method: "POST" });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error);
+                        setComment(data.answer);
+                      } catch (err) {
+                        setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : "AI 답변 생성 실패" });
+                      } finally {
+                        setIsGeneratingAi(false);
+                      }
+                    }}
+                    className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 text-xs h-7"
+                  >
+                    {isGeneratingAi ? "AI 생성 중..." : "✦ AI 답변 생성"}
+                  </Button>
+                </div>
                 <Textarea
-                  placeholder="학생에게 피드백을 남겨보세요..."
+                  placeholder="학생에게 댓글을 남겨보세요... (AI 답변 생성 후 편집 가능)"
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   rows={3}
