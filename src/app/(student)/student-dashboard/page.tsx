@@ -5,6 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { StatBar } from "@/components/shared/StatBar";
+import { getSessionUser } from "@/lib/auth-helpers";
+import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
 
 interface Question {
   id: string;
@@ -20,33 +23,11 @@ interface Stats {
   byCognitive: { factual: number; interpretive: number; evaluative: number };
 }
 
-const CLOSURE_STYLE: Record<string, string> = {
-  closed: "bg-blue-100 text-blue-700",
-  open: "bg-green-100 text-green-700",
-};
-const CLOSURE_LABEL: Record<string, string> = { closed: "폐쇄형", open: "개방형" };
-const COGNITIVE_STYLE: Record<string, string> = {
-  factual: "bg-gray-100 text-gray-700",
-  interpretive: "bg-purple-100 text-purple-700",
-  evaluative: "bg-orange-100 text-orange-700",
-};
-const COGNITIVE_LABEL: Record<string, string> = { factual: "사실적", interpretive: "해석적", evaluative: "평가적" };
-
-function Bar({ value, total, color }: { value: number; total: number; color: string }) {
-  const pct = total === 0 ? 0 : Math.round((value / total) * 100);
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs text-gray-500 w-8 text-right">{pct}%</span>
-    </div>
-  );
-}
-
 export default function StudentDashboard() {
   const { data: session } = useSession();
+  const user = getSessionUser(session);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({
     total: 0,
     byClosure: { closed: 0, open: 0 },
@@ -54,9 +35,9 @@ export default function StudentDashboard() {
   });
 
   useEffect(() => {
-    const userId = (session?.user as { id?: string })?.id;
-    if (!userId) return;
-    fetch(`/api/questions?authorId=${userId}`)
+    if (!user.id) return;
+    setIsLoading(true);
+    fetch(`/api/questions?authorId=${user.id}`)
       .then((r) => r.json())
       .then((data: Question[]) => {
         setQuestions(data.slice(0, 5));
@@ -73,15 +54,16 @@ export default function StudentDashboard() {
           },
         });
       })
-      .catch(() => {});
-  }, [session]);
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  }, [user.id]);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">
-            안녕하세요, {(session?.user as { name?: string })?.name} 학생!
+            안녕하세요, {user.name} 학생!
           </h2>
           <p className="text-gray-600">오늘도 좋은 질문을 만들어 보세요</p>
         </div>
@@ -90,6 +72,10 @@ export default function StudentDashboard() {
         </Link>
       </div>
 
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-400">로딩 중...</div>
+      ) : (
+        <>
       {/* 총 질문 수 */}
       <Card>
         <CardContent className="pt-6">
@@ -113,7 +99,7 @@ export default function StudentDashboard() {
                 </div>
                 <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
               </div>
-              <Bar value={stats.byClosure.closed} total={stats.total} color="bg-blue-500" />
+              <StatBar value={stats.byClosure.closed} total={stats.total} color="bg-blue-500" />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -123,7 +109,7 @@ export default function StudentDashboard() {
                 </div>
                 <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
               </div>
-              <Bar value={stats.byClosure.open} total={stats.total} color="bg-green-500" />
+              <StatBar value={stats.byClosure.open} total={stats.total} color="bg-green-500" />
             </div>
           </div>
         </CardContent>
@@ -144,7 +130,7 @@ export default function StudentDashboard() {
                 </div>
                 <span className="text-2xl font-bold text-gray-700">{stats.byCognitive.factual}</span>
               </div>
-              <Bar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
+              <StatBar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -154,7 +140,7 @@ export default function StudentDashboard() {
                 </div>
                 <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.interpretive}</span>
               </div>
-              <Bar value={stats.byCognitive.interpretive} total={stats.total} color="bg-purple-500" />
+              <StatBar value={stats.byCognitive.interpretive} total={stats.total} color="bg-purple-500" />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -164,7 +150,7 @@ export default function StudentDashboard() {
                 </div>
                 <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.evaluative}</span>
               </div>
-              <Bar value={stats.byCognitive.evaluative} total={stats.total} color="bg-orange-500" />
+              <StatBar value={stats.byCognitive.evaluative} total={stats.total} color="bg-orange-500" />
             </div>
           </div>
         </CardContent>
@@ -205,6 +191,8 @@ export default function StudentDashboard() {
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   );
 }

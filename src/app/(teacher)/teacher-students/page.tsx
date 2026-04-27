@@ -19,7 +19,7 @@ interface Student {
   total: number;
   distribution: { closed: number; open: number };
   cognitiveDistribution: { factual: number; interpretive: number; evaluative: number };
-  trend: number;
+  trend: number | null;
 }
 
 export default function StudentsPage() {
@@ -41,7 +41,8 @@ export default function StudentsPage() {
     }
   };
 
-  const getTrendIcon = (trend: number) => {
+  const getTrendIcon = (trend: number | null) => {
+    if (trend === null) return <span className="text-gray-400 text-xs">신규</span>;
     if (trend > 0) return <span className="text-green-600">▲{trend}%</span>;
     if (trend < 0) return <span className="text-red-600">▼{Math.abs(trend)}%</span>;
     return <span className="text-gray-400">-</span>;

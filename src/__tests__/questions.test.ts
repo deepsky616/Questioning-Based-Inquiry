@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment } from "@/lib/questions";
 
 describe("buildQuestionCreateData", () => {
   const baseData = {
@@ -136,5 +136,20 @@ describe("canPatchQuestion", () => {
 
   it("role이 없으면 수정할 수 없다", () => {
     expect(canPatchQuestion(undefined, "u1", "u1", ["isPublic"])).toBe(false);
+  });
+});
+
+describe("canCreateComment", () => {
+  it("교사는 코멘트를 작성할 수 있다", () => {
+    expect(canCreateComment("TEACHER")).toBe(true);
+  });
+
+  it("학생은 코멘트를 작성할 수 없다", () => {
+    expect(canCreateComment("STUDENT")).toBe(false);
+  });
+
+  it("role이 없으면 코멘트를 작성할 수 없다", () => {
+    expect(canCreateComment(undefined)).toBe(false);
+    expect(canCreateComment(null)).toBe(false);
   });
 });

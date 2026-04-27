@@ -47,6 +47,10 @@ export function buildQuestionCreateData(
   };
 }
 
+export function canCreateComment(role: string | null | undefined): boolean {
+  return role === "TEACHER";
+}
+
 export function canPatchQuestion(
   role: string | null | undefined,
   userId: string,

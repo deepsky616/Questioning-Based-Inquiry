@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
 import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
 
 interface QuestionSession {
@@ -43,18 +44,6 @@ interface Question {
   comments?: Array<{ id: string; content: string; author: { name: string }; createdAt: string }>;
 }
 
-const CLOSURE_LABEL: Record<string, string> = { closed: "폐쇄형", open: "개방형" };
-const COGNITIVE_LABEL: Record<string, string> = { factual: "사실적", interpretive: "해석적", evaluative: "평가적" };
-const CLOSURE_STYLE: Record<string, string> = {
-  closed: "bg-blue-100 text-blue-700",
-  open: "bg-green-100 text-green-700",
-};
-const COGNITIVE_STYLE: Record<string, string> = {
-  factual: "bg-gray-100 text-gray-700",
-  interpretive: "bg-purple-100 text-purple-700",
-  evaluative: "bg-orange-100 text-orange-700",
-};
-
 function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className={`flex flex-col items-center px-4 py-2 rounded-lg ${color}`}>
@@ -72,6 +61,8 @@ export default function QuestionsPage() {
   const [correctionClosure, setCorrectionClosure] = useState("");
   const [correctionCognitive, setCorrectionCognitive] = useState("");
   const [comment, setComment] = useState("");
+  const [correctionMsg, setCorrectionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [isSavingCorrection, setIsSavingCorrection] = useState(false);
 
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
@@ -140,14 +131,33 @@ export default function QuestionsPage() {
 
   const handleSaveCorrection = async () => {
     if (!selectedQuestion) return;
-    await fetch(`/api/questions/${selectedQuestion.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ closure: correctionClosure, cognitive: correctionCognitive }),
-    });
-    setSelectedQuestion(null);
-    setComment("");
-    fetchQuestions(selectedSessionId);
+    setIsSavingCorrection(true);
+    setCorrectionMsg(null);
+    try {
+      const patchRes = await fetch(`/api/questions/${selectedQuestion.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ closure: correctionClosure, cognitive: correctionCognitive }),
+      });
+      if (!patchRes.ok) throw new Error("분류 수정에 실패했습니다");
+
+      if (comment.trim()) {
+        const commentRes = await fetch(`/api/questions/${selectedQuestion.id}/comments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: comment.trim() }),
+        });
+        if (!commentRes.ok) throw new Error("코멘트 저장에 실패했습니다");
+      }
+
+      setSelectedQuestion(null);
+      setComment("");
+      fetchQuestions(selectedSessionId);
+    } catch (err) {
+      setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : "저장에 실패했습니다" });
+    } finally {
+      setIsSavingCorrection(false);
+    }
   };
 
   const filtered = questions.filter(
@@ -557,9 +567,16 @@ export default function QuestionsPage() {
               </div>
             </div>
           )}
+          {correctionMsg && (
+            <p className={`text-sm ${correctionMsg.type === "error" ? "text-red-600" : "text-green-700"}`}>
+              {correctionMsg.text}
+            </p>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedQuestion(null)}>취소</Button>
-            <Button onClick={handleSaveCorrection}>저장</Button>
+            <Button variant="outline" onClick={() => { setSelectedQuestion(null); setCorrectionMsg(null); }}>취소</Button>
+            <Button onClick={handleSaveCorrection} disabled={isSavingCorrection}>
+              {isSavingCorrection ? "저장 중..." : "저장"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
