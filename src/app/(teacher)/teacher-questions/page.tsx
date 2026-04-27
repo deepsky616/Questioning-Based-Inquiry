@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
 import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
-import { formatBulkAiSummary, countQuestionsWithComments } from "@/lib/questions";
+import { formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
 
 interface QuestionSession {
   id: string;
@@ -81,7 +81,17 @@ export default function QuestionsPage() {
 
   // 일괄 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isSendingBulkAi, setIsSendingBulkAi] = useState(false);
+  // 미리보기 2단계 플로우
+  const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
+  const [bulkPreviews, setBulkPreviews] = useState<Array<{
+    questionId: string;
+    questionContent: string;
+    authorName: string;
+    authorInfo: string;
+    answer: string;
+  }> | null>(null);
+  const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
+  const [isSendingPreviews, setIsSendingPreviews] = useState(false);
   const [bulkMsg, setBulkMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showBulkSuccess, setShowBulkSuccess] = useState(false);
 
@@ -118,6 +128,8 @@ export default function QuestionsPage() {
     setSessionAnalysis(null);
     setSessionAnalysisError(null);
     setSelectedIds(new Set());
+    setBulkPreviews(null);
+    setEditedAnswers({});
     setBulkMsg(null);
     setShowBulkSuccess(false);
     fetchQuestions(val);
@@ -137,35 +149,112 @@ export default function QuestionsPage() {
 
   const clearSelection = () => {
     setSelectedIds(new Set());
+    setBulkPreviews(null);
+    setEditedAnswers({});
     setBulkMsg(null);
     setShowBulkSuccess(false);
   };
 
-  const handleBulkAiAnswers = async () => {
+  // 1단계: AI 답변 미리보기 생성 (저장 없음)
+  const handlePreviewBulkAi = async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    setIsSendingBulkAi(true);
+    setIsGeneratingPreviews(true);
+    setBulkMsg(null);
+    setBulkPreviews(null);
+    try {
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          const res = await fetch(`/api/questions/${id}/ai-answer`, { method: "POST" });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error);
+          const q = questions.find((q) => q.id === id);
+          const authorInfo = [
+            q?.author.grade && `${q.author.grade}학년`,
+            q?.author.className && `${q.author.className}반`,
+            q?.author.studentNumber && `${q.author.studentNumber}번`,
+          ].filter(Boolean).join(" ");
+          return {
+            questionId: id,
+            questionContent: q?.content ?? "",
+            authorName: q?.author.name ?? "",
+            authorInfo,
+            answer: (data.answer as string) ?? "",
+          };
+        })
+      );
+      const previews = results
+        .filter(
+          (r): r is PromiseFulfilledResult<{
+            questionId: string;
+            questionContent: string;
+            authorName: string;
+            authorInfo: string;
+            answer: string;
+          }> => r.status === "fulfilled"
+        )
+        .map((r) => r.value);
+
+      if (previews.length === 0) {
+        setBulkMsg({ type: "error", text: "AI 답변 생성에 실패했습니다. API 키를 확인해 주세요." });
+      } else {
+        const initial: Record<string, string> = {};
+        previews.forEach((p) => { initial[p.questionId] = p.answer; });
+        setEditedAnswers(initial);
+        setBulkPreviews(previews);
+        if (previews.length < ids.length) {
+          setBulkMsg({
+            type: "error",
+            text: `${ids.length - previews.length}개 질문의 AI 답변 생성에 실패했습니다`,
+          });
+        }
+      }
+    } catch (err) {
+      setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "AI 답변 생성에 실패했습니다" });
+    } finally {
+      setIsGeneratingPreviews(false);
+    }
+  };
+
+  // 2단계: 교사 확인 후 댓글로 전송
+  const handleConfirmBulkAi = async () => {
+    if (!bulkPreviews || bulkPreviews.length === 0) return;
+    const validationError = validatePreviewAnswers(
+      bulkPreviews.map((p) => ({ questionId: p.questionId, answer: editedAnswers[p.questionId] ?? p.answer }))
+    );
+    if (validationError) {
+      setBulkMsg({ type: "error", text: validationError });
+      return;
+    }
+    setIsSendingPreviews(true);
     setBulkMsg(null);
     try {
-      const res = await fetch("/api/questions/bulk-ai-answers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionIds: ids }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setBulkMsg({ type: "success", text: formatBulkAiSummary(data.success, ids.length) });
+      const results = await Promise.allSettled(
+        bulkPreviews.map(async (p) => {
+          const answer = (editedAnswers[p.questionId] ?? p.answer).trim();
+          const res = await fetch(`/api/questions/${p.questionId}/comments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ content: answer }),
+          });
+          if (!res.ok) throw new Error("전송 실패");
+        })
+      );
+      const success = results.filter((r) => r.status === "fulfilled").length;
+      setBulkPreviews(null);
+      setEditedAnswers({});
+      setBulkMsg({ type: "success", text: formatBulkAiSummary(success, bulkPreviews.length) });
       setShowBulkSuccess(true);
       window.setTimeout(() => {
         setSelectedIds(new Set());
         setBulkMsg(null);
         setShowBulkSuccess(false);
+        fetchQuestions(selectedSessionId);
       }, 2000);
     } catch (err) {
-      setShowBulkSuccess(false);
-      setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "AI 답변 생성에 실패했습니다" });
+      setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
     } finally {
-      setIsSendingBulkAi(false);
+      setIsSendingPreviews(false);
     }
   };
 
@@ -364,44 +453,92 @@ export default function QuestionsPage() {
     );
     return (
       <div className="space-y-4">
-        {list.map((q) => (
-          <div key={q.id} className="border rounded-xl bg-white overflow-hidden shadow-sm">
-            <div className="px-4 py-3 bg-gray-50 border-b flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                  <span className="text-sm font-semibold text-gray-900">{q.author.name}</span>
-                  {q.author.className && (
-                    <span className="text-xs text-gray-400">
-                      {q.author.grade && `${q.author.grade}학년 `}{q.author.className}반
-                      {q.author.studentNumber && ` ${q.author.studentNumber}번`}
-                    </span>
-                  )}
-                  <div className="ml-auto flex gap-1.5 shrink-0">
-                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${CLOSURE_STYLE[q.closure]}`}>
-                      {CLOSURE_LABEL[q.closure]}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
-                      {COGNITIVE_LABEL[q.cognitive]}
-                    </span>
+        {list.map((q) => {
+          const studentInfo = [
+            q.author.grade ? `${q.author.grade}학년` : null,
+            q.author.className ? `${q.author.className}반` : null,
+            q.author.studentNumber ? `${q.author.studentNumber}번` : null,
+          ].filter(Boolean).join(" ");
+          const initial = q.author.name.trim().slice(0, 1) || "?";
+
+          return (
+            <div key={q.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+              <div className="border-b bg-gradient-to-r from-indigo-50 via-white to-gray-50 px-4 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white shadow-sm">
+                    {initial}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex items-center gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{q.author.name}</p>
+                        {studentInfo && (
+                          <p className="text-xs text-gray-500">{studentInfo}</p>
+                        )}
+                      </div>
+                      <div className="ml-auto flex shrink-0 gap-1.5">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CLOSURE_STYLE[q.closure]}`}>
+                          {CLOSURE_LABEL[q.closure]}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
+                          {COGNITIVE_LABEL[q.cognitive]}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="break-words text-sm leading-relaxed text-gray-800">{q.content}</p>
                   </div>
                 </div>
-                <p className="text-sm text-gray-800 leading-relaxed break-words">{q.content}</p>
+              </div>
+              <div className="space-y-2 px-4 py-3">
+                {(q.comments?.length ?? 0) === 0 ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-xs text-gray-400">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white text-base leading-none text-gray-400">
+                      +
+                    </span>
+                    아직 댓글이 없습니다
+                  </div>
+                ) : (
+                  q.comments!.map((c) => {
+                    const isStudentComment = c.author.name === q.author.name;
+
+                    return (
+                      <div
+                        key={c.id}
+                        className={`rounded-lg border px-3 py-2.5 ${
+                          isStudentComment
+                            ? "border-gray-200 bg-gray-50"
+                            : "border-indigo-100 bg-indigo-50"
+                        }`}
+                      >
+                        <div className="mb-1 flex items-center gap-2">
+                          <span
+                            className={`text-xs font-semibold ${
+                              isStudentComment ? "text-gray-700" : "text-indigo-700"
+                            }`}
+                          >
+                            {c.author.name}
+                          </span>
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                              isStudentComment
+                                ? "bg-white text-gray-500"
+                                : "bg-white text-indigo-700"
+                            }`}
+                          >
+                            {isStudentComment ? "학생" : "교사 · AI"}
+                          </span>
+                        </div>
+                        <p className={`text-xs leading-relaxed ${isStudentComment ? "text-gray-700" : "text-indigo-950"}`}>
+                          {c.content}
+                        </p>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
-            <div className="divide-y divide-gray-100">
-              {(q.comments?.length ?? 0) === 0 ? (
-                <p className="px-4 py-3 text-xs text-gray-400">아직 댓글이 없습니다</p>
-              ) : (
-                q.comments!.map((c) => (
-                  <div key={c.id} className="px-4 py-2.5 flex gap-3">
-                    <span className="text-xs font-semibold text-indigo-700 shrink-0 pt-0.5">{c.author.name}</span>
-                    <p className="text-xs text-gray-700 leading-relaxed">{c.content}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -531,9 +668,9 @@ export default function QuestionsPage() {
                 viewMode === "table"
                   ? "bg-indigo-600 text-white"
                   : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
+                }`}
             >
-              목록
+              ☰ 목록
             </button>
             <button
               onClick={() => setViewMode("cards")}
@@ -541,9 +678,9 @@ export default function QuestionsPage() {
                 viewMode === "cards"
                   ? "bg-indigo-600 text-white"
                   : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
+                }`}
             >
-              질문·댓글
+              ▦ 질문·댓글
             </button>
           </div>
         </div>
@@ -629,8 +766,11 @@ export default function QuestionsPage() {
                 if (sessionQuestions.length === 0) return null;
                 return (
                   <div key={s.id}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-sm font-semibold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full">
+                    <div className="mb-3 flex items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm shadow-sm">
+                        📅
+                      </span>
+                      <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-indigo-700 shadow-sm">
                         {buildSessionLabel(s.date, s.subject, s.topic)}
                       </span>
                       <span className="text-xs text-gray-400">
@@ -646,8 +786,11 @@ export default function QuestionsPage() {
                 if (noSession.length === 0) return null;
                 return (
                   <div>
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-sm font-semibold text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    <div className="mb-3 flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm shadow-sm">
+                        📁
+                      </span>
+                      <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-gray-600 shadow-sm">
                         세션 없는 질문
                       </span>
                       <span className="text-xs text-gray-400">
@@ -914,6 +1057,66 @@ export default function QuestionsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* AI 답변 미리보기 Dialog */}
+      <Dialog open={!!bulkPreviews} onOpenChange={() => { if (!isSendingPreviews) { setBulkPreviews(null); setEditedAnswers({}); } }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>AI 개별 답변 미리보기 및 확인</DialogTitle>
+            <p className="text-sm text-gray-500 mt-1">
+              각 학생의 질문에 맞게 AI가 생성한 답변입니다. 내용을 검토하고 필요시 수정 후 전송하세요.
+            </p>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
+            {bulkPreviews?.map((preview) => (
+              <div key={preview.questionId} className="rounded-xl border bg-gray-50 overflow-hidden">
+                <div className="px-4 py-3 border-b bg-white">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-gray-900">{preview.authorName}</span>
+                    {preview.authorInfo && (
+                      <span className="text-xs text-gray-400">{preview.authorInfo}</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed">{preview.questionContent}</p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-xs font-semibold text-indigo-600 mb-1.5">AI 생성 답변 (수정 가능)</p>
+                  <Textarea
+                    value={editedAnswers[preview.questionId] ?? preview.answer}
+                    onChange={(e) =>
+                      setEditedAnswers((prev) => ({ ...prev, [preview.questionId]: e.target.value }))
+                    }
+                    rows={3}
+                    className="text-sm resize-none"
+                    disabled={isSendingPreviews}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          {bulkMsg?.type === "error" && (
+            <p className="text-sm text-red-600 mt-1">{bulkMsg.text}</p>
+          )}
+          <DialogFooter className="gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => { setBulkPreviews(null); setEditedAnswers({}); setBulkMsg(null); }}
+              disabled={isSendingPreviews}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleConfirmBulkAi}
+              disabled={isSendingPreviews}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            >
+              {isSendingPreviews
+                ? "전송 중..."
+                : `${bulkPreviews?.length ?? 0}개 답변 전송`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* AI 일괄 답변 패널 */}
       {selectedIds.size > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-indigo-300 bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 px-4 py-4 shadow-2xl">
@@ -930,7 +1133,7 @@ export default function QuestionsPage() {
               </div>
               <button
                 onClick={clearSelection}
-                disabled={isSendingBulkAi}
+                disabled={isGeneratingPreviews || isSendingPreviews}
                 className="self-start rounded-md px-2 py-1 text-xs font-medium text-indigo-100 underline-offset-4 hover:bg-white/10 hover:text-white hover:underline disabled:opacity-40 sm:self-auto"
               >
                 선택 해제
@@ -955,29 +1158,20 @@ export default function QuestionsPage() {
             </div>
 
             <Button
-              onClick={handleBulkAiAnswers}
-              disabled={isSendingBulkAi}
+              onClick={handlePreviewBulkAi}
+              disabled={isGeneratingPreviews || isSendingPreviews}
               className="h-11 w-full bg-white font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300"
             >
-              {isSendingBulkAi ? (
+              {isGeneratingPreviews ? (
                 <span className="flex items-center justify-center gap-2">
-                  <svg
-                    className="h-4 w-4 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    aria-hidden="true"
-                  >
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
-                    />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
                   </svg>
-                  AI 답변 생성 중... ({selectedIds.size}개 질문 처리 중)
+                  AI 답변 생성 중... ({selectedIds.size}개 질문 분석 중)
                 </span>
               ) : (
-                `✦ AI 개별 맞춤 답변 생성 및 전송 (${selectedIds.size}개)`
+                `✦ AI 개별 답변 미리보기 (${selectedIds.size}개)`
               )}
             </Button>
 

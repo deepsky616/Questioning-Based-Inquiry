@@ -70,6 +70,14 @@ export function countQuestionsWithComments(
   return questions.filter((q) => (q.comments?.length ?? 0) > 0).length;
 }
 
+export function validatePreviewAnswers(
+  previews: Array<{ questionId: string; answer: string }>
+): string | null {
+  if (previews.length === 0) return "생성된 답변이 없습니다";
+  if (previews.some((p) => !p.answer.trim())) return "비어있는 답변이 있습니다. 확인 후 전송해 주세요";
+  return null;
+}
+
 export function canCreateComment(role: string | null | undefined, isPublic: boolean): boolean {
   if (role === "TEACHER") return true;
   if (role === "STUDENT" && isPublic) return true;

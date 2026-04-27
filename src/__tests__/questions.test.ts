@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback, validateBulkAiRequest, formatBulkAiSummary, countQuestionsWithComments } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback, validateBulkAiRequest, formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
 
 describe("buildQuestionCreateData", () => {
   const baseData = {
@@ -234,5 +234,32 @@ describe("countQuestionsWithComments", () => {
 
   it("질문 목록이 비어있으면 0을 반환한다", () => {
     expect(countQuestionsWithComments([])).toBe(0);
+  });
+});
+
+describe("validatePreviewAnswers", () => {
+  it("모든 답변이 유효하면 null을 반환한다", () => {
+    const previews = [
+      { questionId: "q1", answer: "광합성은 빛 에너지를 화학 에너지로 변환하는 과정입니다." },
+      { questionId: "q2", answer: "지구는 자전축을 중심으로 약 24시간 주기로 회전합니다." },
+    ];
+    expect(validatePreviewAnswers(previews)).toBeNull();
+  });
+
+  it("미리보기 목록이 비어있으면 에러를 반환한다", () => {
+    expect(validatePreviewAnswers([])).not.toBeNull();
+  });
+
+  it("빈 문자열 답변이 있으면 에러를 반환한다", () => {
+    const previews = [
+      { questionId: "q1", answer: "" },
+      { questionId: "q2", answer: "정상 답변" },
+    ];
+    expect(validatePreviewAnswers(previews)).not.toBeNull();
+  });
+
+  it("공백만 있는 답변은 유효하지 않다", () => {
+    const previews = [{ questionId: "q1", answer: "   " }];
+    expect(validatePreviewAnswers(previews)).not.toBeNull();
   });
 });
