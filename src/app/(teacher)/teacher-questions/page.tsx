@@ -80,6 +80,7 @@ export default function QuestionsPage() {
   const [bulkComment, setBulkComment] = useState("");
   const [isSendingBulk, setIsSendingBulk] = useState(false);
   const [bulkMsg, setBulkMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [showBulkSuccess, setShowBulkSuccess] = useState(false);
 
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
@@ -115,6 +116,7 @@ export default function QuestionsPage() {
     setSessionAnalysisError(null);
     setSelectedIds(new Set());
     setBulkMsg(null);
+    setShowBulkSuccess(false);
     fetchQuestions(val);
   };
 
@@ -133,6 +135,7 @@ export default function QuestionsPage() {
   const clearSelection = () => {
     setSelectedIds(new Set());
     setBulkMsg(null);
+    setShowBulkSuccess(false);
   };
 
   const handleBulkComment = async () => {
@@ -149,9 +152,15 @@ export default function QuestionsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setBulkMsg({ type: "success", text: `${data.success}개 질문에 피드백을 전송했습니다` });
+      setShowBulkSuccess(true);
       setBulkComment("");
-      clearSelection();
+      window.setTimeout(() => {
+        setSelectedIds(new Set());
+        setBulkMsg(null);
+        setShowBulkSuccess(false);
+      }, 1600);
     } catch (err) {
+      setShowBulkSuccess(false);
       setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
     } finally {
       setIsSendingBulk(false);
@@ -774,39 +783,57 @@ export default function QuestionsPage() {
 
       {/* 일괄 피드백 패널 */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-indigo-200 shadow-lg px-6 py-4">
-          <div className="max-w-4xl mx-auto space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-indigo-700">
-                {selectedIds.size}개 질문 선택됨 — 일괄 피드백
-              </span>
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-indigo-300 bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 px-4 py-4 shadow-2xl">
+          <div className="mx-auto max-w-5xl space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-lg font-bold text-indigo-700 shadow-sm">
+                  {selectedIds.size}
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-white">선택한 질문에 일괄 피드백 전송</p>
+                  <p className="text-xs text-indigo-100">일괄 피드백은 AI 없이 동일 내용이 전송됩니다</p>
+                </div>
+              </div>
               <button
                 onClick={clearSelection}
-                className="text-xs text-gray-400 hover:text-gray-600 underline"
+                className="self-start rounded-md px-2 py-1 text-xs font-medium text-indigo-100 underline-offset-4 hover:bg-white/10 hover:text-white hover:underline sm:self-auto"
               >
                 선택 해제
               </button>
             </div>
-            <div className="flex gap-3 items-end">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <Textarea
                 placeholder="선택한 모든 질문에 전송될 피드백을 입력하세요..."
                 value={bulkComment}
                 onChange={(e) => setBulkComment(e.target.value)}
                 rows={2}
-                className="flex-1 text-sm resize-none"
+                className="min-h-[72px] flex-1 resize-none border-white/20 bg-white text-sm shadow-sm placeholder:text-gray-400"
               />
               <Button
                 onClick={handleBulkComment}
                 disabled={isSendingBulk || !bulkComment.trim()}
-                className="shrink-0 bg-indigo-600 hover:bg-indigo-700"
+                className="h-10 shrink-0 bg-white px-5 text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300"
               >
                 {isSendingBulk ? "전송 중..." : "일괄 전송"}
               </Button>
             </div>
             {bulkMsg && (
-              <p className={`text-xs ${bulkMsg.type === "success" ? "text-green-700" : "text-red-600"}`}>
-                {bulkMsg.text}
-              </p>
+              <div
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
+                  bulkMsg.type === "success"
+                    ? "bg-white text-indigo-700"
+                    : "bg-red-50 text-red-700"
+                }`}
+              >
+                {bulkMsg.type === "success" && (
+                  <span className="relative flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-indigo-600" />
+                  </span>
+                )}
+                <span className={showBulkSuccess ? "animate-pulse" : ""}>{bulkMsg.text}</span>
+              </div>
             )}
           </div>
         </div>
