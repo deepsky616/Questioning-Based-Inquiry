@@ -47,6 +47,12 @@ export function buildQuestionCreateData(
   };
 }
 
+export function validateBulkFeedback(questionIds: string[], content: string): string | null {
+  if (questionIds.length === 0) return "질문을 1개 이상 선택해 주세요";
+  if (!content.trim()) return "피드백 내용을 입력해 주세요";
+  return null;
+}
+
 export function canCreateComment(role: string | null | undefined, isPublic: boolean): boolean {
   if (role === "TEACHER") return true;
   if (role === "STUDENT" && isPublic) return true;

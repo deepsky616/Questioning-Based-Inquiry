@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback } from "@/lib/questions";
 
 describe("buildQuestionCreateData", () => {
   const baseData = {
@@ -159,5 +159,23 @@ describe("canCreateComment", () => {
   it("role이 없으면 코멘트를 작성할 수 없다", () => {
     expect(canCreateComment(undefined, true)).toBe(false);
     expect(canCreateComment(null, true)).toBe(false);
+  });
+});
+
+describe("validateBulkFeedback", () => {
+  it("질문이 1개 이상이고 내용이 있으면 null을 반환한다", () => {
+    expect(validateBulkFeedback(["id1", "id2"], "좋은 질문입니다")).toBeNull();
+  });
+
+  it("질문 목록이 비어있으면 에러 메시지를 반환한다", () => {
+    expect(validateBulkFeedback([], "내용")).not.toBeNull();
+  });
+
+  it("내용이 빈 문자열이면 에러 메시지를 반환한다", () => {
+    expect(validateBulkFeedback(["id1"], "")).not.toBeNull();
+  });
+
+  it("내용이 공백만 있으면 에러 메시지를 반환한다", () => {
+    expect(validateBulkFeedback(["id1"], "   ")).not.toBeNull();
   });
 });

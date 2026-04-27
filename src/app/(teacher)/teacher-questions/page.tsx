@@ -75,6 +75,12 @@ export default function QuestionsPage() {
   const [sessionAnalysis, setSessionAnalysis] = useState<SessionAnalysis | null>(null);
   const [sessionAnalysisError, setSessionAnalysisError] = useState<string | null>(null);
 
+  // 일괄 선택 상태
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkComment, setBulkComment] = useState("");
+  const [isSendingBulk, setIsSendingBulk] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("all");
@@ -107,7 +113,49 @@ export default function QuestionsPage() {
     setSearch("");
     setSessionAnalysis(null);
     setSessionAnalysisError(null);
+    setSelectedIds(new Set());
+    setBulkMsg(null);
     fetchQuestions(val);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = (list: Question[]) => {
+    setSelectedIds(new Set(list.map((q) => q.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setBulkMsg(null);
+  };
+
+  const handleBulkComment = async () => {
+    const ids = Array.from(selectedIds);
+    if (!bulkComment.trim() || ids.length === 0) return;
+    setIsSendingBulk(true);
+    setBulkMsg(null);
+    try {
+      const res = await fetch("/api/questions/bulk-comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ questionIds: ids, content: bulkComment.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setBulkMsg({ type: "success", text: `${data.success}개 질문에 피드백을 전송했습니다` });
+      setBulkComment("");
+      clearSelection();
+    } catch (err) {
+      setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
+    } finally {
+      setIsSendingBulk(false);
+    }
   };
 
   const handleCreateSession = async () => {
@@ -206,8 +254,9 @@ export default function QuestionsPage() {
 
   const currentSession = sessions.find((s) => s.id === selectedSessionId);
 
-  const QuestionTable = ({ list }: { list: Question[] }) =>
-    list.length === 0 ? (
+  const QuestionTable = ({ list }: { list: Question[] }) => {
+    const allChecked = list.length > 0 && list.every((q) => selectedIds.has(q.id));
+    return list.length === 0 ? (
       <div className="text-center py-8 text-gray-400 text-sm">
         {search ? "검색 결과가 없습니다" : "해당하는 질문이 없습니다"}
       </div>
@@ -215,6 +264,14 @@ export default function QuestionsPage() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-8">
+              <input
+                type="checkbox"
+                checked={allChecked}
+                onChange={() => allChecked ? clearSelection() : selectAll(list)}
+                className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
+              />
+            </TableHead>
             <TableHead>학생</TableHead>
             <TableHead>질문 내용</TableHead>
             {selectedSessionId === "all" && <TableHead className="w-36">세션</TableHead>}
@@ -225,7 +282,15 @@ export default function QuestionsPage() {
         </TableHeader>
         <TableBody>
           {list.map((q) => (
-            <TableRow key={q.id}>
+            <TableRow key={q.id} className={selectedIds.has(q.id) ? "bg-indigo-50/40" : ""}>
+              <TableCell>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(q.id)}
+                  onChange={() => toggleSelect(q.id)}
+                  className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
+                />
+              </TableCell>
               <TableCell>
                 <div className="text-sm font-medium">{q.author.name}</div>
                 {q.author.className && (
@@ -277,6 +342,7 @@ export default function QuestionsPage() {
         </TableBody>
       </Table>
     );
+  };
 
   return (
     <div className="space-y-6">
@@ -485,7 +551,18 @@ export default function QuestionsPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50">
-                    <TableHead className="w-8">#</TableHead>
+                    <TableHead className="w-8">
+                      <input
+                        type="checkbox"
+                        checked={filtered.length > 0 && filtered.every((q) => selectedIds.has(q.id))}
+                        onChange={() =>
+                          filtered.every((q) => selectedIds.has(q.id))
+                            ? clearSelection()
+                            : selectAll(filtered)
+                        }
+                        className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
+                      />
+                    </TableHead>
                     <TableHead className="w-28">학생</TableHead>
                     <TableHead>질문 내용</TableHead>
                     <TableHead className="w-20 text-center">폐쇄/개방</TableHead>
@@ -497,9 +574,16 @@ export default function QuestionsPage() {
                   {filtered.map((q, i) => (
                     <TableRow
                       key={q.id}
-                      className={i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
+                      className={selectedIds.has(q.id) ? "bg-indigo-50/40" : i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
                     >
-                      <TableCell className="text-gray-400 text-xs">{i + 1}</TableCell>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(q.id)}
+                          onChange={() => toggleSelect(q.id)}
+                          className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="text-sm font-medium">{q.author.name}</div>
                         {q.author.className && (
@@ -687,6 +771,46 @@ export default function QuestionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 일괄 피드백 패널 */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-indigo-200 shadow-lg px-6 py-4">
+          <div className="max-w-4xl mx-auto space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-indigo-700">
+                {selectedIds.size}개 질문 선택됨 — 일괄 피드백
+              </span>
+              <button
+                onClick={clearSelection}
+                className="text-xs text-gray-400 hover:text-gray-600 underline"
+              >
+                선택 해제
+              </button>
+            </div>
+            <div className="flex gap-3 items-end">
+              <Textarea
+                placeholder="선택한 모든 질문에 전송될 피드백을 입력하세요..."
+                value={bulkComment}
+                onChange={(e) => setBulkComment(e.target.value)}
+                rows={2}
+                className="flex-1 text-sm resize-none"
+              />
+              <Button
+                onClick={handleBulkComment}
+                disabled={isSendingBulk || !bulkComment.trim()}
+                className="shrink-0 bg-indigo-600 hover:bg-indigo-700"
+              >
+                {isSendingBulk ? "전송 중..." : "일괄 전송"}
+              </Button>
+            </div>
+            {bulkMsg && (
+              <p className={`text-xs ${bulkMsg.type === "success" ? "text-green-700" : "text-red-600"}`}>
+                {bulkMsg.text}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
