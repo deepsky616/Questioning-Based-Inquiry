@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback, validateBulkAiRequest, formatBulkAiSummary } from "@/lib/questions";
 
 describe("buildQuestionCreateData", () => {
   const baseData = {
@@ -177,5 +177,37 @@ describe("validateBulkFeedback", () => {
 
   it("내용이 공백만 있으면 에러 메시지를 반환한다", () => {
     expect(validateBulkFeedback(["id1"], "   ")).not.toBeNull();
+  });
+});
+
+describe("validateBulkAiRequest", () => {
+  it("질문이 1개 이상이면 null을 반환한다", () => {
+    expect(validateBulkAiRequest(["id1", "id2"])).toBeNull();
+  });
+
+  it("질문 목록이 비어있으면 에러 메시지를 반환한다", () => {
+    expect(validateBulkAiRequest([])).not.toBeNull();
+  });
+
+  it("질문이 정확히 1개여도 유효하다", () => {
+    expect(validateBulkAiRequest(["id1"])).toBeNull();
+  });
+});
+
+describe("formatBulkAiSummary", () => {
+  it("모두 성공하면 성공 메시지를 반환한다", () => {
+    const msg = formatBulkAiSummary(3, 3);
+    expect(msg).toContain("3");
+  });
+
+  it("일부 실패하면 성공/실패 수를 모두 포함한다", () => {
+    const msg = formatBulkAiSummary(2, 3);
+    expect(msg).toContain("2");
+    expect(msg).toContain("1");
+  });
+
+  it("모두 실패하면 결과에 0이 포함된다", () => {
+    const msg = formatBulkAiSummary(0, 3);
+    expect(msg).toContain("0");
   });
 });

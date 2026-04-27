@@ -53,6 +53,17 @@ export function validateBulkFeedback(questionIds: string[], content: string): st
   return null;
 }
 
+export function validateBulkAiRequest(questionIds: string[]): string | null {
+  if (questionIds.length === 0) return "질문을 1개 이상 선택해 주세요";
+  return null;
+}
+
+export function formatBulkAiSummary(success: number, total: number): string {
+  const failed = total - success;
+  if (failed === 0) return `${success}개 질문에 AI 답변을 전송했습니다`;
+  return `${success}개 성공, ${failed}개 실패`;
+}
+
 export function canCreateComment(role: string | null | undefined, isPublic: boolean): boolean {
   if (role === "TEACHER") return true;
   if (role === "STUDENT" && isPublic) return true;
