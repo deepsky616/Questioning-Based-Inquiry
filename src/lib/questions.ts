@@ -47,8 +47,10 @@ export function buildQuestionCreateData(
   };
 }
 
-export function canCreateComment(role: string | null | undefined): boolean {
-  return role === "TEACHER";
+export function canCreateComment(role: string | null | undefined, isPublic: boolean): boolean {
+  if (role === "TEACHER") return true;
+  if (role === "STUDENT" && isPublic) return true;
+  return false;
 }
 
 export function canPatchQuestion(

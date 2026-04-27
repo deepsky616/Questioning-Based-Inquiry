@@ -140,16 +140,24 @@ describe("canPatchQuestion", () => {
 });
 
 describe("canCreateComment", () => {
-  it("교사는 코멘트를 작성할 수 있다", () => {
-    expect(canCreateComment("TEACHER")).toBe(true);
+  it("교사는 공개 질문에 코멘트를 작성할 수 있다", () => {
+    expect(canCreateComment("TEACHER", true)).toBe(true);
   });
 
-  it("학생은 코멘트를 작성할 수 없다", () => {
-    expect(canCreateComment("STUDENT")).toBe(false);
+  it("교사는 비공개 질문에도 코멘트를 작성할 수 있다", () => {
+    expect(canCreateComment("TEACHER", false)).toBe(true);
+  });
+
+  it("학생은 공개 질문에 코멘트를 작성할 수 있다", () => {
+    expect(canCreateComment("STUDENT", true)).toBe(true);
+  });
+
+  it("학생은 비공개 질문에 코멘트를 작성할 수 없다", () => {
+    expect(canCreateComment("STUDENT", false)).toBe(false);
   });
 
   it("role이 없으면 코멘트를 작성할 수 없다", () => {
-    expect(canCreateComment(undefined)).toBe(false);
-    expect(canCreateComment(null)).toBe(false);
+    expect(canCreateComment(undefined, true)).toBe(false);
+    expect(canCreateComment(null, true)).toBe(false);
   });
 });
