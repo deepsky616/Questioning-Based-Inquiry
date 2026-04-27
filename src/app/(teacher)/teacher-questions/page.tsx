@@ -356,6 +356,13 @@ export default function QuestionsPage() {
   const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
   const previewQuestions = selectedQuestions.slice(0, 3);
   const hiddenPreviewCount = Math.max(selectedQuestions.length - previewQuestions.length, 0);
+  const bulkPreviewTotal = bulkPreviews?.length ?? 0;
+  const bulkPreviewReady = bulkPreviews?.filter((preview) =>
+    (editedAnswers[preview.questionId] ?? preview.answer).trim().length > 0
+  ).length ?? 0;
+  const bulkPreviewOverLimit = bulkPreviews?.filter((preview) =>
+    (editedAnswers[preview.questionId] ?? preview.answer).length > 150
+  ).length ?? 0;
 
   const QuestionTable = ({ list }: { list: Question[] }) => {
     const allChecked = list.length > 0 && list.every((q) => selectedIds.has(q.id));
@@ -1065,33 +1072,66 @@ export default function QuestionsPage() {
             <p className="text-sm text-gray-500 mt-1">
               각 학생의 질문에 맞게 AI가 생성한 답변입니다. 내용을 검토하고 필요시 수정 후 전송하세요.
             </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                답변 준비 {bulkPreviewReady}/{bulkPreviewTotal}
+              </span>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
+                전송 대기 {bulkPreviewTotal}개
+              </span>
+              {bulkPreviewOverLimit > 0 && (
+                <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                  150자 초과 {bulkPreviewOverLimit}개
+                </span>
+              )}
+            </div>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
-            {bulkPreviews?.map((preview) => (
-              <div key={preview.questionId} className="rounded-xl border bg-gray-50 overflow-hidden">
-                <div className="px-4 py-3 border-b bg-white">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold text-gray-900">{preview.authorName}</span>
-                    {preview.authorInfo && (
-                      <span className="text-xs text-gray-400">{preview.authorInfo}</span>
-                    )}
+            {bulkPreviews?.map((preview) => {
+              const answerText = editedAnswers[preview.questionId] ?? preview.answer;
+              const answerLength = answerText.length;
+              const initial = preview.authorName.trim().slice(0, 1) || "?";
+
+              return (
+                <div key={preview.questionId} className="overflow-hidden rounded-xl border bg-gray-50">
+                  <div className="border-b bg-white px-4 py-3">
+                    <div className="mb-2 flex items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white shadow-sm">
+                        {initial}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{preview.authorName}</p>
+                        {preview.authorInfo && (
+                          <p className="text-xs text-gray-400">{preview.authorInfo}</p>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm leading-relaxed text-gray-700">{preview.questionContent}</p>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{preview.questionContent}</p>
+                  <div className="px-4 py-3">
+                    <div className="mb-1.5 flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-indigo-600">AI 생성 답변 (수정 가능)</p>
+                      <span
+                        className={`text-xs font-medium ${
+                          answerLength > 150 ? "text-amber-700" : "text-gray-400"
+                        }`}
+                      >
+                        {answerLength}/150자
+                      </span>
+                    </div>
+                    <Textarea
+                      value={answerText}
+                      onChange={(e) =>
+                        setEditedAnswers((prev) => ({ ...prev, [preview.questionId]: e.target.value }))
+                      }
+                      rows={3}
+                      className="resize-none text-sm"
+                      disabled={isSendingPreviews}
+                    />
+                  </div>
                 </div>
-                <div className="px-4 py-3">
-                  <p className="text-xs font-semibold text-indigo-600 mb-1.5">AI 생성 답변 (수정 가능)</p>
-                  <Textarea
-                    value={editedAnswers[preview.questionId] ?? preview.answer}
-                    onChange={(e) =>
-                      setEditedAnswers((prev) => ({ ...prev, [preview.questionId]: e.target.value }))
-                    }
-                    rows={3}
-                    className="text-sm resize-none"
-                    disabled={isSendingPreviews}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {bulkMsg?.type === "error" && (
             <p className="text-sm text-red-600 mt-1">{bulkMsg.text}</p>
