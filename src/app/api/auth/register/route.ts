@@ -38,7 +38,7 @@ export async function POST(req: Request) {
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return NextResponse.json({ error: "이미 등록된 학생입니다" }, { status: 400 });
+      return NextResponse.json({ error: data.role === "TEACHER" ? "이미 등록된 교사입니다" : "이미 등록된 학생입니다" }, { status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 12);

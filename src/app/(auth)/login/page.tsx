@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
 import Link from "next/link";
 
@@ -136,6 +136,10 @@ function TeacherLoginForm() {
 }
 
 function LoginContent() {
+  const searchParams = useSearchParams();
+  const initialLoginType = searchParams.get("type") === "teacher" ? "teacher" : "student";
+  const [loginType, setLoginType] = useState<"student" | "teacher">(initialLoginType);
+
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-1">
@@ -143,7 +147,7 @@ function LoginContent() {
         <CardDescription className="text-center">질문기반 탐구수업 웹앱</CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="student">
+        <Tabs value={loginType} onValueChange={(value) => setLoginType(value as "student" | "teacher")}>
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="student">학생 로그인</TabsTrigger>
             <TabsTrigger value="teacher">교사 로그인</TabsTrigger>
@@ -158,9 +162,12 @@ function LoginContent() {
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
         <div className="text-sm text-muted-foreground text-center">
-          학생 계정이 없으신가요?{" "}
-          <Link href="/register" className="text-primary hover:underline">
-            학생 회원가입
+          {loginType === "teacher" ? "교사 계정이 없으신가요?" : "학생 계정이 없으신가요?"}{" "}
+          <Link
+            href={loginType === "teacher" ? "/register?role=teacher" : "/register?role=student"}
+            className="text-primary hover:underline"
+          >
+            {loginType === "teacher" ? "교사 회원가입" : "학생 회원가입"}
           </Link>
         </div>
       </CardFooter>
