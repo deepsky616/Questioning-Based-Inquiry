@@ -13,10 +13,6 @@ const forgotPasswordSchema = z.object({
   email: z.string().email(),
 });
 
-const genericResponse = {
-  message: "가입된 교사 이메일이라면 비밀번호 재설정 링크를 보냈습니다.",
-};
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -29,7 +25,10 @@ export async function POST(req: Request) {
     });
 
     if (!teacher || teacher.role !== "TEACHER") {
-      return NextResponse.json(genericResponse);
+      return NextResponse.json(
+        { error: "등록되지 않은 교사 이메일입니다." },
+        { status: 404 }
+      );
     }
 
     const token = createPasswordResetToken();
@@ -63,7 +62,7 @@ export async function POST(req: Request) {
       console.error("Password reset email error:", emailResult.error);
     }
 
-    return NextResponse.json(genericResponse);
+    return NextResponse.json({ message: "비밀번호 재설정 링크를 이메일로 보냈습니다." });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "올바른 이메일을 입력해 주세요" }, { status: 400 });
