@@ -59,6 +59,7 @@ RESEND_FROM_EMAIL="Question Lab <noreply@your-domain.com>"
 The app sends email only from server routes:
 
 - teacher welcome email after teacher registration
+- teacher password reset link
 - student bulk creation summary to the teacher
 - new question notification to the session teacher
 

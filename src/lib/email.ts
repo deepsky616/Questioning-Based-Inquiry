@@ -77,6 +77,27 @@ export async function sendTeacherWelcomeEmail(to: string, name: string): Promise
   });
 }
 
+export async function sendTeacherPasswordResetEmail({
+  to,
+  name,
+  resetUrl,
+}: {
+  to: string;
+  name: string;
+  resetUrl: string;
+}): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    subject: "Question Lab 비밀번호 재설정",
+    text: `${name} 선생님, 아래 링크에서 비밀번호를 재설정할 수 있습니다.\n\n${resetUrl}\n\n이 링크는 30분 동안만 사용할 수 있습니다. 요청하지 않았다면 이 메일을 무시해 주세요.`,
+    html: [
+      `<p>${escapeHtml(name)} 선생님, 아래 링크에서 비밀번호를 재설정할 수 있습니다.</p>`,
+      `<p><a href="${escapeHtml(resetUrl)}">비밀번호 재설정하기</a></p>`,
+      "<p>이 링크는 30분 동안만 사용할 수 있습니다. 요청하지 않았다면 이 메일을 무시해 주세요.</p>",
+    ].join(""),
+  });
+}
+
 export async function sendBulkStudentSummaryEmail({
   to,
   teacherName,

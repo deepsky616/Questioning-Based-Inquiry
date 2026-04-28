@@ -128,6 +128,11 @@ function TeacherLoginForm() {
         <Label htmlFor="t-password">비밀번호</Label>
         <Input id="t-password" name="password" type="password" placeholder="••••••" value={form.password} onChange={handleChange} />
       </div>
+      <div className="text-right">
+        <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+          비밀번호 찾기
+        </Link>
+      </div>
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "로그인 중..." : "교사 로그인"}
       </Button>
