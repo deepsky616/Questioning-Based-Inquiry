@@ -1,3 +1,5 @@
+import nodemailer from "nodemailer";
+
 type SendEmailInput = {
   to: string;
   subject: string;
@@ -10,15 +12,24 @@ type SendEmailResult =
   | { ok: true; skipped: true; reason: string }
   | { ok: false; error: string };
 
-const RESEND_API_URL = "https://api.resend.com/emails";
 const INTERNAL_EMAIL_DOMAIN = "@student.internal";
 
 export function isEmailEnabled(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.RESEND_FROM_EMAIL);
+  return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 }
 
 export function canSendExternalEmail(email: string): boolean {
   return Boolean(email && !email.endsWith(INTERNAL_EMAIL_DOMAIN));
+}
+
+function createTransporter() {
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
 }
 
 export async function sendEmail({
@@ -28,7 +39,7 @@ export async function sendEmail({
   html,
 }: SendEmailInput): Promise<SendEmailResult> {
   if (!isEmailEnabled()) {
-    return { ok: true, skipped: true, reason: "Resend is not configured" };
+    return { ok: true, skipped: true, reason: "Gmail SMTP is not configured" };
   }
 
   if (!canSendExternalEmail(to)) {
@@ -36,29 +47,14 @@ export async function sendEmail({
   }
 
   try {
-    const response = await fetch(RESEND_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL,
-        to,
-        subject,
-        text,
-        ...(html ? { html } : {}),
-      }),
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: `"Question Lab" <${process.env.GMAIL_USER}>`,
+      to,
+      subject,
+      text,
+      ...(html ? { html } : {}),
     });
-
-    if (!response.ok) {
-      const body = await response.text();
-      return {
-        ok: false,
-        error: `Resend returned ${response.status}: ${body}`,
-      };
-    }
-
     return { ok: true };
   } catch (error) {
     return {
