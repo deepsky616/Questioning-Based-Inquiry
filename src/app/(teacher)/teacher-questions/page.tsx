@@ -61,6 +61,62 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
   );
 }
 
+function DateSelect({ value, onChange, className }: {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+}) {
+  const parts = value ? value.split("-") : ["", "", ""];
+  const yr = parts[0] ?? "";
+  const mo = parts[1] ? String(parseInt(parts[1])) : "";
+  const dy = parts[2] ? String(parseInt(parts[2])) : "";
+
+  const update = (newYr: string, newMo: string, newDy: string) => {
+    if (newYr && newMo && newDy) {
+      onChange(`${newYr}-${newMo.padStart(2, "0")}-${newDy.padStart(2, "0")}`);
+    } else {
+      onChange("");
+    }
+  };
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 6 }, (_, i) => String(currentYear - 2 + i));
+  const months = Array.from({ length: 12 }, (_, i) => String(i + 1));
+  const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
+
+  return (
+    <div className={`flex items-center gap-1 ${className ?? ""}`}>
+      <Select value={yr || "__none__"} onValueChange={(v) => update(v === "__none__" ? "" : v, mo, dy)}>
+        <SelectTrigger className="h-8 w-24 text-sm bg-white">
+          <SelectValue placeholder="연도" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">연도</SelectItem>
+          {years.map((y) => <SelectItem key={y} value={y}>{y}년</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Select value={mo || "__none__"} onValueChange={(v) => update(yr, v === "__none__" ? "" : v, dy)}>
+        <SelectTrigger className="h-8 w-16 text-sm bg-white">
+          <SelectValue placeholder="월" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">월</SelectItem>
+          {months.map((m) => <SelectItem key={m} value={m}>{m}월</SelectItem>)}
+        </SelectContent>
+      </Select>
+      <Select value={dy || "__none__"} onValueChange={(v) => update(yr, mo, v === "__none__" ? "" : v)}>
+        <SelectTrigger className="h-8 w-16 text-sm bg-white">
+          <SelectValue placeholder="일" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">일</SelectItem>
+          {days.map((d) => <SelectItem key={d} value={d}>{d}일</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -646,12 +702,10 @@ export default function QuestionsPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="sess-date">날짜</Label>
-                <Input
-                  id="sess-date"
-                  type="date"
+                <Label>날짜</Label>
+                <DateSelect
                   value={sessForm.date}
-                  onChange={(e) => setSessForm((p) => ({ ...p, date: e.target.value }))}
+                  onChange={(v) => setSessForm((p) => ({ ...p, date: v }))}
                 />
               </div>
               <div className="space-y-1">
@@ -793,11 +847,9 @@ export default function QuestionsPage() {
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 min-w-0">
               <label className="text-xs font-medium text-gray-600">날짜</label>
-              <Input
-                type="date"
+              <DateSelect
                 value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="h-8 text-sm w-40 bg-white"
+                onChange={setFilterDate}
               />
             </div>
             <div className="flex flex-col gap-1 min-w-0">
