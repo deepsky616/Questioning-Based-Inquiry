@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { buildStudentEmail } from "@/lib/student-auth";
 import { auth } from "@/lib/auth";
+import { sendBulkStudentSummaryEmail } from "@/lib/email";
 
 const bulkSchema = z.object({
   school: z.string().min(1),
@@ -55,6 +56,23 @@ export async function POST(req: Request) {
         results.created++;
       } catch {
         results.errors.push(`${s.name}(${s.studentNumber}번) 등록 실패`);
+      }
+    }
+
+    const teacherEmail = session.user?.email;
+    if (teacherEmail) {
+      const emailResult = await sendBulkStudentSummaryEmail({
+        to: teacherEmail,
+        teacherName: session.user?.name ?? "선생님",
+        school,
+        grade,
+        className,
+        created: results.created,
+        skipped: results.skipped,
+        errors: results.errors,
+      });
+      if (!emailResult.ok) {
+        console.error("Bulk student summary email error:", emailResult.error);
       }
     }
 

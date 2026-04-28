@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter } from "@/lib/questions";
+import { sendQuestionNotificationEmail } from "@/lib/email";
 
 const createQuestionSchema = z.object({
   content: z.string().min(1).max(500),
@@ -75,8 +76,32 @@ export async function POST(req: Request) {
             className: true,
           },
         },
+        session: {
+          include: {
+            teacher: {
+              select: {
+                email: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
     });
+
+    if (question.session?.teacher.email && question.session.teacher.email !== session.user.email) {
+      const sessionTitle = [question.session.subject, question.session.topic].filter(Boolean).join(" - ");
+      const emailResult = await sendQuestionNotificationEmail({
+        to: question.session.teacher.email,
+        teacherName: question.session.teacher.name,
+        studentName: question.author.name,
+        sessionTitle: sessionTitle || question.session.date,
+        question: question.content,
+      });
+      if (!emailResult.ok) {
+        console.error("Question notification email error:", emailResult.error);
+      }
+    }
 
     return NextResponse.json(question);
   } catch (error) {
