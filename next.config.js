@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  serverExternalPackages: ["nodemailer"],
+  experimental: {
+    serverComponentsExternalPackages: ["nodemailer"],
+  },
 };
 
 module.exports = nextConfig;
