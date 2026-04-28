@@ -21,6 +21,12 @@ export interface QuestionCreateData {
   sessionId?: string;
 }
 
+export interface SessionWhereFilter {
+  date?: string;
+  subject?: { contains: string; mode: "insensitive" };
+  topic?: { contains: string; mode: "insensitive" };
+}
+
 export interface QuestionWhereClause {
   authorId?: string;
   isPublic?: boolean;
@@ -28,6 +34,19 @@ export interface QuestionWhereClause {
   cognitive?: string;
   content?: { contains: string; mode: "insensitive" };
   sessionId?: string | null;
+  session?: SessionWhereFilter;
+}
+
+export function buildSessionWhereFilter(params: {
+  date: string | null;
+  subject: string | null;
+  topic: string | null;
+}): SessionWhereFilter | undefined {
+  const filter: SessionWhereFilter = {};
+  if (params.date?.trim()) filter.date = params.date.trim();
+  if (params.subject?.trim()) filter.subject = { contains: params.subject.trim(), mode: "insensitive" };
+  if (params.topic?.trim()) filter.topic = { contains: params.topic.trim(), mode: "insensitive" };
+  return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
 export function buildQuestionCreateData(
@@ -112,6 +131,9 @@ export function buildQuestionWhereClause(params: {
   cognitive?: string | null;
   search?: string | null;
   sessionId?: string | null;
+  date?: string | null;
+  subject?: string | null;
+  topic?: string | null;
 }): QuestionWhereClause {
   const where: QuestionWhereClause = {};
 
@@ -139,6 +161,15 @@ export function buildQuestionWhereClause(params: {
     where.sessionId = null;
   } else if (params.sessionId && params.sessionId !== "all") {
     where.sessionId = params.sessionId;
+  }
+
+  const sessionFilter = buildSessionWhereFilter({
+    date: params.date ?? null,
+    subject: params.subject ?? null,
+    topic: params.topic ?? null,
+  });
+  if (sessionFilter) {
+    where.session = sessionFilter;
   }
 
   return where;

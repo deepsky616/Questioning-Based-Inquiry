@@ -103,10 +103,21 @@ export default function QuestionsPage() {
   const [sessMsg, setSessMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showSessForm, setShowSessForm] = useState(false);
 
-  const fetchQuestions = useCallback((sessionId: string) => {
+  // 날짜·교과·주제 필터
+  const [filterDate, setFilterDate] = useState("");
+  const [filterSubject, setFilterSubject] = useState("");
+  const [filterTopic, setFilterTopic] = useState("");
+
+  const fetchQuestions = useCallback((
+    sessionId: string,
+    opts?: { date?: string; subject?: string; topic?: string }
+  ) => {
     setIsLoading(true);
     const params = new URLSearchParams();
     if (sessionId !== "all") params.append("sessionId", sessionId);
+    if (opts?.date) params.append("date", opts.date);
+    if (opts?.subject) params.append("subject", opts.subject);
+    if (opts?.topic) params.append("topic", opts.topic);
     fetch(`/api/questions?${params}`)
       .then((r) => r.json())
       .then(setQuestions)
@@ -132,8 +143,28 @@ export default function QuestionsPage() {
     setEditedAnswers({});
     setBulkMsg(null);
     setShowBulkSuccess(false);
-    fetchQuestions(val);
+    fetchQuestions(val, { date: filterDate, subject: filterSubject, topic: filterTopic });
   };
+
+  const handleApplyFilter = () => {
+    setSelectedIds(new Set());
+    setBulkPreviews(null);
+    setEditedAnswers({});
+    setBulkMsg(null);
+    fetchQuestions(selectedSessionId, { date: filterDate, subject: filterSubject, topic: filterTopic });
+  };
+
+  const handleClearFilter = () => {
+    setFilterDate("");
+    setFilterSubject("");
+    setFilterTopic("");
+    setSelectedIds(new Set());
+    setBulkPreviews(null);
+    fetchQuestions(selectedSessionId);
+  };
+
+  const hasActiveFilter = !!(filterDate.trim() || filterSubject.trim() || filterTopic.trim());
+  const uniqueSubjects = [...new Set(sessions.map((s) => s.subject).filter(Boolean))].sort();
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -249,7 +280,7 @@ export default function QuestionsPage() {
         setSelectedIds(new Set());
         setBulkMsg(null);
         setShowBulkSuccess(false);
-        fetchQuestions(selectedSessionId);
+        fetchQuestions(selectedSessionId, { date: filterDate, subject: filterSubject, topic: filterTopic });
       }, 2000);
     } catch (err) {
       setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
@@ -313,7 +344,7 @@ export default function QuestionsPage() {
 
       setSelectedQuestion(null);
       setComment("");
-      fetchQuestions(selectedSessionId);
+      fetchQuestions(selectedSessionId, { date: filterDate, subject: filterSubject, topic: filterTopic });
     } catch (err) {
       setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : "저장에 실패했습니다" });
     } finally {
@@ -691,6 +722,70 @@ export default function QuestionsPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* 날짜·교과·주제 필터 */}
+      <div className={`rounded-lg border p-3 ${hasActiveFilter ? "border-indigo-200 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
+        {selectedSessionId === "none" ? (
+          <p className="text-xs text-gray-500">세션 없는 질문은 날짜·교과·주제 필터를 적용할 수 없습니다.</p>
+        ) : (
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1 min-w-0">
+              <label className="text-xs font-medium text-gray-600">날짜</label>
+              <Input
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="h-8 text-sm w-40 bg-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1 min-w-0">
+              <label className="text-xs font-medium text-gray-600">교과</label>
+              {uniqueSubjects.length > 0 ? (
+                <Select value={filterSubject} onValueChange={setFilterSubject}>
+                  <SelectTrigger className="h-8 text-sm w-36 bg-white">
+                    <SelectValue placeholder="전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">전체</SelectItem>
+                    {uniqueSubjects.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  placeholder="예: 과학"
+                  value={filterSubject}
+                  onChange={(e) => setFilterSubject(e.target.value)}
+                  className="h-8 text-sm w-32 bg-white"
+                />
+              )}
+            </div>
+            <div className="flex flex-col gap-1 min-w-0">
+              <label className="text-xs font-medium text-gray-600">주제</label>
+              <Input
+                placeholder="예: 광합성"
+                value={filterTopic}
+                onChange={(e) => setFilterTopic(e.target.value)}
+                className="h-8 text-sm w-40 bg-white"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" className="h-8" onClick={handleApplyFilter}>
+                조회
+              </Button>
+              {hasActiveFilter && (
+                <Button size="sm" variant="outline" className="h-8" onClick={handleClearFilter}>
+                  초기화
+                </Button>
+              )}
+            </div>
+            {hasActiveFilter && (
+              <span className="text-xs text-indigo-600 font-medium self-end pb-0.5">필터 적용 중</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 세션 선택 시 통계 카드 */}

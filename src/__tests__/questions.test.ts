@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback, validateBulkAiRequest, formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback, validateBulkAiRequest, formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers, buildSessionWhereFilter } from "@/lib/questions";
 
 describe("buildQuestionCreateData", () => {
   const baseData = {
@@ -261,5 +261,38 @@ describe("validatePreviewAnswers", () => {
   it("공백만 있는 답변은 유효하지 않다", () => {
     const previews = [{ questionId: "q1", answer: "   " }];
     expect(validatePreviewAnswers(previews)).not.toBeNull();
+  });
+});
+
+describe("buildSessionWhereFilter", () => {
+  it("모든 파라미터가 null이면 undefined를 반환한다", () => {
+    expect(buildSessionWhereFilter({ date: null, subject: null, topic: null })).toBeUndefined();
+  });
+
+  it("날짜 필터를 적용한다", () => {
+    const f = buildSessionWhereFilter({ date: "2024-01-15", subject: null, topic: null });
+    expect(f).toEqual({ date: "2024-01-15" });
+  });
+
+  it("교과는 부분 일치 필터를 사용한다", () => {
+    const f = buildSessionWhereFilter({ date: null, subject: "과학", topic: null });
+    expect(f).toEqual({ subject: { contains: "과학", mode: "insensitive" } });
+  });
+
+  it("주제는 부분 일치 필터를 사용한다", () => {
+    const f = buildSessionWhereFilter({ date: null, subject: null, topic: "광합성" });
+    expect(f).toEqual({ topic: { contains: "광합성", mode: "insensitive" } });
+  });
+
+  it("세 가지 모두 설정하면 모두 포함한다", () => {
+    const f = buildSessionWhereFilter({ date: "2024-01-15", subject: "과학", topic: "광합성" });
+    expect(f?.date).toBe("2024-01-15");
+    expect(f?.subject).toEqual({ contains: "과학", mode: "insensitive" });
+    expect(f?.topic).toBeDefined();
+  });
+
+  it("빈 문자열은 undefined로 처리한다", () => {
+    const f = buildSessionWhereFilter({ date: "", subject: "", topic: "" });
+    expect(f).toBeUndefined();
   });
 });
