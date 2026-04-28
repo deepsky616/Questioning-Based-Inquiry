@@ -32,6 +32,9 @@ export async function GET(req: Request) {
     cognitive: searchParams.get("cognitive"),
     search: searchParams.get("search"),
     sessionId: searchParams.get("sessionId"),
+    date: searchParams.get("date"),
+    subject: searchParams.get("subject"),
+    topic: searchParams.get("topic"),
   });
 
   const questions = await prisma.question.findMany({

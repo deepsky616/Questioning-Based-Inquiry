@@ -97,16 +97,27 @@ export default function QuestionsPage() {
 
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState("all");
+  const [selectedSessionId, setSelectedSessionId] = useState("");
   const [sessForm, setSessForm] = useState({ date: "", subject: "", topic: "" });
   const [isSavingSess, setIsSavingSess] = useState(false);
   const [sessMsg, setSessMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showSessForm, setShowSessForm] = useState(false);
 
-  // 날짜·교과·주제 필터
+  // 조회 모드: 세션별 | 세부(날짜·교과·주제)
+  const [questionLookupMode, setQuestionLookupMode] = useState<"session" | "detail">("session");
+
+  // 날짜·교과·주제 필터 (세부 조회 모드용)
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
+
+  const resetBulkState = () => {
+    setSelectedIds(new Set());
+    setBulkPreviews(null);
+    setEditedAnswers({});
+    setBulkMsg(null);
+    setShowBulkSuccess(false);
+  };
 
   const fetchQuestions = useCallback((
     sessionId: string,
@@ -114,7 +125,7 @@ export default function QuestionsPage() {
   ) => {
     setIsLoading(true);
     const params = new URLSearchParams();
-    if (sessionId !== "all") params.append("sessionId", sessionId);
+    if (sessionId && sessionId !== "all") params.append("sessionId", sessionId);
     if (opts?.date) params.append("date", opts.date);
     if (opts?.subject) params.append("subject", opts.subject);
     if (opts?.topic) params.append("topic", opts.topic);
@@ -126,11 +137,20 @@ export default function QuestionsPage() {
   }, []);
 
   useEffect(() => {
-    fetchQuestions("all");
     fetch("/api/sessions")
       .then((r) => r.json())
-      .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
-      .catch(() => {});
+      .then((data: QuestionSession[]) => {
+        const sorted = sortSessionsDesc(data);
+        setSessions(sorted);
+        const defaultId = sorted[0]?.id ?? "";
+        setSelectedSessionId(defaultId);
+        if (defaultId) {
+          fetchQuestions(defaultId);
+        } else {
+          setIsLoading(false);
+        }
+      })
+      .catch(() => setIsLoading(false));
   }, [fetchQuestions]);
 
   const handleSessionChange = (val: string) => {
@@ -138,29 +158,35 @@ export default function QuestionsPage() {
     setSearch("");
     setSessionAnalysis(null);
     setSessionAnalysisError(null);
-    setSelectedIds(new Set());
-    setBulkPreviews(null);
-    setEditedAnswers({});
-    setBulkMsg(null);
-    setShowBulkSuccess(false);
-    fetchQuestions(val, { date: filterDate, subject: filterSubject, topic: filterTopic });
+    resetBulkState();
+    fetchQuestions(val);
+  };
+
+  const handleLookupModeChange = (mode: "session" | "detail") => {
+    setQuestionLookupMode(mode);
+    setSearch("");
+    setSessionAnalysis(null);
+    setSessionAnalysisError(null);
+    resetBulkState();
+    if (mode === "session") {
+      if (selectedSessionId) fetchQuestions(selectedSessionId);
+      else setQuestions([]);
+    } else {
+      fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
+    }
   };
 
   const handleApplyFilter = () => {
-    setSelectedIds(new Set());
-    setBulkPreviews(null);
-    setEditedAnswers({});
-    setBulkMsg(null);
-    fetchQuestions(selectedSessionId, { date: filterDate, subject: filterSubject, topic: filterTopic });
+    resetBulkState();
+    fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
   };
 
   const handleClearFilter = () => {
     setFilterDate("");
     setFilterSubject("");
     setFilterTopic("");
-    setSelectedIds(new Set());
-    setBulkPreviews(null);
-    fetchQuestions(selectedSessionId);
+    resetBulkState();
+    fetchQuestions("all");
   };
 
   const hasActiveFilter = !!(filterDate.trim() || filterSubject.trim() || filterTopic.trim());
@@ -280,7 +306,11 @@ export default function QuestionsPage() {
         setSelectedIds(new Set());
         setBulkMsg(null);
         setShowBulkSuccess(false);
-        fetchQuestions(selectedSessionId, { date: filterDate, subject: filterSubject, topic: filterTopic });
+        if (questionLookupMode === "session") {
+          fetchQuestions(selectedSessionId);
+        } else {
+          fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
+        }
       }, 2000);
     } catch (err) {
       setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
@@ -290,8 +320,8 @@ export default function QuestionsPage() {
   };
 
   const handleCreateSession = async () => {
-    if (!sessForm.date || !sessForm.subject) {
-      setSessMsg({ type: "error", text: "날짜와 교과는 필수입니다" });
+    if (!sessForm.date || !sessForm.subject.trim() || !sessForm.topic.trim()) {
+      setSessMsg({ type: "error", text: "날짜, 교과, 주제는 필수입니다" });
       return;
     }
     setIsSavingSess(true);
@@ -307,6 +337,10 @@ export default function QuestionsPage() {
       setSessions((prev) => sortSessionsDesc([created, ...prev]));
       setSessForm({ date: "", subject: "", topic: "" });
       setSessMsg({ type: "success", text: "세션이 추가됐습니다" });
+      if (questionLookupMode === "session") {
+        setSelectedSessionId(created.id);
+        fetchQuestions(created.id);
+      }
     } catch {
       setSessMsg({ type: "error", text: "세션 저장에 실패했습니다" });
     } finally {
@@ -317,8 +351,14 @@ export default function QuestionsPage() {
   const handleDeleteSession = async (id: string) => {
     if (!confirm("이 세션을 삭제하시겠습니까?")) return;
     await fetch(`/api/sessions/${id}`, { method: "DELETE" });
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-    if (selectedSessionId === id) handleSessionChange("all");
+    const remaining = sessions.filter((s) => s.id !== id);
+    setSessions(remaining);
+    if (questionLookupMode === "session" && selectedSessionId === id) {
+      const nextId = remaining[0]?.id ?? "";
+      setSelectedSessionId(nextId);
+      if (nextId) fetchQuestions(nextId);
+      else setQuestions([]);
+    }
   };
 
   const handleSaveCorrection = async () => {
@@ -344,7 +384,11 @@ export default function QuestionsPage() {
 
       setSelectedQuestion(null);
       setComment("");
-      fetchQuestions(selectedSessionId, { date: filterDate, subject: filterSubject, topic: filterTopic });
+      if (questionLookupMode === "session") {
+        fetchQuestions(selectedSessionId);
+      } else {
+        fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
+      }
     } catch (err) {
       setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : "저장에 실패했습니다" });
     } finally {
@@ -383,7 +427,9 @@ export default function QuestionsPage() {
   const byType = (key: "closure" | "cognitive", value: string) =>
     filtered.filter((q) => q[key] === value);
 
-  const currentSession = sessions.find((s) => s.id === selectedSessionId);
+  const currentSession = questionLookupMode === "session"
+    ? sessions.find((s) => s.id === selectedSessionId)
+    : undefined;
   const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
   const previewQuestions = selectedQuestions.slice(0, 3);
   const hiddenPreviewCount = Math.max(selectedQuestions.length - previewQuestions.length, 0);
@@ -415,7 +461,7 @@ export default function QuestionsPage() {
             </TableHead>
             <TableHead>학생</TableHead>
             <TableHead>질문 내용</TableHead>
-            {selectedSessionId === "all" && <TableHead className="w-36">세션</TableHead>}
+            {questionLookupMode === "detail" && <TableHead className="w-36">세션</TableHead>}
             <TableHead className="w-20">폐쇄/개방</TableHead>
             <TableHead className="w-24">인지 수준</TableHead>
             <TableHead className="w-16">수정</TableHead>
@@ -444,7 +490,7 @@ export default function QuestionsPage() {
               <TableCell className="max-w-xs">
                 <p className="truncate">{q.content}</p>
               </TableCell>
-              {selectedSessionId === "all" && (
+              {questionLookupMode === "detail" && (
                 <TableCell>
                   {q.session ? (
                     <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
@@ -625,7 +671,7 @@ export default function QuestionsPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="sess-topic">주제 (선택)</Label>
+                <Label htmlFor="sess-topic">주제</Label>
                 <Input
                   id="sess-topic"
                   placeholder="예: 지구의 역사"
@@ -675,22 +721,30 @@ export default function QuestionsPage() {
         </Card>
       )}
 
-      {/* 세션 선택 필터 */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-          <SelectTrigger className="w-72">
-            <SelectValue placeholder="세션 선택" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 질문</SelectItem>
-            <SelectItem value="none">세션 없는 질문</SelectItem>
-            {sessions.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {buildSessionLabel(s.date, s.subject, s.topic)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* 조회 모드 전환 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex rounded-md border border-gray-200 overflow-hidden">
+          <button
+            onClick={() => handleLookupModeChange("session")}
+            className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+              questionLookupMode === "session"
+                ? "bg-indigo-600 text-white"
+                : "bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            세션별 조회
+          </button>
+          <button
+            onClick={() => handleLookupModeChange("detail")}
+            className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200 ${
+              questionLookupMode === "detail"
+                ? "bg-indigo-600 text-white"
+                : "bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            날짜·교과·주제별 조회
+          </button>
+        </div>
         <Input
           placeholder="질문 또는 학생 이름 검색..."
           value={search}
@@ -706,7 +760,7 @@ export default function QuestionsPage() {
                 viewMode === "table"
                   ? "bg-indigo-600 text-white"
                   : "bg-white text-gray-600 hover:bg-gray-50"
-                }`}
+              }`}
             >
               ☰ 목록
             </button>
@@ -716,7 +770,7 @@ export default function QuestionsPage() {
                 viewMode === "cards"
                   ? "bg-indigo-600 text-white"
                   : "bg-white text-gray-600 hover:bg-gray-50"
-                }`}
+              }`}
             >
               ▦ 질문·댓글
             </button>
@@ -724,11 +778,31 @@ export default function QuestionsPage() {
         </div>
       </div>
 
-      {/* 날짜·교과·주제 필터 */}
-      <div className={`rounded-lg border p-3 ${hasActiveFilter ? "border-indigo-200 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
-        {selectedSessionId === "none" ? (
-          <p className="text-xs text-gray-500">세션 없는 질문은 날짜·교과·주제 필터를 적용할 수 없습니다.</p>
+      {/* 세션별 조회: 세션 Select */}
+      {questionLookupMode === "session" && (
+        sessions.length === 0 ? (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-400">
+            등록된 세션이 없습니다. 세션을 먼저 추가해 주세요.
+          </div>
         ) : (
+          <Select value={selectedSessionId} onValueChange={handleSessionChange}>
+            <SelectTrigger className="w-80">
+              <SelectValue placeholder="세션 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              {sessions.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {buildSessionLabel(s.date, s.subject, s.topic)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )
+      )}
+
+      {/* 세부 조회: 날짜·교과·주제 필터 */}
+      {questionLookupMode === "detail" && (
+        <div className={`rounded-lg border p-3 ${hasActiveFilter ? "border-indigo-200 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 min-w-0">
               <label className="text-xs font-medium text-gray-600">날짜</label>
@@ -788,8 +862,8 @@ export default function QuestionsPage() {
               <span className="text-xs text-indigo-600 font-medium self-end pb-0.5">필터 적용 중</span>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 세션 선택 시 통계 카드 */}
       {currentSession && (
@@ -863,8 +937,12 @@ export default function QuestionsPage() {
         /* ── 카드 뷰: 질문 + 댓글 한눈에 보기 ── */
         <div className="space-y-8">
           {filtered.length === 0 ? (
-            <div className="text-center py-16 text-gray-400 text-sm">해당하는 질문이 없습니다</div>
-          ) : selectedSessionId === "all" ? (
+            <div className="text-center py-16 text-gray-400 text-sm">
+              {questionLookupMode === "session" && !selectedSessionId
+                ? "세션을 선택해 주세요"
+                : "해당하는 질문이 없습니다"}
+            </div>
+          ) : questionLookupMode === "detail" ? (
             <>
               {sessions.map((s) => {
                 const sessionQuestions = filtered.filter((q) => q.sessionId === s.id);
@@ -921,8 +999,11 @@ export default function QuestionsPage() {
             </div>
           )}
         </div>
-      ) : currentSession ? (
-        /* ── 세션 선택됨: 통합 단일 테이블 ── */
+      ) : questionLookupMode === "session" ? (
+        /* ── 세션별 조회 ── */
+        !currentSession ? (
+          <div className="text-center py-16 text-gray-400 text-sm">세션을 선택해 주세요</div>
+        ) : (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
@@ -1019,8 +1100,9 @@ export default function QuestionsPage() {
             )}
           </CardContent>
         </Card>
+        )
       ) : (
-        /* ── 전체 / 세션없음 조회: 분류별 탭 ── */
+        /* ── 날짜·교과·주제별 조회: 분류별 탭 ── */
         <>
           <Card>
             <CardHeader className="pb-2">
