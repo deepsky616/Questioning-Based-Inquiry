@@ -164,7 +164,7 @@ export default function QuestionsPage() {
   };
 
   const hasActiveFilter = !!(filterDate.trim() || filterSubject.trim() || filterTopic.trim());
-  const uniqueSubjects = [...new Set(sessions.map((s) => s.subject).filter(Boolean))].sort();
+  const uniqueSubjects = Array.from(new Set(sessions.map((s) => s.subject).filter(Boolean))).sort();
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
