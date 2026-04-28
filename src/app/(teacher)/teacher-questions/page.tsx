@@ -742,12 +742,15 @@ export default function QuestionsPage() {
             <div className="flex flex-col gap-1 min-w-0">
               <label className="text-xs font-medium text-gray-600">교과</label>
               {uniqueSubjects.length > 0 ? (
-                <Select value={filterSubject} onValueChange={setFilterSubject}>
+                <Select
+                  value={filterSubject || "__all__"}
+                  onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}
+                >
                   <SelectTrigger className="h-8 text-sm w-36 bg-white">
                     <SelectValue placeholder="전체" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">전체</SelectItem>
+                    <SelectItem value="__all__">전체</SelectItem>
                     {uniqueSubjects.map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
