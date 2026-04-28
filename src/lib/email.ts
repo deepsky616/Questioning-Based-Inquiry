@@ -23,11 +23,18 @@ export function canSendExternalEmail(email: string): boolean {
 }
 
 function createTransporter() {
+  const pass = (process.env.GMAIL_APP_PASSWORD ?? "").replace(/\s/g, "");
+  console.log(
+    `[email] user=${process.env.GMAIL_USER} pass_len=${pass.length}`
+  );
   return nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    requireTLS: true,
     auth: {
       user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+      pass,
     },
   });
 }
