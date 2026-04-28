@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
 import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
 import { formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
@@ -61,59 +63,57 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
   );
 }
 
-function DateSelect({ value, onChange, className }: {
+function DatePicker({ value, onChange, placeholder = "날짜 선택" }: {
   value: string;
   onChange: (v: string) => void;
-  className?: string;
+  placeholder?: string;
 }) {
-  const parts = value ? value.split("-") : ["", "", ""];
-  const yr = parts[0] ?? "";
-  const mo = parts[1] ? String(parseInt(parts[1])) : "";
-  const dy = parts[2] ? String(parseInt(parts[2])) : "";
+  const [open, setOpen] = useState(false);
 
-  const update = (newYr: string, newMo: string, newDy: string) => {
-    if (newYr && newMo && newDy) {
-      onChange(`${newYr}-${newMo.padStart(2, "0")}-${newDy.padStart(2, "0")}`);
-    } else {
-      onChange("");
-    }
+  const selected = value ? new Date(value + "T00:00:00") : undefined;
+
+  const displayLabel = selected
+    ? `${selected.getFullYear()}년 ${selected.getMonth() + 1}월 ${selected.getDate()}일`
+    : placeholder;
+
+  const handleSelect = (date: Date | undefined) => {
+    if (!date) { onChange(""); setOpen(false); return; }
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    onChange(`${y}-${m}-${d}`);
+    setOpen(false);
   };
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 6 }, (_, i) => String(currentYear - 2 + i));
-  const months = Array.from({ length: 12 }, (_, i) => String(i + 1));
-  const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
-
   return (
-    <div className={`flex items-center gap-1 ${className ?? ""}`}>
-      <Select value={yr || "__none__"} onValueChange={(v) => update(v === "__none__" ? "" : v, mo, dy)}>
-        <SelectTrigger className="h-8 w-24 text-sm bg-white">
-          <SelectValue placeholder="연도" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none__">연도</SelectItem>
-          {years.map((y) => <SelectItem key={y} value={y}>{y}년</SelectItem>)}
-        </SelectContent>
-      </Select>
-      <Select value={mo || "__none__"} onValueChange={(v) => update(yr, v === "__none__" ? "" : v, dy)}>
-        <SelectTrigger className="h-8 w-16 text-sm bg-white">
-          <SelectValue placeholder="월" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none__">월</SelectItem>
-          {months.map((m) => <SelectItem key={m} value={m}>{m}월</SelectItem>)}
-        </SelectContent>
-      </Select>
-      <Select value={dy || "__none__"} onValueChange={(v) => update(yr, mo, v === "__none__" ? "" : v)}>
-        <SelectTrigger className="h-8 w-16 text-sm bg-white">
-          <SelectValue placeholder="일" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none__">일</SelectItem>
-          {days.map((d) => <SelectItem key={d} value={d}>{d}일</SelectItem>)}
-        </SelectContent>
-      </Select>
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={`h-8 justify-start text-left text-sm font-normal ${!value ? "text-gray-400" : ""}`}
+        >
+          📅 {displayLabel}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent>
+        <Calendar
+          mode="single"
+          selected={selected}
+          onSelect={handleSelect}
+          defaultMonth={selected ?? new Date()}
+        />
+        {value && (
+          <div className="border-t px-3 py-2">
+            <button
+              className="text-xs text-gray-400 hover:text-gray-600"
+              onClick={() => { onChange(""); setOpen(false); }}
+            >
+              선택 초기화
+            </button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -703,7 +703,7 @@ export default function QuestionsPage() {
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
                 <Label>날짜</Label>
-                <DateSelect
+                <DatePicker
                   value={sessForm.date}
                   onChange={(v) => setSessForm((p) => ({ ...p, date: v }))}
                 />
@@ -847,7 +847,7 @@ export default function QuestionsPage() {
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 min-w-0">
               <label className="text-xs font-medium text-gray-600">날짜</label>
-              <DateSelect
+              <DatePicker
                 value={filterDate}
                 onChange={setFilterDate}
               />
