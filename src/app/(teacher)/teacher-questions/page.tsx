@@ -64,7 +64,6 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState("");
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [correctionClosure, setCorrectionClosure] = useState("");
   const [correctionCognitive, setCorrectionCognitive] = useState("");
@@ -155,7 +154,6 @@ export default function QuestionsPage() {
 
   const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);
-    setSearch("");
     setSessionAnalysis(null);
     setSessionAnalysisError(null);
     resetBulkState();
@@ -164,7 +162,6 @@ export default function QuestionsPage() {
 
   const handleLookupModeChange = (mode: "session" | "detail") => {
     setQuestionLookupMode(mode);
-    setSearch("");
     setSessionAnalysis(null);
     setSessionAnalysisError(null);
     resetBulkState();
@@ -418,11 +415,7 @@ export default function QuestionsPage() {
     }
   };
 
-  const filtered = questions.filter(
-    (q) =>
-      q.content.toLowerCase().includes(search.toLowerCase()) ||
-      q.author.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = questions;
 
   const byType = (key: "closure" | "cognitive", value: string) =>
     filtered.filter((q) => q[key] === value);
@@ -445,7 +438,7 @@ export default function QuestionsPage() {
     const allChecked = list.length > 0 && list.every((q) => selectedIds.has(q.id));
     return list.length === 0 ? (
       <div className="text-center py-8 text-gray-400 text-sm">
-        {search ? "검색 결과가 없습니다" : "해당하는 질문이 없습니다"}
+        해당하는 질문이 없습니다
       </div>
     ) : (
       <Table>
@@ -745,12 +738,6 @@ export default function QuestionsPage() {
             날짜·교과·주제별 조회
           </button>
         </div>
-        <Input
-          placeholder="질문 또는 학생 이름 검색..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
-        />
         <div className="ml-auto flex items-center gap-3">
           <span className="text-sm text-gray-500">{filtered.length}개</span>
           <div className="flex rounded-md border border-gray-200 overflow-hidden">
@@ -1016,7 +1003,7 @@ export default function QuestionsPage() {
           <CardContent>
             {filtered.length === 0 ? (
               <div className="text-center py-12 text-gray-400 text-sm">
-                {search ? "검색 결과가 없습니다" : "이 세션에 등록된 질문이 없습니다"}
+                이 세션에 등록된 질문이 없습니다
               </div>
             ) : (
               <Table>
