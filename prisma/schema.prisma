@@ -25,14 +25,26 @@ model User {
 
   school    String?  @map("school")
 
-  questions Question[]       @relation("QuestionAuthor")
-  comments  Comment[]        @relation("CommentAuthor")
-  sessions  QuestionSession[] @relation("SessionTeacher")
+  questions      Question[]        @relation("QuestionAuthor")
+  comments       Comment[]         @relation("CommentAuthor")
+  sessions       QuestionSession[] @relation("SessionTeacher")
+  teacherClasses TeacherClass[]    @relation("TeacherClasses")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model TeacherClass {
+  id        String @id @default(cuid())
+  teacherId String @map("teacher_id")
+  teacher   User   @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
+  grade     String @map("grade")
+  className String @map("class_name")
+
+  @@unique([teacherId, grade, className])
+  @@map("teacher_classes")
 }
 
 model QuestionSession {

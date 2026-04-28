@@ -2,99 +2,165 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { buildTeacherClassLabel } from "@/lib/teacher";
 
 interface Student {
-  studentId: string;
+  id: string;
   name: string;
-  className?: string;
-  total: number;
-  distribution: { closed: number; open: number };
-  cognitiveDistribution: { factual: number; interpretive: number; evaluative: number };
-  trend: number | null;
+  grade: string;
+  className: string;
+  studentNumber: string;
+  school: string;
+  questionCount: number;
+}
+
+interface TeacherClass {
+  grade: string;
+  className: string;
 }
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filterClass, setFilterClass] = useState<string>("all");
 
   useEffect(() => {
-    fetchStudents();
+    fetch("/api/teacher/students")
+      .then((r) => r.json())
+      .then((data) => {
+        setStudents(data.students ?? []);
+        setTeacherClasses(data.teacherClasses ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
   }, []);
 
-  const fetchStudents = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch("/api/stats?period=semester");
-      const data = await res.json();
-      setStudents(data.byStudent || []);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const filtered = students.filter((s) => {
+    const matchSearch =
+      s.name.includes(search) ||
+      s.grade.includes(search) ||
+      s.className.includes(search);
+    const matchClass =
+      filterClass === "all" ||
+      `${s.grade}-${s.className}` === filterClass;
+    return matchSearch && matchClass;
+  });
 
-  const getTrendIcon = (trend: number | null) => {
-    if (trend === null) return <span className="text-gray-400 text-xs">신규</span>;
-    if (trend > 0) return <span className="text-green-600">▲{trend}%</span>;
-    if (trend < 0) return <span className="text-red-600">▼{Math.abs(trend)}%</span>;
-    return <span className="text-gray-400">-</span>;
-  };
+  // 학년·반별 그룹화
+  const grouped = filtered.reduce<Record<string, Student[]>>((acc, s) => {
+    const key = buildTeacherClassLabel(s.grade, s.className);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(s);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">학생 관리</h2>
-        <p className="text-gray-600">학생별 질문 활동량을 확인하세요</p>
+        <p className="text-gray-600">담당 학년·반 학생 목록과 질문 활동을 확인하세요</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>학생 목록</CardTitle>
-          <CardDescription>반 전체 학생의 질문 활동 통계</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8">로딩 중...</div>
-          ) : students.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">학생 데이터가 없습니다</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>이름</TableHead>
-                  <TableHead>반</TableHead>
-                  <TableHead className="text-right">총 질문</TableHead>
-                  <TableHead className="text-right">사실적</TableHead>
-                  <TableHead className="text-right">해석적</TableHead>
-                  <TableHead className="text-right">평가적</TableHead>
-                  <TableHead className="text-right">추세</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((student) => (
-                  <TableRow key={student.studentId}>
-                    <TableCell className="font-medium">{student.name}</TableCell>
-                    <TableCell>{student.className || "-"}</TableCell>
-                    <TableCell className="text-right">{student.total}</TableCell>
-                    <TableCell className="text-right">{student.cognitiveDistribution.factual}</TableCell>
-                    <TableCell className="text-right">{student.cognitiveDistribution.interpretive}</TableCell>
-                    <TableCell className="text-right">{student.cognitiveDistribution.evaluative}</TableCell>
-                    <TableCell className="text-right">{getTrendIcon(student.trend)}</TableCell>
+      {/* 담당 학급 배지 */}
+      {teacherClasses.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setFilterClass("all")}
+            className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+              filterClass === "all"
+                ? "bg-indigo-600 text-white border-indigo-600"
+                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+            }`}
+          >
+            전체
+          </button>
+          {teacherClasses.map((tc) => {
+            const key = `${tc.grade}-${tc.className}`;
+            return (
+              <button
+                key={key}
+                onClick={() => setFilterClass(filterClass === key ? "all" : key)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  filterClass === key
+                    ? "bg-indigo-600 text-white border-indigo-600"
+                    : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                }`}
+              >
+                {buildTeacherClassLabel(tc.grade, tc.className)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 검색 */}
+      <Input
+        placeholder="이름, 학년, 반 검색..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="max-w-xs"
+      />
+
+      {isLoading ? (
+        <div className="text-center py-16 text-gray-400">로딩 중...</div>
+      ) : students.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-gray-500">
+            <p className="font-medium mb-1">등록된 학생이 없습니다</p>
+            <p className="text-sm text-gray-400">
+              같은 학교·학년·반 학생이 회원가입하면 여기에 표시됩니다
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        Object.entries(grouped).map(([classLabel, classStudents]) => (
+          <Card key={classLabel}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-sm font-semibold">
+                  {classLabel}
+                </span>
+                <span className="text-sm font-normal text-gray-500">
+                  {classStudents.length}명
+                </span>
+              </CardTitle>
+              <CardDescription>
+                총 질문 수: {classStudents.reduce((sum, s) => sum + s.questionCount, 0)}개
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">번호</TableHead>
+                    <TableHead>이름</TableHead>
+                    <TableHead className="text-right">총 질문</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {classStudents.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell className="text-gray-500">{s.studentNumber}</TableCell>
+                      <TableCell className="font-medium">{s.name}</TableCell>
+                      <TableCell className="text-right">
+                        <span className={`font-semibold ${s.questionCount > 0 ? "text-indigo-600" : "text-gray-400"}`}>
+                          {s.questionCount}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ))
+      )}
     </div>
   );
 }

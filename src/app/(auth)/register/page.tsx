@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import Link from "next/link";
+import { validateTeacherClasses, buildTeacherClassLabel } from "@/lib/teacher";
 
 function RegisterContent() {
   const router = useRouter();
@@ -26,6 +27,9 @@ function RegisterContent() {
     password: "",
     confirmPassword: "",
   });
+  const [teacherClasses, setTeacherClasses] = useState<Array<{ grade: string; className: string }>>([
+    { grade: "", className: "" },
+  ]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -40,13 +44,17 @@ function RegisterContent() {
       setError("모든 항목을 입력해 주세요");
       return;
     }
-    if (role === "TEACHER" && (!email || !name || !password)) {
+    if (role === "TEACHER" && (!email || !school || !name || !password)) {
       setError("모든 항목을 입력해 주세요");
       return;
     }
     if (role === "TEACHER" && !email.includes("@")) {
       setError("올바른 이메일을 입력해 주세요");
       return;
+    }
+    if (role === "TEACHER") {
+      const classError = validateTeacherClasses(teacherClasses);
+      if (classError) { setError(classError); return; }
     }
     if (password.length < (role === "TEACHER" ? 6 : 4)) {
       setError(role === "TEACHER" ? "비밀번호는 6자 이상이어야 합니다" : "비밀번호는 4자 이상이어야 합니다");
@@ -66,7 +74,7 @@ function RegisterContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           role === "TEACHER"
-            ? { role, email, school, name, password }
+            ? { role, email, school, name, password, teacherClasses }
             : { role, school, grade, className, studentNumber, name, password }
         ),
       });
@@ -134,8 +142,64 @@ function RegisterContent() {
                   <Input id="email" name="email" type="email" placeholder="teacher@school.kr" value={form.email} onChange={handleChange} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="teacher-school">학교 (선택)</Label>
+                  <Label htmlFor="teacher-school">학교</Label>
                   <Input id="teacher-school" name="school" placeholder="한빛초등학교" value={form.school} onChange={handleChange} />
+                </div>
+
+                {/* 담당 학년·반 다중 선택 */}
+                <div className="space-y-2">
+                  <Label>담당 학년·반 <span className="text-red-500">*</span></Label>
+                  <div className="space-y-2">
+                    {teacherClasses.map((tc, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          placeholder="학년 (예: 3)"
+                          value={tc.grade}
+                          onChange={(e) => {
+                            const updated = [...teacherClasses];
+                            updated[idx] = { ...tc, grade: e.target.value };
+                            setTeacherClasses(updated);
+                            setError(null);
+                          }}
+                          className="w-24"
+                        />
+                        <span className="text-sm text-gray-500">학년</span>
+                        <Input
+                          placeholder="반 (예: 2)"
+                          value={tc.className}
+                          onChange={(e) => {
+                            const updated = [...teacherClasses];
+                            updated[idx] = { ...tc, className: e.target.value };
+                            setTeacherClasses(updated);
+                            setError(null);
+                          }}
+                          className="w-24"
+                        />
+                        <span className="text-sm text-gray-500">반</span>
+                        {teacherClasses.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setTeacherClasses(teacherClasses.filter((_, i) => i !== idx))}
+                            className="text-gray-400 hover:text-red-500 text-lg leading-none"
+                          >
+                            ×
+                          </button>
+                        )}
+                        {tc.grade && tc.className && (
+                          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                            {buildTeacherClassLabel(tc.grade, tc.className)}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setTeacherClasses([...teacherClasses, { grade: "", className: "" }])}
+                      className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                    >
+                      + 학년·반 추가
+                    </button>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>

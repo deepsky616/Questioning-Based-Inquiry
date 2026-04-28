@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { buildStudentEmail } from "@/lib/student-auth";
+import { sendTeacherWelcomeEmail } from "@/lib/email";
 
 const studentSchema = z.object({
   role: z.literal("STUDENT"),
@@ -18,7 +19,10 @@ const teacherSchema = z.object({
   role: z.literal("TEACHER"),
   email: z.string().email(),
   name: z.string().min(2),
-  school: z.string().optional(),
+  school: z.string().min(1),
+  teacherClasses: z.array(
+    z.object({ grade: z.string().min(1), className: z.string().min(1) })
+  ).min(1),
   password: z.string().min(6),
 });
 
@@ -49,12 +53,30 @@ export async function POST(req: Request) {
         password: hashedPassword,
         name: data.name,
         role: data.role,
-        school: data.role === "STUDENT" ? data.school : (data.school ?? null),
+        school: data.school,
         grade: data.role === "STUDENT" ? data.grade : null,
         className: data.role === "STUDENT" ? data.className : null,
         studentNumber: data.role === "STUDENT" ? data.studentNumber : null,
+        ...(data.role === "TEACHER"
+          ? {
+              teacherClasses: {
+                create: data.teacherClasses.map((c) => ({
+                  id: `tc_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+                  grade: c.grade.trim(),
+                  className: c.className.trim(),
+                })),
+              },
+            }
+          : {}),
       },
     });
+
+    if (user.role === "TEACHER") {
+      const emailResult = await sendTeacherWelcomeEmail(user.email, user.name);
+      if (!emailResult.ok) {
+        console.error("Teacher welcome email error:", emailResult.error);
+      }
+    }
 
     return NextResponse.json({ id: user.id, name: user.name, role: user.role });
   } catch (error) {
