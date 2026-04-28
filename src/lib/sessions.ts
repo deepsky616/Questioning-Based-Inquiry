@@ -1,5 +1,11 @@
+function formatDateKr(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-");
+  if (!year || !month || !day) return dateStr;
+  return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
+}
+
 export function buildSessionLabel(date: string, subject: string, topic: string): string {
-  const parts = [date, subject];
+  const parts = [formatDateKr(date), subject];
   if (topic.trim()) parts.push(topic.trim());
   return parts.join(" · ");
 }
