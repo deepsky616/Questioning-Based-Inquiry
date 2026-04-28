@@ -58,6 +58,7 @@ export async function POST(req: Request) {
       resetUrl,
     });
 
+    console.log("[forgot-password] emailResult:", JSON.stringify(emailResult));
     if (!emailResult.ok) {
       console.error("Password reset email error:", emailResult.error);
     }
