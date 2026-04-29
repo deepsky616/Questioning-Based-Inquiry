@@ -37,6 +37,32 @@ export async function GET(req: Request) {
     topic: searchParams.get("topic"),
   });
 
+  // 교사: 담당 학년·반 학생 질문만 조회
+  if (role === "TEACHER") {
+    const teacherId = (session.user as { id: string }).id;
+    const teacher = await prisma.user.findUnique({
+      where: { id: teacherId },
+      select: {
+        school: true,
+        teacherClasses: { select: { grade: true, className: true } },
+      },
+    });
+    if (teacher) {
+      const classes = teacher.teacherClasses;
+      if (classes.length > 0) {
+        (where as Record<string, unknown>).author = {
+          role: "STUDENT",
+          OR: classes.map((c) => ({ grade: c.grade, className: c.className })),
+        };
+      } else if (teacher.school) {
+        (where as Record<string, unknown>).author = {
+          role: "STUDENT",
+          school: teacher.school,
+        };
+      }
+    }
+  }
+
   const questions = await prisma.question.findMany({
     where,
     include: {

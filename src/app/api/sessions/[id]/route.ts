@@ -17,6 +17,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   try {
     const { id } = await params;
+    const teacherId = (session.user as any).id as string;
+    const existing = await prisma.questionSession.findUnique({ where: { id } });
+    if (!existing || existing.teacherId !== teacherId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+    }
     const body = await req.json();
     const data = updateSchema.parse(body);
     const updated = await prisma.questionSession.update({ where: { id }, data });
@@ -34,6 +39,11 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
 
   try {
     const { id } = await params;
+    const teacherId = (session.user as any).id as string;
+    const existing = await prisma.questionSession.findUnique({ where: { id } });
+    if (!existing || existing.teacherId !== teacherId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+    }
     await prisma.questionSession.delete({ where: { id } });
     return new NextResponse(null, { status: 204 });
   } catch {
