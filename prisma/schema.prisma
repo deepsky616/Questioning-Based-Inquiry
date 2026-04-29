@@ -30,6 +30,7 @@ model User {
   sessions            QuestionSession[]    @relation("SessionTeacher")
   teacherClasses      TeacherClass[]       @relation("TeacherClasses")
   passwordResetTokens PasswordResetToken[] @relation("PasswordResetTokens")
+  unitDesigns         UnitDesign[]         @relation("UnitDesigns")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -116,4 +117,46 @@ model SystemConfig {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_configs")
+}
+
+// 2022 개정 교육과정 시드 데이터
+model CurriculumArea {
+  id             String   @id @default(cuid())
+  subject        String   @map("subject")        // "과학", "사회", "국어" …
+  gradeRange     String   @map("grade_range")    // "1-2", "3-4", "5-6"
+  area           String   @map("area")           // 영역명 ("생명", "물질" …)
+  coreIdea       String   @db.Text @map("core_idea")
+  knowledgeItems Json     @map("knowledge_items") // 지식·이해 내용요소 배열
+  processItems   Json     @map("process_items")   // 과정·기능 내용요소 배열
+  valueItems     Json     @map("value_items")     // 가치·태도 내용요소 배열
+  achievements   Json     @map("achievements")    // [{code, content}] 성취기준
+
+  unitDesigns    UnitDesign[]
+
+  @@index([subject, gradeRange])
+  @@map("curriculum_areas")
+}
+
+// 교사가 생성·저장한 단원 설계
+model UnitDesign {
+  id                 String          @id @default(cuid())
+  teacherId          String          @map("teacher_id")
+  teacher            User            @relation("UnitDesigns", fields: [teacherId], references: [id], onDelete: Cascade)
+  curriculumAreaId   String?         @map("curriculum_area_id")
+  curriculumArea     CurriculumArea? @relation(fields: [curriculumAreaId], references: [id])
+
+  title              String          @map("title")
+  subject            String          @map("subject")
+  gradeRange         String          @map("grade_range")
+  area               String          @map("area")
+  coreIdea           String          @db.Text @map("core_idea")
+  selectedKeywords   Json            @map("selected_keywords")   // string[]
+  coreSentences      Json            @map("core_sentences")      // string[]
+  essentialQuestions Json            @map("essential_questions") // string[]
+  inquiryQuestions   Json            @map("inquiry_questions")   // [{type, content}][]
+
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  @@map("unit_designs")
 }
