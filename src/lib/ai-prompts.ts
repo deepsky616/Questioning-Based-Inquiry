@@ -4,22 +4,33 @@ interface QuestionSummary {
   cognitive: string;
 }
 
-const COGNITIVE_GUIDE: Record<string, string> = {
-  factual:
-    "사실적 질문입니다. 정확한 사실·개념을 명확히 설명하고, 이해를 확인하는 마무리 문장을 포함하세요.",
-  interpretive:
-    "해석적 질문입니다. 이유·원리·관계를 설명하고, '왜 그럴까?' 생각을 유도하는 마무리 문장을 포함하세요.",
-  evaluative:
-    "평가적 질문입니다. 다양한 관점을 인정하면서 판단 기준이나 근거를 생각해보도록 유도하세요. 정답을 단정짓지 말고 학생 스스로 기준을 세우도록 돕는 마무리 문장을 포함하세요.",
-  applicative:
-    "적용적 질문입니다. 배운 내용을 실제 삶이나 새로운 상황에 연결하는 것을 격려하고, 상상력을 더 발휘하도록 유도하는 마무리 문장을 포함하세요. '만약 ~라면?' 형태의 추가 질문을 덧붙이면 좋습니다.",
-};
-
-const CLOSURE_GUIDE: Record<string, string> = {
-  closed:
-    "닫힌 질문(폐쇄형)입니다. 명확한 답을 제공하되, 비슷한 맥락에서 더 열린 방향으로 생각을 확장할 수 있는 힌트를 살짝 제시하세요.",
-  open:
-    "열린 질문(개방형)입니다. 다양한 답이 가능함을 인정하고, 학생의 창의적 사고를 격려하세요.",
+// 폐쇄형/개방형 × 인지적 수준의 2차원 조합별 답변 지침
+// 장점 인정 → 사고 확장(factual/interpretive) or 판단 기준(evaluative) or 전이 가능성(applicative)
+const ANSWER_GUIDE: Record<string, Record<string, string>> = {
+  factual: {
+    closed:
+      "사실적·폐쇄형: 핵심 사실을 간결하게 확인해 주세요. 마지막에 관련 원리나 비슷한 예시를 하나 덧붙여 이해를 자연스럽게 확장하세요.",
+    open:
+      "사실적·개방형: 여러 측면의 사실을 함께 제시하고, 어떤 부분이 더 궁금한지 생각해보도록 유도하는 문장으로 마무리하세요.",
+  },
+  interpretive: {
+    closed:
+      "해석적·폐쇄형: 이유나 원리를 단계적으로 설명하세요. '그렇다면 다른 상황에서는 어떨까요?'처럼 사고를 확장하는 질문으로 마무리하세요.",
+    open:
+      "해석적·개방형: 여러 가지 해석 가능성을 열어두고 설명하세요. 학생이 어떤 해석이 더 설득력 있다고 느끼는지 스스로 생각해보도록 격려하세요.",
+  },
+  evaluative: {
+    closed:
+      "평가적·폐쇄형: 판단의 기준을 명확히 제시하되, 기준이 달라지면 답도 달라질 수 있음을 보여주세요. 학생 스스로 자신의 기준을 세워보도록 돕는 마무리를 포함하세요.",
+    open:
+      "평가적·개방형: 다양한 관점이 모두 가능함을 인정하고, 좋은 판단을 위해 어떤 기준을 고려해야 하는지 생각해보도록 유도하세요. 정답을 단정하지 마세요.",
+  },
+  applicative: {
+    closed:
+      "적용적·폐쇄형: 배운 개념이 그 상황에 어떻게 연결되는지 설명하세요. '만약 조건이 달라진다면?' 형태로 전이 가능성을 넓혀주는 마무리 질문을 포함하세요.",
+    open:
+      "적용적·개방형: 학생의 상상력과 적용 시도를 칭찬하세요. 배운 개념이 새 상황에 어떻게 이어지는지 단계적으로 연결해주고, 또 다른 상황에도 적용해볼 수 있도록 확장 질문을 덧붙이세요.",
+  },
 };
 
 export function buildAnswerPrompt(
@@ -29,12 +40,15 @@ export function buildAnswerPrompt(
   context?: string
 ): string {
   const contextPart = context ? `\n[수업 맥락] ${context}` : "";
-  const cogGuide = cognitive ? COGNITIVE_GUIDE[cognitive] ?? "" : "";
-  const closureGuide = closure ? CLOSURE_GUIDE[closure] ?? "" : "";
-  const guidePart =
-    cogGuide || closureGuide
-      ? `\n[질문 유형 안내]\n${closureGuide}${cogGuide ? "\n" + cogGuide : ""}`
-      : "";
+
+  const cogKey = cognitive && ANSWER_GUIDE[cognitive] ? cognitive : null;
+  const closureKey = closure === "closed" || closure === "open" ? closure : null;
+  const combinedGuide =
+    cogKey && closureKey ? ANSWER_GUIDE[cogKey][closureKey] : null;
+
+  const guidePart = combinedGuide
+    ? `\n[질문 유형 안내]\n${combinedGuide}`
+    : "";
 
   return `당신은 초·중·고 교사를 돕는 교육 AI입니다. 학생이 수업 중에 제출한 질문에 대해 교사가 학생에게 댓글로 달아줄 답변을 작성해 주세요.
 

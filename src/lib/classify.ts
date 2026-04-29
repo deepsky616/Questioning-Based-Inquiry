@@ -46,13 +46,15 @@ export function parseClassificationResponse(text: string): ClassificationResult 
 }
 
 export function fallbackClassification(content: string): ClassificationResult {
+  // "무슨"/"어떤"은 폐쇄형("무슨 색이에요?")과 개방형("어떤 방법이 좋을까?") 모두에 나타나므로 제외
   const closedKeywords = ["무엇", "언제", "몇", "어디", "누구", "얼마"];
-  const openKeywords = ["왜", "어떻게", "무슨", "어떤", "그래서"];
+  const openKeywords = ["왜", "어떻게"];
 
-  const factualKeywords = ["정의", "설명해", "알려줘", "뭐야"];
-  const interpretiveKeywords = ["비교해", "분석해", "추론해"];
-  const evaluativeKeywords = ["어떻게 생각해", "판단해", "평가해", "의견"];
-  const applicativeKeywords = ["내가", "만약", "라면", "나라면", "적용", "내 삶", "실제로", "활용"];
+  const factualKeywords = ["정의", "설명해", "알려줘", "뭐야", "무엇인가"];
+  const interpretiveKeywords = ["비교해", "분석해", "추론해", "차이", "왜냐면"];
+  const evaluativeKeywords = ["어떻게 생각해", "판단해", "평가해", "의견", "가장 좋은", "더 나은"];
+  // 적용적 키워드: "만약", "~라면" 조합이 핵심 지표
+  const applicativeKeywords = ["만약", "라면", "내가", "나라면", "적용", "내 삶", "실제로", "활용"];
 
   let closedCount = 0;
   let openCount = 0;
@@ -67,20 +69,25 @@ export function fallbackClassification(content: string): ClassificationResult {
   const closureScore = Math.max(0, Math.min(1, 0.5 + (closedCount - openCount) * 0.15));
   const closure: ClosureType = closureScore > 0.5 ? "closed" : "open";
 
+  // 적용적 여부를 먼저 확인 (가장 명확한 지표인 "만약~라면" 조합 우선)
+  const isApplicative = applicativeKeywords.some((kw) => content.includes(kw));
+
   let cognitive: CognitiveType = "factual";
   let cognitiveScore = 0.5;
 
-  for (const kw of factualKeywords) {
-    if (content.includes(kw)) cognitiveScore = Math.min(1, cognitiveScore + 0.1);
-  }
-  for (const kw of interpretiveKeywords) {
-    if (content.includes(kw)) { cognitive = "interpretive"; cognitiveScore = Math.min(1, cognitiveScore + 0.1); }
-  }
-  for (const kw of evaluativeKeywords) {
-    if (content.includes(kw)) { cognitive = "evaluative"; cognitiveScore = Math.min(1, cognitiveScore + 0.2); }
-  }
-  for (const kw of applicativeKeywords) {
-    if (content.includes(kw)) { cognitive = "applicative"; cognitiveScore = Math.min(1, cognitiveScore + 0.2); }
+  if (isApplicative) {
+    cognitive = "applicative";
+    cognitiveScore = Math.min(1, cognitiveScore + 0.25);
+  } else {
+    for (const kw of factualKeywords) {
+      if (content.includes(kw)) cognitiveScore = Math.min(1, cognitiveScore + 0.1);
+    }
+    for (const kw of interpretiveKeywords) {
+      if (content.includes(kw)) { cognitive = "interpretive"; cognitiveScore = Math.min(1, cognitiveScore + 0.1); }
+    }
+    for (const kw of evaluativeKeywords) {
+      if (content.includes(kw)) { cognitive = "evaluative"; cognitiveScore = Math.min(1, cognitiveScore + 0.2); }
+    }
   }
 
   const feedbackMap: Record<string, Record<string, string>> = {
