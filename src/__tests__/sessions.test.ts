@@ -4,16 +4,16 @@ import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/s
 describe("buildSessionLabel", () => {
   it("날짜·교과·주제를 합쳐 레이블을 반환한다", () => {
     expect(buildSessionLabel("2026-04-25", "과학", "지구의 역사")).toBe(
-      "2026-04-25 · 과학 · 지구의 역사"
+      "2026년 4월 25일 · 과학 · 지구의 역사"
     );
   });
 
   it("주제가 없으면 날짜·교과만 표시한다", () => {
-    expect(buildSessionLabel("2026-04-25", "수학", "")).toBe("2026-04-25 · 수학");
+    expect(buildSessionLabel("2026-04-25", "수학", "")).toBe("2026년 4월 25일 · 수학");
   });
 
   it("주제 앞뒤 공백은 무시한다", () => {
-    expect(buildSessionLabel("2026-04-25", "국어", "  ")).toBe("2026-04-25 · 국어");
+    expect(buildSessionLabel("2026-04-25", "국어", "  ")).toBe("2026년 4월 25일 · 국어");
   });
 });
 

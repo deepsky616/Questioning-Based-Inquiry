@@ -8,7 +8,7 @@ describe("buildAnswerPrompt", () => {
   });
 
   it("맥락이 있으면 프롬프트에 포함된다", () => {
-    const prompt = buildAnswerPrompt("왜 하늘은 파란가요?", "과학 수업 중");
+    const prompt = buildAnswerPrompt("왜 하늘은 파란가요?", undefined, undefined, "과학 수업 중");
     expect(prompt).toContain("왜 하늘은 파란가요?");
     expect(prompt).toContain("과학 수업 중");
   });
