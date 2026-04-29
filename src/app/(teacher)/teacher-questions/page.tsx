@@ -918,6 +918,7 @@ export default function QuestionsPage() {
               <StatBadge label="사실적" value={byType("cognitive", "factual").length} color="bg-gray-100 text-gray-700" />
               <StatBadge label="해석적" value={byType("cognitive", "interpretive").length} color="bg-purple-100 text-purple-700" />
               <StatBadge label="평가적" value={byType("cognitive", "evaluative").length} color="bg-orange-100 text-orange-700" />
+              <StatBadge label="적용적" value={byType("cognitive", "applicative").length} color="bg-teal-100 text-teal-700" />
             </div>
             <div className="mt-4">
               <Button
@@ -1165,7 +1166,7 @@ export default function QuestionsPage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 질문</CardTitle>
+              <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 / 적용적 질문</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="factual">
@@ -1179,10 +1180,14 @@ export default function QuestionsPage() {
                   <TabsTrigger value="evaluative">
                     평가적 <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{byType("cognitive", "evaluative").length}</span>
                   </TabsTrigger>
+                  <TabsTrigger value="applicative">
+                    적용적 <span className="ml-1.5 text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">{byType("cognitive", "applicative").length}</span>
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent value="factual"><QuestionTable list={byType("cognitive", "factual")} /></TabsContent>
                 <TabsContent value="interpretive"><QuestionTable list={byType("cognitive", "interpretive")} /></TabsContent>
                 <TabsContent value="evaluative"><QuestionTable list={byType("cognitive", "evaluative")} /></TabsContent>
+                <TabsContent value="applicative"><QuestionTable list={byType("cognitive", "applicative")} /></TabsContent>
               </Tabs>
             </CardContent>
           </Card>
@@ -1229,6 +1234,7 @@ export default function QuestionsPage() {
                       <SelectItem value="factual">사실적 질문</SelectItem>
                       <SelectItem value="interpretive">해석적 질문</SelectItem>
                       <SelectItem value="evaluative">평가적 질문</SelectItem>
+                      <SelectItem value="applicative">적용적 질문</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

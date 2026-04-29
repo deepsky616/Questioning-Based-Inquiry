@@ -124,6 +124,7 @@ export default function AskPage() {
       factual: "사실적 질문",
       interpretive: "해석적 질문",
       evaluative: "평가적 질문",
+      applicative: "적용적 질문",
     };
     return map[c] || c;
   };

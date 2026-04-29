@@ -8,6 +8,7 @@ export interface ClassStats {
     factual: number;
     interpretive: number;
     evaluative: number;
+    applicative: number;
   };
   byStudent: StudentStat[];
   timeline: TimelineEntry[];
@@ -26,6 +27,7 @@ export interface StudentStat {
     factual: number;
     interpretive: number;
     evaluative: number;
+    applicative: number;
   };
   trend: number;
 }

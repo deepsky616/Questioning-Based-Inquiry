@@ -46,7 +46,7 @@ export async function POST(req: Request) {
 
     const questions = await prisma.question.findMany({
       where: { id: { in: questionIds } },
-      select: { id: true, content: true, context: true },
+      select: { id: true, content: true, context: true, closure: true, cognitive: true },
     });
 
     const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
@@ -55,7 +55,12 @@ export async function POST(req: Request) {
     // 각 질문에 대해 AI 답변 동시 생성
     const aiResults = await Promise.allSettled(
       questions.map(async (q) => {
-        const prompt = buildAnswerPrompt(q.content, q.context ?? undefined);
+        const prompt = buildAnswerPrompt(
+          q.content,
+          q.closure ?? undefined,
+          q.cognitive ?? undefined,
+          q.context ?? undefined
+        );
         const result = await model.generateContent(prompt);
         return { id: q.id, answer: result.response.text().trim() };
       })

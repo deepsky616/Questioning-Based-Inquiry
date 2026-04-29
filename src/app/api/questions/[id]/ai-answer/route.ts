@@ -33,7 +33,12 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
     const model = genAI.getGenerativeModel({ model: modelRecord?.value ?? "gemini-2.5-flash" });
 
-    const prompt = buildAnswerPrompt(question.content, question.context ?? undefined);
+    const prompt = buildAnswerPrompt(
+      question.content,
+      question.closure ?? undefined,
+      question.cognitive ?? undefined,
+      question.context ?? undefined
+    );
     const result = await model.generateContent(prompt);
     const answer = result.response.text().trim();
 

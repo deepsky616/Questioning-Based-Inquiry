@@ -12,10 +12,12 @@ export const COGNITIVE_LABEL: Record<string, string> = {
   factual: "사실적",
   interpretive: "해석적",
   evaluative: "평가적",
+  applicative: "적용적",
 };
 
 export const COGNITIVE_STYLE: Record<string, string> = {
   factual: "bg-gray-100 text-gray-700",
   interpretive: "bg-purple-100 text-purple-700",
   evaluative: "bg-orange-100 text-orange-700",
+  applicative: "bg-teal-100 text-teal-700",
 };

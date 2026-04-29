@@ -1,5 +1,5 @@
 export type ClosureType = "closed" | "open";
-export type CognitiveType = "factual" | "interpretive" | "evaluative";
+export type CognitiveType = "factual" | "interpretive" | "evaluative" | "applicative";
 
 export interface Question {
   id: string;
