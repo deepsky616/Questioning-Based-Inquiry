@@ -101,7 +101,7 @@ describe("sendEmail", () => {
     const sendMailMock = vi.fn().mockResolvedValue({ messageId: "msg-001" });
     vi.mocked(nodemailer.createTransport).mockReturnValue({
       sendMail: sendMailMock,
-    } as ReturnType<typeof nodemailer.createTransport>);
+    } as unknown as ReturnType<typeof nodemailer.createTransport>);
 
     const result = await sendEmail({
       to: "teacher@school.kr",
@@ -126,7 +126,7 @@ describe("sendEmail", () => {
     const sendMailMock = vi.fn().mockRejectedValue(new Error("SMTP 연결 실패"));
     vi.mocked(nodemailer.createTransport).mockReturnValue({
       sendMail: sendMailMock,
-    } as ReturnType<typeof nodemailer.createTransport>);
+    } as unknown as ReturnType<typeof nodemailer.createTransport>);
 
     const result = await sendEmail({
       to: "teacher@school.kr",
