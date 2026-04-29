@@ -24,7 +24,7 @@ export async function GET(req: Request) {
   }
 
   // 학년군 목록 반환
-  if (subject && !gradeRange) {
+  if (subject && !gradeRange && !areaId) {
     const grades = await prisma.$queryRaw<{ grade_range: string }[]>`
       SELECT DISTINCT grade_range FROM curriculum_areas
       WHERE subject = ${subject} ORDER BY grade_range
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ gradeRanges: grades.map((g) => g.grade_range) });
   }
 
-  // 특정 영역 단건 반환
+  // 특정 영역 단건 반환 (areaId는 전역 고유 — 다른 조건보다 먼저 처리)
   if (areaId) {
     const row = await prisma.$queryRaw<
       {
