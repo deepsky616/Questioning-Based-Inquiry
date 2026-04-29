@@ -41,11 +41,15 @@ export default function StudentsPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
+  // "5학년", "1반" 같은 접미사를 제거해 grade/className("5", "1")과 매칭
+  const normalizedSearch = search.trim().replace(/학년|반/g, "").trim();
+
   const filtered = students.filter((s) => {
     const matchSearch =
-      s.name.includes(search) ||
-      s.grade.includes(search) ||
-      s.className.includes(search);
+      normalizedSearch === "" ||
+      s.name.includes(normalizedSearch) ||
+      s.grade.includes(normalizedSearch) ||
+      s.className.includes(normalizedSearch);
     const matchClass =
       filterClass === "all" ||
       `${s.grade}-${s.className}` === filterClass;
@@ -115,6 +119,15 @@ export default function StudentsPage() {
             <p className="font-medium mb-1">등록된 학생이 없습니다</p>
             <p className="text-sm text-gray-400">
               같은 학교·학년·반 학생이 회원가입하면 여기에 표시됩니다
+            </p>
+          </CardContent>
+        </Card>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-gray-500">
+            <p className="font-medium mb-1">검색 결과가 없습니다</p>
+            <p className="text-sm text-gray-400">
+              이름, 학년, 반을 다시 확인해 주세요
             </p>
           </CardContent>
         </Card>
