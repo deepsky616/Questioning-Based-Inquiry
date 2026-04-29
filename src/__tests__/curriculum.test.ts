@@ -73,7 +73,7 @@ describe("GET /api/curriculum — 영역 단건 조회", () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockQueryRaw.mockResolvedValue([AREA_ROW]);
 
-    const res = await GET(makeRequest({ subject: "과학", gradeRange: "3-4", areaId: "area-1" }));
+    const res = await GET(makeRequest({ areaId: "area-1" }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe("area-1");
@@ -86,7 +86,7 @@ describe("GET /api/curriculum — 영역 단건 조회", () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockQueryRaw.mockResolvedValue([]);
 
-    const res = await GET(makeRequest({ subject: "과학", gradeRange: "3-4", areaId: "nonexistent" }));
+    const res = await GET(makeRequest({ areaId: "nonexistent" }));
     expect(res.status).toBe(404);
   });
 });

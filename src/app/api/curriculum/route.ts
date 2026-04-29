@@ -15,24 +15,7 @@ export async function GET(req: Request) {
   const gradeRange = searchParams.get("gradeRange");
   const areaId = searchParams.get("areaId");
 
-  // 교과 목록 반환
-  if (!subject) {
-    const subjects = await prisma.$queryRaw<{ subject: string }[]>`
-      SELECT DISTINCT subject FROM curriculum_areas ORDER BY subject
-    `;
-    return NextResponse.json({ subjects: subjects.map((s) => s.subject) });
-  }
-
-  // 학년군 목록 반환
-  if (subject && !gradeRange && !areaId) {
-    const grades = await prisma.$queryRaw<{ grade_range: string }[]>`
-      SELECT DISTINCT grade_range FROM curriculum_areas
-      WHERE subject = ${subject} ORDER BY grade_range
-    `;
-    return NextResponse.json({ gradeRanges: grades.map((g) => g.grade_range) });
-  }
-
-  // 특정 영역 단건 반환 (areaId는 전역 고유 — 다른 조건보다 먼저 처리)
+  // 특정 영역 단건 반환 — areaId는 전역 고유이므로 가장 먼저 처리
   if (areaId) {
     const row = await prisma.$queryRaw<
       {
@@ -49,6 +32,23 @@ export async function GET(req: Request) {
       processItems: r.process_items, valueItems: r.value_items,
       achievements: r.achievements,
     });
+  }
+
+  // 교과 목록 반환
+  if (!subject) {
+    const subjects = await prisma.$queryRaw<{ subject: string }[]>`
+      SELECT DISTINCT subject FROM curriculum_areas ORDER BY subject
+    `;
+    return NextResponse.json({ subjects: subjects.map((s) => s.subject) });
+  }
+
+  // 학년군 목록 반환
+  if (!gradeRange) {
+    const grades = await prisma.$queryRaw<{ grade_range: string }[]>`
+      SELECT DISTINCT grade_range FROM curriculum_areas
+      WHERE subject = ${subject} ORDER BY grade_range
+    `;
+    return NextResponse.json({ gradeRanges: grades.map((g) => g.grade_range) });
   }
 
   // 교과·학년군의 영역 목록 반환
