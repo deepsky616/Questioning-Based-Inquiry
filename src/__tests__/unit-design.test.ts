@@ -7,8 +7,10 @@ vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   prisma: {
     $queryRaw: vi.fn(),
+    $queryRawUnsafe: vi.fn(),
     $executeRawUnsafe: vi.fn(),
     systemConfig: { findUnique: vi.fn() },
+    questionSession: { create: vi.fn() },
   },
 }));
 vi.mock("@google/generative-ai", () => ({
@@ -29,7 +31,9 @@ import { POST as generatePOST } from "@/app/api/unit-design/generate/route";
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
+const mockQueryRawUnsafe = prisma.$queryRawUnsafe as ReturnType<typeof vi.fn>;
 const mockExecRaw = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
+const mockSessionCreate = prisma.questionSession.create as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.systemConfig.findUnique as ReturnType<typeof vi.fn>;
 
 const TEACHER_SESSION = { user: { id: "teacher-1", role: "TEACHER" } };
@@ -122,14 +126,28 @@ describe("POST /api/unit-design — 단원 설계 저장", () => {
     expect(res.status).toBe(403);
   });
 
-  it("유효한 데이터로 저장하면 ok를 반환한다", async () => {
+  it("유효한 데이터로 저장하면 ok와 sessionId를 반환한다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
-    mockExecRaw.mockResolvedValue(undefined);
+    mockQueryRawUnsafe.mockResolvedValue([{ id: "ud-new" }]);
+    mockSessionCreate.mockResolvedValue({ id: "qs-new" });
 
     const res = await POST(makeRequest(VALID_DESIGN));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
+    expect(body.sessionId).toBe("qs-new");
+  });
+
+  it("탐구 질문이 없으면 세션을 생성하지 않는다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockQueryRawUnsafe.mockResolvedValue([{ id: "ud-no-inquiry" }]);
+
+    const res = await POST(makeRequest({ ...VALID_DESIGN, inquiryQuestions: [] }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ok).toBe(true);
+    expect(body.sessionId).toBeNull();
+    expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
   it("title이 빈 문자열이면 400을 반환한다", async () => {
@@ -146,7 +164,8 @@ describe("POST /api/unit-design — 단원 설계 저장", () => {
 
   it("curriculumAreaId가 없어도 저장된다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
-    mockExecRaw.mockResolvedValue(undefined);
+    mockQueryRawUnsafe.mockResolvedValue([{ id: "ud-no-area" }]);
+    mockSessionCreate.mockResolvedValue({ id: "qs-no-area" });
 
     const res = await POST(makeRequest({ ...VALID_DESIGN, curriculumAreaId: undefined }));
     expect(res.status).toBe(200);

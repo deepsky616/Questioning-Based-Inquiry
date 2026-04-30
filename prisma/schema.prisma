@@ -63,14 +63,16 @@ model TeacherClass {
 }
 
 model QuestionSession {
-  id        String     @id @default(cuid())
-  date      String     @map("session_date")
-  subject   String     @map("subject")
-  topic     String     @default("") @map("topic")
-  teacherId String     @map("teacher_id")
-  teacher   User       @relation("SessionTeacher", fields: [teacherId], references: [id])
-  questions Question[] @relation("SessionQuestions")
-  createdAt DateTime   @default(now()) @map("created_at")
+  id              String     @id @default(cuid())
+  date            String     @map("session_date")
+  subject         String     @map("subject")
+  topic           String     @default("") @map("topic")
+  teacherId       String     @map("teacher_id")
+  teacher         User       @relation("SessionTeacher", fields: [teacherId], references: [id])
+  questions       Question[] @relation("SessionQuestions")
+  unitDesignId    String?    @map("unit_design_id")
+  sharedQuestions Json       @default("[]") @map("shared_questions")
+  createdAt       DateTime   @default(now()) @map("created_at")
 
   @@map("question_sessions")
 }

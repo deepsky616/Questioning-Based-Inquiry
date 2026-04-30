@@ -85,6 +85,12 @@ export default function CurriculumPage() {
   const [inquiryQuestions, setInquiryQuestions] = useState<InquiryQuestion[]>([]);
   const [loadingInquiry, setLoadingInquiry] = useState(false);
 
+  // 저장 후 세션 공유 관련 상태
+  const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
+  const [sharedIndices, setSharedIndices] = useState<Set<number>>(new Set());
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
+
   // 교과 목록 로드
   useEffect(() => {
     fetch("/api/curriculum")
@@ -212,6 +218,10 @@ export default function CurriculumPage() {
       const data = await callGenerate("inquiry");
       if (data?.inquiryQuestions) {
         setInquiryQuestions(data.inquiryQuestions);
+        // issue #7: 새 탐구 질문 생성 시 기존 공유 상태 초기화
+        setSavedSessionId(null);
+        setSharedIndices(new Set());
+        setShareSuccess(false);
         setStep(5);
       }
     } finally {
@@ -236,6 +246,10 @@ export default function CurriculumPage() {
   const handleSave = async () => {
     if (!curriculumData || !saveTitle.trim()) return;
     setIsSaving(true);
+    // issue #7: 저장할 때마다 이전 공유 상태 초기화
+    setSavedSessionId(null);
+    setSharedIndices(new Set());
+    setShareSuccess(false);
     try {
       const res = await fetch("/api/unit-design", {
         method: "POST",
@@ -254,15 +268,51 @@ export default function CurriculumPage() {
         }),
       });
       if (res.ok) {
-        alert("저장되었습니다.");
+        // issue #6: 응답 JSON에서 sessionId 읽기
+        const data = await res.json();
         setSaveTitle("");
         fetchSaved();
+        if (data.sessionId) {
+          setSavedSessionId(data.sessionId);
+        }
       } else {
         alert("저장 실패");
       }
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleShare = async () => {
+    if (!savedSessionId || isSharing) return;
+    // issue #8: 최신 배열에서 선택된 질문 추출, 빈 content 제외
+    const selectedOnes = inquiryQuestions
+      .filter((q, i) => sharedIndices.has(i) && q.content.trim())
+      .map(({ type, content }) => ({ type, content: content.trim() }));
+
+    setIsSharing(true);
+    setShareSuccess(false);
+    try {
+      const res = await fetch(`/api/sessions/${savedSessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sharedQuestions: selectedOnes }),
+      });
+      if (res.ok) setShareSuccess(true);
+      else alert("공유 실패. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const toggleSharedIndex = (i: number) => {
+    setShareSuccess(false); // issue #9: 체크박스 변경 시 성공 상태 초기화
+    setSharedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
   };
 
   const handleDelete = async (id: string) => {
@@ -657,7 +707,13 @@ export default function CurriculumPage() {
                 <Input
                   placeholder="단원 설계 이름 입력 (예: 5학년 과학 생명 단원)"
                   value={saveTitle}
-                  onChange={(e) => setSaveTitle(e.target.value)}
+                  onChange={(e) => {
+                    setSaveTitle(e.target.value);
+                    // issue #7: 제목 수정 시 이전 세션 상태 초기화
+                    setSavedSessionId(null);
+                    setSharedIndices(new Set());
+                    setShareSuccess(false);
+                  }}
                 />
                 <Button
                   onClick={handleSave}
@@ -667,6 +723,63 @@ export default function CurriculumPage() {
                   {isSaving ? "저장 중..." : "저장"}
                 </Button>
               </div>
+
+              {/* issue #6: 세션 자동생성 배너 */}
+              {savedSessionId && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                  저장 완료! 수업 세션이 자동으로 생성되었습니다.
+                </div>
+              )}
+
+              {/* 탐구 질문 공유 패널 — 세션이 생성된 경우에만 표시 */}
+              {savedSessionId && (
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-indigo-800">학생에게 탐구 질문 공유</p>
+                    <p className="text-xs text-indigo-500 mt-0.5">
+                      학생이 질문할 때 참고할 수 있도록 탐구 질문을 선택해서 공유하세요
+                    </p>
+                  </div>
+                  {/* issue #8: 인덱스 기반 선택, 빈 content 제외 */}
+                  <div className="space-y-2">
+                    {inquiryQuestions.map((q, i) =>
+                      q.content.trim() ? (
+                        <label
+                          key={i}
+                          className="flex items-start gap-2 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 shrink-0 accent-indigo-600"
+                            checked={sharedIndices.has(i)}
+                            onChange={() => toggleSharedIndex(i)}
+                          />
+                          <span className="text-sm text-indigo-900">
+                            <span className="font-medium text-indigo-600 mr-1">
+                              [{q.type === "factual" ? "사실적" : q.type === "conceptual" ? "개념적" : "논쟁적"}]
+                            </span>
+                            {q.content.trim()}
+                          </span>
+                        </label>
+                      ) : null
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      size="sm"
+                      onClick={handleShare}
+                      disabled={isSharing || sharedIndices.size === 0}
+                      className="shrink-0"
+                    >
+                      {isSharing ? "공유 중..." : "학생에게 공유하기"}
+                    </Button>
+                    {/* issue #9: 성공 상태는 체크박스 변경 시 자동 초기화 */}
+                    {shareSuccess && (
+                      <span className="text-sm text-green-700 font-medium">공유 완료!</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

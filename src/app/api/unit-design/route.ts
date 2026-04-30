@@ -49,7 +49,8 @@ export async function POST(req: Request) {
     const data = saveSchema.parse(body);
     const teacherId = (session.user as { id: string }).id;
 
-    await prisma.$executeRawUnsafe(
+    // 단원 설계 저장 (ID를 RETURNING으로 회수)
+    const inserted = await prisma.$queryRawUnsafe<{ id: string }[]>(
       `INSERT INTO unit_designs
          (id, teacher_id, curriculum_area_id, title, subject, grade_range, area,
           core_idea, selected_keywords, core_sentences, essential_questions, inquiry_questions,
@@ -57,7 +58,8 @@ export async function POST(req: Request) {
        VALUES
          (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
           $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb,
-          now(), now())`,
+          now(), now())
+       RETURNING id`,
       teacherId,
       data.curriculumAreaId ?? null,
       data.title,
@@ -71,7 +73,26 @@ export async function POST(req: Request) {
       JSON.stringify(data.inquiryQuestions)
     );
 
-    return NextResponse.json({ ok: true });
+    const designId = inserted[0]?.id ?? null;
+
+    // 탐구 질문이 있으면 수업 세션 자동 생성
+    let sessionId: string | null = null;
+    if (designId && data.inquiryQuestions.length > 0) {
+      // UTC 기준이 아닌 KST(+9h) 기준 오늘 날짜 사용
+      const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const qs = await prisma.questionSession.create({
+        data: {
+          date: today,
+          subject: data.subject,
+          topic: data.title,
+          teacherId,
+          unitDesignId: designId,
+        },
+      });
+      sessionId = qs.id;
+    }
+
+    return NextResponse.json({ ok: true, sessionId });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });

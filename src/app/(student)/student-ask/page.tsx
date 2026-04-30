@@ -10,12 +10,18 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { buildSessionLabel, buildSessionContextHint, isSessionAvailable } from "@/lib/sessions";
 
+interface SharedQuestion {
+  type: string;
+  content: string;
+}
+
 interface QuestionSession {
   id: string;
   date: string;
   subject: string;
   topic: string;
   teacher: { name: string };
+  sharedQuestions: SharedQuestion[];
 }
 
 interface ClassificationResult {
@@ -26,6 +32,12 @@ interface ClassificationResult {
   reasoning: string;
   feedback?: string;
 }
+
+const TYPE_LABEL: Record<string, string> = {
+  factual: "사실적",
+  conceptual: "개념적",
+  controversial: "논쟁적",
+};
 
 export default function AskPage() {
   const router = useRouter();
@@ -39,7 +51,9 @@ export default function AskPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
-  const [selectedSessionId, setSelectedSessionId] = useState<string>("none");
+  const [sessionsLoaded, setSessionsLoaded] = useState(false);
+  const [sessionsError, setSessionsError] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
 
   useEffect(() => {
     fetch("/api/config")
@@ -48,11 +62,20 @@ export default function AskPage() {
       .catch(() => setAiConfigured(false));
 
     fetch("/api/sessions")
-      .then((r) => r.json())
-      .then((data: QuestionSession[]) =>
-        setSessions(data.filter((s) => isSessionAvailable(s.date)))
-      )
-      .catch(() => {});
+      .then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json();
+      })
+      .then((data: QuestionSession[]) => {
+        const available = data.filter((s) => isSessionAvailable(s.date));
+        setSessions(available);
+        if (available.length > 0) setSelectedSessionId(available[0].id);
+        setSessionsLoaded(true);
+      })
+      .catch(() => {
+        setSessionsError(true);
+        setSessionsLoaded(true);
+      });
   }, []);
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
@@ -60,23 +83,26 @@ export default function AskPage() {
   const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
     setSelectedSessionId(id);
-    // 세션 선택 시 맥락 자동완성 (비어 있을 때만)
-    if (id !== "none" && context.trim() === "") {
+    setResult(null); // issue #5: 세션 변경 시 분류 결과 초기화
+
+    if (id && context.trim() === "") {
       const s = sessions.find((s) => s.id === id);
       if (s) setContext(buildSessionContextHint(s.subject, s.topic, s.teacher.name));
     }
-    if (id === "none") setContext("");
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
+  const canAsk = sessionsLoaded && !sessionsError && sessions.length > 0 && !!selectedSessionId;
+
   const handleClassify = async () => {
+    // issue #3: handler 단에서도 세션 필수 검증
+    if (!canAsk) return;
     if (content.trim().length === 0) {
       alert("질문을 입력해 주세요");
       return;
     }
 
     setIsLoading(true);
-
     try {
       const res = await fetch("/api/classify", {
         method: "POST",
@@ -100,7 +126,8 @@ export default function AskPage() {
   };
 
   const handleSave = async () => {
-    if (!result) return;
+    // issue #3: handler 단에서도 세션 필수 검증
+    if (!canAsk || !result) return;
 
     setIsSaving(true);
     try {
@@ -115,7 +142,7 @@ export default function AskPage() {
           cognitive: result.cognitive,
           closureScore: result.closureScore,
           cognitiveScore: result.cognitiveScore,
-          ...(selectedSessionId !== "none" ? { sessionId: selectedSessionId } : {}),
+          sessionId: selectedSessionId,
         }),
       });
 
@@ -137,6 +164,55 @@ export default function AskPage() {
     };
     return map[c] || c;
   };
+
+  // issue #1: 로딩 중에는 아무것도 표시하지 않음
+  if (!sessionsLoaded) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">질문하기</h2>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center text-gray-400 text-sm">수업 세션 확인 중...</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // issue #1 & #2: 네트워크 오류
+  if (sessionsError) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">질문하기</h2>
+        </div>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6 text-center text-red-700 text-sm">
+            수업 세션 정보를 불러오지 못했습니다. 페이지를 새로고침해 주세요.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // issue #1 & #2: 세션 없음 — 폼 차단
+  if (sessions.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">질문하기</h2>
+        </div>
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-6 text-center text-yellow-800">
+            <p className="font-medium">아직 수업 세션이 없습니다</p>
+            <p className="text-sm mt-1 text-yellow-700">
+              담당 선생님이 수업 세션을 만들어야 질문할 수 있습니다.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -166,41 +242,66 @@ export default function AskPage() {
       <Card>
         <CardHeader>
           <CardTitle>질문 입력</CardTitle>
-          <CardDescription>탐구하고 싶은 질문을 적어보세요</CardDescription>
+          <CardDescription>수업 세션을 선택하고 탐구하고 싶은 질문을 적어보세요</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {sessions.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="session">수업 세션 선택 (선택)</Label>
-              <select
-                id="session"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={selectedSessionId}
-                onChange={handleSessionChange}
-              >
-                <option value="none">세션 없이 질문하기</option>
-                {sessions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {buildSessionLabel(s.date, s.subject, s.topic)}
-                  </option>
-                ))}
-              </select>
-              {selectedSession && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-1">
-                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">현재 수업 세션</p>
-                  <p className="text-sm font-medium text-blue-900">
-                    {selectedSession.subject}
-                    {selectedSession.topic.trim() && (
-                      <span className="text-blue-700"> · {selectedSession.topic.trim()}</span>
-                    )}
-                  </p>
-                  <p className="text-xs text-blue-600">
-                    {selectedSession.teacher.name} 선생님 &nbsp;·&nbsp; {selectedSession.date}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+          {/* 세션 선택 — 필수 */}
+          <div className="space-y-2">
+            <Label htmlFor="session">수업 세션 선택 <span className="text-red-500">*</span></Label>
+            <select
+              id="session"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              value={selectedSessionId}
+              onChange={handleSessionChange}
+            >
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {buildSessionLabel(s.date, s.subject, s.topic)}
+                </option>
+              ))}
+            </select>
+
+            {selectedSession && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-1">
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">현재 수업 세션</p>
+                <p className="text-sm font-medium text-blue-900">
+                  {selectedSession.subject}
+                  {selectedSession.topic.trim() && (
+                    <span className="text-blue-700"> · {selectedSession.topic.trim()}</span>
+                  )}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {selectedSession.teacher.name} 선생님 &nbsp;·&nbsp; {selectedSession.date}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* 선생님의 탐구 질문 안내 패널 (issue #4: 런타임 안전 검증) */}
+          {selectedSession &&
+            Array.isArray(selectedSession.sharedQuestions) &&
+            selectedSession.sharedQuestions.filter((q) => q.content?.trim()).length > 0 && (
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-2">
+                <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
+                  선생님의 탐구 질문
+                </p>
+                <p className="text-xs text-indigo-500 mb-2">
+                  아래 질문을 참고해서 나만의 질문을 만들어보세요
+                </p>
+                <ul className="space-y-1.5">
+                  {selectedSession.sharedQuestions
+                    .filter((q) => q.content?.trim())
+                    .map((q, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-indigo-800">
+                        <span className="shrink-0 mt-0.5 text-xs font-medium text-indigo-500">
+                          [{TYPE_LABEL[q.type] ?? q.type}]
+                        </span>
+                        <span>{q.content}</span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
 
           <div className="space-y-2">
             <Label htmlFor="content">질문</Label>
@@ -227,7 +328,7 @@ export default function AskPage() {
 
           <Button
             onClick={handleClassify}
-            disabled={isLoading || content.trim().length === 0}
+            disabled={isLoading || !canAsk || content.trim().length === 0}
             className="w-full"
           >
             {isLoading ? "분석 중..." : "유형 분석하기"}
