@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
+import { buildSessionLabel, buildSessionContextHint, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
 
 describe("buildSessionLabel", () => {
   it("날짜·교과·주제를 합쳐 레이블을 반환한다", () => {
@@ -28,6 +28,32 @@ describe("isSessionAvailable", () => {
 
   it("지난 세션은 사용 불가하다", () => {
     expect(isSessionAvailable("2026-04-24", new Date("2026-04-25T00:00:00"))).toBe(false);
+  });
+});
+
+describe("buildSessionContextHint", () => {
+  it("교사명·교과·주제 모두 있으면 전체 힌트를 반환한다", () => {
+    expect(buildSessionContextHint("과학", "지구의 역사", "김철수")).toBe(
+      "김철수 선생님의 과학 '지구의 역사' 수업 중"
+    );
+  });
+
+  it("주제가 없으면 교사명·교과만 포함한다", () => {
+    expect(buildSessionContextHint("수학", "", "이영희")).toBe(
+      "이영희 선생님의 수학 수업 중"
+    );
+  });
+
+  it("교사명이 없으면 교과·주제만 포함한다", () => {
+    expect(buildSessionContextHint("국어", "시 읽기")).toBe(
+      "국어 '시 읽기' 수업 중"
+    );
+  });
+
+  it("주제 앞뒤 공백은 무시한다", () => {
+    expect(buildSessionContextHint("과학", "  생태계  ", "박지성")).toBe(
+      "박지성 선생님의 과학 '생태계' 수업 중"
+    );
   });
 });
 

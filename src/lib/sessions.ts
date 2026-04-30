@@ -21,3 +21,13 @@ export function isSessionAvailable(sessionDate: string, now: Date = new Date()):
 export function sortSessionsDesc<T extends { date: string }>(sessions: T[]): T[] {
   return [...sessions].sort((a, b) => b.date.localeCompare(a.date));
 }
+
+// 세션 선택 시 질문 맥락 자동완성용 힌트 문자열 생성
+export function buildSessionContextHint(subject: string, topic: string, teacherName?: string): string {
+  const parts: string[] = [];
+  if (teacherName) parts.push(`${teacherName} 선생님의`);
+  parts.push(subject);
+  if (topic.trim()) parts.push(`'${topic.trim()}'`);
+  parts.push("수업 중");
+  return parts.join(" ");
+}

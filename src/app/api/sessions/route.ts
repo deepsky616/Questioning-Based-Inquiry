@@ -15,13 +15,34 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const role = (session.user as { role?: string }).role;
-  const where = role === "TEACHER"
-    ? { teacherId: (session.user as { id: string }).id }
-    : {};
+  const user = session.user as { id: string; role?: string; grade?: string; className?: string };
 
+  if (user.role === "TEACHER") {
+    const sessions = await prisma.questionSession.findMany({
+      where: { teacherId: user.id },
+      orderBy: { date: "desc" },
+      include: { teacher: { select: { name: true } } },
+    });
+    return NextResponse.json(sessions);
+  }
+
+  // 학생: 같은 학년·반을 담당하는 교사의 세션만 반환
+  if (!user.grade || !user.className) {
+    return NextResponse.json([]);
+  }
+
+  const teacherClasses = await prisma.teacherClass.findMany({
+    where: { grade: user.grade, className: user.className },
+    select: { teacherId: true },
+  });
+
+  if (teacherClasses.length === 0) {
+    return NextResponse.json([]);
+  }
+
+  const teacherIds = teacherClasses.map((tc) => tc.teacherId);
   const sessions = await prisma.questionSession.findMany({
-    where,
+    where: { teacherId: { in: teacherIds } },
     orderBy: { date: "desc" },
     include: { teacher: { select: { name: true } } },
   });

@@ -57,6 +57,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id;
         token.role = (user as any).role;
         token.school = (user as any).school;
+        token.grade = (user as any).grade;
+        token.className = (user as any).className;
       }
       return token;
     },
@@ -65,6 +67,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).id = token.id;
         (session.user as any).role = token.role;
         (session.user as any).school = token.school;
+        (session.user as any).grade = token.grade;
+        (session.user as any).className = token.className;
       }
       return session;
     },

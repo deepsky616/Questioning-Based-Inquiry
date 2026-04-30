@@ -8,13 +8,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { buildSessionLabel, isSessionAvailable } from "@/lib/sessions";
+import { buildSessionLabel, buildSessionContextHint, isSessionAvailable } from "@/lib/sessions";
 
 interface QuestionSession {
   id: string;
   date: string;
   subject: string;
   topic: string;
+  teacher: { name: string };
 }
 
 interface ClassificationResult {
@@ -54,9 +55,17 @@ export default function AskPage() {
       .catch(() => {});
   }, []);
 
+  const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
+
   const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedSessionId(e.target.value);
-    // 세션 선택 직후 textarea로 포커스 이동해 바로 입력 가능하게
+    const id = e.target.value;
+    setSelectedSessionId(id);
+    // 세션 선택 시 맥락 자동완성 (비어 있을 때만)
+    if (id !== "none" && context.trim() === "") {
+      const s = sessions.find((s) => s.id === id);
+      if (s) setContext(buildSessionContextHint(s.subject, s.topic, s.teacher.name));
+    }
+    if (id === "none") setContext("");
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
@@ -176,6 +185,20 @@ export default function AskPage() {
                   </option>
                 ))}
               </select>
+              {selectedSession && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-1">
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">현재 수업 세션</p>
+                  <p className="text-sm font-medium text-blue-900">
+                    {selectedSession.subject}
+                    {selectedSession.topic.trim() && (
+                      <span className="text-blue-700"> · {selectedSession.topic.trim()}</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-blue-600">
+                    {selectedSession.teacher.name} 선생님 &nbsp;·&nbsp; {selectedSession.date}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
