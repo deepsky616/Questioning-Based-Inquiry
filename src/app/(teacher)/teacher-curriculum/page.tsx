@@ -16,6 +16,9 @@ interface CurriculumArea {
   knowledgeItems: string[];
   processItems: string[];
   valueItems: string[];
+  middleKnowledgeItems: string[];
+  middleProcessItems: string[];
+  middleValueItems: string[];
   achievements: { code: string; content: string }[];
 }
 
@@ -419,6 +422,53 @@ export default function CurriculumPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* 중학교 연계 내용요소 (선행 확인용) */}
+              {(curriculumData.middleKnowledgeItems?.length > 0 ||
+                curriculumData.middleProcessItems?.length > 0 ||
+                curriculumData.middleValueItems?.length > 0) && (
+                <details className="rounded-lg border border-amber-200 bg-amber-50">
+                  <summary className="px-4 py-2 text-xs font-semibold text-amber-700 cursor-pointer select-none">
+                    ▶ 중학교 연계 내용요소 (선행 학습 여부 점검용 — 수업에서 직접 다루지 않음)
+                  </summary>
+                  <div className="border-t border-amber-200 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-amber-100">
+                        <tr>
+                          <th className="px-3 py-1.5 text-left font-medium text-amber-700 w-1/3 border-r border-amber-200">지식·이해</th>
+                          <th className="px-3 py-1.5 text-left font-medium text-amber-700 w-1/3 border-r border-amber-200">과정·기능</th>
+                          <th className="px-3 py-1.5 text-left font-medium text-amber-700 w-1/3">가치·태도</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="align-top">
+                          <td className="px-3 py-2 border-r border-amber-200">
+                            <ul className="space-y-0.5">
+                              {curriculumData.middleKnowledgeItems.map((item, i) => (
+                                <li key={i} className="text-amber-800">· {item}</li>
+                              ))}
+                            </ul>
+                          </td>
+                          <td className="px-3 py-2 border-r border-amber-200">
+                            <ul className="space-y-0.5">
+                              {curriculumData.middleProcessItems.map((item, i) => (
+                                <li key={i} className="text-amber-800">· {item}</li>
+                              ))}
+                            </ul>
+                          </td>
+                          <td className="px-3 py-2">
+                            <ul className="space-y-0.5">
+                              {curriculumData.middleValueItems.map((item, i) => (
+                                <li key={i} className="text-amber-800">· {item}</li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              )}
 
               {/* 성취기준 */}
               {curriculumData.achievements.length > 0 && (

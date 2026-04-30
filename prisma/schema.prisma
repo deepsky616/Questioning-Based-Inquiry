@@ -126,10 +126,13 @@ model CurriculumArea {
   gradeRange     String   @map("grade_range")    // "1-2", "3-4", "5-6"
   area           String   @map("area")           // 영역명 ("생명", "물질" …)
   coreIdea       String   @db.Text @map("core_idea")
-  knowledgeItems Json     @map("knowledge_items") // 지식·이해 내용요소 배열
-  processItems   Json     @map("process_items")   // 과정·기능 내용요소 배열
-  valueItems     Json     @map("value_items")     // 가치·태도 내용요소 배열
-  achievements   Json     @map("achievements")    // [{code, content}] 성취기준
+  knowledgeItems       Json  @map("knowledge_items")        // 지식·이해 내용요소 (해당 학년군)
+  processItems         Json  @map("process_items")          // 과정·기능 내용요소 (해당 학년군)
+  valueItems           Json  @map("value_items")            // 가치·태도 내용요소 (해당 학년군)
+  middleKnowledgeItems Json? @map("middle_knowledge_items") // 중학교 지식·이해 (선행 확인용)
+  middleProcessItems   Json? @map("middle_process_items")   // 중학교 과정·기능 (선행 확인용)
+  middleValueItems     Json? @map("middle_value_items")     // 중학교 가치·태도 (선행 확인용)
+  achievements         Json  @map("achievements")           // [{code, content}] 성취기준
 
   unitDesigns    UnitDesign[]
 

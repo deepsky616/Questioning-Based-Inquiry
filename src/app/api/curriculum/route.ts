@@ -21,15 +21,22 @@ export async function GET(req: Request) {
       {
         id: string; subject: string; grade_range: string; area: string;
         core_idea: string; knowledge_items: unknown; process_items: unknown;
-        value_items: unknown; achievements: unknown;
+        value_items: unknown; middle_knowledge_items: unknown;
+        middle_process_items: unknown; middle_value_items: unknown;
+        achievements: unknown;
       }[]
     >`SELECT * FROM curriculum_areas WHERE id = ${areaId} LIMIT 1`;
     if (!row[0]) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const r = row[0];
     return NextResponse.json({
       id: r.id, subject: r.subject, gradeRange: r.grade_range, area: r.area,
-      coreIdea: r.core_idea, knowledgeItems: r.knowledge_items,
-      processItems: r.process_items, valueItems: r.value_items,
+      coreIdea: r.core_idea,
+      knowledgeItems: r.knowledge_items,
+      processItems: r.process_items,
+      valueItems: r.value_items,
+      middleKnowledgeItems: r.middle_knowledge_items ?? [],
+      middleProcessItems: r.middle_process_items ?? [],
+      middleValueItems: r.middle_value_items ?? [],
       achievements: r.achievements,
     });
   }
