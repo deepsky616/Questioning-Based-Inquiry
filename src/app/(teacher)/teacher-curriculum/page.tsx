@@ -116,6 +116,20 @@ export default function CurriculumPage() {
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
   const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>([]);
 
+  // 내용요소 선택 (새 기능: 핵심아이디어·지식이해·과정기능·가치태도 체크박스)
+  const [selectedCoreIdeaLines, setSelectedCoreIdeaLines] = useState<string[]>([]);
+  const [selectedKnowledge, setSelectedKnowledge] = useState<string[]>([]);
+  const [selectedProcess, setSelectedProcess] = useState<string[]>([]);
+  const [selectedValue, setSelectedValue] = useState<string[]>([]);
+
+  // 추천 성취기준 단계
+  const [recommendedAchievements, setRecommendedAchievements] = useState<{ code: string; content: string }[]>([]);
+  const [selectedAchievements, setSelectedAchievements] = useState<{ code: string; content: string }[]>([]);
+  const [achievementExplanations, setAchievementExplanations] = useState<Record<string, string>>({});
+  const [achievementConsiderations, setAchievementConsiderations] = useState<string[]>([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [showRecommendations, setShowRecommendations] = useState(false);
+
   // Step 2 — 핵심어
   const [recommendedKeywords, setRecommendedKeywords] = useState<string[]>([]);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
@@ -172,6 +186,16 @@ export default function CurriculumPage() {
   const loadAreaData = useCallback(async () => {
     if (!selAreaId) return;
     setLoadingCurriculum(true);
+    // 내용요소 선택 및 추천 상태 초기화
+    setSelectedCoreIdeaLines([]);
+    setSelectedKnowledge([]);
+    setSelectedProcess([]);
+    setSelectedValue([]);
+    setRecommendedAchievements([]);
+    setSelectedAchievements([]);
+    setAchievementExplanations({});
+    setAchievementConsiderations([]);
+    setShowRecommendations(false);
     try {
       const r = await fetch(`/api/curriculum?areaId=${selAreaId}`);
       const d: CurriculumArea = await r.json();
@@ -199,6 +223,72 @@ export default function CurriculumPage() {
     );
   };
 
+  // 실제 사용할 성취기준: 추천 모드면 교사가 선택한 것, 아니면 단원 필터 결과
+  const getEffectiveAchievements = () => {
+    if (showRecommendations) return selectedAchievements;
+    return getFilteredAchievements();
+  };
+
+  // 선택한 내용요소로 성취기준 AI 추천
+  const handleRecommendAchievements = async () => {
+    if (!curriculumData) return;
+    setLoadingRecommendations(true);
+    try {
+      const selectedItems = [
+        ...selectedCoreIdeaLines,
+        ...selectedKnowledge,
+        ...selectedProcess,
+        ...selectedValue,
+      ];
+      const filteredAchs = getFilteredAchievements();
+
+      let recommended = filteredAchs;
+      if (selectedItems.length > 0) {
+        const res = await fetch("/api/unit-design/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            step: "recommend_achievements",
+            subject: curriculumData.subject,
+            gradeRange: curriculumData.gradeRange,
+            area: curriculumData.area,
+            coreIdea: curriculumData.coreIdea,
+            selectedContentItems: selectedItems,
+            achievements: filteredAchs,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.recommendedCodes) && data.recommendedCodes.length > 0) {
+            const filtered = filteredAchs.filter((a) => data.recommendedCodes.includes(a.code));
+            if (filtered.length > 0) recommended = filtered;
+          }
+        }
+      }
+
+      setRecommendedAchievements(recommended);
+      setSelectedAchievements([...recommended]);
+
+      // 해설/고려사항 로드
+      const enrichedRes = await fetch(`/api/curriculum/enriched?areaId=${selAreaId}`);
+      if (enrichedRes.ok) {
+        const enrichedData = await enrichedRes.json();
+        const explanations: Record<string, string> = {};
+        const considerations: string[] = [];
+        for (const ud of Object.values(enrichedData.unitDetails ?? {}) as { explanations: Record<string, string>; considerations: string[] }[]) {
+          Object.assign(explanations, ud.explanations);
+          considerations.push(...ud.considerations);
+        }
+        setAchievementExplanations(explanations);
+        setAchievementConsiderations(considerations.filter((c, i) => considerations.indexOf(c) === i));
+      }
+
+      setShowRecommendations(true);
+    } finally {
+      setLoadingRecommendations(false);
+    }
+  };
+
   const callGenerate = async (stepName: string, extra: Record<string, unknown> = {}) => {
     if (!curriculumData) return null;
     const res = await fetch("/api/unit-design/generate", {
@@ -213,7 +303,9 @@ export default function CurriculumPage() {
         knowledgeItems: curriculumData.knowledgeItems,
         processItems: curriculumData.processItems,
         valueItems: curriculumData.valueItems,
-        achievements: getFilteredAchievements(),
+        achievements: getEffectiveAchievements(),
+        achievementExplanations,
+        achievementConsiderations,
         selectedKeywords,
         coreSentences,
         essentialQuestions,
@@ -486,17 +578,35 @@ export default function CurriculumPage() {
 
           {curriculumData && (
             <div className="space-y-3 mt-2">
-              {/* 핵심아이디어 */}
+              {/* 핵심아이디어 (선택 가능) */}
               <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
-                <p className="text-xs font-semibold text-indigo-600 mb-2">핵심아이디어</p>
-                <ul className="space-y-1">
-                  {curriculumData.coreIdea.split("\n").map((line, i) => (
-                    <li key={i} className="text-sm text-gray-800">· {line}</li>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-indigo-600">핵심아이디어</p>
+                  <span className="text-xs text-indigo-400">수업에서 중점 다룰 항목을 체크하세요</span>
+                </div>
+                <ul className="space-y-1.5">
+                  {curriculumData.coreIdea.split("\n").filter((l) => l.trim()).map((line, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id={`core-${i}`}
+                        checked={selectedCoreIdeaLines.includes(line)}
+                        onChange={(e) =>
+                          setSelectedCoreIdeaLines((prev) =>
+                            e.target.checked ? [...prev, line] : prev.filter((l) => l !== line)
+                          )
+                        }
+                        className="mt-0.5 h-3.5 w-3.5 rounded border-indigo-300 text-indigo-600 cursor-pointer flex-shrink-0"
+                      />
+                      <label htmlFor={`core-${i}`} className="text-sm text-gray-800 cursor-pointer leading-snug">
+                        {line}
+                      </label>
+                    </li>
                   ))}
                 </ul>
               </div>
 
-              {/* 내용 요소 표 */}
+              {/* 내용 요소 표 (선택 가능) */}
               <div className="rounded-lg border overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
@@ -509,23 +619,62 @@ export default function CurriculumPage() {
                   <tbody>
                     <tr className="align-top">
                       <td className="px-4 py-3 border-r">
-                        <ul className="space-y-0.5">
+                        <ul className="space-y-1.5">
                           {curriculumData.knowledgeItems.slice(0, 12).map((item, i) => (
-                            <li key={i} className="text-gray-700">· {item}</li>
+                            <li key={i} className="flex items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                id={`k-${i}`}
+                                checked={selectedKnowledge.includes(item)}
+                                onChange={(e) =>
+                                  setSelectedKnowledge((prev) =>
+                                    e.target.checked ? [...prev, item] : prev.filter((x) => x !== item)
+                                  )
+                                }
+                                className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
+                              />
+                              <label htmlFor={`k-${i}`} className="text-gray-700 cursor-pointer text-xs leading-snug">{item}</label>
+                            </li>
                           ))}
                         </ul>
                       </td>
                       <td className="px-4 py-3 border-r">
-                        <ul className="space-y-0.5">
+                        <ul className="space-y-1.5">
                           {curriculumData.processItems.slice(0, 12).map((item, i) => (
-                            <li key={i} className="text-gray-700">· {item}</li>
+                            <li key={i} className="flex items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                id={`p-${i}`}
+                                checked={selectedProcess.includes(item)}
+                                onChange={(e) =>
+                                  setSelectedProcess((prev) =>
+                                    e.target.checked ? [...prev, item] : prev.filter((x) => x !== item)
+                                  )
+                                }
+                                className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
+                              />
+                              <label htmlFor={`p-${i}`} className="text-gray-700 cursor-pointer text-xs leading-snug">{item}</label>
+                            </li>
                           ))}
                         </ul>
                       </td>
                       <td className="px-4 py-3">
-                        <ul className="space-y-0.5">
+                        <ul className="space-y-1.5">
                           {curriculumData.valueItems.slice(0, 8).map((item, i) => (
-                            <li key={i} className="text-gray-700">· {item}</li>
+                            <li key={i} className="flex items-center gap-1.5">
+                              <input
+                                type="checkbox"
+                                id={`v-${i}`}
+                                checked={selectedValue.includes(item)}
+                                onChange={(e) =>
+                                  setSelectedValue((prev) =>
+                                    e.target.checked ? [...prev, item] : prev.filter((x) => x !== item)
+                                  )
+                                }
+                                className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
+                              />
+                              <label htmlFor={`v-${i}`} className="text-gray-700 cursor-pointer text-xs leading-snug">{item}</label>
+                            </li>
                           ))}
                         </ul>
                       </td>
@@ -582,7 +731,7 @@ export default function CurriculumPage() {
               )}
 
               {/* 단원 선택 (단원 데이터가 있는 교과만 표시) */}
-              {curriculumData.units.length > 0 && (
+              {curriculumData.units.length > 0 && !showRecommendations && (
                 <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-blue-700">단원 선택</p>
@@ -636,67 +785,174 @@ export default function CurriculumPage() {
                 </div>
               )}
 
-              {/* 성취기준 — 선택된 단원에 해당하는 것만 표시 */}
-              {curriculumData.achievements.length > 0 && (
-                <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-semibold text-gray-600 mb-2">
-                    성취기준
+              {/* 내용요소 선택 → 성취기준 추천 버튼 */}
+              {!showRecommendations && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 flex items-center justify-between gap-3">
+                  <p className="text-xs text-emerald-700">
+                    {selectedCoreIdeaLines.length + selectedKnowledge.length + selectedProcess.length + selectedValue.length > 0
+                      ? `내용 요소 ${selectedCoreIdeaLines.length + selectedKnowledge.length + selectedProcess.length + selectedValue.length}개 선택됨 — AI가 관련 성취기준을 추천합니다`
+                      : "위에서 수업에서 중점 다룰 내용 요소를 선택하면 AI가 관련 성취기준을 추천해 드립니다"}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleRecommendAchievements}
+                    disabled={loadingRecommendations || (curriculumData.units.length > 0 && selectedUnitCodes.length === 0)}
+                    className="whitespace-nowrap text-emerald-700 border-emerald-400 hover:bg-emerald-100 shrink-0"
+                  >
+                    {loadingRecommendations ? "추천 중..." : "성취기준 추천받기"}
+                  </Button>
+                </div>
+              )}
+
+              {/* 추천 성취기준 (교사가 선택 가능) */}
+              {showRecommendations && (
+                <div className="rounded-lg border border-emerald-300 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-emerald-700">
+                      추천 성취기준 ({recommendedAchievements.length}개) — 수업에 사용할 성취기준을 선택하세요
+                    </p>
+                    <button
+                      onClick={() => {
+                        setShowRecommendations(false);
+                        setRecommendedAchievements([]);
+                        setSelectedAchievements([]);
+                      }}
+                      className="text-xs text-gray-400 hover:text-gray-600 underline"
+                    >
+                      다시 선택
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {recommendedAchievements.map((a) => {
+                      const isSelected = selectedAchievements.some((s) => s.code === a.code);
+                      const explanation = achievementExplanations[a.code];
+                      return (
+                        <div
+                          key={a.code}
+                          className={`rounded-lg border p-3 cursor-pointer transition-colors ${
+                            isSelected
+                              ? "border-emerald-400 bg-emerald-50"
+                              : "border-gray-200 bg-white hover:border-gray-400"
+                          }`}
+                          onClick={() =>
+                            setSelectedAchievements((prev) =>
+                              isSelected
+                                ? prev.filter((s) => s.code !== a.code)
+                                : [...prev, a]
+                            )
+                          }
+                        >
+                          <div className="flex items-start gap-2">
+                            <input
+                              type="checkbox"
+                              readOnly
+                              checked={isSelected}
+                              className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 pointer-events-none"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-gray-800 leading-snug">
+                                <span className="font-mono text-indigo-600 mr-2 text-xs">{a.code}</span>
+                                {a.content}
+                              </p>
+                              {explanation && (
+                                <details className="mt-1.5" onClick={(e) => e.stopPropagation()}>
+                                  <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
+                                    해설 보기
+                                  </summary>
+                                  <p className="mt-1 text-xs text-gray-600 leading-relaxed pl-1">
+                                    {explanation}
+                                  </p>
+                                </details>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {achievementConsiderations.length > 0 && (
+                    <details className="rounded-lg border border-amber-200 bg-amber-50">
+                      <summary className="px-3 py-2 text-xs font-semibold text-amber-700 cursor-pointer select-none">
+                        ▶ 성취기준 적용 시 고려사항
+                      </summary>
+                      <ul className="px-3 pb-3 pt-1 space-y-1">
+                        {achievementConsiderations.map((c, i) => (
+                          <li key={i} className="text-xs text-amber-800">· {c}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  {selectedAchievements.length > 0 && (
+                    <p className="text-xs text-emerald-600 font-medium">
+                      {selectedAchievements.length}개 성취기준 선택됨
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* 성취기준 — 추천 모드 아닐 때 기존 표시 */}
+              {!showRecommendations && curriculumData.achievements.length > 0 && (
+                <details className="rounded-lg border">
+                  <summary className="px-4 py-3 text-xs font-semibold text-gray-600 cursor-pointer select-none">
+                    ▶ 전체 성취기준 보기
                     {curriculumData.units.length > 0 && selectedUnitCodes.length > 0 && (
                       <span className="ml-2 text-indigo-500 font-normal">
                         ({getFilteredAchievements().length}개)
                       </span>
                     )}
-                  </p>
-                  {curriculumData.units.length === 0 || selectedUnitCodes.length === 0 ? (
-                    curriculumData.units.length > 0 ? (
-                      <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
+                  </summary>
+                  <div className="px-4 pb-4 space-y-1">
+                    {curriculumData.units.length === 0 || selectedUnitCodes.length === 0 ? (
+                      curriculumData.units.length > 0 ? (
+                        <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
+                      ) : (
+                        curriculumData.achievements.map((a, i) => (
+                          <p key={i} className="text-sm text-gray-700">
+                            <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
+                            {a.content}
+                          </p>
+                        ))
+                      )
                     ) : (
-                      curriculumData.achievements.map((a, i) => (
-                        <p key={i} className="text-sm text-gray-700">
-                          <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                          {a.content}
-                        </p>
-                      ))
-                    )
-                  ) : (
-                    (() => {
-                      const filtered = getFilteredAchievements();
-                      if (filtered.length === 0) {
-                        return <p className="text-sm text-gray-400">선택된 단원의 성취기준이 없습니다</p>;
-                      }
-                      // 단원별로 그룹화하여 표시
-                      const grouped: Record<string, typeof filtered> = {};
-                      filtered.forEach((a) => {
-                        const code = extractUnitCode(a.code);
-                        if (!grouped[code]) grouped[code] = [];
-                        grouped[code].push(a);
-                      });
-                      return Object.entries(grouped).map(([unitCode, achs]) => {
-                        const unit = curriculumData.units.find((u) => u.unitCode === unitCode);
-                        return (
-                          <div key={unitCode} className="mb-3">
-                            {unit && (
-                              <p className="text-xs font-semibold text-indigo-700 mb-1">
-                                [{unit.unitName}]
-                              </p>
-                            )}
-                            {achs.map((a, i) => (
-                              <p key={i} className="text-sm text-gray-700 ml-2">
-                                <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                                {a.content}
-                              </p>
-                            ))}
-                          </div>
-                        );
-                      });
-                    })()
-                  )}
-                </div>
+                      (() => {
+                        const filtered = getFilteredAchievements();
+                        if (filtered.length === 0) {
+                          return <p className="text-sm text-gray-400">선택된 단원의 성취기준이 없습니다</p>;
+                        }
+                        const grouped: Record<string, typeof filtered> = {};
+                        filtered.forEach((a) => {
+                          const code = extractUnitCode(a.code);
+                          if (!grouped[code]) grouped[code] = [];
+                          grouped[code].push(a);
+                        });
+                        return Object.entries(grouped).map(([unitCode, achs]) => {
+                          const unit = curriculumData.units.find((u) => u.unitCode === unitCode);
+                          return (
+                            <div key={unitCode} className="mb-3">
+                              {unit && (
+                                <p className="text-xs font-semibold text-indigo-700 mb-1">
+                                  [{unit.unitName}]
+                                </p>
+                              )}
+                              {achs.map((a, i) => (
+                                <p key={i} className="text-sm text-gray-700 ml-2">
+                                  <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
+                                  {a.content}
+                                </p>
+                              ))}
+                            </div>
+                          );
+                        });
+                      })()
+                    )}
+                  </div>
+                </details>
               )}
 
               <Button
                 onClick={handleGoStep2}
-                disabled={loadingKeywords || (curriculumData.units.length > 0 && selectedUnitCodes.length === 0)}
+                disabled={loadingKeywords || (showRecommendations && selectedAchievements.length === 0) || (!showRecommendations && curriculumData.units.length > 0 && selectedUnitCodes.length === 0)}
                 className="w-full"
               >
                 {loadingKeywords ? "AI 핵심어 분석 중..." : "다음 단계: 핵심어 추천받기 →"}

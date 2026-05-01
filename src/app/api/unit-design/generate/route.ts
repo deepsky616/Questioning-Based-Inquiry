@@ -5,11 +5,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 const schema = z.object({
-  step: z.enum(["keywords", "sentences", "questions", "inquiry"]),
+  step: z.enum(["keywords", "sentences", "questions", "inquiry", "recommend_achievements"]),
   subject: z.string(),
   gradeRange: z.string(),
   area: z.string(),
-  coreIdea: z.string(),
+  coreIdea: z.string().optional().default(""),
   knowledgeItems: z.array(z.string()).optional().default([]),
   processItems: z.array(z.string()).optional().default([]),
   valueItems: z.array(z.string()).optional().default([]),
@@ -19,16 +19,51 @@ const schema = z.object({
   coreSentences: z.array(z.string()).optional().default([]),
   essentialQuestions: z.array(z.string()).optional().default([]),
   context: z.string().optional(),
+  // 내용요소 선택 기반 추천
+  selectedContentItems: z.array(z.string()).optional().default([]),
+  achievementExplanations: z.record(z.string()).optional().default({}),
+  achievementConsiderations: z.array(z.string()).optional().default([]),
 });
 
 function buildPrompt(data: z.infer<typeof schema>): string {
   const gradeLabel = `초등학교 ${data.gradeRange}학년군`;
   const achievementsSummary = data.achievements
-    .slice(0, 6)
+    .slice(0, 8)
     .map((a) => `${a.code} ${a.content}`)
     .join("\n");
 
+  if (data.step === "recommend_achievements") {
+    const allAchs = data.achievements
+      .map((a) => `${a.code}: ${a.content}`)
+      .join("\n");
+    return `당신은 2022 개정 교육과정 전문가입니다.
+교사가 수업에서 중점적으로 다루고자 하는 내용 요소를 선택했습니다.
+선택한 내용 요소와 관련성이 높은 성취기준만 추천하세요.
+
+[교과] ${data.subject}  [영역] ${data.area}  [학년군] ${gradeLabel}
+
+[교사가 선택한 내용 요소]
+${data.selectedContentItems.join(", ")}
+
+[해당 영역의 성취기준]
+${allAchs}
+
+관련성이 높은 성취기준 코드만 선택하세요. 최소 1개 이상, 너무 많이 고르지 마세요.
+내용 요소와 직접 연관된 성취기준을 우선 선택하되, 관련성이 낮은 것은 제외하세요.
+
+아래 JSON만 출력 (다른 텍스트 없이):
+{"recommendedCodes": ["[예시코드-01]", "[예시코드-02]"]}`;
+  }
+
   if (data.step === "keywords") {
+    const explanationContext = Object.entries(data.achievementExplanations ?? {})
+      .slice(0, 3)
+      .map(([code, exp]) => `${code}: ${(exp as string).substring(0, 120)}`)
+      .join("\n");
+    const considerationContext = (data.achievementConsiderations ?? [])
+      .slice(0, 3)
+      .join("\n");
+
     return `당신은 2022 개정 교육과정 전문가입니다.
 아래 교육과정 데이터에서 ${gradeLabel} 학생이 깊이있게 탐구해야 할 핵심어(개념)를 5~8개 추천하세요.
 
@@ -40,6 +75,8 @@ ${data.coreIdea}
 [가치·태도] ${data.valueItems.slice(0, 6).join(", ")}
 [성취기준]
 ${achievementsSummary}
+${explanationContext ? `[성취기준 해설]\n${explanationContext}` : ""}
+${considerationContext ? `[성취기준 적용시 고려사항]\n${considerationContext}` : ""}
 
 조건:
 - 교과 고유의 핵심 개념 중심 (단순 사실 정보 X)
