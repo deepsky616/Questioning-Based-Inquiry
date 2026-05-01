@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ interface CurriculumArea {
 // 성취기준 코드에서 단원번호 추출: [4과01-01] → "01"
 function extractUnitCode(code: string): string {
   const m = code.match(/\[[^\]]*[가-힣]+(\d+)-/);
-  return m ? m[1] : "";
+  return m ? m[1] : "__unknown__";
 }
 
 interface InquiryQuestion {
@@ -116,6 +116,15 @@ export default function CurriculumPage() {
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
   const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>([]);
 
+  const filteredAchievements = useMemo(() => {
+    if (!curriculumData) return [];
+    const units = curriculumData.units ?? [];
+    if (units.length === 0 || selectedUnitCodes.length === 0) return curriculumData.achievements;
+    return curriculumData.achievements.filter((a) =>
+      selectedUnitCodes.includes(extractUnitCode(a.code))
+    );
+  }, [curriculumData, selectedUnitCodes]);
+
   // Step 2 — 핵심어
   const [recommendedKeywords, setRecommendedKeywords] = useState<string[]>([]);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
@@ -189,16 +198,6 @@ export default function CurriculumPage() {
 
   useEffect(() => { loadAreaData(); }, [loadAreaData]);
 
-  // 선택된 단원의 성취기준만 필터링 (단원 데이터 없으면 전체 반환)
-  const getFilteredAchievements = () => {
-    if (!curriculumData) return [];
-    const units = curriculumData.units ?? [];
-    if (units.length === 0 || selectedUnitCodes.length === 0) return curriculumData.achievements;
-    return curriculumData.achievements.filter((a) =>
-      selectedUnitCodes.includes(extractUnitCode(a.code))
-    );
-  };
-
   const callGenerate = async (stepName: string, extra: Record<string, unknown> = {}) => {
     if (!curriculumData) return null;
     const res = await fetch("/api/unit-design/generate", {
@@ -213,7 +212,7 @@ export default function CurriculumPage() {
         knowledgeItems: curriculumData.knowledgeItems,
         processItems: curriculumData.processItems,
         valueItems: curriculumData.valueItems,
-        achievements: getFilteredAchievements(),
+        achievements: filteredAchievements,
         selectedKeywords,
         coreSentences,
         essentialQuestions,
@@ -631,7 +630,7 @@ export default function CurriculumPage() {
                       </div>
                       {selectedUnitCodes.length > 0 && (
                         <p className="text-xs text-blue-600">
-                          {selectedUnitCodes.length}개 단원 선택됨 · {getFilteredAchievements().length}개 성취기준 적용
+                          {selectedUnitCodes.length}개 단원 선택됨 · {filteredAchievements.length}개 성취기준 적용
                         </p>
                       )}
                     </div>
@@ -643,14 +642,14 @@ export default function CurriculumPage() {
                       성취기준
                       {curriculumData.units.length > 0 && selectedUnitCodes.length > 0 && (
                         <span className="ml-2 text-indigo-500 font-normal">
-                          ({getFilteredAchievements().length}개)
+                          ({filteredAchievements.length}개)
                         </span>
                       )}
                     </p>
                     {curriculumData.units.length === 0 ? (
                       <div className="space-y-1">
-                        {curriculumData.achievements.map((a, i) => (
-                          <p key={i} className="text-sm text-gray-700">
+                        {curriculumData.achievements.map((a) => (
+                          <p key={a.code} className="text-sm text-gray-700">
                             <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
                             {a.content}
                           </p>
@@ -660,7 +659,7 @@ export default function CurriculumPage() {
                       <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
                     ) : (
                       (() => {
-                        const filtered = getFilteredAchievements();
+                        const filtered = filteredAchievements;
                         if (filtered.length === 0)
                           return <p className="text-sm text-gray-400">선택된 단원의 성취기준이 없습니다</p>;
                         const grouped: Record<string, typeof filtered> = {};
@@ -683,8 +682,8 @@ export default function CurriculumPage() {
                                       </p>
                                     )}
                                     <div className="space-y-0.5 ml-2">
-                                      {grouped[uc].map((a, i) => (
-                                        <p key={i} className="text-sm text-gray-700">
+                                      {grouped[uc].map((a) => (
+                                        <p key={a.code} className="text-sm text-gray-700">
                                           <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
                                           {a.content}
                                         </p>
