@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
+  pickAchievementExplanations,
   selectAllAchievementCodes,
   toggleAchievementCode,
   type Achievement,
@@ -24,6 +25,11 @@ interface CurriculumUnit {
   unitName: string;
 }
 
+interface CurriculumAchievementGroup {
+  name: string;
+  achievements: Achievement[];
+}
+
 interface CurriculumArea {
   id: string;
   subject: string;
@@ -38,6 +44,9 @@ interface CurriculumArea {
   middleValueItems: string[];
   achievements: Achievement[];
   units: CurriculumUnit[];
+  achievementExplanations?: Record<string, string>;
+  achievementConsiderations?: string[];
+  achievementGroups?: CurriculumAchievementGroup[];
 }
 
 interface InquiryQuestion {
@@ -209,8 +218,19 @@ export default function CurriculumPage() {
     try {
       const r = await fetch(`/api/curriculum?areaId=${selAreaId}`);
       const d: CurriculumArea = await r.json();
-      setCurriculumData(d);
-      setSelectedAchievementCodes(selectAllAchievementCodes(d.achievements));
+      const enrichedRes = await fetch(`/api/curriculum/enriched?areaId=${selAreaId}`);
+      const enriched = enrichedRes.ok ? await enrichedRes.json() : {};
+      const merged: CurriculumArea = {
+        ...d,
+        achievements: Array.isArray(enriched.achievements) && enriched.achievements.length > 0
+          ? enriched.achievements
+          : d.achievements,
+        achievementExplanations: enriched.achievementExplanations ?? {},
+        achievementConsiderations: enriched.achievementConsiderations ?? [],
+        achievementGroups: enriched.achievementGroups ?? [],
+      };
+      setCurriculumData(merged);
+      setSelectedAchievementCodes(selectAllAchievementCodes(merged.achievements));
       setSelectedCoreIdeaLines(splitCoreIdeaLines(d.coreIdea));
       setSelectedKnowledge(selectAllContentItems(d.knowledgeItems, KNOWLEDGE_ITEM_LIMIT));
       setSelectedProcess(selectAllContentItems(d.processItems, PROCESS_ITEM_LIMIT));
@@ -242,6 +262,18 @@ export default function CurriculumPage() {
     return getSelectedAchievementsForAnalysis(getFilteredAchievements(), selectedAchievementCodes);
   };
 
+  const getFilteredAchievementGroups = () => {
+    const groups = curriculumData?.achievementGroups ?? [];
+    if (groups.length === 0) return [];
+    const visibleCodes = new Set(getFilteredAchievements().map((achievement) => achievement.code));
+    return groups
+      .map((group) => ({
+        ...group,
+        achievements: group.achievements.filter((achievement) => visibleCodes.has(achievement.code)),
+      }))
+      .filter((group) => group.achievements.length > 0);
+  };
+
   const callGenerate = async (stepName: string, extra: Record<string, unknown> = {}) => {
     if (!curriculumData) return null;
     const res = await fetch("/api/unit-design/generate", {
@@ -257,6 +289,11 @@ export default function CurriculumPage() {
         processItems: selectedProcess,
         valueItems: selectedValue,
         achievements: getSelectedAchievements(),
+        achievementExplanations: pickAchievementExplanations(
+          curriculumData.achievementExplanations,
+          getSelectedAchievements().map((achievement) => achievement.code)
+        ),
+        achievementConsiderations: curriculumData.achievementConsiderations ?? [],
         selectedKeywords,
         coreSentences,
         essentialQuestions,
@@ -855,12 +892,13 @@ export default function CurriculumPage() {
                   {getFilteredAchievements().length === 0 ? (
                     <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
                   ) : (
-                    <div className="space-y-2">
-                      {getFilteredAchievements().map((achievement) => {
+                    (() => {
+                      const groups = getFilteredAchievementGroups();
+                      const renderAchievement = (achievement: Achievement) => {
                         const selected = selectedAchievementCodes.includes(achievement.code);
                         return (
                           <label
-                            key={achievement.code}
+                            key={`${achievement.code}-${achievement.content}`}
                             className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer transition-colors ${
                               selected
                                 ? "border-indigo-200 bg-indigo-50"
@@ -883,8 +921,25 @@ export default function CurriculumPage() {
                             </span>
                           </label>
                         );
-                      })}
-                    </div>
+                      };
+
+                      if (groups.length === 0) {
+                        return <div className="space-y-2">{getFilteredAchievements().map(renderAchievement)}</div>;
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          {groups.map((group) => (
+                            <div key={group.name} className="space-y-2">
+                              <p className="text-xs font-semibold text-indigo-700">
+                                {group.name}
+                              </p>
+                              {group.achievements.map(renderAchievement)}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
               )}

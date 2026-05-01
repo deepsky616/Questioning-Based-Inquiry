@@ -36,3 +36,14 @@ export function getSelectedAchievementsForAnalysis(
 ) {
   return achievements.filter((achievement) => selectedCodes.includes(achievement.code));
 }
+
+export function pickAchievementExplanations(
+  explanations: Record<string, string> | undefined,
+  selectedCodes: string[]
+) {
+  if (!explanations) return {};
+  const selected = new Set(selectedCodes);
+  return Object.fromEntries(
+    Object.entries(explanations).filter(([code]) => selected.has(code))
+  );
+}

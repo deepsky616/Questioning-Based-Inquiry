@@ -26,7 +26,7 @@ function normalizeDot(str) {
   return str.replace(/⋅/g, "·");
 }
 
-/** 항목 앞의 `- ` 제거 후 트림 */
+/** 항목 앞의 `- ` 또는 `-` 제거 후 트림 */
 function stripBullet(line) {
   return normalizeDot(line.replace(/^-\s*/, "").trim());
 }
@@ -65,6 +65,8 @@ function parse(rawText) {
   let achievements = []; // [{code, content}]
   let explanations = {}; // { "[코드]": "내용" }
   let considerations = []; // string[]
+  let achievementGroups = []; // [{ name, achievements }]
+  let currentAchievementGroup = null;
 
   // 섹션 추적 (### 이하 ** ** 블록)
   // mode: null | "achievements" | "explanations" | "considerations"
@@ -78,10 +80,16 @@ function parse(rawText) {
       achievements: [...achievements],
       explanations: { ...explanations },
       considerations: [...considerations],
+      achievementGroups: achievementGroups.map((group) => ({
+        name: group.name,
+        achievements: [...group.achievements],
+      })),
     };
     achievements = [];
     explanations = {};
     considerations = [];
+    achievementGroups = [];
+    currentAchievementGroup = null;
     mode = null;
   }
 
@@ -128,6 +136,16 @@ function parse(rawText) {
     }
     if (line.startsWith("**성취기준**")) {
       mode = "achievements";
+      currentAchievementGroup = null;
+      continue;
+    }
+
+    // ── 수학 등에서 성취기준 하위 단원으로 쓰는 #####소단원 ────────────────
+    if (line.startsWith("#####") && mode === "achievements") {
+      currentAchievementGroup = normalizeDot(line.replace(/^#####\s*/, "").trim());
+      if (currentAchievementGroup) {
+        achievementGroups.push({ name: currentAchievementGroup, achievements: [] });
+      }
       continue;
     }
 
@@ -138,13 +156,16 @@ function parse(rawText) {
     }
 
     // ── 항목 줄 (- ...) ───────────────────────────────────────────────────
-    if (line.startsWith("- ") && mode) {
+    if (/^-\s*/.test(line.trimStart()) && mode) {
       const text = stripBullet(line);
 
       if (mode === "achievements") {
         const parsed = parseCodeLine(text);
         if (parsed) {
           achievements.push(parsed);
+          if (currentAchievementGroup && achievementGroups.length > 0) {
+            achievementGroups[achievementGroups.length - 1].achievements.push(parsed);
+          }
         }
       } else if (mode === "explanations") {
         const parsed = parseCodeLine(text);

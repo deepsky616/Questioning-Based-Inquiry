@@ -1,26 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import achievementsData from "@/data/curriculum-achievements.json";
-
-// ─── 타입 ─────────────────────────────────────────────────────────────────────
-
-type AchievementEntry = {
-  code: string;
-  content: string;
-};
-
-type AreaDetail = {
-  achievements: AchievementEntry[];
-  explanations: Record<string, string>;
-  considerations: string[];
-};
-
-type SubjectData = Record<string, AreaDetail>;
-type GradeData = Record<string, SubjectData>;
-type AchievementsJson = Record<string, GradeData>;
-
-const curriculumAchievements = achievementsData as AchievementsJson;
+import { getCurriculumAchievementDetail } from "@/lib/curriculum-achievement-details";
 
 // ─── GET /api/curriculum/enriched?areaId=xxx ──────────────────────────────────
 
@@ -71,11 +52,7 @@ export async function GET(req: Request) {
     .map((u) => u.unitName)
     .filter((name): name is string => Boolean(name));
 
-  // 3. curriculum-achievements.json 에서 단원별 해설/고려사항 매칭
-  //    grade_range: "5-6" → data["5-6"]
-  //    subject: "과학" → data["5-6"]["과학"]
-  const gradeData = curriculumAchievements[r.grade_range] ?? {};
-  const subjectData = gradeData[r.subject] ?? {};
+  const areaDetail = getCurriculumAchievementDetail(r.grade_range, r.subject, r.area);
 
   const unitDetails: Record<
     string,
@@ -86,7 +63,7 @@ export async function GET(req: Request) {
   > = {};
 
   for (const unitName of unitNames) {
-    const detail = subjectData[unitName];
+    const detail = getCurriculumAchievementDetail(r.grade_range, r.subject, unitName);
     if (detail) {
       unitDetails[unitName] = {
         explanations: detail.explanations,
@@ -114,8 +91,11 @@ export async function GET(req: Request) {
     middleKnowledgeItems: r.middle_knowledge_items ?? [],
     middleProcessItems: r.middle_process_items ?? [],
     middleValueItems: r.middle_value_items ?? [],
-    achievements: r.achievements,
+    achievements: areaDetail?.achievements ?? r.achievements,
     units,
+    achievementExplanations: areaDetail?.explanations ?? {},
+    achievementConsiderations: areaDetail?.considerations ?? [],
+    achievementGroups: areaDetail?.achievementGroups ?? [],
     // 추가: 단원별 성취기준 해설/고려사항
     unitDetails,
   });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
+  pickAchievementExplanations,
   selectAllAchievementCodes,
   toggleAchievementCode,
 } from "@/lib/achievement-selection";
@@ -47,5 +48,17 @@ describe("achievement-selection", () => {
     expect(getSelectedAchievementsForAnalysis(ACHIEVEMENTS, ["[4과01-02]"])).toEqual([
       ACHIEVEMENTS[1],
     ]);
+  });
+
+  it("선택한 성취기준 코드의 해설만 추린다", () => {
+    expect(
+      pickAchievementExplanations(
+        {
+          "[4과01-01]": "선택한 해설",
+          "[4과01-02]": "선택하지 않은 해설",
+        },
+        ["[4과01-01]"]
+      )
+    ).toEqual({ "[4과01-01]": "선택한 해설" });
   });
 });

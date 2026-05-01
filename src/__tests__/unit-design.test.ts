@@ -28,6 +28,7 @@ import { prisma } from "@/lib/db";
 import { GET, POST } from "@/app/api/unit-design/route";
 import { DELETE } from "@/app/api/unit-design/[id]/route";
 import { POST as generatePOST } from "@/app/api/unit-design/generate/route";
+import { buildPrompt } from "@/lib/unit-design-prompt";
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
@@ -229,6 +230,15 @@ const GENERATE_BASE = {
   essentialQuestions: [],
 };
 
+const PROMPT_BASE = {
+  ...GENERATE_BASE,
+  achievements: [{ code: "[4과03-01]", content: "광합성 과정을 설명한다" }],
+  selectedContentItems: [],
+  achievementExplanations: {},
+  achievementConsiderations: [],
+  context: undefined,
+};
+
 function setAiResponse(text: string) {
   mockGenerateContent.mockResolvedValue({ response: { text: () => text } });
 }
@@ -341,5 +351,46 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     const res = await generatePOST(makeRequest({ ...GENERATE_BASE, step: "invalid" }));
     expect(res.status).toBe(400);
+  });
+});
+
+describe("unit-design prompt — 선택 성취기준 맥락", () => {
+  it("keywords 단계는 선택한 성취기준의 해설만 포함한다", () => {
+    const prompt = buildPrompt({
+      ...PROMPT_BASE,
+      step: "keywords",
+      achievementExplanations: {
+        "[4과03-01]": "광합성은 빛 에너지 전환 관점에서 다룬다.",
+        "[4과03-99]": "선택하지 않은 성취기준 해설",
+      },
+      achievementConsiderations: ["실험 안전과 생명 존중을 함께 고려한다."],
+    });
+
+    expect(prompt).toContain("[선택 성취기준 해설]");
+    expect(prompt).toContain("광합성은 빛 에너지 전환 관점");
+    expect(prompt).toContain("실험 안전과 생명 존중");
+    expect(prompt).not.toContain("선택하지 않은 성취기준 해설");
+  });
+
+  it("핵심 질문과 탐구 질문 단계도 선택 성취기준 기반 맥락을 포함한다", () => {
+    const questionsPrompt = buildPrompt({
+      ...PROMPT_BASE,
+      step: "questions",
+      coreSentences: ["식물은 빛 에너지를 생명 활동에 필요한 물질로 전환한다."],
+      achievementExplanations: {
+        "[4과03-01]": "광합성을 에너지 전환과 연결한다.",
+      },
+    });
+    const inquiryPrompt = buildPrompt({
+      ...PROMPT_BASE,
+      step: "inquiry",
+      essentialQuestions: ["생물은 어떻게 에너지를 얻고 활용하는가?"],
+      achievementConsiderations: ["학생의 관찰 경험과 연결한다."],
+    });
+
+    expect(questionsPrompt).toContain("[선택 성취기준 기반 맥락]");
+    expect(questionsPrompt).toContain("광합성을 에너지 전환과 연결한다.");
+    expect(inquiryPrompt).toContain("[선택 성취기준 기반 맥락]");
+    expect(inquiryPrompt).toContain("학생의 관찰 경험과 연결한다.");
   });
 });
