@@ -1,17 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
-interface CurriculumUnit {
-  unitCode: string;
-  unitName: string;
-}
-
 interface CurriculumArea {
   id: string;
   subject: string;
@@ -25,13 +20,6 @@ interface CurriculumArea {
   middleProcessItems: string[];
   middleValueItems: string[];
   achievements: { code: string; content: string }[];
-  units: CurriculumUnit[];
-}
-
-// 성취기준 코드에서 단원번호 추출: [4과01-01] → "01"
-function extractUnitCode(code: string): string {
-  const m = code.match(/\[[^\]]*[가-힣]+(\d+)-/);
-  return m ? m[1] : "__unknown__";
 }
 
 interface InquiryQuestion {
@@ -114,16 +102,6 @@ export default function CurriculumPage() {
   const [selAreaId, setSelAreaId] = useState("");
   const [curriculumData, setCurriculumData] = useState<CurriculumArea | null>(null);
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
-  const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>([]);
-
-  const filteredAchievements = useMemo(() => {
-    if (!curriculumData) return [];
-    const units = curriculumData.units ?? [];
-    if (units.length === 0 || selectedUnitCodes.length === 0) return curriculumData.achievements;
-    return curriculumData.achievements.filter((a) =>
-      selectedUnitCodes.includes(extractUnitCode(a.code))
-    );
-  }, [curriculumData, selectedUnitCodes]);
 
   // Step 2 — 핵심어
   const [recommendedKeywords, setRecommendedKeywords] = useState<string[]>([]);
@@ -164,13 +142,12 @@ export default function CurriculumPage() {
     setSelAreaId("");
     setAreas([]);
     setCurriculumData(null);
-    setSelectedUnitCodes([]);
   }, [selGrade]);
 
   // 교과 변경 → 영역 목록 로드 (2022 교육과정 순서로 정렬)
   useEffect(() => {
-    if (!selSubject || !selGrade) { setAreas([]); setSelAreaId(""); setCurriculumData(null); setSelectedUnitCodes([]); return; }
-    setSelAreaId(""); setCurriculumData(null); setSelectedUnitCodes([]);
+    if (!selSubject || !selGrade) { setAreas([]); setSelAreaId(""); setCurriculumData(null); return; }
+    setSelAreaId(""); setCurriculumData(null);
     fetch(`/api/curriculum?subject=${encodeURIComponent(selSubject)}&gradeRange=${encodeURIComponent(selGrade)}`)
       .then((r) => r.json())
       .then((d) => setAreas(sortAreasByOrder(d.areas ?? [], selSubject)))
@@ -185,12 +162,6 @@ export default function CurriculumPage() {
       const r = await fetch(`/api/curriculum?areaId=${selAreaId}`);
       const d: CurriculumArea = await r.json();
       setCurriculumData(d);
-      // 단원 데이터가 있으면 전체 선택 초기 상태로 설정
-      if (Array.isArray(d.units) && d.units.length > 0) {
-        setSelectedUnitCodes(d.units.map((u) => u.unitCode));
-      } else {
-        setSelectedUnitCodes([]);
-      }
     } finally {
       setLoadingCurriculum(false);
     }
@@ -212,7 +183,7 @@ export default function CurriculumPage() {
         knowledgeItems: curriculumData.knowledgeItems,
         processItems: curriculumData.processItems,
         valueItems: curriculumData.valueItems,
-        achievements: filteredAchievements,
+        achievements: curriculumData.achievements,
         selectedKeywords,
         coreSentences,
         essentialQuestions,
@@ -382,21 +353,21 @@ export default function CurriculumPage() {
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">단원 설계 도우미</h2>
-          <p className="text-gray-600">교육과정 분석 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
+          <h2 className="text-2xl font-bold text-gray-900">탐구질문 도우미</h2>
+          <p className="text-gray-600">교육과정을 바탕으로 핵심 질문과 탐구 질문을 설계합니다</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setShowSaved(!showSaved)}>
-          저장된 단원 설계 {savedList.length > 0 ? `(${savedList.length})` : ""}
+          저장된 탐구질문 {savedList.length > 0 ? `(${savedList.length})` : ""}
         </Button>
       </div>
 
       {/* 저장 목록 */}
       {showSaved && (
         <Card>
-          <CardHeader><CardTitle className="text-base">저장된 단원 설계</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">저장된 탐구질문</CardTitle></CardHeader>
           <CardContent>
             {savedList.length === 0 ? (
-              <p className="text-gray-400 text-sm">저장된 단원 설계가 없습니다.</p>
+              <p className="text-gray-400 text-sm">저장된 탐구질문이 없습니다.</p>
             ) : (
               <ul className="divide-y">
                 {savedList.map((d) => (
@@ -580,132 +551,12 @@ export default function CurriculumPage() {
                 </details>
               )}
 
-              {/* 성취기준 선택 — 단원 칩 + 분류 표시 통합 */}
-              {curriculumData.achievements.length > 0 && (
-                <div className="rounded-lg border p-4 space-y-4">
-                  {/* 단원 칩 — 데이터 있는 교과만 */}
-                  {curriculumData.units.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-blue-700">단원(분류) 선택</p>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setSelectedUnitCodes(curriculumData.units.map((u) => u.unitCode))}
-                            className="text-xs text-blue-600 hover:text-blue-800 underline"
-                          >
-                            전체 선택
-                          </button>
-                          <span className="text-xs text-blue-300">|</span>
-                          <button
-                            onClick={() => setSelectedUnitCodes([])}
-                            className="text-xs text-blue-600 hover:text-blue-800 underline"
-                          >
-                            전체 해제
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {curriculumData.units.map((u) => {
-                          const selected = selectedUnitCodes.includes(u.unitCode);
-                          return (
-                            <button
-                              key={u.unitCode}
-                              onClick={() =>
-                                setSelectedUnitCodes((prev) =>
-                                  selected
-                                    ? prev.filter((c) => c !== u.unitCode)
-                                    : [...prev, u.unitCode]
-                                )
-                              }
-                              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                                selected
-                                  ? "bg-blue-600 text-white border-blue-600"
-                                  : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
-                              }`}
-                            >
-                              {u.unitName}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      {selectedUnitCodes.length > 0 && (
-                        <p className="text-xs text-blue-600">
-                          {selectedUnitCodes.length}개 단원 선택됨 · {filteredAchievements.length}개 성취기준 적용
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 성취기준 목록 */}
-                  <div>
-                    <p className="text-xs font-semibold text-gray-600 mb-2">
-                      성취기준
-                      {curriculumData.units.length > 0 && selectedUnitCodes.length > 0 && (
-                        <span className="ml-2 text-indigo-500 font-normal">
-                          ({filteredAchievements.length}개)
-                        </span>
-                      )}
-                    </p>
-                    {curriculumData.units.length === 0 ? (
-                      <div className="space-y-1">
-                        {curriculumData.achievements.map((a) => (
-                          <p key={a.code} className="text-sm text-gray-700">
-                            <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                            {a.content}
-                          </p>
-                        ))}
-                      </div>
-                    ) : selectedUnitCodes.length === 0 ? (
-                      <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
-                    ) : (
-                      (() => {
-                        const filtered = filteredAchievements;
-                        if (filtered.length === 0)
-                          return <p className="text-sm text-gray-400">선택된 단원의 성취기준이 없습니다</p>;
-                        const grouped: Record<string, typeof filtered> = {};
-                        filtered.forEach((a) => {
-                          const uc = extractUnitCode(a.code);
-                          if (!grouped[uc]) grouped[uc] = [];
-                          grouped[uc].push(a);
-                        });
-                        return (
-                          <div className="space-y-3">
-                            {selectedUnitCodes
-                              .filter((uc) => grouped[uc])
-                              .map((uc) => {
-                                const unit = curriculumData.units.find((u) => u.unitCode === uc);
-                                return (
-                                  <div key={uc}>
-                                    {unit && (
-                                      <p className="text-xs font-semibold text-indigo-700 mb-1">
-                                        [{unit.unitName}]
-                                      </p>
-                                    )}
-                                    <div className="space-y-0.5 ml-2">
-                                      {grouped[uc].map((a) => (
-                                        <p key={a.code} className="text-sm text-gray-700">
-                                          <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                                          {a.content}
-                                        </p>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                          </div>
-                        );
-                      })()
-                    )}
-                  </div>
-                </div>
-              )}
-
               <Button
                 onClick={handleGoStep2}
-                disabled={loadingKeywords || (curriculumData.units.length > 0 && selectedUnitCodes.length === 0)}
+                disabled={loadingKeywords}
                 className="w-full"
               >
-                {loadingKeywords ? "AI 핵심어 분석 중..." : "다음 단계: 핵심어 추천받기 →"}
+                {loadingKeywords ? "AI 핵심어 분석 중..." : "다음 단계: 핵심어 분석하기 →"}
               </Button>
             </div>
           )}
@@ -872,7 +723,7 @@ export default function CurriculumPage() {
             <div className="border-t pt-4 space-y-3">
               <div className="flex gap-2 items-center">
                 <Input
-                  placeholder="단원 설계 이름 입력 (예: 5학년 과학 생명 단원)"
+                  placeholder="탐구질문 이름 입력 (예: 5학년 과학 생명 탐구)"
                   value={saveTitle}
                   onChange={(e) => {
                     setSaveTitle(e.target.value);
