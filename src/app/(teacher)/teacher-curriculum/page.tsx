@@ -5,6 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  filterAchievementsByUnitCodes,
+  getSelectedAchievementsForAnalysis,
+  selectAllAchievementCodes,
+  toggleAchievementCode,
+  type Achievement,
+} from "@/lib/achievement-selection";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 interface CurriculumUnit {
@@ -24,14 +31,8 @@ interface CurriculumArea {
   middleKnowledgeItems: string[];
   middleProcessItems: string[];
   middleValueItems: string[];
-  achievements: { code: string; content: string }[];
+  achievements: Achievement[];
   units: CurriculumUnit[];
-}
-
-// 성취기준 코드에서 단원번호 추출: [4과01-01] → "01"
-function extractUnitCode(code: string): string {
-  const m = code.match(/\[[^\]]*[가-힣]+(\d+)-/);
-  return m ? m[1] : "";
 }
 
 interface InquiryQuestion {
@@ -115,6 +116,7 @@ export default function CurriculumPage() {
   const [curriculumData, setCurriculumData] = useState<CurriculumArea | null>(null);
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
   const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>([]);
+  const [selectedAchievementCodes, setSelectedAchievementCodes] = useState<string[]>([]);
 
   // 내용요소 선택 (새 기능: 핵심아이디어·지식이해·과정기능·가치태도 체크박스)
   const [selectedCoreIdeaLines, setSelectedCoreIdeaLines] = useState<string[]>([]);
@@ -163,12 +165,23 @@ export default function CurriculumPage() {
     setAreas([]);
     setCurriculumData(null);
     setSelectedUnitCodes([]);
+    setSelectedAchievementCodes([]);
   }, [selGrade]);
 
   // 교과 변경 → 영역 목록 로드 (2022 교육과정 순서로 정렬)
   useEffect(() => {
-    if (!selSubject || !selGrade) { setAreas([]); setSelAreaId(""); setCurriculumData(null); setSelectedUnitCodes([]); return; }
-    setSelAreaId(""); setCurriculumData(null); setSelectedUnitCodes([]);
+    if (!selSubject || !selGrade) {
+      setAreas([]);
+      setSelAreaId("");
+      setCurriculumData(null);
+      setSelectedUnitCodes([]);
+      setSelectedAchievementCodes([]);
+      return;
+    }
+    setSelAreaId("");
+    setCurriculumData(null);
+    setSelectedUnitCodes([]);
+    setSelectedAchievementCodes([]);
     fetch(`/api/curriculum?subject=${encodeURIComponent(selSubject)}&gradeRange=${encodeURIComponent(selGrade)}`)
       .then((r) => r.json())
       .then((d) => setAreas(sortAreasByOrder(d.areas ?? [], selSubject)))
@@ -188,6 +201,7 @@ export default function CurriculumPage() {
       const r = await fetch(`/api/curriculum?areaId=${selAreaId}`);
       const d: CurriculumArea = await r.json();
       setCurriculumData(d);
+      setSelectedAchievementCodes(selectAllAchievementCodes(d.achievements));
       // 단원 데이터가 있으면 전체 선택 초기 상태로 설정
       if (Array.isArray(d.units) && d.units.length > 0) {
         setSelectedUnitCodes(d.units.map((u) => u.unitCode));
@@ -204,11 +218,15 @@ export default function CurriculumPage() {
   // 선택된 단원의 성취기준만 필터링 (단원 데이터 없으면 전체 반환)
   const getFilteredAchievements = () => {
     if (!curriculumData) return [];
-    const units = curriculumData.units ?? [];
-    if (units.length === 0 || selectedUnitCodes.length === 0) return curriculumData.achievements;
-    return curriculumData.achievements.filter((a) =>
-      selectedUnitCodes.includes(extractUnitCode(a.code))
+    return filterAchievementsByUnitCodes(
+      curriculumData.achievements,
+      selectedUnitCodes,
+      curriculumData.units.length > 0
     );
+  };
+
+  const getSelectedAchievements = () => {
+    return getSelectedAchievementsForAnalysis(getFilteredAchievements(), selectedAchievementCodes);
   };
 
   const callGenerate = async (stepName: string, extra: Record<string, unknown> = {}) => {
@@ -225,7 +243,7 @@ export default function CurriculumPage() {
         knowledgeItems: curriculumData.knowledgeItems,
         processItems: curriculumData.processItems,
         valueItems: curriculumData.valueItems,
-        achievements: getFilteredAchievements(),
+        achievements: getSelectedAchievements(),
         selectedKeywords,
         coreSentences,
         essentialQuestions,
@@ -395,21 +413,21 @@ export default function CurriculumPage() {
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">단원 설계 도우미</h2>
-          <p className="text-gray-600">교육과정 분석 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
+          <h2 className="text-2xl font-bold text-gray-900">탐구 질문 도우미</h2>
+          <p className="text-gray-600">교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setShowSaved(!showSaved)}>
-          저장된 단원 설계 {savedList.length > 0 ? `(${savedList.length})` : ""}
+          저장된 탐구 질문 {savedList.length > 0 ? `(${savedList.length})` : ""}
         </Button>
       </div>
 
       {/* 저장 목록 */}
       {showSaved && (
         <Card>
-          <CardHeader><CardTitle className="text-base">저장된 단원 설계</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">저장된 탐구 질문</CardTitle></CardHeader>
           <CardContent>
             {savedList.length === 0 ? (
-              <p className="text-gray-400 text-sm">저장된 단원 설계가 없습니다.</p>
+              <p className="text-gray-400 text-sm">저장된 탐구 질문이 없습니다.</p>
             ) : (
               <ul className="divide-y">
                 {savedList.map((d) => (
@@ -707,64 +725,78 @@ export default function CurriculumPage() {
 
               {/* 성취기준 */}
               {curriculumData.achievements.length > 0 && (
-                <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-semibold text-gray-600 mb-2">
-                    성취기준
-                    {curriculumData.units.length > 0 && selectedUnitCodes.length > 0 && (
-                      <span className="ml-2 text-indigo-500 font-normal">
-                        ({getFilteredAchievements().length}개)
-                      </span>
-                    )}
-                  </p>
-                  {curriculumData.units.length === 0 || selectedUnitCodes.length === 0 ? (
-                    curriculumData.units.length > 0 ? (
-                      <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
-                    ) : (
-                      curriculumData.achievements.map((a, i) => (
-                        <p key={i} className="text-sm text-gray-700">
-                          <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                          {a.content}
-                        </p>
-                      ))
-                    )
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600">
+                        성취기준 선택
+                        <span className="ml-2 text-indigo-500 font-normal">
+                          {getSelectedAchievements().length} / {getFilteredAchievements().length}개 선택
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        선택한 성취기준만 핵심어 추천 분석에 반영됩니다
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAchievementCodes(selectAllAchievementCodes(getFilteredAchievements()))}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        전체 선택
+                      </button>
+                      <span className="text-xs text-gray-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAchievementCodes([])}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        전체 해제
+                      </button>
+                    </div>
+                  </div>
+
+                  {getFilteredAchievements().length === 0 ? (
+                    <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
                   ) : (
-                    (() => {
-                      const filtered = getFilteredAchievements();
-                      if (filtered.length === 0) {
-                        return <p className="text-sm text-gray-400">선택된 단원의 성취기준이 없습니다</p>;
-                      }
-                      const grouped: Record<string, typeof filtered> = {};
-                      filtered.forEach((a) => {
-                        const code = extractUnitCode(a.code);
-                        if (!grouped[code]) grouped[code] = [];
-                        grouped[code].push(a);
-                      });
-                      return Object.entries(grouped).map(([unitCode, achs]) => {
-                        const unit = curriculumData.units.find((u) => u.unitCode === unitCode);
+                    <div className="space-y-2">
+                      {getFilteredAchievements().map((achievement) => {
+                        const selected = selectedAchievementCodes.includes(achievement.code);
                         return (
-                          <div key={unitCode} className="mb-3">
-                            {unit && (
-                              <p className="text-xs font-semibold text-indigo-700 mb-1">
-                                [{unit.unitName}]
-                              </p>
-                            )}
-                            {achs.map((a, i) => (
-                              <p key={i} className="text-sm text-gray-700 ml-2">
-                                <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                                {a.content}
-                              </p>
-                            ))}
-                          </div>
+                          <label
+                            key={achievement.code}
+                            className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer transition-colors ${
+                              selected
+                                ? "border-indigo-200 bg-indigo-50"
+                                : "border-gray-200 bg-white hover:border-indigo-200"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
+                              checked={selected}
+                              onChange={() =>
+                                setSelectedAchievementCodes((prev) =>
+                                  toggleAchievementCode(prev, achievement.code)
+                                )
+                              }
+                            />
+                            <span className="text-sm text-gray-700 leading-snug">
+                              <span className="font-mono text-indigo-600 mr-2">{achievement.code}</span>
+                              {achievement.content}
+                            </span>
+                          </label>
                         );
-                      });
-                    })()
+                      })}
+                    </div>
                   )}
                 </div>
               )}
 
               <Button
                 onClick={handleGoStep2}
-                disabled={loadingKeywords || (curriculumData.units.length > 0 && selectedUnitCodes.length === 0)}
+                disabled={loadingKeywords || getSelectedAchievements().length === 0}
                 className="w-full"
               >
                 {loadingKeywords ? "AI 핵심어 분석 중..." : "다음 단계: 핵심어 추천받기 →"}
@@ -934,7 +966,7 @@ export default function CurriculumPage() {
             <div className="border-t pt-4 space-y-3">
               <div className="flex gap-2 items-center">
                 <Input
-                  placeholder="단원 설계 이름 입력 (예: 5학년 과학 생명 단원)"
+                  placeholder="탐구 질문 이름 입력 (예: 5학년 과학 생명 탐구)"
                   value={saveTitle}
                   onChange={(e) => {
                     setSaveTitle(e.target.value);
