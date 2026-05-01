@@ -49,6 +49,44 @@ const TYPE_COLOR: Record<string, string> = {
   controversial: "bg-orange-50 border-orange-200 text-orange-800",
 };
 
+// ── 교육과정 상수 ──────────────────────────────────────────────────────
+const GRADE_RANGES = ["1-2", "3-4", "5-6"] as const;
+
+const SUBJECTS_BY_GRADE: Record<string, string[]> = {
+  "1-2": ["국어", "수학", "바른 생활", "슬기로운 생활", "즐거운 생활"],
+  "3-4": ["국어", "사회", "도덕", "수학", "과학", "체육", "음악", "미술", "영어"],
+  "5-6": ["국어", "사회", "도덕", "수학", "과학", "실과", "체육", "음악", "미술", "영어"],
+};
+
+// Codex(웹검색) 검증 완료 — 2022 개정 교육과정 문서 순서
+const AREA_ORDER: Record<string, string[]> = {
+  국어: ["듣기·말하기", "읽기", "쓰기", "문법", "문학", "매체"],
+  수학: ["수와 연산", "변화와 관계", "도형과 측정", "자료와 가능성"],
+  사회: ["지리 인식", "자연환경과 인간생활", "인문환경과 인간생활", "지속가능한 세계", "정치", "법", "경제", "사회·문화", "역사 일반", "지역사", "한국사"],
+  과학: ["운동과 에너지", "물질", "생명", "지구와 우주", "과학과 사회"],
+  도덕: ["자신과의 관계", "타인과의 관계", "사회·공동체와의 관계", "자연과의 관계"],
+  음악: ["연주", "감상", "창작"],
+  미술: ["미적 체험", "표현", "감상"],
+  체육: ["운동", "스포츠", "표현"],
+  영어: ["이해(reception)", "표현(production)"],
+  실과: ["인간 발달과 주도적 삶", "생활환경과 지속가능한 선택", "기술적 문제해결과 혁신", "지속가능한 기술과 융합", "디지털 사회와 인공지능"],
+  "바른 생활": ["나와 우리", "자연과 더불어 사는 삶", "인터넷·AI와 생활"],
+  "슬기로운 생활": ["나와 가족", "마을과 우리나라", "봄·여름", "가을·겨울"],
+  "즐거운 생활": ["나와 가족", "마을과 우리나라", "봄·여름", "가을·겨울"],
+};
+
+function sortAreasByOrder(areas: { id: string; area: string }[], subject: string) {
+  const order = AREA_ORDER[subject] ?? [];
+  return [...areas].sort((a, b) => {
+    const ai = order.indexOf(a.area);
+    const bi = order.indexOf(b.area);
+    if (ai === -1 && bi === -1) return a.area.localeCompare(b.area, "ko");
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+}
+
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
 export default function CurriculumPage() {
   const [step, setStep] = useState<Step>(1);
@@ -57,12 +95,10 @@ export default function CurriculumPage() {
   const [savedList, setSavedList] = useState<{ id: string; title: string; subject: string; gradeRange: string; area: string }[]>([]);
   const [showSaved, setShowSaved] = useState(false);
 
-  // Step 1 — 교과 선택
-  const [subjects, setSubjects] = useState<string[]>([]);
-  const [gradeRanges, setGradeRanges] = useState<string[]>([]);
+  // Step 1 — 학년군·교과·영역 선택 (학년군 → 교과 → 영역 순)
   const [areas, setAreas] = useState<{ id: string; area: string }[]>([]);
-  const [selSubject, setSelSubject] = useState("");
   const [selGrade, setSelGrade] = useState("");
+  const [selSubject, setSelSubject] = useState("");
   const [selAreaId, setSelAreaId] = useState("");
   const [curriculumData, setCurriculumData] = useState<CurriculumArea | null>(null);
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
@@ -91,14 +127,7 @@ export default function CurriculumPage() {
   const [isSharing, setIsSharing] = useState(false);
   const [shareSuccess, setShareSuccess] = useState(false);
 
-  // 교과 목록 로드
-  useEffect(() => {
-    fetch("/api/curriculum")
-      .then((r) => r.json())
-      .then((d) => setSubjects(d.subjects ?? []))
-      .catch(() => {});
-    fetchSaved();
-  }, []);
+  useEffect(() => { fetchSaved(); }, []);
 
   const fetchSaved = () => {
     fetch("/api/unit-design")
@@ -107,23 +136,21 @@ export default function CurriculumPage() {
       .catch(() => {});
   };
 
-  // 학년군 목록 로드
+  // 학년군 변경 → 교과·영역·커리큘럼 초기화
   useEffect(() => {
-    if (!selSubject) return;
-    setSelGrade(""); setSelAreaId(""); setAreas([]); setCurriculumData(null);
-    fetch(`/api/curriculum?subject=${encodeURIComponent(selSubject)}`)
-      .then((r) => r.json())
-      .then((d) => setGradeRanges(d.gradeRanges ?? []))
-      .catch(() => {});
-  }, [selSubject]);
+    setSelSubject("");
+    setSelAreaId("");
+    setAreas([]);
+    setCurriculumData(null);
+  }, [selGrade]);
 
-  // 영역 목록 로드
+  // 교과 변경 → 영역 목록 로드 (2022 교육과정 순서로 정렬)
   useEffect(() => {
-    if (!selSubject || !selGrade) return;
+    if (!selSubject || !selGrade) { setAreas([]); setSelAreaId(""); setCurriculumData(null); return; }
     setSelAreaId(""); setCurriculumData(null);
     fetch(`/api/curriculum?subject=${encodeURIComponent(selSubject)}&gradeRange=${encodeURIComponent(selGrade)}`)
       .then((r) => r.json())
-      .then((d) => setAreas(d.areas ?? []))
+      .then((d) => setAreas(sortAreasByOrder(d.areas ?? [], selSubject)))
       .catch(() => {});
   }, [selSubject, selGrade]);
 
@@ -385,26 +412,30 @@ export default function CurriculumPage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label>교과</Label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={selSubject}
-                onChange={(e) => setSelSubject(e.target.value)}
-              >
-                <option value="">교과 선택</option>
-                {subjects.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
               <Label>학년군</Label>
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={selGrade}
                 onChange={(e) => setSelGrade(e.target.value)}
-                disabled={!selSubject}
               >
                 <option value="">학년군 선택</option>
-                {gradeRanges.map((g) => <option key={g} value={g}>{g}학년군</option>)}
+                {GRADE_RANGES.map((g) => (
+                  <option key={g} value={g}>{g}학년군</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label>교과</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={selSubject}
+                onChange={(e) => setSelSubject(e.target.value)}
+                disabled={!selGrade}
+              >
+                <option value="">교과 선택</option>
+                {(SUBJECTS_BY_GRADE[selGrade] ?? []).map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </select>
             </div>
             <div className="space-y-1">
@@ -413,7 +444,7 @@ export default function CurriculumPage() {
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={selAreaId}
                 onChange={(e) => setSelAreaId(e.target.value)}
-                disabled={!selGrade}
+                disabled={!selSubject}
               >
                 <option value="">영역 선택</option>
                 {areas.map((a) => <option key={a.id} value={a.id}>{a.area}</option>)}
