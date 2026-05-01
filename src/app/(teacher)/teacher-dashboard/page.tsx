@@ -12,6 +12,11 @@ import {
 import { StatBar } from "@/components/shared/StatBar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+interface TeacherClass {
+  grade: string;
+  className: string;
+}
+
 interface Stats {
   total: number;
   byClosure: { closed: number; open: number };
@@ -26,24 +31,41 @@ interface Stats {
     trend: number | null;
   }>;
   timeline: Array<{ date: string; count: number }>;
+  teacherClasses: TeacherClass[];
+}
+
+// 학급 Select에서 사용할 복합 키 (grade|className)
+function classKey(tc: TeacherClass) {
+  return `${tc.grade}|${tc.className}`;
 }
 
 export default function TeacherDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [period, setPeriod] = useState("month");
-  const [className, setClassName] = useState("all");
+  const [selectedClass, setSelectedClass] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setIsLoading(true);
     const params = new URLSearchParams({ period });
-    if (className !== "all") params.append("className", className);
+    if (selectedClass !== "all") {
+      const [grade, className] = selectedClass.split("|");
+      params.append("grade", grade);
+      params.append("className", className);
+    }
     fetch(`/api/stats?${params}`)
       .then((r) => r.json())
       .then(setStats)
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, [period, className]);
+  }, [period, selectedClass]);
+
+  // 학급 변경 시 선택값이 새 목록에 없으면 "전체"로 초기화
+  useEffect(() => {
+    if (!stats || selectedClass === "all") return;
+    const keys = stats.teacherClasses.map(classKey);
+    if (!keys.includes(selectedClass)) setSelectedClass("all");
+  }, [stats, selectedClass]);
 
   const getTrendLabel = (trend: number | null) => {
     if (trend === null) return <span className="text-gray-400 text-xs">신규</span>;
@@ -52,11 +74,13 @@ export default function TeacherDashboard() {
     return <span className="text-gray-400 text-xs">-</span>;
   };
 
+  const teacherClasses = stats?.teacherClasses ?? [];
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">교사 대시보드</h2>
-        <p className="text-gray-600">학생들의 질문 통계를 확인하세요</p>
+        <p className="text-gray-600">담당 학생들의 질문 통계를 확인하세요</p>
       </div>
 
       {/* 필터 */}
@@ -71,15 +95,19 @@ export default function TeacherDashboard() {
             <SelectItem value="semester">최근 6개월</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={className} onValueChange={setClassName}>
-          <SelectTrigger className="w-32">
+
+        {/* 담당 학급 드롭다운 — 동적으로 생성 */}
+        <Select value={selectedClass} onValueChange={setSelectedClass}>
+          <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">전체 반</SelectItem>
-            <SelectItem value="1반">1반</SelectItem>
-            <SelectItem value="2반">2반</SelectItem>
-            <SelectItem value="3반">3반</SelectItem>
+            <SelectItem value="all">전체 담당 학급</SelectItem>
+            {teacherClasses.map((tc) => (
+              <SelectItem key={classKey(tc)} value={classKey(tc)}>
+                {tc.grade}학년 {tc.className}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -102,6 +130,10 @@ export default function TeacherDashboard() {
                   {period === "week" && "최근 1주 기준"}
                   {period === "month" && "최근 1개월 기준"}
                   {period === "semester" && "최근 6개월 기준"}
+                  {selectedClass !== "all" && (() => {
+                    const [grade, className] = selectedClass.split("|");
+                    return ` · ${grade}학년 ${className}`;
+                  })()}
                 </div>
               </div>
             </CardContent>
