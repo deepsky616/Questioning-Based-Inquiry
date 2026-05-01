@@ -135,6 +135,7 @@ model CurriculumArea {
   middleProcessItems   Json? @map("middle_process_items")   // 중학교 과정·기능 (선행 확인용)
   middleValueItems     Json? @map("middle_value_items")     // 중학교 가치·태도 (선행 확인용)
   achievements         Json  @map("achievements")           // [{code, content}] 성취기준
+  units                Json  @default("[]") @map("units")  // [{unitCode, unitName}] 영역 내 단원 목록
 
   unitDesigns    UnitDesign[]
 

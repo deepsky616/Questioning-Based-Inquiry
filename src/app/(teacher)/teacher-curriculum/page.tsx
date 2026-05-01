@@ -7,6 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
+interface CurriculumUnit {
+  unitCode: string;
+  unitName: string;
+}
+
 interface CurriculumArea {
   id: string;
   subject: string;
@@ -20,6 +25,13 @@ interface CurriculumArea {
   middleProcessItems: string[];
   middleValueItems: string[];
   achievements: { code: string; content: string }[];
+  units: CurriculumUnit[];
+}
+
+// 성취기준 코드에서 단원번호 추출: [4과01-01] → "01"
+function extractUnitCode(code: string): string {
+  const m = code.match(/\[[^\]]*[가-힣]+(\d+)-/);
+  return m ? m[1] : "";
 }
 
 interface InquiryQuestion {
@@ -102,6 +114,7 @@ export default function CurriculumPage() {
   const [selAreaId, setSelAreaId] = useState("");
   const [curriculumData, setCurriculumData] = useState<CurriculumArea | null>(null);
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
+  const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>([]);
 
   // Step 2 — 핵심어
   const [recommendedKeywords, setRecommendedKeywords] = useState<string[]>([]);
@@ -142,12 +155,13 @@ export default function CurriculumPage() {
     setSelAreaId("");
     setAreas([]);
     setCurriculumData(null);
+    setSelectedUnitCodes([]);
   }, [selGrade]);
 
   // 교과 변경 → 영역 목록 로드 (2022 교육과정 순서로 정렬)
   useEffect(() => {
-    if (!selSubject || !selGrade) { setAreas([]); setSelAreaId(""); setCurriculumData(null); return; }
-    setSelAreaId(""); setCurriculumData(null);
+    if (!selSubject || !selGrade) { setAreas([]); setSelAreaId(""); setCurriculumData(null); setSelectedUnitCodes([]); return; }
+    setSelAreaId(""); setCurriculumData(null); setSelectedUnitCodes([]);
     fetch(`/api/curriculum?subject=${encodeURIComponent(selSubject)}&gradeRange=${encodeURIComponent(selGrade)}`)
       .then((r) => r.json())
       .then((d) => setAreas(sortAreasByOrder(d.areas ?? [], selSubject)))
@@ -160,14 +174,30 @@ export default function CurriculumPage() {
     setLoadingCurriculum(true);
     try {
       const r = await fetch(`/api/curriculum?areaId=${selAreaId}`);
-      const d = await r.json();
+      const d: CurriculumArea = await r.json();
       setCurriculumData(d);
+      // 단원 데이터가 있으면 전체 선택 초기 상태로 설정
+      if (Array.isArray(d.units) && d.units.length > 0) {
+        setSelectedUnitCodes(d.units.map((u) => u.unitCode));
+      } else {
+        setSelectedUnitCodes([]);
+      }
     } finally {
       setLoadingCurriculum(false);
     }
   }, [selAreaId]);
 
   useEffect(() => { loadAreaData(); }, [loadAreaData]);
+
+  // 선택된 단원의 성취기준만 필터링 (단원 데이터 없으면 전체 반환)
+  const getFilteredAchievements = () => {
+    if (!curriculumData) return [];
+    const units = curriculumData.units ?? [];
+    if (units.length === 0 || selectedUnitCodes.length === 0) return curriculumData.achievements;
+    return curriculumData.achievements.filter((a) =>
+      selectedUnitCodes.includes(extractUnitCode(a.code))
+    );
+  };
 
   const callGenerate = async (stepName: string, extra: Record<string, unknown> = {}) => {
     if (!curriculumData) return null;
@@ -183,7 +213,7 @@ export default function CurriculumPage() {
         knowledgeItems: curriculumData.knowledgeItems,
         processItems: curriculumData.processItems,
         valueItems: curriculumData.valueItems,
-        achievements: curriculumData.achievements,
+        achievements: getFilteredAchievements(),
         selectedKeywords,
         coreSentences,
         essentialQuestions,
@@ -551,22 +581,122 @@ export default function CurriculumPage() {
                 </details>
               )}
 
-              {/* 성취기준 */}
+              {/* 단원 선택 (단원 데이터가 있는 교과만 표시) */}
+              {curriculumData.units.length > 0 && (
+                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-blue-700">단원 선택</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setSelectedUnitCodes(curriculumData.units.map((u) => u.unitCode))}
+                        className="text-xs text-blue-600 hover:text-blue-800 underline"
+                      >
+                        전체 선택
+                      </button>
+                      <span className="text-xs text-blue-300">|</span>
+                      <button
+                        onClick={() => setSelectedUnitCodes([])}
+                        className="text-xs text-blue-600 hover:text-blue-800 underline"
+                      >
+                        전체 해제
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-blue-500">수업할 단원을 선택하면 해당 단원의 성취기준만 표시됩니다</p>
+                  <div className="flex flex-wrap gap-2">
+                    {curriculumData.units.map((u) => {
+                      const selected = selectedUnitCodes.includes(u.unitCode);
+                      return (
+                        <button
+                          key={u.unitCode}
+                          onClick={() =>
+                            setSelectedUnitCodes((prev) =>
+                              selected
+                                ? prev.filter((c) => c !== u.unitCode)
+                                : [...prev, u.unitCode]
+                            )
+                          }
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                            selected
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+                          }`}
+                        >
+                          {u.unitName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedUnitCodes.length > 0 && (
+                    <p className="text-xs text-blue-600">
+                      {selectedUnitCodes.length}개 단원 선택됨 ·{" "}
+                      {getFilteredAchievements().length}개 성취기준 적용
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* 성취기준 — 선택된 단원에 해당하는 것만 표시 */}
               {curriculumData.achievements.length > 0 && (
                 <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-semibold text-gray-600 mb-2">성취기준</p>
-                  {curriculumData.achievements.map((a, i) => (
-                    <p key={i} className="text-sm text-gray-700">
-                      <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                      {a.content}
-                    </p>
-                  ))}
+                  <p className="text-xs font-semibold text-gray-600 mb-2">
+                    성취기준
+                    {curriculumData.units.length > 0 && selectedUnitCodes.length > 0 && (
+                      <span className="ml-2 text-indigo-500 font-normal">
+                        ({getFilteredAchievements().length}개)
+                      </span>
+                    )}
+                  </p>
+                  {curriculumData.units.length === 0 || selectedUnitCodes.length === 0 ? (
+                    curriculumData.units.length > 0 ? (
+                      <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
+                    ) : (
+                      curriculumData.achievements.map((a, i) => (
+                        <p key={i} className="text-sm text-gray-700">
+                          <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
+                          {a.content}
+                        </p>
+                      ))
+                    )
+                  ) : (
+                    (() => {
+                      const filtered = getFilteredAchievements();
+                      if (filtered.length === 0) {
+                        return <p className="text-sm text-gray-400">선택된 단원의 성취기준이 없습니다</p>;
+                      }
+                      // 단원별로 그룹화하여 표시
+                      const grouped: Record<string, typeof filtered> = {};
+                      filtered.forEach((a) => {
+                        const code = extractUnitCode(a.code);
+                        if (!grouped[code]) grouped[code] = [];
+                        grouped[code].push(a);
+                      });
+                      return Object.entries(grouped).map(([unitCode, achs]) => {
+                        const unit = curriculumData.units.find((u) => u.unitCode === unitCode);
+                        return (
+                          <div key={unitCode} className="mb-3">
+                            {unit && (
+                              <p className="text-xs font-semibold text-indigo-700 mb-1">
+                                [{unit.unitName}]
+                              </p>
+                            )}
+                            {achs.map((a, i) => (
+                              <p key={i} className="text-sm text-gray-700 ml-2">
+                                <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
+                                {a.content}
+                              </p>
+                            ))}
+                          </div>
+                        );
+                      });
+                    })()
+                  )}
                 </div>
               )}
 
               <Button
                 onClick={handleGoStep2}
-                disabled={loadingKeywords}
+                disabled={loadingKeywords || (curriculumData.units.length > 0 && selectedUnitCodes.length === 0)}
                 className="w-full"
               >
                 {loadingKeywords ? "AI 핵심어 분석 중..." : "다음 단계: 핵심어 추천받기 →"}
