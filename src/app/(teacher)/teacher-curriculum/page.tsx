@@ -581,116 +581,123 @@ export default function CurriculumPage() {
                 </details>
               )}
 
-              {/* 단원 선택 (단원 데이터가 있는 교과만 표시) */}
-              {curriculumData.units.length > 0 && (
-                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-blue-700">단원 선택</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setSelectedUnitCodes(curriculumData.units.map((u) => u.unitCode))}
-                        className="text-xs text-blue-600 hover:text-blue-800 underline"
-                      >
-                        전체 선택
-                      </button>
-                      <span className="text-xs text-blue-300">|</span>
-                      <button
-                        onClick={() => setSelectedUnitCodes([])}
-                        className="text-xs text-blue-600 hover:text-blue-800 underline"
-                      >
-                        전체 해제
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-blue-500">수업할 단원을 선택하면 해당 단원의 성취기준만 표시됩니다</p>
-                  <div className="flex flex-wrap gap-2">
-                    {curriculumData.units.map((u) => {
-                      const selected = selectedUnitCodes.includes(u.unitCode);
-                      return (
-                        <button
-                          key={u.unitCode}
-                          onClick={() =>
-                            setSelectedUnitCodes((prev) =>
-                              selected
-                                ? prev.filter((c) => c !== u.unitCode)
-                                : [...prev, u.unitCode]
-                            )
-                          }
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                            selected
-                              ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
-                          }`}
-                        >
-                          {u.unitName}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {selectedUnitCodes.length > 0 && (
-                    <p className="text-xs text-blue-600">
-                      {selectedUnitCodes.length}개 단원 선택됨 ·{" "}
-                      {getFilteredAchievements().length}개 성취기준 적용
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* 성취기준 — 선택된 단원에 해당하는 것만 표시 */}
+              {/* 성취기준 선택 — 단원 칩 + 분류 표시 통합 */}
               {curriculumData.achievements.length > 0 && (
-                <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-semibold text-gray-600 mb-2">
-                    성취기준
-                    {curriculumData.units.length > 0 && selectedUnitCodes.length > 0 && (
-                      <span className="ml-2 text-indigo-500 font-normal">
-                        ({getFilteredAchievements().length}개)
-                      </span>
-                    )}
-                  </p>
-                  {curriculumData.units.length === 0 || selectedUnitCodes.length === 0 ? (
-                    curriculumData.units.length > 0 ? (
+                <div className="rounded-lg border p-4 space-y-4">
+                  {/* 단원 칩 — 데이터 있는 교과만 */}
+                  {curriculumData.units.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-blue-700">단원(분류) 선택</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setSelectedUnitCodes(curriculumData.units.map((u) => u.unitCode))}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline"
+                          >
+                            전체 선택
+                          </button>
+                          <span className="text-xs text-blue-300">|</span>
+                          <button
+                            onClick={() => setSelectedUnitCodes([])}
+                            className="text-xs text-blue-600 hover:text-blue-800 underline"
+                          >
+                            전체 해제
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {curriculumData.units.map((u) => {
+                          const selected = selectedUnitCodes.includes(u.unitCode);
+                          return (
+                            <button
+                              key={u.unitCode}
+                              onClick={() =>
+                                setSelectedUnitCodes((prev) =>
+                                  selected
+                                    ? prev.filter((c) => c !== u.unitCode)
+                                    : [...prev, u.unitCode]
+                                )
+                              }
+                              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                                selected
+                                  ? "bg-blue-600 text-white border-blue-600"
+                                  : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+                              }`}
+                            >
+                              {u.unitName}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {selectedUnitCodes.length > 0 && (
+                        <p className="text-xs text-blue-600">
+                          {selectedUnitCodes.length}개 단원 선택됨 · {getFilteredAchievements().length}개 성취기준 적용
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 성취기준 목록 */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 mb-2">
+                      성취기준
+                      {curriculumData.units.length > 0 && selectedUnitCodes.length > 0 && (
+                        <span className="ml-2 text-indigo-500 font-normal">
+                          ({getFilteredAchievements().length}개)
+                        </span>
+                      )}
+                    </p>
+                    {curriculumData.units.length === 0 ? (
+                      <div className="space-y-1">
+                        {curriculumData.achievements.map((a, i) => (
+                          <p key={i} className="text-sm text-gray-700">
+                            <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
+                            {a.content}
+                          </p>
+                        ))}
+                      </div>
+                    ) : selectedUnitCodes.length === 0 ? (
                       <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
                     ) : (
-                      curriculumData.achievements.map((a, i) => (
-                        <p key={i} className="text-sm text-gray-700">
-                          <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                          {a.content}
-                        </p>
-                      ))
-                    )
-                  ) : (
-                    (() => {
-                      const filtered = getFilteredAchievements();
-                      if (filtered.length === 0) {
-                        return <p className="text-sm text-gray-400">선택된 단원의 성취기준이 없습니다</p>;
-                      }
-                      // 단원별로 그룹화하여 표시
-                      const grouped: Record<string, typeof filtered> = {};
-                      filtered.forEach((a) => {
-                        const code = extractUnitCode(a.code);
-                        if (!grouped[code]) grouped[code] = [];
-                        grouped[code].push(a);
-                      });
-                      return Object.entries(grouped).map(([unitCode, achs]) => {
-                        const unit = curriculumData.units.find((u) => u.unitCode === unitCode);
+                      (() => {
+                        const filtered = getFilteredAchievements();
+                        if (filtered.length === 0)
+                          return <p className="text-sm text-gray-400">선택된 단원의 성취기준이 없습니다</p>;
+                        const grouped: Record<string, typeof filtered> = {};
+                        filtered.forEach((a) => {
+                          const uc = extractUnitCode(a.code);
+                          if (!grouped[uc]) grouped[uc] = [];
+                          grouped[uc].push(a);
+                        });
                         return (
-                          <div key={unitCode} className="mb-3">
-                            {unit && (
-                              <p className="text-xs font-semibold text-indigo-700 mb-1">
-                                [{unit.unitName}]
-                              </p>
-                            )}
-                            {achs.map((a, i) => (
-                              <p key={i} className="text-sm text-gray-700 ml-2">
-                                <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                                {a.content}
-                              </p>
-                            ))}
+                          <div className="space-y-3">
+                            {selectedUnitCodes
+                              .filter((uc) => grouped[uc])
+                              .map((uc) => {
+                                const unit = curriculumData.units.find((u) => u.unitCode === uc);
+                                return (
+                                  <div key={uc}>
+                                    {unit && (
+                                      <p className="text-xs font-semibold text-indigo-700 mb-1">
+                                        [{unit.unitName}]
+                                      </p>
+                                    )}
+                                    <div className="space-y-0.5 ml-2">
+                                      {grouped[uc].map((a, i) => (
+                                        <p key={i} className="text-sm text-gray-700">
+                                          <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
+                                          {a.content}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                           </div>
                         );
-                      });
-                    })()
-                  )}
+                      })()
+                    )}
+                  </div>
                 </div>
               )}
 
