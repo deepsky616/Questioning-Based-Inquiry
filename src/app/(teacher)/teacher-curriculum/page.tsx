@@ -12,6 +12,11 @@ import {
   toggleAchievementCode,
   type Achievement,
 } from "@/lib/achievement-selection";
+import {
+  selectAllContentItems,
+  splitCoreIdeaLines,
+  toggleContentItem,
+} from "@/lib/content-selection";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 interface CurriculumUnit {
@@ -61,6 +66,10 @@ const TYPE_COLOR: Record<string, string> = {
   conceptual: "bg-purple-50 border-purple-200 text-purple-800",
   controversial: "bg-orange-50 border-orange-200 text-orange-800",
 };
+
+const KNOWLEDGE_ITEM_LIMIT = 12;
+const PROCESS_ITEM_LIMIT = 12;
+const VALUE_ITEM_LIMIT = 8;
 
 // ── 교육과정 상수 ──────────────────────────────────────────────────────
 const GRADE_RANGES = ["1-2", "3-4", "5-6"] as const;
@@ -202,6 +211,10 @@ export default function CurriculumPage() {
       const d: CurriculumArea = await r.json();
       setCurriculumData(d);
       setSelectedAchievementCodes(selectAllAchievementCodes(d.achievements));
+      setSelectedCoreIdeaLines(splitCoreIdeaLines(d.coreIdea));
+      setSelectedKnowledge(selectAllContentItems(d.knowledgeItems, KNOWLEDGE_ITEM_LIMIT));
+      setSelectedProcess(selectAllContentItems(d.processItems, PROCESS_ITEM_LIMIT));
+      setSelectedValue(selectAllContentItems(d.valueItems, VALUE_ITEM_LIMIT));
       // 단원 데이터가 있으면 전체 선택 초기 상태로 설정
       if (Array.isArray(d.units) && d.units.length > 0) {
         setSelectedUnitCodes(d.units.map((u) => u.unitCode));
@@ -239,10 +252,10 @@ export default function CurriculumPage() {
         subject: curriculumData.subject,
         gradeRange: curriculumData.gradeRange,
         area: curriculumData.area,
-        coreIdea: curriculumData.coreIdea,
-        knowledgeItems: curriculumData.knowledgeItems,
-        processItems: curriculumData.processItems,
-        valueItems: curriculumData.valueItems,
+        coreIdea: selectedCoreIdeaLines.join("\n"),
+        knowledgeItems: selectedKnowledge,
+        processItems: selectedProcess,
+        valueItems: selectedValue,
         achievements: getSelectedAchievements(),
         selectedKeywords,
         coreSentences,
@@ -518,20 +531,39 @@ export default function CurriculumPage() {
             <div className="space-y-3 mt-2">
               {/* 핵심아이디어 (선택 가능) */}
               <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-indigo-600">핵심아이디어</p>
-                  <span className="text-xs text-indigo-400">수업에서 중점 다룰 항목을 체크하세요</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div>
+                    <p className="text-xs font-semibold text-indigo-600">핵심아이디어</p>
+                    <span className="text-xs text-indigo-400">수업에서 중점 다룰 항목을 체크하세요</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCoreIdeaLines(splitCoreIdeaLines(curriculumData.coreIdea))}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                    >
+                      전체 선택
+                    </button>
+                    <span className="text-xs text-indigo-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCoreIdeaLines([])}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                    >
+                      전체 해제
+                    </button>
+                  </div>
                 </div>
                 <ul className="space-y-1.5">
-                  {curriculumData.coreIdea.split("\n").filter((l) => l.trim()).map((line, i) => (
+                  {splitCoreIdeaLines(curriculumData.coreIdea).map((line, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <input
                         type="checkbox"
                         id={`core-${i}`}
                         checked={selectedCoreIdeaLines.includes(line)}
-                        onChange={(e) =>
+                        onChange={() =>
                           setSelectedCoreIdeaLines((prev) =>
-                            e.target.checked ? [...prev, line] : prev.filter((l) => l !== line)
+                            toggleContentItem(prev, line)
                           )
                         }
                         className="mt-0.5 h-3.5 w-3.5 rounded border-indigo-300 text-indigo-600 cursor-pointer flex-shrink-0"
@@ -549,24 +581,87 @@ export default function CurriculumPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">지식·이해</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">과정·기능</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3">가치·태도</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span>지식·이해</span>
+                          <span className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedKnowledge(selectAllContentItems(curriculumData.knowledgeItems, KNOWLEDGE_ITEM_LIMIT))}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 선택
+                            </button>
+                            <span className="text-xs text-gray-300 font-normal">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedKnowledge([])}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 해제
+                            </button>
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span>과정·기능</span>
+                          <span className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProcess(selectAllContentItems(curriculumData.processItems, PROCESS_ITEM_LIMIT))}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 선택
+                            </button>
+                            <span className="text-xs text-gray-300 font-normal">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProcess([])}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 해제
+                            </button>
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span>가치·태도</span>
+                          <span className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedValue(selectAllContentItems(curriculumData.valueItems, VALUE_ITEM_LIMIT))}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 선택
+                            </button>
+                            <span className="text-xs text-gray-300 font-normal">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedValue([])}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 해제
+                            </button>
+                          </span>
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="align-top">
                       <td className="px-4 py-3 border-r">
                         <ul className="space-y-1.5">
-                          {curriculumData.knowledgeItems.slice(0, 12).map((item, i) => (
+                          {curriculumData.knowledgeItems.slice(0, KNOWLEDGE_ITEM_LIMIT).map((item, i) => (
                             <li key={i} className="flex items-center gap-1.5">
                               <input
                                 type="checkbox"
                                 id={`k-${i}`}
                                 checked={selectedKnowledge.includes(item)}
-                                onChange={(e) =>
+                                onChange={() =>
                                   setSelectedKnowledge((prev) =>
-                                    e.target.checked ? [...prev, item] : prev.filter((x) => x !== item)
+                                    toggleContentItem(prev, item)
                                   )
                                 }
                                 className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
@@ -578,15 +673,15 @@ export default function CurriculumPage() {
                       </td>
                       <td className="px-4 py-3 border-r">
                         <ul className="space-y-1.5">
-                          {curriculumData.processItems.slice(0, 12).map((item, i) => (
+                          {curriculumData.processItems.slice(0, PROCESS_ITEM_LIMIT).map((item, i) => (
                             <li key={i} className="flex items-center gap-1.5">
                               <input
                                 type="checkbox"
                                 id={`p-${i}`}
                                 checked={selectedProcess.includes(item)}
-                                onChange={(e) =>
+                                onChange={() =>
                                   setSelectedProcess((prev) =>
-                                    e.target.checked ? [...prev, item] : prev.filter((x) => x !== item)
+                                    toggleContentItem(prev, item)
                                   )
                                 }
                                 className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
@@ -598,15 +693,15 @@ export default function CurriculumPage() {
                       </td>
                       <td className="px-4 py-3">
                         <ul className="space-y-1.5">
-                          {curriculumData.valueItems.slice(0, 8).map((item, i) => (
+                          {curriculumData.valueItems.slice(0, VALUE_ITEM_LIMIT).map((item, i) => (
                             <li key={i} className="flex items-center gap-1.5">
                               <input
                                 type="checkbox"
                                 id={`v-${i}`}
                                 checked={selectedValue.includes(item)}
-                                onChange={(e) =>
+                                onChange={() =>
                                   setSelectedValue((prev) =>
-                                    e.target.checked ? [...prev, item] : prev.filter((x) => x !== item)
+                                    toggleContentItem(prev, item)
                                   )
                                 }
                                 className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
