@@ -31,7 +31,7 @@ export default function DatePicker({ value, onChange, placeholder = "날짜 선�
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className={`h-8 justify-start text-left text-sm font-normal ${!value ? "text-gray-400" : ""}`}
+          className={`h-8 w-full justify-start text-left text-sm font-normal ${!value ? "text-gray-400" : ""}`}
         >
           📅 {displayLabel}
         </Button>

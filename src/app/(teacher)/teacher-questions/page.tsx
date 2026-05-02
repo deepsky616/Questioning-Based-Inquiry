@@ -901,7 +901,7 @@ export default function QuestionsPage() {
       {questionLookupMode === "detail" && (
         <div className={`rounded-lg border p-3 ${hasActiveFilter ? "border-indigo-200 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex flex-col gap-1 w-40">
               <label className="text-xs font-medium text-gray-600">날짜</label>
               <DatePicker
                 value={filterDate}
