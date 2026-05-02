@@ -20,6 +20,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import DatePicker from "@/components/shared/DatePicker";
+import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -40,6 +41,7 @@ interface QuestionSession {
   teacher: { name: string };
   unitDesignId?: string | null;
   defaultQuestionPublic?: boolean;
+  sharedQuestions?: Array<{ type: string; content: string }>;
 }
 
 interface Question {
@@ -1141,6 +1143,24 @@ export default function QuestionsPage() {
             </CardContent>
           )}
         </Card>
+      )}
+
+      {currentSession && currentSession.unitDesignId && (
+        <InquiryFlowGraph
+          title="탐구 질문 관계도"
+          description="선생님의 탐구 질문이 학생 질문으로 어떻게 이어졌는지 한눈에 확인합니다"
+          subject={currentSession.subject}
+          topic={currentSession.topic}
+          sharedQuestions={Array.isArray(currentSession.sharedQuestions) ? currentSession.sharedQuestions : []}
+          studentQuestions={filtered.map((question) => ({
+            id: question.id,
+            content: question.content,
+            cognitive: question.cognitive,
+            closure: question.closure,
+            isPublic: question.isPublic,
+          }))}
+          audience="teacher"
+        />
       )}
 
       {isLoading ? (

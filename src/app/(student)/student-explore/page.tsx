@@ -17,12 +17,15 @@ import {
 import { buildSessionLabel, sortSessionsDesc } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
 import DatePicker from "@/components/shared/DatePicker";
+import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 
 interface QuestionSession {
   id: string;
   date: string;
   subject: string;
   topic: string;
+  unitDesignId?: string | null;
+  sharedQuestions?: Array<{ type: string; content: string }>;
 }
 
 interface Comment {
@@ -218,6 +221,7 @@ export default function ExplorePage() {
       q.content.toLowerCase().includes(search.toLowerCase()) ||
       q.author.name.toLowerCase().includes(search.toLowerCase())
   );
+  const selectedSession = sessions.find((session) => session.id === selectedSessionId);
 
   const byType = (key: "closure" | "cognitive", value: string) =>
     filtered.filter((q) =>
@@ -345,11 +349,29 @@ export default function ExplorePage() {
       {lookupMode === "session" && selectedSessionId !== "all" && (
         <div className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2">
           {buildSessionLabel(
-            sessions.find((s) => s.id === selectedSessionId)?.date ?? "",
-            sessions.find((s) => s.id === selectedSessionId)?.subject ?? "",
-            sessions.find((s) => s.id === selectedSessionId)?.topic ?? ""
+            selectedSession?.date ?? "",
+            selectedSession?.subject ?? "",
+            selectedSession?.topic ?? ""
           )} · {filtered.length}개 질문
         </div>
+      )}
+
+      {selectedSession?.unitDesignId && (
+        <InquiryFlowGraph
+          title="탐구 질문 관계도"
+          description="선생님의 탐구 질문과 친구들의 공개 질문 흐름을 함께 봅니다"
+          subject={selectedSession.subject}
+          topic={selectedSession.topic}
+          sharedQuestions={Array.isArray(selectedSession.sharedQuestions) ? selectedSession.sharedQuestions : []}
+          studentQuestions={filtered.map((question) => ({
+            id: question.id,
+            content: question.content,
+            cognitive: question.cognitive,
+            closure: question.closure,
+            isPublic: true,
+          }))}
+          audience="student"
+        />
       )}
 
       {/* 분류 1: 폐쇄형 / 개방형 */}
