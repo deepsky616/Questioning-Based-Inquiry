@@ -54,6 +54,23 @@ interface SessionAnalysis {
   totalQuestions: number;
 }
 
+interface ParticipantStudent {
+  id: string;
+  name: string;
+  grade: string | null;
+  className: string | null;
+  studentNumber: string | null;
+  hasQuestion: boolean;
+  questionContent: string | null;
+}
+
+interface ParticipationData {
+  sessionId: string;
+  totalStudents: number;
+  submittedCount: number;
+  students: ParticipantStudent[];
+}
+
 function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div className={`flex flex-col items-center px-4 py-2 rounded-lg ${color}`}>
@@ -130,6 +147,12 @@ export default function QuestionsPage() {
   const [isAnalyzingSession, setIsAnalyzingSession] = useState(false);
   const [sessionAnalysis, setSessionAnalysis] = useState<SessionAnalysis | null>(null);
   const [sessionAnalysisError, setSessionAnalysisError] = useState<string | null>(null);
+
+  // 참여 현황
+  const [participation, setParticipation] = useState<ParticipationData | null>(null);
+  const [isLoadingParticipation, setIsLoadingParticipation] = useState(false);
+  const [participationFilter, setParticipationFilter] = useState<"all" | "submitted" | "not-submitted">("all");
+  const [showParticipation, setShowParticipation] = useState(false);
 
   // 뷰 모드
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
@@ -212,6 +235,8 @@ export default function QuestionsPage() {
     setSelectedSessionId(val);
     setSessionAnalysis(null);
     setSessionAnalysisError(null);
+    setParticipation(null);
+    setShowParticipation(false);
     resetBulkState();
     fetchQuestions(val);
   };
@@ -220,6 +245,8 @@ export default function QuestionsPage() {
     setQuestionLookupMode(mode);
     setSessionAnalysis(null);
     setSessionAnalysisError(null);
+    setParticipation(null);
+    setShowParticipation(false);
     resetBulkState();
     if (mode === "session") {
       if (selectedSessionId) fetchQuestions(selectedSessionId);
@@ -468,6 +495,22 @@ export default function QuestionsPage() {
       setSessionAnalysisError(err instanceof Error ? err.message : "AI 세션 분석에 실패했습니다");
     } finally {
       setIsAnalyzingSession(false);
+    }
+  };
+
+  const handleLoadParticipation = async () => {
+    if (!selectedSessionId) return;
+    setIsLoadingParticipation(true);
+    try {
+      const res = await fetch(`/api/sessions/${selectedSessionId}/participation`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "참여 현황 조회 실패");
+      setParticipation(data as ParticipationData);
+      setShowParticipation(true);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingParticipation(false);
     }
   };
 
@@ -968,6 +1011,123 @@ export default function QuestionsPage() {
               </>
             ) : null}
           </CardContent>
+        </Card>
+      )}
+
+      {/* 참여 현황 패널 */}
+      {questionLookupMode === "session" && currentSession && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">학생 참여 현황</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={showParticipation ? () => setShowParticipation(false) : handleLoadParticipation}
+                disabled={isLoadingParticipation}
+                className="text-xs"
+              >
+                {isLoadingParticipation ? "조회 중..." : showParticipation ? "접기" : "참여 현황 조회"}
+              </Button>
+            </div>
+          </CardHeader>
+          {showParticipation && participation && (
+            <CardContent>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-sm text-gray-600">
+                  <span className="font-semibold text-green-700">{participation.submittedCount}</span>
+                  /{participation.totalStudents}명 제출
+                </span>
+                <div className="flex rounded-md border border-gray-200 overflow-hidden ml-auto">
+                  {(["all", "submitted", "not-submitted"] as const).map((f, i) => (
+                    <button
+                      key={f}
+                      onClick={() => setParticipationFilter(f)}
+                      className={`px-3 py-1 text-xs font-medium transition-colors ${
+                        i > 0 ? "border-l border-gray-200" : ""
+                      } ${
+                        participationFilter === f
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      {f === "all" ? "전체" : f === "submitted" ? "제출" : "미제출"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">학생</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600 w-24">학년·반·번호</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">질문 내용</th>
+                      <th className="text-center px-3 py-2 font-medium text-gray-600 w-14">제출</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {participation.students
+                      .filter((s) =>
+                        participationFilter === "all"
+                          ? true
+                          : participationFilter === "submitted"
+                          ? s.hasQuestion
+                          : !s.hasQuestion
+                      )
+                      .map((s) => (
+                        <tr key={s.id} className={s.hasQuestion ? "bg-white" : "bg-gray-50/50"}>
+                          <td className="px-3 py-2 font-medium text-gray-900">{s.name}</td>
+                          <td className="px-3 py-2 text-xs text-gray-500">
+                            {[
+                              s.grade && `${s.grade}학년`,
+                              s.className && `${s.className}반`,
+                              s.studentNumber && `${s.studentNumber}번`,
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          </td>
+                          <td className="px-3 py-2 text-gray-600 max-w-xs truncate">
+                            {s.questionContent ? (
+                              <span>
+                                &ldquo;{s.questionContent}
+                                {s.questionContent.length >= 50 ? "..." : ""}&rdquo;
+                              </span>
+                            ) : (
+                              <span className="text-gray-300 text-xs">미작성</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {s.hasQuestion ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                                ✓
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-400 text-xs">
+                                -
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+                {participation.students.filter((s) =>
+                  participationFilter === "all"
+                    ? true
+                    : participationFilter === "submitted"
+                    ? s.hasQuestion
+                    : !s.hasQuestion
+                ).length === 0 && (
+                  <div className="text-center py-6 text-gray-400 text-sm">
+                    {participationFilter === "submitted"
+                      ? "제출한 학생이 없습니다"
+                      : "미제출 학생이 없습니다"}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          )}
         </Card>
       )}
 

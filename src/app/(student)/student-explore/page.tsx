@@ -150,11 +150,18 @@ export default function ExplorePage() {
   const [selectedSessionId, setSelectedSessionId] = useState("all");
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [lookupMode, setLookupMode] = useState<"session" | "detail">("session");
+  const [filterDate, setFilterDate] = useState("");
+  const [filterSubject, setFilterSubject] = useState("");
+  const [filterTopic, setFilterTopic] = useState("");
 
-  const fetchQuestions = (sessionId: string) => {
+  const fetchQuestions = (sessionId: string, opts?: { date?: string; subject?: string; topic?: string }) => {
     setIsLoading(true);
     const params = new URLSearchParams({ isPublic: "true" });
     if (sessionId !== "all") params.set("sessionId", sessionId);
+    if (opts?.date) params.set("date", opts.date);
+    if (opts?.subject) params.set("subject", opts.subject);
+    if (opts?.topic) params.set("topic", opts.topic);
     fetch(`/api/questions?${params}`)
       .then((r) => r.json())
       .then(setQuestions)
@@ -169,6 +176,27 @@ export default function ExplorePage() {
       .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
       .catch(() => {});
   }, []);
+
+  const handleLookupModeChange = (mode: "session" | "detail") => {
+    setLookupMode(mode);
+    setSearch("");
+    if (mode === "session") {
+      fetchQuestions(selectedSessionId);
+    } else {
+      fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
+    }
+  };
+
+  const handleApplyFilter = () => {
+    fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
+  };
+
+  const handleClearFilter = () => {
+    setFilterDate("");
+    setFilterSubject("");
+    setFilterTopic("");
+    fetchQuestions("all");
+  };
 
   const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
@@ -210,31 +238,102 @@ export default function ExplorePage() {
         <p className="text-gray-600">다른 학생들의 질문을 살펴보고 댓글을 남겨보세요 · 공개 {questions.length}개</p>
       </div>
 
-      {/* 필터 영역 */}
-      <div className="flex flex-wrap gap-3 items-center">
-        {sessions.length > 0 && (
-          <select
-            className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            value={selectedSessionId}
-            onChange={handleSessionChange}
+      {/* 조회 모드 전환 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex rounded-md border border-gray-200 overflow-hidden">
+          <button
+            onClick={() => handleLookupModeChange("session")}
+            className={`px-4 py-1.5 text-sm font-medium transition-colors ${
+              lookupMode === "session"
+                ? "bg-indigo-600 text-white"
+                : "bg-white text-gray-600 hover:bg-gray-50"
+            }`}
           >
-            <option value="all">전체 세션</option>
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {buildSessionLabel(s.date, s.subject, s.topic)}
-              </option>
-            ))}
-          </select>
-        )}
-        <Input
-          placeholder="질문 또는 이름으로 검색..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
+            세션별 조회
+          </button>
+          <button
+            onClick={() => handleLookupModeChange("detail")}
+            className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200 ${
+              lookupMode === "detail"
+                ? "bg-indigo-600 text-white"
+                : "bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            날짜·교과·주제별 조회
+          </button>
+        </div>
+        <span className="ml-auto text-sm text-gray-500">{filtered.length}개</span>
       </div>
 
-      {selectedSessionId !== "all" && (
+      {/* 세션별 조회 UI */}
+      {lookupMode === "session" && (
+        <div className="flex flex-wrap gap-3 items-center">
+          {sessions.length > 0 && (
+            <select
+              className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={selectedSessionId}
+              onChange={handleSessionChange}
+            >
+              <option value="all">전체 세션</option>
+              {sessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {buildSessionLabel(s.date, s.subject, s.topic)}
+                </option>
+              ))}
+            </select>
+          )}
+          <Input
+            placeholder="질문 또는 이름으로 검색..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
+      )}
+
+      {/* 날짜·교과·주제별 조회 UI */}
+      {lookupMode === "detail" && (
+        <div className={`rounded-lg border p-3 ${(filterDate || filterSubject || filterTopic) ? "border-indigo-200 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-600">날짜</label>
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="h-8 px-2 rounded-md border border-input text-sm bg-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-600">교과</label>
+              <Input
+                placeholder="예: 과학"
+                value={filterSubject}
+                onChange={(e) => setFilterSubject(e.target.value)}
+                className="h-8 text-sm w-32 bg-white"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-gray-600">주제</label>
+              <Input
+                placeholder="예: 광합성"
+                value={filterTopic}
+                onChange={(e) => setFilterTopic(e.target.value)}
+                className="h-8 text-sm w-40 bg-white"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" className="h-8" onClick={handleApplyFilter}>조회</Button>
+              {(filterDate || filterSubject || filterTopic) && (
+                <Button size="sm" variant="outline" className="h-8" onClick={handleClearFilter}>초기화</Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 세션 선택 배너 (세션별 조회 모드에서만) */}
+      {lookupMode === "session" && selectedSessionId !== "all" && (
         <div className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2">
           {buildSessionLabel(
             sessions.find((s) => s.id === selectedSessionId)?.date ?? "",

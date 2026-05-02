@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { buildSessionLabel, buildSessionContextHint, isSessionAvailable } from "@/lib/sessions";
+import { getSessionUser } from "@/lib/auth-helpers";
 
 interface SharedQuestion {
   type: string;
@@ -31,6 +33,7 @@ interface ClassificationResult {
   cognitiveScore: number;
   reasoning: string;
   feedback?: string;
+  improvedExample?: string;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -42,8 +45,12 @@ const TYPE_LABEL: Record<string, string> = {
 export default function AskPage() {
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { data: authSession } = useSession();
+  const user = getSessionUser(authSession);
 
   const [content, setContent] = useState("");
+  const [existingQuestion, setExistingQuestion] = useState<{ id: string; content: string } | null>(null);
+  const [isCheckingExisting, setIsCheckingExisting] = useState(false);
   const [context, setContext] = useState("");
   const [isPublic, setIsPublic] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -84,6 +91,20 @@ export default function AskPage() {
     const id = e.target.value;
     setSelectedSessionId(id);
     setResult(null); // issue #5: 세션 변경 시 분류 결과 초기화
+
+    // 세션 변경 시 기존 질문 확인
+    setExistingQuestion(null);
+    if (id) {
+      setIsCheckingExisting(true);
+      const currentUserId = user.id;
+      fetch(`/api/questions?sessionId=${id}&authorId=${currentUserId}`)
+        .then(r => r.json())
+        .then((qs: Array<{id: string; content: string}>) => {
+          setExistingQuestion(qs.length > 0 ? { id: qs[0].id, content: qs[0].content } : null);
+        })
+        .catch(() => {})
+        .finally(() => setIsCheckingExisting(false));
+    }
 
     if (id && context.trim() === "") {
       const s = sessions.find((s) => s.id === id);
@@ -303,6 +324,15 @@ export default function AskPage() {
               </div>
             )}
 
+          {/* 이미 제출한 질문 배너 */}
+          {existingQuestion && !isCheckingExisting && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              이 세션에 이미 질문을 작성했습니다: <strong>"{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? '...' : ''}"</strong>
+              <br />
+              <span className="text-xs text-amber-600">새 질문을 작성하면 기존 질문과 별도로 저장됩니다.</span>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="content">질문</Label>
             <Textarea
@@ -348,7 +378,10 @@ export default function AskPage() {
                 <div className="text-xl font-bold text-blue-700">
                   {result.closure === "closed" ? "닫힌 질문" : "열린 질문"}
                 </div>
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-blue-600 mt-0.5">
+                  {result.closure === "closed" ? "정해진 답이 있어요" : "다양한 답이 가능해요"}
+                </div>
+                <div className="text-sm text-gray-500 mt-1">
                   신뢰도: {Math.round(result.closureScore * 100)}%
                 </div>
               </div>
@@ -357,7 +390,13 @@ export default function AskPage() {
                 <div className="text-xl font-bold text-purple-700">
                   {getCognitiveLabel(result.cognitive)}
                 </div>
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-purple-600 mt-0.5">
+                  {result.cognitive === "factual" && "사실을 확인하는 질문이에요"}
+                  {result.cognitive === "interpretive" && "추론하고 분석하는 질문이에요"}
+                  {result.cognitive === "evaluative" && "스스로 판단하는 질문이에요"}
+                  {result.cognitive === "applicative" && "배운 것을 연결하는 질문이에요"}
+                </div>
+                <div className="text-sm text-gray-500 mt-1">
                   신뢰도: {Math.round(result.cognitiveScore * 100)}%
                 </div>
               </div>
@@ -374,6 +413,16 @@ export default function AskPage() {
                   더 좋은 질문을 위한 제안
                 </div>
                 <p className="text-amber-700">{result.feedback}</p>
+              </div>
+            )}
+
+            {result.improvedExample && result.improvedExample.trim() && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="text-sm font-medium text-green-800 mb-2">
+                  이렇게 바꿔보면 어떨까요?
+                </div>
+                <p className="text-green-900 font-medium">"{result.improvedExample}"</p>
+                <p className="text-xs text-green-600 mt-1">이 질문을 참고해서 더 깊이 생각할 수 있는 질문을 만들어보세요!</p>
               </div>
             )}
 
