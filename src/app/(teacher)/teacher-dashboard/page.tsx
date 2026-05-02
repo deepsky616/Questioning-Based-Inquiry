@@ -20,14 +20,14 @@ interface TeacherClass {
 interface Stats {
   total: number;
   byClosure: { closed: number; open: number };
-  byCognitive: { factual: number; interpretive: number; evaluative: number };
+  byCognitive: { factual: number; conceptual: number; controversial: number };
   byStudent: Array<{
     studentId: string;
     name: string;
     className?: string;
     total: number;
     distribution: { closed: number; open: number };
-    cognitiveDistribution: { factual: number; interpretive: number; evaluative: number };
+    cognitiveDistribution: { factual: number; conceptual: number; controversial: number };
     trend: number | null;
   }>;
   timeline: Array<{ date: string; count: number }>;
@@ -170,10 +170,10 @@ export default function TeacherDashboard() {
             </CardContent>
           </Card>
 
-          {/* 분류 2 · 사실적 / 해석적 / 평가적 */}
+          {/* 분류 2 · 사실적 / 개념적 / 논쟁적 */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 질문</CardTitle>
+              <CardTitle className="text-base">분류 2 · 사실적 / 개념적 / 논쟁적 질문</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-6">
@@ -191,21 +191,21 @@ export default function TeacherDashboard() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
-                      <span className="text-sm font-medium">해석적 질문</span>
+                      <span className="text-sm font-medium">개념적 질문</span>
                     </div>
-                    <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.interpretive}</span>
+                    <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.conceptual}</span>
                   </div>
-                  <StatBar value={stats.byCognitive.interpretive} total={stats.total} color="bg-purple-500" />
+                  <StatBar value={stats.byCognitive.conceptual} total={stats.total} color="bg-purple-500" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
-                      <span className="text-sm font-medium">평가적 질문</span>
+                      <span className="text-sm font-medium">논쟁적 질문</span>
                     </div>
-                    <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.evaluative}</span>
+                    <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.controversial}</span>
                   </div>
-                  <StatBar value={stats.byCognitive.evaluative} total={stats.total} color="bg-orange-500" />
+                  <StatBar value={stats.byCognitive.controversial} total={stats.total} color="bg-orange-500" />
                 </div>
               </div>
             </CardContent>
@@ -228,8 +228,8 @@ export default function TeacherDashboard() {
                       <TableHead className="text-right text-blue-600">폐쇄형</TableHead>
                       <TableHead className="text-right text-green-600">개방형</TableHead>
                       <TableHead className="text-right text-gray-500">사실적</TableHead>
-                      <TableHead className="text-right text-purple-600">해석적</TableHead>
-                      <TableHead className="text-right text-orange-600">평가적</TableHead>
+                      <TableHead className="text-right text-purple-600">개념적</TableHead>
+                      <TableHead className="text-right text-orange-600">논쟁적</TableHead>
                       <TableHead className="text-right">추세</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -246,8 +246,8 @@ export default function TeacherDashboard() {
                         <TableCell className="text-right text-blue-600">{s.distribution.closed}</TableCell>
                         <TableCell className="text-right text-green-600">{s.distribution.open}</TableCell>
                         <TableCell className="text-right text-gray-500">{s.cognitiveDistribution.factual}</TableCell>
-                        <TableCell className="text-right text-purple-600">{s.cognitiveDistribution.interpretive}</TableCell>
-                        <TableCell className="text-right text-orange-600">{s.cognitiveDistribution.evaluative}</TableCell>
+                        <TableCell className="text-right text-purple-600">{s.cognitiveDistribution.conceptual}</TableCell>
+                        <TableCell className="text-right text-orange-600">{s.cognitiveDistribution.controversial}</TableCell>
                         <TableCell className="text-right">{getTrendLabel(s.trend)}</TableCell>
                       </TableRow>
                     ))}

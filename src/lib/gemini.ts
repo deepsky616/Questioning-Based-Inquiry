@@ -13,14 +13,14 @@ const CLASSIFICATION_PROMPT = `당신은 질문 유형 분류 전문가입니다
 
 2. 인지적 수준:
    - 사실적: 사실/정보 확인, 검색적 질문
-   - 해석적: 내용 파악, 추론, 비교 분석
-   - 평가적: 판단, 의견, 가치 기준 적용
+   - 개념적: 내용 파악, 추론, 비교 분석
+   - 논쟁적: 판단, 의견, 가치 기준 적용
 
 [출력 형식]
 아래 JSON만 출력:
 {
   "closure": "closed" 또는 "open",
-  "cognitive": "factual" 또는 "interpretive" 또는 "evaluative",
+  "cognitive": "factual" 또는 "conceptual" 또는 "controversial",
   "closureScore": 0.0부터 1.0 사이의 숫자,
   "cognitiveScore": 0.0부터 1.0 사이의 숫자,
   "reasoning": "분류 근거 50자 이내"

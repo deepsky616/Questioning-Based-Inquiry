@@ -5,11 +5,30 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  filterAchievementsByUnitCodes,
+  getSelectedAchievementsForAnalysis,
+  pickAchievementExplanations,
+  selectAllAchievementCodes,
+  toggleAchievementCode,
+  type Achievement,
+} from "@/lib/achievement-selection";
+import {
+  selectAllContentItems,
+  splitCoreIdeaLines,
+  toggleContentItem,
+} from "@/lib/content-selection";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 interface CurriculumUnit {
   unitCode: string;
   unitName: string;
+}
+
+interface CurriculumAchievementGroup {
+  name: string;
+  achievements: Achievement[];
 }
 
 interface CurriculumArea {
@@ -24,19 +43,26 @@ interface CurriculumArea {
   middleKnowledgeItems: string[];
   middleProcessItems: string[];
   middleValueItems: string[];
-  achievements: { code: string; content: string }[];
+  achievements: Achievement[];
   units: CurriculumUnit[];
-}
-
-// 성취기준 코드에서 단원번호 추출: [4과01-01] → "01"
-function extractUnitCode(code: string): string {
-  const m = code.match(/\[[^\]]*[가-힣]+(\d+)-/);
-  return m ? m[1] : "";
+  achievementExplanations?: Record<string, string>;
+  achievementConsiderations?: string[];
+  achievementGroups?: CurriculumAchievementGroup[];
 }
 
 interface InquiryQuestion {
   type: "factual" | "conceptual" | "controversial";
   content: string;
+}
+
+interface SavedInquiryDesign {
+  id: string;
+  title: string;
+  subject: string;
+  gradeRange: string;
+  area: string;
+  inquiryQuestions: InquiryQuestion[];
+  createdAt?: string;
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -50,9 +76,9 @@ const STEP_LABELS: Record<Step, string> = {
 };
 
 const TYPE_LABEL: Record<string, string> = {
-  factual: "사실적",
-  conceptual: "개념적",
-  controversial: "논쟁적",
+  factual: "사실적 질문",
+  conceptual: "개념적 질문",
+  controversial: "논쟁적 질문",
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -60,6 +86,10 @@ const TYPE_COLOR: Record<string, string> = {
   conceptual: "bg-purple-50 border-purple-200 text-purple-800",
   controversial: "bg-orange-50 border-orange-200 text-orange-800",
 };
+
+const KNOWLEDGE_ITEM_LIMIT = 12;
+const PROCESS_ITEM_LIMIT = 12;
+const VALUE_ITEM_LIMIT = 8;
 
 // ── 교육과정 상수 ──────────────────────────────────────────────────────
 const GRADE_RANGES = ["1-2", "3-4", "5-6"] as const;
@@ -104,8 +134,15 @@ export default function CurriculumPage() {
   const [step, setStep] = useState<Step>(1);
   const [isSaving, setIsSaving] = useState(false);
   const [saveTitle, setSaveTitle] = useState("");
-  const [savedList, setSavedList] = useState<{ id: string; title: string; subject: string; gradeRange: string; area: string }[]>([]);
+  const [savedList, setSavedList] = useState<SavedInquiryDesign[]>([]);
   const [showSaved, setShowSaved] = useState(false);
+  const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
+  const [sessionDate, setSessionDate] = useState("");
+  const [sessionTopic, setSessionTopic] = useState("");
+  const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(false);
+  const [selectedSavedQuestionKeys, setSelectedSavedQuestionKeys] = useState<Set<string>>(new Set());
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [createdSessionMessage, setCreatedSessionMessage] = useState("");
 
   // Step 1 — 학년군·교과·영역 선택 (학년군 → 교과 → 영역 순)
   const [areas, setAreas] = useState<{ id: string; area: string }[]>([]);
@@ -115,6 +152,7 @@ export default function CurriculumPage() {
   const [curriculumData, setCurriculumData] = useState<CurriculumArea | null>(null);
   const [loadingCurriculum, setLoadingCurriculum] = useState(false);
   const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>([]);
+  const [selectedAchievementCodes, setSelectedAchievementCodes] = useState<string[]>([]);
 
   // 내용요소 선택 (새 기능: 핵심아이디어·지식이해·과정기능·가치태도 체크박스)
   const [selectedCoreIdeaLines, setSelectedCoreIdeaLines] = useState<string[]>([]);
@@ -141,12 +179,6 @@ export default function CurriculumPage() {
   const [inquiryQuestions, setInquiryQuestions] = useState<InquiryQuestion[]>([]);
   const [loadingInquiry, setLoadingInquiry] = useState(false);
 
-  // 저장 후 세션 공유 관련 상태
-  const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
-  const [sharedIndices, setSharedIndices] = useState<Set<number>>(new Set());
-  const [isSharing, setIsSharing] = useState(false);
-  const [shareSuccess, setShareSuccess] = useState(false);
-
   useEffect(() => { fetchSaved(); }, []);
 
   const fetchSaved = () => {
@@ -156,6 +188,10 @@ export default function CurriculumPage() {
       .catch(() => {});
   };
 
+  const getQuestionKey = (question: InquiryQuestion) => `${question.type}|${question.content.trim()}`;
+
+  const selectedSavedDesign = savedList.find((design) => design.id === selectedSavedId) ?? null;
+
   // 학년군 변경 → 교과·영역·커리큘럼 초기화
   useEffect(() => {
     setSelSubject("");
@@ -163,12 +199,23 @@ export default function CurriculumPage() {
     setAreas([]);
     setCurriculumData(null);
     setSelectedUnitCodes([]);
+    setSelectedAchievementCodes([]);
   }, [selGrade]);
 
   // 교과 변경 → 영역 목록 로드 (2022 교육과정 순서로 정렬)
   useEffect(() => {
-    if (!selSubject || !selGrade) { setAreas([]); setSelAreaId(""); setCurriculumData(null); setSelectedUnitCodes([]); return; }
-    setSelAreaId(""); setCurriculumData(null); setSelectedUnitCodes([]);
+    if (!selSubject || !selGrade) {
+      setAreas([]);
+      setSelAreaId("");
+      setCurriculumData(null);
+      setSelectedUnitCodes([]);
+      setSelectedAchievementCodes([]);
+      return;
+    }
+    setSelAreaId("");
+    setCurriculumData(null);
+    setSelectedUnitCodes([]);
+    setSelectedAchievementCodes([]);
     fetch(`/api/curriculum?subject=${encodeURIComponent(selSubject)}&gradeRange=${encodeURIComponent(selGrade)}`)
       .then((r) => r.json())
       .then((d) => setAreas(sortAreasByOrder(d.areas ?? [], selSubject)))
@@ -187,7 +234,23 @@ export default function CurriculumPage() {
     try {
       const r = await fetch(`/api/curriculum?areaId=${selAreaId}`);
       const d: CurriculumArea = await r.json();
-      setCurriculumData(d);
+      const enrichedRes = await fetch(`/api/curriculum/enriched?areaId=${selAreaId}`);
+      const enriched = enrichedRes.ok ? await enrichedRes.json() : {};
+      const merged: CurriculumArea = {
+        ...d,
+        achievements: Array.isArray(enriched.achievements) && enriched.achievements.length > 0
+          ? enriched.achievements
+          : d.achievements,
+        achievementExplanations: enriched.achievementExplanations ?? {},
+        achievementConsiderations: enriched.achievementConsiderations ?? [],
+        achievementGroups: enriched.achievementGroups ?? [],
+      };
+      setCurriculumData(merged);
+      setSelectedAchievementCodes(selectAllAchievementCodes(merged.achievements));
+      setSelectedCoreIdeaLines(splitCoreIdeaLines(d.coreIdea));
+      setSelectedKnowledge(selectAllContentItems(d.knowledgeItems, KNOWLEDGE_ITEM_LIMIT));
+      setSelectedProcess(selectAllContentItems(d.processItems, PROCESS_ITEM_LIMIT));
+      setSelectedValue(selectAllContentItems(d.valueItems, VALUE_ITEM_LIMIT));
       // 단원 데이터가 있으면 전체 선택 초기 상태로 설정
       if (Array.isArray(d.units) && d.units.length > 0) {
         setSelectedUnitCodes(d.units.map((u) => u.unitCode));
@@ -204,11 +267,27 @@ export default function CurriculumPage() {
   // 선택된 단원의 성취기준만 필터링 (단원 데이터 없으면 전체 반환)
   const getFilteredAchievements = () => {
     if (!curriculumData) return [];
-    const units = curriculumData.units ?? [];
-    if (units.length === 0 || selectedUnitCodes.length === 0) return curriculumData.achievements;
-    return curriculumData.achievements.filter((a) =>
-      selectedUnitCodes.includes(extractUnitCode(a.code))
+    return filterAchievementsByUnitCodes(
+      curriculumData.achievements,
+      selectedUnitCodes,
+      curriculumData.units.length > 0
     );
+  };
+
+  const getSelectedAchievements = () => {
+    return getSelectedAchievementsForAnalysis(getFilteredAchievements(), selectedAchievementCodes);
+  };
+
+  const getFilteredAchievementGroups = () => {
+    const groups = curriculumData?.achievementGroups ?? [];
+    if (groups.length === 0) return [];
+    const visibleCodes = new Set(getFilteredAchievements().map((achievement) => achievement.code));
+    return groups
+      .map((group) => ({
+        ...group,
+        achievements: group.achievements.filter((achievement) => visibleCodes.has(achievement.code)),
+      }))
+      .filter((group) => group.achievements.length > 0);
   };
 
   const callGenerate = async (stepName: string, extra: Record<string, unknown> = {}) => {
@@ -221,11 +300,16 @@ export default function CurriculumPage() {
         subject: curriculumData.subject,
         gradeRange: curriculumData.gradeRange,
         area: curriculumData.area,
-        coreIdea: curriculumData.coreIdea,
-        knowledgeItems: curriculumData.knowledgeItems,
-        processItems: curriculumData.processItems,
-        valueItems: curriculumData.valueItems,
-        achievements: getFilteredAchievements(),
+        coreIdea: selectedCoreIdeaLines.join("\n"),
+        knowledgeItems: selectedKnowledge,
+        processItems: selectedProcess,
+        valueItems: selectedValue,
+        achievements: getSelectedAchievements(),
+        achievementExplanations: pickAchievementExplanations(
+          curriculumData.achievementExplanations,
+          getSelectedAchievements().map((achievement) => achievement.code)
+        ),
+        achievementConsiderations: curriculumData.achievementConsiderations ?? [],
         selectedKeywords,
         coreSentences,
         essentialQuestions,
@@ -287,10 +371,6 @@ export default function CurriculumPage() {
       const data = await callGenerate("inquiry");
       if (data?.inquiryQuestions) {
         setInquiryQuestions(data.inquiryQuestions);
-        // issue #7: 새 탐구 질문 생성 시 기존 공유 상태 초기화
-        setSavedSessionId(null);
-        setSharedIndices(new Set());
-        setShareSuccess(false);
         setStep(5);
       }
     } finally {
@@ -315,10 +395,7 @@ export default function CurriculumPage() {
   const handleSave = async () => {
     if (!curriculumData || !saveTitle.trim()) return;
     setIsSaving(true);
-    // issue #7: 저장할 때마다 이전 공유 상태 초기화
-    setSavedSessionId(null);
-    setSharedIndices(new Set());
-    setShareSuccess(false);
+    setCreatedSessionMessage("");
     try {
       const res = await fetch("/api/unit-design", {
         method: "POST",
@@ -337,12 +414,18 @@ export default function CurriculumPage() {
         }),
       });
       if (res.ok) {
-        // issue #6: 응답 JSON에서 sessionId 읽기
         const data = await res.json();
+        const savedDesign: SavedInquiryDesign | null = data.design ?? null;
         setSaveTitle("");
         fetchSaved();
-        if (data.sessionId) {
-          setSavedSessionId(data.sessionId);
+        if (savedDesign?.id) {
+          setSavedList((prev) => [
+            { ...savedDesign, createdAt: new Date().toISOString() },
+            ...prev.filter((design) => design.id !== savedDesign.id),
+          ]);
+          setShowSaved(true);
+          setSelectedSavedId(savedDesign.id);
+          setSelectedSavedQuestionKeys(new Set(savedDesign.inquiryQuestions.map(getQuestionKey)));
         }
       } else {
         alert("저장 실패");
@@ -352,41 +435,65 @@ export default function CurriculumPage() {
     }
   };
 
-  const handleShare = async () => {
-    if (!savedSessionId || isSharing) return;
-    // issue #8: 최신 배열에서 선택된 질문 추출, 빈 content 제외
-    const selectedOnes = inquiryQuestions
-      .filter((q, i) => sharedIndices.has(i) && q.content.trim())
-      .map(({ type, content }) => ({ type, content: content.trim() }));
-
-    setIsSharing(true);
-    setShareSuccess(false);
-    try {
-      const res = await fetch(`/api/sessions/${savedSessionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sharedQuestions: selectedOnes }),
-      });
-      if (res.ok) setShareSuccess(true);
-      else alert("공유 실패. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setIsSharing(false);
-    }
-  };
-
-  const toggleSharedIndex = (i: number) => {
-    setShareSuccess(false); // issue #9: 체크박스 변경 시 성공 상태 초기화
-    setSharedIndices((prev) => {
+  const toggleSavedQuestion = (question: InquiryQuestion) => {
+    setCreatedSessionMessage("");
+    const key = getQuestionKey(question);
+    setSelectedSavedQuestionKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
+  };
+
+  const handleSelectSavedDesign = (design: SavedInquiryDesign) => {
+    setSelectedSavedId((prev) => (prev === design.id ? null : design.id));
+    setCreatedSessionMessage("");
+    setSessionTopic(design.title);
+    setSelectedSavedQuestionKeys(new Set(design.inquiryQuestions.map(getQuestionKey)));
+  };
+
+  const handleCreateSessionFromSaved = async () => {
+    if (!selectedSavedDesign || !sessionDate || !sessionTopic.trim() || isCreatingSession) return;
+    const selectedQuestions = selectedSavedDesign.inquiryQuestions
+      .filter((question) => question.content.trim() && selectedSavedQuestionKeys.has(getQuestionKey(question)))
+      .map((question) => ({ type: question.type, content: question.content.trim() }));
+
+    if (selectedQuestions.length === 0) return;
+
+    setIsCreatingSession(true);
+    setCreatedSessionMessage("");
+    try {
+      const res = await fetch(`/api/unit-design/${selectedSavedDesign.id}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: sessionDate,
+          topic: sessionTopic.trim(),
+          defaultQuestionPublic,
+          sharedQuestions: selectedQuestions,
+        }),
+      });
+      if (res.ok) {
+        setCreatedSessionMessage(`${sessionDate} ${selectedSavedDesign.subject} 수업 세션에 탐구 질문을 제시했습니다.`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "수업 세션 생성 실패");
+      }
+    } finally {
+      setIsCreatingSession(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("삭제하시겠습니까?")) return;
     await fetch(`/api/unit-design/${id}`, { method: "DELETE" });
+    if (selectedSavedId === id) {
+      setSelectedSavedId(null);
+      setSelectedSavedQuestionKeys(new Set());
+      setCreatedSessionMessage("");
+      setSessionTopic("");
+    }
     fetchSaved();
   };
 
@@ -395,30 +502,136 @@ export default function CurriculumPage() {
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">단원 설계 도우미</h2>
-          <p className="text-gray-600">교육과정 분석 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
+          <h2 className="text-2xl font-bold text-gray-900">탐구 질문 도우미</h2>
+          <p className="text-gray-600">교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => setShowSaved(!showSaved)}>
-          저장된 단원 설계 {savedList.length > 0 ? `(${savedList.length})` : ""}
+          저장된 탐구 질문 {savedList.length > 0 ? `(${savedList.length})` : ""}
         </Button>
       </div>
 
       {/* 저장 목록 */}
       {showSaved && (
         <Card>
-          <CardHeader><CardTitle className="text-base">저장된 단원 설계</CardTitle></CardHeader>
-          <CardContent>
+          <CardHeader>
+            <CardTitle className="text-base">저장된 탐구 질문</CardTitle>
+            <CardDescription>저장된 질문을 확인하고 원하는 날짜의 수업 세션에 제시할 질문을 선택하세요</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {savedList.length === 0 ? (
-              <p className="text-gray-400 text-sm">저장된 단원 설계가 없습니다.</p>
+              <p className="text-gray-400 text-sm">저장된 탐구 질문이 없습니다.</p>
             ) : (
-              <ul className="divide-y">
+              <ul className="divide-y rounded-md border">
                 {savedList.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between py-2">
-                    <div>
-                      <span className="font-medium text-sm">{d.title}</span>
-                      <span className="text-xs text-gray-400 ml-2">{d.subject} · {d.gradeRange}학년군 · {d.area}</span>
+                  <li key={d.id} className="p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSavedDesign(d)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <span className="block truncate font-medium text-sm text-gray-900">{d.title}</span>
+                        <span className="text-xs text-gray-400">
+                          {d.subject} · {d.gradeRange}학년군 · {d.area} · 탐구질문 {d.inquiryQuestions.length}개
+                        </span>
+                      </button>
+                      <button onClick={() => handleDelete(d.id)} className="text-xs text-red-400 hover:text-red-600">삭제</button>
                     </div>
-                    <button onClick={() => handleDelete(d.id)} className="text-xs text-red-400 hover:text-red-600">삭제</button>
+
+                    {selectedSavedId === d.id && (
+                      <div className="mt-3 space-y-3 rounded-md bg-gray-50 p-3">
+                        <div className="space-y-2">
+                          {d.inquiryQuestions.length === 0 ? (
+                            <p className="text-sm text-gray-400">저장된 탐구질문이 없습니다.</p>
+                          ) : (
+                            d.inquiryQuestions.map((question, i) => (
+                              <label key={`${question.type}-${i}`} className="flex items-start gap-2">
+                                <input
+                                  type="checkbox"
+                                  className="mt-1 shrink-0 accent-indigo-600"
+                                  checked={selectedSavedQuestionKeys.has(getQuestionKey(question))}
+                                  onChange={() => toggleSavedQuestion(question)}
+                                />
+                                <span className="text-sm text-gray-800">
+                                  <span className="font-medium text-indigo-600 mr-1">
+                                    [{TYPE_LABEL[question.type]}]
+                                  </span>
+                                  {question.content}
+                                </span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+
+                        <div className="grid gap-3 border-t pt-3 sm:grid-cols-3">
+                          <div className="space-y-1">
+                            <Label>수업 날짜</Label>
+                            <Input
+                              type="date"
+                              value={sessionDate}
+                              onChange={(e) => {
+                                setSessionDate(e.target.value);
+                                setCreatedSessionMessage("");
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>교과</Label>
+                            <Input value={d.subject} disabled className="bg-gray-100" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>주제</Label>
+                            <Input
+                              value={sessionTopic}
+                              onChange={(e) => {
+                                setSessionTopic(e.target.value);
+                                setCreatedSessionMessage("");
+                              }}
+                              placeholder="수업 주제"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">이 세션 질문 기본 공개</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                켜면 학생이 이 탐구 질문 수업에서 만든 질문이 저장 즉시 공개됩니다.
+                              </p>
+                            </div>
+                            <Switch
+                              checked={defaultQuestionPublic}
+                              onCheckedChange={(checked) => {
+                                setDefaultQuestionPublic(checked);
+                                setCreatedSessionMessage("");
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <Button
+                            onClick={handleCreateSessionFromSaved}
+                            disabled={
+                              isCreatingSession ||
+                              !sessionDate ||
+                              !sessionTopic.trim() ||
+                              d.inquiryQuestions.length === 0 ||
+                              selectedSavedQuestionKeys.size === 0
+                            }
+                          >
+                            {isCreatingSession ? "세션 생성 중..." : "선택 질문으로 수업 세션 만들기"}
+                          </Button>
+                        </div>
+
+                        {createdSessionMessage && (
+                          <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                            {createdSessionMessage}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -500,20 +713,39 @@ export default function CurriculumPage() {
             <div className="space-y-3 mt-2">
               {/* 핵심아이디어 (선택 가능) */}
               <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-indigo-600">핵심아이디어</p>
-                  <span className="text-xs text-indigo-400">수업에서 중점 다룰 항목을 체크하세요</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div>
+                    <p className="text-xs font-semibold text-indigo-600">핵심아이디어</p>
+                    <span className="text-xs text-indigo-400">수업에서 중점 다룰 항목을 체크하세요</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCoreIdeaLines(splitCoreIdeaLines(curriculumData.coreIdea))}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                    >
+                      전체 선택
+                    </button>
+                    <span className="text-xs text-indigo-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCoreIdeaLines([])}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                    >
+                      전체 해제
+                    </button>
+                  </div>
                 </div>
                 <ul className="space-y-1.5">
-                  {curriculumData.coreIdea.split("\n").filter((l) => l.trim()).map((line, i) => (
+                  {splitCoreIdeaLines(curriculumData.coreIdea).map((line, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <input
                         type="checkbox"
                         id={`core-${i}`}
                         checked={selectedCoreIdeaLines.includes(line)}
-                        onChange={(e) =>
+                        onChange={() =>
                           setSelectedCoreIdeaLines((prev) =>
-                            e.target.checked ? [...prev, line] : prev.filter((l) => l !== line)
+                            toggleContentItem(prev, line)
                           )
                         }
                         className="mt-0.5 h-3.5 w-3.5 rounded border-indigo-300 text-indigo-600 cursor-pointer flex-shrink-0"
@@ -531,24 +763,87 @@ export default function CurriculumPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">지식·이해</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">과정·기능</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3">가치·태도</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span>지식·이해</span>
+                          <span className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedKnowledge(selectAllContentItems(curriculumData.knowledgeItems, KNOWLEDGE_ITEM_LIMIT))}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 선택
+                            </button>
+                            <span className="text-xs text-gray-300 font-normal">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedKnowledge([])}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 해제
+                            </button>
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span>과정·기능</span>
+                          <span className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProcess(selectAllContentItems(curriculumData.processItems, PROCESS_ITEM_LIMIT))}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 선택
+                            </button>
+                            <span className="text-xs text-gray-300 font-normal">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProcess([])}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 해제
+                            </button>
+                          </span>
+                        </div>
+                      </th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span>가치·태도</span>
+                          <span className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedValue(selectAllContentItems(curriculumData.valueItems, VALUE_ITEM_LIMIT))}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 선택
+                            </button>
+                            <span className="text-xs text-gray-300 font-normal">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedValue([])}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
+                            >
+                              전체 해제
+                            </button>
+                          </span>
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="align-top">
                       <td className="px-4 py-3 border-r">
                         <ul className="space-y-1.5">
-                          {curriculumData.knowledgeItems.slice(0, 12).map((item, i) => (
+                          {curriculumData.knowledgeItems.slice(0, KNOWLEDGE_ITEM_LIMIT).map((item, i) => (
                             <li key={i} className="flex items-center gap-1.5">
                               <input
                                 type="checkbox"
                                 id={`k-${i}`}
                                 checked={selectedKnowledge.includes(item)}
-                                onChange={(e) =>
+                                onChange={() =>
                                   setSelectedKnowledge((prev) =>
-                                    e.target.checked ? [...prev, item] : prev.filter((x) => x !== item)
+                                    toggleContentItem(prev, item)
                                   )
                                 }
                                 className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
@@ -560,15 +855,15 @@ export default function CurriculumPage() {
                       </td>
                       <td className="px-4 py-3 border-r">
                         <ul className="space-y-1.5">
-                          {curriculumData.processItems.slice(0, 12).map((item, i) => (
+                          {curriculumData.processItems.slice(0, PROCESS_ITEM_LIMIT).map((item, i) => (
                             <li key={i} className="flex items-center gap-1.5">
                               <input
                                 type="checkbox"
                                 id={`p-${i}`}
                                 checked={selectedProcess.includes(item)}
-                                onChange={(e) =>
+                                onChange={() =>
                                   setSelectedProcess((prev) =>
-                                    e.target.checked ? [...prev, item] : prev.filter((x) => x !== item)
+                                    toggleContentItem(prev, item)
                                   )
                                 }
                                 className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
@@ -580,15 +875,15 @@ export default function CurriculumPage() {
                       </td>
                       <td className="px-4 py-3">
                         <ul className="space-y-1.5">
-                          {curriculumData.valueItems.slice(0, 8).map((item, i) => (
+                          {curriculumData.valueItems.slice(0, VALUE_ITEM_LIMIT).map((item, i) => (
                             <li key={i} className="flex items-center gap-1.5">
                               <input
                                 type="checkbox"
                                 id={`v-${i}`}
                                 checked={selectedValue.includes(item)}
-                                onChange={(e) =>
+                                onChange={() =>
                                   setSelectedValue((prev) =>
-                                    e.target.checked ? [...prev, item] : prev.filter((x) => x !== item)
+                                    toggleContentItem(prev, item)
                                   )
                                 }
                                 className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
@@ -707,56 +1002,88 @@ export default function CurriculumPage() {
 
               {/* 성취기준 */}
               {curriculumData.achievements.length > 0 && (
-                <div className="rounded-lg border p-4 space-y-1">
-                  <p className="text-xs font-semibold text-gray-600 mb-2">
-                    성취기준
-                    {curriculumData.units.length > 0 && selectedUnitCodes.length > 0 && (
-                      <span className="ml-2 text-indigo-500 font-normal">
-                        ({getFilteredAchievements().length}개)
-                      </span>
-                    )}
-                  </p>
-                  {curriculumData.units.length === 0 || selectedUnitCodes.length === 0 ? (
-                    curriculumData.units.length > 0 ? (
-                      <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
-                    ) : (
-                      curriculumData.achievements.map((a, i) => (
-                        <p key={i} className="text-sm text-gray-700">
-                          <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                          {a.content}
-                        </p>
-                      ))
-                    )
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-600">
+                        성취기준 선택
+                        <span className="ml-2 text-indigo-500 font-normal">
+                          {getSelectedAchievements().length} / {getFilteredAchievements().length}개 선택
+                        </span>
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        선택한 성취기준만 핵심어 추천 분석에 반영됩니다
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAchievementCodes(selectAllAchievementCodes(getFilteredAchievements()))}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        전체 선택
+                      </button>
+                      <span className="text-xs text-gray-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAchievementCodes([])}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        전체 해제
+                      </button>
+                    </div>
+                  </div>
+
+                  {getFilteredAchievements().length === 0 ? (
+                    <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
                   ) : (
                     (() => {
-                      const filtered = getFilteredAchievements();
-                      if (filtered.length === 0) {
-                        return <p className="text-sm text-gray-400">선택된 단원의 성취기준이 없습니다</p>;
-                      }
-                      const grouped: Record<string, typeof filtered> = {};
-                      filtered.forEach((a) => {
-                        const code = extractUnitCode(a.code);
-                        if (!grouped[code]) grouped[code] = [];
-                        grouped[code].push(a);
-                      });
-                      return Object.entries(grouped).map(([unitCode, achs]) => {
-                        const unit = curriculumData.units.find((u) => u.unitCode === unitCode);
+                      const groups = getFilteredAchievementGroups();
+                      const renderAchievement = (achievement: Achievement) => {
+                        const selected = selectedAchievementCodes.includes(achievement.code);
                         return (
-                          <div key={unitCode} className="mb-3">
-                            {unit && (
-                              <p className="text-xs font-semibold text-indigo-700 mb-1">
-                                [{unit.unitName}]
-                              </p>
-                            )}
-                            {achs.map((a, i) => (
-                              <p key={i} className="text-sm text-gray-700 ml-2">
-                                <span className="font-mono text-indigo-600 mr-2">{a.code}</span>
-                                {a.content}
-                              </p>
-                            ))}
-                          </div>
+                          <label
+                            key={`${achievement.code}-${achievement.content}`}
+                            className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer transition-colors ${
+                              selected
+                                ? "border-indigo-200 bg-indigo-50"
+                                : "border-gray-200 bg-white hover:border-indigo-200"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600"
+                              checked={selected}
+                              onChange={() =>
+                                setSelectedAchievementCodes((prev) =>
+                                  toggleAchievementCode(prev, achievement.code)
+                                )
+                              }
+                            />
+                            <span className="text-sm text-gray-700 leading-snug">
+                              <span className="font-mono text-indigo-600 mr-2">{achievement.code}</span>
+                              {achievement.content}
+                            </span>
+                          </label>
                         );
-                      });
+                      };
+
+                      if (groups.length === 0) {
+                        return <div className="space-y-2">{getFilteredAchievements().map(renderAchievement)}</div>;
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          {groups.map((group) => (
+                            <div key={group.name} className="space-y-2">
+                              <p className="text-xs font-semibold text-indigo-700">
+                                {group.name}
+                              </p>
+                              {group.achievements.map(renderAchievement)}
+                            </div>
+                          ))}
+                        </div>
+                      );
                     })()
                   )}
                 </div>
@@ -764,7 +1091,7 @@ export default function CurriculumPage() {
 
               <Button
                 onClick={handleGoStep2}
-                disabled={loadingKeywords || (curriculumData.units.length > 0 && selectedUnitCodes.length === 0)}
+                disabled={loadingKeywords || getSelectedAchievements().length === 0}
                 className="w-full"
               >
                 {loadingKeywords ? "AI 핵심어 분석 중..." : "다음 단계: 핵심어 추천받기 →"}
@@ -906,7 +1233,7 @@ export default function CurriculumPage() {
             {(["factual", "conceptual", "controversial"] as const).map((type) => (
               <div key={type}>
                 <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
-                  {TYPE_LABEL[type]} 질문
+                  {TYPE_LABEL[type]}
                 </p>
                 <div className="space-y-2">
                   {inquiryQuestions
@@ -934,15 +1261,9 @@ export default function CurriculumPage() {
             <div className="border-t pt-4 space-y-3">
               <div className="flex gap-2 items-center">
                 <Input
-                  placeholder="단원 설계 이름 입력 (예: 5학년 과학 생명 단원)"
+                  placeholder="탐구 질문 이름 입력 (예: 5학년 과학 생명 탐구)"
                   value={saveTitle}
-                  onChange={(e) => {
-                    setSaveTitle(e.target.value);
-                    // issue #7: 제목 수정 시 이전 세션 상태 초기화
-                    setSavedSessionId(null);
-                    setSharedIndices(new Set());
-                    setShareSuccess(false);
-                  }}
+                  onChange={(e) => setSaveTitle(e.target.value)}
                 />
                 <Button
                   onClick={handleSave}
@@ -952,63 +1273,6 @@ export default function CurriculumPage() {
                   {isSaving ? "저장 중..." : "저장"}
                 </Button>
               </div>
-
-              {/* issue #6: 세션 자동생성 배너 */}
-              {savedSessionId && (
-                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                  저장 완료! 수업 세션이 자동으로 생성되었습니다.
-                </div>
-              )}
-
-              {/* 탐구 질문 공유 패널 — 세션이 생성된 경우에만 표시 */}
-              {savedSessionId && (
-                <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
-                  <div>
-                    <p className="text-sm font-semibold text-indigo-800">학생에게 탐구 질문 공유</p>
-                    <p className="text-xs text-indigo-500 mt-0.5">
-                      학생이 질문할 때 참고할 수 있도록 탐구 질문을 선택해서 공유하세요
-                    </p>
-                  </div>
-                  {/* issue #8: 인덱스 기반 선택, 빈 content 제외 */}
-                  <div className="space-y-2">
-                    {inquiryQuestions.map((q, i) =>
-                      q.content.trim() ? (
-                        <label
-                          key={i}
-                          className="flex items-start gap-2 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 shrink-0 accent-indigo-600"
-                            checked={sharedIndices.has(i)}
-                            onChange={() => toggleSharedIndex(i)}
-                          />
-                          <span className="text-sm text-indigo-900">
-                            <span className="font-medium text-indigo-600 mr-1">
-                              [{q.type === "factual" ? "사실적" : q.type === "conceptual" ? "개념적" : "논쟁적"}]
-                            </span>
-                            {q.content.trim()}
-                          </span>
-                        </label>
-                      ) : null
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      size="sm"
-                      onClick={handleShare}
-                      disabled={isSharing || sharedIndices.size === 0}
-                      className="shrink-0"
-                    >
-                      {isSharing ? "공유 중..." : "학생에게 공유하기"}
-                    </Button>
-                    {/* issue #9: 성공 상태는 체크박스 변경 시 자동 초기화 */}
-                    {shareSuccess && (
-                      <span className="text-sm text-green-700 font-medium">공유 완료!</span>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>

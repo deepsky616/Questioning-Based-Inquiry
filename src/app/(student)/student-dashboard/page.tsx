@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { StatBar } from "@/components/shared/StatBar";
 import { getSessionUser } from "@/lib/auth-helpers";
-import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
+import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
 
 interface Question {
   id: string;
@@ -20,7 +20,7 @@ interface Question {
 interface Stats {
   total: number;
   byClosure: { closed: number; open: number };
-  byCognitive: { factual: number; interpretive: number; evaluative: number; applicative: number };
+  byCognitive: { factual: number; conceptual: number; controversial: number };
 }
 
 export default function StudentDashboard() {
@@ -31,7 +31,7 @@ export default function StudentDashboard() {
   const [stats, setStats] = useState<Stats>({
     total: 0,
     byClosure: { closed: 0, open: 0 },
-    byCognitive: { factual: 0, interpretive: 0, evaluative: 0, applicative: 0 },
+    byCognitive: { factual: 0, conceptual: 0, controversial: 0 },
   });
 
   useEffect(() => {
@@ -48,10 +48,9 @@ export default function StudentDashboard() {
             open: data.filter((q) => q.closure === "open").length,
           },
           byCognitive: {
-            factual: data.filter((q) => q.cognitive === "factual").length,
-            interpretive: data.filter((q) => q.cognitive === "interpretive").length,
-            evaluative: data.filter((q) => q.cognitive === "evaluative").length,
-            applicative: data.filter((q) => q.cognitive === "applicative").length,
+            factual: data.filter((q) => matchesCognitiveCategory(q.cognitive, "factual")).length,
+            conceptual: data.filter((q) => matchesCognitiveCategory(q.cognitive, "conceptual")).length,
+            controversial: data.filter((q) => matchesCognitiveCategory(q.cognitive, "controversial")).length,
           },
         });
       })
@@ -116,13 +115,13 @@ export default function StudentDashboard() {
         </CardContent>
       </Card>
 
-      {/* 분류 2 · 사실적 / 해석적 / 평가적 */}
+      {/* 분류 2 · 사실적 / 개념적 / 논쟁적 */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 / 적용적 질문</CardTitle>
+          <CardTitle className="text-base">분류 2 · 사실적 / 개념적 / 논쟁적 질문</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -137,31 +136,21 @@ export default function StudentDashboard() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
-                  <span className="text-sm font-medium">해석적</span>
+                  <span className="text-sm font-medium">개념적</span>
                 </div>
-                <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.interpretive}</span>
+                <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.conceptual}</span>
               </div>
-              <StatBar value={stats.byCognitive.interpretive} total={stats.total} color="bg-purple-500" />
+              <StatBar value={stats.byCognitive.conceptual} total={stats.total} color="bg-purple-500" />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
-                  <span className="text-sm font-medium">평가적</span>
+                  <span className="text-sm font-medium">논쟁적</span>
                 </div>
-                <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.evaluative}</span>
+                <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.controversial}</span>
               </div>
-              <StatBar value={stats.byCognitive.evaluative} total={stats.total} color="bg-orange-500" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-teal-500 inline-block" />
-                  <span className="text-sm font-medium">적용적</span>
-                </div>
-                <span className="text-2xl font-bold text-teal-600">{stats.byCognitive.applicative}</span>
-              </div>
-              <StatBar value={stats.byCognitive.applicative} total={stats.total} color="bg-teal-500" />
+              <StatBar value={stats.byCognitive.controversial} total={stats.total} color="bg-orange-500" />
             </div>
           </div>
         </CardContent>

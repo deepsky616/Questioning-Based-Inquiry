@@ -72,6 +72,7 @@ model QuestionSession {
   questions       Question[] @relation("SessionQuestions")
   unitDesignId    String?    @map("unit_design_id")
   sharedQuestions Json       @default("[]") @map("shared_questions")
+  defaultQuestionPublic Boolean @default(false) @map("default_question_public")
   createdAt       DateTime   @default(now()) @map("created_at")
 
   @@map("question_sessions")

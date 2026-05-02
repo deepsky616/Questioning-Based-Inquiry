@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, canPatchQuestion, canCreateComment, validateBulkFeedback, validateBulkAiRequest, formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers, buildSessionWhereFilter } from "@/lib/questions";
+import { COGNITIVE_LABEL, matchesCognitiveCategory, normalizeCognitiveType } from "@/lib/question-labels";
 
 describe("buildQuestionCreateData", () => {
   const baseData = {
@@ -38,9 +39,36 @@ describe("buildQuestionCreateData", () => {
     expect(result.isPublic).toBe(false);
   });
 
+  it("학생 요청의 isPublic 값은 무시하고 세션 기본 공개 설정을 따른다", () => {
+    const result = buildQuestionCreateData({ content: baseData.content, isPublic: true }, "user1");
+    expect(result.isPublic).toBe(false);
+    const publicResult = buildQuestionCreateData(
+      { content: baseData.content, isPublic: false },
+      "user1",
+      { defaultIsPublic: true },
+    );
+    expect(publicResult.isPublic).toBe(true);
+  });
+
   it("authorId를 올바르게 설정한다", () => {
     const result = buildQuestionCreateData(baseData, "user-abc");
     expect(result.authorId).toBe("user-abc");
+  });
+});
+
+describe("question cognitive labels", () => {
+  it("질문 유형 라벨을 사실적/개념적/논쟁적으로 통일한다", () => {
+    expect(COGNITIVE_LABEL.factual).toBe("사실적 질문");
+    expect(COGNITIVE_LABEL.conceptual).toBe("개념적 질문");
+    expect(COGNITIVE_LABEL.controversial).toBe("논쟁적 질문");
+  });
+
+  it("기존 해석적/평가적/적용적 값은 새 분류로 호환한다", () => {
+    expect(normalizeCognitiveType("interpretive")).toBe("conceptual");
+    expect(normalizeCognitiveType("evaluative")).toBe("controversial");
+    expect(normalizeCognitiveType("applicative")).toBe("controversial");
+    expect(matchesCognitiveCategory("interpretive", "conceptual")).toBe(true);
+    expect(matchesCognitiveCategory("evaluative", "controversial")).toBe(true);
   });
 });
 
@@ -118,8 +146,8 @@ describe("canPatchQuestion", () => {
     expect(canPatchQuestion("TEACHER", "t1", "s1", ["isPublic", "closure", "cognitive"])).toBe(true);
   });
 
-  it("학생은 본인 질문의 isPublic만 수정할 수 있다", () => {
-    expect(canPatchQuestion("STUDENT", "s1", "s1", ["isPublic"])).toBe(true);
+  it("학생은 본인 질문의 isPublic도 수정할 수 없다", () => {
+    expect(canPatchQuestion("STUDENT", "s1", "s1", ["isPublic"])).toBe(false);
   });
 
   it("학생은 본인 질문이라도 closure는 수정할 수 없다", () => {

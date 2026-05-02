@@ -5,10 +5,16 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getSessionUser } from "@/lib/auth-helpers";
-import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
+import {
+  CLOSURE_LABEL,
+  CLOSURE_STYLE,
+  COGNITIVE_CATEGORIES,
+  COGNITIVE_LABEL,
+  COGNITIVE_STYLE,
+  matchesCognitiveCategory,
+} from "@/lib/question-labels";
 import {
   Table,
   TableBody,
@@ -54,33 +60,14 @@ export default function HistoryPage() {
       .catch(() => {});
   }, [user.id]);
 
-  const togglePublic = async (id: string, currentPublic: boolean) => {
-    // 클릭 즉시 반영 (낙관적 업데이트)
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === id ? { ...q, isPublic: !currentPublic } : q))
-    );
-
-    try {
-      const res = await fetch(`/api/questions/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPublic: !currentPublic }),
-      });
-      if (!res.ok) throw new Error("업데이트 실패");
-    } catch {
-      // 실패 시 원래 상태로 복원
-      setQuestions((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, isPublic: currentPublic } : q))
-      );
-    }
-  };
-
   const filtered = questions.filter((q) =>
     q.content.toLowerCase().includes(search.toLowerCase())
   );
 
   const byType = (key: "closure" | "cognitive", value: string) =>
-    filtered.filter((q) => q[key] === value);
+    filtered.filter((q) =>
+      key === "cognitive" ? matchesCognitiveCategory(q.cognitive, value) : q[key] === value
+    );
 
   const toggleComments = async (questionId: string) => {
     if (expandedQuestionId === questionId) {
@@ -145,7 +132,9 @@ export default function HistoryPage() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <Switch checked={q.isPublic} onCheckedChange={() => togglePublic(q.id, q.isPublic)} />
+                    <span className={`text-xs px-2 py-1 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      {q.isPublic ? "공개" : "비공개"}
+                    </span>
                   </TableCell>
                   <TableCell className="text-sm text-gray-400">
                     {new Date(q.createdAt).toLocaleDateString("ko-KR")}
@@ -241,33 +230,28 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
 
-      {/* 분류 2: 사실적 / 해석적 / 평가적 */}
+      {/* 분류 2: 사실적 / 개념적 / 논쟁적 */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 질문</CardTitle>
+          <CardTitle className="text-base">분류 2 · 사실적 / 개념적 / 논쟁적 질문</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="factual">
             <TabsList>
-              <TabsTrigger value="factual">
-                사실적 질문 <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">{byType("cognitive", "factual").length}</span>
-              </TabsTrigger>
-              <TabsTrigger value="interpretive">
-                해석적 질문 <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{byType("cognitive", "interpretive").length}</span>
-              </TabsTrigger>
-              <TabsTrigger value="evaluative">
-                평가적 질문 <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{byType("cognitive", "evaluative").length}</span>
-              </TabsTrigger>
+              {COGNITIVE_CATEGORIES.map((category) => (
+                <TabsTrigger key={category.value} value={category.value}>
+                  {category.label}
+                  <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">
+                    {byType("cognitive", category.value).length}
+                  </span>
+                </TabsTrigger>
+              ))}
             </TabsList>
-            <TabsContent value="factual">
-              <QuestionRows list={byType("cognitive", "factual")} />
-            </TabsContent>
-            <TabsContent value="interpretive">
-              <QuestionRows list={byType("cognitive", "interpretive")} />
-            </TabsContent>
-            <TabsContent value="evaluative">
-              <QuestionRows list={byType("cognitive", "evaluative")} />
-            </TabsContent>
+            {COGNITIVE_CATEGORIES.map((category) => (
+              <TabsContent key={category.value} value={category.value}>
+                <QuestionRows list={byType("cognitive", category.value)} />
+              </TabsContent>
+            ))}
           </Tabs>
         </CardContent>
       </Card>

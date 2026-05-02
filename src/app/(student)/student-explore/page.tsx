@@ -6,7 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
+import {
+  CLOSURE_LABEL,
+  CLOSURE_STYLE,
+  COGNITIVE_CATEGORIES,
+  COGNITIVE_LABEL,
+  COGNITIVE_STYLE,
+  matchesCognitiveCategory,
+} from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsDesc } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
 
@@ -212,7 +219,9 @@ export default function ExplorePage() {
   );
 
   const byType = (key: "closure" | "cognitive", value: string) =>
-    filtered.filter((q) => q[key] === value);
+    filtered.filter((q) =>
+      key === "cognitive" ? matchesCognitiveCategory(q.cognitive, value) : q[key] === value
+    );
 
   const Empty = () => (
     <div className="text-center py-8 text-gray-400 text-sm">
@@ -364,27 +373,28 @@ export default function ExplorePage() {
         </CardContent>
       </Card>
 
-      {/* 분류 2: 사실적 / 해석적 / 평가적 */}
+      {/* 분류 2: 사실적 / 개념적 / 논쟁적 */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 질문</CardTitle>
+          <CardTitle className="text-base">분류 2 · 사실적 / 개념적 / 논쟁적 질문</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="factual">
             <TabsList>
-              <TabsTrigger value="factual">
-                사실적 질문 <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">{byType("cognitive", "factual").length}</span>
-              </TabsTrigger>
-              <TabsTrigger value="interpretive">
-                해석적 질문 <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{byType("cognitive", "interpretive").length}</span>
-              </TabsTrigger>
-              <TabsTrigger value="evaluative">
-                평가적 질문 <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{byType("cognitive", "evaluative").length}</span>
-              </TabsTrigger>
+              {COGNITIVE_CATEGORIES.map((category) => (
+                <TabsTrigger key={category.value} value={category.value}>
+                  {category.label}
+                  <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">
+                    {byType("cognitive", category.value).length}
+                  </span>
+                </TabsTrigger>
+              ))}
             </TabsList>
-            <TabsContent value="factual"><QuestionList list={byType("cognitive", "factual")} /></TabsContent>
-            <TabsContent value="interpretive"><QuestionList list={byType("cognitive", "interpretive")} /></TabsContent>
-            <TabsContent value="evaluative"><QuestionList list={byType("cognitive", "evaluative")} /></TabsContent>
+            {COGNITIVE_CATEGORIES.map((category) => (
+              <TabsContent key={category.value} value={category.value}>
+                <QuestionList list={byType("cognitive", category.value)} />
+              </TabsContent>
+            ))}
           </Tabs>
         </CardContent>
       </Card>

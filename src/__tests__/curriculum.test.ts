@@ -6,11 +6,28 @@ vi.mock("@/lib/db", () => ({ prisma: { $queryRaw: vi.fn() } }));
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { GET } from "@/app/api/curriculum/route";
+import { GET as GET_ENRICHED } from "@/app/api/curriculum/enriched/route";
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
 
 const TEACHER_SESSION = { user: { id: "teacher-1", role: "TEACHER" } };
+
+const AREA_ROW = {
+  id: "area-1",
+  subject: "과학",
+  grade_range: "3-4",
+  area: "생명과학",
+  core_idea: "핵심아이디어 예시",
+  knowledge_items: ["지식1"],
+  process_items: ["과정1"],
+  value_items: ["가치1"],
+  middle_knowledge_items: [],
+  middle_process_items: [],
+  middle_value_items: [],
+  achievements: [{ code: "4과03-01", content: "성취기준 예시" }],
+  units: [],
+};
 
 function makeRequest(params: Record<string, string> = {}): Request {
   const url = new URL("http://localhost/api/curriculum");
@@ -57,18 +74,6 @@ describe("GET /api/curriculum — 학년군 목록", () => {
 describe("GET /api/curriculum — 영역 단건 조회", () => {
   // 라우팅 순서: !subject → subject&&!gradeRange → areaId → subject+gradeRange
   // areaId 분기에 도달하려면 subject와 gradeRange도 함께 전달해야 한다
-  const AREA_ROW = {
-    id: "area-1",
-    subject: "과학",
-    grade_range: "3-4",
-    area: "생명과학",
-    core_idea: "핵심아이디어 예시",
-    knowledge_items: ["지식1"],
-    process_items: ["과정1"],
-    value_items: ["가치1"],
-    achievements: [{ code: "4과03-01", content: "성취기준 예시" }],
-  };
-
   it("areaId가 있으면 영역 단건을 반환한다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockQueryRaw.mockResolvedValue([AREA_ROW]);
@@ -114,5 +119,29 @@ describe("GET /api/curriculum — 영역 목록", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.areas).toEqual([]);
+  });
+});
+
+describe("GET /api/curriculum/enriched — MD 기반 보강 데이터", () => {
+  it("areaId의 교과·학년군·영역에 맞는 성취기준 해설과 세부 그룹을 반환한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockQueryRaw.mockResolvedValue([
+      {
+        ...AREA_ROW,
+        subject: "수학",
+        grade_range: "3-4",
+        area: "도형과 측정",
+        units: [],
+      },
+    ]);
+
+    const res = await GET_ENRICHED(makeRequest({ areaId: "math-geometry" }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+
+    expect(body.achievements).toHaveLength(25);
+    expect(body.achievementGroups.map((group: { name: string }) => group.name)).toContain("도형의 기초");
+    expect(body.achievementExplanations["[4수03-04]"]).toContain("평면도형의 이동");
+    expect(body.achievementConsiderations.length).toBeGreaterThan(0);
   });
 });

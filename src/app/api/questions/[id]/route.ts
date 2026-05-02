@@ -3,6 +3,41 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canPatchQuestion } from "@/lib/questions";
 
+async function canTeacherManageQuestion(teacherId: string, questionId: string) {
+  const teacher = await prisma.user.findUnique({
+    where: { id: teacherId },
+    select: {
+      school: true,
+      teacherClasses: { select: { grade: true, className: true } },
+    },
+  });
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+    select: {
+      author: {
+        select: {
+          role: true,
+          school: true,
+          grade: true,
+          className: true,
+        },
+      },
+    },
+  });
+
+  if (!teacher || !question || question.author.role !== "STUDENT") return false;
+
+  if (teacher.teacherClasses.length > 0) {
+    return Boolean(teacher.school && teacher.school === question.author.school) && teacher.teacherClasses.some(
+      (teacherClass) =>
+        teacherClass.grade === question.author.grade &&
+        teacherClass.className === question.author.className,
+    );
+  }
+
+  return Boolean(teacher.school && teacher.school === question.author.school);
+}
+
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
   if (!session?.user) {
@@ -70,6 +105,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     if (!canPatchQuestion(userRole, userId, existing.authorId, patchedFields)) {
+      return NextResponse.json({ error: "수정 권한이 없습니다" }, { status: 403 });
+    }
+
+    if (userRole === "TEACHER" && !(await canTeacherManageQuestion(userId, params.id))) {
       return NextResponse.json({ error: "수정 권한이 없습니다" }, { status: 403 });
     }
 

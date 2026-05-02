@@ -8,9 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { buildSessionLabel, buildSessionContextHint, isSessionAvailable } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
+import { COGNITIVE_LABEL } from "@/lib/question-labels";
 
 interface SharedQuestion {
   type: string;
@@ -24,6 +24,8 @@ interface QuestionSession {
   topic: string;
   teacher: { name: string };
   sharedQuestions: SharedQuestion[];
+  unitDesignId?: string | null;
+  defaultQuestionPublic?: boolean;
 }
 
 interface ClassificationResult {
@@ -36,11 +38,7 @@ interface ClassificationResult {
   improvedExample?: string;
 }
 
-const TYPE_LABEL: Record<string, string> = {
-  factual: "사실적",
-  conceptual: "개념적",
-  controversial: "논쟁적",
-};
+const TYPE_LABEL = COGNITIVE_LABEL;
 
 export default function AskPage() {
   const router = useRouter();
@@ -52,7 +50,6 @@ export default function AskPage() {
   const [existingQuestion, setExistingQuestion] = useState<{ id: string; content: string } | null>(null);
   const [isCheckingExisting, setIsCheckingExisting] = useState(false);
   const [context, setContext] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ClassificationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -158,7 +155,6 @@ export default function AskPage() {
         body: JSON.stringify({
           content,
           context,
-          isPublic,
           closure: result.closure,
           cognitive: result.cognitive,
           closureScore: result.closureScore,
@@ -174,16 +170,6 @@ export default function AskPage() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const getCognitiveLabel = (c: string) => {
-    const map: Record<string, string> = {
-      factual: "사실적 질문",
-      interpretive: "해석적 질문",
-      evaluative: "평가적 질문",
-      applicative: "적용적 질문",
-    };
-    return map[c] || c;
   };
 
   // issue #1: 로딩 중에는 아무것도 표시하지 않음
@@ -294,6 +280,14 @@ export default function AskPage() {
                 <p className="text-xs text-blue-600">
                   {selectedSession.teacher.name} 선생님 &nbsp;·&nbsp; {selectedSession.date}
                 </p>
+                {selectedSession.unitDesignId && (
+                  <div className="mt-2 rounded-md border border-indigo-200 bg-white px-3 py-2 text-xs text-indigo-700">
+                    선생님이 만든 탐구 질문 수업입니다. 아래 탐구 질문을 참고해 나만의 질문을 만들어 보세요.
+                  </div>
+                )}
+                <p className="text-xs text-blue-500">
+                  이 세션의 질문은 선생님 설정에 따라 {selectedSession.defaultQuestionPublic ? "공개" : "비공개"}로 저장됩니다.
+                </p>
               </div>
             )}
           </div>
@@ -388,7 +382,7 @@ export default function AskPage() {
               <div className="p-4 bg-purple-50 rounded-lg">
                 <div className="text-sm text-gray-600">인지적 수준</div>
                 <div className="text-xl font-bold text-purple-700">
-                  {getCognitiveLabel(result.cognitive)}
+                  {COGNITIVE_LABEL[result.cognitive] ?? result.cognitive}
                 </div>
                 <div className="text-sm text-purple-600 mt-0.5">
                   {result.cognitive === "factual" && "사실을 확인하는 질문이에요"}
@@ -421,16 +415,13 @@ export default function AskPage() {
                 <div className="text-sm font-medium text-green-800 mb-2">
                   이렇게 바꿔보면 어떨까요?
                 </div>
-                <p className="text-green-900 font-medium">"{result.improvedExample}"</p>
+                <p className="text-green-900 font-medium">&ldquo;{result.improvedExample}&rdquo;</p>
                 <p className="text-xs text-green-600 mt-1">이 질문을 참고해서 더 깊이 생각할 수 있는 질문을 만들어보세요!</p>
               </div>
             )}
 
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="flex items-center space-x-2">
-                <Switch checked={isPublic} onCheckedChange={setIsPublic} />
-                <span className="text-sm">다른 학생에게 질문 공개</span>
-              </div>
+            <div className="p-4 border rounded-lg bg-gray-50 text-sm text-gray-600">
+              질문 공개 여부는 선생님이 수업 세션에서 설정합니다.
             </div>
 
             <Button onClick={handleSave} disabled={isSaving} className="w-full">

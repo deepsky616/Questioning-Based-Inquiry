@@ -6,9 +6,8 @@ export interface ClassStats {
   };
   byCognitive: {
     factual: number;
-    interpretive: number;
-    evaluative: number;
-    applicative: number;
+    conceptual: number;
+    controversial: number;
   };
   byStudent: StudentStat[];
   timeline: TimelineEntry[];
@@ -25,9 +24,8 @@ export interface StudentStat {
   };
   cognitiveDistribution: {
     factual: number;
-    interpretive: number;
-    evaluative: number;
-    applicative: number;
+    conceptual: number;
+    controversial: number;
   };
   trend: number;
 }

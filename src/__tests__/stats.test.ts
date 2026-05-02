@@ -65,7 +65,7 @@ describe("aggregateByStudent", () => {
     name: string,
     className: string,
     closure: "closed" | "open",
-    cognitive: "factual" | "interpretive" | "evaluative",
+    cognitive: string,
     createdAt: Date
   ) => ({ author: { id: authorId, name, className }, closure, cognitive, createdAt });
 
@@ -82,7 +82,7 @@ describe("aggregateByStudent", () => {
     expect(s1!.distribution.closed).toBe(1);
     expect(s1!.distribution.open).toBe(1);
     expect(s1!.cognitiveDistribution.factual).toBe(1);
-    expect(s1!.cognitiveDistribution.interpretive).toBe(1);
+    expect(s1!.cognitiveDistribution.conceptual).toBe(1);
   });
 
   it("빈 질문 배열이면 빈 배열을 반환한다", () => {

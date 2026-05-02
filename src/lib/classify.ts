@@ -1,7 +1,7 @@
 import type { ClassificationResult } from "@/types/question";
 
 export type ClosureType = "closed" | "open";
-export type CognitiveType = "factual" | "interpretive" | "evaluative" | "applicative";
+export type CognitiveType = "factual" | "conceptual" | "controversial";
 
 export function isValidClosureType(value: unknown): value is ClosureType {
   return value === "closed" || value === "open";
@@ -10,9 +10,8 @@ export function isValidClosureType(value: unknown): value is ClosureType {
 export function isValidCognitiveType(value: unknown): value is CognitiveType {
   return (
     value === "factual" ||
-    value === "interpretive" ||
-    value === "evaluative" ||
-    value === "applicative"
+    value === "conceptual" ||
+    value === "controversial"
   );
 }
 
@@ -51,10 +50,23 @@ export function fallbackClassification(content: string): ClassificationResult {
   const openKeywords = ["왜", "어떻게"];
 
   const factualKeywords = ["정의", "설명해", "알려줘", "뭐야", "무엇인가"];
-  const interpretiveKeywords = ["비교해", "분석해", "추론해", "차이", "왜냐면"];
-  const evaluativeKeywords = ["어떻게 생각해", "판단해", "평가해", "의견", "가장 좋은", "더 나은"];
-  // 적용적 키워드: "만약", "~라면" 조합이 핵심 지표
-  const applicativeKeywords = ["만약", "라면", "내가", "나라면", "적용", "내 삶", "실제로", "활용"];
+  const conceptualKeywords = ["비교해", "분석해", "추론해", "차이", "왜냐면"];
+  const controversialKeywords = [
+    "어떻게 생각해",
+    "판단해",
+    "평가해",
+    "의견",
+    "가장 좋은",
+    "더 나은",
+    "만약",
+    "라면",
+    "내가",
+    "나라면",
+    "적용",
+    "내 삶",
+    "실제로",
+    "활용",
+  ];
 
   let closedCount = 0;
   let openCount = 0;
@@ -69,39 +81,29 @@ export function fallbackClassification(content: string): ClassificationResult {
   const closureScore = Math.max(0, Math.min(1, 0.5 + (closedCount - openCount) * 0.15));
   const closure: ClosureType = closureScore > 0.5 ? "closed" : "open";
 
-  // 적용적 여부를 먼저 확인 (가장 명확한 지표인 "만약~라면" 조합 우선)
-  const isApplicative = applicativeKeywords.some((kw) => content.includes(kw));
-
   let cognitive: CognitiveType = "factual";
   let cognitiveScore = 0.5;
 
-  if (isApplicative) {
-    cognitive = "applicative";
-    cognitiveScore = Math.min(1, cognitiveScore + 0.25);
-  } else {
-    for (const kw of factualKeywords) {
-      if (content.includes(kw)) cognitiveScore = Math.min(1, cognitiveScore + 0.1);
-    }
-    for (const kw of interpretiveKeywords) {
-      if (content.includes(kw)) { cognitive = "interpretive"; cognitiveScore = Math.min(1, cognitiveScore + 0.1); }
-    }
-    for (const kw of evaluativeKeywords) {
-      if (content.includes(kw)) { cognitive = "evaluative"; cognitiveScore = Math.min(1, cognitiveScore + 0.2); }
-    }
+  for (const kw of factualKeywords) {
+    if (content.includes(kw)) cognitiveScore = Math.min(1, cognitiveScore + 0.1);
+  }
+  for (const kw of conceptualKeywords) {
+    if (content.includes(kw)) { cognitive = "conceptual"; cognitiveScore = Math.min(1, cognitiveScore + 0.1); }
+  }
+  for (const kw of controversialKeywords) {
+    if (content.includes(kw)) { cognitive = "controversial"; cognitiveScore = Math.min(1, cognitiveScore + 0.2); }
   }
 
   const feedbackMap: Record<string, Record<string, string>> = {
     closed: {
       factual: "정답이 하나인 닫힌 질문입니다. '왜' 또는 '어떻게'로 바꾸면 다양한 생각을 이끌어내는 열린 질문이 됩니다.",
-      interpretive: "'왜 그럴까요?'처럼 이유와 과정을 탐색하는 형태로 바꾸면 더 깊은 이해를 이끌어낼 수 있습니다.",
-      evaluative: "판단을 묻는 질문입니다. 열린 형태로 바꾸면 더 다양한 관점의 의견을 이끌어낼 수 있습니다.",
-      applicative: "배운 내용을 적용해보려는 좋은 시도입니다. '만약 내가 ~라면?' 형태로 더 열어보세요.",
+      conceptual: "'왜 그럴까요?'처럼 이유와 과정을 탐색하는 형태로 바꾸면 더 깊은 이해를 이끌어낼 수 있습니다.",
+      controversial: "판단과 적용을 묻는 질문입니다. 열린 형태로 바꾸면 더 다양한 관점의 의견을 이끌어낼 수 있습니다.",
     },
     open: {
       factual: "열린 질문입니다. '왜' 또는 '어떻게'를 추가해 이유와 과정까지 탐구해보세요.",
-      interpretive: "훌륭한 해석적 질문입니다! 구체적인 비교 대상이나 관점을 추가하면 더욱 풍부해집니다.",
-      evaluative: "훌륭한 평가적 질문입니다! 판단의 기준을 함께 제시하면 더 깊은 논의가 가능해집니다.",
-      applicative: "훌륭한 적용적 질문입니다! 배운 내용을 자신의 경험에 연결하는 뛰어난 질문입니다.",
+      conceptual: "훌륭한 개념적 질문입니다! 구체적인 비교 대상이나 관점을 추가하면 더욱 풍부해집니다.",
+      controversial: "훌륭한 논쟁적 질문입니다! 판단의 기준을 함께 제시하면 더 깊은 논의가 가능해집니다.",
     },
   };
 
