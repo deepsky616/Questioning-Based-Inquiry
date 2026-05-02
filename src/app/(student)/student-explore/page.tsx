@@ -325,10 +325,10 @@ export default function ExplorePage() {
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-600">주제</label>
               <Input
-                placeholder="예: 광합성"
+                placeholder="예: 광합성과 에너지, 지구의 역사"
                 value={filterTopic}
                 onChange={(e) => setFilterTopic(e.target.value)}
-                className="h-8 text-sm w-40 bg-white"
+                className="h-8 text-sm w-64 bg-white"
               />
             </div>
             <div className="flex gap-2">

@@ -734,7 +734,7 @@ export default function QuestionsPage() {
             <CardDescription>날짜·교과·주제를 설정하면 학생 질문하기 화면에서 선택할 수 있습니다</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-[1fr_1fr_2fr] gap-3">
               <div className="space-y-1">
                 <Label>날짜</Label>
                 <DatePicker
@@ -937,10 +937,10 @@ export default function QuestionsPage() {
             <div className="flex flex-col gap-1 min-w-0">
               <label className="text-xs font-medium text-gray-600">주제</label>
               <Input
-                placeholder="예: 광합성"
+                placeholder="예: 광합성과 에너지, 지구의 역사"
                 value={filterTopic}
                 onChange={(e) => setFilterTopic(e.target.value)}
-                className="h-8 text-sm w-40 bg-white"
+                className="h-8 text-sm w-64 bg-white"
               />
             </div>
             <div className="flex gap-2">

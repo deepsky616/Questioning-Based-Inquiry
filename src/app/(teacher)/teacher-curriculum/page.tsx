@@ -564,7 +564,7 @@ export default function CurriculumPage() {
                           )}
                         </div>
 
-                        <div className="grid gap-3 border-t pt-3 sm:grid-cols-3">
+                        <div className="grid gap-3 border-t pt-3 sm:grid-cols-[1fr_1fr_2fr]">
                           <div className="space-y-1">
                             <Label>수업 날짜</Label>
                             <DatePicker
@@ -588,7 +588,7 @@ export default function CurriculumPage() {
                                 setSessionTopic(e.target.value);
                                 setCreatedSessionMessage("");
                               }}
-                              placeholder="수업 주제"
+                              placeholder="수업 주제 (예: 광합성과 에너지)"
                             />
                           </div>
                         </div>
