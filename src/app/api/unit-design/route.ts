@@ -22,9 +22,17 @@ export async function GET(req: Request) {
 
   const teacherId = (session.user as { id: string }).id;
   const designs = await prisma.$queryRaw<
-    { id: string; title: string; subject: string; grade_range: string; area: string; created_at: Date }[]
+    {
+      id: string;
+      title: string;
+      subject: string;
+      grade_range: string;
+      area: string;
+      inquiry_questions: unknown;
+      created_at: Date;
+    }[]
   >`
-    SELECT id, title, subject, grade_range, area, created_at
+    SELECT id, title, subject, grade_range, area, inquiry_questions, created_at
     FROM unit_designs
     WHERE teacher_id = ${teacherId}
     ORDER BY created_at DESC
@@ -33,7 +41,9 @@ export async function GET(req: Request) {
   return NextResponse.json(
     designs.map((d) => ({
       id: d.id, title: d.title, subject: d.subject,
-      gradeRange: d.grade_range, area: d.area, createdAt: d.created_at,
+      gradeRange: d.grade_range, area: d.area,
+      inquiryQuestions: Array.isArray(d.inquiry_questions) ? d.inquiry_questions : [],
+      createdAt: d.created_at,
     }))
   );
 }
@@ -75,24 +85,20 @@ export async function POST(req: Request) {
 
     const designId = inserted[0]?.id ?? null;
 
-    // 탐구 질문이 있으면 수업 세션 자동 생성
-    let sessionId: string | null = null;
-    if (designId && data.inquiryQuestions.length > 0) {
-      // UTC 기준이 아닌 KST(+9h) 기준 오늘 날짜 사용
-      const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-      const qs = await prisma.questionSession.create({
-        data: {
-          date: today,
-          subject: data.subject,
-          topic: data.title,
-          teacherId,
-          unitDesignId: designId,
-        },
-      });
-      sessionId = qs.id;
-    }
-
-    return NextResponse.json({ ok: true, sessionId });
+    return NextResponse.json({
+      ok: true,
+      designId,
+      design: designId
+        ? {
+            id: designId,
+            title: data.title,
+            subject: data.subject,
+            gradeRange: data.gradeRange,
+            area: data.area,
+            inquiryQuestions: data.inquiryQuestions,
+          }
+        : null,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });

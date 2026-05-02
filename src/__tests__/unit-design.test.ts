@@ -27,6 +27,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { GET, POST } from "@/app/api/unit-design/route";
 import { DELETE } from "@/app/api/unit-design/[id]/route";
+import { POST as createSessionFromDesign } from "@/app/api/unit-design/[id]/session/route";
 import { POST as generatePOST } from "@/app/api/unit-design/generate/route";
 import { buildPrompt } from "@/lib/unit-design-prompt";
 
@@ -55,6 +56,20 @@ function makeDeleteRequest(id: string): [Request, { params: { id: string } }] {
   ];
 }
 
+function makeDesignSessionRequest(
+  id: string,
+  body: unknown,
+): [Request, { params: Promise<{ id: string }> }] {
+  return [
+    new Request(`http://localhost/api/unit-design/${id}/session`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+    { params: Promise.resolve({ id }) },
+  ];
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -77,6 +92,7 @@ describe("GET /api/unit-design — 단원 설계 목록", () => {
         subject: "과학",
         grade_range: "3-4",
         area: "생명과학",
+        inquiry_questions: [{ type: "factual", content: "광합성이 일어나는 장소는 어디인가?" }],
         created_at: new Date("2026-04-01"),
       },
     ]);
@@ -87,6 +103,9 @@ describe("GET /api/unit-design — 단원 설계 목록", () => {
     expect(body).toHaveLength(1);
     expect(body[0].id).toBe("ud-1");
     expect(body[0].gradeRange).toBe("3-4");
+    expect(body[0].inquiryQuestions).toEqual([
+      { type: "factual", content: "광합성이 일어나는 장소는 어디인가?" },
+    ]);
   });
 
   it("단원 설계가 없으면 빈 배열을 반환한다", async () => {
@@ -127,16 +146,16 @@ describe("POST /api/unit-design — 단원 설계 저장", () => {
     expect(res.status).toBe(403);
   });
 
-  it("유효한 데이터로 저장하면 ok와 sessionId를 반환한다", async () => {
+  it("유효한 데이터로 저장하면 ok와 designId를 반환하고 세션은 자동 생성하지 않는다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockQueryRawUnsafe.mockResolvedValue([{ id: "ud-new" }]);
-    mockSessionCreate.mockResolvedValue({ id: "qs-new" });
 
     const res = await POST(makeRequest(VALID_DESIGN));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.sessionId).toBe("qs-new");
+    expect(body.designId).toBe("ud-new");
+    expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
   it("탐구 질문이 없으면 세션을 생성하지 않는다", async () => {
@@ -147,7 +166,7 @@ describe("POST /api/unit-design — 단원 설계 저장", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.sessionId).toBeNull();
+    expect(body.designId).toBe("ud-no-inquiry");
     expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
@@ -211,6 +230,110 @@ describe("DELETE /api/unit-design/[id] — 단원 설계 삭제", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
+  });
+});
+
+// ─── POST /api/unit-design/[id]/session ──────────────────────────────────────
+
+describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 생성", () => {
+  const SAVED_DESIGN = {
+    id: "ud-1",
+    teacher_id: "teacher-1",
+    title: "광합성과 에너지",
+    subject: "과학",
+    inquiry_questions: [
+      { type: "factual", content: "광합성이 일어나는 장소는 어디인가?" },
+      { type: "conceptual", content: "광합성과 호흡은 어떻게 다른가?" },
+    ],
+  };
+
+  it("세션이 없으면 401을 반환한다", async () => {
+    mockAuth.mockResolvedValue(null);
+    const [req, ctx] = makeDesignSessionRequest("ud-1", {
+      date: "2026-05-10",
+      sharedQuestions: [SAVED_DESIGN.inquiry_questions[0]],
+    });
+
+    const res = await createSessionFromDesign(req, ctx);
+    expect(res.status).toBe(401);
+  });
+
+  it("학생 역할이면 403을 반환한다", async () => {
+    mockAuth.mockResolvedValue(STUDENT_SESSION);
+    const [req, ctx] = makeDesignSessionRequest("ud-1", {
+      date: "2026-05-10",
+      sharedQuestions: [SAVED_DESIGN.inquiry_questions[0]],
+    });
+
+    const res = await createSessionFromDesign(req, ctx);
+    expect(res.status).toBe(403);
+  });
+
+  it("저장된 설계의 소유자가 아니면 403을 반환한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockQueryRaw.mockResolvedValue([{ ...SAVED_DESIGN, teacher_id: "other-teacher" }]);
+    const [req, ctx] = makeDesignSessionRequest("ud-1", {
+      date: "2026-05-10",
+      sharedQuestions: [SAVED_DESIGN.inquiry_questions[0]],
+    });
+
+    const res = await createSessionFromDesign(req, ctx);
+    expect(res.status).toBe(403);
+  });
+
+  it("저장된 탐구질문 중 선택한 질문만 원하는 날짜의 수업 세션으로 생성한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockQueryRaw.mockResolvedValue([SAVED_DESIGN]);
+    mockSessionCreate.mockResolvedValue({
+      id: "qs-1",
+      date: "2026-05-10",
+      subject: "과학",
+      topic: "광합성과 에너지",
+      sharedQuestions: [SAVED_DESIGN.inquiry_questions[1]],
+    });
+
+    const [req, ctx] = makeDesignSessionRequest("ud-1", {
+      date: "2026-05-10",
+      sharedQuestions: [SAVED_DESIGN.inquiry_questions[1]],
+    });
+
+    const res = await createSessionFromDesign(req, ctx);
+    expect(res.status).toBe(201);
+    expect(mockSessionCreate).toHaveBeenCalledWith({
+      data: {
+        date: "2026-05-10",
+        subject: "과학",
+        topic: "광합성과 에너지",
+        teacherId: "teacher-1",
+        unitDesignId: "ud-1",
+        sharedQuestions: [SAVED_DESIGN.inquiry_questions[1]],
+      },
+    });
+  });
+
+  it("저장된 탐구질문에 없는 질문은 400을 반환한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockQueryRaw.mockResolvedValue([SAVED_DESIGN]);
+    const [req, ctx] = makeDesignSessionRequest("ud-1", {
+      date: "2026-05-10",
+      sharedQuestions: [{ type: "factual", content: "임의 질문" }],
+    });
+
+    const res = await createSessionFromDesign(req, ctx);
+    expect(res.status).toBe(400);
+    expect(mockSessionCreate).not.toHaveBeenCalled();
+  });
+
+  it("선택한 탐구질문이 없으면 400을 반환한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockQueryRaw.mockResolvedValue([SAVED_DESIGN]);
+    const [req, ctx] = makeDesignSessionRequest("ud-1", {
+      date: "2026-05-10",
+      sharedQuestions: [],
+    });
+
+    const res = await createSessionFromDesign(req, ctx);
+    expect(res.status).toBe(400);
   });
 });
 

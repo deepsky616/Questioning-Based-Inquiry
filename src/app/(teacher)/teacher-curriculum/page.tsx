@@ -54,6 +54,16 @@ interface InquiryQuestion {
   content: string;
 }
 
+interface SavedInquiryDesign {
+  id: string;
+  title: string;
+  subject: string;
+  gradeRange: string;
+  area: string;
+  inquiryQuestions: InquiryQuestion[];
+  createdAt?: string;
+}
+
 type Step = 1 | 2 | 3 | 4 | 5;
 
 const STEP_LABELS: Record<Step, string> = {
@@ -123,8 +133,13 @@ export default function CurriculumPage() {
   const [step, setStep] = useState<Step>(1);
   const [isSaving, setIsSaving] = useState(false);
   const [saveTitle, setSaveTitle] = useState("");
-  const [savedList, setSavedList] = useState<{ id: string; title: string; subject: string; gradeRange: string; area: string }[]>([]);
+  const [savedList, setSavedList] = useState<SavedInquiryDesign[]>([]);
   const [showSaved, setShowSaved] = useState(false);
+  const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
+  const [sessionDate, setSessionDate] = useState("");
+  const [selectedSavedQuestionKeys, setSelectedSavedQuestionKeys] = useState<Set<string>>(new Set());
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [createdSessionMessage, setCreatedSessionMessage] = useState("");
 
   // Step 1 — 학년군·교과·영역 선택 (학년군 → 교과 → 영역 순)
   const [areas, setAreas] = useState<{ id: string; area: string }[]>([]);
@@ -161,12 +176,6 @@ export default function CurriculumPage() {
   const [inquiryQuestions, setInquiryQuestions] = useState<InquiryQuestion[]>([]);
   const [loadingInquiry, setLoadingInquiry] = useState(false);
 
-  // 저장 후 세션 공유 관련 상태
-  const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
-  const [sharedIndices, setSharedIndices] = useState<Set<number>>(new Set());
-  const [isSharing, setIsSharing] = useState(false);
-  const [shareSuccess, setShareSuccess] = useState(false);
-
   useEffect(() => { fetchSaved(); }, []);
 
   const fetchSaved = () => {
@@ -175,6 +184,10 @@ export default function CurriculumPage() {
       .then((d) => setSavedList(Array.isArray(d) ? d : []))
       .catch(() => {});
   };
+
+  const getQuestionKey = (question: InquiryQuestion) => `${question.type}|${question.content.trim()}`;
+
+  const selectedSavedDesign = savedList.find((design) => design.id === selectedSavedId) ?? null;
 
   // 학년군 변경 → 교과·영역·커리큘럼 초기화
   useEffect(() => {
@@ -355,10 +368,6 @@ export default function CurriculumPage() {
       const data = await callGenerate("inquiry");
       if (data?.inquiryQuestions) {
         setInquiryQuestions(data.inquiryQuestions);
-        // issue #7: 새 탐구 질문 생성 시 기존 공유 상태 초기화
-        setSavedSessionId(null);
-        setSharedIndices(new Set());
-        setShareSuccess(false);
         setStep(5);
       }
     } finally {
@@ -383,10 +392,7 @@ export default function CurriculumPage() {
   const handleSave = async () => {
     if (!curriculumData || !saveTitle.trim()) return;
     setIsSaving(true);
-    // issue #7: 저장할 때마다 이전 공유 상태 초기화
-    setSavedSessionId(null);
-    setSharedIndices(new Set());
-    setShareSuccess(false);
+    setCreatedSessionMessage("");
     try {
       const res = await fetch("/api/unit-design", {
         method: "POST",
@@ -405,12 +411,18 @@ export default function CurriculumPage() {
         }),
       });
       if (res.ok) {
-        // issue #6: 응답 JSON에서 sessionId 읽기
         const data = await res.json();
+        const savedDesign: SavedInquiryDesign | null = data.design ?? null;
         setSaveTitle("");
         fetchSaved();
-        if (data.sessionId) {
-          setSavedSessionId(data.sessionId);
+        if (savedDesign?.id) {
+          setSavedList((prev) => [
+            { ...savedDesign, createdAt: new Date().toISOString() },
+            ...prev.filter((design) => design.id !== savedDesign.id),
+          ]);
+          setShowSaved(true);
+          setSelectedSavedId(savedDesign.id);
+          setSelectedSavedQuestionKeys(new Set(savedDesign.inquiryQuestions.map(getQuestionKey)));
         }
       } else {
         alert("저장 실패");
@@ -420,41 +432,58 @@ export default function CurriculumPage() {
     }
   };
 
-  const handleShare = async () => {
-    if (!savedSessionId || isSharing) return;
-    // issue #8: 최신 배열에서 선택된 질문 추출, 빈 content 제외
-    const selectedOnes = inquiryQuestions
-      .filter((q, i) => sharedIndices.has(i) && q.content.trim())
-      .map(({ type, content }) => ({ type, content: content.trim() }));
-
-    setIsSharing(true);
-    setShareSuccess(false);
-    try {
-      const res = await fetch(`/api/sessions/${savedSessionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sharedQuestions: selectedOnes }),
-      });
-      if (res.ok) setShareSuccess(true);
-      else alert("공유 실패. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setIsSharing(false);
-    }
-  };
-
-  const toggleSharedIndex = (i: number) => {
-    setShareSuccess(false); // issue #9: 체크박스 변경 시 성공 상태 초기화
-    setSharedIndices((prev) => {
+  const toggleSavedQuestion = (question: InquiryQuestion) => {
+    setCreatedSessionMessage("");
+    const key = getQuestionKey(question);
+    setSelectedSavedQuestionKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
+  };
+
+  const handleSelectSavedDesign = (design: SavedInquiryDesign) => {
+    setSelectedSavedId((prev) => (prev === design.id ? null : design.id));
+    setCreatedSessionMessage("");
+    setSelectedSavedQuestionKeys(new Set(design.inquiryQuestions.map(getQuestionKey)));
+  };
+
+  const handleCreateSessionFromSaved = async () => {
+    if (!selectedSavedDesign || !sessionDate || isCreatingSession) return;
+    const selectedQuestions = selectedSavedDesign.inquiryQuestions
+      .filter((question) => question.content.trim() && selectedSavedQuestionKeys.has(getQuestionKey(question)))
+      .map((question) => ({ type: question.type, content: question.content.trim() }));
+
+    if (selectedQuestions.length === 0) return;
+
+    setIsCreatingSession(true);
+    setCreatedSessionMessage("");
+    try {
+      const res = await fetch(`/api/unit-design/${selectedSavedDesign.id}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: sessionDate, sharedQuestions: selectedQuestions }),
+      });
+      if (res.ok) {
+        setCreatedSessionMessage(`${sessionDate} 수업 세션에 탐구질문을 제시했습니다.`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || "수업 세션 생성 실패");
+      }
+    } finally {
+      setIsCreatingSession(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("삭제하시겠습니까?")) return;
     await fetch(`/api/unit-design/${id}`, { method: "DELETE" });
+    if (selectedSavedId === id) {
+      setSelectedSavedId(null);
+      setSelectedSavedQuestionKeys(new Set());
+      setCreatedSessionMessage("");
+    }
     fetchSaved();
   };
 
@@ -474,19 +503,89 @@ export default function CurriculumPage() {
       {/* 저장 목록 */}
       {showSaved && (
         <Card>
-          <CardHeader><CardTitle className="text-base">저장된 탐구 질문</CardTitle></CardHeader>
-          <CardContent>
+          <CardHeader>
+            <CardTitle className="text-base">저장된 탐구 질문</CardTitle>
+            <CardDescription>저장된 질문을 확인하고 원하는 날짜의 수업 세션에 제시할 질문을 선택하세요</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {savedList.length === 0 ? (
               <p className="text-gray-400 text-sm">저장된 탐구 질문이 없습니다.</p>
             ) : (
-              <ul className="divide-y">
+              <ul className="divide-y rounded-md border">
                 {savedList.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between py-2">
-                    <div>
-                      <span className="font-medium text-sm">{d.title}</span>
-                      <span className="text-xs text-gray-400 ml-2">{d.subject} · {d.gradeRange}학년군 · {d.area}</span>
+                  <li key={d.id} className="p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSavedDesign(d)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <span className="block truncate font-medium text-sm text-gray-900">{d.title}</span>
+                        <span className="text-xs text-gray-400">
+                          {d.subject} · {d.gradeRange}학년군 · {d.area} · 탐구질문 {d.inquiryQuestions.length}개
+                        </span>
+                      </button>
+                      <button onClick={() => handleDelete(d.id)} className="text-xs text-red-400 hover:text-red-600">삭제</button>
                     </div>
-                    <button onClick={() => handleDelete(d.id)} className="text-xs text-red-400 hover:text-red-600">삭제</button>
+
+                    {selectedSavedId === d.id && (
+                      <div className="mt-3 space-y-3 rounded-md bg-gray-50 p-3">
+                        <div className="space-y-2">
+                          {d.inquiryQuestions.length === 0 ? (
+                            <p className="text-sm text-gray-400">저장된 탐구질문이 없습니다.</p>
+                          ) : (
+                            d.inquiryQuestions.map((question, i) => (
+                              <label key={`${question.type}-${i}`} className="flex items-start gap-2">
+                                <input
+                                  type="checkbox"
+                                  className="mt-1 shrink-0 accent-indigo-600"
+                                  checked={selectedSavedQuestionKeys.has(getQuestionKey(question))}
+                                  onChange={() => toggleSavedQuestion(question)}
+                                />
+                                <span className="text-sm text-gray-800">
+                                  <span className="font-medium text-indigo-600 mr-1">
+                                    [{TYPE_LABEL[question.type]}]
+                                  </span>
+                                  {question.content}
+                                </span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center">
+                          <div className="space-y-1 sm:w-48">
+                            <Label>수업 날짜</Label>
+                            <Input
+                              type="date"
+                              value={sessionDate}
+                              onChange={(e) => {
+                                setSessionDate(e.target.value);
+                                setCreatedSessionMessage("");
+                              }}
+                            />
+                          </div>
+                          <Button
+                            className="sm:mt-6"
+                            onClick={handleCreateSessionFromSaved}
+                            disabled={
+                              isCreatingSession ||
+                              !sessionDate ||
+                              d.inquiryQuestions.length === 0 ||
+                              selectedSavedQuestionKeys.size === 0
+                            }
+                          >
+                            {isCreatingSession ? "세션 생성 중..." : "선택 질문으로 수업 세션 만들기"}
+                          </Button>
+                        </div>
+
+                        {createdSessionMessage && (
+                          <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                            {createdSessionMessage}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -1118,13 +1217,7 @@ export default function CurriculumPage() {
                 <Input
                   placeholder="탐구 질문 이름 입력 (예: 5학년 과학 생명 탐구)"
                   value={saveTitle}
-                  onChange={(e) => {
-                    setSaveTitle(e.target.value);
-                    // issue #7: 제목 수정 시 이전 세션 상태 초기화
-                    setSavedSessionId(null);
-                    setSharedIndices(new Set());
-                    setShareSuccess(false);
-                  }}
+                  onChange={(e) => setSaveTitle(e.target.value)}
                 />
                 <Button
                   onClick={handleSave}
@@ -1134,63 +1227,6 @@ export default function CurriculumPage() {
                   {isSaving ? "저장 중..." : "저장"}
                 </Button>
               </div>
-
-              {/* issue #6: 세션 자동생성 배너 */}
-              {savedSessionId && (
-                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                  저장 완료! 수업 세션이 자동으로 생성되었습니다.
-                </div>
-              )}
-
-              {/* 탐구 질문 공유 패널 — 세션이 생성된 경우에만 표시 */}
-              {savedSessionId && (
-                <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-3">
-                  <div>
-                    <p className="text-sm font-semibold text-indigo-800">학생에게 탐구 질문 공유</p>
-                    <p className="text-xs text-indigo-500 mt-0.5">
-                      학생이 질문할 때 참고할 수 있도록 탐구 질문을 선택해서 공유하세요
-                    </p>
-                  </div>
-                  {/* issue #8: 인덱스 기반 선택, 빈 content 제외 */}
-                  <div className="space-y-2">
-                    {inquiryQuestions.map((q, i) =>
-                      q.content.trim() ? (
-                        <label
-                          key={i}
-                          className="flex items-start gap-2 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 shrink-0 accent-indigo-600"
-                            checked={sharedIndices.has(i)}
-                            onChange={() => toggleSharedIndex(i)}
-                          />
-                          <span className="text-sm text-indigo-900">
-                            <span className="font-medium text-indigo-600 mr-1">
-                              [{q.type === "factual" ? "사실적" : q.type === "conceptual" ? "개념적" : "논쟁적"}]
-                            </span>
-                            {q.content.trim()}
-                          </span>
-                        </label>
-                      ) : null
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      size="sm"
-                      onClick={handleShare}
-                      disabled={isSharing || sharedIndices.size === 0}
-                      className="shrink-0"
-                    >
-                      {isSharing ? "공유 중..." : "학생에게 공유하기"}
-                    </Button>
-                    {/* issue #9: 성공 상태는 체크박스 변경 시 자동 초기화 */}
-                    {shareSuccess && (
-                      <span className="text-sm text-green-700 font-medium">공유 완료!</span>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
