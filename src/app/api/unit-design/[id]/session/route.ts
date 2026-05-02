@@ -10,6 +10,8 @@ const inquiryQuestionSchema = z.object({
 
 const createSessionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  topic: z.string().min(1).optional(),
+  defaultQuestionPublic: z.boolean().optional().default(false),
   sharedQuestions: z.array(inquiryQuestionSchema).min(1),
 });
 
@@ -78,10 +80,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       data: {
         date: data.date,
         subject: design.subject,
-        topic: design.title,
+        topic: data.topic?.trim() || design.title,
         teacherId,
         unitDesignId: design.id,
         sharedQuestions: selectedQuestions,
+        defaultQuestionPublic: data.defaultQuestionPublic,
       },
     });
 

@@ -294,6 +294,8 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
 
     const [req, ctx] = makeDesignSessionRequest("ud-1", {
       date: "2026-05-10",
+      topic: "광합성 탐구 수업",
+      defaultQuestionPublic: true,
       sharedQuestions: [SAVED_DESIGN.inquiry_questions[1]],
     });
 
@@ -303,10 +305,11 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
       data: {
         date: "2026-05-10",
         subject: "과학",
-        topic: "광합성과 에너지",
+        topic: "광합성 탐구 수업",
         teacherId: "teacher-1",
         unitDesignId: "ud-1",
         sharedQuestions: [SAVED_DESIGN.inquiry_questions[1]],
+        defaultQuestionPublic: true,
       },
     });
   });

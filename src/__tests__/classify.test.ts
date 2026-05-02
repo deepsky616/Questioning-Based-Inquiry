@@ -43,14 +43,14 @@ describe("fallbackClassification", () => {
     expect(result.cognitiveScore).toBeLessThanOrEqual(1);
   });
 
-  it("평가적 키워드가 있으면 evaluative를 반환한다", () => {
+  it("논쟁적 키워드가 있으면 controversial을 반환한다", () => {
     const result = fallbackClassification("이 작품에 대해 어떻게 생각해요?");
-    expect(result.cognitive).toBe("evaluative");
+    expect(result.cognitive).toBe("controversial");
   });
 
-  it("해석적 키워드만 있으면 interpretive를 반환한다", () => {
+  it("개념적 키워드만 있으면 conceptual을 반환한다", () => {
     const result = fallbackClassification("두 현상을 비교해 보세요");
-    expect(result.cognitive).toBe("interpretive");
+    expect(result.cognitive).toBe("conceptual");
   });
 
   it("키워드 없이 빈 문자열이면 기본값을 반환한다", () => {
@@ -75,18 +75,16 @@ describe("fallbackClassification", () => {
     expect(result.feedback).toContain("왜");
   });
 
-  it("열린+평가적 질문이면 긍정 피드백을 반환한다", () => {
+  it("열린+논쟁적 질문이면 긍정 피드백을 반환한다", () => {
     const result = fallbackClassification("왜 이 작품에 대해 어떻게 생각해요?");
     expect(result.closure).toBe("open");
-    expect(result.cognitive).toBe("evaluative");
+    expect(result.cognitive).toBe("controversial");
     expect(result.feedback).toBeDefined();
   });
 
-  it("평가적 키워드가 있을 때 interpretive로 잘못 분류되지 않는다", () => {
-    // "어떻게 생각해"는 평가적이지만 "어떻게"도 포함되어 있어
-    // 순서에 따라 interpretive로 잘못 분류될 수 있음
+  it("논쟁적 키워드가 있을 때 conceptual로 잘못 분류되지 않는다", () => {
     const result = fallbackClassification("이 내용에 대해 어떻게 생각해요?");
-    expect(result.cognitive).toBe("evaluative");
+    expect(result.cognitive).toBe("controversial");
   });
 });
 
@@ -107,10 +105,10 @@ describe("isValidClosureType", () => {
 });
 
 describe("isValidCognitiveType", () => {
-  it("factual, interpretive, evaluative는 유효하다", () => {
+  it("factual, conceptual, controversial은 유효하다", () => {
     expect(isValidCognitiveType("factual")).toBe(true);
-    expect(isValidCognitiveType("interpretive")).toBe(true);
-    expect(isValidCognitiveType("evaluative")).toBe(true);
+    expect(isValidCognitiveType("conceptual")).toBe(true);
+    expect(isValidCognitiveType("controversial")).toBe(true);
   });
 
   it("다른 값은 유효하지 않다", () => {
@@ -146,7 +144,7 @@ describe("parseClassificationResponse", () => {
   });
 
   it("마크다운 코드블록 안의 JSON도 파싱한다", () => {
-    const text = `\`\`\`json\n{"closure":"open","cognitive":"evaluative","closureScore":0.3,"cognitiveScore":0.9,"reasoning":"이유"}\n\`\`\``;
+    const text = `\`\`\`json\n{"closure":"open","cognitive":"controversial","closureScore":0.3,"cognitiveScore":0.9,"reasoning":"이유"}\n\`\`\``;
     const result = parseClassificationResponse(text);
     expect(result).not.toBeNull();
     expect(result!.closure).toBe("open");

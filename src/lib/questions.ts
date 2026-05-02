@@ -51,7 +51,8 @@ export function buildSessionWhereFilter(params: {
 
 export function buildQuestionCreateData(
   data: CreateQuestionInput,
-  authorId: string
+  authorId: string,
+  options: { defaultIsPublic?: boolean } = {}
 ): QuestionCreateData {
   return {
     content: data.content,
@@ -60,7 +61,7 @@ export function buildQuestionCreateData(
     cognitive: data.cognitive ?? "factual",
     closureScore: data.closureScore ?? 0.5,
     cognitiveScore: data.cognitiveScore ?? 0.5,
-    isPublic: data.isPublic ?? false,
+    isPublic: options.defaultIsPublic ?? false,
     authorId,
     ...(data.sessionId ? { sessionId: data.sessionId } : {}),
   };
@@ -110,9 +111,7 @@ export function canPatchQuestion(
   fields: string[]
 ): boolean {
   if (role === "TEACHER") return true;
-  if (role === "STUDENT" && userId === authorId) {
-    return fields.every((f) => f === "isPublic");
-  }
+  if (role === "STUDENT" && userId === authorId) return fields.length === 0;
   return false;
 }
 

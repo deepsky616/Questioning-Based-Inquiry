@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
@@ -75,9 +76,9 @@ const STEP_LABELS: Record<Step, string> = {
 };
 
 const TYPE_LABEL: Record<string, string> = {
-  factual: "사실적",
-  conceptual: "개념적",
-  controversial: "논쟁적",
+  factual: "사실적 질문",
+  conceptual: "개념적 질문",
+  controversial: "논쟁적 질문",
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -137,6 +138,8 @@ export default function CurriculumPage() {
   const [showSaved, setShowSaved] = useState(false);
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
   const [sessionDate, setSessionDate] = useState("");
+  const [sessionTopic, setSessionTopic] = useState("");
+  const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(false);
   const [selectedSavedQuestionKeys, setSelectedSavedQuestionKeys] = useState<Set<string>>(new Set());
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [createdSessionMessage, setCreatedSessionMessage] = useState("");
@@ -446,11 +449,12 @@ export default function CurriculumPage() {
   const handleSelectSavedDesign = (design: SavedInquiryDesign) => {
     setSelectedSavedId((prev) => (prev === design.id ? null : design.id));
     setCreatedSessionMessage("");
+    setSessionTopic(design.title);
     setSelectedSavedQuestionKeys(new Set(design.inquiryQuestions.map(getQuestionKey)));
   };
 
   const handleCreateSessionFromSaved = async () => {
-    if (!selectedSavedDesign || !sessionDate || isCreatingSession) return;
+    if (!selectedSavedDesign || !sessionDate || !sessionTopic.trim() || isCreatingSession) return;
     const selectedQuestions = selectedSavedDesign.inquiryQuestions
       .filter((question) => question.content.trim() && selectedSavedQuestionKeys.has(getQuestionKey(question)))
       .map((question) => ({ type: question.type, content: question.content.trim() }));
@@ -463,10 +467,15 @@ export default function CurriculumPage() {
       const res = await fetch(`/api/unit-design/${selectedSavedDesign.id}/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: sessionDate, sharedQuestions: selectedQuestions }),
+        body: JSON.stringify({
+          date: sessionDate,
+          topic: sessionTopic.trim(),
+          defaultQuestionPublic,
+          sharedQuestions: selectedQuestions,
+        }),
       });
       if (res.ok) {
-        setCreatedSessionMessage(`${sessionDate} 수업 세션에 탐구질문을 제시했습니다.`);
+        setCreatedSessionMessage(`${sessionDate} ${selectedSavedDesign.subject} 수업 세션에 탐구 질문을 제시했습니다.`);
       } else {
         const data = await res.json().catch(() => ({}));
         alert(data.error || "수업 세션 생성 실패");
@@ -483,6 +492,7 @@ export default function CurriculumPage() {
       setSelectedSavedId(null);
       setSelectedSavedQuestionKeys(new Set());
       setCreatedSessionMessage("");
+      setSessionTopic("");
     }
     fetchSaved();
   };
@@ -553,8 +563,8 @@ export default function CurriculumPage() {
                           )}
                         </div>
 
-                        <div className="flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center">
-                          <div className="space-y-1 sm:w-48">
+                        <div className="grid gap-3 border-t pt-3 sm:grid-cols-3">
+                          <div className="space-y-1">
                             <Label>수업 날짜</Label>
                             <Input
                               type="date"
@@ -565,12 +575,48 @@ export default function CurriculumPage() {
                               }}
                             />
                           </div>
+                          <div className="space-y-1">
+                            <Label>교과</Label>
+                            <Input value={d.subject} disabled className="bg-gray-100" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>주제</Label>
+                            <Input
+                              value={sessionTopic}
+                              onChange={(e) => {
+                                setSessionTopic(e.target.value);
+                                setCreatedSessionMessage("");
+                              }}
+                              placeholder="수업 주제"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="text-sm font-medium text-gray-800">이 세션 질문 기본 공개</p>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                켜면 학생이 이 탐구 질문 수업에서 만든 질문이 저장 즉시 공개됩니다.
+                              </p>
+                            </div>
+                            <Switch
+                              checked={defaultQuestionPublic}
+                              onCheckedChange={(checked) => {
+                                setDefaultQuestionPublic(checked);
+                                setCreatedSessionMessage("");
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
                           <Button
-                            className="sm:mt-6"
                             onClick={handleCreateSessionFromSaved}
                             disabled={
                               isCreatingSession ||
                               !sessionDate ||
+                              !sessionTopic.trim() ||
                               d.inquiryQuestions.length === 0 ||
                               selectedSavedQuestionKeys.size === 0
                             }
@@ -1187,7 +1233,7 @@ export default function CurriculumPage() {
             {(["factual", "conceptual", "controversial"] as const).map((type) => (
               <div key={type}>
                 <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
-                  {TYPE_LABEL[type]} 질문
+                  {TYPE_LABEL[type]}
                 </p>
                 <div className="space-y-2">
                   {inquiryQuestions

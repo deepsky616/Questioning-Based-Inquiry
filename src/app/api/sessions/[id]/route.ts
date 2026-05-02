@@ -10,6 +10,7 @@ const updateSchema = z.object({
   sharedQuestions: z
     .array(z.object({ type: z.string(), content: z.string() }))
     .optional(),
+  defaultQuestionPublic: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

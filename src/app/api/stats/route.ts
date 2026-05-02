@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { calcTrend, calcStartDate, aggregateByStudent, buildTimeline } from "@/lib/stats-calc";
+import { matchesCognitiveCategory } from "@/lib/question-labels";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -40,7 +41,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       total: 0,
       byClosure: { closed: 0, open: 0 },
-      byCognitive: { factual: 0, interpretive: 0, evaluative: 0 },
+      byCognitive: { factual: 0, conceptual: 0, controversial: 0 },
       byStudent: [],
       timeline: [],
       teacherClasses: teacher?.teacherClasses ?? [],
@@ -98,9 +99,9 @@ export async function GET(req: Request) {
   };
 
   const byCognitive = {
-    factual: questions.filter((q) => q.cognitive === "factual").length,
-    interpretive: questions.filter((q) => q.cognitive === "interpretive").length,
-    evaluative: questions.filter((q) => q.cognitive === "evaluative").length,
+    factual: questions.filter((q) => matchesCognitiveCategory(q.cognitive, "factual")).length,
+    conceptual: questions.filter((q) => matchesCognitiveCategory(q.cognitive, "conceptual")).length,
+    controversial: questions.filter((q) => matchesCognitiveCategory(q.cognitive, "controversial")).length,
   };
 
   const midpoint = new Date(
@@ -113,7 +114,7 @@ export async function GET(req: Request) {
     questions.map((q) => ({
       ...q,
       closure: q.closure as "closed" | "open",
-      cognitive: q.cognitive as "factual" | "interpretive" | "evaluative",
+      cognitive: q.cognitive,
       author: { id: q.author.id, name: q.author.name, className: q.author.className },
     }))
   );
@@ -128,7 +129,7 @@ export async function GET(req: Request) {
     questions.map((q) => ({
       ...q,
       closure: q.closure as "closed" | "open",
-      cognitive: q.cognitive as "factual" | "interpretive" | "evaluative",
+      cognitive: q.cognitive,
       author: { id: q.author.id, name: q.author.name, className: q.author.className },
     }))
   );

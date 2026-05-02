@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
@@ -20,7 +21,15 @@ import {
 } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
+import {
+  CLOSURE_LABEL,
+  CLOSURE_STYLE,
+  COGNITIVE_CATEGORIES,
+  COGNITIVE_LABEL,
+  COGNITIVE_STYLE,
+  matchesCognitiveCategory,
+  normalizeCognitiveType,
+} from "@/lib/question-labels";
 import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
 import { formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
 
@@ -30,6 +39,8 @@ interface QuestionSession {
   subject: string;
   topic: string;
   teacher: { name: string };
+  unitDesignId?: string | null;
+  defaultQuestionPublic?: boolean;
 }
 
 interface Question {
@@ -153,7 +164,7 @@ export default function QuestionsPage() {
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
-  const [sessForm, setSessForm] = useState({ date: "", subject: "", topic: "" });
+  const [sessForm, setSessForm] = useState({ date: "", subject: "", topic: "", defaultQuestionPublic: false });
   const [isSavingSess, setIsSavingSess] = useState(false);
   const [sessMsg, setSessMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showSessForm, setShowSessForm] = useState(false);
@@ -388,7 +399,7 @@ export default function QuestionsPage() {
       if (!res.ok) throw new Error();
       const created: QuestionSession = await res.json();
       setSessions((prev) => sortSessionsDesc([created, ...prev]));
-      setSessForm({ date: "", subject: "", topic: "" });
+      setSessForm({ date: "", subject: "", topic: "", defaultQuestionPublic: false });
       setSessMsg({ type: "success", text: "세션이 추가됐습니다" });
       if (questionLookupMode === "session") {
         setSelectedSessionId(created.id);
@@ -449,6 +460,25 @@ export default function QuestionsPage() {
     }
   };
 
+  const handleToggleQuestionPublic = async (question: Question) => {
+    const nextPublic = !question.isPublic;
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === question.id ? { ...q, isPublic: nextPublic } : q))
+    );
+    try {
+      const res = await fetch(`/api/questions/${question.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic: nextPublic }),
+      });
+      if (!res.ok) throw new Error("공개 여부 수정 실패");
+    } catch {
+      setQuestions((prev) =>
+        prev.map((q) => (q.id === question.id ? { ...q, isPublic: question.isPublic } : q))
+      );
+    }
+  };
+
   const handleAnalyzeSession = async () => {
     if (!currentSession) return;
 
@@ -474,7 +504,9 @@ export default function QuestionsPage() {
   const filtered = questions;
 
   const byType = (key: "closure" | "cognitive", value: string) =>
-    filtered.filter((q) => q[key] === value);
+    filtered.filter((q) =>
+      key === "cognitive" ? matchesCognitiveCategory(q.cognitive, value) : q[key] === value
+    );
 
   const currentSession = questionLookupMode === "session"
     ? sessions.find((s) => s.id === selectedSessionId)
@@ -513,6 +545,7 @@ export default function QuestionsPage() {
             {questionLookupMode === "detail" && <TableHead className="w-36">세션</TableHead>}
             <TableHead className="w-20">폐쇄/개방</TableHead>
             <TableHead className="w-24">인지 수준</TableHead>
+            <TableHead className="w-20">공개</TableHead>
             <TableHead className="w-16">수정</TableHead>
           </TableRow>
         </TableHeader>
@@ -561,13 +594,19 @@ export default function QuestionsPage() {
                 </span>
               </TableCell>
               <TableCell>
+                <Switch
+                  checked={q.isPublic}
+                  onCheckedChange={() => handleToggleQuestionPublic(q)}
+                />
+              </TableCell>
+              <TableCell>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
                     setSelectedQuestion(q);
                     setCorrectionClosure(q.closure);
-                    setCorrectionCognitive(q.cognitive);
+                    setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
                   }}
                 >
                   수정
@@ -616,6 +655,13 @@ export default function QuestionsPage() {
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
                           {COGNITIVE_LABEL[q.cognitive]}
                         </span>
+                        <label className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600">
+                          공개
+                          <Switch
+                            checked={q.isPublic}
+                            onCheckedChange={() => handleToggleQuestionPublic(q)}
+                          />
+                        </label>
                       </div>
                     </div>
                     <p className="break-words text-sm leading-relaxed text-gray-800">{q.content}</p>
@@ -727,6 +773,22 @@ export default function QuestionsPage() {
                 />
               </div>
             </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">이 세션 질문 기본 공개</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    켜면 학생이 이 세션에서 만든 질문이 저장 즉시 공개됩니다. 학생은 직접 변경할 수 없습니다.
+                  </p>
+                </div>
+                <Switch
+                  checked={sessForm.defaultQuestionPublic}
+                  onCheckedChange={(checked) =>
+                    setSessForm((p) => ({ ...p, defaultQuestionPublic: checked }))
+                  }
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-3">
               <Button size="sm" onClick={handleCreateSession} disabled={isSavingSess}>
                 {isSavingSess ? "저장 중..." : "세션 추가"}
@@ -750,6 +812,12 @@ export default function QuestionsPage() {
                         {active && (
                           <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">활성</span>
                         )}
+                        {s.unitDesignId && (
+                          <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">탐구 질문 수업</span>
+                        )}
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${s.defaultQuestionPublic ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                          질문 {s.defaultQuestionPublic ? "공개" : "비공개"}
+                        </span>
                       </div>
                       <Button
                         variant="ghost"
@@ -916,9 +984,8 @@ export default function QuestionsPage() {
               <StatBadge label="폐쇄형" value={byType("closure", "closed").length} color="bg-blue-100 text-blue-700" />
               <StatBadge label="개방형" value={byType("closure", "open").length} color="bg-green-100 text-green-700" />
               <StatBadge label="사실적" value={byType("cognitive", "factual").length} color="bg-gray-100 text-gray-700" />
-              <StatBadge label="해석적" value={byType("cognitive", "interpretive").length} color="bg-purple-100 text-purple-700" />
-              <StatBadge label="평가적" value={byType("cognitive", "evaluative").length} color="bg-orange-100 text-orange-700" />
-              <StatBadge label="적용적" value={byType("cognitive", "applicative").length} color="bg-teal-100 text-teal-700" />
+              <StatBadge label="개념적" value={byType("cognitive", "conceptual").length} color="bg-purple-100 text-purple-700" />
+              <StatBadge label="논쟁적" value={byType("cognitive", "controversial").length} color="bg-orange-100 text-orange-700" />
             </div>
             <div className="mt-4">
               <Button
@@ -1078,6 +1145,7 @@ export default function QuestionsPage() {
                     <TableHead>질문 내용</TableHead>
                     <TableHead className="w-20 text-center">폐쇄/개방</TableHead>
                     <TableHead className="w-24 text-center">인지 수준</TableHead>
+                    <TableHead className="w-20 text-center">공개</TableHead>
                     <TableHead className="w-16 text-center">수정</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1121,13 +1189,19 @@ export default function QuestionsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
+                        <Switch
+                          checked={q.isPublic}
+                          onCheckedChange={() => handleToggleQuestionPublic(q)}
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
                             setSelectedQuestion(q);
                             setCorrectionClosure(q.closure);
-                            setCorrectionCognitive(q.cognitive);
+                            setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
                           }}
                         >
                           수정
@@ -1166,28 +1240,25 @@ export default function QuestionsPage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">분류 2 · 사실적 / 해석적 / 평가적 / 적용적 질문</CardTitle>
+              <CardTitle className="text-base">분류 2 · 사실적 / 개념적 / 논쟁적 질문</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="factual">
                 <TabsList>
-                  <TabsTrigger value="factual">
-                    사실적 <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">{byType("cognitive", "factual").length}</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="interpretive">
-                    해석적 <span className="ml-1.5 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">{byType("cognitive", "interpretive").length}</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="evaluative">
-                    평가적 <span className="ml-1.5 text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">{byType("cognitive", "evaluative").length}</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="applicative">
-                    적용적 <span className="ml-1.5 text-xs bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded">{byType("cognitive", "applicative").length}</span>
-                  </TabsTrigger>
+                  {COGNITIVE_CATEGORIES.map((category) => (
+                    <TabsTrigger key={category.value} value={category.value}>
+                      {category.label}
+                      <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">
+                        {byType("cognitive", category.value).length}
+                      </span>
+                    </TabsTrigger>
+                  ))}
                 </TabsList>
-                <TabsContent value="factual"><QuestionTable list={byType("cognitive", "factual")} /></TabsContent>
-                <TabsContent value="interpretive"><QuestionTable list={byType("cognitive", "interpretive")} /></TabsContent>
-                <TabsContent value="evaluative"><QuestionTable list={byType("cognitive", "evaluative")} /></TabsContent>
-                <TabsContent value="applicative"><QuestionTable list={byType("cognitive", "applicative")} /></TabsContent>
+                {COGNITIVE_CATEGORIES.map((category) => (
+                  <TabsContent key={category.value} value={category.value}>
+                    <QuestionTable list={byType("cognitive", category.value)} />
+                  </TabsContent>
+                ))}
               </Tabs>
             </CardContent>
           </Card>
@@ -1232,9 +1303,8 @@ export default function QuestionsPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="factual">사실적 질문</SelectItem>
-                      <SelectItem value="interpretive">해석적 질문</SelectItem>
-                      <SelectItem value="evaluative">평가적 질문</SelectItem>
-                      <SelectItem value="applicative">적용적 질문</SelectItem>
+                      <SelectItem value="conceptual">개념적 질문</SelectItem>
+                      <SelectItem value="controversial">논쟁적 질문</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

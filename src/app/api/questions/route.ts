@@ -95,8 +95,17 @@ export async function POST(req: Request) {
     const data = createQuestionSchema.parse(body);
     const userId = (session.user as { id: string }).id;
 
+    const selectedSession = data.sessionId
+      ? await prisma.questionSession.findUnique({
+          where: { id: data.sessionId },
+          select: { defaultQuestionPublic: true },
+        })
+      : null;
+
     const question = await prisma.question.create({
-      data: buildQuestionCreateData(data, userId),
+      data: buildQuestionCreateData(data, userId, {
+        defaultIsPublic: selectedSession?.defaultQuestionPublic ?? false,
+      }),
       include: {
         author: {
           select: {
