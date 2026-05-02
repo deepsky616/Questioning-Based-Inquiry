@@ -11,7 +11,7 @@ const inquiryQuestionSchema = z.object({
 const createSessionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   topic: z.string().min(1).optional(),
-  defaultQuestionPublic: z.boolean().optional().default(false),
+  defaultQuestionPublic: z.boolean().optional().default(true),
   sharedQuestions: z.array(inquiryQuestionSchema).min(1),
 });
 

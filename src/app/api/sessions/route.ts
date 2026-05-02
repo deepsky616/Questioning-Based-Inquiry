@@ -7,7 +7,7 @@ const createSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   subject: z.string().min(1),
   topic: z.string().default(""),
-  defaultQuestionPublic: z.boolean().optional().default(false),
+  defaultQuestionPublic: z.boolean().optional().default(true),
 });
 
 export async function GET() {

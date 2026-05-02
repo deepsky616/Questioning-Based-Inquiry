@@ -19,8 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import DatePicker from "@/components/shared/DatePicker";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -91,60 +90,6 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
   );
 }
 
-function DatePicker({ value, onChange, placeholder = "날짜 선택" }: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-
-  const selected = value ? new Date(value + "T00:00:00") : undefined;
-
-  const displayLabel = selected
-    ? `${selected.getFullYear()}년 ${selected.getMonth() + 1}월 ${selected.getDate()}일`
-    : placeholder;
-
-  const handleSelect = (date: Date | undefined) => {
-    if (!date) { onChange(""); setOpen(false); return; }
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    onChange(`${y}-${m}-${d}`);
-    setOpen(false);
-  };
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className={`h-8 justify-start text-left text-sm font-normal ${!value ? "text-gray-400" : ""}`}
-        >
-          📅 {displayLabel}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent>
-        <Calendar
-          mode="single"
-          selected={selected}
-          onSelect={handleSelect}
-          defaultMonth={selected ?? new Date()}
-        />
-        {value && (
-          <div className="border-t px-3 py-2">
-            <button
-              className="text-xs text-gray-400 hover:text-gray-600"
-              onClick={() => { onChange(""); setOpen(false); }}
-            >
-              선택 초기화
-            </button>
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -187,7 +132,7 @@ export default function QuestionsPage() {
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
-  const [sessForm, setSessForm] = useState({ date: "", subject: "", topic: "", defaultQuestionPublic: false });
+  const [sessForm, setSessForm] = useState({ date: "", subject: "", topic: "", defaultQuestionPublic: true });
   const [isSavingSess, setIsSavingSess] = useState(false);
   const [sessMsg, setSessMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showSessForm, setShowSessForm] = useState(false);
@@ -426,7 +371,7 @@ export default function QuestionsPage() {
       if (!res.ok) throw new Error();
       const created: QuestionSession = await res.json();
       setSessions((prev) => sortSessionsDesc([created, ...prev]));
-      setSessForm({ date: "", subject: "", topic: "", defaultQuestionPublic: false });
+      setSessForm({ date: "", subject: "", topic: "", defaultQuestionPublic: true });
       setSessMsg({ type: "success", text: "세션이 추가됐습니다" });
       if (questionLookupMode === "session") {
         setSelectedSessionId(created.id);

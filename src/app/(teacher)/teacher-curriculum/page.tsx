@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import DatePicker from "@/components/shared/DatePicker";
 import {
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
@@ -139,7 +140,7 @@ export default function CurriculumPage() {
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
   const [sessionDate, setSessionDate] = useState("");
   const [sessionTopic, setSessionTopic] = useState("");
-  const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(false);
+  const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(true);
   const [selectedSavedQuestionKeys, setSelectedSavedQuestionKeys] = useState<Set<string>>(new Set());
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [createdSessionMessage, setCreatedSessionMessage] = useState("");
@@ -566,13 +567,13 @@ export default function CurriculumPage() {
                         <div className="grid gap-3 border-t pt-3 sm:grid-cols-3">
                           <div className="space-y-1">
                             <Label>수업 날짜</Label>
-                            <Input
-                              type="date"
+                            <DatePicker
                               value={sessionDate}
-                              onChange={(e) => {
-                                setSessionDate(e.target.value);
+                              onChange={(v) => {
+                                setSessionDate(v);
                                 setCreatedSessionMessage("");
                               }}
+                              placeholder="수업 날짜 선택"
                             />
                           </div>
                           <div className="space-y-1">

@@ -16,6 +16,7 @@ import {
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsDesc } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
+import DatePicker from "@/components/shared/DatePicker";
 
 interface QuestionSession {
   id: string;
@@ -306,11 +307,10 @@ export default function ExplorePage() {
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-600">날짜</label>
-              <input
-                type="date"
+              <DatePicker
                 value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="h-8 px-2 rounded-md border border-input text-sm bg-white"
+                onChange={setFilterDate}
+                placeholder="날짜 선택"
               />
             </div>
             <div className="flex flex-col gap-1">
