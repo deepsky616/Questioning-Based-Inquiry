@@ -57,6 +57,8 @@ interface Question {
   isPublic: boolean;
   createdAt: string;
   comments?: Array<{ id: string; content: string; author: { name: string }; createdAt: string }>;
+  likeCount: number;
+  likedBy?: Array<{ id: string; name: string }>;
 }
 
 interface SessionAnalysis {
@@ -149,6 +151,9 @@ export default function QuestionsPage() {
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
 
+  // 좋아요 정렬
+  const [likeSort, setLikeSort] = useState<"none" | "desc" | "asc">("none");
+
   const resetBulkState = () => {
     setSelectedIds(new Set());
     setBulkPreviews(null);
@@ -159,7 +164,7 @@ export default function QuestionsPage() {
 
   const fetchQuestions = useCallback((
     sessionId: string,
-    opts?: { date?: string; subject?: string; topic?: string }
+    opts?: { date?: string; subject?: string; topic?: string; likeSort?: "none" | "desc" | "asc" }
   ) => {
     setIsLoading(true);
     const params = new URLSearchParams();
@@ -167,12 +172,14 @@ export default function QuestionsPage() {
     if (opts?.date) params.append("date", opts.date);
     if (opts?.subject) params.append("subject", opts.subject);
     if (opts?.topic) params.append("topic", opts.topic);
+    const sort = opts?.likeSort ?? likeSort;
+    if (sort !== "none") params.append("likeSort", sort);
     fetch(`/api/questions?${params}`)
       .then((r) => r.json())
       .then(setQuestions)
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [likeSort]);
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -537,6 +544,7 @@ export default function QuestionsPage() {
             {questionLookupMode === "detail" && <TableHead className="w-36">세션</TableHead>}
             <TableHead className="w-20">폐쇄/개방</TableHead>
             <TableHead className="w-24">인지 수준</TableHead>
+            <TableHead className="w-16 text-center">좋아요</TableHead>
             <TableHead className="w-20">공개</TableHead>
             <TableHead className="w-16">수정</TableHead>
           </TableRow>
@@ -584,6 +592,21 @@ export default function QuestionsPage() {
                 <span className={`text-xs px-2 py-1 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>
                   {COGNITIVE_LABEL[q.cognitive]}
                 </span>
+              </TableCell>
+              <TableCell className="text-center">
+                <div className="group relative inline-block">
+                  <span className="flex items-center gap-1 text-sm font-medium text-rose-500">
+                    ❤️ {q.likeCount}
+                  </span>
+                  {(q.likedBy?.length ?? 0) > 0 && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-36 shadow-lg">
+                      <p className="font-semibold mb-1">좋아요한 학생</p>
+                      {q.likedBy!.map((u) => (
+                        <p key={u.id} className="truncate">{u.name}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <Switch
@@ -640,13 +663,26 @@ export default function QuestionsPage() {
                           <p className="text-xs text-gray-500">{studentInfo}</p>
                         )}
                       </div>
-                      <div className="ml-auto flex shrink-0 gap-1.5">
+                      <div className="ml-auto flex shrink-0 gap-1.5 flex-wrap justify-end">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CLOSURE_STYLE[q.closure]}`}>
                           {CLOSURE_LABEL[q.closure]}
                         </span>
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
                           {COGNITIVE_LABEL[q.cognitive]}
                         </span>
+                        <div className="group relative">
+                          <span className="flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-600 cursor-default">
+                            ❤️ {q.likeCount}
+                          </span>
+                          {(q.likedBy?.length ?? 0) > 0 && (
+                            <div className="absolute bottom-full right-0 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-32 shadow-lg">
+                              <p className="font-semibold mb-1">좋아요한 학생</p>
+                              {q.likedBy!.map((u) => (
+                                <p key={u.id} className="truncate">{u.name}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <label className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600">
                           공개
                           <Switch
@@ -852,7 +888,35 @@ export default function QuestionsPage() {
             날짜·교과·주제별 조회
           </button>
         </div>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-3 flex-wrap">
+          {/* 좋아요 정렬 */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">좋아요순</span>
+            <div className="flex rounded-md border border-gray-200 overflow-hidden">
+              {(["none", "desc", "asc"] as const).map((order, i) => (
+                <button
+                  key={order}
+                  onClick={() => {
+                    setLikeSort(order);
+                    if (questionLookupMode === "session") {
+                      fetchQuestions(selectedSessionId, { likeSort: order });
+                    } else {
+                      fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic, likeSort: order });
+                    }
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    i > 0 ? "border-l border-gray-200" : ""
+                  } ${
+                    likeSort === order
+                      ? "bg-rose-500 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
+                </button>
+              ))}
+            </div>
+          </div>
           <span className="text-sm text-gray-500">{filtered.length}개</span>
           <div className="flex rounded-md border border-gray-200 overflow-hidden">
             <button
@@ -1288,6 +1352,7 @@ export default function QuestionsPage() {
                     <TableHead>질문 내용</TableHead>
                     <TableHead className="w-20 text-center">폐쇄/개방</TableHead>
                     <TableHead className="w-24 text-center">인지 수준</TableHead>
+                    <TableHead className="w-16 text-center">좋아요</TableHead>
                     <TableHead className="w-20 text-center">공개</TableHead>
                     <TableHead className="w-16 text-center">수정</TableHead>
                   </TableRow>
@@ -1330,6 +1395,21 @@ export default function QuestionsPage() {
                         <span className={`text-xs px-2 py-1 rounded font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
                           {COGNITIVE_LABEL[q.cognitive]}
                         </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="group relative inline-block">
+                          <span className="flex items-center gap-1 text-sm font-medium text-rose-500 justify-center">
+                            ❤️ {q.likeCount}
+                          </span>
+                          {(q.likedBy?.length ?? 0) > 0 && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-36 shadow-lg">
+                              <p className="font-semibold mb-1">좋아요한 학생</p>
+                              {q.likedBy!.map((u) => (
+                                <p key={u.id} className="truncate">{u.name}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <Switch

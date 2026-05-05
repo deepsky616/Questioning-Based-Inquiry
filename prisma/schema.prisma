@@ -31,6 +31,7 @@ model User {
   teacherClasses      TeacherClass[]       @relation("TeacherClasses")
   passwordResetTokens PasswordResetToken[] @relation("PasswordResetTokens")
   unitDesigns         UnitDesign[]         @relation("UnitDesigns")
+  questionLikes       QuestionLike[]       @relation("UserLikes")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -93,6 +94,7 @@ model Question {
   authorId String    @map("author_id")
   author   User      @relation("QuestionAuthor", fields: [authorId], references: [id])
   comments Comment[] @relation("QuestionComments")
+  likes    QuestionLike[] @relation("QuestionLikes")
 
   isPublic  Boolean  @default(false) @map("is_public")
   createdAt DateTime @default(now()) @map("created_at")
@@ -166,4 +168,17 @@ model UnitDesign {
   updatedAt          DateTime        @updatedAt @map("updated_at")
 
   @@map("unit_designs")
+}
+
+model QuestionLike {
+  id         String   @id @default(cuid())
+  questionId String   @map("question_id")
+  question   Question @relation("QuestionLikes", fields: [questionId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  user       User     @relation("UserLikes", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([questionId, userId])
+  @@index([questionId])
+  @@map("question_likes")
 }

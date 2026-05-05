@@ -67,6 +67,9 @@ export async function GET(req: Request) {
     }
   }
 
+  const userId = session.user.id;
+  const likeSortParam = searchParams.get("likeSort") as "asc" | "desc" | null;
+
   const questions = await prisma.question.findMany({
     where,
     include: {
@@ -81,11 +84,33 @@ export async function GET(req: Request) {
           author: { select: { id: true, name: true } },
         },
       },
+      likes: {
+        select: {
+          userId: true,
+          user: { select: { id: true, name: true } },
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(questions);
+  const enriched = questions.map((q) => ({
+    ...q,
+    likeCount: q.likes.length,
+    myLike: q.likes.some((l) => l.userId === userId),
+    likedBy: role === "TEACHER"
+      ? q.likes.map((l) => ({ id: l.user.id, name: l.user.name }))
+      : undefined,
+    likes: undefined,
+  }));
+
+  if (likeSortParam === "desc") {
+    enriched.sort((a, b) => b.likeCount - a.likeCount);
+  } else if (likeSortParam === "asc") {
+    enriched.sort((a, b) => a.likeCount - b.likeCount);
+  }
+
+  return NextResponse.json(enriched);
 }
 
 export async function POST(req: Request) {

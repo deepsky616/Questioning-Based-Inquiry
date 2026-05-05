@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { buildSessionLabel, sortSessionsDesc } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
 import DatePicker from "@/components/shared/DatePicker";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
+import type { LikeSortOrder } from "@/lib/question-likes";
 
 interface QuestionSession {
   id: string;
@@ -40,8 +41,10 @@ interface Question {
   content: string;
   closure: string;
   cognitive: string;
-  author: { name: string; className?: string };
+  author: { id: string; name: string; className?: string };
   createdAt: string;
+  likeCount: number;
+  myLike: boolean;
 }
 
 function CommentSection({ questionId }: { questionId: string }) {
@@ -106,10 +109,20 @@ function CommentSection({ questionId }: { questionId: string }) {
             placeholder="댓글을 입력하세요..."
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
             className="text-sm h-8"
           />
-          <Button size="sm" onClick={handleSubmit} disabled={isPosting || !newComment.trim()} className="h-8 shrink-0">
+          <Button
+            size="sm"
+            onClick={handleSubmit}
+            disabled={isPosting || !newComment.trim()}
+            className="h-8 shrink-0"
+          >
             {isPosting ? "..." : "등록"}
           </Button>
         </div>
@@ -118,7 +131,67 @@ function CommentSection({ questionId }: { questionId: string }) {
   );
 }
 
-function QuestionCard({ q }: { q: Question }) {
+function LikeButton({
+  questionId,
+  authorId,
+  likeCount,
+  myLike,
+  onLikeChange,
+}: {
+  questionId: string;
+  authorId: string;
+  likeCount: number;
+  myLike: boolean;
+  onLikeChange: (questionId: string, newCount: number, myLike: boolean) => void;
+}) {
+  const { data: session } = useSession();
+  const user = getSessionUser(session);
+  const [isPending, setIsPending] = useState(false);
+
+  const isSelf = user.id === authorId;
+
+  const handleClick = async () => {
+    if (!user.id || isSelf || isPending) return;
+    setIsPending(true);
+    try {
+      const method = myLike ? "DELETE" : "POST";
+      const res = await fetch(`/api/questions/${questionId}/likes`, { method });
+      if (res.ok) {
+        const data = await res.json();
+        onLikeChange(questionId, data.likeCount, !myLike);
+      }
+    } catch {
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isSelf || isPending || !user.id}
+      title={isSelf ? "자신의 질문에는 좋아요를 할 수 없습니다" : myLike ? "좋아요 취소" : "좋아요"}
+      className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+        myLike
+          ? "bg-rose-100 text-rose-600 hover:bg-rose-200"
+          : isSelf
+          ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+          : "bg-gray-100 text-gray-500 hover:bg-rose-50 hover:text-rose-500"
+      } ${isPending ? "opacity-50" : ""}`}
+    >
+      <span>{myLike ? "❤️" : "🤍"}</span>
+      <span>{likeCount}</span>
+    </button>
+  );
+}
+
+function QuestionCard({
+  q,
+  onLikeChange,
+}: {
+  q: Question;
+  onLikeChange: (questionId: string, newCount: number, myLike: boolean) => void;
+}) {
   const [showComments, setShowComments] = useState(false);
 
   return (
@@ -126,13 +199,20 @@ function QuestionCard({ q }: { q: Question }) {
       <div className="p-4 bg-gray-50 flex justify-between items-start gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-gray-900">{q.content}</p>
-          <div className="flex gap-2 mt-2">
+          <div className="flex gap-2 mt-2 flex-wrap items-center">
             <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
               {CLOSURE_LABEL[q.closure]}
             </span>
             <span className={`text-xs px-2 py-1 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>
               {COGNITIVE_LABEL[q.cognitive]}
             </span>
+            <LikeButton
+              questionId={q.id}
+              authorId={q.author.id}
+              likeCount={q.likeCount}
+              myLike={q.myLike}
+              onLikeChange={onLikeChange}
+            />
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
@@ -165,20 +245,26 @@ export default function ExplorePage() {
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
+  const [likeSort, setLikeSort] = useState<LikeSortOrder>("none");
 
-  const fetchQuestions = (sessionId: string, opts?: { date?: string; subject?: string; topic?: string }) => {
-    setIsLoading(true);
-    const params = new URLSearchParams({ isPublic: "true" });
-    if (sessionId !== "all") params.set("sessionId", sessionId);
-    if (opts?.date) params.set("date", opts.date);
-    if (opts?.subject) params.set("subject", opts.subject);
-    if (opts?.topic) params.set("topic", opts.topic);
-    fetch(`/api/questions?${params}`)
-      .then((r) => r.json())
-      .then(setQuestions)
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  };
+  const fetchQuestions = useCallback(
+    (sessionId: string, opts?: { date?: string; subject?: string; topic?: string; likeSort?: LikeSortOrder }) => {
+      setIsLoading(true);
+      const params = new URLSearchParams({ isPublic: "true" });
+      if (sessionId !== "all") params.set("sessionId", sessionId);
+      if (opts?.date) params.set("date", opts.date);
+      if (opts?.subject) params.set("subject", opts.subject);
+      if (opts?.topic) params.set("topic", opts.topic);
+      const sort = opts?.likeSort ?? likeSort;
+      if (sort !== "none") params.set("likeSort", sort);
+      fetch(`/api/questions?${params}`)
+        .then((r) => r.json())
+        .then(setQuestions)
+        .catch(() => {})
+        .finally(() => setIsLoading(false));
+    },
+    [likeSort]
+  );
 
   useEffect(() => {
     fetchQuestions("all");
@@ -186,7 +272,27 @@ export default function ExplorePage() {
       .then((r) => r.json())
       .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
       .catch(() => {});
-  }, []);
+  }, [fetchQuestions]);
+
+  const handleLikeChange = (questionId: string, newCount: number, myLike: boolean) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === questionId ? { ...q, likeCount: newCount, myLike } : q))
+    );
+  };
+
+  const handleLikeSortChange = (order: LikeSortOrder) => {
+    setLikeSort(order);
+    if (lookupMode === "session") {
+      fetchQuestions(selectedSessionId, { likeSort: order });
+    } else {
+      fetchQuestions("all", {
+        date: filterDate,
+        subject: filterSubject,
+        topic: filterTopic,
+        likeSort: order,
+      });
+    }
+  };
 
   const handleLookupModeChange = (mode: "session" | "detail") => {
     setLookupMode(mode);
@@ -235,9 +341,13 @@ export default function ExplorePage() {
   );
 
   const QuestionList = ({ list }: { list: Question[] }) =>
-    list.length === 0 ? <Empty /> : (
+    list.length === 0 ? (
+      <Empty />
+    ) : (
       <div className="space-y-3 mt-3">
-        {list.map((q) => <QuestionCard key={q.id} q={q} />)}
+        {list.map((q) => (
+          <QuestionCard key={q.id} q={q} onLikeChange={handleLikeChange} />
+        ))}
       </div>
     );
 
@@ -249,7 +359,9 @@ export default function ExplorePage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">질문 탐구</h2>
-        <p className="text-gray-600">다른 학생들의 질문을 살펴보고 댓글을 남겨보세요 · 공개 {questions.length}개</p>
+        <p className="text-gray-600">
+          다른 학생들의 질문을 살펴보고 댓글을 남겨보세요 · 공개 {questions.length}개
+        </p>
       </div>
 
       {/* 조회 모드 전환 */}
@@ -276,7 +388,29 @@ export default function ExplorePage() {
             날짜·교과·주제별 조회
           </button>
         </div>
-        <span className="ml-auto text-sm text-gray-500">{filtered.length}개</span>
+
+        {/* 좋아요 정렬 */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <span className="text-xs text-gray-500">좋아요순</span>
+          <div className="flex rounded-md border border-gray-200 overflow-hidden">
+            {(["none", "desc", "asc"] as LikeSortOrder[]).map((order, i) => (
+              <button
+                key={order}
+                onClick={() => handleLikeSortChange(order)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  i > 0 ? "border-l border-gray-200" : ""
+                } ${
+                  likeSort === order
+                    ? "bg-rose-500 text-white"
+                    : "bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
+              </button>
+            ))}
+          </div>
+          <span className="text-sm text-gray-500">{filtered.length}개</span>
+        </div>
       </div>
 
       {/* 세션별 조회 UI */}
@@ -307,15 +441,17 @@ export default function ExplorePage() {
 
       {/* 날짜·교과·주제별 조회 UI */}
       {lookupMode === "detail" && (
-        <div className={`rounded-lg border p-3 ${(filterDate || filterSubject || filterTopic) ? "border-indigo-200 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
+        <div
+          className={`rounded-lg border p-3 ${
+            filterDate || filterSubject || filterTopic
+              ? "border-indigo-200 bg-indigo-50"
+              : "border-gray-200 bg-gray-50"
+          }`}
+        >
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 w-40">
               <label className="text-xs font-medium text-gray-600">날짜</label>
-              <DatePicker
-                value={filterDate}
-                onChange={setFilterDate}
-                placeholder="날짜 선택"
-              />
+              <DatePicker value={filterDate} onChange={setFilterDate} placeholder="날짜 선택" />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-gray-600">교과</label>
@@ -336,23 +472,28 @@ export default function ExplorePage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button size="sm" className="h-8" onClick={handleApplyFilter}>조회</Button>
+              <Button size="sm" className="h-8" onClick={handleApplyFilter}>
+                조회
+              </Button>
               {(filterDate || filterSubject || filterTopic) && (
-                <Button size="sm" variant="outline" className="h-8" onClick={handleClearFilter}>초기화</Button>
+                <Button size="sm" variant="outline" className="h-8" onClick={handleClearFilter}>
+                  초기화
+                </Button>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 세션 선택 배너 (세션별 조회 모드에서만) */}
+      {/* 세션 선택 배너 */}
       {lookupMode === "session" && selectedSessionId !== "all" && (
         <div className="text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2">
           {buildSessionLabel(
             selectedSession?.date ?? "",
             selectedSession?.subject ?? "",
             selectedSession?.topic ?? ""
-          )} · {filtered.length}개 질문
+          )}{" "}
+          · {filtered.length}개 질문
         </div>
       )}
 
@@ -362,7 +503,9 @@ export default function ExplorePage() {
           description="선생님의 탐구 질문과 친구들의 공개 질문 흐름을 함께 봅니다"
           subject={selectedSession.subject}
           topic={selectedSession.topic}
-          sharedQuestions={Array.isArray(selectedSession.sharedQuestions) ? selectedSession.sharedQuestions : []}
+          sharedQuestions={
+            Array.isArray(selectedSession.sharedQuestions) ? selectedSession.sharedQuestions : []
+          }
           studentQuestions={filtered.map((question) => ({
             id: question.id,
             content: question.content,
@@ -383,14 +526,24 @@ export default function ExplorePage() {
           <Tabs defaultValue="closed">
             <TabsList>
               <TabsTrigger value="closed">
-                폐쇄형 질문 <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{byType("closure", "closed").length}</span>
+                폐쇄형 질문{" "}
+                <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                  {byType("closure", "closed").length}
+                </span>
               </TabsTrigger>
               <TabsTrigger value="open">
-                개방형 질문 <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">{byType("closure", "open").length}</span>
+                개방형 질문{" "}
+                <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                  {byType("closure", "open").length}
+                </span>
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="closed"><QuestionList list={byType("closure", "closed")} /></TabsContent>
-            <TabsContent value="open"><QuestionList list={byType("closure", "open")} /></TabsContent>
+            <TabsContent value="closed">
+              <QuestionList list={byType("closure", "closed")} />
+            </TabsContent>
+            <TabsContent value="open">
+              <QuestionList list={byType("closure", "open")} />
+            </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
