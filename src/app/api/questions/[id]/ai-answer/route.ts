@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/lib/auth";
@@ -45,7 +46,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
     return NextResponse.json({ answer });
   } catch (error) {
-    console.error("AI answer generation error:", error);
+    logger.error("AI answer generation error:", error);
     return NextResponse.json({ error: "AI 답변 생성에 실패했습니다" }, { status: 500 });
   }
 }

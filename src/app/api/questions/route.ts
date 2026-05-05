@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -140,7 +141,7 @@ export async function POST(req: Request) {
         question: question.content,
       });
       if (!emailResult.ok) {
-        console.error("Question notification email error:", emailResult.error);
+        logger.error("Question notification email error:", emailResult.error);
       }
     }
 
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
     }
-    console.error("Create question error:", error);
+    logger.error("Create question error:", error);
     return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });
   }
 }

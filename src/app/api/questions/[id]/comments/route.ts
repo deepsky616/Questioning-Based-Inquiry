@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -62,7 +63,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     return NextResponse.json(comment);
   } catch (error) {
-    console.error("Create comment error:", error);
+    logger.error("Create comment error:", error);
     return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -99,7 +100,7 @@ export async function GET(
       students: studentList,
     });
   } catch (error) {
-    console.error("Participation fetch error:", error);
+    logger.error("Participation fetch error:", error);
     return NextResponse.json({ error: "서버 오류" }, { status: 500 });
   }
 }

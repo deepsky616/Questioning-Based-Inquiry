@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/lib/auth";
@@ -108,7 +109,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       totalComments,
     });
   } catch (error) {
-    console.error("Session analysis error:", error);
+    logger.error("Session analysis error:", error);
     return NextResponse.json({ error: "AI 분석에 실패했습니다" }, { status: 500 });
   }
 }

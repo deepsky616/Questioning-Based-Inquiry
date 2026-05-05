@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendTeacherPasswordResetEmail } from "@/lib/email";
@@ -57,9 +58,9 @@ export async function POST(req: Request) {
       resetUrl,
     });
 
-    console.log("[forgot-password] emailResult:", JSON.stringify(emailResult));
+    logger.info("[forgot-password] emailResult:", JSON.stringify(emailResult));
     if (!emailResult.ok) {
-      console.error("Password reset email error:", emailResult.error);
+      logger.error("Password reset email error:", emailResult.error);
     }
 
     return NextResponse.json({ message: "비밀번호 재설정 링크를 이메일로 보냈습니다." });
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "올바른 이메일을 입력해 주세요" }, { status: 400 });
     }
-    console.error("Forgot password error:", error);
+    logger.error("Forgot password error:", error);
     return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });
   }
 }

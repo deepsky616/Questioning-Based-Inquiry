@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
     }
-    console.error("Config save error:", error);
+    logger.error("Config save error:", error);
     return NextResponse.json({ error: "설정 저장에 실패했습니다" }, { status: 500 });
   }
 }

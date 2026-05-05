@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "API 키가 올바르지 않습니다" }, { status: 400 });
     }
 
-    console.error("Gemini test error:", error);
+    logger.error("Gemini test error:", error);
     return NextResponse.json({
       success: false,
       error: "Gemini API 연결에 실패했습니다. API 키와 모델을 확인해 주세요."

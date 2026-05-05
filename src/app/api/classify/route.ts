@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
     }
 
-    console.error("Gemini classify error:", error);
+    logger.error("Gemini classify error:", error);
     return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });
   }
 }

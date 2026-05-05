@@ -55,21 +55,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     jwt: ({ token, user }) => {
       if (user) {
         token.id = user.id;
-        token.role = (user as any).role;
-        token.school = (user as any).school;
-        token.grade = (user as any).grade;
-        token.className = (user as any).className;
+        token.role = user.role;
+        token.school = user.school;
+        token.grade = user.grade;
+        token.className = user.className;
       }
       return token;
     },
     session: ({ session, token }) => {
-      if (session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).role = token.role;
-        (session.user as any).school = token.school;
-        (session.user as any).grade = token.grade;
-        (session.user as any).className = token.className;
-      }
+      session.user.id = token.id;
+      session.user.role = token.role;
+      session.user.school = token.school;
+      session.user.grade = token.grade;
+      session.user.className = token.className;
       return session;
     },
   },
