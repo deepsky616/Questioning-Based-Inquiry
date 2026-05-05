@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     const data = saveSchema.parse(body);
     const teacherId = (session.user as { id: string }).id;
 
-    // 단원 설계 저장 (ID를 RETURNING으로 회수)
+    // 탐구 질문 저장 (ID를 RETURNING으로 회수)
     const inserted = await prisma.$queryRawUnsafe<{ id: string }[]>(
       `INSERT INTO unit_designs
          (id, teacher_id, curriculum_area_id, title, subject, grade_range, area,

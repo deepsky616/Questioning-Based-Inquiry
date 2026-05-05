@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { fallbackClassification, parseClassificationResponse } from "@/lib/classify";
 import type { ClassificationResult } from "@/types/question";
+import { DEFAULT_GEMINI_MODEL } from "@/lib/api-config";
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || "");
 
@@ -38,7 +39,7 @@ export async function classifyQuestion(
   if (cached) return cached;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: DEFAULT_GEMINI_MODEL });
 
     const fullPrompt = `${CLASSIFICATION_PROMPT}\n\n[분석할 질문]\n${content}${context ? `\n[맥락] ${context}` : ""}`;
 

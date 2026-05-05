@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
+import { resolveGeminiModel } from "@/lib/api-config";
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -45,7 +46,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
-    const model = genAI.getGenerativeModel({ model: modelRecord?.value ?? "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: resolveGeminiModel(modelRecord?.value) });
 
     const prompt = buildSessionAnalysisPrompt(questions, questionSession.subject, questionSession.topic);
     const result = await model.generateContent(prompt);

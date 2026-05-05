@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
-import { maskApiKey } from "@/lib/api-config";
+import { DEFAULT_GEMINI_MODEL, isAllowedGeminiModel, maskApiKey } from "@/lib/api-config";
 
 const saveConfigSchema = z.object({
-  apiKey: z.string().min(10),
-  model: z.string().min(1),
+  apiKey: z.string().optional(),
+  model: z.string().refine(isAllowedGeminiModel, "지원하지 않는 Gemini 모델입니다"),
 });
 
 export async function GET() {
@@ -23,7 +23,9 @@ export async function GET() {
   return NextResponse.json({
     configured: !!apiKeyRecord,
     maskedApiKey: apiKeyRecord ? maskApiKey(apiKeyRecord.value) : null,
-    model: modelRecord?.value ?? "gemini-2.0-flash",
+    model: modelRecord?.value && isAllowedGeminiModel(modelRecord.value)
+      ? modelRecord.value
+      : DEFAULT_GEMINI_MODEL,
   });
 }
 
@@ -41,21 +43,44 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { apiKey, model } = saveConfigSchema.parse(body);
+    const trimmedApiKey = apiKey?.trim() ?? "";
+    const existingApiKey = await prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } });
 
-    await Promise.all([
-      prisma.systemConfig.upsert({
-        where: { key: "gemini_api_key" },
-        update: { value: apiKey },
-        create: { key: "gemini_api_key", value: apiKey },
-      }),
+    if (!existingApiKey && trimmedApiKey.length < 10) {
+      return NextResponse.json({ error: "API 키를 입력해 주세요" }, { status: 400 });
+    }
+    if (trimmedApiKey && trimmedApiKey.length < 10) {
+      return NextResponse.json({ error: "API 키는 10자 이상이어야 합니다" }, { status: 400 });
+    }
+
+    const writes = [
       prisma.systemConfig.upsert({
         where: { key: "gemini_model" },
         update: { value: model },
         create: { key: "gemini_model", value: model },
       }),
-    ]);
+    ];
 
-    return NextResponse.json({ success: true, model });
+    if (trimmedApiKey) {
+      writes.push(
+        prisma.systemConfig.upsert({
+          where: { key: "gemini_api_key" },
+          update: { value: trimmedApiKey },
+          create: { key: "gemini_api_key", value: trimmedApiKey },
+        })
+      );
+    }
+
+    await Promise.all(writes);
+
+    return NextResponse.json({
+      success: true,
+      model,
+      configured: true,
+      maskedApiKey: trimmedApiKey
+        ? maskApiKey(trimmedApiKey)
+        : maskApiKey(existingApiKey!.value),
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });

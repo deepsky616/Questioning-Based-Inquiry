@@ -76,14 +76,14 @@ beforeEach(() => {
 
 // ─── GET /api/unit-design ─────────────────────────────────────────────────────
 
-describe("GET /api/unit-design — 단원 설계 목록", () => {
+describe("GET /api/unit-design — 탐구 질문 목록", () => {
   it("세션이 없으면 401을 반환한다", async () => {
     mockAuth.mockResolvedValue(null);
     const res = await GET(new Request("http://localhost/api/unit-design"));
     expect(res.status).toBe(401);
   });
 
-  it("교사 세션이면 단원 설계 목록을 반환한다", async () => {
+  it("교사 세션이면 탐구 질문 목록을 반환한다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockQueryRaw.mockResolvedValue([
       {
@@ -108,7 +108,7 @@ describe("GET /api/unit-design — 단원 설계 목록", () => {
     ]);
   });
 
-  it("단원 설계가 없으면 빈 배열을 반환한다", async () => {
+  it("탐구 질문가 없으면 빈 배열을 반환한다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockQueryRaw.mockResolvedValue([]);
 
@@ -133,7 +133,7 @@ const VALID_DESIGN = {
   inquiryQuestions: [{ type: "factual", content: "광합성이 일어나는 장소는 어디인가?" }],
 };
 
-describe("POST /api/unit-design — 단원 설계 저장", () => {
+describe("POST /api/unit-design — 탐구 질문 저장", () => {
   it("세션이 없으면 401을 반환한다", async () => {
     mockAuth.mockResolvedValue(null);
     const res = await POST(makeRequest(VALID_DESIGN));
@@ -194,7 +194,7 @@ describe("POST /api/unit-design — 단원 설계 저장", () => {
 
 // ─── DELETE /api/unit-design/[id] ────────────────────────────────────────────
 
-describe("DELETE /api/unit-design/[id] — 단원 설계 삭제", () => {
+describe("DELETE /api/unit-design/[id] — 탐구 질문 삭제", () => {
   it("세션이 없으면 401을 반환한다", async () => {
     mockAuth.mockResolvedValue(null);
     const [req, ctx] = makeDeleteRequest("ud-1");
@@ -396,7 +396,7 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockFindUnique
       .mockResolvedValueOnce({ value: "test-api-key" })
-      .mockResolvedValueOnce({ value: "gemini-2.0-flash" });
+      .mockResolvedValueOnce({ value: "gemini-2.5-flash" });
 
     setAiResponse('{"keywords": ["광합성", "엽록체", "에너지 전환"]}');
 

@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildAnswerPrompt } from "@/lib/ai-prompts";
 import { validateBulkAiRequest } from "@/lib/questions";
+import { resolveGeminiModel } from "@/lib/api-config";
 
 const schema = z.object({
   questionIds: z.array(z.string()).min(1),
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
     });
 
     const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
-    const model = genAI.getGenerativeModel({ model: modelRecord?.value ?? "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: resolveGeminiModel(modelRecord?.value) });
 
     // 각 질문에 대해 AI 답변 동시 생성
     const aiResults = await Promise.allSettled(

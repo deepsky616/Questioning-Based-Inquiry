@@ -9,6 +9,14 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, Suspense } from "react";
 import Link from "next/link";
+import {
+  sanitizeStudentNumberInput,
+  STUDENT_LOGIN_AUTOCOMPLETE,
+  STUDENT_LOGIN_FORM_PROPS,
+  STUDENT_NUMBER_INPUT_PROPS,
+  TEACHER_LOGIN_AUTOCOMPLETE,
+  TEACHER_LOGIN_FORM_PROPS,
+} from "@/lib/login-autocomplete";
 
 function StudentLoginForm() {
   const router = useRouter();
@@ -17,7 +25,10 @@ function StudentLoginForm() {
   const [form, setForm] = useState({ school: "", grade: "", className: "", studentNumber: "", password: "" });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const value = e.target.name === "studentNumber"
+      ? sanitizeStudentNumberInput(e.target.value)
+      : e.target.value;
+    setForm((prev) => ({ ...prev, [e.target.name]: value }));
     setError(null);
   };
 
@@ -50,29 +61,29 @@ function StudentLoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4" {...STUDENT_LOGIN_FORM_PROPS}>
       {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>}
       <div className="space-y-2">
         <Label htmlFor="s-school">학교</Label>
-        <Input id="s-school" name="school" placeholder="한빛초등학교" value={form.school} onChange={handleChange} />
+        <Input id="s-school" name="school" placeholder="한빛초등학교" value={form.school} onChange={handleChange} autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.school} />
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-2">
           <Label htmlFor="s-grade">학년</Label>
-          <Input id="s-grade" name="grade" placeholder="3" value={form.grade} onChange={handleChange} />
+          <Input id="s-grade" name="grade" placeholder="3" value={form.grade} onChange={handleChange} autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.grade} inputMode="numeric" pattern="[0-9]*" />
         </div>
         <div className="space-y-2">
           <Label htmlFor="s-class">반</Label>
-          <Input id="s-class" name="className" placeholder="2" value={form.className} onChange={handleChange} />
+          <Input id="s-class" name="className" placeholder="2" value={form.className} onChange={handleChange} autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.className} inputMode="numeric" pattern="[0-9]*" />
         </div>
         <div className="space-y-2">
           <Label htmlFor="s-number">번호</Label>
-          <Input id="s-number" name="studentNumber" placeholder="15" value={form.studentNumber} onChange={handleChange} />
+          <Input id="s-number" name="studentNumber" placeholder="15" value={form.studentNumber} onChange={handleChange} {...STUDENT_NUMBER_INPUT_PROPS} />
         </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor="s-password">비밀번호</Label>
-        <Input id="s-password" name="password" type="password" placeholder="••••" value={form.password} onChange={handleChange} />
+        <Input id="s-password" name="password" type="password" placeholder="••••" value={form.password} onChange={handleChange} autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.password} />
       </div>
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "로그인 중..." : "학생 로그인"}
@@ -118,15 +129,15 @@ function TeacherLoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4" {...TEACHER_LOGIN_FORM_PROPS}>
       {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>}
       <div className="space-y-2">
         <Label htmlFor="t-email">이메일</Label>
-        <Input id="t-email" name="email" type="email" placeholder="teacher@school.kr" value={form.email} onChange={handleChange} />
+        <Input id="t-email" name="email" type="email" placeholder="teacher@school.kr" value={form.email} onChange={handleChange} autoComplete={TEACHER_LOGIN_AUTOCOMPLETE.email} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="t-password">비밀번호</Label>
-        <Input id="t-password" name="password" type="password" placeholder="••••••" value={form.password} onChange={handleChange} />
+        <Input id="t-password" name="password" type="password" placeholder="••••••" value={form.password} onChange={handleChange} autoComplete={TEACHER_LOGIN_AUTOCOMPLETE.password} />
       </div>
       <div className="text-right">
         <Link href="/forgot-password" className="text-sm text-primary hover:underline">

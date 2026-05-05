@@ -13,12 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const GEMINI_MODELS = [
-  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
-];
+import { DEFAULT_GEMINI_MODEL, GEMINI_MODELS } from "@/lib/api-config";
 
 interface BulkStudent {
   studentNumber: string;
@@ -30,7 +25,7 @@ export default function TeacherSettingsPage() {
   const user = session?.user as { name?: string; email?: string; school?: string };
 
   const [apiKey, setApiKey] = useState("");
-  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_GEMINI_MODEL);
   const [currentConfig, setCurrentConfig] = useState<{
     configured: boolean;
     maskedApiKey: string | null;
@@ -61,8 +56,12 @@ export default function TeacherSettingsPage() {
   }, []);
 
   const handleTest = async () => {
-    if (!apiKey || apiKey.length < 10) {
+    if (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) {
       setMessage({ type: "error", text: "API 키를 입력해 주세요 (10자 이상)" });
+      return;
+    }
+    if (apiKey && apiKey.length < 10) {
+      setMessage({ type: "error", text: "API 키는 10자 이상이어야 합니다" });
       return;
     }
 
@@ -89,8 +88,12 @@ export default function TeacherSettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!apiKey || apiKey.length < 10) {
+    if (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) {
       setMessage({ type: "error", text: "API 키를 입력해 주세요 (10자 이상)" });
+      return;
+    }
+    if (apiKey && apiKey.length < 10) {
+      setMessage({ type: "error", text: "API 키는 10자 이상이어야 합니다" });
       return;
     }
 
@@ -104,13 +107,18 @@ export default function TeacherSettingsPage() {
         body: JSON.stringify({ apiKey, model: selectedModel }),
       });
 
-      if (!res.ok) throw new Error("저장 실패");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "저장 실패");
 
-      setCurrentConfig({ configured: true, maskedApiKey: `${apiKey.slice(0, 4)}****`, model: selectedModel });
+      setCurrentConfig({
+        configured: true,
+        maskedApiKey: data.maskedApiKey ?? currentConfig?.maskedApiKey ?? null,
+        model: data.model ?? selectedModel,
+      });
       setApiKey("");
-      setMessage({ type: "success", text: "API 설정이 저장됐습니다. 이제 모든 학생이 AI 분류를 사용할 수 있습니다." });
-    } catch {
-      setMessage({ type: "error", text: "설정 저장에 실패했습니다" });
+      setMessage({ type: "success", text: "AI 설정이 저장됐습니다. 저장된 API 키는 유지되고 선택한 모델이 적용됩니다." });
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "설정 저장에 실패했습니다" });
     } finally {
       setIsSaving(false);
     }
@@ -122,7 +130,8 @@ export default function TeacherSettingsPage() {
     setIsDeleting(true);
     try {
       await fetch("/api/config", { method: "DELETE" });
-      setCurrentConfig({ configured: false, maskedApiKey: null, model: "gemini-2.5-flash" });
+      setCurrentConfig({ configured: false, maskedApiKey: null, model: DEFAULT_GEMINI_MODEL });
+      setSelectedModel(DEFAULT_GEMINI_MODEL);
       setMessage({ type: "success", text: "AI 설정이 삭제됐습니다" });
     } catch {
       setMessage({ type: "error", text: "삭제에 실패했습니다" });
@@ -325,7 +334,7 @@ export default function TeacherSettingsPage() {
           {currentConfig?.configured && (
             <div className="p-3 rounded-lg bg-green-50 border border-green-200 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-800">AI 분류가 활성화됐습니다</p>
+            <p className="text-sm font-medium text-green-800">AI 분류가 활성화됐습니다</p>
                 <p className="text-xs text-green-600 mt-0.5">
                   현재 키: {currentConfig.maskedApiKey} · 모델: {currentConfig.model}
                 </p>
@@ -362,6 +371,11 @@ export default function TeacherSettingsPage() {
                 setMessage(null);
               }}
             />
+            {currentConfig?.configured && (
+              <p className="text-xs text-gray-500">
+                비워두고 저장하면 기존 API 키는 그대로 유지되고 모델만 변경됩니다.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -387,13 +401,13 @@ export default function TeacherSettingsPage() {
             <Button
               variant="outline"
               onClick={handleTest}
-              disabled={!apiKey || apiKey.length < 10 || isTesting}
+              disabled={isTesting || (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) || (!!apiKey && apiKey.length < 10)}
             >
               {isTesting ? "테스트 중..." : "연결 테스트"}
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!apiKey || apiKey.length < 10 || isSaving}
+              disabled={isSaving || (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) || (!!apiKey && apiKey.length < 10)}
             >
               {isSaving ? "저장 중..." : "저장"}
             </Button>

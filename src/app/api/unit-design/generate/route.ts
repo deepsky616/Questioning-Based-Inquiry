@@ -4,6 +4,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildPrompt, unitDesignGenerateSchema } from "@/lib/unit-design-prompt";
+import { resolveGeminiModel } from "@/lib/api-config";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(keyRecord.value);
-    const model = genAI.getGenerativeModel({ model: modelRecord?.value ?? "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: resolveGeminiModel(modelRecord?.value) });
 
     const prompt = buildPrompt(data);
     const result = await model.generateContent(prompt);

@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { fallbackClassification, parseClassificationResponse } from "@/lib/classify";
-import { resolveApiKey } from "@/lib/api-config";
+import { isAllowedGeminiModel, resolveApiKey, resolveGeminiModel } from "@/lib/api-config";
 import { prisma } from "@/lib/db";
 
 const classifySchema = z.object({
   apiKey: z.string().optional(),
-  model: z.string().optional(),
+  model: z.string().refine(isAllowedGeminiModel, "지원하지 않는 Gemini 모델입니다").optional(),
   content: z.string().min(1).max(500),
   context: z.string().optional(),
 });
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     ]);
 
     const apiKey = resolveApiKey(requestApiKey, serverKeyRecord?.value);
-    const model = requestModel || serverModelRecord?.value || "gemini-2.0-flash";
+    const model = resolveGeminiModel(requestModel || serverModelRecord?.value);
 
     // API 키가 없으면 키워드 기반 fallback 분류
     if (!apiKey) {
