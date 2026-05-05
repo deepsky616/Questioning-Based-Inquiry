@@ -22,7 +22,7 @@ describe("canLikeQuestion", () => {
       likerRole: "STUDENT",
     });
     expect(result.ok).toBe(false);
-    expect(result.reason).toMatch(/자신/);
+    if (!result.ok) expect(result.reason).toMatch(/자신/);
   });
 
   it("교사는 좋아요를 할 수 없다", () => {
@@ -32,7 +32,7 @@ describe("canLikeQuestion", () => {
       likerRole: "TEACHER",
     });
     expect(result.ok).toBe(false);
-    expect(result.reason).toMatch(/학생/);
+    if (!result.ok) expect(result.reason).toMatch(/학생/);
   });
 
   it("비공개 질문에는 좋아요를 할 수 없다", () => {
@@ -43,7 +43,7 @@ describe("canLikeQuestion", () => {
       isPublic: false,
     });
     expect(result.ok).toBe(false);
-    expect(result.reason).toMatch(/공개/);
+    if (!result.ok) expect(result.reason).toMatch(/공개/);
   });
 
   it("공개 질문에는 좋아요를 할 수 있다", () => {

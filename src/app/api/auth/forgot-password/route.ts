@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       resetUrl,
     });
 
-    logger.info("[forgot-password] emailResult:", JSON.stringify(emailResult));
+    logger.info("[forgot-password] emailResult:", emailResult);
     if (!emailResult.ok) {
       logger.error("Password reset email error:", emailResult.error);
     }

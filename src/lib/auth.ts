@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { buildStudentEmail } from "@/lib/student-auth";
+import type { UserRole } from "@/types/user";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -63,11 +64,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     session: ({ session, token }) => {
-      session.user.id = token.id;
-      session.user.role = token.role;
-      session.user.school = token.school;
-      session.user.grade = token.grade;
-      session.user.className = token.className;
+      session.user.id = token.id as string;
+      session.user.role = token.role as UserRole;
+      session.user.school = (token.school as string | null) ?? null;
+      session.user.grade = (token.grade as string | null) ?? null;
+      session.user.className = (token.className as string | null) ?? null;
       return session;
     },
   },
