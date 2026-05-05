@@ -20,6 +20,12 @@ import {
   splitCoreIdeaLines,
   toggleContentItem,
 } from "@/lib/content-selection";
+import {
+  filterSelectedInquiryQuestions,
+  filterSelectedTexts,
+  selectAllIndices,
+  toggleSelectedIndex,
+} from "@/lib/inquiry-design-selection";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 interface CurriculumUnit {
@@ -170,14 +176,17 @@ export default function CurriculumPage() {
 
   // Step 3 — 핵심 문장
   const [coreSentences, setCoreSentences] = useState<string[]>([]);
+  const [selectedCoreSentenceIndices, setSelectedCoreSentenceIndices] = useState<number[]>([]);
   const [loadingSentences, setLoadingSentences] = useState(false);
 
   // Step 4 — 핵심 질문
   const [essentialQuestions, setEssentialQuestions] = useState<string[]>([]);
+  const [selectedEssentialQuestionIndices, setSelectedEssentialQuestionIndices] = useState<number[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
   // Step 5 — 탐구 질문
   const [inquiryQuestions, setInquiryQuestions] = useState<InquiryQuestion[]>([]);
+  const [selectedInquiryQuestionIndices, setSelectedInquiryQuestionIndices] = useState<number[]>([]);
   const [loadingInquiry, setLoadingInquiry] = useState(false);
 
   useEffect(() => { fetchSaved(); }, []);
@@ -279,6 +288,16 @@ export default function CurriculumPage() {
     return getSelectedAchievementsForAnalysis(getFilteredAchievements(), selectedAchievementCodes);
   };
 
+  const selectedCoreSentences = filterSelectedTexts(coreSentences, selectedCoreSentenceIndices);
+  const selectedEssentialQuestions = filterSelectedTexts(
+    essentialQuestions,
+    selectedEssentialQuestionIndices
+  );
+  const selectedInquiryQuestions = filterSelectedInquiryQuestions(
+    inquiryQuestions,
+    selectedInquiryQuestionIndices
+  );
+
   const getFilteredAchievementGroups = () => {
     const groups = curriculumData?.achievementGroups ?? [];
     if (groups.length === 0) return [];
@@ -346,6 +365,11 @@ export default function CurriculumPage() {
       const data = await callGenerate("sentences");
       if (data?.sentences) {
         setCoreSentences(data.sentences);
+        setSelectedCoreSentenceIndices(selectAllIndices(data.sentences));
+        setEssentialQuestions([]);
+        setSelectedEssentialQuestionIndices([]);
+        setInquiryQuestions([]);
+        setSelectedInquiryQuestionIndices([]);
         setStep(3);
       }
     } finally {
@@ -356,9 +380,12 @@ export default function CurriculumPage() {
   const handleGoStep4 = async () => {
     setLoadingQuestions(true);
     try {
-      const data = await callGenerate("questions");
+      const data = await callGenerate("questions", { coreSentences: selectedCoreSentences });
       if (data?.questions) {
         setEssentialQuestions(data.questions);
+        setSelectedEssentialQuestionIndices(selectAllIndices(data.questions));
+        setInquiryQuestions([]);
+        setSelectedInquiryQuestionIndices([]);
         setStep(4);
       }
     } finally {
@@ -369,9 +396,13 @@ export default function CurriculumPage() {
   const handleGoStep5 = async () => {
     setLoadingInquiry(true);
     try {
-      const data = await callGenerate("inquiry");
+      const data = await callGenerate("inquiry", {
+        coreSentences: selectedCoreSentences,
+        essentialQuestions: selectedEssentialQuestions,
+      });
       if (data?.inquiryQuestions) {
         setInquiryQuestions(data.inquiryQuestions);
+        setSelectedInquiryQuestionIndices(selectAllIndices(data.inquiryQuestions));
         setStep(5);
       }
     } finally {
@@ -394,7 +425,7 @@ export default function CurriculumPage() {
   };
 
   const handleSave = async () => {
-    if (!curriculumData || !saveTitle.trim()) return;
+    if (!curriculumData || !saveTitle.trim() || selectedInquiryQuestions.length === 0) return;
     setIsSaving(true);
     setCreatedSessionMessage("");
     try {
@@ -409,9 +440,9 @@ export default function CurriculumPage() {
           area: curriculumData.area,
           coreIdea: curriculumData.coreIdea,
           selectedKeywords,
-          coreSentences,
-          essentialQuestions,
-          inquiryQuestions,
+          coreSentences: selectedCoreSentences,
+          essentialQuestions: selectedEssentialQuestions,
+          inquiryQuestions: selectedInquiryQuestions,
         }),
       });
       if (res.ok) {
@@ -1160,11 +1191,40 @@ export default function CurriculumPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">3단계 · 핵심 문장</CardTitle>
-            <CardDescription>학년 수준에 맞게 재진술된 핵심 문장입니다. 직접 수정할 수 있습니다.</CardDescription>
+            <CardDescription>다음 단계에 반영할 핵심 문장을 선택하고 직접 수정할 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>{selectedCoreSentences.length}개 선택됨</span>
+              <span className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCoreSentenceIndices(selectAllIndices(coreSentences))}
+                  className="text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  전체 선택
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCoreSentenceIndices([])}
+                  className="text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  전체 해제
+                </button>
+              </span>
+            </div>
             {coreSentences.map((s, i) => (
               <div key={i} className="flex gap-2 items-start">
+                <input
+                  type="checkbox"
+                  className="mt-2.5 h-4 w-4 shrink-0 accent-indigo-600"
+                  checked={selectedCoreSentenceIndices.includes(i)}
+                  onChange={() =>
+                    setSelectedCoreSentenceIndices((prev) => toggleSelectedIndex(prev, i))
+                  }
+                  aria-label={`${i + 1}번 핵심 문장 선택`}
+                />
                 <span className="mt-2.5 text-xs font-bold text-indigo-500 shrink-0">{i + 1}</span>
                 <textarea
                   className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
@@ -1180,7 +1240,7 @@ export default function CurriculumPage() {
             ))}
             <Button
               onClick={handleGoStep4}
-              disabled={loadingQuestions || coreSentences.every((s) => !s.trim())}
+              disabled={loadingQuestions || selectedCoreSentences.length === 0}
               className="w-full"
             >
               {loadingQuestions ? "핵심 질문 도출 중..." : "다음 단계: 핵심 질문 도출하기 →"}
@@ -1194,11 +1254,40 @@ export default function CurriculumPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">4단계 · 핵심 질문</CardTitle>
-            <CardDescription>단원 전체를 관통하는 본질적인 질문입니다. 직접 수정할 수 있습니다.</CardDescription>
+            <CardDescription>탐구 질문 생성에 반영할 핵심 질문을 선택하고 직접 수정할 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>{selectedEssentialQuestions.length}개 선택됨</span>
+              <span className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedEssentialQuestionIndices(selectAllIndices(essentialQuestions))}
+                  className="text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  전체 선택
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedEssentialQuestionIndices([])}
+                  className="text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  전체 해제
+                </button>
+              </span>
+            </div>
             {essentialQuestions.map((q, i) => (
               <div key={i} className="flex gap-2 items-start">
+                <input
+                  type="checkbox"
+                  className="mt-2.5 h-4 w-4 shrink-0 accent-indigo-600"
+                  checked={selectedEssentialQuestionIndices.includes(i)}
+                  onChange={() =>
+                    setSelectedEssentialQuestionIndices((prev) => toggleSelectedIndex(prev, i))
+                  }
+                  aria-label={`${i + 1}번 핵심 질문 선택`}
+                />
                 <span className="mt-2.5 text-xs font-bold text-indigo-500 shrink-0">Q{i + 1}</span>
                 <textarea
                   className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
@@ -1214,7 +1303,7 @@ export default function CurriculumPage() {
             ))}
             <Button
               onClick={handleGoStep5}
-              disabled={loadingInquiry || essentialQuestions.every((q) => !q.trim())}
+              disabled={loadingInquiry || selectedEssentialQuestions.length === 0}
               className="w-full"
             >
               {loadingInquiry ? "탐구 질문 생성 중..." : "다음 단계: 탐구 질문 구체화하기 →"}
@@ -1228,9 +1317,29 @@ export default function CurriculumPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">5단계 · 탐구 질문</CardTitle>
-            <CardDescription>핵심 질문에 도달하기 위한 사실적·개념적·논쟁적 질문입니다.</CardDescription>
+            <CardDescription>저장할 사실적·개념적·논쟁적 질문을 선택하고 직접 수정할 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>{selectedInquiryQuestions.length}개 선택됨</span>
+              <span className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInquiryQuestionIndices(selectAllIndices(inquiryQuestions))}
+                  className="text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  전체 선택
+                </button>
+                <span className="text-gray-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInquiryQuestionIndices([])}
+                  className="text-indigo-600 hover:text-indigo-800 underline"
+                >
+                  전체 해제
+                </button>
+              </span>
+            </div>
             {(["factual", "conceptual", "controversial"] as const).map((type) => (
               <div key={type}>
                 <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
@@ -1241,7 +1350,18 @@ export default function CurriculumPage() {
                     .map((q, i) => ({ ...q, idx: i }))
                     .filter((q) => q.type === type)
                     .map(({ content, idx }) => (
-                      <div key={idx} className={`rounded-lg border px-4 py-3 ${TYPE_COLOR[type]}`}>
+                      <div key={idx} className={`flex gap-2 rounded-lg border px-4 py-3 ${TYPE_COLOR[type]}`}>
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 shrink-0 accent-indigo-600"
+                          checked={selectedInquiryQuestionIndices.includes(idx)}
+                          onChange={() =>
+                            setSelectedInquiryQuestionIndices((prev) =>
+                              toggleSelectedIndex(prev, idx)
+                            )
+                          }
+                          aria-label={`${TYPE_LABEL[type]} 선택`}
+                        />
                         <textarea
                           className="w-full bg-transparent text-sm resize-none outline-none"
                           rows={2}
@@ -1268,7 +1388,7 @@ export default function CurriculumPage() {
                 />
                 <Button
                   onClick={handleSave}
-                  disabled={isSaving || !saveTitle.trim()}
+                  disabled={isSaving || !saveTitle.trim() || selectedInquiryQuestions.length === 0}
                   className="shrink-0"
                 >
                   {isSaving ? "저장 중..." : "저장"}

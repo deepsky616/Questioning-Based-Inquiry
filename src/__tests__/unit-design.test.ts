@@ -510,6 +510,8 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     const inquiryPrompt = buildPrompt({
       ...PROMPT_BASE,
       step: "inquiry",
+      selectedKeywords: ["광합성", "에너지 전환"],
+      coreSentences: ["식물은 빛 에너지를 생명 활동에 필요한 물질로 전환한다."],
       essentialQuestions: ["생물은 어떻게 에너지를 얻고 활용하는가?"],
       achievementConsiderations: ["학생의 관찰 경험과 연결한다."],
     });
@@ -518,5 +520,13 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     expect(questionsPrompt).toContain("광합성을 에너지 전환과 연결한다.");
     expect(inquiryPrompt).toContain("[선택 성취기준 기반 맥락]");
     expect(inquiryPrompt).toContain("학생의 관찰 경험과 연결한다.");
+    expect(inquiryPrompt).toContain("[선택한 핵심어] 광합성, 에너지 전환");
+    expect(inquiryPrompt).toContain("[선택 핵심 문장]");
+    expect(inquiryPrompt).toContain("식물은 빛 에너지를 생명 활동에 필요한 물질로 전환한다.");
+    expect(inquiryPrompt).toContain("[선택 핵심 질문]");
+    expect(inquiryPrompt).toContain("생물은 어떻게 에너지를 얻고 활용하는가?");
+    expect(inquiryPrompt).toContain("factual (사실적): 사실·정보 확인·기억 → 3~4개");
+    expect(inquiryPrompt).toContain("conceptual (개념적): 추론·비교·분석·해석 → 3~4개");
+    expect(inquiryPrompt).toContain("controversial (논쟁적): 판단·의견·가치·적용 → 정확히 2개");
   });
 });

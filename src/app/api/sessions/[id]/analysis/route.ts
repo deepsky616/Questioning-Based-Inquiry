@@ -20,13 +20,40 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     where: { id: params.id },
     include: {
       questions: {
-        select: { content: true, closure: true, cognitive: true },
+        select: {
+          content: true,
+          closure: true,
+          cognitive: true,
+          author: {
+            select: {
+              role: true,
+            },
+          },
+          comments: {
+            select: {
+              content: true,
+              author: {
+                select: {
+                  name: true,
+                  role: true,
+                },
+              },
+            },
+            orderBy: { createdAt: "asc" },
+          },
+        },
+        orderBy: { createdAt: "asc" },
       },
     },
   });
 
   if (!questionSession) {
     return NextResponse.json({ error: "세션을 찾을 수 없습니다" }, { status: 404 });
+  }
+
+  const teacherId = (session.user as { id: string }).id;
+  if (questionSession.teacherId !== teacherId) {
+    return NextResponse.json({ error: "세션 분석 권한이 없습니다" }, { status: 403 });
   }
 
   const [apiKeyRecord, modelRecord] = await Promise.all([
@@ -38,11 +65,21 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
   }
 
-  const questions = questionSession.questions.map((q) => ({
-    content: q.content,
-    closure: q.closure,
-    cognitive: q.cognitive,
-  }));
+  const questions = questionSession.questions
+    .filter((q) => q.author.role !== "TEACHER")
+    .map((q) => ({
+      content: q.content,
+      closure: q.closure,
+      cognitive: q.cognitive,
+      comments: q.comments
+        .filter((comment) => comment.author.role !== "TEACHER")
+        .map((comment) => ({
+          content: comment.content,
+          authorRole: comment.author.role,
+          authorName: comment.author.name,
+        })),
+    }));
+  const totalComments = questions.reduce((count, question) => count + question.comments.length, 0);
 
   try {
     const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
@@ -59,13 +96,16 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       summary: string;
       themes: string[];
       insights: string;
+      commentInsights?: string;
     };
 
     return NextResponse.json({
       summary: parsed.summary ?? "",
       themes: Array.isArray(parsed.themes) ? parsed.themes : [],
       insights: parsed.insights ?? "",
+      commentInsights: parsed.commentInsights ?? "",
       totalQuestions: questions.length,
+      totalComments,
     });
   } catch (error) {
     console.error("Session analysis error:", error);

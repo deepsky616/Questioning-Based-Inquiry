@@ -126,18 +126,21 @@ ${data.coreSentences.map((s, i) => `${i + 1}. ${s}`).join("\n")}
   }
 
   return `당신은 수업 설계 전문가입니다.
-아래 핵심 질문에 도달하기 위한 탐구 질문을 세 유형으로 생성하세요.
+아래 교육과정 분석, 성취기준, 핵심어, 핵심 문장, 핵심 질문을 종합해 탐구 질문을 세 유형으로 생성하세요.
 
 [교과] ${data.subject}  [영역] ${data.area}  [학년군] ${gradeLabel}
 [선택 성취기준 기반 맥락]
 ${achievementSupportContext}
-[핵심 질문]
+[선택한 핵심어] ${data.selectedKeywords.join(", ")}
+[선택 핵심 문장]
+${data.coreSentences.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+[선택 핵심 질문]
 ${data.essentialQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 
 탐구 질문 유형 및 수:
-- factual (사실적): 사실·정보 확인·기억 → 2~3개
-- conceptual (개념적): 추론·비교·분석·해석 → 2~3개
-- controversial (논쟁적): 판단·의견·가치·적용 → 2~3개
+- factual (사실적): 사실·정보 확인·기억 → 3~4개
+- conceptual (개념적): 추론·비교·분석·해석 → 3~4개
+- controversial (논쟁적): 판단·의견·가치·적용 → 정확히 2개
 
 각 탐구 질문은 핵심 질문에 가까워지는 '징검다리' 역할을 해야 합니다.
 
@@ -145,6 +148,8 @@ ${data.essentialQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 {"inquiryQuestions": [
   {"type": "factual", "content": "..."},
   {"type": "factual", "content": "..."},
+  {"type": "factual", "content": "..."},
+  {"type": "conceptual", "content": "..."},
   {"type": "conceptual", "content": "..."},
   {"type": "conceptual", "content": "..."},
   {"type": "controversial", "content": "..."},

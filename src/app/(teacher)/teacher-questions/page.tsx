@@ -63,7 +63,9 @@ interface SessionAnalysis {
   summary: string;
   themes: string[];
   insights: string;
+  commentInsights?: string;
   totalQuestions: number;
+  totalComments?: number;
 }
 
 interface ParticipantStudent {
@@ -1003,6 +1005,14 @@ export default function QuestionsPage() {
               <p className="text-sm text-red-600">{sessionAnalysisError}</p>
             ) : sessionAnalysis ? (
               <>
+                <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1">
+                    질문 {sessionAnalysis.totalQuestions}개
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-2.5 py-1">
+                    댓글 {sessionAnalysis.totalComments ?? 0}개
+                  </span>
+                </div>
                 <div className="rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-800">
                   {sessionAnalysis.summary}
                 </div>
@@ -1022,6 +1032,14 @@ export default function QuestionsPage() {
                     {sessionAnalysis.insights}
                   </p>
                 </div>
+                {sessionAnalysis.commentInsights && (
+                  <div className="rounded-lg bg-emerald-50 p-4">
+                    <p className="text-xs font-semibold text-emerald-800">댓글 대화 분석</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950">
+                      {sessionAnalysis.commentInsights}
+                    </p>
+                  </div>
+                )}
               </>
             ) : null}
           </CardContent>
