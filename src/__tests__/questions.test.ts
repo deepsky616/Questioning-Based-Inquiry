@@ -63,12 +63,12 @@ describe("question cognitive labels", () => {
     expect(COGNITIVE_LABEL.controversial).toBe("논쟁적 질문");
   });
 
-  it("기존 해석적/평가적/적용적 값은 새 분류로 호환한다", () => {
-    expect(normalizeCognitiveType("interpretive")).toBe("conceptual");
-    expect(normalizeCognitiveType("evaluative")).toBe("controversial");
-    expect(normalizeCognitiveType("applicative")).toBe("controversial");
-    expect(matchesCognitiveCategory("interpretive", "conceptual")).toBe(true);
-    expect(matchesCognitiveCategory("evaluative", "controversial")).toBe(true);
+  it("질문 유형 매칭은 사실적/개념적/논쟁적 분류만 사용한다", () => {
+    expect(normalizeCognitiveType("factual")).toBe("factual");
+    expect(normalizeCognitiveType("conceptual")).toBe("conceptual");
+    expect(normalizeCognitiveType("controversial")).toBe("controversial");
+    expect(matchesCognitiveCategory("conceptual", "conceptual")).toBe(true);
+    expect(matchesCognitiveCategory("controversial", "conceptual")).toBe(false);
   });
 });
 

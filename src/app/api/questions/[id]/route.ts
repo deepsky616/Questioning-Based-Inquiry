@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canPatchQuestion } from "@/lib/questions";
+import { z } from "zod";
+
+const patchQuestionSchema = z.object({
+  closure: z.enum(["closed", "open"]).optional(),
+  cognitive: z.enum(["factual", "conceptual", "controversial"]).optional(),
+  isPublic: z.boolean().optional(),
+});
 
 async function canTeacherManageQuestion(teacherId: string, questionId: string) {
   const teacher = await prisma.user.findUnique({
@@ -93,9 +100,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   try {
     const body = await req.json();
-    const { closure, cognitive, isPublic } = body;
+    const data = patchQuestionSchema.parse(body);
+    const { closure, cognitive, isPublic } = data;
 
-    const patchedFields = Object.keys(body).filter((k) =>
+    const patchedFields = Object.keys(data).filter((k) =>
       ["closure", "cognitive", "isPublic"].includes(k)
     );
 
@@ -132,6 +140,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     return NextResponse.json(question);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
+    }
     console.error("Update question error:", error);
     return NextResponse.json({ error: "질문을 찾을 수 없거나 수정에 실패했습니다" }, { status: 404 });
   }

@@ -22,14 +22,15 @@ describe("buildInquiryGraphSummary", () => {
     expect(summary.byClosure).toEqual({ closed: 1, open: 2 });
   });
 
-  it("기존 해석적/평가적/적용적 질문도 새 분류로 묶는다", () => {
+  it("사실적/개념적/논쟁적 질문만 집계한다", () => {
     const summary = buildInquiryGraphSummary([], [
-      { content: "비교해 주세요", cognitive: "interpretive", closure: "open" },
-      { content: "판단해 주세요", cognitive: "evaluative", closure: "open" },
-      { content: "적용해 주세요", cognitive: "applicative", closure: "closed" },
+      { content: "확인해 주세요", cognitive: "factual", closure: "closed" },
+      { content: "비교해 주세요", cognitive: "conceptual", closure: "open" },
+      { content: "판단해 주세요", cognitive: "controversial", closure: "open" },
     ]);
 
+    expect(summary.byCognitive.factual).toBe(1);
     expect(summary.byCognitive.conceptual).toBe(1);
-    expect(summary.byCognitive.controversial).toBe(2);
+    expect(summary.byCognitive.controversial).toBe(1);
   });
 });

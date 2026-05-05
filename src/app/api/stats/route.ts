@@ -114,7 +114,7 @@ export async function GET(req: Request) {
     questions.map((q) => ({
       ...q,
       closure: q.closure as "closed" | "open",
-      cognitive: q.cognitive,
+      cognitive: q.cognitive as "factual" | "conceptual" | "controversial",
       author: { id: q.author.id, name: q.author.name, className: q.author.className },
     }))
   );
@@ -129,7 +129,7 @@ export async function GET(req: Request) {
     questions.map((q) => ({
       ...q,
       closure: q.closure as "closed" | "open",
-      cognitive: q.cognitive,
+      cognitive: q.cognitive as "factual" | "conceptual" | "controversial",
       author: { id: q.author.id, name: q.author.name, className: q.author.className },
     }))
   );

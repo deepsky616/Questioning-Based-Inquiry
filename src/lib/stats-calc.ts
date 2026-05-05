@@ -3,7 +3,7 @@ export type PeriodType = "week" | "month" | "semester" | string;
 export interface QuestionForStats {
   createdAt: Date;
   closure: "closed" | "open";
-  cognitive: string;
+  cognitive: "factual" | "conceptual" | "controversial";
   author: {
     id: string;
     name: string;
@@ -77,13 +77,7 @@ export function aggregateByStudent(questions: QuestionForStats[]): Omit<StudentS
     const student = studentMap.get(sid)!;
     student.total++;
     student.distribution[q.closure]++;
-    if (q.cognitive === "conceptual" || q.cognitive === "interpretive") {
-      student.cognitiveDistribution.conceptual++;
-    } else if (q.cognitive === "controversial" || q.cognitive === "evaluative" || q.cognitive === "applicative") {
-      student.cognitiveDistribution.controversial++;
-    } else {
-      student.cognitiveDistribution.factual++;
-    }
+    student.cognitiveDistribution[q.cognitive]++;
   }
 
   return Array.from(studentMap.values());

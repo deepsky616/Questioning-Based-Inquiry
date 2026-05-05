@@ -65,15 +65,15 @@ describe("aggregateByStudent", () => {
     name: string,
     className: string,
     closure: "closed" | "open",
-    cognitive: string,
+    cognitive: "factual" | "conceptual" | "controversial",
     createdAt: Date
   ) => ({ author: { id: authorId, name, className }, closure, cognitive, createdAt });
 
   it("학생별로 질문을 집계한다", () => {
     const questions = [
       makeQuestion("s1", "김철수", "1반", "closed", "factual", new Date("2026-04-01")),
-      makeQuestion("s1", "김철수", "1반", "open", "interpretive", new Date("2026-04-02")),
-      makeQuestion("s2", "이영희", "2반", "open", "evaluative", new Date("2026-04-01")),
+      makeQuestion("s1", "김철수", "1반", "open", "conceptual", new Date("2026-04-02")),
+      makeQuestion("s2", "이영희", "2반", "open", "controversial", new Date("2026-04-01")),
     ];
     const result = aggregateByStudent(questions);
     expect(result).toHaveLength(2);

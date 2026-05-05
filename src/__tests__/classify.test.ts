@@ -83,6 +83,8 @@ describe("fallbackClassification", () => {
   });
 
   it("논쟁적 키워드가 있을 때 conceptual로 잘못 분류되지 않는다", () => {
+    // "어떻게 생각해"는 논쟁적이지만 "어떻게"도 포함되어 있어
+    // 순서에 따라 conceptual로 잘못 분류될 수 있음
     const result = fallbackClassification("이 내용에 대해 어떻게 생각해요?");
     expect(result.cognitive).toBe("controversial");
   });

@@ -28,7 +28,7 @@ const CLASSIFICATION_PROMPT = `당신은 초·중·고 수업에서 학생 질�
 2. 인지적 수준(cognitive):
    - 사실적(factual): 사실·정보를 확인하거나 기억에서 검색하는 질문. 예) "광합성에 필요한 세 가지는 무엇인가요?"
    - 개념적(conceptual): 내용의 의미를 파악하고 추론·비교·분석이 필요한 질문. 예) "낮과 밤에 식물의 호흡이 다른 이유는 무엇인가요?"
-   - 논쟁적(controversial): 가치 판단·의견·기준 적용, 삶이나 가상 상황에 연결하는 질문. 예) "온실가스 감축을 위해 어떤 방법이 가장 효과적일까요?"
+   - 논쟁적(controversial): 가치 판단·의견·기준을 스스로 세우고 여러 관점을 비교해야 하는 질문. 예) "온실가스 감축을 위해 어떤 방법이 가장 효과적일까요?"
 
 [출력 형식]
 아래 JSON만 출력 (다른 텍스트 없이):
@@ -39,7 +39,7 @@ const CLASSIFICATION_PROMPT = `당신은 초·중·고 수업에서 학생 질�
   "cognitiveScore": 0.0부터 1.0 사이의 숫자 (분류 확신도),
   "reasoning": "이 질문이 왜 이 유형으로 분류됐는지를 학생이 이해할 수 있는 쉬운 말로 60자 이내",
   "feedback": "학생을 응원하는 말로 시작해. 질문의 좋은 점을 구체적으로 1문장 칭찬하고, 닫힌 질문이거나 사실적 질문이면 어떻게 바꾸면 더 깊이 생각할 수 있는 질문이 되는지 친근한 말투로 1~2문장 조언해. 전체 150자 이내.",
-  "improvedExample": "closure가 closed이거나 cognitive가 factual인 경우에만 원래 질문을 개방형 또는 해석적·평가적·적용적 질문으로 발전시킨 예시 1개. 이미 open이고 interpretive/evaluative/applicative이면 빈 문자열(\"\")."
+  "improvedExample": "closure가 closed이거나 cognitive가 factual인 경우에만 원래 질문을 개방형 또는 개념적·논쟁적 질문으로 발전시킨 예시 1개. 이미 open이고 cognitive가 conceptual 또는 controversial이면 빈 문자열(\"\")."
 }`;
 
 export async function POST(req: Request) {

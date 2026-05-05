@@ -5,14 +5,17 @@ import { z } from "zod";
 import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter } from "@/lib/questions";
 import { sendQuestionNotificationEmail } from "@/lib/email";
 
+const closureSchema = z.enum(["closed", "open"]);
+const cognitiveSchema = z.enum(["factual", "conceptual", "controversial"]);
+
 const createQuestionSchema = z.object({
   content: z.string().min(1).max(500),
   context: z.string().optional(),
   isPublic: z.boolean().optional(),
-  closure: z.string().optional(),
-  cognitive: z.string().optional(),
-  closureScore: z.number().optional(),
-  cognitiveScore: z.number().optional(),
+  closure: closureSchema.optional(),
+  cognitive: cognitiveSchema.optional(),
+  closureScore: z.number().min(0).max(1).optional(),
+  cognitiveScore: z.number().min(0).max(1).optional(),
   sessionId: z.string().optional(),
 });
 

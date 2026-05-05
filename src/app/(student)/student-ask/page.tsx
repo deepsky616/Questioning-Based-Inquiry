@@ -172,6 +172,15 @@ export default function AskPage() {
     }
   };
 
+  const getCognitiveLabel = (c: string) => {
+    const map: Record<string, string> = {
+      factual: "사실적 질문",
+      conceptual: "개념적 질문",
+      controversial: "논쟁적 질문",
+    };
+    return map[c] || c;
+  };
+
   // issue #1: 로딩 중에는 아무것도 표시하지 않음
   if (!sessionsLoaded) {
     return (
@@ -386,9 +395,8 @@ export default function AskPage() {
                 </div>
                 <div className="text-sm text-purple-600 mt-0.5">
                   {result.cognitive === "factual" && "사실을 확인하는 질문이에요"}
-                  {result.cognitive === "interpretive" && "추론하고 분석하는 질문이에요"}
-                  {result.cognitive === "evaluative" && "스스로 판단하는 질문이에요"}
-                  {result.cognitive === "applicative" && "배운 것을 연결하는 질문이에요"}
+                  {result.cognitive === "conceptual" && "추론하고 분석하는 질문이에요"}
+                  {result.cognitive === "controversial" && "스스로 판단하는 질문이에요"}
                 </div>
                 <div className="text-sm text-gray-500 mt-1">
                   신뢰도: {Math.round(result.cognitiveScore * 100)}%

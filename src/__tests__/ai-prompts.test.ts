@@ -22,8 +22,8 @@ describe("buildAnswerPrompt", () => {
 describe("buildSessionAnalysisPrompt", () => {
   const sampleQuestions = [
     { content: "광합성이란?", closure: "closed", cognitive: "factual" },
-    { content: "왜 식물은 녹색인가요?", closure: "open", cognitive: "interpretive" },
-    { content: "환경 문제를 해결하려면 어떻게 해야 할까요?", closure: "open", cognitive: "evaluative" },
+    { content: "왜 식물은 녹색인가요?", closure: "open", cognitive: "conceptual" },
+    { content: "환경 문제를 해결하려면 어떻게 해야 할까요?", closure: "open", cognitive: "controversial" },
   ];
 
   it("세션 교과와 주제가 프롬프트에 포함된다", () => {

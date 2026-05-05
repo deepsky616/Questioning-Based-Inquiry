@@ -50,23 +50,8 @@ export function fallbackClassification(content: string): ClassificationResult {
   const openKeywords = ["왜", "어떻게"];
 
   const factualKeywords = ["정의", "설명해", "알려줘", "뭐야", "무엇인가"];
-  const conceptualKeywords = ["비교해", "분석해", "추론해", "차이", "왜냐면"];
-  const controversialKeywords = [
-    "어떻게 생각해",
-    "판단해",
-    "평가해",
-    "의견",
-    "가장 좋은",
-    "더 나은",
-    "만약",
-    "라면",
-    "내가",
-    "나라면",
-    "적용",
-    "내 삶",
-    "실제로",
-    "활용",
-  ];
+  const conceptualKeywords = ["비교해", "분석해", "추론해", "차이", "왜냐면", "관계", "원리"];
+  const controversialKeywords = ["어떻게 생각해", "판단해", "평가해", "의견", "가장 좋은", "더 나은", "찬성", "반대"];
 
   let closedCount = 0;
   let openCount = 0;
@@ -97,8 +82,8 @@ export function fallbackClassification(content: string): ClassificationResult {
   const feedbackMap: Record<string, Record<string, string>> = {
     closed: {
       factual: "정답이 하나인 닫힌 질문입니다. '왜' 또는 '어떻게'로 바꾸면 다양한 생각을 이끌어내는 열린 질문이 됩니다.",
-      conceptual: "'왜 그럴까요?'처럼 이유와 과정을 탐색하는 형태로 바꾸면 더 깊은 이해를 이끌어낼 수 있습니다.",
-      controversial: "판단과 적용을 묻는 질문입니다. 열린 형태로 바꾸면 더 다양한 관점의 의견을 이끌어낼 수 있습니다.",
+      conceptual: "'왜 그럴까요?'처럼 이유와 관계를 탐색하는 형태로 바꾸면 더 깊은 이해를 이끌어낼 수 있습니다.",
+      controversial: "판단을 묻는 질문입니다. 열린 형태로 바꾸면 더 다양한 관점의 의견을 이끌어낼 수 있습니다.",
     },
     open: {
       factual: "열린 질문입니다. '왜' 또는 '어떻게'를 추가해 이유와 과정까지 탐구해보세요.",

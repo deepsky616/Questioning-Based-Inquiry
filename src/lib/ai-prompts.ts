@@ -4,12 +4,6 @@ interface QuestionSummary {
   cognitive: string;
 }
 
-function normalizeCognitive(value: string) {
-  if (value === "conceptual" || value === "interpretive") return "conceptual";
-  if (value === "controversial" || value === "evaluative" || value === "applicative") return "controversial";
-  return "factual";
-}
-
 // 폐쇄형/개방형 × 인지적 수준의 2차원 조합별 답변 지침
 const ANSWER_GUIDE: Record<string, Record<string, string>> = {
   factual: {
@@ -22,7 +16,7 @@ const ANSWER_GUIDE: Record<string, Record<string, string>> = {
     closed:
       "개념적·폐쇄형: 이유나 원리를 단계적으로 설명하세요. '그렇다면 다른 상황에서는 어떨까요?'처럼 사고를 확장하는 질문으로 마무리하세요.",
     open:
-      "개념적·개방형: 여러 가지 해석 가능성을 열어두고 설명하세요. 학생이 어떤 해석이 더 설득력 있다고 느끼는지 스스로 생각해보도록 격려하세요.",
+      "개념적·개방형: 여러 가지 설명 가능성을 열어두고, 개념 사이의 관계를 스스로 생각해보도록 격려하세요.",
   },
   controversial: {
     closed:
@@ -40,8 +34,7 @@ export function buildAnswerPrompt(
 ): string {
   const contextPart = context ? `\n[수업 맥락] ${context}` : "";
 
-  const normalizedCognitive = normalizeCognitive(cognitive ?? "");
-  const cogKey = ANSWER_GUIDE[normalizedCognitive] ? normalizedCognitive : null;
+  const cogKey = cognitive && ANSWER_GUIDE[cognitive] ? cognitive : null;
   const closureKey = closure === "closed" || closure === "open" ? closure : null;
   const combinedGuide =
     cogKey && closureKey ? ANSWER_GUIDE[cogKey][closureKey] : null;
@@ -71,15 +64,15 @@ export function buildSessionAnalysisPrompt(
   const total = questions.length;
   const closedCount = questions.filter((q) => q.closure === "closed").length;
   const openCount = questions.filter((q) => q.closure === "open").length;
-  const factualCount = questions.filter((q) => normalizeCognitive(q.cognitive) === "factual").length;
-  const conceptualCount = questions.filter((q) => normalizeCognitive(q.cognitive) === "conceptual").length;
-  const controversialCount = questions.filter((q) => normalizeCognitive(q.cognitive) === "controversial").length;
+  const factualCount = questions.filter((q) => q.cognitive === "factual").length;
+  const conceptualCount = questions.filter((q) => q.cognitive === "conceptual").length;
+  const controversialCount = questions.filter((q) => q.cognitive === "controversial").length;
 
   const questionList =
     questions.length > 0
       ? questions.map((q, i) => `${i + 1}. [${q.closure === "closed" ? "폐쇄" : "개방"}·${
-          normalizeCognitive(q.cognitive) === "factual" ? "사실" :
-          normalizeCognitive(q.cognitive) === "conceptual" ? "개념" : "논쟁"
+          q.cognitive === "factual" ? "사실" :
+          q.cognitive === "conceptual" ? "개념" : "논쟁"
         }] ${q.content}`).join("\n")
       : "(질문 없음)";
 
@@ -96,8 +89,8 @@ export function buildSessionAnalysisPrompt(
 - 폐쇄형: 정답이 하나인 확인형 질문
 - 개방형: 다양한 답이 나올 수 있는 탐구형 질문
 - 사실적: 사실·정보 확인
-- 개념적: 추론·분석·비교
-- 논쟁적: 판단·의견·가치 적용, 배운 내용을 삶·새 상황에 연결
+- 개념적: 추론·분석·비교를 통해 개념과 원리의 관계를 탐색
+- 논쟁적: 판단·의견·가치 기준을 세워 여러 관점을 비교
 
 [학생 질문 목록]
 ${questionList}
