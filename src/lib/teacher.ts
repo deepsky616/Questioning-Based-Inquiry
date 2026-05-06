@@ -31,3 +31,13 @@ export function sortTeacherClasses<T extends { grade: string; className: string 
     return a.className.localeCompare(b.className, "ko-u-kn");
   });
 }
+
+export type ClassInputMode = "auto" | "select" | "manual";
+
+export function resolveClassInputMode(
+  classes: Array<{ grade: string; className: string }>
+): ClassInputMode {
+  if (classes.length === 0) return "manual";
+  if (classes.length === 1) return "auto";
+  return "select";
+}

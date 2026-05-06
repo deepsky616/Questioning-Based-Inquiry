@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateTeacherClasses, buildTeacherClassLabel, parseTeacherClassKey, sortTeacherClasses } from "@/lib/teacher";
+import { validateTeacherClasses, buildTeacherClassLabel, parseTeacherClassKey, sortTeacherClasses, resolveClassInputMode } from "@/lib/teacher";
 
 describe("validateTeacherClasses", () => {
   it("유효한 학년·반 목록이면 null을 반환한다", () => {
@@ -92,5 +92,23 @@ describe("sortTeacherClasses", () => {
     const copy = [...input];
     sortTeacherClasses(input);
     expect(input).toEqual(copy);
+  });
+});
+
+describe("resolveClassInputMode", () => {
+  it("담당 학급이 없으면 'manual'을 반환한다", () => {
+    expect(resolveClassInputMode([])).toBe("manual");
+  });
+
+  it("담당 학급이 1개이면 'auto'를 반환한다", () => {
+    expect(resolveClassInputMode([{ grade: "3", className: "2" }])).toBe("auto");
+  });
+
+  it("담당 학급이 2개 이상이면 'select'를 반환한다", () => {
+    const classes = [
+      { grade: "3", className: "2" },
+      { grade: "4", className: "1" },
+    ];
+    expect(resolveClassInputMode(classes)).toBe("select");
   });
 });

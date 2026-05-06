@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DEFAULT_GEMINI_MODEL, GEMINI_MODELS } from "@/lib/api-config";
-import { buildTeacherClassLabel } from "@/lib/teacher";
+import { buildTeacherClassLabel, resolveClassInputMode } from "@/lib/teacher";
 
 interface BulkStudent {
   studentNumber: string;
@@ -64,7 +64,14 @@ export default function TeacherSettingsPage() {
     fetch("/api/teacher/profile")
       .then((r) => r.json())
       .then((data) => {
-        if (data.teacherClasses) setTeacherClasses(data.teacherClasses);
+        if (data.teacherClasses) {
+          setTeacherClasses(data.teacherClasses);
+          if (data.school) setBulkSchool(data.school);
+          if (data.teacherClasses.length === 1) {
+            setBulkGrade(data.teacherClasses[0].grade);
+            setBulkClass(data.teacherClasses[0].className);
+          }
+        }
       })
       .catch(() => {});
   }, []);
@@ -269,35 +276,83 @@ export default function TeacherSettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="bulkSchool">학교</Label>
-              <Input
-                id="bulkSchool"
-                placeholder="한빛초등학교"
-                value={bulkSchool}
-                onChange={(e) => setBulkSchool(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bulkGrade">학년</Label>
-              <Input
-                id="bulkGrade"
-                placeholder="3"
-                value={bulkGrade}
-                onChange={(e) => setBulkGrade(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bulkClass">반</Label>
-              <Input
-                id="bulkClass"
-                placeholder="2"
-                value={bulkClass}
-                onChange={(e) => setBulkClass(e.target.value)}
-              />
-            </div>
-          </div>
+          {(() => {
+            const mode = resolveClassInputMode(teacherClasses);
+            return (
+              <div className="space-y-3">
+                {/* 학교 */}
+                <div className="space-y-2">
+                  <Label htmlFor="bulkSchool">학교</Label>
+                  <Input
+                    id="bulkSchool"
+                    placeholder="한빛초등학교"
+                    value={bulkSchool}
+                    disabled={mode !== "manual"}
+                    onChange={(e) => setBulkSchool(e.target.value)}
+                  />
+                </div>
+
+                {/* 학년·반 — 모드별 분기 */}
+                {mode === "manual" && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="bulkGrade">학년</Label>
+                      <Input
+                        id="bulkGrade"
+                        placeholder="3"
+                        value={bulkGrade}
+                        onChange={(e) => setBulkGrade(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bulkClass">반</Label>
+                      <Input
+                        id="bulkClass"
+                        placeholder="2"
+                        value={bulkClass}
+                        onChange={(e) => setBulkClass(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {mode === "auto" && (
+                  <div className="space-y-2">
+                    <Label>학년·반</Label>
+                    <Input
+                      value={buildTeacherClassLabel(bulkGrade, bulkClass)}
+                      disabled
+                    />
+                  </div>
+                )}
+
+                {mode === "select" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="bulkClassSelect">학년·반 선택</Label>
+                    <Select
+                      value={bulkGrade && bulkClass ? `${bulkGrade}-${bulkClass}` : ""}
+                      onValueChange={(val) => {
+                        const [g, c] = val.split("-");
+                        setBulkGrade(g);
+                        setBulkClass(c);
+                      }}
+                    >
+                      <SelectTrigger id="bulkClassSelect">
+                        <SelectValue placeholder="담당 학급을 선택하세요" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teacherClasses.map((c) => (
+                          <SelectItem key={`${c.grade}-${c.className}`} value={`${c.grade}-${c.className}`}>
+                            {buildTeacherClassLabel(c.grade, c.className)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="space-y-2">
             <Label htmlFor="bulkPassword">기본 비밀번호</Label>
