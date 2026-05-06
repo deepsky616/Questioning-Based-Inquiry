@@ -30,7 +30,7 @@ import {
   matchesCognitiveCategory,
   normalizeCognitiveType,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
 import { formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
 
 interface QuestionSession {
@@ -181,7 +181,7 @@ export default function QuestionsPage() {
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((data: QuestionSession[]) => {
-        const sorted = sortSessionsDesc(data);
+        const sorted = sortSessionsAsc(data);
         setSessions(sorted);
         const defaultId = sorted[0]?.id ?? "";
         setSelectedSessionId(defaultId);

@@ -21,7 +21,7 @@ export async function GET() {
   if (user.role === "TEACHER") {
     const sessions = await prisma.questionSession.findMany({
       where: { teacherId: user.id },
-      orderBy: { date: "desc" },
+      orderBy: { date: "asc" },
       include: { teacher: { select: { name: true } } },
     });
     return NextResponse.json(sessions);
@@ -44,7 +44,7 @@ export async function GET() {
   const teacherIds = teacherClasses.map((tc) => tc.teacherId);
   const sessions = await prisma.questionSession.findMany({
     where: { teacherId: { in: teacherIds }, isActive: true },
-    orderBy: { date: "desc" },
+    orderBy: { date: "asc" },
     include: { teacher: { select: { name: true } } },
   });
   return NextResponse.json(sessions);

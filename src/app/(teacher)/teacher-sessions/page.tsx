@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import DatePicker from "@/components/shared/DatePicker";
-import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
+import { buildSessionLabel, isSessionAvailable, sortSessionsAsc } from "@/lib/sessions";
 
 interface QuestionSession {
   id: string;
@@ -35,7 +35,7 @@ export default function TeacherSessionsPage() {
   useEffect(() => {
     fetch("/api/sessions")
       .then((r) => r.json())
-      .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
+      .then((data: QuestionSession[]) => setSessions(sortSessionsAsc(data)))
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
@@ -55,7 +55,7 @@ export default function TeacherSessionsPage() {
       });
       if (!res.ok) throw new Error();
       const created: QuestionSession = await res.json();
-      setSessions((prev) => sortSessionsDesc([created, ...prev]));
+      setSessions((prev) => sortSessionsAsc([created, ...prev]));
       setSessForm({ date: "", subject: "", topic: "", defaultQuestionPublic: true });
       setMsg({ type: "success", text: "세션이 추가됐습니다" });
     } catch {

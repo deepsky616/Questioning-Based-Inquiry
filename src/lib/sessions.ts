@@ -22,6 +22,10 @@ export function sortSessionsDesc<T extends { date: string }>(sessions: T[]): T[]
   return [...sessions].sort((a, b) => b.date.localeCompare(a.date));
 }
 
+export function sortSessionsAsc<T extends { date: string }>(sessions: T[]): T[] {
+  return [...sessions].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 // 세션 선택 시 질문 맥락 자동완성용 힌트 문자열 생성
 export function buildSessionContextHint(subject: string, topic: string, teacherName?: string): string {
   const parts: string[] = [];
