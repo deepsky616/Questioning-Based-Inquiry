@@ -2,7 +2,6 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
-import { buildStudentEmail } from "@/lib/student-auth";
 import type { UserRole } from "@/types/user";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -20,7 +19,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       authorize: async (credentials) => {
         if (!credentials?.password) return null;
 
-        let email = credentials.email as string | undefined;
+        let user;
 
         if (credentials.loginType === "student") {
           const school = credentials.school as string;
@@ -28,12 +27,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const className = credentials.className as string;
           const studentNumber = credentials.studentNumber as string;
           if (!school || !grade || !className || !studentNumber) return null;
-          email = buildStudentEmail(school, grade, className, studentNumber);
+          user = await prisma.user.findFirst({
+            where: { role: "STUDENT", school, grade, className, studentNumber },
+          });
+        } else {
+          const email = credentials.email as string | undefined;
+          if (!email) return null;
+          user = await prisma.user.findUnique({ where: { email } });
         }
 
-        if (!email) return null;
-
-        const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
 
         const isValid = await bcrypt.compare(credentials.password as string, user.password);
@@ -41,7 +43,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         return {
           id: user.id,
-          email: user.email,
+          email: user.email ?? undefined,
           role: user.role,
           name: user.name,
           school: user.school,
@@ -60,6 +62,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.school = user.school;
         token.grade = user.grade;
         token.className = user.className;
+        token.studentNumber = user.studentNumber;
       }
       return token;
     },
@@ -69,6 +72,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.school = (token.school as string | null) ?? null;
       session.user.grade = (token.grade as string | null) ?? null;
       session.user.className = (token.className as string | null) ?? null;
+      session.user.studentNumber = (token.studentNumber as string | null) ?? null;
       return session;
     },
   },

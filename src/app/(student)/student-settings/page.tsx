@@ -5,10 +5,20 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import type { UserRole } from "@/types/user";
+
+interface ExtendedUser {
+  name?: string;
+  role?: UserRole;
+  school?: string | null;
+  grade?: string | null;
+  className?: string | null;
+  studentNumber?: string | null;
+}
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const user = session?.user as { name?: string; email?: string; role?: string; className?: string };
+  const user = session?.user as ExtendedUser | undefined;
 
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const [aiModel, setAiModel] = useState<string | null>(null);
@@ -41,20 +51,36 @@ export default function SettingsPage() {
               <Input value={user?.name || ""} disabled />
             </div>
             <div className="space-y-2">
-              <Label>이메일</Label>
-              <Input value={user?.email || ""} disabled />
+              <Label>역할</Label>
+              <Input value="학생" disabled />
             </div>
           </div>
-          <div className="space-y-2">
-            <Label>역할</Label>
-            <Input value={user?.role === "STUDENT" ? "학생" : "교사"} disabled />
-          </div>
-          {user?.className && (
+          {user?.school && (
             <div className="space-y-2">
-              <Label>반</Label>
-              <Input value={user.className} disabled />
+              <Label>소속 학교</Label>
+              <Input value={user.school} disabled />
             </div>
           )}
+          <div className="grid grid-cols-3 gap-4">
+            {user?.grade && (
+              <div className="space-y-2">
+                <Label>학년</Label>
+                <Input value={`${user.grade}학년`} disabled />
+              </div>
+            )}
+            {user?.className && (
+              <div className="space-y-2">
+                <Label>반</Label>
+                <Input value={`${user.className}반`} disabled />
+              </div>
+            )}
+            {user?.studentNumber && (
+              <div className="space-y-2">
+                <Label>번호</Label>
+                <Input value={`${user.studentNumber}번`} disabled />
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

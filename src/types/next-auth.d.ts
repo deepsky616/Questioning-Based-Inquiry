@@ -4,18 +4,19 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      email: string;
+      email?: string | null;
       name: string;
       role: UserRole;
       school: string | null;
       grade: string | null;
       className: string | null;
+      studentNumber: string | null;
     };
   }
 
   interface User {
     id: string;
-    email: string;
+    email?: string | null;
     name: string;
     role: UserRole;
     school: string | null;
@@ -32,5 +33,6 @@ declare module "next-auth/jwt" {
     school: string | null;
     grade: string | null;
     className: string | null;
+    studentNumber: string | null;
   }
 }

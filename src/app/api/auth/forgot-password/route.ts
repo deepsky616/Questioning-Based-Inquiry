@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     const origin = process.env.NEXTAUTH_URL ?? new URL(req.url).origin;
     const resetUrl = buildPasswordResetUrl(origin, token);
     const emailResult = await sendTeacherPasswordResetEmail({
-      to: teacher.email,
+      to: teacher.email!,
       name: teacher.name,
       resetUrl,
     });

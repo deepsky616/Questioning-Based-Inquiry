@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { buildStudentEmail } from "@/lib/student-auth";
 import { sendTeacherWelcomeEmail } from "@/lib/email";
 
 const studentSchema = z.object({
@@ -34,23 +33,25 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = registerSchema.parse(body);
 
-    let email: string;
     if (data.role === "STUDENT") {
-      email = buildStudentEmail(data.school, data.grade, data.className, data.studentNumber);
+      const existingStudent = await prisma.user.findFirst({
+        where: { role: "STUDENT", school: data.school, grade: data.grade, className: data.className, studentNumber: data.studentNumber },
+      });
+      if (existingStudent) {
+        return NextResponse.json({ error: "이미 등록된 학생입니다" }, { status: 400 });
+      }
     } else {
-      email = data.email;
-    }
-
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return NextResponse.json({ error: data.role === "TEACHER" ? "이미 등록된 교사입니다" : "이미 등록된 학생입니다" }, { status: 400 });
+      const existingTeacher = await prisma.user.findUnique({ where: { email: data.email } });
+      if (existingTeacher) {
+        return NextResponse.json({ error: "이미 등록된 교사입니다" }, { status: 400 });
+      }
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
 
     const user = await prisma.user.create({
       data: {
-        email,
+        ...(data.role === "TEACHER" ? { email: data.email } : {}),
         password: hashedPassword,
         name: data.name,
         role: data.role,
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
       },
     });
 
-    if (user.role === "TEACHER") {
+    if (user.role === "TEACHER" && user.email) {
       const emailResult = await sendTeacherWelcomeEmail(user.email, user.name);
       if (!emailResult.ok) {
         logger.error("Teacher welcome email error:", emailResult.error);

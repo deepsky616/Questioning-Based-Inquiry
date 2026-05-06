@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { buildStudentEmail } from "@/lib/student-auth";
 import { auth } from "@/lib/auth";
 import { sendBulkStudentSummaryEmail } from "@/lib/email";
 import { partitionStudents, buildStudentCreateData } from "@/lib/student-registration";
@@ -34,18 +33,16 @@ export async function POST(req: Request) {
     const { school, grade, className, defaultPassword, students } = bulkSchema.parse(body);
 
     const classInfo = { school, grade, className };
-    const allEmails = students.map((s) =>
-      buildStudentEmail(school, grade, className, s.studentNumber)
-    );
+    const allNumbers = students.map((s) => s.studentNumber);
 
-    // 기존 학생 이메일을 한 번에 조회 (N+1 → 1쿼리)
+    // 기존 학생 학번을 한 번에 조회 (N+1 → 1쿼리)
     const existingUsers = await prisma.user.findMany({
-      where: { email: { in: allEmails } },
-      select: { email: true },
+      where: { role: "STUDENT", school, grade, className, studentNumber: { in: allNumbers } },
+      select: { studentNumber: true },
     });
-    const existingEmails = new Set(existingUsers.map((u) => u.email));
+    const existingNumbers = new Set(existingUsers.map((u) => u.studentNumber ?? ""));
 
-    const { toCreate, skippedCount } = partitionStudents(students, classInfo, existingEmails);
+    const { toCreate, skippedCount } = partitionStudents(students, classInfo, existingNumbers);
 
     const hashedPassword = await bcrypt.hash(defaultPassword, 12);
     const errors: string[] = [];

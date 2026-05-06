@@ -1,5 +1,3 @@
-import { buildStudentEmail } from "@/lib/student-auth";
-
 export interface StudentInput {
   studentNumber: string;
   name: string;
@@ -12,7 +10,6 @@ export interface ClassInfo {
 }
 
 export interface StudentCreateData {
-  email: string;
   password: string;
   name: string;
   role: "STUDENT";
@@ -39,7 +36,6 @@ export function buildStudentCreateData(
   hashedPassword: string
 ): StudentCreateData {
   return {
-    email: buildStudentEmail(classInfo.school, classInfo.grade, classInfo.className, student.studentNumber),
     password: hashedPassword,
     name: student.name,
     role: "STUDENT",
@@ -53,14 +49,13 @@ export function buildStudentCreateData(
 export function partitionStudents(
   students: StudentInput[],
   classInfo: ClassInfo,
-  existingEmails: Set<string>
+  existingStudentNumbers: Set<string>
 ): BulkPartition {
   const toCreate: StudentCreateData[] = [];
   let skippedCount = 0;
 
   for (const s of students) {
-    const email = buildStudentEmail(classInfo.school, classInfo.grade, classInfo.className, s.studentNumber);
-    if (existingEmails.has(email)) {
+    if (existingStudentNumbers.has(s.studentNumber)) {
       skippedCount++;
     } else {
       toCreate.push(buildStudentCreateData(s, classInfo, ""));
