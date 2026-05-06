@@ -14,15 +14,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DEFAULT_GEMINI_MODEL, GEMINI_MODELS } from "@/lib/api-config";
+import { buildTeacherClassLabel } from "@/lib/teacher";
 
 interface BulkStudent {
   studentNumber: string;
   name: string;
 }
 
+interface TeacherClass {
+  grade: string;
+  className: string;
+}
+
 export default function TeacherSettingsPage() {
   const { data: session } = useSession();
   const user = session?.user as { name?: string; email?: string; school?: string };
+  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
 
   const [apiKey, setApiKey] = useState("");
   const [selectedModel, setSelectedModel] = useState(DEFAULT_GEMINI_MODEL);
@@ -51,6 +58,13 @@ export default function TeacherSettingsPage() {
       .then((data) => {
         setCurrentConfig(data);
         if (data.model) setSelectedModel(data.model);
+      })
+      .catch(() => {});
+
+    fetch("/api/teacher/profile")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.teacherClasses) setTeacherClasses(data.teacherClasses);
       })
       .catch(() => {});
   }, []);
@@ -226,6 +240,23 @@ export default function TeacherSettingsPage() {
               <Input value={user.school} disabled />
             </div>
           )}
+          <div className="space-y-2">
+            <Label>담당 학년·반</Label>
+            {teacherClasses.length > 0 ? (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {teacherClasses.map((c) => (
+                  <span
+                    key={`${c.grade}-${c.className}`}
+                    className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 ring-1 ring-inset ring-blue-200"
+                  >
+                    {buildTeacherClassLabel(c.grade, c.className)}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 pt-1">등록된 담당 학급 정보가 없습니다.</p>
+            )}
+          </div>
         </CardContent>
       </Card>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateTeacherClasses, buildTeacherClassLabel, parseTeacherClassKey } from "@/lib/teacher";
+import { validateTeacherClasses, buildTeacherClassLabel, parseTeacherClassKey, sortTeacherClasses } from "@/lib/teacher";
 
 describe("validateTeacherClasses", () => {
   it("유효한 학년·반 목록이면 null을 반환한다", () => {
@@ -56,5 +56,41 @@ describe("parseTeacherClassKey", () => {
 
   it("잘못된 형식이면 null을 반환한다", () => {
     expect(parseTeacherClassKey("invalid")).toBeNull();
+  });
+});
+
+describe("sortTeacherClasses", () => {
+  it("학년 오름차순으로 정렬한다", () => {
+    const input = [
+      { grade: "5", className: "1" },
+      { grade: "3", className: "2" },
+      { grade: "4", className: "1" },
+    ];
+    const result = sortTeacherClasses(input);
+    expect(result.map((c) => c.grade)).toEqual(["3", "4", "5"]);
+  });
+
+  it("같은 학년이면 반 오름차순으로 정렬한다", () => {
+    const input = [
+      { grade: "3", className: "3" },
+      { grade: "3", className: "1" },
+      { grade: "3", className: "2" },
+    ];
+    const result = sortTeacherClasses(input);
+    expect(result.map((c) => c.className)).toEqual(["1", "2", "3"]);
+  });
+
+  it("빈 배열을 그대로 반환한다", () => {
+    expect(sortTeacherClasses([])).toEqual([]);
+  });
+
+  it("원본 배열을 변경하지 않는다", () => {
+    const input = [
+      { grade: "4", className: "1" },
+      { grade: "3", className: "2" },
+    ];
+    const copy = [...input];
+    sortTeacherClasses(input);
+    expect(input).toEqual(copy);
   });
 });

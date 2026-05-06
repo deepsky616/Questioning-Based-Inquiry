@@ -22,3 +22,12 @@ export function parseTeacherClassKey(
   if (idx <= 0 || idx === key.length - 1) return null;
   return { grade: key.slice(0, idx), className: key.slice(idx + 1) };
 }
+
+export function sortTeacherClasses<T extends { grade: string; className: string }>(
+  classes: T[]
+): T[] {
+  return [...classes].sort((a, b) => {
+    if (a.grade !== b.grade) return a.grade.localeCompare(b.grade, "ko-u-kn");
+    return a.className.localeCompare(b.className, "ko-u-kn");
+  });
+}
