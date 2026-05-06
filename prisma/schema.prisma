@@ -7,17 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  STUDENT
-  TEACHER
-}
-
 model User {
-  id       String   @id @default(cuid())
-  email    String?  @unique @map("email")
-  password String   @map("password")
-  name     String   @map("name")
-  role     UserRole @map("role")
+  id       String  @id @default(cuid())
+  email    String? @unique @map("email")
+  password String  @map("password")
+  name     String  @map("name")
+  role     String  @map("role")
 
   grade         String? @map("grade")
   className     String? @map("class_name")
