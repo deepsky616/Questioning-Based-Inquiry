@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -30,7 +30,7 @@ import {
   matchesCognitiveCategory,
   normalizeCognitiveType,
 } from "@/lib/question-labels";
-import { buildSessionLabel, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc } from "@/lib/sessions";
 import { formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
 
 interface QuestionSession {
@@ -138,10 +138,6 @@ export default function QuestionsPage() {
   // 세션 관련 상태
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
-  const [sessForm, setSessForm] = useState({ date: "", subject: "", topic: "", defaultQuestionPublic: true });
-  const [isSavingSess, setIsSavingSess] = useState(false);
-  const [sessMsg, setSessMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [showSessForm, setShowSessForm] = useState(false);
 
   // 조회 모드: 세션별 | 세부(날짜·교과·주제)
   const [questionLookupMode, setQuestionLookupMode] = useState<"session" | "detail">("session");
@@ -363,48 +359,6 @@ export default function QuestionsPage() {
       setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
     } finally {
       setIsSendingPreviews(false);
-    }
-  };
-
-  const handleCreateSession = async () => {
-    if (!sessForm.date || !sessForm.subject.trim() || !sessForm.topic.trim()) {
-      setSessMsg({ type: "error", text: "날짜, 교과, 주제는 필수입니다" });
-      return;
-    }
-    setIsSavingSess(true);
-    setSessMsg(null);
-    try {
-      const res = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sessForm),
-      });
-      if (!res.ok) throw new Error();
-      const created: QuestionSession = await res.json();
-      setSessions((prev) => sortSessionsDesc([created, ...prev]));
-      setSessForm({ date: "", subject: "", topic: "", defaultQuestionPublic: true });
-      setSessMsg({ type: "success", text: "세션이 추가됐습니다" });
-      if (questionLookupMode === "session") {
-        setSelectedSessionId(created.id);
-        fetchQuestions(created.id);
-      }
-    } catch {
-      setSessMsg({ type: "error", text: "세션 저장에 실패했습니다" });
-    } finally {
-      setIsSavingSess(false);
-    }
-  };
-
-  const handleDeleteSession = async (id: string) => {
-    if (!confirm("이 세션을 삭제하시겠습니까?")) return;
-    await fetch(`/api/sessions/${id}`, { method: "DELETE" });
-    const remaining = sessions.filter((s) => s.id !== id);
-    setSessions(remaining);
-    if (questionLookupMode === "session" && selectedSessionId === id) {
-      const nextId = remaining[0]?.id ?? "";
-      setSelectedSessionId(nextId);
-      if (nextId) fetchQuestions(nextId);
-      else setQuestions([]);
     }
   };
 
@@ -752,117 +706,10 @@ export default function QuestionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">질문 조회</h2>
-          <p className="text-gray-600">세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => { setShowSessForm((v) => !v); setSessMsg(null); }}
-        >
-          {showSessForm ? "세션 설정 닫기" : "세션 설정"}
-        </Button>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">질문 조회</h2>
+        <p className="text-gray-600">세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
       </div>
-
-      {/* 세션 관리 (토글) */}
-      {showSessForm && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">질문 세션 설정</CardTitle>
-            <CardDescription>날짜·교과·주제를 설정하면 학생 질문하기 화면에서 선택할 수 있습니다</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-[1fr_1fr_2fr] gap-3">
-              <div className="space-y-1">
-                <Label>날짜</Label>
-                <DatePicker
-                  value={sessForm.date}
-                  onChange={(v) => setSessForm((p) => ({ ...p, date: v }))}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="sess-subject">교과</Label>
-                <Input
-                  id="sess-subject"
-                  placeholder="예: 과학"
-                  value={sessForm.subject}
-                  onChange={(e) => setSessForm((p) => ({ ...p, subject: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="sess-topic">주제</Label>
-                <Input
-                  id="sess-topic"
-                  placeholder="예: 지구의 역사"
-                  value={sessForm.topic}
-                  onChange={(e) => setSessForm((p) => ({ ...p, topic: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-800">이 세션 질문 기본 공개</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    켜면 학생이 이 세션에서 만든 질문이 저장 즉시 공개됩니다. 학생은 직접 변경할 수 없습니다.
-                  </p>
-                </div>
-                <Switch
-                  checked={sessForm.defaultQuestionPublic}
-                  onCheckedChange={(checked) =>
-                    setSessForm((p) => ({ ...p, defaultQuestionPublic: checked }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button size="sm" onClick={handleCreateSession} disabled={isSavingSess}>
-                {isSavingSess ? "저장 중..." : "세션 추가"}
-              </Button>
-              {sessMsg && (
-                <span className={`text-sm ${sessMsg.type === "success" ? "text-green-700" : "text-red-600"}`}>
-                  {sessMsg.text}
-                </span>
-              )}
-            </div>
-
-            {sessions.length > 0 && (
-              <div className="divide-y rounded-lg border mt-2">
-                {sessions.map((s) => {
-                  const active = isSessionAvailable(s.date);
-                  return (
-                    <div key={s.id} className="flex items-center justify-between px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${active ? "bg-green-500" : "bg-gray-300"}`} />
-                        <span className="text-sm">{buildSessionLabel(s.date, s.subject, s.topic)}</span>
-                        {active && (
-                          <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">활성</span>
-                        )}
-                        {s.unitDesignId && (
-                          <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">탐구 질문 수업</span>
-                        )}
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${s.defaultQuestionPublic ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                          질문 {s.defaultQuestionPublic ? "공개" : "비공개"}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-500 hover:text-red-700 h-7 px-2 text-xs"
-                        onClick={() => handleDeleteSession(s.id)}
-                      >
-                        삭제
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* 조회 모드 전환 */}
       <div className="flex items-center gap-2 flex-wrap">
