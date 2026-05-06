@@ -16,7 +16,8 @@ interface QuestionSession {
   topic: string;
   teacher: { name: string };
   unitDesignId?: string | null;
-  defaultQuestionPublic?: boolean;
+  defaultQuestionPublic: boolean;
+  isActive: boolean;
 }
 
 export default function TeacherSessionsPage() {
@@ -68,6 +69,40 @@ export default function TeacherSessionsPage() {
     if (!confirm("이 세션을 삭제하시겠습니까? 연결된 질문은 세션 없음 상태가 됩니다.")) return;
     await fetch(`/api/sessions/${id}`, { method: "DELETE" });
     setSessions((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const handleToggleActive = async (id: string, currentValue: boolean) => {
+    const next = !currentValue;
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, isActive: next } : s))
+    );
+    const res = await fetch(`/api/sessions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: next }),
+    });
+    if (!res.ok) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, isActive: currentValue } : s))
+      );
+    }
+  };
+
+  const handleTogglePublic = async (id: string, currentValue: boolean) => {
+    const next = !currentValue;
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, defaultQuestionPublic: next } : s))
+    );
+    const res = await fetch(`/api/sessions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ defaultQuestionPublic: next }),
+    });
+    if (!res.ok) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, defaultQuestionPublic: currentValue } : s))
+      );
+    }
   };
 
   const activeSessions = sessions.filter((s) => isSessionAvailable(s.date));
@@ -152,19 +187,32 @@ export default function TeacherSessionsPage() {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* 헤더 설명 */}
+          <div className="flex items-center justify-end gap-6 px-4 text-xs text-gray-400">
+            <span className="w-16 text-center">세션 활성화</span>
+            <span className="w-16 text-center">질문 공개</span>
+            <span className="w-8" />
+          </div>
+
           {activeSessions.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                  활성 세션
+                  이번 주 이후 세션
                   <span className="text-sm font-normal text-gray-500">({activeSessions.length}개)</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="divide-y rounded-lg border overflow-hidden">
                   {activeSessions.map((s) => (
-                    <SessionRow key={s.id} session={s} onDelete={handleDelete} />
+                    <SessionRow
+                      key={s.id}
+                      session={s}
+                      onDelete={handleDelete}
+                      onToggleActive={handleToggleActive}
+                      onTogglePublic={handleTogglePublic}
+                    />
                   ))}
                 </div>
               </CardContent>
@@ -183,7 +231,13 @@ export default function TeacherSessionsPage() {
               <CardContent>
                 <div className="divide-y rounded-lg border overflow-hidden">
                   {pastSessions.map((s) => (
-                    <SessionRow key={s.id} session={s} onDelete={handleDelete} />
+                    <SessionRow
+                      key={s.id}
+                      session={s}
+                      onDelete={handleDelete}
+                      onToggleActive={handleToggleActive}
+                      onTogglePublic={handleTogglePublic}
+                    />
                   ))}
                 </div>
               </CardContent>
@@ -198,40 +252,50 @@ export default function TeacherSessionsPage() {
 function SessionRow({
   session,
   onDelete,
+  onToggleActive,
+  onTogglePublic,
 }: {
   session: QuestionSession;
   onDelete: (id: string) => void;
+  onToggleActive: (id: string, current: boolean) => void;
+  onTogglePublic: (id: string, current: boolean) => void;
 }) {
-  const active = isSessionAvailable(session.date);
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+    <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}`}>
       <div className="flex items-center gap-3 min-w-0">
-        <span className={`shrink-0 w-2 h-2 rounded-full ${active ? "bg-green-500" : "bg-gray-300"}`} />
+        <span className={`shrink-0 w-2 h-2 rounded-full ${session.isActive ? "bg-green-500" : "bg-gray-300"}`} />
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
+          <p className={`text-sm font-medium truncate ${session.isActive ? "text-gray-900" : "text-gray-400"}`}>
             {buildSessionLabel(session.date, session.subject, session.topic)}
           </p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            {active && (
-              <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">활성</span>
+            {!session.isActive && (
+              <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">학생 비활성</span>
             )}
             {session.unitDesignId && (
               <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">탐구 질문 수업</span>
             )}
-            <span className={`text-xs px-1.5 py-0.5 rounded ${session.defaultQuestionPublic ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-              질문 {session.defaultQuestionPublic ? "공개" : "비공개"}
-            </span>
           </div>
         </div>
       </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        className="shrink-0 text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2 text-xs"
-        onClick={() => onDelete(session.id)}
-      >
-        삭제
-      </Button>
+      <div className="flex items-center gap-5 shrink-0">
+        <Switch
+          checked={session.isActive}
+          onCheckedChange={() => onToggleActive(session.id, session.isActive)}
+        />
+        <Switch
+          checked={session.defaultQuestionPublic}
+          onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2 text-xs"
+          onClick={() => onDelete(session.id)}
+        >
+          삭제
+        </Button>
+      </div>
     </div>
   );
 }

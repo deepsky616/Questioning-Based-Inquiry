@@ -127,9 +127,14 @@ export async function POST(req: Request) {
     const selectedSession = data.sessionId
       ? await prisma.questionSession.findUnique({
           where: { id: data.sessionId },
-          select: { defaultQuestionPublic: true },
+          select: { defaultQuestionPublic: true, isActive: true },
         })
       : null;
+
+    const userRole = (session.user as { role?: string }).role;
+    if (selectedSession && !selectedSession.isActive && userRole !== "TEACHER") {
+      return NextResponse.json({ error: "비활성화된 세션에서는 질문을 작성할 수 없습니다" }, { status: 403 });
+    }
 
     const question = await prisma.question.create({
       data: buildQuestionCreateData(data, userId, {

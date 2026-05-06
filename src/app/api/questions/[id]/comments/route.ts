@@ -47,13 +47,20 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: "댓글 내용을 입력해 주세요" }, { status: 400 });
     }
 
-    const question = await prisma.question.findUnique({ where: { id: params.id } });
+    const question = await prisma.question.findUnique({
+      where: { id: params.id },
+      include: { session: { select: { isActive: true } } },
+    });
     if (!question) {
       return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
     }
 
     if (!canCreateComment(userRole, question.isPublic)) {
       return NextResponse.json({ error: "댓글 작성 권한이 없습니다" }, { status: 403 });
+    }
+
+    if (question.session && !question.session.isActive && userRole !== "TEACHER") {
+      return NextResponse.json({ error: "비활성화된 세션에서는 댓글을 작성할 수 없습니다" }, { status: 403 });
     }
 
     const comment = await prisma.comment.create({

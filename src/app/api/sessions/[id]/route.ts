@@ -11,6 +11,7 @@ const updateSchema = z.object({
     .array(z.object({ type: z.string(), content: z.string() }))
     .optional(),
   defaultQuestionPublic: z.boolean().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

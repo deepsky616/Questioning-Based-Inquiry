@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { buildSessionLabel, buildSessionContextHint, isSessionAvailable } from "@/lib/sessions";
+import { buildSessionLabel, buildSessionContextHint } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { COGNITIVE_LABEL } from "@/lib/question-labels";
 
@@ -71,9 +71,8 @@ export default function AskPage() {
         return r.json();
       })
       .then((data: QuestionSession[]) => {
-        const available = data.filter((s) => isSessionAvailable(s.date));
-        setSessions(available);
-        if (available.length > 0) setSelectedSessionId(available[0].id);
+        setSessions(data);
+        if (data.length > 0) setSelectedSessionId(data[0].id);
         setSessionsLoaded(true);
       })
       .catch(() => {

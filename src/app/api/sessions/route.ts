@@ -43,7 +43,7 @@ export async function GET() {
 
   const teacherIds = teacherClasses.map((tc) => tc.teacherId);
   const sessions = await prisma.questionSession.findMany({
-    where: { teacherId: { in: teacherIds } },
+    where: { teacherId: { in: teacherIds }, isActive: true },
     orderBy: { date: "desc" },
     include: { teacher: { select: { name: true } } },
   });
