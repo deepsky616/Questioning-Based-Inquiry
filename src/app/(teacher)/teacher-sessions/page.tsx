@@ -271,6 +271,9 @@ function SessionRow({
             {!session.isActive && (
               <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">학생 비활성</span>
             )}
+            {!session.defaultQuestionPublic && (
+              <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">질문 비공개</span>
+            )}
             {session.unitDesignId && (
               <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">탐구 질문 수업</span>
             )}
