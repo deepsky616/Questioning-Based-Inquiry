@@ -187,21 +187,20 @@ export default function TeacherSessionsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* 헤더 설명 */}
-          <div className="flex items-center justify-end gap-6 px-4 text-xs text-gray-400">
-            <span className="w-16 text-center">세션 활성화</span>
-            <span className="w-16 text-center">질문 공개</span>
-            <span className="w-8" />
-          </div>
-
           {activeSessions.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                  이번 주 이후 세션
-                  <span className="text-sm font-normal text-gray-500">({activeSessions.length}개)</span>
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
+                    생성된 수업 세션
+                    <span className="text-sm font-normal text-gray-500">({activeSessions.length}개)</span>
+                  </CardTitle>
+                  <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
+                    <span className="w-16 text-center">세션 활성화</span>
+                    <span className="w-16 text-center">질문 공개</span>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="divide-y rounded-lg border overflow-hidden">
