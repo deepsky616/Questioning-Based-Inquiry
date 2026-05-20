@@ -110,18 +110,6 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>공개 설정</CardTitle>
-          <CardDescription>내가 작성한 질문의 공개 여부를 설정하세요</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-600">
-            기본적으로 모든 질문은 비공개로 설정됩니다. 질문을 저장할 때 개별적으로 공개 여부를 선택할 수 있습니다.
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
