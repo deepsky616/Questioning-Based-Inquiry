@@ -4,6 +4,17 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+const inquiryQuestionSchema = z.object({
+  type: z.string(),
+  content: z.string(),
+  id: z.string().optional(),
+  source: z.enum(["student", "teacher"]).optional(),
+  contentGroup: z.string().optional(),
+  priority: z.number().optional(),
+  lessonPhase: z.string().optional(),
+  rationale: z.string().optional(),
+}).passthrough();
+
 const saveSchema = z.object({
   title: z.string().min(1),
   curriculumAreaId: z.string().optional(),
@@ -14,7 +25,7 @@ const saveSchema = z.object({
   selectedKeywords: z.array(z.string()),
   coreSentences: z.array(z.string()),
   essentialQuestions: z.array(z.string()),
-  inquiryQuestions: z.array(z.object({ type: z.string(), content: z.string() })),
+  inquiryQuestions: z.array(inquiryQuestionSchema),
 });
 
 export async function GET(req: Request) {
