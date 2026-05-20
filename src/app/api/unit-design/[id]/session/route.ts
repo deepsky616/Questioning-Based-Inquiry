@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 const inquiryQuestionSchema = z.object({
   type: z.string(),
   content: z.string().min(1),
-});
+}).passthrough();
 
 const createSessionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -71,6 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const savedKeys = new Set(savedQuestions.map(questionKey));
     const selectedQuestions = data.sharedQuestions.map((question) => ({
+      ...question,
       type: question.type,
       content: question.content.trim(),
     }));

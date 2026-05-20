@@ -365,8 +365,12 @@ export default function TeacherUnitDesignPage() {
   };
 
   const publishDesign = async () => {
-    if (!newSession.date || !newSession.subject.trim() || !newSession.topic.trim()) {
-      setMessage({ type: "error", text: "배포할 날짜, 교과, 단원/주제를 입력하세요" });
+    const publishDate = selectedSession?.date || newSession.date;
+    const publishSubject = selectedSession?.subject || newSession.subject;
+    const publishTopic = selectedSession?.topic || newSession.topic || currentDesignArea;
+
+    if (!publishDate || !publishSubject.trim() || !publishTopic.trim()) {
+      setMessage({ type: "error", text: "배포할 수업세션을 선택하거나 날짜, 교과, 단원/주제를 입력하세요" });
       return;
     }
     const payload = buildClassStudentTargetPayload({
@@ -382,23 +386,44 @@ export default function TeacherUnitDesignPage() {
     try {
       const designId = editingDesignId ?? await saveDesign();
       if (!designId) return;
-      const res = await fetch(`/api/unit-design/${designId}/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: newSession.date,
-          topic: newSession.topic,
-          defaultQuestionPublic: newSession.defaultQuestionPublic,
-          sharedQuestions: sequencedQuestions.map((question) => ({
-            type: question.type,
-            content: question.content,
-          })),
-          ...payload,
-        }),
-      });
+
+      const sharedQuestions = sequencedQuestions.map((question) => ({
+        type: question.type,
+        content: question.content,
+        contentGroup: question.contentGroup,
+        lessonPhase: question.lessonPhase,
+        rationale: question.rationale,
+        priority: question.priority,
+      }));
+
+      const res = selectedSession
+        ? await fetch(`/api/sessions/${selectedSession.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              unitDesignId: designId,
+              sharedQuestions,
+              ...payload,
+            }),
+          })
+        : await fetch(`/api/unit-design/${designId}/session`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date: publishDate,
+            topic: publishTopic,
+            defaultQuestionPublic: newSession.defaultQuestionPublic,
+            sharedQuestions,
+            ...payload,
+          }),
+        });
       const created = await res.json();
       if (!res.ok) throw new Error(created.error ?? "publish failed");
-      setSessions((prev) => sortSessionsAsc([...prev, created]));
+      setSessions((prev) =>
+        sortSessionsAsc(selectedSession
+          ? prev.map((session) => (session.id === created.id ? created : session))
+          : [...prev, created]),
+      );
       setSelectedSessionId(created.id);
       setMessage({ type: "success", text: "단원설계 결과를 선택한 대상에게 배포했습니다" });
     } catch (error) {

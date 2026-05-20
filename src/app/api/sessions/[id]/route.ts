@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
@@ -12,8 +13,9 @@ const updateSchema = z.object({
   targetClassName: z.string().nullable().optional(),
   targetStudentId: z.string().nullable().optional(),
   targetStudentIds: z.array(z.string()).optional(),
+  unitDesignId: z.string().nullable().optional(),
   sharedQuestions: z
-    .array(z.object({ type: z.string(), content: z.string() }))
+    .array(z.object({ type: z.string(), content: z.string() }).passthrough())
     .optional(),
   defaultQuestionPublic: z.boolean().optional(),
   isActive: z.boolean().optional(),
@@ -34,7 +36,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
     const body = await req.json();
     const data = updateSchema.parse(body);
-    const updated = await prisma.questionSession.update({ where: { id }, data });
+    const { sharedQuestions, targetStudentIds, ...scalarData } = data;
+    const updateData: Prisma.QuestionSessionUpdateInput = {
+      ...scalarData,
+      ...(sharedQuestions !== undefined && {
+        sharedQuestions: sharedQuestions as Prisma.InputJsonValue,
+      }),
+      ...(targetStudentIds !== undefined && {
+        targetStudentIds: targetStudentIds as Prisma.InputJsonValue,
+      }),
+    };
+    const updated = await prisma.questionSession.update({ where: { id }, data: updateData });
     return NextResponse.json(updated);
   } catch {
     return NextResponse.json({ error: "서버 오류" }, { status: 500 });
