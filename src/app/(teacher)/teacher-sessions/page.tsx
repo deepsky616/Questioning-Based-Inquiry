@@ -6,19 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DatePicker from "@/components/shared/DatePicker";
+import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { buildSessionLabel, isSessionAvailable, sortSessionsAsc } from "@/lib/sessions";
 import {
   buildClassTargetValue,
-  buildSessionTargetPayload,
-  buildStudentTargetValue,
+  buildClassStudentTargetPayload,
   buildTargetLabel,
   getSubjectsForGrade,
   getTargetGrade,
@@ -39,6 +33,7 @@ interface QuestionSession {
   targetGrade?: string | null;
   targetClassName?: string | null;
   targetStudentId?: string | null;
+  targetStudentIds?: string[];
   targetStudent?: { name: string } | null;
 }
 
@@ -48,7 +43,8 @@ export default function TeacherSessionsPage() {
   const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sessForm, setSessForm] = useState({
-    targetValue: "all",
+    targetClassValue: "all",
+    selectedStudentIds: [] as string[],
     date: "",
     subject: "",
     topic: "",
@@ -71,7 +67,7 @@ export default function TeacherSessionsPage() {
     return Array.from(map.values());
   }, [students, teacherClasses]);
 
-  const selectedTargetGrade = getTargetGrade(sessForm.targetValue, targetClasses, students);
+  const selectedTargetGrade = getTargetGrade(sessForm.targetClassValue, targetClasses, students);
   const subjectOptions = getSubjectsForGrade(selectedTargetGrade);
 
   useEffect(() => {
@@ -85,7 +81,11 @@ export default function TeacherSessionsPage() {
         setTeacherClasses(targetData.teacherClasses ?? []);
         const classes = targetData.teacherClasses ?? [];
         if (classes.length > 0) {
-          setSessForm((prev) => ({ ...prev, targetValue: buildClassTargetValue(classes[0]) }));
+          const targetClassValue = buildClassTargetValue(classes[0]);
+          const selectedStudentIds = (targetData.students ?? [])
+            .filter((student: SessionTargetStudent) => student.grade === classes[0].grade && student.className === classes[0].className)
+            .map((student: SessionTargetStudent) => student.id);
+          setSessForm((prev) => ({ ...prev, targetClassValue, selectedStudentIds }));
         }
       })
       .catch(() => {})
@@ -103,6 +103,10 @@ export default function TeacherSessionsPage() {
       setMsg({ type: "error", text: "날짜, 교과, 주제는 필수입니다" });
       return;
     }
+    if (sessForm.targetClassValue !== "all" && sessForm.selectedStudentIds.length === 0) {
+      setMsg({ type: "error", text: "배포할 학생을 1명 이상 선택하세요" });
+      return;
+    }
     setIsSaving(true);
     setMsg(null);
     try {
@@ -111,16 +115,21 @@ export default function TeacherSessionsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...sessForm,
-          ...buildSessionTargetPayload(sessForm.targetValue),
+          ...buildClassStudentTargetPayload({
+            targetClassValue: sessForm.targetClassValue,
+            selectedStudentIds: sessForm.selectedStudentIds,
+            students,
+          }),
         }),
       });
       if (!res.ok) throw new Error();
       const created: QuestionSession = await res.json();
       setSessions((prev) => sortSessionsAsc([created, ...prev]));
       setSessForm((prev) => ({
-        targetValue: prev.targetValue,
+        targetClassValue: prev.targetClassValue,
+        selectedStudentIds: prev.selectedStudentIds,
         date: "",
-        subject: getSubjectsForGrade(getTargetGrade(prev.targetValue, targetClasses, students))[0] ?? "",
+        subject: getSubjectsForGrade(getTargetGrade(prev.targetClassValue, targetClasses, students))[0] ?? "",
         topic: "",
         defaultQuestionPublic: true,
       }));
@@ -190,30 +199,18 @@ export default function TeacherSessionsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_2fr]">
-            <div className="space-y-1">
-              <Label>배포 대상</Label>
-              <Select
-                value={sessForm.targetValue}
-                onValueChange={(value) => setSessForm((p) => ({ ...p, targetValue: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="학급 또는 학생 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체 담당 학급</SelectItem>
-                  {targetClasses.map((targetClass) => (
-                    <SelectItem key={buildClassTargetValue(targetClass)} value={buildClassTargetValue(targetClass)}>
-                      {targetClass.grade}학년 {targetClass.className}반
-                    </SelectItem>
-                  ))}
-                  {students.map((student) => (
-                    <SelectItem key={student.id} value={buildStudentTargetValue(student)}>
-                      {student.grade}학년 {student.className}반 {student.studentNumber}번 {student.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <SessionTargetSelector
+              classes={targetClasses}
+              students={students}
+              targetClassValue={sessForm.targetClassValue}
+              selectedStudentIds={sessForm.selectedStudentIds}
+              onTargetClassChange={(targetClassValue, selectedStudentIds) =>
+                setSessForm((prev) => ({ ...prev, targetClassValue, selectedStudentIds }))
+              }
+              onSelectedStudentIdsChange={(selectedStudentIds) =>
+                setSessForm((prev) => ({ ...prev, selectedStudentIds }))
+              }
+            />
             <div className="space-y-1">
               <Label>날짜</Label>
               <DatePicker

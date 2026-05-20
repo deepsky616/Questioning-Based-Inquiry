@@ -70,6 +70,76 @@ export function buildSessionTargetPayload(targetValue: string) {
   return { targetType: "ALL", targetGrade: null, targetClassName: null, targetStudentId: null };
 }
 
+export function buildClassStudentTargetPayload(params: {
+  targetClassValue: string;
+  selectedStudentIds: string[];
+  students: SessionTargetStudent[];
+}) {
+  if (params.targetClassValue === "all") {
+    return {
+      targetType: "ALL",
+      targetGrade: null,
+      targetClassName: null,
+      targetStudentId: null,
+      targetStudentIds: [],
+    };
+  }
+
+  const [, grade, className] = params.targetClassValue.split(":");
+  const classStudents = params.students.filter(
+    (student) => student.grade === grade && student.className === className,
+  );
+  const selectedIds = params.selectedStudentIds.filter((id) =>
+    classStudents.some((student) => student.id === id),
+  );
+
+  if (selectedIds.length === classStudents.length) {
+    return {
+      targetType: "CLASS",
+      targetGrade: grade,
+      targetClassName: className,
+      targetStudentId: null,
+      targetStudentIds: selectedIds,
+    };
+  }
+
+  if (selectedIds.length === 1) {
+    return {
+      targetType: "STUDENT",
+      targetGrade: grade,
+      targetClassName: className,
+      targetStudentId: selectedIds[0],
+      targetStudentIds: selectedIds,
+    };
+  }
+
+  return {
+    targetType: "CUSTOM",
+    targetGrade: grade,
+    targetClassName: className,
+    targetStudentId: null,
+    targetStudentIds: selectedIds,
+  };
+}
+
+export function buildClassSelectionLabel(params: {
+  targetClassValue: string;
+  selectedStudentIds: string[];
+  students: SessionTargetStudent[];
+}) {
+  if (params.targetClassValue === "all") {
+    return `전체 담당 학급(${params.students.length}/${params.students.length})`;
+  }
+  const [, grade, className] = params.targetClassValue.split(":");
+  const classStudents = params.students.filter(
+    (student) => student.grade === grade && student.className === className,
+  );
+  const selectedCount = params.selectedStudentIds.filter((id) =>
+    classStudents.some((student) => student.id === id),
+  ).length;
+  return `${grade}학년 ${className}반(${selectedCount}/${classStudents.length})`;
+}
+
 export function buildTargetLabel(params: {
   targetType?: string | null;
   targetGrade?: string | null;
@@ -81,6 +151,9 @@ export function buildTargetLabel(params: {
   }
   if (params.targetType === "STUDENT") {
     return params.targetStudentName ? `학생 ${params.targetStudentName}` : "개별 학생";
+  }
+  if (params.targetType === "CUSTOM" && params.targetGrade && params.targetClassName) {
+    return `${params.targetGrade}학년 ${params.targetClassName}반 일부`;
   }
   return "전체 담당 학급";
 }

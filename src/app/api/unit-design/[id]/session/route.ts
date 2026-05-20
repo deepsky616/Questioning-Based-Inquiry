@@ -5,13 +5,18 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 const inquiryQuestionSchema = z.object({
-  type: z.enum(["factual", "conceptual", "controversial"]),
+  type: z.string(),
   content: z.string().min(1),
 });
 
 const createSessionSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   topic: z.string().min(1).optional(),
+  targetType: z.enum(["ALL", "CLASS", "STUDENT", "CUSTOM"]).optional().default("ALL"),
+  targetGrade: z.string().nullable().optional(),
+  targetClassName: z.string().nullable().optional(),
+  targetStudentId: z.string().nullable().optional(),
+  targetStudentIds: z.array(z.string()).optional().default([]),
   defaultQuestionPublic: z.boolean().optional().default(true),
   sharedQuestions: z.array(inquiryQuestionSchema).min(1),
 });
@@ -85,6 +90,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         teacherId,
         unitDesignId: design.id,
         sharedQuestions: selectedQuestions,
+        targetType: data.targetType,
+        targetGrade: data.targetType === "CLASS" || data.targetType === "CUSTOM" ? data.targetGrade ?? null : null,
+        targetClassName: data.targetType === "CLASS" || data.targetType === "CUSTOM" ? data.targetClassName ?? null : null,
+        targetStudentId: data.targetType === "STUDENT" ? data.targetStudentId ?? null : null,
+        targetStudentIds: ["CLASS", "STUDENT", "CUSTOM"].includes(data.targetType) ? data.targetStudentIds : [],
         defaultQuestionPublic: data.defaultQuestionPublic,
       },
     });

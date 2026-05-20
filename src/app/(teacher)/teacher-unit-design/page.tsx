@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { GripVertical, Plus, RotateCw, Save, Sparkles, Trash2 } from "lucide-react";
+import { GripVertical, Plus, RotateCw, Save, Send, Sparkles, Trash2 } from "lucide-react";
 import DatePicker from "@/components/shared/DatePicker";
+import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,8 +20,7 @@ import { UNIT_FLOW_GROUPS, UNIT_FLOW_OPTIONS } from "@/lib/unit-sequence";
 import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
 import {
   buildClassTargetValue,
-  buildSessionTargetPayload,
-  buildStudentTargetValue,
+  buildClassStudentTargetPayload,
   getSubjectsForGrade,
   getTargetGrade,
   type SessionTargetClass,
@@ -38,6 +38,7 @@ interface QuestionSession {
   targetGrade?: string | null;
   targetClassName?: string | null;
   targetStudentId?: string | null;
+  targetStudentIds?: string[];
 }
 
 interface SequencedQuestion {
@@ -49,6 +50,16 @@ interface SequencedQuestion {
   priority: number;
   lessonPhase: string;
   rationale: string;
+}
+
+interface SavedUnitDesign {
+  id: string;
+  title: string;
+  subject: string;
+  gradeRange: string;
+  area: string;
+  inquiryQuestions: SequencedQuestion[];
+  createdAt?: string;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -80,7 +91,8 @@ export default function TeacherUnitDesignPage() {
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [flowId, setFlowId] = useState("cognitive-development");
   const [newSession, setNewSession] = useState({
-    targetValue: "all",
+    targetClassValue: "all",
+    selectedStudentIds: [] as string[],
     date: "",
     subject: "",
     topic: "",
@@ -89,12 +101,17 @@ export default function TeacherUnitDesignPage() {
   const [additionalQuestion, setAdditionalQuestion] = useState("");
   const [additionalQuestions, setAdditionalQuestions] = useState<string[]>([]);
   const [sequencedQuestions, setSequencedQuestions] = useState<SequencedQuestion[]>([]);
+  const [savedDesigns, setSavedDesigns] = useState<SavedUnitDesign[]>([]);
+  const [editingDesignId, setEditingDesignId] = useState<string | null>(null);
+  const [currentDesignSubject, setCurrentDesignSubject] = useState("");
+  const [currentDesignArea, setCurrentDesignArea] = useState("");
   const [designTitle, setDesignTitle] = useState("");
   const [generatedBy, setGeneratedBy] = useState<"ai" | "rules" | "">("");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [isSequencing, setIsSequencing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null;
@@ -112,7 +129,7 @@ export default function TeacherUnitDesignPage() {
     });
     return Array.from(map.values());
   }, [students, teacherClasses]);
-  const selectedTargetGrade = getTargetGrade(newSession.targetValue, targetClasses, students);
+  const selectedTargetGrade = getTargetGrade(newSession.targetClassValue, targetClasses, students);
   const subjectOptions = getSubjectsForGrade(selectedTargetGrade);
   const groupedQuestions = useMemo(() => {
     const groups = new Map<string, SequencedQuestion[]>();
@@ -125,7 +142,18 @@ export default function TeacherUnitDesignPage() {
 
   useEffect(() => {
     fetchSessions();
+    fetchSavedDesigns();
   }, []);
+
+  const fetchSavedDesigns = async () => {
+    try {
+      const res = await fetch("/api/unit-design");
+      const data = await res.json();
+      setSavedDesigns(Array.isArray(data) ? data : []);
+    } catch {
+      setSavedDesigns([]);
+    }
+  };
 
   const fetchSessions = async () => {
     setIsLoadingSessions(true);
@@ -141,7 +169,11 @@ export default function TeacherUnitDesignPage() {
       setTeacherClasses(targetData.teacherClasses ?? []);
       const classes = targetData.teacherClasses ?? [];
       if (classes.length > 0) {
-        setNewSession((prev) => ({ ...prev, targetValue: buildClassTargetValue(classes[0]) }));
+        const targetClassValue = buildClassTargetValue(classes[0]);
+        const selectedStudentIds = (targetData.students ?? [])
+          .filter((student: SessionTargetStudent) => student.grade === classes[0].grade && student.className === classes[0].className)
+          .map((student: SessionTargetStudent) => student.id);
+        setNewSession((prev) => ({ ...prev, targetClassValue, selectedStudentIds }));
       }
     } catch {
       setMessage({ type: "error", text: "수업세션 목록을 불러오지 못했습니다" });
@@ -169,7 +201,11 @@ export default function TeacherUnitDesignPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...newSession,
-          ...buildSessionTargetPayload(newSession.targetValue),
+          ...buildClassStudentTargetPayload({
+            targetClassValue: newSession.targetClassValue,
+            selectedStudentIds: newSession.selectedStudentIds,
+            students,
+          }),
         }),
       });
       if (!res.ok) throw new Error();
@@ -178,9 +214,10 @@ export default function TeacherUnitDesignPage() {
       setSelectedSessionId(created.id);
       setDesignTitle(`${created.subject} ${created.topic} 단원 설계`);
       setNewSession((prev) => ({
-        targetValue: prev.targetValue,
+        targetClassValue: prev.targetClassValue,
+        selectedStudentIds: prev.selectedStudentIds,
         date: "",
-        subject: getSubjectsForGrade(getTargetGrade(prev.targetValue, targetClasses, students))[0] ?? "",
+        subject: getSubjectsForGrade(getTargetGrade(prev.targetClassValue, targetClasses, students))[0] ?? "",
         topic: "",
         defaultQuestionPublic: true,
       }));
@@ -215,7 +252,10 @@ export default function TeacherUnitDesignPage() {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "sequence failed");
       setSequencedQuestions(body.sequencedQuestions ?? []);
+      setEditingDesignId(null);
       setGeneratedBy(body.generatedBy ?? "rules");
+      setCurrentDesignSubject(body.session.subject ?? "");
+      setCurrentDesignArea(body.session.topic ?? "단원설계");
       setDesignTitle((prev) =>
         prev || `${body.session.subject} ${body.session.topic || body.session.date} 단원 설계`,
       );
@@ -235,43 +275,139 @@ export default function TeacherUnitDesignPage() {
     }
   };
 
-  const saveDesign = async () => {
-    if (!selectedSession || sequencedQuestions.length === 0) {
+  const buildDesignPayload = () => {
+    const subject = selectedSession?.subject || currentDesignSubject || newSession.subject;
+    const area = selectedSession?.topic || currentDesignArea || newSession.topic || "단원설계";
+    return {
+      title: designTitle.trim() || `${subject} ${area} 단원 설계`,
+      subject,
+      gradeRange: "",
+      area,
+      coreIdea: selectedFlow.description,
+      selectedKeywords: [selectedFlow.title],
+      coreSentences: groupedQuestions.map(([group]) => group),
+      essentialQuestions: [`${selectedFlow.title} 기준으로 어떤 순서로 탐구할까?`],
+      inquiryQuestions: sequencedQuestions.map((question, index) => ({
+        ...question,
+        priority: index + 1,
+      })),
+    };
+  };
+
+  const saveDesign = async (): Promise<string | null> => {
+    if (sequencedQuestions.length === 0) {
       setMessage({ type: "error", text: "저장할 단원설계 결과가 없습니다" });
-      return;
+      return null;
     }
     setIsSaving(true);
     setMessage(null);
     try {
-      const orderedQuestions = sequencedQuestions.map((question, index) => ({
-        ...question,
-        priority: index + 1,
-      }));
-      const res = await fetch("/api/unit-design", {
-        method: "POST",
+      const payload = buildDesignPayload();
+      const res = await fetch(editingDesignId ? `/api/unit-design/${editingDesignId}` : "/api/unit-design", {
+        method: editingDesignId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: designTitle.trim() || `${selectedSession.subject} ${selectedSession.topic} 단원 설계`,
-          subject: selectedSession.subject,
-          gradeRange: "",
-          area: selectedSession.topic || "단원설계",
-          coreIdea: selectedFlow.description,
-          selectedKeywords: [selectedFlow.title],
-          coreSentences: groupedQuestions.map(([group]) => group),
-          essentialQuestions: [`${selectedFlow.title} 기준으로 어떤 순서로 탐구할까?`],
-          inquiryQuestions: orderedQuestions,
-        }),
+        body: JSON.stringify(payload),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "save failed");
-      setMessage({ type: "success", text: "단원설계를 저장했습니다" });
+      const designId = body.designId ?? editingDesignId;
+      setEditingDesignId(designId);
+      setCurrentDesignSubject(payload.subject);
+      setCurrentDesignArea(payload.area);
+      await fetchSavedDesigns();
+      setMessage({ type: "success", text: editingDesignId ? "단원설계를 수정 저장했습니다" : "단원설계를 저장했습니다" });
+      return designId;
     } catch (error) {
       setMessage({
         type: "error",
         text: error instanceof Error ? error.message : "단원설계 저장에 실패했습니다",
       });
+      return null;
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const loadSavedDesign = (design: SavedUnitDesign) => {
+    setEditingDesignId(design.id);
+    setDesignTitle(design.title);
+    setCurrentDesignSubject(design.subject);
+    setCurrentDesignArea(design.area);
+    setSequencedQuestions(
+      (design.inquiryQuestions ?? []).map((question, index) => ({
+        ...question,
+        id: question.id ?? `saved-${design.id}-${index}`,
+        source: question.source ?? "student",
+        priority: question.priority ?? index + 1,
+        contentGroup: question.contentGroup ?? "공통 탐구 질문",
+        lessonPhase: question.lessonPhase ?? "탐구",
+        rationale: question.rationale ?? "저장된 단원설계 질문입니다.",
+      })),
+    );
+    setGeneratedBy("");
+    setMessage({ type: "success", text: "저장된 단원설계를 불러왔습니다" });
+  };
+
+  const deleteSavedDesign = async (id: string) => {
+    if (!confirm("저장된 단원설계를 삭제하시겠습니까?")) return;
+    const res = await fetch(`/api/unit-design/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      if (editingDesignId === id) {
+        setEditingDesignId(null);
+        setSequencedQuestions([]);
+        setDesignTitle("");
+      }
+      await fetchSavedDesigns();
+      setMessage({ type: "success", text: "단원설계를 삭제했습니다" });
+    } else {
+      setMessage({ type: "error", text: "단원설계 삭제에 실패했습니다" });
+    }
+  };
+
+  const publishDesign = async () => {
+    if (!newSession.date || !newSession.subject.trim() || !newSession.topic.trim()) {
+      setMessage({ type: "error", text: "배포할 날짜, 교과, 단원/주제를 입력하세요" });
+      return;
+    }
+    const payload = buildClassStudentTargetPayload({
+      targetClassValue: newSession.targetClassValue,
+      selectedStudentIds: newSession.selectedStudentIds,
+      students,
+    });
+    if (payload.targetType !== "ALL" && payload.targetStudentIds.length === 0) {
+      setMessage({ type: "error", text: "배포할 학생을 1명 이상 선택하세요" });
+      return;
+    }
+    setIsPublishing(true);
+    try {
+      const designId = editingDesignId ?? await saveDesign();
+      if (!designId) return;
+      const res = await fetch(`/api/unit-design/${designId}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: newSession.date,
+          topic: newSession.topic,
+          defaultQuestionPublic: newSession.defaultQuestionPublic,
+          sharedQuestions: sequencedQuestions.map((question) => ({
+            type: question.type,
+            content: question.content,
+          })),
+          ...payload,
+        }),
+      });
+      const created = await res.json();
+      if (!res.ok) throw new Error(created.error ?? "publish failed");
+      setSessions((prev) => sortSessionsAsc([...prev, created]));
+      setSelectedSessionId(created.id);
+      setMessage({ type: "success", text: "단원설계 결과를 선택한 대상에게 배포했습니다" });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "단원설계 배포에 실패했습니다",
+      });
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -302,30 +438,18 @@ export default function TeacherUnitDesignPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_2fr_auto]">
-            <div className="space-y-1">
-              <Label>배포 대상</Label>
-              <Select
-                value={newSession.targetValue}
-                onValueChange={(value) => setNewSession((prev) => ({ ...prev, targetValue: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="학급 또는 학생 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">전체 담당 학급</SelectItem>
-                  {targetClasses.map((targetClass) => (
-                    <SelectItem key={buildClassTargetValue(targetClass)} value={buildClassTargetValue(targetClass)}>
-                      {targetClass.grade}학년 {targetClass.className}반
-                    </SelectItem>
-                  ))}
-                  {students.map((student) => (
-                    <SelectItem key={student.id} value={buildStudentTargetValue(student)}>
-                      {student.grade}학년 {student.className}반 {student.studentNumber}번 {student.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <SessionTargetSelector
+              classes={targetClasses}
+              students={students}
+              targetClassValue={newSession.targetClassValue}
+              selectedStudentIds={newSession.selectedStudentIds}
+              onTargetClassChange={(targetClassValue, selectedStudentIds) =>
+                setNewSession((prev) => ({ ...prev, targetClassValue, selectedStudentIds }))
+              }
+              onSelectedStudentIdsChange={(selectedStudentIds) =>
+                setNewSession((prev) => ({ ...prev, selectedStudentIds }))
+              }
+            />
             <div className="space-y-1">
               <Label>날짜</Label>
               <DatePicker
@@ -372,6 +496,47 @@ export default function TeacherUnitDesignPage() {
 
       <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <div className="space-y-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">저장된 단원설계</CardTitle>
+              <CardDescription>불러온 뒤 수정 저장하거나 삭제할 수 있습니다</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {savedDesigns.length === 0 ? (
+                <div className="rounded-md border border-dashed p-4 text-center text-sm text-gray-400">
+                  저장된 단원설계가 없습니다
+                </div>
+              ) : (
+                savedDesigns.map((design) => (
+                  <div
+                    key={design.id}
+                    className={`rounded-md border p-3 ${editingDesignId === design.id ? "border-indigo-300 bg-indigo-50" : "bg-white"}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-900">{design.title}</p>
+                      <p className="text-xs text-gray-500">
+                        {design.subject} · {design.area} · {design.inquiryQuestions.length}개 질문
+                      </p>
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <Button variant="outline" size="sm" className="h-8 flex-1" onClick={() => loadSavedDesign(design)}>
+                        불러오기
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-red-500 hover:bg-red-50 hover:text-red-700"
+                        onClick={() => deleteSavedDesign(design.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">설계 조건</CardTitle>
@@ -495,7 +660,11 @@ export default function TeacherUnitDesignPage() {
                   </Button>
                   <Button onClick={saveDesign} disabled={isSaving || sequencedQuestions.length === 0}>
                     <Save className="mr-2 h-4 w-4" />
-                    {isSaving ? "저장 중" : "저장"}
+                    {isSaving ? "저장 중" : editingDesignId ? "수정 저장" : "저장"}
+                  </Button>
+                  <Button onClick={publishDesign} disabled={isPublishing || sequencedQuestions.length === 0}>
+                    <Send className="mr-2 h-4 w-4" />
+                    {isPublishing ? "배포 중" : "배포"}
                   </Button>
                 </div>
               </div>

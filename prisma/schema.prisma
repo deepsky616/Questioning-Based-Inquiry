@@ -67,6 +67,7 @@ model QuestionSession {
   targetGrade     String?    @map("target_grade")
   targetClassName String?    @map("target_class_name")
   targetStudentId String?    @map("target_student_id")
+  targetStudentIds Json      @default("[]") @map("target_student_ids")
   teacherId       String     @map("teacher_id")
   teacher         User       @relation("SessionTeacher", fields: [teacherId], references: [id])
   questions       Question[] @relation("SessionQuestions")

@@ -7,10 +7,11 @@ const createSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   subject: z.string().min(1),
   topic: z.string().default(""),
-  targetType: z.enum(["ALL", "CLASS", "STUDENT"]).optional().default("ALL"),
+  targetType: z.enum(["ALL", "CLASS", "STUDENT", "CUSTOM"]).optional().default("ALL"),
   targetGrade: z.string().nullable().optional(),
   targetClassName: z.string().nullable().optional(),
   targetStudentId: z.string().nullable().optional(),
+  targetStudentIds: z.array(z.string()).optional().default([]),
   defaultQuestionPublic: z.boolean().optional().default(true),
 });
 
@@ -54,6 +55,7 @@ export async function GET() {
         { targetType: "ALL" },
         { targetType: "CLASS", targetGrade: user.grade, targetClassName: user.className },
         { targetType: "STUDENT", targetStudentId: user.id },
+        { targetType: "CUSTOM", targetStudentIds: { array_contains: user.id } },
       ],
     },
     orderBy: { date: "asc" },
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { date, subject, topic, targetType, targetGrade, targetClassName, targetStudentId, defaultQuestionPublic } =
+    const { date, subject, topic, targetType, targetGrade, targetClassName, targetStudentId, targetStudentIds, defaultQuestionPublic } =
       createSchema.parse(body);
 
     const teacherId = (session.user as any).id as string;
@@ -81,9 +83,12 @@ export async function POST(req: Request) {
         topic,
         teacherId,
         targetType,
-        targetGrade: targetType === "CLASS" ? targetGrade ?? null : null,
-        targetClassName: targetType === "CLASS" ? targetClassName ?? null : null,
+        targetGrade: targetType === "CLASS" || targetType === "CUSTOM" ? targetGrade ?? null : null,
+        targetClassName: targetType === "CLASS" || targetType === "CUSTOM" ? targetClassName ?? null : null,
         targetStudentId: targetType === "STUDENT" ? targetStudentId ?? null : null,
+        targetStudentIds: targetType === "CUSTOM" || targetType === "STUDENT" || targetType === "CLASS"
+          ? targetStudentIds
+          : [],
         defaultQuestionPublic,
       },
     });

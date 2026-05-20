@@ -309,6 +309,11 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
         teacherId: "teacher-1",
         unitDesignId: "ud-1",
         sharedQuestions: [SAVED_DESIGN.inquiry_questions[1]],
+        targetType: "ALL",
+        targetGrade: null,
+        targetClassName: null,
+        targetStudentId: null,
+        targetStudentIds: [],
         defaultQuestionPublic: true,
       },
     });
