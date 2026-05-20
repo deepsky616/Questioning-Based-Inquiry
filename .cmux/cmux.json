@@ -1,0 +1,58 @@
+{
+  "commands": [
+    {
+      "name": "AI Collaboration Team",
+      "keywords": ["ai", "team", "collaboration", "claude", "codex", "opencode"],
+      "workspace": {
+        "name": "AI Collaboration Team",
+        "cwd": ".",
+        "layout": {
+          "direction": "horizontal",
+          "split": 0.34,
+          "children": [
+            {
+              "pane": {
+                "surfaces": [
+                  {
+                    "type": "terminal",
+                    "name": "Claude - Orchestrator",
+                    "command": "printf '%s\\n\\n' 'ROLE: Orchestrator' 'You are responsible for the overall project plan, task breakdown, coordination, integration strategy, and final consistency checks. Do not edit files unless explicitly asked. Coordinate Codex for implementation/design and OpenCode for verification/analysis.' && claude",
+                    "focus": true
+                  }
+                ]
+              }
+            },
+            {
+              "direction": "vertical",
+              "split": 0.5,
+              "children": [
+                {
+                  "pane": {
+                    "surfaces": [
+                      {
+                        "type": "terminal",
+                        "name": "Codex - Coding and Design",
+                        "command": "printf '%s\\n\\n' 'ROLE: Coding and Design' 'You are responsible for implementation, frontend/backend code changes, UI design, refactoring, and applying the orchestrator plan. Before editing, inspect the repo and keep changes scoped. Coordinate with Claude for plan/integration and OpenCode for verification findings.' && codex"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "pane": {
+                    "surfaces": [
+                      {
+                        "type": "terminal",
+                        "name": "OpenCode - Verification and Analysis",
+                        "command": "printf '%s\\n\\n' 'ROLE: Verification and Analysis' 'You are responsible for codebase analysis, test planning, running checks, reviewing diffs, finding bugs/regressions, and validating the implementation. Prefer read-only review unless asked to patch a focused issue. Report findings clearly to Claude and Codex.' && opencode"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

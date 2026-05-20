@@ -17,6 +17,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { UNIT_FLOW_GROUPS, UNIT_FLOW_OPTIONS } from "@/lib/unit-sequence";
 import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
+import {
+  buildClassTargetValue,
+  buildSessionTargetPayload,
+  buildStudentTargetValue,
+  getSubjectsForGrade,
+  getTargetGrade,
+  type SessionTargetClass,
+  type SessionTargetStudent,
+} from "@/lib/session-targeting";
 
 interface QuestionSession {
   id: string;
@@ -25,6 +34,10 @@ interface QuestionSession {
   topic: string;
   defaultQuestionPublic: boolean;
   isActive: boolean;
+  targetType?: string | null;
+  targetGrade?: string | null;
+  targetClassName?: string | null;
+  targetStudentId?: string | null;
 }
 
 interface SequencedQuestion {
@@ -61,10 +74,13 @@ function reorder<T>(items: T[], from: number, to: number) {
 
 export default function TeacherUnitDesignPage() {
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [students, setStudents] = useState<SessionTargetStudent[]>([]);
+  const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [flowId, setFlowId] = useState("cognitive-development");
   const [newSession, setNewSession] = useState({
+    targetValue: "all",
     date: "",
     subject: "",
     topic: "",
@@ -83,6 +99,21 @@ export default function TeacherUnitDesignPage() {
 
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null;
   const selectedFlow = UNIT_FLOW_OPTIONS.find((flow) => flow.id === flowId) ?? UNIT_FLOW_OPTIONS[0];
+  const targetClasses = useMemo(() => {
+    if (teacherClasses.length > 0) return teacherClasses;
+    const map = new Map<string, SessionTargetClass>();
+    students.forEach((student) => {
+      if (student.grade && student.className) {
+        map.set(`${student.grade}-${student.className}`, {
+          grade: student.grade,
+          className: student.className,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [students, teacherClasses]);
+  const selectedTargetGrade = getTargetGrade(newSession.targetValue, targetClasses, students);
+  const subjectOptions = getSubjectsForGrade(selectedTargetGrade);
   const groupedQuestions = useMemo(() => {
     const groups = new Map<string, SequencedQuestion[]>();
     sequencedQuestions.forEach((question) => {
@@ -99,15 +130,31 @@ export default function TeacherUnitDesignPage() {
   const fetchSessions = async () => {
     setIsLoadingSessions(true);
     try {
-      const res = await fetch("/api/sessions");
+      const [res, targetRes] = await Promise.all([
+        fetch("/api/sessions"),
+        fetch("/api/teacher/students"),
+      ]);
       const data: QuestionSession[] = await res.json();
+      const targetData = await targetRes.json();
       setSessions(sortSessionsAsc(Array.isArray(data) ? data : []));
+      setStudents(targetData.students ?? []);
+      setTeacherClasses(targetData.teacherClasses ?? []);
+      const classes = targetData.teacherClasses ?? [];
+      if (classes.length > 0) {
+        setNewSession((prev) => ({ ...prev, targetValue: buildClassTargetValue(classes[0]) }));
+      }
     } catch {
       setMessage({ type: "error", text: "수업세션 목록을 불러오지 못했습니다" });
     } finally {
       setIsLoadingSessions(false);
     }
   };
+
+  useEffect(() => {
+    if (!subjectOptions.includes(newSession.subject)) {
+      setNewSession((prev) => ({ ...prev, subject: subjectOptions[0] ?? "" }));
+    }
+  }, [newSession.subject, subjectOptions]);
 
   const createSession = async () => {
     if (!newSession.date || !newSession.subject.trim() || !newSession.topic.trim()) {
@@ -120,14 +167,23 @@ export default function TeacherUnitDesignPage() {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newSession),
+        body: JSON.stringify({
+          ...newSession,
+          ...buildSessionTargetPayload(newSession.targetValue),
+        }),
       });
       if (!res.ok) throw new Error();
       const created: QuestionSession = await res.json();
       setSessions((prev) => sortSessionsAsc([...prev, created]));
       setSelectedSessionId(created.id);
       setDesignTitle(`${created.subject} ${created.topic} 단원 설계`);
-      setNewSession({ date: "", subject: "", topic: "", defaultQuestionPublic: true });
+      setNewSession((prev) => ({
+        targetValue: prev.targetValue,
+        date: "",
+        subject: getSubjectsForGrade(getTargetGrade(prev.targetValue, targetClasses, students))[0] ?? "",
+        topic: "",
+        defaultQuestionPublic: true,
+      }));
       setMessage({ type: "success", text: "단원설계용 수업세션을 만들었습니다" });
     } catch {
       setMessage({ type: "error", text: "수업세션 생성에 실패했습니다" });
@@ -245,7 +301,31 @@ export default function TeacherUnitDesignPage() {
           <CardDescription>학생들이 질문을 남길 단원 세션을 먼저 만들거나 기존 세션을 선택하세요</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr_2fr_auto]">
+          <div className="grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_2fr_auto]">
+            <div className="space-y-1">
+              <Label>배포 대상</Label>
+              <Select
+                value={newSession.targetValue}
+                onValueChange={(value) => setNewSession((prev) => ({ ...prev, targetValue: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="학급 또는 학생 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체 담당 학급</SelectItem>
+                  {targetClasses.map((targetClass) => (
+                    <SelectItem key={buildClassTargetValue(targetClass)} value={buildClassTargetValue(targetClass)}>
+                      {targetClass.grade}학년 {targetClass.className}반
+                    </SelectItem>
+                  ))}
+                  {students.map((student) => (
+                    <SelectItem key={student.id} value={buildStudentTargetValue(student)}>
+                      {student.grade}학년 {student.className}반 {student.studentNumber}번 {student.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1">
               <Label>날짜</Label>
               <DatePicker
@@ -255,12 +335,21 @@ export default function TeacherUnitDesignPage() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="unit-subject">교과</Label>
-              <Input
-                id="unit-subject"
-                placeholder="예: 과학"
+              <Select
                 value={newSession.subject}
-                onChange={(event) => setNewSession((prev) => ({ ...prev, subject: event.target.value }))}
-              />
+                onValueChange={(value) => setNewSession((prev) => ({ ...prev, subject: value }))}
+              >
+                <SelectTrigger id="unit-subject">
+                  <SelectValue placeholder="교과 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjectOptions.map((subject) => (
+                    <SelectItem key={subject} value={subject}>
+                      {subject}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="unit-topic">단원/주제</Label>

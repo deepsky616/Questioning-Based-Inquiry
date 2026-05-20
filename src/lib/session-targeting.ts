@@ -1,0 +1,86 @@
+export interface SessionTargetStudent {
+  id: string;
+  name: string;
+  grade: string;
+  className: string;
+  studentNumber: string;
+}
+
+export interface SessionTargetClass {
+  grade: string;
+  className: string;
+}
+
+export const SUBJECTS_BY_GRADE_RANGE: Record<string, string[]> = {
+  "1-2": ["국어", "수학", "바른 생활", "슬기로운 생활", "즐거운 생활"],
+  "3-4": ["국어", "사회", "도덕", "수학", "과학", "체육", "음악", "미술", "영어"],
+  "5-6": ["국어", "사회", "도덕", "수학", "과학", "실과", "체육", "음악", "미술", "영어"],
+};
+
+export const ALL_ELEMENTARY_SUBJECTS = Array.from(
+  new Set(Object.values(SUBJECTS_BY_GRADE_RANGE).flat()),
+);
+
+export function getGradeRange(grade?: string | null): string | null {
+  const normalized = String(grade ?? "").replace(/[^0-9]/g, "");
+  if (normalized === "1" || normalized === "2") return "1-2";
+  if (normalized === "3" || normalized === "4") return "3-4";
+  if (normalized === "5" || normalized === "6") return "5-6";
+  return null;
+}
+
+export function getSubjectsForGrade(grade?: string | null): string[] {
+  const range = getGradeRange(grade);
+  return range ? SUBJECTS_BY_GRADE_RANGE[range] : ALL_ELEMENTARY_SUBJECTS;
+}
+
+export function buildClassTargetValue(targetClass: SessionTargetClass): string {
+  return `class:${targetClass.grade}:${targetClass.className}`;
+}
+
+export function buildStudentTargetValue(student: SessionTargetStudent): string {
+  return `student:${student.id}`;
+}
+
+export function getTargetGrade(
+  targetValue: string,
+  classes: SessionTargetClass[],
+  students: SessionTargetStudent[],
+): string {
+  if (targetValue.startsWith("class:")) {
+    const [, grade, className] = targetValue.split(":");
+    return classes.find((targetClass) => targetClass.grade === grade && targetClass.className === className)?.grade ?? "";
+  }
+  if (targetValue.startsWith("student:")) {
+    const [, studentId] = targetValue.split(":");
+    return students.find((student) => student.id === studentId)?.grade ?? "";
+  }
+  return "";
+}
+
+export function buildSessionTargetPayload(targetValue: string) {
+  if (targetValue.startsWith("class:")) {
+    const [, grade, className] = targetValue.split(":");
+    return { targetType: "CLASS", targetGrade: grade, targetClassName: className, targetStudentId: null };
+  }
+  if (targetValue.startsWith("student:")) {
+    const [, studentId] = targetValue.split(":");
+    return { targetType: "STUDENT", targetGrade: null, targetClassName: null, targetStudentId: studentId };
+  }
+  return { targetType: "ALL", targetGrade: null, targetClassName: null, targetStudentId: null };
+}
+
+export function buildTargetLabel(params: {
+  targetType?: string | null;
+  targetGrade?: string | null;
+  targetClassName?: string | null;
+  targetStudentName?: string | null;
+}) {
+  if (params.targetType === "CLASS" && params.targetGrade && params.targetClassName) {
+    return `${params.targetGrade}학년 ${params.targetClassName}반`;
+  }
+  if (params.targetType === "STUDENT") {
+    return params.targetStudentName ? `학생 ${params.targetStudentName}` : "개별 학생";
+  }
+  return "전체 담당 학급";
+}

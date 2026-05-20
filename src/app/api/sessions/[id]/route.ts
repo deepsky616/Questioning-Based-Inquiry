@@ -7,6 +7,10 @@ const updateSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   subject: z.string().min(1).optional(),
   topic: z.string().optional(),
+  targetType: z.enum(["ALL", "CLASS", "STUDENT"]).optional(),
+  targetGrade: z.string().nullable().optional(),
+  targetClassName: z.string().nullable().optional(),
+  targetStudentId: z.string().nullable().optional(),
   sharedQuestions: z
     .array(z.object({ type: z.string(), content: z.string() }))
     .optional(),

@@ -7,6 +7,10 @@ const createSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   subject: z.string().min(1),
   topic: z.string().default(""),
+  targetType: z.enum(["ALL", "CLASS", "STUDENT"]).optional().default("ALL"),
+  targetGrade: z.string().nullable().optional(),
+  targetClassName: z.string().nullable().optional(),
+  targetStudentId: z.string().nullable().optional(),
   defaultQuestionPublic: z.boolean().optional().default(true),
 });
 
@@ -43,7 +47,15 @@ export async function GET() {
 
   const teacherIds = teacherClasses.map((tc) => tc.teacherId);
   const sessions = await prisma.questionSession.findMany({
-    where: { teacherId: { in: teacherIds }, isActive: true },
+    where: {
+      teacherId: { in: teacherIds },
+      isActive: true,
+      OR: [
+        { targetType: "ALL" },
+        { targetType: "CLASS", targetGrade: user.grade, targetClassName: user.className },
+        { targetType: "STUDENT", targetStudentId: user.id },
+      ],
+    },
     orderBy: { date: "asc" },
     include: { teacher: { select: { name: true } } },
   });
@@ -58,11 +70,22 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { date, subject, topic, defaultQuestionPublic } = createSchema.parse(body);
+    const { date, subject, topic, targetType, targetGrade, targetClassName, targetStudentId, defaultQuestionPublic } =
+      createSchema.parse(body);
 
     const teacherId = (session.user as any).id as string;
     const newSession = await prisma.questionSession.create({
-      data: { date, subject, topic, teacherId, defaultQuestionPublic },
+      data: {
+        date,
+        subject,
+        topic,
+        teacherId,
+        targetType,
+        targetGrade: targetType === "CLASS" ? targetGrade ?? null : null,
+        targetClassName: targetType === "CLASS" ? targetClassName ?? null : null,
+        targetStudentId: targetType === "STUDENT" ? targetStudentId ?? null : null,
+        defaultQuestionPublic,
+      },
     });
     return NextResponse.json(newSession, { status: 201 });
   } catch (error) {

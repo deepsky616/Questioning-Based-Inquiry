@@ -1,13 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import DatePicker from "@/components/shared/DatePicker";
 import { buildSessionLabel, isSessionAvailable, sortSessionsAsc } from "@/lib/sessions";
+import {
+  buildClassTargetValue,
+  buildSessionTargetPayload,
+  buildStudentTargetValue,
+  buildTargetLabel,
+  getSubjectsForGrade,
+  getTargetGrade,
+  type SessionTargetClass,
+  type SessionTargetStudent,
+} from "@/lib/session-targeting";
 
 interface QuestionSession {
   id: string;
@@ -18,12 +35,20 @@ interface QuestionSession {
   unitDesignId?: string | null;
   defaultQuestionPublic: boolean;
   isActive: boolean;
+  targetType?: string | null;
+  targetGrade?: string | null;
+  targetClassName?: string | null;
+  targetStudentId?: string | null;
+  targetStudent?: { name: string } | null;
 }
 
 export default function TeacherSessionsPage() {
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const [students, setStudents] = useState<SessionTargetStudent[]>([]);
+  const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sessForm, setSessForm] = useState({
+    targetValue: "all",
     date: "",
     subject: "",
     topic: "",
@@ -32,13 +57,46 @@ export default function TeacherSessionsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const targetClasses = useMemo(() => {
+    if (teacherClasses.length > 0) return teacherClasses;
+    const map = new Map<string, SessionTargetClass>();
+    students.forEach((student) => {
+      if (student.grade && student.className) {
+        map.set(`${student.grade}-${student.className}`, {
+          grade: student.grade,
+          className: student.className,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [students, teacherClasses]);
+
+  const selectedTargetGrade = getTargetGrade(sessForm.targetValue, targetClasses, students);
+  const subjectOptions = getSubjectsForGrade(selectedTargetGrade);
+
   useEffect(() => {
-    fetch("/api/sessions")
-      .then((r) => r.json())
-      .then((data: QuestionSession[]) => setSessions(sortSessionsAsc(data)))
+    Promise.all([
+      fetch("/api/sessions").then((r) => r.json()),
+      fetch("/api/teacher/students").then((r) => r.json()),
+    ])
+      .then(([sessionData, targetData]) => {
+        setSessions(sortSessionsAsc(Array.isArray(sessionData) ? sessionData : []));
+        setStudents(targetData.students ?? []);
+        setTeacherClasses(targetData.teacherClasses ?? []);
+        const classes = targetData.teacherClasses ?? [];
+        if (classes.length > 0) {
+          setSessForm((prev) => ({ ...prev, targetValue: buildClassTargetValue(classes[0]) }));
+        }
+      })
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!subjectOptions.includes(sessForm.subject)) {
+      setSessForm((prev) => ({ ...prev, subject: subjectOptions[0] ?? "" }));
+    }
+  }, [sessForm.subject, subjectOptions]);
 
   const handleCreate = async () => {
     if (!sessForm.date || !sessForm.subject.trim() || !sessForm.topic.trim()) {
@@ -51,12 +109,21 @@ export default function TeacherSessionsPage() {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sessForm),
+        body: JSON.stringify({
+          ...sessForm,
+          ...buildSessionTargetPayload(sessForm.targetValue),
+        }),
       });
       if (!res.ok) throw new Error();
       const created: QuestionSession = await res.json();
       setSessions((prev) => sortSessionsAsc([created, ...prev]));
-      setSessForm({ date: "", subject: "", topic: "", defaultQuestionPublic: true });
+      setSessForm((prev) => ({
+        targetValue: prev.targetValue,
+        date: "",
+        subject: getSubjectsForGrade(getTargetGrade(prev.targetValue, targetClasses, students))[0] ?? "",
+        topic: "",
+        defaultQuestionPublic: true,
+      }));
       setMsg({ type: "success", text: "세션이 추가됐습니다" });
     } catch {
       setMsg({ type: "error", text: "세션 저장에 실패했습니다" });
@@ -122,7 +189,31 @@ export default function TeacherSessionsPage() {
           <CardDescription>날짜·교과·주제를 입력하면 학생 화면에서 선택 가능한 세션이 생성됩니다</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-[1fr_1fr_2fr] gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_2fr]">
+            <div className="space-y-1">
+              <Label>배포 대상</Label>
+              <Select
+                value={sessForm.targetValue}
+                onValueChange={(value) => setSessForm((p) => ({ ...p, targetValue: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="학급 또는 학생 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체 담당 학급</SelectItem>
+                  {targetClasses.map((targetClass) => (
+                    <SelectItem key={buildClassTargetValue(targetClass)} value={buildClassTargetValue(targetClass)}>
+                      {targetClass.grade}학년 {targetClass.className}반
+                    </SelectItem>
+                  ))}
+                  {students.map((student) => (
+                    <SelectItem key={student.id} value={buildStudentTargetValue(student)}>
+                      {student.grade}학년 {student.className}반 {student.studentNumber}번 {student.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1">
               <Label>날짜</Label>
               <DatePicker
@@ -132,12 +223,21 @@ export default function TeacherSessionsPage() {
             </div>
             <div className="space-y-1">
               <Label htmlFor="sess-subject">교과</Label>
-              <Input
-                id="sess-subject"
-                placeholder="예: 과학"
+              <Select
                 value={sessForm.subject}
-                onChange={(e) => setSessForm((p) => ({ ...p, subject: e.target.value }))}
-              />
+                onValueChange={(value) => setSessForm((p) => ({ ...p, subject: value }))}
+              >
+                <SelectTrigger id="sess-subject">
+                  <SelectValue placeholder="교과 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjectOptions.map((subject) => (
+                    <SelectItem key={subject} value={subject}>
+                      {subject}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="sess-topic">주제</Label>
@@ -197,7 +297,7 @@ export default function TeacherSessionsPage() {
                     <span className="text-sm font-normal text-gray-500">({activeSessions.length}개)</span>
                   </CardTitle>
                   <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
-                    <span className="w-16 text-center">세션 활성화</span>
+                    <span className="w-16 text-center">학생 활성화</span>
                     <span className="w-16 text-center">질문 공개</span>
                   </div>
                 </div>
@@ -221,11 +321,17 @@ export default function TeacherSessionsPage() {
           {pastSessions.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
-                  지난 세션
-                  <span className="text-sm font-normal text-gray-500">({pastSessions.length}개)</span>
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
+                    수업 세션 목록
+                    <span className="text-sm font-normal text-gray-500">({pastSessions.length}개)</span>
+                  </CardTitle>
+                  <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
+                    <span className="w-16 text-center">학생 활성화</span>
+                    <span className="w-16 text-center">질문 공개</span>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="divide-y rounded-lg border overflow-hidden">
@@ -277,6 +383,14 @@ function SessionRow({
             {session.unitDesignId && (
               <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">탐구 질문 수업</span>
             )}
+            <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+              {buildTargetLabel({
+                targetType: session.targetType,
+                targetGrade: session.targetGrade,
+                targetClassName: session.targetClassName,
+                targetStudentName: session.targetStudent?.name,
+              })}
+            </span>
           </div>
         </div>
       </div>
