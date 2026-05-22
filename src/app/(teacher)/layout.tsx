@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageNav } from "@/components/shared/PageNav";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { getSessionUser } from "@/lib/auth-helpers";
 
 const TEACHER_PAGES = [
@@ -42,8 +43,8 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   if (!session) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
+    <div className="min-h-screen bg-background">
+      <header className="bg-card shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-8">
@@ -53,7 +54,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
                   <Link
                     key={p.href}
                     href={p.href}
-                    className="text-gray-700 hover:text-primary px-3 py-2 rounded-md text-sm font-medium"
+                    className="text-muted-foreground hover:text-primary px-3 py-2 rounded-md text-sm font-medium"
                   >
                     {p.label}
                   </Link>
@@ -61,7 +62,8 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
               </nav>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{user.name} 선생님</span>
+              <ThemeToggle />
+              <span className="text-sm text-muted-foreground">{user.name} 선생님</span>
               <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
                 로그아웃
               </Button>
