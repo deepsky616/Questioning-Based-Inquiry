@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 
 type Theme = "light" | "dark";
 
@@ -24,13 +25,28 @@ function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle("dark", theme === "dark");
 }
 
+function isThemeDisabledPath(pathname: string | null) {
+  return pathname === "/login";
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
     const initialTheme = getInitialTheme();
     setThemeState(initialTheme);
-    applyTheme(initialTheme);
+    applyTheme(isThemeDisabledPath(pathname) ? "light" : initialTheme);
+  }, [pathname]);
+
+  useEffect(() => {
+    applyTheme(isThemeDisabledPath(pathname) ? "light" : theme);
+  }, [pathname, theme]);
+
+  useEffect(() => {
+    return () => {
+      applyTheme("light");
+    };
   }, []);
 
   const setTheme = (nextTheme: Theme) => {
