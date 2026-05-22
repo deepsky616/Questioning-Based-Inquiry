@@ -193,10 +193,30 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Suspense fallback={<div className="text-muted-foreground">로딩 중...</div>}>
-        <LoginContent />
-      </Suspense>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4">
+      <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="overflow-hidden rounded-2xl border border-white/70 bg-white/70 shadow-xl shadow-blue-100/70">
+          <div className="relative aspect-[16/10] lg:aspect-[4/3]">
+            <img
+              src="/login-inquiry-hero.png"
+              alt="질문에서 탐구로 이어지는 학습 여정 일러스트"
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent p-5 text-white">
+              <p className="text-sm font-medium opacity-90">Question Lab</p>
+              <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-3xl">
+                질문에서 시작해 탐구로 이어지는 수업
+              </h1>
+            </div>
+          </div>
+        </section>
+
+        <div className="flex justify-center">
+          <Suspense fallback={<div className="text-muted-foreground">로딩 중...</div>}>
+            <LoginContent />
+          </Suspense>
+        </div>
+      </div>
     </div>
   );
 }
