@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { useAIPlay } from "./useAIPlay";
 import type { BuiltInGame } from "@/lib/question-games-data";
+import type { GameStartConfig } from "../[gameId]/page";
 
 const TOPICS = [
   "우리 학교에서 가장 좋아하는 장소",
@@ -19,10 +21,12 @@ const TOPICS = [
   "꿈과 목표",
 ];
 
-interface RoundEntry { topic: string; question: string }
-interface Props { game: BuiltInGame; onBack: () => void }
+interface RoundEntry { topic: string; question: string; aiQuestion?: string }
+interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
-export default function HotPotatoGame({ game, onBack }: Props) {
+export default function HotPotatoGame({ game, onBack, config }: Props) {
+  const isAI = config.mode === "ai";
+  const { ask, loading: aiLoading } = useAIPlay();
   const [phase, setPhase] = useState<"waiting" | "running" | "caught" | "submitted">("waiting");
   const [timeLeft, setTimeLeft] = useState(0);
   const [topic, setTopic] = useState("");
@@ -57,9 +61,14 @@ export default function HotPotatoGame({ game, onBack }: Props) {
     }, 1000);
   }
 
-  function submitQuestion() {
+  async function submitQuestion() {
     if (!question.trim()) return;
-    setRounds((r) => [...r, { topic, question }]);
+    let aiQ: string | undefined;
+    if (isAI) {
+      const res = await ask({ action: "hot-potato:generate", context: { topic } });
+      aiQ = res?.text;
+    }
+    setRounds((r) => [...r, { topic, question, aiQuestion: aiQ }]);
     setQuestion("");
     setPhase("submitted");
   }
@@ -174,10 +183,10 @@ export default function HotPotatoGame({ game, onBack }: Props) {
             <Button
               className="w-full font-bold text-white rounded-xl"
               style={{ background: "linear-gradient(135deg, #FB923C, #EF4444)", opacity: question.trim() ? 1 : 0.5 }}
-              disabled={!question.trim()}
+              disabled={!question.trim() || aiLoading}
               onClick={submitQuestion}
             >
-              질문 제출하기 🎉
+              {aiLoading ? "AI 질문 생성 중..." : "질문 제출하기 🎉"}
             </Button>
           </div>
         </div>
@@ -207,9 +216,14 @@ export default function HotPotatoGame({ game, onBack }: Props) {
         <div className="space-y-3">
           <h3 className="font-bold text-gray-700 text-sm">📝 지금까지 만든 질문 ({rounds.length}개)</h3>
           {rounds.map((r, i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-100 p-4">
-              <p className="text-orange-500 text-xs font-medium mb-1">주제: {r.topic}</p>
-              <p className="text-gray-800 text-sm">{r.question}</p>
+            <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 space-y-2">
+              <p className="text-orange-500 text-xs font-medium">주제: {r.topic}</p>
+              <p className="text-gray-800 text-sm">👤 {r.question}</p>
+              {r.aiQuestion && (
+                <p className="text-indigo-600 text-sm bg-indigo-50 rounded-lg px-3 py-1.5">
+                  🤖 {r.aiQuestion}
+                </p>
+              )}
             </div>
           ))}
         </div>

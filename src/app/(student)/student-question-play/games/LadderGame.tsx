@@ -3,7 +3,9 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAIPlay } from "./useAIPlay";
 import type { BuiltInGame } from "@/lib/question-games-data";
+import type { GameStartConfig } from "../[gameId]/page";
 
 const COLORS = ["#7C3AED","#2563EB","#059669","#D97706","#DC2626","#DB2777"];
 
@@ -38,9 +40,11 @@ function tracePath(startCol: number, grid: boolean[][]): number[] {
   return path;
 }
 
-interface Props { game: BuiltInGame; onBack: () => void }
+interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
-export default function LadderGame({ game, onBack }: Props) {
+export default function LadderGame({ game, onBack, config }: Props) {
+  const { ask, loading: aiLoading } = useAIPlay();
+  void config; void ask; void aiLoading;
   const [phase, setPhase] = useState<"setup" | "reveal" | "result">("setup");
   const [names, setNames] = useState(["", "", "", ""]);
   const [topics, setTopics] = useState(["", "", "", ""]);

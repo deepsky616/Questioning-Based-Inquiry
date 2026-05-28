@@ -2,7 +2,9 @@
 
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { useAIPlay } from "./useAIPlay";
 import type { BuiltInGame } from "@/lib/question-games-data";
+import type { GameStartConfig } from "../[gameId]/page";
 
 const ALL_TYPES = [
   "사실질문", "개념질문", "논쟁질문",
@@ -24,9 +26,12 @@ function checkBingo(marks: boolean[]): { hasBingo: boolean; lines: number[][] } 
   return { hasBingo: bingoLines.length > 0, lines: bingoLines };
 }
 
-interface Props { game: BuiltInGame; onBack: () => void }
+interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
-export default function BingoGame({ game, onBack }: Props) {
+export default function BingoGame({ game, onBack, config }: Props) {
+  const isAI = config.mode === "ai";
+  const { ask, loading: aiLoading } = useAIPlay();
+  void isAI; void ask; void aiLoading; // AI 기능 준비 (향후 확장)
   const [phase, setPhase] = useState<"fill" | "play" | "bingo">("fill");
   const [types] = useState<string[]>(() => shuffle(ALL_TYPES));
   const [questions, setQuestions] = useState<string[]>(Array(9).fill(""));
