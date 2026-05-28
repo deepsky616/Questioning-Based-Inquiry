@@ -1,6 +1,5 @@
 "use client";
 
-import { use } from "react";
 import { useRouter } from "next/navigation";
 import { BUILT_IN_GAMES } from "@/lib/question-games-data";
 import BingoGame from "../games/BingoGame";
@@ -22,8 +21,8 @@ const GAME_MAP: Record<string, GameComponent> = {
   "mystery-box": MysteryBoxGame as GameComponent,
 };
 
-export default function GamePage({ params }: { params: Promise<{ gameId: string }> }) {
-  const { gameId } = use(params);
+export default function GamePage({ params }: { params: { gameId: string } }) {
+  const { gameId } = params;
   const router = useRouter();
   const game = BUILT_IN_GAMES.find((g) => g.id === gameId);
   const GameComponent = GAME_MAP[gameId];
