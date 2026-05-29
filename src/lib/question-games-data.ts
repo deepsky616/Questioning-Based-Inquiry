@@ -29,6 +29,35 @@ export interface CustomGame {
 
 export type AnyGame = BuiltInGame | CustomGame;
 
+/* ── 멀티플레이 방(대기실) 관련 타입 ── */
+export interface RoomPlayer {
+  id: string;
+  name: string;
+  isHost: boolean;
+  joinedAt: number;
+}
+
+export interface RoomChainItem {
+  question: string;
+  playerId: string;
+  playerName: string;
+}
+
+export type RoomStatus = "waiting" | "playing" | "ended";
+
+export interface GameRoom {
+  code: string;
+  gameId: string;
+  hostId: string;
+  status: RoomStatus;
+  players: RoomPlayer[];
+  topic: string;
+  chain: RoomChainItem[];
+  turnIndex: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface GameVisibility {
   type: "all" | "hidden" | "classes" | "students";
   classKeys?: string[]; // "{grade}-{className}" 형식
