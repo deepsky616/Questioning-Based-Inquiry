@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { RoomHeader, playerColorById } from "./roomShared";
+import { RoomHeader } from "./roomShared";
+import RoomResult from "./RoomResult";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
 const ALL_TYPES = [
@@ -56,29 +57,16 @@ export default function RoomBingo({ game, room, myId, actionLoading, onAction, o
   }
 
   if (room.status === "ended") {
+    // 빙고 완성 순서가 빠를수록 높은 점수
+    const scores = room.players.map((p) => {
+      const rank = winners.findIndex((w) => w.playerId === p.id);
+      return { playerId: p.id, name: p.name, score: rank >= 0 ? winners.length - rank : 0 };
+    });
     return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="게임 종료!" onLeave={onLeave} />
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-4">
-          <div className="text-6xl">🎯</div>
-          <h2 className="text-2xl font-black text-gray-800">빙고 게임 끝!</h2>
-          <div className="w-full space-y-2">
-            {winners.length === 0 ? (
-              <p className="text-gray-400 text-sm text-center">빙고를 완성한 사람이 없어요</p>
-            ) : winners.map((w, i) => (
-              <div key={w.playerId} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                <span className="text-lg">{["🥇", "🥈", "🥉"][i] ?? "⭐"}</span>
-                <span className="font-bold text-gray-800">{w.playerName}</span>
-                <span className="text-xs text-gray-400 ml-auto">{i + 1}번째 빙고</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        {isHost && (
-          <Button className="w-full py-4 font-black text-white rounded-xl" style={{ background: game.gradientCss }}
-            onClick={() => onAction("restart")}>🔄 대기실로 돌아가기</Button>
-        )}
-      </div>
+      <RoomResult game={game} room={room} myId={myId}
+        scoreLabel="빙고 점수" scoreUnit="점"
+        scores={scores} questions={[]}
+        onAction={onAction} onLeave={onLeave} />
     );
   }
 

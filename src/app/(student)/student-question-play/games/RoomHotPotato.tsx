@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, WaitingBanner, playerColorById } from "./roomShared";
+import RoomResult from "./RoomResult";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
 const TOPICS = [
@@ -79,27 +80,17 @@ export default function RoomHotPotato({ game, room, myId, actionLoading, onActio
   }, [hasState, state?.phase]);
 
   if (room.status === "ended" || (hasState && state.phase === "done")) {
+    const rounds = state?.rounds ?? [];
+    const scores = room.players.map((p) => ({
+      playerId: p.id, name: p.name,
+      score: rounds.filter((r) => r.playerId === p.id).length,
+    }));
+    const questions = rounds.map((r) => ({ playerName: r.playerName, question: r.question }));
     return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="게임 종료!" onLeave={onLeave} />
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-4">
-          <div className="text-6xl">🥔</div>
-          <h2 className="text-2xl font-black text-gray-800">뜨거운 감자 끝!</h2>
-          <p className="text-gray-500 text-sm">{state?.rounds?.length ?? 0}개의 질문을 만들었어요!</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-2 max-h-72 overflow-y-auto">
-          {(state?.rounds ?? []).map((r, i) => (
-            <div key={i} className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs" style={{ color: playerColorById(room, r.playerId) }}>{r.playerName} · {r.topic}</p>
-              <p className="text-gray-800 text-sm">{r.question}</p>
-            </div>
-          ))}
-        </div>
-        {isHost && (
-          <Button className="w-full py-4 font-black text-white rounded-xl" style={{ background: game.gradientCss }}
-            onClick={() => onAction("restart")}>🔄 대기실로 돌아가기</Button>
-        )}
-      </div>
+      <RoomResult game={game} room={room} myId={myId}
+        scoreLabel="만든 질문" scoreUnit="개"
+        scores={scores} questions={questions}
+        onAction={onAction} onLeave={onLeave} />
     );
   }
 

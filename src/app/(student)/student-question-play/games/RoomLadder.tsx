@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RoomHeader, WaitingBanner, PLAYER_COLORS, playerColorById } from "./roomShared";
+import RoomResult from "./RoomResult";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
 const ROWS = 10;
@@ -63,26 +64,17 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
 
   // ─── 종료 ───
   if (room.status === "ended") {
+    const qs = state?.questions ?? [];
+    const scores = room.players.map((p) => ({
+      playerId: p.id, name: p.name,
+      score: qs.filter((q) => q.playerId === p.id).length,
+    }));
+    const questions = qs.map((q) => ({ playerName: q.playerName, question: q.question }));
     return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="게임 종료!" onLeave={onLeave} />
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-3">
-          <div className="text-6xl">🪜</div>
-          <h2 className="text-2xl font-black text-gray-800">질문 사다리 완성!</h2>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-2 max-h-72 overflow-y-auto">
-          {(state?.questions ?? []).map((q, i) => (
-            <div key={i} className="bg-gray-50 rounded-xl p-3">
-              <p className="text-xs" style={{ color: playerColorById(room, q.playerId) }}>{q.playerName} · 📌 {q.topic}</p>
-              <p className="text-gray-800 text-sm">{q.question}</p>
-            </div>
-          ))}
-        </div>
-        {isHost && (
-          <Button className="w-full py-4 font-black text-white rounded-xl" style={{ background: game.gradientCss }}
-            onClick={() => onAction("restart")}>🔄 대기실로 돌아가기</Button>
-        )}
-      </div>
+      <RoomResult game={game} room={room} myId={myId}
+        scoreLabel="만든 질문" scoreUnit="개"
+        scores={scores} questions={questions}
+        onAction={onAction} onLeave={onLeave} />
     );
   }
 

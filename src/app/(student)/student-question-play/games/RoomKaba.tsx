@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, TurnBar, WaitingBanner, playerColorById } from "./roomShared";
+import RoomResult from "./RoomResult";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
 const SENTENCES = [
@@ -49,34 +50,17 @@ export default function RoomKaba({ game, room, myId, actionLoading, onAction, on
   }, [isHost, hasState, room.status, ROUNDS, onAction]);
 
   if (room.status === "ended" || (hasState && state.idx >= state.sentences.length)) {
-    const correctByPlayer: Record<string, number> = {};
-    (state?.history ?? []).forEach((h) => {
-      if (h.correct) correctByPlayer[h.playerName] = (correctByPlayer[h.playerName] ?? 0) + 1;
-    });
+    const hist = state?.history ?? [];
+    const scores = room.players.map((p) => ({
+      playerId: p.id, name: p.name,
+      score: hist.filter((h) => h.playerId === p.id && h.correct).length,
+    }));
+    const questions = hist.filter((h) => h.correct).map((h) => ({ playerName: h.playerName, question: h.answer }));
     return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="게임 종료!" onLeave={onLeave} />
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-4">
-          <div className="text-6xl">🏆</div>
-          <h2 className="text-2xl font-black text-gray-800">까바놀이 완성!</h2>
-          <div className="w-full space-y-2">
-            {Object.entries(correctByPlayer).sort((a, b) => b[1] - a[1]).map(([name, cnt], i) => (
-              <div key={name} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                <span className="text-lg">{["🥇", "🥈", "🥉"][i] ?? "⭐"}</span>
-                <span className="font-bold text-gray-800 flex-1">{name}</span>
-                <span className="font-black" style={{ color: game.accentColor }}>{cnt}개</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        {isHost && (
-          <Button className="w-full py-4 font-black text-white rounded-xl"
-            style={{ background: game.gradientCss }} onClick={() => onAction("restart")}>
-            🔄 대기실로 돌아가기
-          </Button>
-        )}
-        {!isHost && <p className="text-center text-gray-400 text-sm">방장이 다음 게임을 준비하고 있어요...</p>}
-      </div>
+      <RoomResult game={game} room={room} myId={myId}
+        scoreLabel="맞힌 질문" scoreUnit="개"
+        scores={scores} questions={questions}
+        onAction={onAction} onLeave={onLeave} />
     );
   }
 

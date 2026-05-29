@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import RoomResult from "./RoomResult";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
 const PRESET_TOPICS = [
@@ -74,43 +75,16 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
 
   /* ─── 종료 화면 ─── */
   if (room.status === "ended") {
+    const scores = room.players.map((p) => ({
+      playerId: p.id, name: p.name,
+      score: room.chain.filter((c) => c.playerId === p.id).length,
+    }));
+    const questions = room.chain.map((c) => ({ playerName: c.playerName, question: c.question }));
     return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <div className="flex items-center gap-3">
-          <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">← 나가기</button>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-4">
-          <div className="text-6xl">🏆</div>
-          <h2 className="text-2xl font-black text-gray-800">릴레이 완성!</h2>
-          <p className="text-gray-500 text-sm">주제: <span className="font-bold text-orange-500">{room.topic}</span></p>
-          <p className="text-gray-500 text-sm">
-            {playerCount}명이 함께 <span className="text-2xl font-black" style={{ color: game.accentColor }}>{room.chain.length}</span>개의 질문을 이어갔어요!
-          </p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3 max-h-80 overflow-y-auto">
-          <h3 className="font-black text-gray-700">📜 전체 질문 체인</h3>
-          {room.chain.map((item, i) => (
-            <div key={i} className="flex gap-3 items-start">
-              <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black text-white mt-0.5"
-                style={{ background: playerColor(item.playerId) }}>{i + 1}</div>
-              <div className="flex-1">
-                <p className="text-xs font-bold mb-0.5" style={{ color: playerColor(item.playerId) }}>{item.playerName}</p>
-                <p className="text-gray-800 text-sm leading-relaxed">{item.question}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        {isHost && (
-          <Button className="w-full py-4 font-black text-white rounded-xl"
-            style={{ background: game.gradientCss }}
-            onClick={() => onAction("restart")}>
-            🔄 대기실로 돌아가기
-          </Button>
-        )}
-        {!isHost && (
-          <p className="text-center text-gray-400 text-sm">방장이 다음 게임을 준비하고 있어요...</p>
-        )}
-      </div>
+      <RoomResult game={game} room={room} myId={myId}
+        scoreLabel="이어간 질문" scoreUnit="개"
+        scores={scores} questions={questions}
+        onAction={onAction} onLeave={onLeave} />
     );
   }
 
