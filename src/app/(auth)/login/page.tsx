@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import {
   sanitizeStudentNumberInput,
@@ -18,18 +18,72 @@ import {
   TEACHER_LOGIN_FORM_PROPS,
 } from "@/lib/login-autocomplete";
 
+const STUDENT_SAVE_KEY = "ql_saved_student_id";
+const TEACHER_SAVE_KEY = "ql_saved_teacher_id";
+
+function SaveIdCheckbox({
+  id,
+  checked,
+  onChange,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label htmlFor={id} className="flex items-center gap-2 cursor-pointer select-none w-fit">
+      <input
+        type="checkbox"
+        id={id}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="w-4 h-4 rounded cursor-pointer accent-primary"
+      />
+      <span className="text-sm text-muted-foreground">아이디 저장</span>
+    </label>
+  );
+}
+
 function StudentLoginForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [form, setForm] = useState({ school: "", grade: "", className: "", studentNumber: "", password: "" });
+  const [saveId, setSaveId] = useState(false);
+  const [form, setForm] = useState({
+    school: "", grade: "", className: "", studentNumber: "", password: "",
+  });
+
+  // 저장된 아이디 복원
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STUDENT_SAVE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        school: string; grade: string; className: string; studentNumber: string;
+      };
+      setSaveId(true);
+      setForm((prev) => ({
+        ...prev,
+        school: saved.school ?? "",
+        grade: saved.grade ?? "",
+        className: saved.className ?? "",
+        studentNumber: saved.studentNumber ?? "",
+      }));
+    } catch {}
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.name === "studentNumber"
-      ? sanitizeStudentNumberInput(e.target.value)
-      : e.target.value;
+    const value =
+      e.target.name === "studentNumber"
+        ? sanitizeStudentNumberInput(e.target.value)
+        : e.target.value;
     setForm((prev) => ({ ...prev, [e.target.name]: value }));
     setError(null);
+  };
+
+  const handleSaveIdChange = (checked: boolean) => {
+    setSaveId(checked);
+    if (!checked) localStorage.removeItem(STUDENT_SAVE_KEY);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,35 +110,79 @@ function StudentLoginForm() {
       setError("학교·학년·반·번호 또는 비밀번호가 올바르지 않습니다");
       return;
     }
+
+    // 로그인 성공 시 아이디 저장/삭제
+    if (saveId) {
+      localStorage.setItem(
+        STUDENT_SAVE_KEY,
+        JSON.stringify({
+          school: form.school,
+          grade: form.grade,
+          className: form.className,
+          studentNumber: form.studentNumber,
+        })
+      );
+    } else {
+      localStorage.removeItem(STUDENT_SAVE_KEY);
+    }
+
     router.push("/student-dashboard");
     router.refresh();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" {...STUDENT_LOGIN_FORM_PROPS}>
-      {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>}
+      {error && (
+        <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
+      )}
       <div className="space-y-2">
         <Label htmlFor="s-school">학교</Label>
-        <Input id="s-school" name="school" placeholder="한빛초등학교" value={form.school} onChange={handleChange} autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.school} />
+        <Input
+          id="s-school" name="school" placeholder="한빛초등학교"
+          value={form.school} onChange={handleChange}
+          autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.school}
+        />
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-2">
           <Label htmlFor="s-grade">학년</Label>
-          <Input id="s-grade" name="grade" placeholder="3" value={form.grade} onChange={handleChange} autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.grade} inputMode="numeric" pattern="[0-9]*" />
+          <Input
+            id="s-grade" name="grade" placeholder="3"
+            value={form.grade} onChange={handleChange}
+            autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.grade}
+            inputMode="numeric" pattern="[0-9]*"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="s-class">반</Label>
-          <Input id="s-class" name="className" placeholder="2" value={form.className} onChange={handleChange} autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.className} inputMode="numeric" pattern="[0-9]*" />
+          <Input
+            id="s-class" name="className" placeholder="2"
+            value={form.className} onChange={handleChange}
+            autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.className}
+            inputMode="numeric" pattern="[0-9]*"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="s-number">번호</Label>
-          <Input id="s-number" name="studentNumber" placeholder="15" value={form.studentNumber} onChange={handleChange} {...STUDENT_NUMBER_INPUT_PROPS} />
+          <Input
+            id="s-number" name="studentNumber" placeholder="15"
+            value={form.studentNumber} onChange={handleChange}
+            {...STUDENT_NUMBER_INPUT_PROPS}
+          />
         </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor="s-password">비밀번호</Label>
-        <Input id="s-password" name="password" type="password" placeholder="••••" value={form.password} onChange={handleChange} autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.password} />
+        <Input
+          id="s-password" name="password" type="password" placeholder="••••"
+          value={form.password} onChange={handleChange}
+          autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.password}
+        />
       </div>
+
+      {/* 아이디 저장 */}
+      <SaveIdCheckbox id="s-save-id" checked={saveId} onChange={handleSaveIdChange} />
+
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "로그인 중..." : "학생 로그인"}
       </Button>
@@ -96,11 +194,28 @@ function TeacherLoginForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveId, setSaveId] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
+
+  // 저장된 이메일 복원
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TEACHER_SAVE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { email: string };
+      setSaveId(true);
+      setForm((prev) => ({ ...prev, email: saved.email ?? "" }));
+    } catch {}
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setError(null);
+  };
+
+  const handleSaveIdChange = (checked: boolean) => {
+    setSaveId(checked);
+    if (!checked) localStorage.removeItem(TEACHER_SAVE_KEY);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,26 +239,48 @@ function TeacherLoginForm() {
       setError("이메일 또는 비밀번호가 올바르지 않습니다");
       return;
     }
+
+    // 로그인 성공 시 이메일 저장/삭제
+    if (saveId) {
+      localStorage.setItem(TEACHER_SAVE_KEY, JSON.stringify({ email: form.email }));
+    } else {
+      localStorage.removeItem(TEACHER_SAVE_KEY);
+    }
+
     router.push("/teacher-dashboard");
     router.refresh();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" {...TEACHER_LOGIN_FORM_PROPS}>
-      {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>}
+      {error && (
+        <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
+      )}
       <div className="space-y-2">
         <Label htmlFor="t-email">이메일</Label>
-        <Input id="t-email" name="email" type="email" placeholder="teacher@school.kr" value={form.email} onChange={handleChange} autoComplete={TEACHER_LOGIN_AUTOCOMPLETE.email} />
+        <Input
+          id="t-email" name="email" type="email" placeholder="teacher@school.kr"
+          value={form.email} onChange={handleChange}
+          autoComplete={TEACHER_LOGIN_AUTOCOMPLETE.email}
+        />
       </div>
       <div className="space-y-2">
         <Label htmlFor="t-password">비밀번호</Label>
-        <Input id="t-password" name="password" type="password" placeholder="••••••" value={form.password} onChange={handleChange} autoComplete={TEACHER_LOGIN_AUTOCOMPLETE.password} />
+        <Input
+          id="t-password" name="password" type="password" placeholder="••••••"
+          value={form.password} onChange={handleChange}
+          autoComplete={TEACHER_LOGIN_AUTOCOMPLETE.password}
+        />
       </div>
-      <div className="text-right">
+
+      {/* 아이디 저장 + 비밀번호 찾기 */}
+      <div className="flex items-center justify-between">
+        <SaveIdCheckbox id="t-save-id" checked={saveId} onChange={handleSaveIdChange} />
         <Link href="/forgot-password" className="text-sm text-primary hover:underline">
           비밀번호 찾기
         </Link>
       </div>
+
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "로그인 중..." : "교사 로그인"}
       </Button>
