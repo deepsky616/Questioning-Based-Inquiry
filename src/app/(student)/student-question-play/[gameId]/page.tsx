@@ -9,6 +9,7 @@ import DiceGame from "../games/DiceGame";
 import LadderGame from "../games/LadderGame";
 import RelayGame from "../games/RelayGame";
 import MysteryBoxGame from "../games/MysteryBoxGame";
+import KabaGame from "../games/KabaGame";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { BuiltInGame } from "@/lib/question-games-data";
@@ -27,6 +28,7 @@ type GameComponent = React.ComponentType<{
 }>;
 
 const GAME_MAP: Record<string, GameComponent> = {
+  kaba: KabaGame as GameComponent,
   bingo: BingoGame as GameComponent,
   "hot-potato": HotPotatoGame as GameComponent,
   dice: DiceGame as GameComponent,

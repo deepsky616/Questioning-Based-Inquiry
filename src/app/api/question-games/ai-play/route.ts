@@ -40,6 +40,9 @@ const PROMPTS: Record<string, (ctx: Record<string, string>) => string> = {
 
   "ladder:suggest": (c) =>
     `주제: "${c.topic}"\n이 주제로 만들 수 있는 좋은 질문 2가지를 짧게 제안해주세요.\n번호 없이 각 질문을 한 줄씩, 총 2줄로 출력하세요.`,
+
+  "kaba:check": (c) =>
+    `초등학교 1~2학년 학생이 평서문을 질문으로 바꾸는 '까바놀이'를 하고 있어요.\n\n원래 평서문: "${c.original}"\n학생이 바꾼 질문: "${c.student}"\n\n다음 두 가지를 확인해 주세요:\n1. 평서문이 질문 형태(~나요? ~인가요? ~할까요? 등)로 바뀌었나요?\n2. 원래 문장의 의미가 잘 담겨 있나요?\n\n반드시 아래 형식으로만 답하세요 (다른 말 없이):\n판정: 잘했어요 또는 다시해봐요\n이유: (한 문장)\n격려: (따뜻한 한 문장)`,
 };
 
 export async function POST(req: NextRequest) {

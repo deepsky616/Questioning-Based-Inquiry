@@ -169,6 +169,24 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     isBuiltIn: true,
     order: 6,
   },
+  {
+    id: "kaba",
+    title: "까바놀이",
+    description: "평서문을 질문으로 바꿔요! '고양이가 잔다' → '고양이가 자나요?' 1~2학년 추천!",
+    emoji: "🙋",
+    gradientCss: "linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)",
+    accentColor: "#2563EB",
+    playerCount: "1~30명",
+    duration: "10~20분",
+    instructions: [
+      "선생님이나 화면에 나온 평서문을 읽어요. 예) 고양이가 잔다",
+      "평서문을 질문으로 바꿔 말하거나 써요. 예) 고양이가 자나요?",
+      "문장 끝을 '~나요?', '~인가요?', '~할까요?' 등으로 바꾸면 돼요.",
+      "AI 모드에서는 AI 선생님이 잘 바꿨는지 확인해 줘요!",
+    ],
+    isBuiltIn: true,
+    order: 7,
+  },
 ];
 
 export function isGameVisibleToStudent(
