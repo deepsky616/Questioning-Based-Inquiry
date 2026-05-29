@@ -98,7 +98,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
 
   async function handleJoinRoom() {
     const code = joinCode.trim();
-    if (code.length !== 6) return;
+    if (code.length !== 4) return;
     await joinRoom(code);
   }
 
@@ -239,7 +239,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
             <span className="text-4xl">🔑</span>
             <div>
               <h1 className="text-xl font-black">방 코드 입력</h1>
-              <p className="text-white/80 text-sm">친구가 알려준 6자리 코드를 입력해요</p>
+              <p className="text-white/80 text-sm">친구가 알려준 4자리 코드를 입력해요</p>
             </div>
           </div>
         </div>
@@ -252,19 +252,19 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
           <input
             type="text"
             inputMode="numeric"
-            maxLength={6}
-            className="w-full border-2 rounded-2xl px-4 py-5 text-4xl font-black text-center tracking-[0.3em] focus:outline-none transition-colors"
+            maxLength={4}
+            className="w-full border-2 rounded-2xl px-4 py-5 text-5xl font-black text-center tracking-[0.4em] focus:outline-none transition-colors"
             style={{ borderColor: joinCode ? game.accentColor : "#e5e7eb" }}
-            placeholder="------"
+            placeholder="----"
             value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-            onKeyDown={(e) => { if (e.key === "Enter" && joinCode.length === 6) handleJoinRoom(); }}
+            onChange={(e) => setJoinCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+            onKeyDown={(e) => { if (e.key === "Enter" && joinCode.length === 4) handleJoinRoom(); }}
             autoFocus
           />
           <Button
             className="w-full py-4 font-black text-white rounded-xl text-lg"
-            style={{ background: game.gradientCss, opacity: joinCode.length === 6 && !actionLoading ? 1 : 0.4 }}
-            disabled={joinCode.length !== 6 || actionLoading}
+            style={{ background: game.gradientCss, opacity: joinCode.length === 4 && !actionLoading ? 1 : 0.4 }}
+            disabled={joinCode.length !== 4 || actionLoading}
             onClick={handleJoinRoom}>
             {actionLoading ? "참가하는 중..." : "🚪 방 참가하기"}
           </Button>

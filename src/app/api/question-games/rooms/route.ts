@@ -5,8 +5,8 @@ import type { GameRoom, RoomPlayer } from "@/lib/question-games-data";
 
 const ROOM_KEY = (code: string) => `game_room_${code}`;
 
-function gen6() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+function gen4() {
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 // 방 생성
@@ -24,10 +24,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "gameId가 필요합니다" }, { status: 400 });
   }
 
-  // 충돌 없는 6자리 코드 생성 (최대 8회 시도)
+  // 충돌 없는 4자리 코드 생성 (최대 12회 시도)
   let code = "";
-  for (let i = 0; i < 8; i++) {
-    const candidate = gen6();
+  for (let i = 0; i < 12; i++) {
+    const candidate = gen4();
     const existing = await prisma.systemConfig.findUnique({ where: { key: ROOM_KEY(candidate) } });
     if (!existing) { code = candidate; break; }
   }
