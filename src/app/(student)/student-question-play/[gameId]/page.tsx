@@ -13,10 +13,15 @@ import MysteryBoxGame from "../games/MysteryBoxGame";
 import KabaGame from "../games/KabaGame";
 import RoomLobby from "../games/RoomLobby";
 import RoomRelay from "../games/RoomRelay";
+import RoomKaba from "../games/RoomKaba";
+import RoomDice from "../games/RoomDice";
+import RoomHotPotato from "../games/RoomHotPotato";
+import RoomBingo from "../games/RoomBingo";
+import RoomLadder from "../games/RoomLadder";
 import { useRoom } from "../games/useRoom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { BuiltInGame } from "@/lib/question-games-data";
+import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
 export type GameMode = "solo" | "friend" | "ai";
 
@@ -39,6 +44,25 @@ const GAME_MAP: Record<string, GameComponent> = {
   ladder: LadderGame as GameComponent,
   relay: RelayGame as GameComponent,
   "mystery-box": MysteryBoxGame as GameComponent,
+};
+
+type RoomGameComponent = React.ComponentType<{
+  game: BuiltInGame;
+  room: GameRoom;
+  myId: string;
+  actionLoading: boolean;
+  onAction: (action: string, extra?: Record<string, unknown>) => Promise<GameRoom | null>;
+  onLeave: () => void;
+}>;
+
+// 실시간 멀티 동기화를 지원하는 게임들
+const ROOM_GAME_MAP: Record<string, RoomGameComponent> = {
+  relay: RoomRelay,
+  kaba: RoomKaba,
+  dice: RoomDice,
+  "hot-potato": RoomHotPotato,
+  bingo: RoomBingo,
+  ladder: RoomLadder,
 };
 
 export default function GamePage({ params }: { params: { gameId: string } }) {
@@ -113,10 +137,11 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
         />
       );
     }
-    // 게임 진행 / 종료
-    if (gameId === "relay") {
+    // 게임 진행 / 종료 — 멀티 동기화 컴포넌트
+    const RoomComponent = ROOM_GAME_MAP[gameId];
+    if (RoomComponent) {
       return (
-        <RoomRelay
+        <RoomComponent
           game={game}
           room={room}
           myId={myId}
@@ -126,7 +151,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
         />
       );
     }
-    // 릴레이 외 게임: 방 참가자 명단으로 로컬 진행 (한 기기에서 함께)
+    // 멀티 미지원 게임(미스터리 박스): 방 참가자 명단으로 로컬 진행
     return (
       <GameComponent
         game={game}

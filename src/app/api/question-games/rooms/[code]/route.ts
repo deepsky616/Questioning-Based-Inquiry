@@ -99,6 +99,33 @@ export async function PATCH(
       room.status = "playing";
       room.turnIndex = 0;
       room.chain = [];
+      room.gameState = {};
+      await saveRoom(room);
+      break;
+    }
+
+    case "update-state": {
+      // gameState 부분 병합 (참가자 누구나 자기 액션 반영 가능)
+      const patch = (body.patch ?? {}) as Record<string, unknown>;
+      room.gameState = { ...room.gameState, ...patch };
+      if (typeof body.turnIndex === "number") room.turnIndex = body.turnIndex;
+      if (typeof body.status === "string" && (body.status === "playing" || body.status === "ended")) {
+        room.status = body.status;
+      }
+      await saveRoom(room);
+      break;
+    }
+
+    case "set-state": {
+      // gameState 전체 교체 (주로 방장이 초기화/리셋)
+      room.gameState = (body.state ?? {}) as Record<string, unknown>;
+      if (typeof body.turnIndex === "number") room.turnIndex = body.turnIndex;
+      await saveRoom(room);
+      break;
+    }
+
+    case "next-turn": {
+      room.turnIndex = (room.turnIndex + 1) % room.players.length;
       await saveRoom(room);
       break;
     }
@@ -150,6 +177,7 @@ export async function PATCH(
       room.chain = [];
       room.turnIndex = 0;
       room.topic = "";
+      room.gameState = {};
       await saveRoom(room);
       break;
     }

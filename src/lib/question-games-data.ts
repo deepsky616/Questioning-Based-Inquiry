@@ -54,6 +54,7 @@ export interface GameRoom {
   topic: string;
   chain: RoomChainItem[];
   turnIndex: number;
+  gameState: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
 }
