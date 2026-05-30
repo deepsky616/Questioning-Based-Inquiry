@@ -52,7 +52,8 @@ export async function GET() {
       className: true,
       studentNumber: true,
       school: true,
-      _count: { select: { questions: true } },
+      totalPoints: true,
+      _count: { select: { questions: true, comments: true, pointLogs: true } },
     },
     orderBy: [{ grade: "asc" }, { className: "asc" }, { studentNumber: "asc" }],
   });
@@ -66,6 +67,9 @@ export async function GET() {
       studentNumber: s.studentNumber ?? "",
       school: s.school ?? "",
       questionCount: s._count.questions,
+      commentCount: s._count.comments,
+      pointLogCount: s._count.pointLogs,
+      totalPoints: s.totalPoints,
     })),
     teacherClasses,
   });
