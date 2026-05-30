@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { AI_BONUS_TYPES, BonusKey, GAME_LABEL } from "@/lib/points-policy";
 
 const POLL_MS = 5000;
@@ -90,12 +89,7 @@ export default function PointsCard({ myId }: { myId: string }) {
 
       {/* 학급 순위 */}
       <div className="md:col-span-2 rounded-2xl p-5 bg-white border border-gray-100 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-black text-gray-800 text-sm">🏆 우리 반 순위</h3>
-          <Link href="/student-question-play" className="text-xs text-indigo-600 hover:underline">
-            놀이하러 가기 →
-          </Link>
-        </div>
+        <h3 className="font-black text-gray-800 text-sm mb-3">🏆 우리 반 순위</h3>
         {topStudents.length === 0 ? (
           <p className="text-gray-400 text-sm text-center py-4">아직 점수가 없어요</p>
         ) : (
