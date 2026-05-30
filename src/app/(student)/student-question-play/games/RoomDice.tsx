@@ -55,7 +55,7 @@ export default function RoomDice({ game, room, myId, actionLoading, onAction, on
       playerId: p.id, name: p.name,
       score: hist.filter((h) => h.playerId === p.id).length,
     }));
-    const questions = hist.map((h) => ({ playerName: h.playerName, question: h.question }));
+    const questions = hist.map((h) => ({ playerId: h.playerId, playerName: h.playerName, question: h.question }));
     return (
       <RoomResult game={game} room={room} myId={myId}
         scoreLabel="만든 질문" scoreUnit="개"

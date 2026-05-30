@@ -59,3 +59,41 @@ ALTER TABLE comments ADD CONSTRAINT comments_author_id_fkey
 
 ALTER TABLE comments ADD CONSTRAINT comments_question_id_fkey
     FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE;
+
+-- ─────────────────────────────────────────────────────────
+-- 학생 포인트 시스템 (멀티 질문놀이 활동 보상)
+-- ─────────────────────────────────────────────────────────
+
+-- User에 누적 포인트 컬럼
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS total_points INTEGER NOT NULL DEFAULT 0;
+
+-- 포인트 획득 이력
+CREATE TABLE IF NOT EXISTS point_logs (
+    id              TEXT NOT NULL,
+    student_id      TEXT NOT NULL,
+    game_id         TEXT NOT NULL,
+    room_code       TEXT,
+    bonus_type      TEXT NOT NULL,
+    points          INTEGER NOT NULL,
+    reason          TEXT NOT NULL DEFAULT '',
+    awarded_by_id   TEXT,
+    created_at      TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+
+-- 중복 지급 방지 (같은 방·게임·상 조합은 학생당 1회)
+CREATE UNIQUE INDEX IF NOT EXISTS point_logs_uniq_award
+    ON point_logs(student_id, game_id, room_code, bonus_type);
+
+CREATE INDEX IF NOT EXISTS point_logs_student_created_idx
+    ON point_logs(student_id, created_at);
+
+CREATE INDEX IF NOT EXISTS point_logs_game_created_idx
+    ON point_logs(game_id, created_at);
+
+ALTER TABLE point_logs ADD CONSTRAINT point_logs_student_id_fkey
+    FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE;
+
+ALTER TABLE point_logs ADD CONSTRAINT point_logs_awarded_by_id_fkey
+    FOREIGN KEY (awarded_by_id) REFERENCES users(id) ON DELETE SET NULL;

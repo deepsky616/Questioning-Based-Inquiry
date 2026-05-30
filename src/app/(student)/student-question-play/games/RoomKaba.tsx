@@ -55,7 +55,7 @@ export default function RoomKaba({ game, room, myId, actionLoading, onAction, on
       playerId: p.id, name: p.name,
       score: hist.filter((h) => h.playerId === p.id && h.correct).length,
     }));
-    const questions = hist.filter((h) => h.correct).map((h) => ({ playerName: h.playerName, question: h.answer }));
+    const questions = hist.filter((h) => h.correct).map((h) => ({ playerId: h.playerId, playerName: h.playerName, question: h.answer }));
     return (
       <RoomResult game={game} room={room} myId={myId}
         scoreLabel="맞힌 질문" scoreUnit="개"

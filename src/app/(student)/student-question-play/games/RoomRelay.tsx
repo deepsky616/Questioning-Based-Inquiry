@@ -79,7 +79,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
       playerId: p.id, name: p.name,
       score: room.chain.filter((c) => c.playerId === p.id).length,
     }));
-    const questions = room.chain.map((c) => ({ playerName: c.playerName, question: c.question }));
+    const questions = room.chain.map((c) => ({ playerId: c.playerId, playerName: c.playerName, question: c.question }));
     return (
       <RoomResult game={game} room={room} myId={myId}
         scoreLabel="이어간 질문" scoreUnit="개"

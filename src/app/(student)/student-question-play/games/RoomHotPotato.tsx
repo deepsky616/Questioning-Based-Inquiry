@@ -85,7 +85,7 @@ export default function RoomHotPotato({ game, room, myId, actionLoading, onActio
       playerId: p.id, name: p.name,
       score: rounds.filter((r) => r.playerId === p.id).length,
     }));
-    const questions = rounds.map((r) => ({ playerName: r.playerName, question: r.question }));
+    const questions = rounds.map((r) => ({ playerId: r.playerId, playerName: r.playerName, question: r.question }));
     return (
       <RoomResult game={game} room={room} myId={myId}
         scoreLabel="만든 질문" scoreUnit="개"

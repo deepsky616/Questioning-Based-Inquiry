@@ -20,6 +20,8 @@ model User {
 
   school String? @map("school")
 
+  totalPoints Int @default(0) @map("total_points")
+
   questions           Question[]           @relation("QuestionAuthor")
   comments            Comment[]            @relation("CommentAuthor")
   sessions            QuestionSession[]    @relation("SessionTeacher")
@@ -27,11 +29,32 @@ model User {
   passwordResetTokens PasswordResetToken[] @relation("PasswordResetTokens")
   unitDesigns         UnitDesign[]         @relation("UnitDesigns")
   questionLikes       QuestionLike[]       @relation("UserLikes")
+  pointLogs           PointLog[]           @relation("StudentPointLogs")
+  awardedLogs         PointLog[]           @relation("AwardedByTeacher")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+model PointLog {
+  id          String   @id @default(cuid())
+  studentId   String   @map("student_id")
+  student     User     @relation("StudentPointLogs", fields: [studentId], references: [id], onDelete: Cascade)
+  gameId      String   @map("game_id")
+  roomCode    String?  @map("room_code")
+  bonusType   String   @map("bonus_type")
+  points      Int      @map("points")
+  reason      String   @default("") @map("reason")
+  awardedById String?  @map("awarded_by_id")
+  awardedBy   User?    @relation("AwardedByTeacher", fields: [awardedById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@unique([studentId, gameId, roomCode, bonusType], name: "uniq_point_award")
+  @@index([studentId, createdAt])
+  @@index([gameId, createdAt])
+  @@map("point_logs")
 }
 
 model PasswordResetToken {

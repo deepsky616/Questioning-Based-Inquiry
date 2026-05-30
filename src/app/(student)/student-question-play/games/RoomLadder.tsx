@@ -69,7 +69,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
       playerId: p.id, name: p.name,
       score: qs.filter((q) => q.playerId === p.id).length,
     }));
-    const questions = qs.map((q) => ({ playerName: q.playerName, question: q.question }));
+    const questions = qs.map((q) => ({ playerId: q.playerId, playerName: q.playerName, question: q.question }));
     return (
       <RoomResult game={game} room={room} myId={myId}
         scoreLabel="만든 질문" scoreUnit="개"

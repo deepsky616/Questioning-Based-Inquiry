@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import { StatBar } from "@/components/shared/StatBar";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
+import PointsCard from "@/components/shared/PointsCard";
 
 interface Question {
   id: string;
@@ -71,6 +72,9 @@ export default function StudentDashboard() {
           <Button size="lg">질문하기</Button>
         </Link>
       </div>
+
+      {/* 포인트 카드 */}
+      <PointsCard myId={user.id} />
 
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">로딩 중...</div>
