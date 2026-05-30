@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter } from "@/lib/questions";
 import { sendQuestionNotificationEmail } from "@/lib/email";
+import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
+import { Prisma } from "@prisma/client";
 
 const closureSchema = z.enum(["closed", "open"]);
 const cognitiveSchema = z.enum(["factual", "conceptual", "controversial"]);
@@ -136,10 +138,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "비활성화된 세션에서는 질문을 작성할 수 없습니다" }, { status: 403 });
     }
 
+    // 중복 검사 (학생 + 같은 세션 + 정규화 동일)
+    const normalized = normalizeContent(data.content);
+    if (userRole === "STUDENT" && data.sessionId && normalized.length > 0) {
+      const existing = await prisma.question.findFirst({
+        where: {
+          sessionId: data.sessionId,
+          authorId: userId,
+          normalizedContent: normalized,
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: "이미 같은 질문을 작성했어요. 다른 관점으로 바꿔보세요!", code: "DUPLICATE" },
+          { status: 409 }
+        );
+      }
+    }
+
+    const createData = buildQuestionCreateData(data, userId, {
+      defaultIsPublic: selectedSession?.defaultQuestionPublic ?? false,
+    }) as Prisma.QuestionUncheckedCreateInput;
+    createData.normalizedContent = normalized;
+
     const question = await prisma.question.create({
-      data: buildQuestionCreateData(data, userId, {
-        defaultIsPublic: selectedSession?.defaultQuestionPublic ?? false,
-      }),
+      data: createData as Prisma.QuestionUncheckedCreateInput,
       include: {
         author: {
           select: {
@@ -160,6 +184,35 @@ export async function POST(req: Request) {
         },
       },
     });
+
+    // 학생이 수업세션에 질문 작성 시 자동 기본 점수 (멱등)
+    if (userRole === "STUDENT" && question.sessionId && question.source !== "TEACHER_SHARED") {
+      try {
+        await prisma.$transaction([
+          prisma.pointLog.create({
+            data: {
+              studentId: userId,
+              gameId: "ACTIVITY",
+              bonusType: "QUESTION_WRITE",
+              points: ACTIVITY_BASE_POINTS.QUESTION_WRITE,
+              reason: "수업세션 질문 작성",
+              status: "APPROVED",
+              sessionId: question.sessionId,
+              relatedQuestionId: question.id,
+            },
+          }),
+          prisma.user.update({
+            where: { id: userId },
+            data: { totalPoints: { increment: ACTIVITY_BASE_POINTS.QUESTION_WRITE } },
+          }),
+        ]);
+      } catch (e) {
+        // P2002 멱등 위반은 무시 (이미 점수 부여됨)
+        if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") {
+          logger.error("Question point award failed:", e);
+        }
+      }
+    }
 
     if (question.session?.teacher.email && question.session.teacher.email !== session.user.email) {
       const sessionTitle = [question.session.subject, question.session.topic].filter(Boolean).join(" - ");

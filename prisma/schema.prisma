@@ -47,13 +47,24 @@ model PointLog {
   bonusType   String   @map("bonus_type")
   points      Int      @map("points")
   reason      String   @default("") @map("reason")
+  status      String   @default("APPROVED") @map("status") // APPROVED | PENDING | REJECTED
+  sessionId   String?  @map("session_id_ref")
+  relatedQuestionId String? @map("related_question_id")
+  relatedCommentId  String? @map("related_comment_id")
+  aiAnalysis  String?  @map("ai_analysis")
   awardedById String?  @map("awarded_by_id")
   awardedBy   User?    @relation("AwardedByTeacher", fields: [awardedById], references: [id])
+  decidedById String?  @map("decided_by_id")
+  decidedAt   DateTime? @map("decided_at")
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@unique([studentId, gameId, roomCode, bonusType], name: "uniq_point_award")
+  @@unique([relatedQuestionId, bonusType], name: "uniq_point_per_question")
+  @@unique([relatedCommentId, bonusType], name: "uniq_point_per_comment")
   @@index([studentId, createdAt])
   @@index([gameId, createdAt])
+  @@index([status])
+  @@index([sessionId])
   @@map("point_logs")
 }
 
@@ -106,6 +117,7 @@ model QuestionSession {
 model Question {
   id             String  @id @default(cuid())
   content        String  @map("content")
+  normalizedContent String @default("") @map("normalized_content")
   closure        String  @map("closure")
   cognitive      String  @map("cognitive")
   closureScore   Float?  @map("closure_score")
@@ -126,18 +138,23 @@ model Question {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([sessionId, authorId, normalizedContent])
+  @@index([normalizedContent])
   @@map("questions")
 }
 
 model Comment {
   id         String   @id @default(cuid())
   content    String   @map("content")
+  normalizedContent String @default("") @map("normalized_content")
   authorId   String   @map("author_id")
   author     User     @relation("CommentAuthor", fields: [authorId], references: [id])
   questionId String   @map("question_id")
   question   Question @relation("QuestionComments", fields: [questionId], references: [id])
   createdAt  DateTime @default(now()) @map("created_at")
 
+  @@index([questionId, authorId, normalizedContent])
+  @@index([normalizedContent])
   @@map("comments")
 }
 

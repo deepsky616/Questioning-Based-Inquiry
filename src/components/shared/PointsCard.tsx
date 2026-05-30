@@ -12,6 +12,7 @@ interface PointLog {
   bonusType: string;
   points: number;
   reason: string;
+  status?: string;
   createdAt: string;
 }
 
@@ -130,15 +131,32 @@ export default function PointsCard({ myId }: { myId: string }) {
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {recent.slice(0, 8).map((log) => {
               const b = bonusLabel(log.bonusType);
+              const isPending = log.status === "PENDING";
+              const isRejected = log.status === "REJECTED";
               return (
-                <div key={log.id} className="flex items-center gap-3 text-sm py-1">
+                <div key={log.id}
+                  className={`flex items-center gap-3 text-sm py-1 ${isRejected ? "opacity-40" : ""}`}>
                   <span className="text-base">{b.emoji}</span>
                   <span className="text-gray-700 flex-shrink-0">{b.label}</span>
+                  {isPending && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 flex-shrink-0">
+                      선생님 승인 대기
+                    </span>
+                  )}
+                  {isRejected && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 flex-shrink-0">
+                      거부됨
+                    </span>
+                  )}
                   <span className="text-gray-400 text-xs flex-1 truncate">
                     · {GAME_LABEL[log.gameId] ?? log.gameId} · {log.reason}
                   </span>
                   <span className="text-gray-400 text-xs">{relativeTime(log.createdAt)}</span>
-                  <span className="font-black text-indigo-600 w-12 text-right">+{log.points}</span>
+                  <span className={`font-black w-12 text-right ${
+                    isPending ? "text-amber-500" : isRejected ? "text-gray-400" : "text-indigo-600"
+                  }`}>
+                    {isPending ? `(+${log.points})` : `+${log.points}`}
+                  </span>
                 </div>
               );
             })}

@@ -104,3 +104,34 @@ ALTER TABLE point_logs ADD CONSTRAINT point_logs_awarded_by_id_fkey
 ALTER TABLE questions
   ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'STUDENT',
   ADD COLUMN IF NOT EXISTS inquiry_type TEXT;
+
+-- ─────────────────────────────────────────────────────────
+-- 정규화 + 포인트 검토 워크플로우
+-- ─────────────────────────────────────────────────────────
+ALTER TABLE questions
+  ADD COLUMN IF NOT EXISTS normalized_content TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS questions_session_author_norm_idx
+  ON questions(session_id, author_id, normalized_content);
+CREATE INDEX IF NOT EXISTS questions_norm_idx ON questions(normalized_content);
+
+ALTER TABLE comments
+  ADD COLUMN IF NOT EXISTS normalized_content TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS comments_question_author_norm_idx
+  ON comments(question_id, author_id, normalized_content);
+CREATE INDEX IF NOT EXISTS comments_norm_idx ON comments(normalized_content);
+
+ALTER TABLE point_logs
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'APPROVED',
+  ADD COLUMN IF NOT EXISTS session_id_ref TEXT,
+  ADD COLUMN IF NOT EXISTS related_question_id TEXT,
+  ADD COLUMN IF NOT EXISTS related_comment_id TEXT,
+  ADD COLUMN IF NOT EXISTS ai_analysis TEXT,
+  ADD COLUMN IF NOT EXISTS decided_by_id TEXT,
+  ADD COLUMN IF NOT EXISTS decided_at TIMESTAMP(3);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_point_per_question
+  ON point_logs(related_question_id, bonus_type);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_point_per_comment
+  ON point_logs(related_comment_id, bonus_type);
+CREATE INDEX IF NOT EXISTS point_logs_status_idx ON point_logs(status);
+CREATE INDEX IF NOT EXISTS point_logs_session_idx ON point_logs(session_id_ref);
