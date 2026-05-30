@@ -111,6 +111,8 @@ model Question {
   closureScore   Float?  @map("closure_score")
   cognitiveScore Float?  @map("cognitive_score")
   context        String? @map("context")
+  source         String  @default("STUDENT") @map("source")
+  inquiryType    String? @map("inquiry_type")
 
   sessionId String?          @map("session_id")
   session   QuestionSession? @relation("SessionQuestions", fields: [sessionId], references: [id])

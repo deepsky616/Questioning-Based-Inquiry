@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DatePicker from "@/components/shared/DatePicker";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
+import PublishQuestionsDialog from "./PublishQuestionsDialog";
 import { buildSessionLabel, isSessionAvailable, sortSessionsAsc } from "@/lib/sessions";
 import {
   buildClassTargetValue,
@@ -42,6 +43,7 @@ export default function TeacherSessionsPage() {
   const [students, setStudents] = useState<SessionTargetStudent[]>([]);
   const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [publishTarget, setPublishTarget] = useState<QuestionSession | null>(null);
   const [sessForm, setSessForm] = useState({
     targetClassValue: "all",
     selectedStudentIds: [] as string[],
@@ -308,6 +310,7 @@ export default function TeacherSessionsPage() {
                       onDelete={handleDelete}
                       onToggleActive={handleToggleActive}
                       onTogglePublic={handleTogglePublic}
+                      onPublish={setPublishTarget}
                     />
                   ))}
                 </div>
@@ -339,6 +342,7 @@ export default function TeacherSessionsPage() {
                       onDelete={handleDelete}
                       onToggleActive={handleToggleActive}
                       onTogglePublic={handleTogglePublic}
+                      onPublish={setPublishTarget}
                     />
                   ))}
                 </div>
@@ -346,6 +350,15 @@ export default function TeacherSessionsPage() {
             </Card>
           )}
         </div>
+      )}
+
+      {publishTarget && publishTarget.unitDesignId && (
+        <PublishQuestionsDialog
+          sessionId={publishTarget.id}
+          sessionLabel={buildSessionLabel(publishTarget.date, publishTarget.subject, publishTarget.topic)}
+          unitDesignId={publishTarget.unitDesignId}
+          onClose={() => setPublishTarget(null)}
+        />
       )}
     </div>
   );
@@ -356,11 +369,13 @@ function SessionRow({
   onDelete,
   onToggleActive,
   onTogglePublic,
+  onPublish,
 }: {
   session: QuestionSession;
   onDelete: (id: string) => void;
   onToggleActive: (id: string, current: boolean) => void;
   onTogglePublic: (id: string, current: boolean) => void;
+  onPublish: (s: QuestionSession) => void;
 }) {
   return (
     <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}`}>
@@ -400,6 +415,16 @@ function SessionRow({
           checked={session.defaultQuestionPublic}
           onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)}
         />
+        {session.unitDesignId && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+            onClick={() => onPublish(session)}
+          >
+            📤 질문 배포
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

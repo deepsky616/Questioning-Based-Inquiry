@@ -97,3 +97,10 @@ ALTER TABLE point_logs ADD CONSTRAINT point_logs_student_id_fkey
 
 ALTER TABLE point_logs ADD CONSTRAINT point_logs_awarded_by_id_fkey
     FOREIGN KEY (awarded_by_id) REFERENCES users(id) ON DELETE SET NULL;
+
+-- ─────────────────────────────────────────────────────────
+-- Question 출처 구분 (학생/교사 배포)
+-- ─────────────────────────────────────────────────────────
+ALTER TABLE questions
+  ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'STUDENT',
+  ADD COLUMN IF NOT EXISTS inquiry_type TEXT;
