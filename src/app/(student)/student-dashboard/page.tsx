@@ -61,16 +61,11 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            안녕하세요, {user.name} 학생!
-          </h2>
-          <p className="text-gray-600">오늘도 좋은 질문을 만들어 보세요</p>
-        </div>
-        <Link href="/student-ask">
-          <Button size="lg">질문하기</Button>
-        </Link>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">
+          안녕하세요, {user.name} 학생!
+        </h2>
+        <p className="text-gray-600">오늘도 좋은 질문을 만들어 보세요</p>
       </div>
 
       {/* 포인트 카드 */}
