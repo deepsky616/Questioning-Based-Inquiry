@@ -191,7 +191,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
           <span className="text-4xl">{game.emoji}</span>
           <div>
             <h1 className="text-xl font-black">{game.title}</h1>
-            <p className="text-white/80 text-sm">평서문을 질문으로 바꿔요! 1~2학년 추천 ⭐</p>
+            <p className="text-white/80 text-sm">평서문을 질문으로 바꿔요!</p>
           </div>
         </div>
       </div>

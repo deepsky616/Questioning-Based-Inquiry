@@ -202,7 +202,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
   {
     id: "kaba",
     title: "까바놀이",
-    description: "평서문을 질문으로 바꿔요! '고양이가 잔다' → '고양이가 자나요?' 1~2학년 추천!",
+    description: "평서문을 질문으로 바꿔요! '고양이가 잔다' → '고양이가 자나요?'",
     emoji: "🙋",
     gradientCss: "linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)",
     accentColor: "#2563EB",
