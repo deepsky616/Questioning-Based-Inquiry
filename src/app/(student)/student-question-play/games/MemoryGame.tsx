@@ -135,53 +135,62 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     flip(card);
   }
 
-  /* AI 차례: 자동으로 카드 선택 */
+  /* AI 차례: 단계별로 카드 선택 (revealed 상태 변화에 따라 재실행) */
   useEffect(() => {
     if (!isAITurn || phase !== "play") return;
-    if (revealed.length !== 0) return; // 이미 진행 중이면 패스
     if (missTimerRef.current) return;
 
-    // AI 기억: 본 카드들 중 짝이 맞는 게 있으면 시도, 아니면 랜덤
-    if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
-    aiTimerRef.current = setTimeout(() => {
-      const availableQ = qCards.filter((c) => !taken.includes(c.id));
-      const availableA = aCards.filter((c) => !taken.includes(c.id));
-      if (availableQ.length === 0 || availableA.length === 0) return;
+    const seen = seenRef.current;
+    const availableQ = qCards.filter((c) => !taken.includes(c.id));
+    const availableA = aCards.filter((c) => !taken.includes(c.id));
 
-      // 기억된 짝 시도
-      const seen = seenRef.current;
-      let pickedQ: Card | undefined;
-      let pickedA: Card | undefined;
-      // 모든 본 Q-A 페어 중 같은 pairId가 있으면 매칭
-      const seenQs = availableQ.filter((c) => seen.has(c.id));
-      const seenAs = availableA.filter((c) => seen.has(c.id));
-      for (const q of seenQs) {
-        const matchA = seenAs.find((a) => a.pairId === q.pairId);
-        if (matchA) { pickedQ = q; pickedA = matchA; break; }
-      }
-      // 못 찾으면: 랜덤이지만 본 적 없는 카드 우선 (탐색)
-      if (!pickedQ) {
-        const unseenQ = availableQ.filter((c) => !seen.has(c.id));
-        pickedQ = unseenQ.length > 0
-          ? unseenQ[Math.floor(Math.random() * unseenQ.length)]
-          : availableQ[Math.floor(Math.random() * availableQ.length)];
-      }
-      if (!pickedA) {
-        const unseenA = availableA.filter((c) => !seen.has(c.id));
-        pickedA = unseenA.length > 0
-          ? unseenA[Math.floor(Math.random() * unseenA.length)]
-          : availableA[Math.floor(Math.random() * availableA.length)];
-      }
+    // 1단계: 질문 카드 선택 (revealed가 비어 있을 때)
+    if (revealed.length === 0) {
+      if (availableQ.length === 0) return;
+      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+      aiTimerRef.current = setTimeout(() => {
+        // 본 적 있는 카드들 중 짝이 맞는 페어가 있으면 그 질문 우선
+        const seenQs = availableQ.filter((c) => seen.has(c.id));
+        const seenAs = availableA.filter((c) => seen.has(c.id));
+        let pickedQ: Card | undefined;
+        for (const q of seenQs) {
+          if (seenAs.some((a) => a.pairId === q.pairId)) { pickedQ = q; break; }
+        }
+        if (!pickedQ) {
+          // 본 적 없는 질문 카드 우선 (탐색)
+          const unseenQ = availableQ.filter((c) => !seen.has(c.id));
+          pickedQ = unseenQ.length > 0
+            ? unseenQ[Math.floor(Math.random() * unseenQ.length)]
+            : availableQ[Math.floor(Math.random() * availableQ.length)];
+        }
+        flip(pickedQ);
+      }, AI_THINK_MS);
+    }
 
-      // 첫 카드 뒤집기 (질문)
-      flip(pickedQ);
-      // 잠시 후 두 번째 카드 뒤집기 (대답)
-      setTimeout(() => { if (pickedA) flip(pickedA); }, AI_THINK_MS);
-    }, AI_THINK_MS);
+    // 2단계: 대답 카드 선택 (revealed에 질문이 들어있을 때)
+    if (revealed.length === 1) {
+      const revealedQId = revealed[0];
+      const revealedQ = qCards.find((c) => c.id === revealedQId);
+      if (!revealedQ || availableA.length === 0) return;
+      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+      aiTimerRef.current = setTimeout(() => {
+        // 짝이 맞는 대답 카드를 본 적이 있으면 그것 선택 (똑똑한 매칭)
+        let pickedA: Card | undefined =
+          availableA.find((c) => c.pairId === revealedQ.pairId && seen.has(c.id));
+        if (!pickedA) {
+          // 본 적 없는 대답 카드 우선 (탐색)
+          const unseenA = availableA.filter((c) => !seen.has(c.id));
+          pickedA = unseenA.length > 0
+            ? unseenA[Math.floor(Math.random() * unseenA.length)]
+            : availableA[Math.floor(Math.random() * availableA.length)];
+        }
+        flip(pickedA);
+      }, AI_THINK_MS);
+    }
 
     return () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAITurn, phase, revealed.length, taken.length]);
+  }, [isAITurn, phase, revealed, taken.length, qCards, aCards]);
 
   /* 결과 */
   if (phase === "done") {
