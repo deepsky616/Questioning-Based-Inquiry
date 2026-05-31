@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { BUILT_IN_GAMES } from "@/lib/question-games-data";
 import BingoGame from "../games/BingoGame";
-import HotPotatoGame from "../games/HotPotatoGame";
+import StoryDiceGame from "../games/StoryDiceGame";
 import DiceGame from "../games/DiceGame";
 import LadderGame from "../games/LadderGame";
 import RelayGame from "../games/RelayGame";
@@ -15,7 +15,7 @@ import RoomLobby from "../games/RoomLobby";
 import RoomRelay from "../games/RoomRelay";
 import RoomKaba from "../games/RoomKaba";
 import RoomDice from "../games/RoomDice";
-import RoomHotPotato from "../games/RoomHotPotato";
+import RoomStoryDice from "../games/RoomStoryDice";
 import RoomBingo from "../games/RoomBingo";
 import RoomLadder from "../games/RoomLadder";
 import { useRoom } from "../games/useRoom";
@@ -39,7 +39,7 @@ type GameComponent = React.ComponentType<{
 const GAME_MAP: Record<string, GameComponent> = {
   kaba: KabaGame as GameComponent,
   bingo: BingoGame as GameComponent,
-  "hot-potato": HotPotatoGame as GameComponent,
+  "story-dice": StoryDiceGame as GameComponent,
   dice: DiceGame as GameComponent,
   ladder: LadderGame as GameComponent,
   relay: RelayGame as GameComponent,
@@ -60,7 +60,7 @@ const ROOM_GAME_MAP: Record<string, RoomGameComponent> = {
   relay: RoomRelay,
   kaba: RoomKaba,
   dice: RoomDice,
-  "hot-potato": RoomHotPotato,
+  "story-dice": RoomStoryDice,
   bingo: RoomBingo,
   ladder: RoomLadder,
 };

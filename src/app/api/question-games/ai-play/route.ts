@@ -41,6 +41,15 @@ const PROMPTS: Record<string, (ctx: Record<string, string>) => string> = {
   "ladder:suggest": (c) =>
     `주제: "${c.topic}"\n이 주제로 만들 수 있는 좋은 질문 2가지를 짧게 제안해주세요.\n번호 없이 각 질문을 한 줄씩, 총 2줄로 출력하세요.`,
 
+  "story-dice:words": (_c) =>
+    `초등학생이 이야기를 만들 수 있는 수준의 단어를 다음 세 카테고리로 각각 8개씩 골라주세요. 매번 새롭게 만들어야 하므로 흔하지 않은 조합도 환영합니다.\n\n- 주인공: 사람·동물·상상의 존재 (예: 로봇, 탐정, 마법사, 외계인)\n- 장소: 어디서 일어나는 일인지 (예: 학교, 숲, 우주, 무인도)\n- 사건/물건: 이야기를 흥미롭게 만드는 요소 (예: 보물상자, 비밀지도, 타임머신, 알 수 없는 소리)\n\n반드시 다음 JSON 형식으로만 답하세요 (다른 텍스트 금지):\n{\n  "protagonist": ["...", "...", ... 8개],\n  "place": ["...", "...", ... 8개],\n  "event": ["...", "...", ... 8개]\n}`,
+
+  "story-dice:ai-question": (c) =>
+    `이야기 주사위 놀이입니다.\n주사위로 나온 단어: 주인공=${c.protagonist}, 장소=${c.place}, 사건/물건=${c.event}\n술래가 만든 이야기: "${c.story}"\n지금까지의 질문·대답: ${c.history || "(없음)"}\n\n위 이야기와 흐름에 어울리는 새 질문 한 개를 만들어주세요. 너무 길지 않게 한 문장이면 좋아요.\n질문만 한 줄로 출력하세요.`,
+
+  "story-dice:ai-answer": (c) =>
+    `이야기 주사위 놀이입니다. 당신은 술래입니다.\n주사위 단어: 주인공=${c.protagonist}, 장소=${c.place}, 사건/물건=${c.event}\n이야기: "${c.story}"\n지금까지의 흐름: ${c.history || "(없음)"}\n학생의 질문: "${c.question}"\n\n이야기 흐름에 어울리고 자연스럽게 이야기를 확장하는 짧은 대답을 한 문장으로 해주세요.\n대답만 한 줄로 출력하세요.`,
+
   "game:best": (c) =>
     `초등·중학생이 질문놀이에서 만든 질문 목록입니다:\n${c.questions}\n\n이 중에서 가장 창의적이고 좋은 질문 1개를 골라주세요.\n반드시 아래 형식으로만 답하세요 (다른 말 없이):\n베스트: (질문을 그대로)\n학생: (그 질문을 만든 학생 이름)\n총평: (왜 좋은 질문인지 따뜻하게 한 문장)`,
 
@@ -87,8 +96,8 @@ export async function POST(req: NextRequest) {
     const result = await gemini.generateContent(userPrompt);
     const text = result.response.text().trim();
 
-    // mystery-box:setup → JSON 파싱 시도
-    if (action === "mystery-box:setup") {
+    // JSON 응답 파싱이 필요한 액션들
+    if (action === "mystery-box:setup" || action === "story-dice:words") {
       try {
         const match = text.match(/\{[\s\S]*\}/);
         const parsed = JSON.parse(match ? match[0] : text);
