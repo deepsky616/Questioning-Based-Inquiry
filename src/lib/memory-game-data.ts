@@ -1,0 +1,77 @@
+/**
+ * 질문-대답 짝 찾기 놀이 — 폴백 페어 풀과 도우미
+ * AI가 페어 생성에 실패할 때 사용.
+ */
+
+export interface QAPair {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export const MEMORY_FALLBACK_PAIRS: ReadonlyArray<{ question: string; answer: string }> = [
+  { question: "하늘은 왜 파랄까?", answer: "햇빛이 공기에 부딪혀 파란빛이 흩어지기 때문이에요." },
+  { question: "비는 어떻게 만들어질까?", answer: "수증기가 차가운 곳에서 모여 물방울이 되면 비가 돼요." },
+  { question: "왜 잠을 자야 할까?", answer: "몸과 뇌가 쉬면서 자라기 위해 필요해요." },
+  { question: "지구는 어떻게 돌까?", answer: "지구는 태양 주위를 1년에 한 바퀴 돌아요." },
+  { question: "씨앗은 어떻게 자랄까?", answer: "물·햇빛·흙 속 양분으로 천천히 자라나요." },
+  { question: "왜 무지개가 생길까?", answer: "햇빛이 빗방울에 닿아 일곱 빛깔로 나뉘기 때문이에요." },
+  { question: "달은 왜 모양이 변할까?", answer: "지구 주위를 돌면서 햇빛 받는 면이 달라지기 때문이에요." },
+  { question: "왜 바다는 짤까?", answer: "땅에 있던 소금이 강물을 따라 바다로 모였기 때문이에요." },
+  { question: "벌은 왜 꽃에 갈까?", answer: "꽃의 꿀을 모아 벌집에 저장해서 먹기 때문이에요." },
+  { question: "북극은 왜 그렇게 추울까?", answer: "햇빛이 비스듬히 들어와 적게 데워지기 때문이에요." },
+  { question: "왜 손을 자주 씻어야 할까?", answer: "보이지 않는 균을 닦아 병을 막기 위해서예요." },
+  { question: "별은 왜 깜빡거릴까?", answer: "별빛이 지구 공기를 통과하면서 흔들리기 때문이에요." },
+  { question: "공룡은 왜 사라졌을까?", answer: "큰 운석이 지구에 떨어져 환경이 크게 바뀌었기 때문이에요." },
+  { question: "왜 바람이 불까?", answer: "공기가 따뜻한 곳에서 차가운 곳으로 움직이기 때문이에요." },
+  { question: "고양이는 왜 그르렁거릴까?", answer: "기분이 좋거나 안정될 때 내는 소리예요." },
+  { question: "물은 왜 얼면 부피가 커질까?", answer: "물 분자가 얼면서 더 큰 모양으로 배열되기 때문이에요." },
+  { question: "왜 책을 읽으면 좋을까?", answer: "새로운 생각을 배우고 상상력을 키울 수 있어요." },
+  { question: "사람은 왜 음식이 필요할까?", answer: "음식에서 힘과 영양을 얻어 자라기 때문이에요." },
+  { question: "왜 신호등은 빨간색일까?", answer: "빨간색이 멀리서도 잘 보여서 '멈춰'라는 뜻을 알리기 좋아요." },
+  { question: "왜 친구가 필요할까?", answer: "함께 놀고 도와주며 마음을 나눌 수 있어요." },
+];
+
+/** 카드 수 → 쌍 수 */
+export const MEMORY_DIFFICULTY = {
+  easy:   { cards: 12, pairs: 6,  label: "쉬움" },
+  normal: { cards: 20, pairs: 10, label: "보통" },
+  hard:   { cards: 30, pairs: 15, label: "어려움" },
+} as const;
+
+export type MemoryDifficulty = keyof typeof MEMORY_DIFFICULTY;
+
+export function shuffle<T>(a: T[]): T[] {
+  const c = [...a];
+  for (let i = c.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [c[i], c[j]] = [c[j], c[i]];
+  }
+  return c;
+}
+
+export function pickFallbackPairs(n: number): QAPair[] {
+  const shuffled = shuffle([...MEMORY_FALLBACK_PAIRS]);
+  return shuffled.slice(0, n).map((p, idx) => ({
+    id: `p${idx}`, question: p.question, answer: p.answer,
+  }));
+}
+
+export function parseAIPairs(text: string, expected: number): QAPair[] | null {
+  try {
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) return null;
+    const arr = JSON.parse(match[0]);
+    if (!Array.isArray(arr)) return null;
+    const valid = arr.filter((x) =>
+      x && typeof x.question === "string" && typeof x.answer === "string"
+      && x.question.length > 0 && x.answer.length > 0
+    );
+    if (valid.length < expected) return null;
+    return valid.slice(0, expected).map((p, idx) => ({
+      id: `p${idx}`, question: p.question.trim(), answer: p.answer.trim(),
+    }));
+  } catch {
+    return null;
+  }
+}

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { BUILT_IN_GAMES } from "@/lib/question-games-data";
-import BingoGame from "../games/BingoGame";
+import MemoryGame from "../games/MemoryGame";
 import StoryDiceGame from "../games/StoryDiceGame";
 import DiceGame from "../games/DiceGame";
 import LadderGame from "../games/LadderGame";
@@ -16,7 +16,7 @@ import RoomRelay from "../games/RoomRelay";
 import RoomKaba from "../games/RoomKaba";
 import RoomDice from "../games/RoomDice";
 import RoomStoryDice from "../games/RoomStoryDice";
-import RoomBingo from "../games/RoomBingo";
+import RoomMemory from "../games/RoomMemory";
 import RoomLadder from "../games/RoomLadder";
 import { useRoom } from "../games/useRoom";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,7 @@ type GameComponent = React.ComponentType<{
 
 const GAME_MAP: Record<string, GameComponent> = {
   kaba: KabaGame as GameComponent,
-  bingo: BingoGame as GameComponent,
+  memory: MemoryGame as GameComponent,
   "story-dice": StoryDiceGame as GameComponent,
   dice: DiceGame as GameComponent,
   ladder: LadderGame as GameComponent,
@@ -61,7 +61,7 @@ const ROOM_GAME_MAP: Record<string, RoomGameComponent> = {
   kaba: RoomKaba,
   dice: RoomDice,
   "story-dice": RoomStoryDice,
-  bingo: RoomBingo,
+  memory: RoomMemory,
   ladder: RoomLadder,
 };
 
