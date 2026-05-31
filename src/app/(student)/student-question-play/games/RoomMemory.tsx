@@ -253,7 +253,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
                     className="rounded-2xl border-2 p-4 transition-all hover:scale-105"
                     style={{
                       borderColor: "#e5e7eb",
-                      background: "white",
+                      background: "hsl(var(--card))",
                     }}>
                     <p className="font-black text-gray-800 text-sm">{cfg.label}</p>
                     <p className="text-2xl font-black mt-1" style={{ color: game.accentColor }}>{cfg.cards}장</p>

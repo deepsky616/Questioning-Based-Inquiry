@@ -74,7 +74,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
           {room.players.map((p, i) => (
             <div key={p.id}
               className="flex items-center gap-3 rounded-xl p-3 transition-all"
-              style={{ background: p.id === myId ? `${game.accentColor}10` : "#f9fafb" }}>
+              style={{ background: p.id === myId ? `${game.accentColor}10` : "hsl(var(--muted))" }}>
               <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-black text-sm"
                 style={{ background: PLAYER_COLORS[i % PLAYER_COLORS.length] }}>
                 {p.name.charAt(0)}

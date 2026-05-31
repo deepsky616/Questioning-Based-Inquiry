@@ -132,7 +132,7 @@ export default function RoomResult({
           return (
             <div key={s.playerId}
               className="flex items-center gap-3 rounded-xl p-3"
-              style={{ background: isWinner ? `${game.accentColor}12` : "#f9fafb" }}>
+              style={{ background: isWinner ? `${game.accentColor}12` : "hsl(var(--muted))" }}>
               <span className="text-lg w-6 text-center">{MEDALS[i] ?? `${i + 1}`}</span>
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-sm"
                 style={{ background: playerColorById(room, s.playerId) }}>
@@ -185,7 +185,7 @@ export default function RoomResult({
                 return (
                   <div key={s.playerId}
                     className="rounded-xl p-3 border border-gray-100 space-y-1.5"
-                    style={{ background: s.playerId === myId ? `${game.accentColor}08` : "white" }}>
+                    style={{ background: s.playerId === myId ? `${game.accentColor}08` : "hsl(var(--card))" }}>
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-black text-xs"
                         style={{ background: playerColorById(room, s.playerId) }}>
