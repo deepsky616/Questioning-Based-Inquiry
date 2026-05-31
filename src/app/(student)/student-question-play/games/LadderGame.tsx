@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAIPlay } from "./useAIPlay";
@@ -43,18 +43,67 @@ function tracePath(startCol: number, grid: boolean[][]): number[] {
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
 export default function LadderGame({ game, onBack, config }: Props) {
+  const { mode } = config;
+  const isAI = mode === "ai";
+  const isSolo = mode === "solo";
+  const AI_NAME = "🤖 AI";
+  const myName = config.players[0]?.trim() || "나";
+
   const { ask, loading: aiLoading } = useAIPlay();
-  void config; void ask; void aiLoading;
   const [phase, setPhase] = useState<"setup" | "reveal" | "result">("setup");
   const [names, setNames] = useState(["", "", "", ""]);
   const [topics, setTopics] = useState(["", "", "", ""]);
-  const [count, setCount] = useState(4);
+  const [count, setCount] = useState(isAI ? 2 : isSolo ? 3 : 4);
   const [grid, setGrid] = useState<boolean[][]>([]);
   const [paths, setPaths] = useState<number[][]>([]);
   const [revealedIdx, setRevealedIdx] = useState<number>(-1);
   const [assignments, setAssignments] = useState<{ name: string; topic: string }[]>([]);
+  const [aiQuestions, setAiQuestions] = useState<Record<number, string>>({});
 
   const ROWS = 10;
+  const aiQGenRef = useRef(false);
+
+  // 모드별 초기 참가자 이름 설정
+  useEffect(() => {
+    if (isAI) {
+      // 학생 + AI 2명
+      setNames([myName, AI_NAME, "", ""]);
+    } else if (isSolo) {
+      // 솔로: 본인이 여러 역할 (이름은 자유롭게 입력 가능)
+      setNames([myName, "", "", ""]);
+    }
+    // friend 모드: config.players를 채워줄 수도 있음
+    if (mode === "friend" && config.players.length > 0) {
+      const arr = config.players.slice(0, 6);
+      const padded = [...arr];
+      while (padded.length < 4) padded.push("");
+      setNames(padded);
+      setCount(arr.length);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 결과 공개 후 AI가 자기 도착 주제로 자동 질문 생성
+  useEffect(() => {
+    if (!isAI || phase !== "result" || aiQGenRef.current) return;
+    aiQGenRef.current = true;
+    const aiIdx = names.findIndex((n) => n === AI_NAME);
+    if (aiIdx < 0) return;
+    const myTopic = assignments[aiIdx]?.topic;
+    if (!myTopic) return;
+    (async () => {
+      const res = await ask({
+        action: "ladder:suggest",
+        context: { topic: myTopic },
+      });
+      if (res?.text) {
+        // 첫 줄을 AI 질문으로 사용
+        const first = res.text.split("\n").filter((l) => l.trim()).map((l) => l.trim())[0] ?? "";
+        setAiQuestions((q) => ({ ...q, [aiIdx]: first }));
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   function buildLadder() {
     const n = count;
@@ -70,6 +119,8 @@ export default function LadderGame({ game, onBack, config }: Props) {
     setPaths(ps);
     setAssignments(asgn);
     setRevealedIdx(-1);
+    setAiQuestions({});
+    aiQGenRef.current = false;
     setPhase("reveal");
   }
 
@@ -270,19 +321,40 @@ export default function LadderGame({ game, onBack, config }: Props) {
           {/* 전체 결과 */}
           {phase === "result" && (
             <div className="space-y-3">
-              {assignments.map((a, i) => (
-                <div key={i} className="bg-white rounded-xl border-2 p-4 flex items-center gap-4"
-                  style={{ borderColor: COLORS[i] }}>
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black"
-                    style={{ background: COLORS[i] }}>
-                    {names[i]?.trim().charAt(0) || (i+1)}
+              {assignments.map((a, i) => {
+                const isAIRow = names[i]?.trim() === AI_NAME;
+                const aiQ = aiQuestions[i];
+                return (
+                  <div key={i} className="bg-white rounded-xl border-2 p-4 flex flex-col gap-2"
+                    style={{ borderColor: COLORS[i] }}>
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-black"
+                        style={{ background: COLORS[i] }}>
+                        {names[i]?.trim().charAt(0) || (i+1)}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-800">{names[i]?.trim() || `학생 ${i+1}`}</p>
+                        <p className="text-sm" style={{ color: COLORS[i] }}>📌 {a.topic}</p>
+                      </div>
+                    </div>
+                    {isAIRow && (
+                      <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-sm">
+                        {aiQ ? (
+                          <>
+                            <p className="text-xs font-bold text-indigo-600 mb-0.5">🤖 AI 친구의 질문</p>
+                            <p className="text-gray-700">{aiQ}</p>
+                          </>
+                        ) : aiLoading ? (
+                          <div className="flex items-center gap-2 text-indigo-500">
+                            <span className="w-3 h-3 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
+                            <span className="text-xs">AI 친구가 질문을 만드는 중...</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <p className="font-bold text-gray-800">{names[i]?.trim() || `학생 ${i+1}`}</p>
-                    <p className="text-sm" style={{ color: COLORS[i] }}>📌 {a.topic}</p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1 rounded-xl" onClick={() => { setPhase("reveal"); setRevealedIdx(-1); }}>
                   사다리 다시 보기

@@ -19,8 +19,22 @@ interface Card {
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
 const MISS_DELAY = 1800;
+const AI_NAME = "🤖 AI";
+const AI_THINK_MS = 1200;
 
 export default function MemoryGame({ game, onBack, config }: Props) {
+  const { mode } = config;
+  const isAI = mode === "ai";
+  const isSolo = mode === "solo";
+
+  // 참가자 구성
+  const playersList = (() => {
+    if (isSolo) return [config.players[0]?.trim() || "나"];
+    if (isAI) return [config.players[0]?.trim() || "나", AI_NAME];
+    return config.players.length > 0 ? config.players : ["나"];
+  })();
+  const hasOpponents = playersList.length > 1;
+
   const [phase, setPhase] = useState<"setup" | "generating" | "play" | "done">("setup");
   const [difficulty, setDifficulty] = useState<MemoryDifficulty>("normal");
   const [pairs, setPairs] = useState<QAPair[]>([]);
@@ -29,15 +43,27 @@ export default function MemoryGame({ game, onBack, config }: Props) {
   const [revealed, setRevealed] = useState<string[]>([]);
   const [taken, setTaken] = useState<string[]>([]);
   const [tries, setTries] = useState(0);
-  const [matches, setMatches] = useState(0);
+  // 차례 + 점수 (멀티/AI 모드)
+  const [turnIdx, setTurnIdx] = useState(0);
+  const [scores, setScores] = useState<Record<string, number>>(
+    Object.fromEntries(playersList.map((p) => [p, 0]))
+  );
+
+  // AI 기억력: 본 카드들의 (id, pairId)
+  const seenRef = useRef<Map<string, string>>(new Map());
 
   const { ask, loading: aiLoading } = useAIPlay();
   const missTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const currentPlayer = playersList[turnIdx % playersList.length] ?? "나";
+  const isAITurn = isAI && currentPlayer === AI_NAME;
+  const isHumanTurn = !isAITurn;
+
+  /* 난이도 + 페어 생성 */
   async function startGame(diff: MemoryDifficulty) {
     setDifficulty(diff);
     setPhase("generating");
-
     const cfg = MEMORY_DIFFICULTY[diff];
     const res = await ask({ action: "memory:pairs", context: { count: String(cfg.pairs) } });
     let p: QAPair[] | null = null;
@@ -52,7 +78,9 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     setRevealed([]);
     setTaken([]);
     setTries(0);
-    setMatches(0);
+    setTurnIdx(0);
+    setScores(Object.fromEntries(playersList.map((pl) => [pl, 0])));
+    seenRef.current = new Map();
     setPhase("play");
   }
 
@@ -60,14 +88,16 @@ export default function MemoryGame({ game, onBack, config }: Props) {
   const isFlipped = (c: Card) => revealed.includes(c.id) || taken.includes(c.id);
   const isTaken = (c: Card) => taken.includes(c.id);
 
-  function flip(card: Card) {
-    if (phase !== "play") return;
-    if (isFlipped(card)) return;
-    if (revealed.length >= 2) return;
-    if (revealed.length === 0 && card.type !== "q") return;
-    if (revealed.length === 1 && card.type !== "a") return;
-    if (missTimerRef.current) return;
+  /* 카드 뒤집기 */
+  function flip(card: Card): "match" | "miss" | "noop" {
+    if (phase !== "play") return "noop";
+    if (isFlipped(card)) return "noop";
+    if (revealed.length >= 2) return "noop";
+    if (revealed.length === 0 && card.type !== "q") return "noop";
+    if (revealed.length === 1 && card.type !== "a") return "noop";
+    if (missTimerRef.current) return "noop";
 
+    seenRef.current.set(card.id, card.pairId);
     const newRevealed = [...revealed, card.id];
     setRevealed(newRevealed);
 
@@ -76,44 +106,126 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       const [qId, aId] = newRevealed;
       const qCard = qCards.find((c) => c.id === qId);
       const aCard = aCards.find((c) => c.id === aId);
-      if (qCard && aCard && qCard.pairId === aCard.pairId) {
-        // 즉시 획득
+      const match = !!(qCard && aCard && qCard.pairId === aCard.pairId);
+
+      if (match) {
         setTimeout(() => {
           const newTaken = [...taken, qId, aId];
           setTaken(newTaken);
           setRevealed([]);
-          setMatches((m) => m + 1);
-          if (newTaken.length >= qCards.length + aCards.length) {
-            setPhase("done");
-          }
-        }, 400);
+          setScores((s) => ({ ...s, [currentPlayer]: (s[currentPlayer] ?? 0) + 1 }));
+          if (newTaken.length >= qCards.length + aCards.length) setPhase("done");
+        }, 500);
+        return "match";
       } else {
-        // miss
+        // miss: 잠시 후 복원 + 차례 넘김 (멀티/AI 모드만)
         missTimerRef.current = setTimeout(() => {
           setRevealed([]);
           missTimerRef.current = null;
+          if (hasOpponents) setTurnIdx((t) => (t + 1) % playersList.length);
         }, MISS_DELAY);
+        return "miss";
       }
     }
+    return "noop";
   }
 
-  /* ── 결과 ── */
+  function userFlip(card: Card) {
+    if (!isHumanTurn) return;
+    flip(card);
+  }
+
+  /* AI 차례: 자동으로 카드 선택 */
+  useEffect(() => {
+    if (!isAITurn || phase !== "play") return;
+    if (revealed.length !== 0) return; // 이미 진행 중이면 패스
+    if (missTimerRef.current) return;
+
+    // AI 기억: 본 카드들 중 짝이 맞는 게 있으면 시도, 아니면 랜덤
+    if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+    aiTimerRef.current = setTimeout(() => {
+      const availableQ = qCards.filter((c) => !taken.includes(c.id));
+      const availableA = aCards.filter((c) => !taken.includes(c.id));
+      if (availableQ.length === 0 || availableA.length === 0) return;
+
+      // 기억된 짝 시도
+      const seen = seenRef.current;
+      let pickedQ: Card | undefined;
+      let pickedA: Card | undefined;
+      // 모든 본 Q-A 페어 중 같은 pairId가 있으면 매칭
+      const seenQs = availableQ.filter((c) => seen.has(c.id));
+      const seenAs = availableA.filter((c) => seen.has(c.id));
+      for (const q of seenQs) {
+        const matchA = seenAs.find((a) => a.pairId === q.pairId);
+        if (matchA) { pickedQ = q; pickedA = matchA; break; }
+      }
+      // 못 찾으면: 랜덤이지만 본 적 없는 카드 우선 (탐색)
+      if (!pickedQ) {
+        const unseenQ = availableQ.filter((c) => !seen.has(c.id));
+        pickedQ = unseenQ.length > 0
+          ? unseenQ[Math.floor(Math.random() * unseenQ.length)]
+          : availableQ[Math.floor(Math.random() * availableQ.length)];
+      }
+      if (!pickedA) {
+        const unseenA = availableA.filter((c) => !seen.has(c.id));
+        pickedA = unseenA.length > 0
+          ? unseenA[Math.floor(Math.random() * unseenA.length)]
+          : availableA[Math.floor(Math.random() * availableA.length)];
+      }
+
+      // 첫 카드 뒤집기 (질문)
+      flip(pickedQ);
+      // 잠시 후 두 번째 카드 뒤집기 (대답)
+      setTimeout(() => { if (pickedA) flip(pickedA); }, AI_THINK_MS);
+    }, AI_THINK_MS);
+
+    return () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAITurn, phase, revealed.length, taken.length]);
+
+  /* 결과 */
   if (phase === "done") {
     const cfg = MEMORY_DIFFICULTY[difficulty];
-    const accuracy = tries === 0 ? 0 : Math.round((matches / tries) * 100);
+    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    const topScore = sorted[0]?.[1] ?? 0;
+    const winners = sorted.filter(([, s]) => s === topScore && topScore > 0);
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <Header game={game} subtitle="완성!" onBack={onBack} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 flex flex-col items-center gap-3">
           <div className="text-6xl">🏆</div>
           <h2 className="text-2xl font-black text-gray-800">짝 찾기 완성!</h2>
-          <p className="text-gray-500 text-sm">
-            {cfg.label} · {matches}쌍 / {cfg.pairs}쌍
-          </p>
-          <p className="text-gray-400 text-xs">
-            시도 {tries}번 · 정확도 {accuracy}%
-          </p>
+          {hasOpponents && winners.length > 0 ? (
+            <>
+              <p className="text-gray-500 text-sm">{winners.length === 1 ? "우승" : "공동 우승"}</p>
+              <div className="flex flex-wrap gap-2">
+                {winners.map(([name]) => (
+                  <span key={name} className="px-3 py-1 rounded-full text-white text-sm font-black"
+                    style={{ background: game.gradientCss }}>
+                    👑 {name}
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-gray-500 text-sm">{cfg.label} · {tries}번 시도</p>
+          )}
         </div>
+
+        {/* 점수판 */}
+        {hasOpponents && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
+            <h3 className="font-black text-gray-700 text-sm mb-1">📊 점수판</h3>
+            {sorted.map(([name, score], i) => (
+              <div key={name} className="flex items-center gap-3 rounded-xl p-3 bg-gray-50">
+                <span className="text-lg w-6 text-center">{["🥇", "🥈", "🥉"][i] ?? `${i + 1}`}</span>
+                <span className="font-bold text-gray-800 flex-1">{name}</span>
+                <span className="font-black" style={{ color: game.accentColor }}>{score}쌍</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
           onClick={() => setPhase("setup")}>
@@ -123,13 +235,26 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     );
   }
 
-  /* ── 난이도 선택 ── */
+  /* 난이도 선택 */
   if (phase === "setup") {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <Header game={game} subtitle="난이도 선택" onBack={onBack} />
+        <Header game={game} subtitle={
+          isSolo ? "혼자 모드 — 자유롭게 진행"
+          : isAI ? "AI와 함께 — 점수 경쟁"
+          : `친구 모드 — ${playersList.length}명 차례 진행`
+        } onBack={onBack} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
           <h2 className="font-black text-gray-800">🎚️ 난이도를 골라요</h2>
+          {hasOpponents && (
+            <div className="flex flex-wrap gap-2">
+              {playersList.map((p, i) => (
+                <span key={p} className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">
+                  {i + 1}. {p}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(MEMORY_DIFFICULTY) as MemoryDifficulty[]).map((d) => {
               const cfg = MEMORY_DIFFICULTY[d];
@@ -148,7 +273,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     );
   }
 
-  /* ── AI 생성 중 ── */
+  /* 생성 중 */
   if (phase === "generating") {
     return (
       <div className="max-w-lg mx-auto space-y-5">
@@ -163,14 +288,48 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     );
   }
 
-  /* ── 게임 진행 ── */
+  /* 게임 진행 */
   const cfg = MEMORY_DIFFICULTY[difficulty];
   const remaining = qCards.length + aCards.length - taken.length;
   const cols = cfg.pairs <= 6 ? 3 : 5;
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <Header game={game} subtitle={`남은 카드 ${remaining}장 · 시도 ${tries}번 · 맞춤 ${matches}쌍`} onBack={onBack} />
+      <Header game={game}
+        subtitle={hasOpponents
+          ? `${currentPlayer}의 차례 · 남은 카드 ${remaining}장`
+          : `남은 카드 ${remaining}장 · 시도 ${tries}번`}
+        onBack={onBack} />
+
+      {/* 점수판 (멀티/AI 모드) */}
+      {hasOpponents && (
+        <div className="flex gap-1 overflow-x-auto pb-1">
+          {playersList.map((p, i) => {
+            const isCurrent = i === turnIdx % playersList.length;
+            return (
+              <div key={p}
+                className="flex items-center gap-1 rounded-full px-3 py-1 text-xs flex-shrink-0"
+                style={{
+                  background: isCurrent ? game.accentColor : `${game.accentColor}20`,
+                  color: isCurrent ? "white" : game.accentColor,
+                }}>
+                <span className="font-bold">{p}</span>
+                <span className="font-black">{scores[p] ?? 0}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* AI 생각 중 */}
+      {isAITurn && revealed.length === 0 && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center">
+          <div className="flex items-center justify-center gap-2 text-indigo-600">
+            <span className="w-4 h-4 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-bold">🤖 AI가 카드를 고르는 중...</p>
+          </div>
+        </div>
+      )}
 
       {/* 질문 카드 */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
@@ -181,14 +340,15 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             const tk = isTaken(c);
             const pair = findPair(c.pairId);
             return (
-              <button key={c.id} onClick={() => !flipped && flip(c)}
-                disabled={flipped || revealed.length >= 2}
+              <button key={c.id} onClick={() => !flipped && userFlip(c)}
+                disabled={flipped || revealed.length >= 2 || !isHumanTurn}
                 className="aspect-[3/4] rounded-xl border-2 flex items-center justify-center text-xs text-center p-1.5 transition-all"
                 style={{
                   background: tk ? "#dbeafe33" : flipped ? "#dbeafe" : "linear-gradient(135deg, #3b82f6, #2563eb)",
                   borderColor: tk ? "transparent" : flipped ? "#3b82f6" : "#1e40af",
                   color: flipped ? "#1e3a8a" : "white",
                   opacity: tk ? 0.3 : 1,
+                  cursor: !isHumanTurn || flipped ? "default" : "pointer",
                 }}>
                 {flipped ? (
                   <span className="text-[10px] leading-tight">{pair?.question ?? "?"}</span>
@@ -210,14 +370,15 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             const tk = isTaken(c);
             const pair = findPair(c.pairId);
             return (
-              <button key={c.id} onClick={() => !flipped && flip(c)}
-                disabled={flipped || revealed.length !== 1}
+              <button key={c.id} onClick={() => !flipped && userFlip(c)}
+                disabled={flipped || revealed.length !== 1 || !isHumanTurn}
                 className="aspect-[3/4] rounded-xl border-2 flex items-center justify-center text-xs text-center p-1.5 transition-all"
                 style={{
                   background: tk ? "#fef3c733" : flipped ? "#fef3c7" : "linear-gradient(135deg, #f59e0b, #d97706)",
                   borderColor: tk ? "transparent" : flipped ? "#f59e0b" : "#92400e",
                   color: flipped ? "#78350f" : "white",
                   opacity: tk ? 0.3 : 1,
+                  cursor: !isHumanTurn || flipped ? "default" : "pointer",
                 }}>
                 {flipped ? (
                   <span className="text-[10px] leading-tight">{pair?.answer ?? "!"}</span>
@@ -231,9 +392,10 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       </div>
 
       <p className="text-xs text-center text-gray-500">
-        {revealed.length === 0 && "💧 파란색(질문) 카드 1장을 골라요"}
-        {revealed.length === 1 && "⭐ 노란색(대답) 카드 1장을 골라 짝을 맞춰요"}
-        {revealed.length === 2 && "✨ 짝 확인 중..."}
+        {isHumanTurn && revealed.length === 0 && "💧 파란색(질문) 카드 1장을 골라요"}
+        {isHumanTurn && revealed.length === 1 && "⭐ 노란색(대답) 카드 1장을 골라 짝을 맞춰요"}
+        {isHumanTurn && revealed.length === 2 && "✨ 짝 확인 중..."}
+        {isAITurn && revealed.length > 0 && "🤖 AI가 카드를 뒤집고 있어요..."}
       </p>
     </div>
   );
