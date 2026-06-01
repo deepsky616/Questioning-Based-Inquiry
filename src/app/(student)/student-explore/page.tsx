@@ -199,12 +199,44 @@ function QuestionCard({
   commentsEnabled: boolean;
 }) {
   const [showComments, setShowComments] = useState(false);
+  const isTeacherShared = q.source === "TEACHER_SHARED";
 
   return (
-    <div className="rounded-lg border border-gray-200 overflow-hidden">
-      <div className="p-4 bg-gray-50 flex justify-between items-start gap-4">
+    <div
+      className={
+        isTeacherShared
+          ? "rounded-lg border-2 border-indigo-300 overflow-hidden bg-gradient-to-br from-indigo-50/60 to-white"
+          : "rounded-lg border border-gray-200 overflow-hidden"
+      }
+    >
+      <div
+        className={
+          isTeacherShared
+            ? "p-4 bg-indigo-50/30 flex justify-between items-start gap-4"
+            : "p-4 bg-gray-50 flex justify-between items-start gap-4"
+        }
+      >
         <div className="flex-1 min-w-0">
-          <p className="text-gray-900">{q.content}</p>
+          {/* 출처 배지 */}
+          <div className="flex gap-2 mb-2 flex-wrap items-center">
+            {isTeacherShared ? (
+              <span className="text-xs font-bold px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+                📌 단원설계 질문
+              </span>
+            ) : (
+              <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                ✏️ 학생 질문
+              </span>
+            )}
+            {isTeacherShared && q.inquiryType && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white text-indigo-600 border border-indigo-200">
+                {q.inquiryType}
+              </span>
+            )}
+          </div>
+          <p className={isTeacherShared ? "text-gray-900 font-medium" : "text-gray-900"}>
+            {q.content}
+          </p>
           <div className="flex gap-2 mt-2 flex-wrap items-center">
             <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
               {CLOSURE_LABEL[q.closure]}
@@ -225,8 +257,10 @@ function QuestionCard({
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <div className="text-right">
-            <div className="text-sm text-gray-600">{q.author.name}</div>
-            {q.author.className && (
+            <div className="text-sm text-gray-600">
+              {isTeacherShared ? `${q.author.name} 선생님` : q.author.name}
+            </div>
+            {!isTeacherShared && q.author.className && (
               <div className="text-xs text-gray-400">{q.author.className}</div>
             )}
           </div>
@@ -342,15 +376,20 @@ export default function ExplorePage() {
     fetchQuestions(val);
   };
 
-  // 선생님이 배포한 질문과 학생 질문 분리
-  const teacherQuestions = questions.filter((q) => q.source === "TEACHER_SHARED");
-  const studentQuestions = questions.filter((q) => q.source !== "TEACHER_SHARED");
-
-  const filtered = studentQuestions.filter(
-    (q) =>
-      q.content.toLowerCase().includes(search.toLowerCase()) ||
-      q.author.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // 단원설계 질문(TEACHER_SHARED)을 일반 학생 질문과 같이 한 목록에 표시
+  // (정렬은 단원설계 질문이 위쪽에 오도록 우선순위 부여)
+  const filtered = questions
+    .filter(
+      (q) =>
+        q.content.toLowerCase().includes(search.toLowerCase()) ||
+        q.author.name.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aPriority = a.source === "TEACHER_SHARED" ? 0 : 1;
+      const bPriority = b.source === "TEACHER_SHARED" ? 0 : 1;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   const selectedSession = sessions.find((session) => session.id === selectedSessionId);
 
   const byType = (key: "closure" | "cognitive", value: string) =>
@@ -520,45 +559,6 @@ export default function ExplorePage() {
           )}{" "}
           · {filtered.length}개 질문
         </div>
-      )}
-
-      {/* 📌 선생님이 배포한 질문 — 답변 작성 가능 */}
-      {teacherQuestions.length > 0 && (
-        <Card className="border-2 border-indigo-200 bg-gradient-to-br from-indigo-50/40 to-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <span className="text-xl">📌</span>
-              선생님이 배포한 질문
-              <span className="text-sm font-normal text-indigo-500">({teacherQuestions.length}개)</span>
-            </CardTitle>
-            <p className="text-xs text-gray-500 mt-0.5">
-              직접 답변을 달아 친구들과 함께 탐구해보세요!
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {teacherQuestions.map((q) => (
-              <div key={q.id}
-                className="rounded-xl border-2 border-indigo-200 bg-white p-4 space-y-3">
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl flex-shrink-0">❓</span>
-                  <div className="flex-1 min-w-0">
-                    {q.inquiryType && (
-                      <span className="inline-block text-xs font-bold text-indigo-600 bg-indigo-100 rounded-full px-2 py-0.5 mb-1.5">
-                        {q.inquiryType}
-                      </span>
-                    )}
-                    <p className="text-gray-800 font-medium leading-relaxed">{q.content}</p>
-                  </div>
-                </div>
-                {exploreCfg.commentsEnabled && (
-                  <div className="border-t border-indigo-100 pt-2">
-                    <CommentSection questionId={q.id} />
-                  </div>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
       )}
 
       {selectedSession?.unitDesignId && (
