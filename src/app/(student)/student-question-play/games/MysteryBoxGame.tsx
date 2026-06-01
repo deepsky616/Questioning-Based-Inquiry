@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
+import { useSingleAward, AwardBadge } from "./useSingleAward";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -57,7 +58,9 @@ interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig
 
 export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const isAI = config.mode === "ai";
+  const isSolo = config.mode === "solo";
   const { ask, loading: aiLoading } = useAIPlay();
+  const { award, result: awardResult } = useSingleAward();
 
   const [phase, setPhase] = useState<"start"|"playing"|"guessing"|"win"|"lose">("start");
   const [localItem, setLocalItem] = useState<MysteryItem | null>(null);
@@ -70,6 +73,19 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
   const item = isAI ? aiItem : localItem;
   const remaining = MAX_Q - qaList.length;
+
+  // 적립 (혼자/AI 모드)
+  useEffect(() => {
+    if (phase !== "win" && phase !== "lose") return;
+    if (!isSolo && !isAI) return;
+    award({
+      mode: isAI ? "ai" : "solo",
+      gameId: "mystery-box",
+      validQuestions: qaList.length,
+      completed: phase === "win",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   async function startGame() {
     setQaList([]);
@@ -271,6 +287,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             {qaList.length}개의 질문으로 맞혔어요!{"\n"}
             {isAI && <span className="text-indigo-500 font-bold">AI를 이겼어요! 🏆</span>}
           </p>
+          <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>
             🔄 다시 하기
@@ -290,6 +307,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             <h2 className="text-4xl font-black text-gray-800">{isAI ? aiItem?.name : localItem?.name}</h2>
             <p className="text-gray-400 text-sm mt-1">({isAI ? aiItem?.category : localItem?.hint})</p>
           </div>
+          <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>
             🔄 다시 도전!

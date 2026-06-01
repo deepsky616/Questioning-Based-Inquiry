@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
+import { useSingleAward, AwardBadge } from "./useSingleAward";
 import {
   MEMORY_DIFFICULTY, MemoryDifficulty, QAPair,
   pickFallbackPairs, parseAIPairs, shuffle,
@@ -53,8 +54,27 @@ export default function MemoryGame({ game, onBack, config }: Props) {
   const seenRef = useRef<Map<string, string>>(new Map());
 
   const { ask, loading: aiLoading } = useAIPlay();
+  const { award, result: awardResult, reset: resetAward } = useSingleAward();
   const missTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 본인이 모은 쌍 수 (혼자 모드는 전체 matches, AI 모드는 본인 score)
+  const myMatches = isSolo
+    ? Object.values(scores).reduce((a, b) => a + b, 0)
+    : (scores[playersList[0]] ?? 0);
+
+  // 종료 시 1회 적립 (혼자/AI 모드만)
+  useEffect(() => {
+    if (phase !== "done") return;
+    if (mode !== "solo" && mode !== "ai") return;
+    award({
+      mode: mode as "solo" | "ai",
+      gameId: "memory",
+      validQuestions: myMatches,
+      completed: taken.length >= qCards.length + aCards.length,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   const currentPlayer = playersList[turnIdx % playersList.length] ?? "나";
   const isAITurn = isAI && currentPlayer === AI_NAME;
@@ -235,9 +255,12 @@ export default function MemoryGame({ game, onBack, config }: Props) {
           </div>
         )}
 
+        {/* 적립 결과 */}
+        <AwardBadge result={awardResult} />
+
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
-          onClick={() => setPhase("setup")}>
+          onClick={() => { resetAward(); setPhase("setup"); }}>
           🔄 다시 하기
         </Button>
       </div>

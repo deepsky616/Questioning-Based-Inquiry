@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAIPlay } from "./useAIPlay";
+import { useSingleAward, AwardBadge } from "./useSingleAward";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -50,6 +51,8 @@ export default function LadderGame({ game, onBack, config }: Props) {
   const myName = config.players[0]?.trim() || "나";
 
   const { ask, loading: aiLoading } = useAIPlay();
+  const { award, result: awardResult } = useSingleAward();
+
   const [phase, setPhase] = useState<"setup" | "reveal" | "result">("setup");
   const [names, setNames] = useState(["", "", "", ""]);
   const [topics, setTopics] = useState(["", "", "", ""]);
@@ -62,6 +65,19 @@ export default function LadderGame({ game, onBack, config }: Props) {
 
   const ROWS = 10;
   const aiQGenRef = useRef(false);
+
+  // 적립 (혼자/AI 모드)
+  useEffect(() => {
+    if (phase !== "result") return;
+    if (mode !== "solo" && mode !== "ai") return;
+    award({
+      mode: mode as "solo" | "ai",
+      gameId: "ladder",
+      validQuestions: assignments.length,
+      completed: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   // 모드별 초기 참가자 이름 설정
   useEffect(() => {
@@ -355,6 +371,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
                   </div>
                 );
               })}
+              <AwardBadge result={awardResult} />
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1 rounded-xl" onClick={() => { setPhase("reveal"); setRevealedIdx(-1); }}>
                   사다리 다시 보기

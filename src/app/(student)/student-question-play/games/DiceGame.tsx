@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
+import { useSingleAward } from "./useSingleAward";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -43,9 +44,25 @@ export default function DiceGame({ game, onBack, config }: Props) {
   const [feedback, setFeedback] = useState("");
 
   const { ask, loading: aiLoading } = useAIPlay();
+  const { award } = useSingleAward();
 
   const currentPlayer = players[currentPlayerIdx] ?? "나";
   const isAITurn = isAI && currentPlayerIdx === 1;
+
+  function handleBack() {
+    if (mode === "solo" || mode === "ai") {
+      const myCount = history.filter((h) => h.player === (players[0] || "나")).length;
+      if (myCount > 0) {
+        award({
+          mode: mode as "solo" | "ai",
+          gameId: "dice",
+          validQuestions: myCount,
+          completed: myCount >= 3,
+        });
+      }
+    }
+    onBack();
+  }
 
   const roll = useCallback(() => {
     setPhase("rolling");
@@ -112,7 +129,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
     <div className="max-w-xl mx-auto space-y-6">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">← 목록</button>
+        <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">← 목록</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>

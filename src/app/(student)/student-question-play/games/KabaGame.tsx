@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
+import { useSingleAward, AwardBadge } from "./useSingleAward";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -65,6 +66,21 @@ export default function KabaGame({ game, onBack, config }: Props) {
   const [localResult, setLocalResult] = useState<"correct" | "incorrect" | null>(null);
 
   const { ask, loading: aiLoading } = useAIPlay();
+  const { award, result: awardResult } = useSingleAward();
+
+  // 적립 (혼자/AI 모드)
+  useEffect(() => {
+    if (phase !== "done") return;
+    if (mode !== "solo" && mode !== "ai") return;
+    const myCorrect = history.filter((h) => h.isCorrect && h.playerName === (players[0] || "나")).length;
+    award({
+      mode: mode as "solo" | "ai",
+      gameId: "kaba",
+      validQuestions: myCorrect,
+      completed: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   const TOTAL_ROUNDS = Math.min(10, sentences.length);
   const current = sentences[idx] ?? "";
@@ -172,6 +188,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
               </div>
             ))}
           </div>
+          <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: game.gradientCss }} onClick={restart}>
             🔄 다시 하기!

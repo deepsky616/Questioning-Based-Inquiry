@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
+import { useSingleAward, AwardBadge } from "./useSingleAward";
 import {
   STORY_DICE_LABEL, STORY_DICE_EMOJI, STORY_DICE_COLOR,
   pickFallbackWords, parseAIWords, StoryDiceWords, DiceCategory,
@@ -34,6 +35,22 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
 
   const initRef = useRef(false);
   const { ask, loading: aiLoading } = useAIPlay();
+  const { award, result: awardResult, reset: resetAward } = useSingleAward();
+
+  // 적립 (혼자/AI 모드)
+  useEffect(() => {
+    if (phase !== "done") return;
+    if (mode !== "solo" && mode !== "ai") return;
+    const myUtterances = chain.filter((c) => !c.isAI && c.type !== "story").length
+      + chain.filter((c) => c.type === "story" && !c.isAI).length;
+    award({
+      mode: mode as "solo" | "ai",
+      gameId: "story-dice",
+      validQuestions: myUtterances,
+      completed: chain.length >= 4,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   // 1) 시작 시 단어 생성
   useEffect(() => {
@@ -158,9 +175,10 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
             </div>
           ))}
         </div>
+        <AwardBadge result={awardResult} />
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
-          onClick={onBack}>
+          onClick={() => { resetAward(); onBack(); }}>
           🔄 다른 놀이 하러 가기
         </Button>
       </div>

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
+import { useSingleAward, AwardBadge } from "./useSingleAward";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -62,6 +63,22 @@ export default function RelayGame({ game, onBack, config }: Props) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [aiLoading, phase]);
+
+  const { award, result: awardResult } = useSingleAward();
+
+  // 적립 (혼자/AI 모드)
+  useEffect(() => {
+    if (phase !== "done") return;
+    if (mode !== "solo" && mode !== "ai") return;
+    const myCount = chain.filter((c) => c.player === myPlayerName).length;
+    award({
+      mode: mode as "solo" | "ai",
+      gameId: "relay",
+      validQuestions: myCount,
+      completed: chain.length >= 4,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   function startGame() {
     if (!finalTopic) return;
@@ -243,6 +260,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
           ))}
         </div>
 
+        <AwardBadge result={awardResult} />
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
           onClick={() => { setPhase("setup"); setTopic(""); setCustomTopic(""); }}>

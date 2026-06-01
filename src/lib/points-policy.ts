@@ -13,6 +13,26 @@ export const BASE_POINTS = {
   WINNER_BONUS: 10,      // 점수표 1등 (공동 우승은 모두 지급)
 } as const;
 
+// ── 혼자 모드 점수 (멀티의 일부) ────────────────────────────
+export const SOLO_POINTS = {
+  PARTICIPATION: 0,
+  PER_VALID_QUESTION: 1, // 유효 활동 1개당
+  COMPLETION: 2,
+} as const;
+
+// ── AI 모드 점수 (혼자 < AI < 멀티) ──────────────────────────
+export const AI_POINTS = {
+  PARTICIPATION: 0,
+  PER_VALID_QUESTION: 2,
+  COMPLETION: 3,
+} as const;
+
+// ── 일일 상한 (어뷰징 방지) ──────────────────────────────
+export const DAILY_LIMITS = {
+  SOLO: 30, // 혼자 모드 일일 누적 상한
+  AI: 50,   // AI 모드 일일 누적 상한
+} as const;
+
 // ── AI 보너스 상 정의 ────────────────────────────────────
 export const AI_BONUS_TYPES = {
   BEST_QUESTION: { key: "BEST_QUESTION", label: "베스트 질문상", points: 10, emoji: "🏆" },
