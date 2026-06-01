@@ -69,6 +69,30 @@ export async function GET(req: Request) {
     }
   }
 
+  // 학생: 본인의 작성 질문이 아니라면 같은 학교+학년+반 학생 질문만 조회
+  if (role === "STUDENT") {
+    const studentId = (session.user as { id: string }).id;
+    // 본인 질문 조회(authorId=본인)는 그대로 통과
+    if (searchParams.get("authorId") !== studentId) {
+      const me = await prisma.user.findUnique({
+        where: { id: studentId },
+        select: { school: true, grade: true, className: true },
+      });
+      if (me?.school && me.grade && me.className) {
+        (where as Record<string, unknown>).author = {
+          OR: [
+            { id: studentId }, // 본인 질문은 항상 보임
+            { role: "STUDENT", school: me.school, grade: me.grade, className: me.className },
+            { role: "TEACHER", school: me.school }, // 같은 학교 교사가 배포한 질문(TEACHER_SHARED)
+          ],
+        };
+      } else {
+        // 학교/학년/반 미설정이면 본인 질문만
+        (where as Record<string, unknown>).author = { id: studentId };
+      }
+    }
+  }
+
   const userId = session.user.id;
   const likeSortParam = searchParams.get("likeSort") as "asc" | "desc" | null;
 

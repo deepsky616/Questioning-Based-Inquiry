@@ -33,6 +33,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "mode, gameId, instanceId 필요" }, { status: 400 });
   }
 
+  // 끝까지 마무리한 경우에만 적립
+  if (!completed) {
+    return NextResponse.json({
+      awarded: 0,
+      notCompleted: true,
+      message: "놀이를 끝까지 마무리해야 포인트가 지급돼요.",
+    });
+  }
+
   // 정책별 점수 계산
   const policy = mode === "solo" ? SOLO_POINTS : AI_POINTS;
   const dailyLimit = mode === "solo" ? DAILY_LIMITS.SOLO : DAILY_LIMITS.AI;
@@ -40,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   let computed = policy.PARTICIPATION;
   computed += validQuestions * policy.PER_VALID_QUESTION;
-  if (completed) computed += policy.COMPLETION;
+  computed += policy.COMPLETION;
   if (computed <= 0) {
     return NextResponse.json({ awarded: 0, reason: "활동 점수 없음" });
   }

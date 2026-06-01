@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canCreateComment } from "@/lib/questions";
 import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
+import { resolveStudentExploreConfig } from "@/lib/explore-config";
 import { Prisma } from "@prisma/client";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -12,7 +13,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const question = await prisma.question.findUnique({ where: { id: params.id } });
+  const question = await prisma.question.findUnique({
+    where: { id: params.id },
+    include: {
+      author: { select: { id: true, role: true, school: true, grade: true, className: true } },
+    },
+  });
   if (!question) {
     return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
   }
@@ -25,8 +31,46 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
   }
 
+  // 학생 + 본인 질문 아님 → 작성자가 같은 학교/학년/반 학생이거나 같은 학교 교사여야 댓글 조회 가능
+  if (userRole === "STUDENT" && !isOwner) {
+    const me = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { school: true, grade: true, className: true },
+    });
+    const a = question.author;
+    const sameClass = !!(me?.school && me.grade && me.className
+      && a?.school === me.school && a?.grade === me.grade && a?.className === me.className);
+    const teacherShared = a?.role === "TEACHER" && a?.school === me?.school;
+    if (!sameClass && !teacherShared) {
+      return NextResponse.json([]);
+    }
+  }
+
+  // 댓글 조회 — 학생이면 본인이거나 같은 학교/학년/반 학생 댓글만
+  let commentWhere: Record<string, unknown> = { questionId: params.id };
+  if (userRole === "STUDENT") {
+    const me = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { school: true, grade: true, className: true },
+    });
+    if (me?.school && me.grade && me.className) {
+      commentWhere = {
+        questionId: params.id,
+        author: {
+          OR: [
+            { id: userId },
+            { role: "STUDENT", school: me.school, grade: me.grade, className: me.className },
+            { role: "TEACHER", school: me.school },
+          ],
+        },
+      };
+    } else {
+      commentWhere = { questionId: params.id, authorId: userId };
+    }
+  }
+
   const comments = await prisma.comment.findMany({
-    where: { questionId: params.id },
+    where: commentWhere,
     include: { author: { select: { id: true, name: true } } },
     orderBy: { createdAt: "asc" },
   });
@@ -63,6 +107,14 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     if (question.session && !question.session.isActive && userRole !== "TEACHER") {
       return NextResponse.json({ error: "비활성화된 세션에서는 댓글을 작성할 수 없습니다" }, { status: 403 });
+    }
+
+    // 학생: 본인 교사가 댓글 기능을 비활성화했으면 차단
+    if (userRole === "STUDENT") {
+      const cfg = await resolveStudentExploreConfig(prisma, userId);
+      if (!cfg.commentsEnabled) {
+        return NextResponse.json({ error: "선생님께서 댓글 기능을 꺼두셨어요." }, { status: 403 });
+      }
     }
 
     // 중복 검사 (학생 + 같은 질문 + 정규화 동일)

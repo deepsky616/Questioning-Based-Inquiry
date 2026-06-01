@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canLikeQuestion } from "@/lib/question-likes";
 import { formatErrorBody } from "@/lib/api-error";
+import { resolveStudentExploreConfig } from "@/lib/explore-config";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -36,6 +37,14 @@ export async function POST(_req: Request, { params }: Params) {
 
     if (!check.ok) {
       return NextResponse.json({ error: check.reason }, { status: 403 });
+    }
+
+    // 학생: 본인 교사가 좋아요 기능을 비활성화했으면 차단
+    if (role === "STUDENT") {
+      const cfg = await resolveStudentExploreConfig(prisma, userId);
+      if (!cfg.likesEnabled) {
+        return NextResponse.json({ error: "선생님께서 좋아요 기능을 꺼두셨어요." }, { status: 403 });
+      }
     }
 
     const like = await prisma.questionLike.create({

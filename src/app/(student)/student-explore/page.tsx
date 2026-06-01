@@ -190,9 +190,13 @@ function LikeButton({
 function QuestionCard({
   q,
   onLikeChange,
+  likesEnabled,
+  commentsEnabled,
 }: {
   q: Question;
   onLikeChange: (questionId: string, newCount: number, myLike: boolean) => void;
+  likesEnabled: boolean;
+  commentsEnabled: boolean;
 }) {
   const [showComments, setShowComments] = useState(false);
 
@@ -208,13 +212,15 @@ function QuestionCard({
             <span className={`text-xs px-2 py-1 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>
               {COGNITIVE_LABEL[q.cognitive]}
             </span>
-            <LikeButton
-              questionId={q.id}
-              authorId={q.author.id}
-              likeCount={q.likeCount}
-              myLike={q.myLike}
-              onLikeChange={onLikeChange}
-            />
+            {likesEnabled && (
+              <LikeButton
+                questionId={q.id}
+                authorId={q.author.id}
+                likeCount={q.likeCount}
+                myLike={q.myLike}
+                onLikeChange={onLikeChange}
+              />
+            )}
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
@@ -224,15 +230,17 @@ function QuestionCard({
               <div className="text-xs text-gray-400">{q.author.className}</div>
             )}
           </div>
-          <button
-            onClick={() => setShowComments((v) => !v)}
-            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-          >
-            {showComments ? "댓글 닫기" : "댓글 보기"}
-          </button>
+          {commentsEnabled && (
+            <button
+              onClick={() => setShowComments((v) => !v)}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              {showComments ? "댓글 닫기" : "댓글 보기"}
+            </button>
+          )}
         </div>
       </div>
-      {showComments && <CommentSection questionId={q.id} />}
+      {commentsEnabled && showComments && <CommentSection questionId={q.id} />}
     </div>
   );
 }
@@ -248,6 +256,16 @@ export default function ExplorePage() {
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
   const [likeSort, setLikeSort] = useState<LikeSortOrder>("none");
+  const [exploreCfg, setExploreCfg] = useState<{ likesEnabled: boolean; commentsEnabled: boolean }>({ likesEnabled: true, commentsEnabled: true });
+
+  useEffect(() => {
+    fetch("/api/explore-config")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d && typeof d.likesEnabled === "boolean") setExploreCfg(d);
+      })
+      .catch(() => {});
+  }, []);
 
   const fetchQuestions = useCallback(
     (sessionId: string, opts?: { date?: string; subject?: string; topic?: string; likeSort?: LikeSortOrder }) => {
@@ -352,7 +370,8 @@ export default function ExplorePage() {
     ) : (
       <div className="space-y-3 mt-3">
         {list.map((q) => (
-          <QuestionCard key={q.id} q={q} onLikeChange={handleLikeChange} />
+          <QuestionCard key={q.id} q={q} onLikeChange={handleLikeChange}
+            likesEnabled={exploreCfg.likesEnabled} commentsEnabled={exploreCfg.commentsEnabled} />
         ))}
       </div>
     );
@@ -531,9 +550,11 @@ export default function ExplorePage() {
                     <p className="text-gray-800 font-medium leading-relaxed">{q.content}</p>
                   </div>
                 </div>
-                <div className="border-t border-indigo-100 pt-2">
-                  <CommentSection questionId={q.id} />
-                </div>
+                {exploreCfg.commentsEnabled && (
+                  <div className="border-t border-indigo-100 pt-2">
+                    <CommentSection questionId={q.id} />
+                  </div>
+                )}
               </div>
             ))}
           </CardContent>
