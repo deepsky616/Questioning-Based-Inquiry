@@ -17,6 +17,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     where: { id: params.id },
     include: {
       author: { select: { id: true, role: true, school: true, grade: true, className: true } },
+      session: { select: { id: true, isActive: true } },
     },
   });
   if (!question) {
@@ -42,6 +43,10 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       && a?.school === me.school && a?.grade === me.grade && a?.className === me.className);
     const teacherShared = a?.role === "TEACHER" && a?.school === me?.school;
     if (!sameClass && !teacherShared) {
+      return NextResponse.json([]);
+    }
+    // 비활성 세션의 질문 댓글은 차단 (전체 세션 조회 일관성)
+    if (question.session && !question.session.isActive) {
       return NextResponse.json([]);
     }
   }

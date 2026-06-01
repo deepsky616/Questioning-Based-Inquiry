@@ -72,8 +72,11 @@ export async function GET(req: Request) {
   // 학생: 본인의 작성 질문이 아니라면 같은 학교+학년+반 학생 질문만 조회
   if (role === "STUDENT") {
     const studentId = (session.user as { id: string }).id;
+    const requestedSessionId = searchParams.get("sessionId");
+    const requestedAuthorId = searchParams.get("authorId");
+
     // 본인 질문 조회(authorId=본인)는 그대로 통과
-    if (searchParams.get("authorId") !== studentId) {
+    if (requestedAuthorId !== studentId) {
       const me = await prisma.user.findUnique({
         where: { id: studentId },
         select: { school: true, grade: true, className: true },
@@ -89,6 +92,12 @@ export async function GET(req: Request) {
       } else {
         // 학교/학년/반 미설정이면 본인 질문만
         (where as Record<string, unknown>).author = { id: studentId };
+      }
+
+      // "전체 세션" 선택 시: 활성화된 세션에 속한 질문만 노출
+      // (특정 sessionId가 지정된 경우엔 그 세션 그대로 조회)
+      if (!requestedSessionId || requestedSessionId === "all") {
+        (where as Record<string, unknown>).session = { isActive: true };
       }
     }
   }
