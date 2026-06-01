@@ -94,9 +94,15 @@ export async function GET(req: Request) {
         (where as Record<string, unknown>).author = { id: studentId };
       }
 
-      // "전체 세션" 선택 시: 활성화된 세션에 속한 질문만 노출
-      // (특정 sessionId가 지정된 경우엔 그 세션 그대로 조회)
-      if (!requestedSessionId || requestedSessionId === "all") {
+      // "전체 세션" 선택 시: 활성화된 세션의 질문만 노출
+      // 단, 날짜/교과/주제 필터를 명시적으로 건 경우엔 전체 세션(활성/비활성 무관) 검색
+      // - 특정 sessionId가 지정된 경우엔 그 세션 그대로
+      const hasDetailFilter = !!(
+        searchParams.get("date") ||
+        searchParams.get("subject") ||
+        searchParams.get("topic")
+      );
+      if ((!requestedSessionId || requestedSessionId === "all") && !hasDetailFilter) {
         (where as Record<string, unknown>).session = { isActive: true };
       }
     }

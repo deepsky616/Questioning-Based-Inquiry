@@ -45,10 +45,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     if (!sameClass && !teacherShared) {
       return NextResponse.json([]);
     }
-    // 비활성 세션의 질문 댓글은 차단 (전체 세션 조회 일관성)
-    if (question.session && !question.session.isActive) {
-      return NextResponse.json([]);
-    }
+    // 비활성 세션 차단은 제거: 질문 GET이 활성 필터를 적절히 적용함
+    // (날짜/교과/주제 검색에서는 전체 세션이 조회 대상이므로 댓글도 그대로 노출)
   }
 
   // 댓글 조회 — 학생이면 본인이거나 같은 학교/학년/반 학생 댓글만
