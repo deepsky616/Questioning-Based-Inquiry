@@ -431,9 +431,22 @@ export default function AskPage() {
               질문 공개 여부는 선생님이 수업 세션에서 설정합니다.
             </div>
 
-            <Button onClick={handleSave} disabled={isSaving} className="w-full">
-              {isSaving ? "저장 중..." : "질문 저장하기"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={isSaving}
+                onClick={() => {
+                  setResult(null);
+                  setContent("");
+                }}
+              >
+                ✏️ 질문 다시 작성하기
+              </Button>
+              <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+                {isSaving ? "저장 중..." : "💾 질문 저장하기"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
