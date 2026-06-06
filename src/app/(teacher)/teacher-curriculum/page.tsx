@@ -338,10 +338,12 @@ export default function CurriculumPage() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      const msg = err.detail
-        ? `${err.error || "AI 생성 오류"}\n\n자세한 원인: ${err.detail}`
-        : (err.error || "AI 생성 오류");
-      alert(msg);
+      // 브라우저 콘솔에 진단 정보 전체 출력 (네트워크 탭에서도 확인 가능)
+      console.error(`[unit-design/generate] HTTP ${res.status}`, err);
+      const parts = [err.error || "AI 생성 오류"];
+      if (err.detail) parts.push(`\n자세한 원인:\n${err.detail}`);
+      if (err.rawPreview) parts.push(`\nAI 응답 일부:\n${err.rawPreview}`);
+      alert(parts.join("\n"));
       return null;
     }
     return res.json();
