@@ -139,10 +139,16 @@ export default function TeacherSettingsPage() {
       if (data.success) {
         setMessage({ type: "success", text: `연결 성공! 모델: ${selectedModel}` });
       } else {
-        setMessage({ type: "error", text: data.error || "연결 실패" });
+        // 콘솔에도 진단 정보 전체 출력
+        console.error(`[gemini/test] HTTP ${res.status}`, data);
+        const parts = [data.error || "연결 실패"];
+        if (data.action) parts.push(`→ ${data.action}`);
+        if (data.detail) parts.push(`\n자세한 원인: ${data.detail}`);
+        setMessage({ type: "error", text: parts.join("\n") });
       }
-    } catch {
-      setMessage({ type: "error", text: "테스트 중 오류가 발생했습니다" });
+    } catch (e) {
+      console.error("[gemini/test] network error", e);
+      setMessage({ type: "error", text: "테스트 요청 자체가 실패했어요. 네트워크를 확인해주세요." });
     } finally {
       setIsTesting(false);
     }
@@ -577,7 +583,7 @@ export default function TeacherSettingsPage() {
           </div>
 
           {message && (
-            <div className={`p-3 rounded-lg text-sm ${
+            <div className={`p-3 rounded-lg text-sm whitespace-pre-line ${
               message.type === "success"
                 ? "bg-green-50 text-green-700 border border-green-200"
                 : "bg-red-50 text-red-700 border border-red-200"

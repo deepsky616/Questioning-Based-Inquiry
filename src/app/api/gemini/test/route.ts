@@ -5,6 +5,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isAllowedGeminiModel } from "@/lib/api-config";
+import { classifyGeminiError } from "@/lib/gemini-error";
 
 const testSchema = z.object({
   apiKey: z.string().optional(),
@@ -51,18 +52,21 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ success: false, error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
+      return NextResponse.json({
+        success: false,
+        error: "입력 형식이 올바르지 않습니다",
+        detail: error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "),
+      }, { status: 400 });
     }
 
-    const err = error as any;
-    if (err.message?.includes("API_KEY_INVALID") || err.message?.includes("invalid api key")) {
-      return NextResponse.json({ success: false, error: "API 키가 올바르지 않습니다" }, { status: 400 });
-    }
-
-    logger.error("Gemini test error:", error);
+    const detail = error instanceof Error ? error.message : String(error);
+    const { status, hint, action } = classifyGeminiError(error);
+    logger.error(`Gemini test error [${status}]:`, detail);
     return NextResponse.json({
       success: false,
-      error: "Gemini API 연결에 실패했습니다. API 키와 모델을 확인해 주세요."
-    }, { status: 500 });
+      error: hint,
+      action,
+      detail,
+    }, { status });
   }
 }
