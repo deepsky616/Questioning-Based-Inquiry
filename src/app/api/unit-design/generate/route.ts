@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildPrompt, unitDesignGenerateSchema } from "@/lib/unit-design-prompt";
 import { resolveGeminiModel } from "@/lib/api-config";
+import { extractJsonObject } from "@/lib/json-extract";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -34,21 +35,45 @@ export async function POST(req: Request) {
     const model = genAI.getGenerativeModel({ model: resolveGeminiModel(modelRecord?.value) });
 
     const prompt = buildPrompt(data);
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json({ error: "AI 응답을 파싱할 수 없습니다" }, { status: 500 });
+    let text: string;
+    try {
+      const result = await model.generateContent(prompt);
+      text = result.response.text();
+    } catch (aiErr) {
+      const detail = aiErr instanceof Error ? aiErr.message : String(aiErr);
+      logger.error("Gemini API call failed:", detail);
+      return NextResponse.json({
+        error: "AI 호출에 실패했어요. 설정 페이지에서 API 키와 모델을 확인해주세요.",
+        detail,
+      }, { status: 502 });
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    let parsed: unknown;
+    try {
+      parsed = extractJsonObject(text);
+    } catch (parseErr) {
+      const detail = parseErr instanceof Error ? parseErr.message : String(parseErr);
+      logger.error("AI response parse failed:", `${detail} | raw: ${text?.slice(0, 500)}`);
+      return NextResponse.json({
+        error: "AI 응답을 이해할 수 없어요. 다시 시도해주세요.",
+        detail,
+        rawPreview: text?.slice(0, 200),
+      }, { status: 502 });
+    }
     return NextResponse.json(parsed);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
+      return NextResponse.json({
+        error: "입력 형식이 올바르지 않습니다",
+        detail: error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; "),
+      }, { status: 400 });
     }
-    logger.error("unit-design generate error:", error);
-    return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });
+    const detail = error instanceof Error ? error.message : String(error);
+    logger.error("unit-design generate error:", detail);
+    return NextResponse.json({
+      error: "서버 오류가 발생했어요. 잠시 후 다시 시도해주세요.",
+      detail,
+    }, { status: 500 });
   }
 }

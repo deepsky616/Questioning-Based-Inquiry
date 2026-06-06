@@ -337,8 +337,11 @@ export default function CurriculumPage() {
       }),
     });
     if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || "AI 생성 오류");
+      const err = await res.json().catch(() => ({}));
+      const msg = err.detail
+        ? `${err.error || "AI 생성 오류"}\n\n자세한 원인: ${err.detail}`
+        : (err.error || "AI 생성 오류");
+      alert(msg);
       return null;
     }
     return res.json();
