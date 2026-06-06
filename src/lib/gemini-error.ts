@@ -32,6 +32,14 @@ export function classifyGeminiError(raw: unknown): GeminiErrorClass {
       action: "다른 Gemini 모델(예: Pro ↔ Flash)을 선택해 다시 테스트해주세요.",
     };
   }
+  // 선불 크레딧 소진 (429 안에서 가장 명확한 신호)
+  if (msg.includes("prepayment") || msg.includes("credits are depleted") || msg.includes("credit") && msg.includes("deplete")) {
+    return {
+      status: 402,
+      hint: "Google AI Studio의 선불 크레딧이 모두 소진됐어요.",
+      action: "https://ai.studio/projects 에서 결제 정보 추가 또는 새 무료 키 발급 후 다시 시도해주세요.",
+    };
+  }
   if (msg.includes("quota") || msg.includes("rate") || msg.includes(" 429 ") || msg.includes("[429") || msg.includes("resource_exhausted")) {
     return {
       status: 429,
