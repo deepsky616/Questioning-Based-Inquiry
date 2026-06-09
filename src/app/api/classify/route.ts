@@ -2,6 +2,8 @@ import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
+import { auth } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 import { fallbackClassification, parseClassificationResponse } from "@/lib/classify";
 import { isAllowedGeminiModel, resolveApiKey, resolveGeminiModel } from "@/lib/api-config";
 import { prisma } from "@/lib/db";
@@ -44,6 +46,22 @@ const CLASSIFICATION_PROMPT = `당신은 초·중·고 수업에서 학생 질�
 }`;
 
 export async function POST(req: Request) {
+  // 인증: 로그인한 사용자만 분류 요청 가능 (서버 저장 Gemini 키 남용 방지)
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // 레이트 리밋: 사용자당 분당 20회 (Gemini 호출 비용 보호)
+  const userId = (session.user as { id: string }).id;
+  const { success } = rateLimit(`classify:${userId}`, { limit: 20, windowMs: 60_000 });
+  if (!success) {
+    return NextResponse.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+      { status: 429 }
+    );
+  }
+
   try {
     const body = await req.json();
     const { apiKey: requestApiKey, model: requestModel, content, context } = classifySchema.parse(body);
