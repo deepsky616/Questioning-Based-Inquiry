@@ -9,15 +9,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import {
   AnyGame,
   GameVisibility,
-  GRADIENT_PRESETS,
-  EMOJI_PRESETS,
 } from "@/lib/question-games-data";
 
 type VisType = "all" | "classes" | "students" | "hidden";
@@ -53,19 +49,6 @@ export default function TeacherQuestionPlayPage() {
   const [visDialogGame, setVisDialogGame] = useState<AnyGame | null>(null);
   const [editVis, setEditVis] = useState<GameVisibility>({ type: "all" });
   const [visSaving, setVisSaving] = useState(false);
-
-  // 새 게임 생성 다이얼로그
-  const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    emoji: "🎮",
-    gradientPresetId: "violet",
-    playerCount: "2~30명",
-    duration: "20분",
-    instructions: [""],
-  });
 
   const load = useCallback(() => {
     setIsLoading(true);
@@ -108,32 +91,6 @@ export default function TeacherQuestionPlayPage() {
     load();
   }
 
-  // 새 게임 생성
-  async function createGame() {
-    const preset = GRADIENT_PRESETS.find((p) => p.id === form.gradientPresetId) ?? GRADIENT_PRESETS[0];
-    setCreating(true);
-    try {
-      await fetch("/api/teacher/question-games", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: form.title,
-          description: form.description,
-          emoji: form.emoji,
-          gradientCss: preset.css,
-          accentColor: preset.accent,
-          playerCount: form.playerCount,
-          duration: form.duration,
-          instructions: form.instructions.filter((i) => i.trim()),
-        }),
-      });
-      setShowCreate(false);
-      setForm({ title: "", description: "", emoji: "🎮", gradientPresetId: "violet", playerCount: "2~30명", duration: "20분", instructions: [""] });
-      load();
-    } catch {}
-    setCreating(false);
-  }
-
   const getVis = (gameId: string): GameVisibility =>
     visibilityMap[gameId] ?? { type: "all" };
 
@@ -150,22 +107,13 @@ export default function TeacherQuestionPlayPage() {
   return (
     <div className="space-y-6">
       {/* 페이지 헤더 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-            🎮 질문놀이 관리
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            학생들에게 질문놀이를 공개하고 새로운 놀이를 만들어보세요
-          </p>
-        </div>
-        <Button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 font-bold rounded-xl px-6"
-          style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
-        >
-          <span className="text-lg">+</span> 새 놀이 만들기
-        </Button>
+      <div>
+        <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+          🎮 질문놀이 관리
+        </h1>
+        <p className="text-gray-500 text-sm mt-1">
+          학생들에게 질문놀이를 공개해보세요
+        </p>
       </div>
 
       {/* 통계 카드 */}
@@ -414,198 +362,6 @@ export default function TeacherQuestionPlayPage() {
               </DialogFooter>
             </>
           )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ── 새 놀이 만들기 다이얼로그 ── */}
-      <Dialog open={showCreate} onOpenChange={(o) => { if (!o) setShowCreate(false); }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-black">🎨 새 질문놀이 만들기</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-5 mt-2">
-            {/* 이름 */}
-            <div>
-              <Label className="text-sm font-bold text-gray-700 mb-1.5 block">
-                놀이 이름 <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                placeholder="예) 질문 스피드 퀴즈"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="rounded-xl"
-              />
-            </div>
-
-            {/* 설명 */}
-            <div>
-              <Label className="text-sm font-bold text-gray-700 mb-1.5 block">
-                놀이 설명 <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                placeholder="이 놀이가 어떤 놀이인지 간단히 설명해주세요"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                className="rounded-xl resize-none h-20"
-              />
-            </div>
-
-            {/* 이모지 선택 */}
-            <div>
-              <Label className="text-sm font-bold text-gray-700 mb-1.5 block">
-                아이콘 이모지 선택
-              </Label>
-              <div className="grid grid-cols-8 gap-1 p-3 bg-gray-50 rounded-xl">
-                {EMOJI_PRESETS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    className="text-2xl p-1.5 rounded-lg transition-all hover:scale-110"
-                    style={{
-                      background: form.emoji === emoji ? "#ede9fe" : "transparent",
-                      outline: form.emoji === emoji ? "2px solid #7C3AED" : "none",
-                    }}
-                    onClick={() => setForm({ ...form, emoji })}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 색상 선택 */}
-            <div>
-              <Label className="text-sm font-bold text-gray-700 mb-1.5 block">
-                테마 색상 선택
-              </Label>
-              <div className="grid grid-cols-4 gap-2">
-                {GRADIENT_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    className="h-12 rounded-xl font-medium text-white text-sm transition-all hover:scale-105"
-                    style={{
-                      background: preset.css,
-                      outline: form.gradientPresetId === preset.id ? "3px solid #1f2937" : "none",
-                      outlineOffset: "2px",
-                    }}
-                    onClick={() => setForm({ ...form, gradientPresetId: preset.id })}
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 인원/시간 */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-sm font-bold text-gray-700 mb-1.5 block">
-                  참여 인원
-                </Label>
-                <Input
-                  placeholder="예) 2~30명"
-                  value={form.playerCount}
-                  onChange={(e) => setForm({ ...form, playerCount: e.target.value })}
-                  className="rounded-xl"
-                />
-              </div>
-              <div>
-                <Label className="text-sm font-bold text-gray-700 mb-1.5 block">
-                  소요 시간
-                </Label>
-                <Input
-                  placeholder="예) 20~30분"
-                  value={form.duration}
-                  onChange={(e) => setForm({ ...form, duration: e.target.value })}
-                  className="rounded-xl"
-                />
-              </div>
-            </div>
-
-            {/* 게임 방법 */}
-            <div>
-              <Label className="text-sm font-bold text-gray-700 mb-1.5 block">
-                게임 방법 (단계별로 입력)
-              </Label>
-              <div className="space-y-2">
-                {form.instructions.map((step, idx) => (
-                  <div key={idx} className="flex gap-2 items-start">
-                    <span
-                      className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white mt-1"
-                      style={{ background: GRADIENT_PRESETS.find((p) => p.id === form.gradientPresetId)?.accent }}
-                    >
-                      {idx + 1}
-                    </span>
-                    <Input
-                      placeholder={`${idx + 1}단계 설명`}
-                      value={step}
-                      onChange={(e) => {
-                        const updated = [...form.instructions];
-                        updated[idx] = e.target.value;
-                        setForm({ ...form, instructions: updated });
-                      }}
-                      className="rounded-xl flex-1"
-                    />
-                    {form.instructions.length > 1 && (
-                      <button
-                        className="text-red-400 hover:text-red-600 text-lg mt-1"
-                        onClick={() =>
-                          setForm({
-                            ...form,
-                            instructions: form.instructions.filter((_, i) => i !== idx),
-                          })
-                        }
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  className="w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-sm hover:border-gray-300 hover:text-gray-500 transition-colors"
-                  onClick={() => setForm({ ...form, instructions: [...form.instructions, ""] })}
-                >
-                  + 단계 추가
-                </button>
-              </div>
-            </div>
-
-            {/* 미리보기 */}
-            {form.title && (
-              <div>
-                <Label className="text-sm font-bold text-gray-700 mb-1.5 block">
-                  미리보기
-                </Label>
-                <div className="rounded-xl overflow-hidden border border-gray-100">
-                  <div
-                    className="h-24 flex items-center justify-center gap-4"
-                    style={{
-                      background: GRADIENT_PRESETS.find((p) => p.id === form.gradientPresetId)?.css,
-                    }}
-                  >
-                    <span className="text-5xl">{form.emoji}</span>
-                    <span className="text-white font-black text-xl">{form.title}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="mt-6">
-            <Button variant="outline" onClick={() => setShowCreate(false)}>
-              취소
-            </Button>
-            <Button
-              onClick={createGame}
-              disabled={creating || !form.title.trim() || !form.description.trim()}
-              className="font-bold text-white"
-              style={{
-                background: GRADIENT_PRESETS.find((p) => p.id === form.gradientPresetId)?.css,
-              }}
-            >
-              {creating ? "만드는 중..." : "놀이 만들기 🎉"}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

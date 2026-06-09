@@ -407,14 +407,6 @@ function SessionRow({
         </div>
       </div>
       <div className="flex items-center gap-5 shrink-0">
-        <Switch
-          checked={session.isActive}
-          onCheckedChange={() => onToggleActive(session.id, session.isActive)}
-        />
-        <Switch
-          checked={session.defaultQuestionPublic}
-          onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)}
-        />
         {session.unitDesignId && (
           <Button
             variant="outline"
@@ -425,6 +417,14 @@ function SessionRow({
             📤 질문 배포
           </Button>
         )}
+        <Switch
+          checked={session.isActive}
+          onCheckedChange={() => onToggleActive(session.id, session.isActive)}
+        />
+        <Switch
+          checked={session.defaultQuestionPublic}
+          onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)}
+        />
         <Button
           variant="ghost"
           size="sm"
