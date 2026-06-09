@@ -4,7 +4,7 @@ Questioning-Based Inquiry Web App - 질문기반 탐구수업 웹앱
 
 ## Features
 
-- 학생: 질문 작성 및 AI 분류, 질문库里, 다른 학생 질문 탐구
+- 학생: 질문 작성 및 AI 분류, 질문 보기, 다른 학생 질문 탐구
 - 교사: 학생 질문 통계, 유형별 분석, 질문 수정/코멘트
 
 ## Tech Stack
