@@ -2,6 +2,7 @@ import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
 import { resolveGeminiModel } from "@/lib/api-config";
@@ -16,6 +17,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   if (userRole !== "TEACHER") {
     return NextResponse.json({ error: "교사만 세션 분석을 실행할 수 있습니다" }, { status: 403 });
   }
+
+  const limited = checkRateLimit(`session-analysis:${(session.user as { id: string }).id}`, 10);
+  if (limited) return limited;
 
   const questionSession = await prisma.questionSession.findUnique({
     where: { id: params.id },
