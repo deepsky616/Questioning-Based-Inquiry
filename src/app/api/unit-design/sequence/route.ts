@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { resolveGeminiModel } from "@/lib/api-config";
 import { logger } from "@/lib/logger";
@@ -62,6 +63,9 @@ export async function POST(req: Request) {
   if (user.role !== "TEACHER") {
     return NextResponse.json({ error: "교사만 사용할 수 있습니다" }, { status: 403 });
   }
+
+  const limited = checkRateLimit(`unit-design-sequence:${user.id}`, 10);
+  if (limited) return limited;
 
   try {
     const body = await req.json();

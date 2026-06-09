@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { resolveGeminiModel } from "@/lib/api-config";
@@ -25,6 +26,9 @@ export async function POST(req: NextRequest) {
   const role = (session.user as { role?: string }).role;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 가능" }, { status: 403 });
   const teacherId = (session.user as { id: string }).id;
+
+  const limited = checkRateLimit(`points-analyze:${teacherId}`, 10);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => ({}));
   const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";

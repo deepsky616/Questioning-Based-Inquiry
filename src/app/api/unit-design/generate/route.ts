@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildPrompt, unitDesignGenerateSchema } from "@/lib/unit-design-prompt";
 import { resolveGeminiModel } from "@/lib/api-config";
@@ -13,6 +14,10 @@ export async function POST(req: Request) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const limited = checkRateLimit(`unit-design-generate:${(session.user as { id: string }).id}`, 10);
+  if (limited) return limited;
+
   const userRole = (session.user as { role?: string }).role;
   if (userRole !== "TEACHER") {
     return NextResponse.json({ error: "교사만 사용할 수 있습니다" }, { status: 403 });

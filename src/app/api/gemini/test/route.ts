@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { isAllowedGeminiModel } from "@/lib/api-config";
 import { classifyGeminiError } from "@/lib/gemini-error";
@@ -19,6 +20,9 @@ export async function POST(req: Request) {
   if (!session?.user || (session.user as { role?: string }).role !== "TEACHER") {
     return NextResponse.json({ success: false, error: "권한이 없습니다" }, { status: 403 });
   }
+
+  const limited = checkRateLimit(`gemini-test:${(session.user as { id: string }).id}`, 20);
+  if (limited) return limited;
 
   try {
     const body = await req.json();

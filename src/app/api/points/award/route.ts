@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { resolveGeminiModel } from "@/lib/api-config";
@@ -192,6 +193,9 @@ export async function POST(req: NextRequest) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const limited = checkRateLimit(`points-award:${(session.user as { id: string }).id}`, 10);
+  if (limited) return limited;
 
   const body = (await req.json().catch(() => ({}))) as Partial<AwardRequest>;
   const gameId = typeof body.gameId === "string" ? body.gameId : "";
