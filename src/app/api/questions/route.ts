@@ -196,13 +196,15 @@ export async function POST(req: Request) {
       }
     }
 
-    const createData = buildQuestionCreateData(data, userId, {
-      defaultIsPublic: selectedSession?.defaultQuestionPublic ?? false,
-    }) as Prisma.QuestionUncheckedCreateInput;
-    createData.normalizedContent = normalized;
+    const createData: Prisma.QuestionUncheckedCreateInput = {
+      ...buildQuestionCreateData(data, userId, {
+        defaultIsPublic: selectedSession?.defaultQuestionPublic ?? false,
+      }),
+      normalizedContent: normalized,
+    };
 
     const question = await prisma.question.create({
-      data: createData as Prisma.QuestionUncheckedCreateInput,
+      data: createData,
       include: {
         author: {
           select: {
