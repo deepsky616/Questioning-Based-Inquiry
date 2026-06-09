@@ -466,7 +466,7 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     expect(body.inquiryQuestions[0].type).toBe("factual");
   });
 
-  it("AI 응답에서 JSON을 파싱할 수 없으면 500을 반환한다", async () => {
+  it("AI 응답에서 JSON을 파싱할 수 없으면 502를 반환한다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockFindUnique
       .mockResolvedValueOnce({ value: "test-api-key" })
@@ -475,7 +475,8 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     setAiResponse("JSON이 아닌 응답입니다");
 
     const res = await generatePOST(makeRequest({ ...GENERATE_BASE, step: "keywords" }));
-    expect(res.status).toBe(500);
+    // AI(upstream) 응답 파싱 실패는 502(Bad Gateway): route.ts 참고
+    expect(res.status).toBe(502);
   });
 
   it("step 값이 유효하지 않으면 400을 반환한다", async () => {
