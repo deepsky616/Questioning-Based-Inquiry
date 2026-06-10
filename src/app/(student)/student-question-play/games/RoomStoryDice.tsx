@@ -6,7 +6,7 @@ import { RoomHeader, WaitingBanner, playerColorById } from "./roomShared";
 import RoomResult from "./RoomResult";
 import { useAIPlay } from "./useAIPlay";
 import {
-  STORY_DICE_LABEL, STORY_DICE_EMOJI, STORY_DICE_COLOR,
+  STORY_DICE_LABEL, STORY_DICE_EMOJI, STORY_DICE_COLOR, getWordEmoji,
   pickFallbackWords, parseAIWords, StoryDiceWords, DiceCategory,
 } from "@/lib/story-dice-data";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
@@ -200,7 +200,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
               <div className="flex flex-wrap gap-1 justify-center">
                 {state.words![cat].map((w) => (
                   <span key={w} className="text-[11px] bg-white border border-gray-200 rounded-full px-2 py-0.5 text-gray-600">
-                    {w}
+                    {getWordEmoji(w, cat)} {w}
                   </span>
                 ))}
               </div>
@@ -220,13 +220,16 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
                   {STORY_DICE_EMOJI[cat]} {STORY_DICE_LABEL[cat]}
                 </p>
                 <div
-                  className="rounded-2xl py-3 text-lg font-black text-white shadow-md"
+                  className="rounded-2xl py-3 text-white shadow-md flex flex-col items-center gap-0.5"
                   style={{
                     background: STORY_DICE_COLOR[cat],
                     transform: rolling ? `rotate(${animTick * 5}deg) scale(${1 + (animTick % 2) * 0.05})` : "none",
                     transition: "transform 0.1s",
                   }}>
-                  {value}
+                  <span className="text-3xl leading-none">
+                    {value === "?" ? "🎲" : getWordEmoji(value, cat)}
+                  </span>
+                  <span className="text-lg font-black">{value}</span>
                 </div>
               </div>
             );
