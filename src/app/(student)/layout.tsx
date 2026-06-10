@@ -12,7 +12,7 @@ import { getSessionUser } from "@/lib/auth-helpers";
 const STUDENT_PAGES = [
   { href: "/student-dashboard", label: "대시보드" },
   { href: "/student-question-play", label: "질문놀이" },
-  { href: "/student-unit-design", label: "단원설계" },
+  { href: "/student-unit-design", label: "탐구설계" },
   { href: "/student-ask", label: "질문하기" },
   { href: "/student-history", label: "내 질문" },
   { href: "/student-explore", label: "질문탐구" },

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
+import { groupSharedQuestions } from "@/lib/shared-questions";
 
 interface SharedQuestion {
   type: string;
@@ -48,7 +49,7 @@ export default function StudentUnitDesignPage() {
       .then((res) => res.json())
       .then((data: QuestionSession[]) => {
         const unitDesignSessions = sortSessionsAsc(Array.isArray(data) ? data : [])
-          .filter((session) => session.unitDesignId && (session.sharedQuestions?.length ?? 0) > 0);
+          .filter((session) => (session.sharedQuestions?.length ?? 0) > 0);
         setSessions(unitDesignSessions);
         if (unitDesignSessions.length > 0) setSelectedId(unitDesignSessions[0].id);
       })
@@ -57,22 +58,18 @@ export default function StudentUnitDesignPage() {
   }, []);
 
   const selectedSession = sessions.find((session) => session.id === selectedId) ?? sessions[0] ?? null;
-  const grouped = useMemo(() => {
-    const questions = selectedSession?.sharedQuestions ?? [];
-    const map = new Map<string, SharedQuestion[]>();
-    questions.forEach((question, index) => {
-      const key = question.contentGroup || "수업 순서";
-      const normalized = { ...question, priority: question.priority ?? index + 1 };
-      map.set(key, [...(map.get(key) ?? []), normalized]);
-    });
-    return Array.from(map.entries());
-  }, [selectedSession]);
+  const grouped = useMemo(
+    () => groupSharedQuestions(selectedSession?.sharedQuestions ?? []).map(
+      (g) => [g.group, g.questions] as [string, typeof g.questions],
+    ),
+    [selectedSession],
+  );
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">단원설계</h2>
-        <p className="text-gray-600">선생님이 배포한 단원별 질문 수업 순서를 확인하세요</p>
+        <h2 className="text-2xl font-bold text-gray-900">질문 중심 탐구설계</h2>
+        <p className="text-gray-600">선생님이 정리해 배포한 질문 순서를 확인하세요</p>
       </div>
 
       {isLoading ? (
@@ -80,8 +77,8 @@ export default function StudentUnitDesignPage() {
       ) : sessions.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
-            <p className="font-medium mb-1">배포된 단원설계가 없습니다</p>
-            <p className="text-sm text-gray-400">선생님이 단원설계를 배포하면 여기에 표시됩니다</p>
+            <p className="font-medium mb-1">배포된 탐구설계가 없습니다</p>
+            <p className="text-sm text-gray-400">선생님이 탐구설계를 배포하면 여기에 표시됩니다</p>
           </CardContent>
         </Card>
       ) : (

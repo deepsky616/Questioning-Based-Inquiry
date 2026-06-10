@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import DatePicker from "@/components/shared/DatePicker";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
+import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -118,6 +119,7 @@ export default function QuestionsPage() {
 
   // 뷰 모드
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [showSequence, setShowSequence] = useState(false);
 
   // 일괄 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -1072,6 +1074,30 @@ export default function QuestionsPage() {
             </CardContent>
           )}
         </Card>
+      )}
+
+      {currentSession && (
+        <div className="rounded-xl border bg-white p-4">
+          <button
+            type="button"
+            onClick={() => setShowSequence((v) => !v)}
+            className="text-sm font-bold text-indigo-600"
+          >
+            {showSequence ? "▾ 질문 중심 탐구설계 닫기" : "▸ 질문 중심 탐구설계 (묶기·순서·배포)"}
+          </button>
+          {showSequence && (
+            <div className="mt-3">
+              <QuestionSequencePanel
+                sessionId={currentSession.id}
+                subject={currentSession.subject}
+                topic={currentSession.topic}
+                questions={filtered.map((q) => ({
+                  id: q.id, content: q.content, cognitive: q.cognitive, source: "student" as const,
+                }))}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {currentSession && currentSession.unitDesignId && (

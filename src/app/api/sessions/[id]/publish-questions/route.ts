@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { normalizeSharedQuestions, type SharedQuestionItem } from "@/lib/shared-questions";
 
 interface PublishItem { type?: string; content: string }
 
@@ -57,6 +58,43 @@ export async function POST(
   if (!qs) return NextResponse.json({ error: "세션 없음" }, { status: 404 });
   if (qs.teacherId !== teacherId) {
     return NextResponse.json({ error: "권한 없음" }, { status: 403 });
+  }
+
+  // 신규: 질문 중심 탐구설계 시퀀스 배포 (그룹/순서 포함)
+  if (Array.isArray(body.sequence)) {
+    const seq = normalizeSharedQuestions(body.sequence as SharedQuestionItem[]);
+
+    // 교사 추가 질문만 TEACHER_SHARED Question으로 멱등 생성
+    const existingShared = await prisma.question.findMany({
+      where: { sessionId, source: "TEACHER_SHARED" },
+      select: { content: true },
+    });
+    const existingSet = new Set(existingShared.map((q) => q.content.trim()));
+    const teacherNew = seq.filter((q) => q.source === "teacher" && !existingSet.has(q.content.trim()));
+    await Promise.all(
+      teacherNew.map((q) =>
+        prisma.question.create({
+          data: {
+            content: q.content.trim(),
+            closure: "open",
+            cognitive: "conceptual",
+            source: "TEACHER_SHARED",
+            inquiryType: q.type,
+            isPublic: true,
+            authorId: teacherId,
+            sessionId,
+          },
+        }),
+      ),
+    );
+
+    // sharedQuestions에 전체 시퀀스(그룹/순서) 저장
+    await prisma.questionSession.update({
+      where: { id: sessionId },
+      data: { sharedQuestions: seq as unknown as Prisma.InputJsonValue },
+    });
+
+    return NextResponse.json({ ok: true, count: seq.length });
   }
 
   // 이미 배포된 교사 질문 조회
