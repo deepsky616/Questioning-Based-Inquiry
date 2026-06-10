@@ -13,7 +13,6 @@ const TEACHER_PAGES = [
   { href: "/teacher-dashboard", label: "대시보드" },
   { href: "/teacher-students", label: "학생관리" },
   { href: "/teacher-question-play", label: "질문놀이" },
-  { href: "/teacher-unit-design", label: "단원설계" },
   { href: "/teacher-sessions", label: "수업세션" },
   { href: "/teacher-questions", label: "질문조회" },
   { href: "/teacher-review", label: "AI검토" },
