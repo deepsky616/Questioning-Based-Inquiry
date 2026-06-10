@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/db", () => ({
@@ -19,7 +20,7 @@ const mockQFind = prisma.question.findMany as ReturnType<typeof vi.fn>;
 const mockQCreate = prisma.question.create as ReturnType<typeof vi.fn>;
 
 function req(body: unknown) {
-  return new Request("http://localhost/api/sessions/s1/publish-questions", {
+  return new NextRequest("http://localhost/api/sessions/s1/publish-questions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
