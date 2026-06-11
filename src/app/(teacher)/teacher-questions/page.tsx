@@ -19,7 +19,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import DatePicker from "@/components/shared/DatePicker";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import {
@@ -31,7 +30,7 @@ import {
   matchesCognitiveCategory,
   normalizeCognitiveType,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
 
 interface QuestionSession {
@@ -141,8 +140,8 @@ export default function QuestionsPage() {
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
 
-  // 조회 모드: 세션별 | 세부(날짜·교과·주제)
-  const [questionLookupMode, setQuestionLookupMode] = useState<"session" | "detail">("session");
+  // 조회는 항상 단일 세션 기준 (세션별/날짜-교과-주제별 통합). detail 분기는 점진 제거 예정.
+  const [questionLookupMode] = useState<"session" | "detail">("session");
 
   // 날짜·교과·주제 필터 (세부 조회 모드용)
   const [filterDate, setFilterDate] = useState("");
@@ -206,36 +205,22 @@ export default function QuestionsPage() {
     fetchQuestions(val);
   };
 
-  const handleLookupModeChange = (mode: "session" | "detail") => {
-    setQuestionLookupMode(mode);
-    setSessionAnalysis(null);
-    setSessionAnalysisError(null);
-    setParticipation(null);
-    setShowParticipation(false);
-    resetBulkState();
-    if (mode === "session") {
-      if (selectedSessionId) fetchQuestions(selectedSessionId);
-      else setQuestions([]);
-    } else {
-      fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
+  // 날짜·교과·주제 필터로 세션 목록을 좁힌다(질문 직접 조회가 아니라 세션을 고르는 보조 필터)
+  const filterOptions = getSessionFilterOptions(sessions);
+  const filteredSessions = filterSessions(sessions, {
+    date: filterDate || undefined,
+    subject: filterSubject || undefined,
+    topic: filterTopic || undefined,
+  });
+
+  // 필터 변경으로 현재 선택 세션이 목록 밖이면 첫 세션으로 보정
+  useEffect(() => {
+    if (filteredSessions.length === 0) return;
+    if (!filteredSessions.some((s) => s.id === selectedSessionId)) {
+      handleSessionChange(filteredSessions[0].id);
     }
-  };
-
-  const handleApplyFilter = () => {
-    resetBulkState();
-    fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
-  };
-
-  const handleClearFilter = () => {
-    setFilterDate("");
-    setFilterSubject("");
-    setFilterTopic("");
-    resetBulkState();
-    fetchQuestions("all");
-  };
-
-  const hasActiveFilter = !!(filterDate.trim() || filterSubject.trim() || filterTopic.trim());
-  const uniqueSubjects = Array.from(new Set(sessions.map((s) => s.subject).filter(Boolean))).sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterDate, filterSubject, filterTopic]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -351,11 +336,7 @@ export default function QuestionsPage() {
         setSelectedIds(new Set());
         setBulkMsg(null);
         setShowBulkSuccess(false);
-        if (questionLookupMode === "session") {
-          fetchQuestions(selectedSessionId);
-        } else {
-          fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
-        }
+        fetchQuestions(selectedSessionId);
       }, 2000);
     } catch (err) {
       setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
@@ -387,11 +368,7 @@ export default function QuestionsPage() {
 
       setSelectedQuestion(null);
       setComment("");
-      if (questionLookupMode === "session") {
-        fetchQuestions(selectedSessionId);
-      } else {
-        fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
-      }
+      fetchQuestions(selectedSessionId);
     } catch (err) {
       setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : "저장에 실패했습니다" });
     } finally {
@@ -713,167 +690,111 @@ export default function QuestionsPage() {
         <p className="text-gray-600">세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
       </div>
 
-      {/* 조회 모드 전환 */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* 정렬·뷰 모드 */}
+      <div className="flex items-center gap-3 flex-wrap justify-end">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-500">좋아요순</span>
+          <div className="flex rounded-md border border-gray-200 overflow-hidden">
+            {(["none", "desc", "asc"] as const).map((order, i) => (
+              <button
+                key={order}
+                onClick={() => {
+                  setLikeSort(order);
+                  fetchQuestions(selectedSessionId, { likeSort: order });
+                }}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  i > 0 ? "border-l border-gray-200" : ""
+                } ${
+                  likeSort === order
+                    ? "bg-rose-500 text-white"
+                    : "bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <span className="text-sm text-gray-500">{filtered.length}개</span>
         <div className="flex rounded-md border border-gray-200 overflow-hidden">
           <button
-            onClick={() => handleLookupModeChange("session")}
-            className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-              questionLookupMode === "session"
+            onClick={() => setViewMode("table")}
+            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+              viewMode === "table"
                 ? "bg-indigo-600 text-white"
                 : "bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
-            세션별 조회
+            ☰ 목록
           </button>
           <button
-            onClick={() => handleLookupModeChange("detail")}
-            className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200 ${
-              questionLookupMode === "detail"
+            onClick={() => setViewMode("cards")}
+            className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+              viewMode === "cards"
                 ? "bg-indigo-600 text-white"
                 : "bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
-            날짜·교과·주제별 조회
+            ▦ 질문·댓글
           </button>
-        </div>
-        <div className="ml-auto flex items-center gap-3 flex-wrap">
-          {/* 좋아요 정렬 */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">좋아요순</span>
-            <div className="flex rounded-md border border-gray-200 overflow-hidden">
-              {(["none", "desc", "asc"] as const).map((order, i) => (
-                <button
-                  key={order}
-                  onClick={() => {
-                    setLikeSort(order);
-                    if (questionLookupMode === "session") {
-                      fetchQuestions(selectedSessionId, { likeSort: order });
-                    } else {
-                      fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic, likeSort: order });
-                    }
-                  }}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                    i > 0 ? "border-l border-gray-200" : ""
-                  } ${
-                    likeSort === order
-                      ? "bg-rose-500 text-white"
-                      : "bg-white text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <span className="text-sm text-gray-500">{filtered.length}개</span>
-          <div className="flex rounded-md border border-gray-200 overflow-hidden">
-            <button
-              onClick={() => setViewMode("table")}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                viewMode === "table"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              ☰ 목록
-            </button>
-            <button
-              onClick={() => setViewMode("cards")}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
-                viewMode === "cards"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              ▦ 질문·댓글
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* 세션별 조회: 세션 Select */}
-      {questionLookupMode === "session" && (
-        sessions.length === 0 ? (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-400">
-            등록된 세션이 없습니다. 세션을 먼저 추가해 주세요.
-          </div>
-        ) : (
-          <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-            <SelectTrigger className="w-80">
-              <SelectValue placeholder="세션 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              {sessions.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {buildSessionLabel(s.date, s.subject, s.topic)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )
-      )}
-
-      {/* 세부 조회: 날짜·교과·주제 필터 */}
-      {questionLookupMode === "detail" && (
-        <div className={`rounded-lg border p-3 ${hasActiveFilter ? "border-indigo-200 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
+      {/* 수업 세션 선택: 날짜·교과·주제로 좁혀서 단일 세션 선택 */}
+      {sessions.length === 0 ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-400">
+          등록된 세션이 없습니다. 세션을 먼저 추가해 주세요.
+        </div>
+      ) : (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1 w-40">
+            <div className="flex flex-col gap-1 w-36">
               <label className="text-xs font-medium text-gray-600">날짜</label>
-              <DatePicker
-                value={filterDate}
-                onChange={setFilterDate}
-              />
+              <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 날짜</SelectItem>
+                  {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex flex-col gap-1 w-32">
               <label className="text-xs font-medium text-gray-600">교과</label>
-              {uniqueSubjects.length > 0 ? (
-                <Select
-                  value={filterSubject || "__all__"}
-                  onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}
-                >
-                  <SelectTrigger className="h-8 text-sm w-36 bg-white">
-                    <SelectValue placeholder="전체" />
-                  </SelectTrigger>
+              <Select value={filterSubject || "__all__"} onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 교과</SelectItem>
+                  {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 w-52">
+              <label className="text-xs font-medium text-gray-600">주제</label>
+              <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 주제</SelectItem>
+                  {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-0 flex-1">
+              <label className="text-xs font-medium text-gray-600">세션</label>
+              {filteredSessions.length === 0 ? (
+                <div className="h-8 flex items-center text-sm text-gray-400">조건에 맞는 세션이 없습니다</div>
+              ) : (
+                <Select value={selectedSessionId} onValueChange={handleSessionChange}>
+                  <SelectTrigger className="bg-white font-medium"><SelectValue placeholder="세션 선택" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">전체</SelectItem>
-                    {uniqueSubjects.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    {filteredSessions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              ) : (
-                <Input
-                  placeholder="예: 과학"
-                  value={filterSubject}
-                  onChange={(e) => setFilterSubject(e.target.value)}
-                  className="h-8 text-sm w-32 bg-white"
-                />
               )}
             </div>
-            <div className="flex flex-col gap-1 min-w-0">
-              <label className="text-xs font-medium text-gray-600">주제</label>
-              <Input
-                placeholder="예: 광합성과 에너지, 지구의 역사"
-                value={filterTopic}
-                onChange={(e) => setFilterTopic(e.target.value)}
-                className="h-8 text-sm w-64 bg-white"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" className="h-8" onClick={handleApplyFilter}>
-                조회
-              </Button>
-              {hasActiveFilter && (
-                <Button size="sm" variant="outline" className="h-8" onClick={handleClearFilter}>
-                  초기화
-                </Button>
-              )}
-            </div>
-            {hasActiveFilter && (
-              <span className="text-xs text-indigo-600 font-medium self-end pb-0.5">필터 적용 중</span>
-            )}
           </div>
+          <p className="text-xs text-gray-400 mt-2">💡 날짜·교과·주제로 좁혀도, 직접 세션을 골라도 결과는 같습니다.</p>
         </div>
       )}
 
