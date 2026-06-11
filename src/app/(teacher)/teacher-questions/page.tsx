@@ -473,7 +473,6 @@ export default function QuestionsPage() {
             </TableHead>
             <TableHead>학생</TableHead>
             <TableHead>질문 내용</TableHead>
-            {questionLookupMode === "detail" && <TableHead className="w-36">세션</TableHead>}
             <TableHead className="w-20">폐쇄/개방</TableHead>
             <TableHead className="w-24">인지 수준</TableHead>
             <TableHead className="w-16 text-center">좋아요</TableHead>
@@ -504,17 +503,6 @@ export default function QuestionsPage() {
               <TableCell className="max-w-xs">
                 <p className="truncate">{q.content}</p>
               </TableCell>
-              {questionLookupMode === "detail" && (
-                <TableCell>
-                  {q.session ? (
-                    <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
-                      {buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-400">세션 없음</span>
-                  )}
-                </TableCell>
-              )}
               <TableCell>
                 <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
                   {CLOSURE_LABEL[q.closure]}
@@ -1060,55 +1048,9 @@ export default function QuestionsPage() {
         <div className="space-y-8">
           {filtered.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">
-              {questionLookupMode === "session" && !selectedSessionId
-                ? "세션을 선택해 주세요"
-                : "해당하는 질문이 없습니다"}
+              {!selectedSessionId ? "세션을 선택해 주세요" : "해당하는 질문이 없습니다"}
             </div>
-          ) : questionLookupMode === "detail" ? (
-            <>
-              {sessions.map((s) => {
-                const sessionQuestions = filtered.filter((q) => q.sessionId === s.id);
-                if (sessionQuestions.length === 0) return null;
-                return (
-                  <div key={s.id}>
-                    <div className="mb-3 flex items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm shadow-sm">
-                        📅
-                      </span>
-                      <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-indigo-700 shadow-sm">
-                        {buildSessionLabel(s.date, s.subject, s.topic)}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {sessionQuestions.length}개 질문 · 댓글 있는 질문 {countQuestionsWithComments(sessionQuestions)}개
-                      </span>
-                    </div>
-                    <QuestionCommentCards list={sessionQuestions} />
-                  </div>
-                );
-              })}
-              {(() => {
-                const noSession = filtered.filter((q) => !q.sessionId);
-                if (noSession.length === 0) return null;
-                return (
-                  <div>
-                    <div className="mb-3 flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm shadow-sm">
-                        📁
-                      </span>
-                      <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-gray-600 shadow-sm">
-                        세션 없는 질문
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {noSession.length}개 질문 · 댓글 있는 질문 {countQuestionsWithComments(noSession)}개
-                      </span>
-                    </div>
-                    <QuestionCommentCards list={noSession} />
-                  </div>
-                );
-              })()}
-            </>
           ) : (
-            /* 특정 세션 또는 세션 없음 */
             <div>
               {currentSession && (
                 <div className="flex items-center gap-3 mb-3">
