@@ -141,8 +141,6 @@ export default function QuestionsPage() {
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
 
-  // 조회는 항상 단일 세션 기준 (세션별/날짜-교과-주제별 통합). detail 분기는 점진 제거 예정.
-  const [questionLookupMode] = useState<"session" | "detail">("session");
 
   // 날짜·교과·주제 필터 (세부 조회 모드용)
   const [filterDate, setFilterDate] = useState("");
@@ -1063,131 +1061,8 @@ export default function QuestionsPage() {
             </div>
           )}
         </div>
-      ) : questionLookupMode === "session" ? (
-        /* ── 세션별 조회 ── */
-        !currentSession ? (
-          <div className="text-center py-16 text-gray-400 text-sm">세션을 선택해 주세요</div>
-        ) : (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">
-              전체 질문 목록
-              <span className="ml-2 text-sm font-normal text-gray-500">
-                {filtered.length}개
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {filtered.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">
-                이 세션에 등록된 질문이 없습니다
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="w-8">
-                      <input
-                        type="checkbox"
-                        checked={filtered.length > 0 && filtered.every((q) => selectedIds.has(q.id))}
-                        onChange={() =>
-                          filtered.every((q) => selectedIds.has(q.id))
-                            ? clearSelection()
-                            : selectAll(filtered)
-                        }
-                        className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
-                      />
-                    </TableHead>
-                    <TableHead className="w-28">학생</TableHead>
-                    <TableHead>질문 내용</TableHead>
-                    <TableHead className="w-20 text-center">폐쇄/개방</TableHead>
-                    <TableHead className="w-24 text-center">인지 수준</TableHead>
-                    <TableHead className="w-16 text-center">좋아요</TableHead>
-                    <TableHead className="w-20 text-center">공개</TableHead>
-                    <TableHead className="w-16 text-center">수정</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((q, i) => (
-                    <TableRow
-                      key={q.id}
-                      className={selectedIds.has(q.id) ? "bg-indigo-50/40" : i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
-                    >
-                      <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(q.id)}
-                          onChange={() => toggleSelect(q.id)}
-                          className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm font-medium">{q.author.name}</div>
-                        {q.author.className && (
-                          <div className="text-xs text-gray-400">
-                            {q.author.grade && `${q.author.grade}학년 `}
-                            {q.author.className}반
-                            {q.author.studentNumber && ` ${q.author.studentNumber}번`}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <p className="text-sm leading-snug whitespace-pre-wrap break-words max-w-md">
-                          {q.content}
-                        </p>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={`text-xs px-2 py-1 rounded font-medium ${CLOSURE_STYLE[q.closure]}`}>
-                          {CLOSURE_LABEL[q.closure]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={`text-xs px-2 py-1 rounded font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
-                          {COGNITIVE_LABEL[q.cognitive]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="group relative inline-block">
-                          <span className="flex items-center gap-1 text-sm font-medium text-rose-500 justify-center">
-                            ❤️ {q.likeCount}
-                          </span>
-                          {(q.likedBy?.length ?? 0) > 0 && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-36 shadow-lg">
-                              <p className="font-semibold mb-1">좋아요한 학생</p>
-                              {q.likedBy!.map((u) => (
-                                <p key={u.id} className="truncate">{u.name}</p>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={q.isPublic}
-                          onCheckedChange={() => handleToggleQuestionPublic(q)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedQuestion(q);
-                            setCorrectionClosure(q.closure);
-                            setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
-                          }}
-                        >
-                          수정
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-        )
+      ) : !currentSession ? (
+        <div className="text-center py-16 text-gray-400 text-sm">세션을 선택해 주세요</div>
       ) : (
         /* ── 날짜·교과·주제별 조회: 분류별 탭 ── */
         <>
