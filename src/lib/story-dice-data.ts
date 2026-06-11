@@ -27,6 +27,7 @@ export interface StoryDiceWords {
   protagonist: string[]; // 8개
   place: string[];
   event: string[];
+  emojis?: Record<string, string>; // AI가 단어별로 함께 생성한 이모지 (선택)
 }
 
 export const STORY_DICE_LABEL: Record<DiceCategory, string> = {
@@ -73,11 +74,19 @@ export function parseAIWords(text: string): StoryDiceWords | null {
     const valid = (v: unknown): v is string[] =>
       Array.isArray(v) && v.length >= 6 && v.every((s) => typeof s === "string");
     if (!valid(obj.protagonist) || !valid(obj.place) || !valid(obj.event)) return null;
-    return {
+    const words: StoryDiceWords = {
       protagonist: obj.protagonist.slice(0, 8),
       place: obj.place.slice(0, 8),
       event: obj.event.slice(0, 8),
     };
+    if (obj.emojis && typeof obj.emojis === "object" && !Array.isArray(obj.emojis)) {
+      const em: Record<string, string> = {};
+      for (const [k, v] of Object.entries(obj.emojis)) {
+        if (typeof v === "string" && v.trim()) em[k.trim()] = v.trim();
+      }
+      if (Object.keys(em).length > 0) words.emojis = em;
+    }
+    return words;
   } catch {
     return null;
   }
@@ -94,8 +103,8 @@ export const STORY_DICE_WORD_EMOJI: Record<string, string> = {
   // 장소
   "학교": "🏫", "숲": "🌳", "바다": "🌊", "우주": "🌌", "놀이공원": "🎡",
   "무인도": "🏝️", "동굴": "🕳️", "미래도시": "🌆", "도서관": "📚", "옛날 성": "🏰",
-  "지하 세계": "🕳️", "구름 위": "☁️", "사막": "🏜️", "정글": "🌴", "박물관": "🏛️",
-  "외딴 섬": "🏝️", "비밀 기지": "🛰️", "마법 학교": "🪄", "거대한 나무 위": "🌲",
+  "지하 세계": "🌑", "구름 위": "☁️", "사막": "🏜️", "정글": "🌴", "박물관": "🏛️",
+  "외딴 섬": "🏖️", "비밀 기지": "🛰️", "마법 학교": "🪄", "거대한 나무 위": "🌲",
   "타임 터널": "🌀", "고요한 호수": "🏞️", "용암 화산": "🌋", "유령의 집": "🏚️", "북극": "❄️",
   // 사건/물건
   "보물상자": "💰", "비밀지도": "🗺️", "열쇠": "🔑", "타임머신": "⏳", "마법책": "📖",
@@ -105,15 +114,36 @@ export const STORY_DICE_WORD_EMOJI: Record<string, string> = {
   "수수께끼 같은 메시지": "💬", "신비한 가루": "✨", "갑자기 켜진 불빛": "💡", "오래된 동전": "🪙", "큰 그림자": "👥",
 };
 
+/** 카테고리별 이모지 풀 — 매핑되지 않은 AI 단어를 단어마다 다르게 분산시키기 위함 */
+export const STORY_DICE_EMOJI_POOL: Record<DiceCategory, string[]> = {
+  protagonist: ["🦸", "🧙", "🧚", "🤖", "🐉", "🦊", "🦄", "🧛", "🧜", "🧞", "👻", "🐲", "🦅", "🐺", "🦁", "🐯", "🐱", "🐶", "👽", "🧟"],
+  place: ["🗺️", "🏞️", "🏔️", "🏖️", "🌋", "🏰", "🌃", "🏝️", "🏟️", "⛩️", "🌉", "🏕️", "🗼", "🏜️", "🌅", "🏛️", "🌲", "🏚️", "🌌", "🌑"],
+  event: ["✨", "🎁", "🔮", "💥", "🎆", "🪄", "🧩", "📜", "🎭", "🕯️", "🎯", "💫", "🧨", "🎟️", "🪅", "🔔", "💎", "🗝️", "📦", "🪞"],
+};
+
+/** 문자열 → 안정적인 해시(같은 단어는 항상 같은 값) */
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 /**
  * 단어에 어울리는 이모지를 반환한다.
- * 1) 정확히 매칭 → 2) 부분 매칭(수식어가 붙은 AI 단어 대응) → 3) 카테고리 기본 이모지
+ * 1) AI가 준 이모지 → 2) 정확 매칭 → 3) 부분 매칭(수식어 대응)
+ * → 4) 카테고리 이모지 풀에서 단어 해시로 선택(같은 카테고리 안에서도 단어마다 다름)
  */
-export function getWordEmoji(word: string, category: DiceCategory): string {
+export function getWordEmoji(
+  word: string,
+  category: DiceCategory,
+  dynamicEmojis?: Record<string, string>,
+): string {
   const trimmed = word.trim();
+  if (dynamicEmojis && dynamicEmojis[trimmed]) return dynamicEmojis[trimmed];
   if (STORY_DICE_WORD_EMOJI[trimmed]) return STORY_DICE_WORD_EMOJI[trimmed];
   for (const [key, emoji] of Object.entries(STORY_DICE_WORD_EMOJI)) {
     if (trimmed.includes(key)) return emoji;
   }
-  return STORY_DICE_EMOJI[category];
+  const pool = STORY_DICE_EMOJI_POOL[category];
+  return pool[hashString(trimmed) % pool.length];
 }

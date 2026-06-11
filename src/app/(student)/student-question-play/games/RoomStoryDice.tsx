@@ -200,7 +200,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
               <div className="flex flex-wrap gap-1 justify-center">
                 {state.words![cat].map((w) => (
                   <span key={w} className="text-[11px] bg-white border border-gray-200 rounded-full px-2 py-0.5 text-gray-600">
-                    {getWordEmoji(w, cat)} {w}
+                    {getWordEmoji(w, cat, state.words?.emojis)} {w}
                   </span>
                 ))}
               </div>
@@ -227,7 +227,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
                     transition: "transform 0.1s",
                   }}>
                   <span className="text-3xl leading-none">
-                    {value === "?" ? "🎲" : getWordEmoji(value, cat)}
+                    {value === "?" ? "🎲" : getWordEmoji(value, cat, state.words?.emojis)}
                   </span>
                   <span className="text-lg font-black">{value}</span>
                 </div>
