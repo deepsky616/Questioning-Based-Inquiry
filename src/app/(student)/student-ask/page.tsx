@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { buildSessionLabel, buildSessionContextHint } from "@/lib/sessions";
+import { buildSessionLabel, buildSessionContextHint, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { COGNITIVE_LABEL } from "@/lib/question-labels";
 
@@ -58,6 +58,9 @@ export default function AskPage() {
   const [sessionsLoaded, setSessionsLoaded] = useState(false);
   const [sessionsError, setSessionsError] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
+  const [filterDate, setFilterDate] = useState("");
+  const [filterSubject, setFilterSubject] = useState("");
+  const [filterTopic, setFilterTopic] = useState("");
 
   useEffect(() => {
     fetch("/api/config")
@@ -83,8 +86,15 @@ export default function AskPage() {
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
 
-  const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const id = e.target.value;
+  // 날짜/교과/주제 필터로 좁힌 세션 목록
+  const filterOptions = getSessionFilterOptions(sessions);
+  const filteredSessions = filterSessions(sessions, {
+    date: filterDate || undefined,
+    subject: filterSubject || undefined,
+    topic: filterTopic || undefined,
+  });
+
+  const selectSession = (id: string) => {
     setSelectedSessionId(id);
     setResult(null); // issue #5: 세션 변경 시 분류 결과 초기화
 
@@ -108,6 +118,23 @@ export default function AskPage() {
     }
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
+
+  const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    selectSession(e.target.value);
+  };
+
+  // 필터 변경 시 선택 세션 보정: 목록에 없으면 첫 세션으로, 목록이 비면 선택 해제
+  useEffect(() => {
+    if (!sessionsLoaded) return;
+    if (filteredSessions.length === 0) {
+      if (selectedSessionId) setSelectedSessionId("");
+      return;
+    }
+    if (!filteredSessions.some((s) => s.id === selectedSessionId)) {
+      selectSession(filteredSessions[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterDate, filterSubject, filterTopic]);
 
   const canAsk = sessionsLoaded && !sessionsError && sessions.length > 0 && !!selectedSessionId;
 
@@ -263,17 +290,60 @@ export default function AskPage() {
           {/* 세션 선택 — 필수 */}
           <div className="space-y-2">
             <Label htmlFor="session">수업 세션 선택 <span className="text-red-500">*</span></Label>
+
+            {/* 날짜·교과·주제로 좁혀서 찾기 (선택) */}
+            <div className="grid grid-cols-3 gap-2">
+              <select
+                aria-label="날짜로 거르기"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+              >
+                <option value="">전체 날짜</option>
+                {filterOptions.dates.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <select
+                aria-label="교과로 거르기"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={filterSubject}
+                onChange={(e) => setFilterSubject(e.target.value)}
+              >
+                <option value="">전체 교과</option>
+                {filterOptions.subjects.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <select
+                aria-label="주제로 거르기"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={filterTopic}
+                onChange={(e) => setFilterTopic(e.target.value)}
+              >
+                <option value="">전체 주제</option>
+                {filterOptions.topics.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
             <select
               id="session"
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               value={selectedSessionId}
               onChange={handleSessionChange}
+              disabled={filteredSessions.length === 0}
             >
-              {sessions.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {buildSessionLabel(s.date, s.subject, s.topic)}
-                </option>
-              ))}
+              {filteredSessions.length === 0 ? (
+                <option value="">조건에 맞는 세션이 없습니다</option>
+              ) : (
+                filteredSessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {buildSessionLabel(s.date, s.subject, s.topic)}
+                  </option>
+                ))
+              )}
             </select>
 
             {selectedSession && (
