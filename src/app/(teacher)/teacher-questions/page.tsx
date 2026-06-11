@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
+import { summarizeQuestionTypes } from "@/lib/stats-calc";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -961,6 +962,52 @@ export default function QuestionsPage() {
               ) : null}
             </CardContent>
           )}
+        </Card>
+      )}
+
+      {/* 질문 분류 통계 현황 */}
+      {currentSession && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              📊 질문 분류 통계 현황 <span className="text-xs font-normal text-gray-400">· 총 {filtered.length}개</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const s = summarizeQuestionTypes(filtered);
+              const pct = (n: number) => (s.total ? Math.round((n / s.total) * 100) : 0);
+              const bars = (items: { name: string; value: number; color: string }[]) =>
+                items.map((it) => (
+                  <div key={it.name} className="flex items-center gap-2 mb-1.5">
+                    <span className="w-12 shrink-0 text-xs text-gray-500">{it.name}</span>
+                    <div className="flex-1 h-3.5 rounded bg-gray-100 overflow-hidden">
+                      <div style={{ width: `${pct(it.value)}%`, background: it.color, height: "100%" }} />
+                    </div>
+                    <span className="w-16 shrink-0 text-right text-xs font-semibold text-gray-600">{it.value} ({pct(it.value)}%)</span>
+                  </div>
+                ));
+              return (
+                <div className="grid md:grid-cols-2 gap-x-8 gap-y-2">
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold mb-2">분류1 — 폐쇄형 / 개방형</p>
+                    {bars([
+                      { name: "폐쇄형", value: s.closure.closed, color: "#3b82f6" },
+                      { name: "개방형", value: s.closure.open, color: "#10b981" },
+                    ])}
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁</p>
+                    {bars([
+                      { name: "사실적", value: s.cognitive.factual, color: "#94a3b8" },
+                      { name: "개념적", value: s.cognitive.conceptual, color: "#a855f7" },
+                      { name: "논쟁적", value: s.cognitive.controversial, color: "#f97316" },
+                    ])}
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
         </Card>
       )}
 
