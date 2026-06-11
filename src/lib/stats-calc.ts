@@ -98,3 +98,24 @@ export function buildTimeline(questions: QuestionForStats[]): TimelineEntry[] {
     .map(([date, count]) => ({ date, count }))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
+
+export interface QuestionTypeSummary {
+  total: number;
+  closure: { closed: number; open: number };
+  cognitive: { factual: number; conceptual: number; controversial: number };
+}
+
+/** 질문 목록의 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 개수를 집계한다. */
+export function summarizeQuestionTypes(
+  questions: Array<{ closure: string; cognitive: string }>,
+): QuestionTypeSummary {
+  const closure = { closed: 0, open: 0 };
+  const cognitive = { factual: 0, conceptual: 0, controversial: 0 };
+  for (const q of questions) {
+    if (q.closure === "closed" || q.closure === "open") closure[q.closure]++;
+    if (q.cognitive === "factual" || q.cognitive === "conceptual" || q.cognitive === "controversial") {
+      cognitive[q.cognitive]++;
+    }
+  }
+  return { total: questions.length, closure, cognitive };
+}
