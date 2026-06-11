@@ -498,8 +498,21 @@ export default function QuestionsPage() {
                   </div>
                 )}
               </TableCell>
-              <TableCell className="max-w-xs">
-                <p className="truncate">{q.content}</p>
+              <TableCell className="max-w-sm">
+                <p className="whitespace-pre-wrap break-words text-sm">{q.content}</p>
+                {(q.comments?.length ?? 0) > 0 && (
+                  <div className="mt-1.5 space-y-1 border-l-2 border-muted pl-2">
+                    <p className="text-[11px] font-semibold text-muted-foreground">💬 댓글 {q.comments!.length}개</p>
+                    {q.comments!.slice(0, 3).map((c) => (
+                      <p key={c.id} className="text-[11px] text-muted-foreground break-words">
+                        <span className="font-medium text-foreground">{c.author.name}</span>: {c.content}
+                      </p>
+                    ))}
+                    {q.comments!.length > 3 && (
+                      <p className="text-[11px] text-muted-foreground">+{q.comments!.length - 3}개 더</p>
+                    )}
+                  </div>
+                )}
               </TableCell>
               <TableCell>
                 <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
