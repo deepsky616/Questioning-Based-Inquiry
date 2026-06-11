@@ -440,9 +440,7 @@ export default function QuestionsPage() {
       key === "cognitive" ? matchesCognitiveCategory(q.cognitive, value) : q[key] === value
     );
 
-  const currentSession = questionLookupMode === "session"
-    ? sessions.find((s) => s.id === selectedSessionId)
-    : undefined;
+  const currentSession = sessions.find((s) => s.id === selectedSessionId);
   const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
   const previewQuestions = selectedQuestions.slice(0, 3);
   const hiddenPreviewCount = Math.max(selectedQuestions.length - previewQuestions.length, 0);
@@ -880,8 +878,8 @@ export default function QuestionsPage() {
         </Card>
       )}
 
-      {/* 참여 현황 패널 */}
-      {questionLookupMode === "session" && currentSession && (
+      {/* 학생 참여 현황 */}
+      {currentSession && (
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
