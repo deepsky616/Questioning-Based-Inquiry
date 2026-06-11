@@ -35,3 +35,40 @@ export function buildSessionContextHint(subject: string, topic: string, teacherN
   parts.push("수업 중");
   return parts.join(" ");
 }
+
+interface SessionLike {
+  date: string;
+  subject: string;
+  topic: string;
+}
+
+export interface SessionFilter {
+  date?: string;
+  subject?: string;
+  topic?: string;
+}
+
+/** 세션 목록에서 날짜/교과/주제의 고유 옵션을 정렬해 추출한다(빈 값 제외). */
+export function getSessionFilterOptions<T extends SessionLike>(sessions: T[]): {
+  dates: string[];
+  subjects: string[];
+  topics: string[];
+} {
+  const uniqSorted = (values: string[]) =>
+    Array.from(new Set(values.map((v) => v.trim()).filter(Boolean))).sort();
+  return {
+    dates: uniqSorted(sessions.map((s) => s.date)),
+    subjects: uniqSorted(sessions.map((s) => s.subject)),
+    topics: uniqSorted(sessions.map((s) => s.topic)),
+  };
+}
+
+/** 날짜/교과/주제 필터로 세션을 거른다(빈 필터는 무시). */
+export function filterSessions<T extends SessionLike>(sessions: T[], filter: SessionFilter): T[] {
+  return sessions.filter(
+    (s) =>
+      (!filter.date || s.date === filter.date) &&
+      (!filter.subject || s.subject === filter.subject) &&
+      (!filter.topic || s.topic === filter.topic),
+  );
+}
