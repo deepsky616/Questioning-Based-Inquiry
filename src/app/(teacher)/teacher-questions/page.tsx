@@ -796,88 +796,6 @@ export default function QuestionsPage() {
         </div>
       )}
 
-      {/* 세션 선택 시 통계 카드 */}
-      {currentSession && (
-        <Card className="bg-indigo-50 border-indigo-200">
-          <CardContent className="pt-4 pb-3">
-            <p className="text-sm font-semibold text-indigo-800 mb-3">
-              {buildSessionLabel(currentSession.date, currentSession.subject, currentSession.topic)}
-            </p>
-            <div className="flex gap-2 flex-wrap">
-              <StatBadge label="전체" value={filtered.length} color="bg-white text-gray-700" />
-              <StatBadge label="폐쇄형" value={byType("closure", "closed").length} color="bg-blue-100 text-blue-700" />
-              <StatBadge label="개방형" value={byType("closure", "open").length} color="bg-green-100 text-green-700" />
-              <StatBadge label="사실적" value={byType("cognitive", "factual").length} color="bg-gray-100 text-gray-700" />
-              <StatBadge label="개념적" value={byType("cognitive", "conceptual").length} color="bg-purple-100 text-purple-700" />
-              <StatBadge label="논쟁적" value={byType("cognitive", "controversial").length} color="bg-orange-100 text-orange-700" />
-            </div>
-            <div className="mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isAnalyzingSession}
-                onClick={handleAnalyzeSession}
-                className="border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100"
-              >
-                {isAnalyzingSession ? "분석 중..." : "✦ AI 세션 분석"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {currentSession && (sessionAnalysis || sessionAnalysisError) && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">AI 세션 분석 결과</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {sessionAnalysisError ? (
-              <p className="text-sm text-red-600">{sessionAnalysisError}</p>
-            ) : sessionAnalysis ? (
-              <>
-                <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1">
-                    질문 {sessionAnalysis.totalQuestions}개
-                  </span>
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1">
-                    댓글 {sessionAnalysis.totalComments ?? 0}개
-                  </span>
-                </div>
-                <div className="rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-800">
-                  {sessionAnalysis.summary}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {sessionAnalysis.themes.map((theme) => (
-                    <span
-                      key={theme}
-                      className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700"
-                    >
-                      {theme}
-                    </span>
-                  ))}
-                </div>
-                <div className="rounded-lg bg-amber-50 p-4">
-                  <p className="text-xs font-semibold text-amber-800">교사 시사점</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950">
-                    {sessionAnalysis.insights}
-                  </p>
-                </div>
-                {sessionAnalysis.commentInsights && (
-                  <div className="rounded-lg bg-emerald-50 p-4">
-                    <p className="text-xs font-semibold text-emerald-800">댓글 대화 분석</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950">
-                      {sessionAnalysis.commentInsights}
-                    </p>
-                  </div>
-                )}
-              </>
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
-
       {/* 학생 참여 현황 */}
       {currentSession && (
         <Card>
@@ -990,6 +908,57 @@ export default function QuestionsPage() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* AI 세션 분석 */}
+      {currentSession && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">AI 세션 분석</CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isAnalyzingSession}
+                onClick={handleAnalyzeSession}
+                className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              >
+                {isAnalyzingSession ? "분석 중..." : "✦ 분석하기"}
+              </Button>
+            </div>
+          </CardHeader>
+          {(sessionAnalysis || sessionAnalysisError) && (
+            <CardContent className="space-y-4">
+              {sessionAnalysisError ? (
+                <p className="text-sm text-red-600">{sessionAnalysisError}</p>
+              ) : sessionAnalysis ? (
+                <>
+                  <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1">질문 {sessionAnalysis.totalQuestions}개</span>
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1">댓글 {sessionAnalysis.totalComments ?? 0}개</span>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-800">{sessionAnalysis.summary}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {sessionAnalysis.themes.map((theme) => (
+                      <span key={theme} className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">{theme}</span>
+                    ))}
+                  </div>
+                  <div className="rounded-lg bg-amber-50 p-4">
+                    <p className="text-xs font-semibold text-amber-800">교사 시사점</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950">{sessionAnalysis.insights}</p>
+                  </div>
+                  {sessionAnalysis.commentInsights && (
+                    <div className="rounded-lg bg-emerald-50 p-4">
+                      <p className="text-xs font-semibold text-emerald-800">댓글 대화 분석</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950">{sessionAnalysis.commentInsights}</p>
+                    </div>
+                  )}
+                </>
+              ) : null}
             </CardContent>
           )}
         </Card>
