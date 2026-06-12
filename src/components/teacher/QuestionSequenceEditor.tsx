@@ -93,7 +93,10 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
           <SelectTrigger className="h-9 w-56 bg-background"><SelectValue placeholder="탐구 흐름 기준" /></SelectTrigger>
           <SelectContent>
             {UNIT_FLOW_OPTIONS.map((flow) => (
-              <SelectItem key={flow.id} value={flow.id}>{flow.title}</SelectItem>
+              <SelectItem key={flow.id} value={flow.id}>
+                <span className="font-medium">{flow.title}</span>
+                <span className="ml-1.5 text-xs text-muted-foreground">{flow.axis}</span>
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -105,6 +108,19 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
           <span className="text-xs text-muted-foreground">{generatedBy === "ai" ? "AI 제안" : "기본 규칙 제안"}</span>
         )}
       </div>
+
+      {/* 선택한 탐구 흐름 설명 (용어 이해 도움) */}
+      {(() => {
+        const f = UNIT_FLOW_OPTIONS.find((x) => x.id === flowId);
+        if (!f) return null;
+        return (
+          <div className="rounded-md border bg-muted/40 p-2.5 text-xs">
+            <span className="font-semibold text-foreground">📘 {f.title}</span>
+            <span className="text-muted-foreground"> · {f.axis}</span>
+            <p className="mt-1 leading-relaxed text-muted-foreground">{f.description}</p>
+          </div>
+        );
+      })()}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
