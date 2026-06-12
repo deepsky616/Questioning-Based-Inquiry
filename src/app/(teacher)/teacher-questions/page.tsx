@@ -1010,48 +1010,6 @@ export default function QuestionsPage() {
         </Card>
       )}
 
-      {currentSession && (
-        <div className="rounded-xl border bg-white p-4">
-          <button
-            type="button"
-            onClick={() => setShowSequence((v) => !v)}
-            className="text-sm font-bold text-indigo-600"
-          >
-            {showSequence ? "▾ 질문 중심 탐구설계 닫기" : "▸ 질문 중심 탐구설계 (묶기·순서·배포)"}
-          </button>
-          {showSequence && (
-            <div className="mt-3">
-              <QuestionSequencePanel
-                sessionId={currentSession.id}
-                subject={currentSession.subject}
-                topic={currentSession.topic}
-                questions={filtered.map((q) => ({
-                  id: q.id, content: q.content, cognitive: q.cognitive, source: "student" as const,
-                }))}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
-      {currentSession && currentSession.unitDesignId && (
-        <InquiryFlowGraph
-          title="탐구 질문 관계도"
-          description="선생님의 탐구 질문이 학생 질문으로 어떻게 이어졌는지 한눈에 확인합니다"
-          subject={currentSession.subject}
-          topic={currentSession.topic}
-          sharedQuestions={Array.isArray(currentSession.sharedQuestions) ? currentSession.sharedQuestions : []}
-          studentQuestions={filtered.map((question) => ({
-            id: question.id,
-            content: question.content,
-            cognitive: question.cognitive,
-            closure: question.closure,
-            isPublic: question.isPublic,
-          }))}
-          audience="teacher"
-        />
-      )}
-
       {isLoading ? (
         <div className="text-center py-16 text-gray-400">로딩 중...</div>
       ) : viewMode === "cards" ? (
@@ -1124,6 +1082,46 @@ export default function QuestionsPage() {
             </CardContent>
           </Card>
         </>
+      )}
+
+      {/* 질문 중심 탐구설계 (질문 목록 아래) */}
+      {currentSession && (
+        <div className="rounded-xl border bg-card p-4">
+          <button
+            type="button"
+            onClick={() => setShowSequence((v) => !v)}
+            className="text-sm font-bold text-indigo-600"
+          >
+            {showSequence ? "▾ 질문 중심 탐구설계 닫기" : "▸ 질문 중심 탐구설계 (묶기·순서·배포)"}
+          </button>
+          {showSequence && (
+            <div className="mt-3">
+              <QuestionSequencePanel
+                sessionId={currentSession.id}
+                subject={currentSession.subject}
+                topic={currentSession.topic}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {currentSession && currentSession.unitDesignId && (
+        <InquiryFlowGraph
+          title="탐구 질문 관계도"
+          description="선생님의 탐구 질문이 학생 질문으로 어떻게 이어졌는지 한눈에 확인합니다"
+          subject={currentSession.subject}
+          topic={currentSession.topic}
+          sharedQuestions={Array.isArray(currentSession.sharedQuestions) ? currentSession.sharedQuestions : []}
+          studentQuestions={filtered.map((question) => ({
+            id: question.id,
+            content: question.content,
+            cognitive: question.cognitive,
+            closure: question.closure,
+            isPublic: question.isPublic,
+          }))}
+          audience="teacher"
+        />
       )}
 
       {/* 수정 다이얼로그 */}
