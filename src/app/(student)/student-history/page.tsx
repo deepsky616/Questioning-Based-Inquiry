@@ -41,6 +41,7 @@ interface Question {
   cognitiveScore: number;
   isPublic: boolean;
   createdAt: string;
+  likeCount?: number;
   comments?: Comment[];
   session?: { id: string; date: string; subject: string; topic: string } | null;
 }
@@ -58,6 +59,7 @@ export default function HistoryPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
+  const [likeSort, setLikeSort] = useState<"none" | "desc" | "asc">("none");
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [search, setSearch] = useState("");
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
@@ -128,7 +130,15 @@ export default function HistoryPage() {
     q.content.toLowerCase().includes(search.toLowerCase())
   );
 
-  const displayed = applyClassificationFilter(filtered, filterClosure, filterCognitive);
+  const classified = applyClassificationFilter(filtered, filterClosure, filterCognitive);
+  const displayed =
+    likeSort === "none"
+      ? classified
+      : [...classified].sort((a, b) =>
+          likeSort === "desc"
+            ? (b.likeCount ?? 0) - (a.likeCount ?? 0)
+            : (a.likeCount ?? 0) - (b.likeCount ?? 0)
+        );
 
   const toggleComments = async (questionId: string) => {
     if (expandedQuestionId === questionId) {
@@ -185,6 +195,7 @@ export default function HistoryPage() {
             <TableHead className="w-24">공개</TableHead>
             <TableHead className="w-32">세션</TableHead>
             <TableHead className="w-28">날짜</TableHead>
+            <TableHead className="w-16">좋아요</TableHead>
             <TableHead className="w-24">댓글</TableHead>
             <TableHead className="w-20">관리</TableHead>
           </TableRow>
@@ -225,6 +236,9 @@ export default function HistoryPage() {
                   <TableCell className="text-sm text-gray-400">
                     {new Date(q.createdAt).toLocaleDateString("ko-KR")}
                   </TableCell>
+                  <TableCell className="text-sm text-rose-500">
+                    ♥ {q.likeCount ?? 0}
+                  </TableCell>
                   <TableCell>
                     <Button
                       type="button"
@@ -255,7 +269,7 @@ export default function HistoryPage() {
                 </TableRow>
                 {isExpanded && (
                   <TableRow>
-                    <TableCell colSpan={9} className="bg-gray-50/70 px-6 py-4">
+                    <TableCell colSpan={10} className="bg-gray-50/70 px-6 py-4">
                       {isLoadingComments ? (
                         <div className="text-sm text-gray-400">댓글을 불러오는 중...</div>
                       ) : comments.length === 0 ? (
@@ -391,12 +405,30 @@ export default function HistoryPage() {
         onFilterCognitive={setFilterCognitive}
       />
 
-      {/* 전체 질문 목록 */}
+      {/* 전체 질문 목록 — 정렬(좋아요순) */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            전체 질문 목록 <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
-          </CardTitle>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <CardTitle className="text-base">
+              📝 전체 질문 목록 <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
+            </CardTitle>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">좋아요순</span>
+              <div className="flex rounded-md border overflow-hidden">
+                {(["none", "desc", "asc"] as const).map((order, i) => (
+                  <button
+                    key={order}
+                    onClick={() => setLikeSort(order)}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+                      likeSort === order ? "bg-rose-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <QuestionRows list={displayed} />
