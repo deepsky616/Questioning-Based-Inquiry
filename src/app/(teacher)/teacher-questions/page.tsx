@@ -120,6 +120,7 @@ export default function QuestionsPage() {
   const [showSequence, setShowSequence] = useState(false);
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
+  const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
 
   // 일괄 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -439,6 +440,11 @@ export default function QuestionsPage() {
     (filterClosure === "all" || q.closure === filterClosure) &&
     (filterCognitive === "all" || matchesCognitiveCategory(q.cognitive, filterCognitive))
   );
+
+  // 학생(작성자)별 질문·댓글 (참여 현황의 댓글수/상세에 사용)
+  const studentQuestions = (studentId: string) => filtered.filter((q) => q.author.id === studentId);
+  const studentCommentCount = (studentId: string) =>
+    studentQuestions(studentId).reduce((sum, q) => sum + (q.comments?.length ?? 0), 0);
 
   const currentSession = sessions.find((s) => s.id === selectedSessionId);
   const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
@@ -870,12 +876,22 @@ export default function QuestionsPage() {
                               .join(" ")}
                           </td>
                           <td className="px-3 py-2 font-medium text-gray-900">{s.name}</td>
-                          <td className="px-3 py-2 text-gray-600 max-w-xs truncate">
+                          <td className="px-3 py-2 text-gray-600 max-w-xs">
                             {s.questionContent ? (
-                              <span>
-                                &ldquo;{s.questionContent}
-                                {s.questionContent.length >= 50 ? "..." : ""}&rdquo;
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="truncate flex-1">
+                                  &ldquo;{s.questionContent}
+                                  {s.questionContent.length >= 50 ? "..." : ""}&rdquo;
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setDetailStudentId(s.id)}
+                                  title="질문과 댓글 상세 보기"
+                                  className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100"
+                                >
+                                  💬 {studentCommentCount(s.id)}
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-gray-300 text-xs">미작성</span>
                             )}
@@ -1108,6 +1124,47 @@ export default function QuestionsPage() {
           audience="teacher"
         />
       )}
+
+      {/* 학생별 질문·댓글 상세 (참여 현황 댓글수 클릭) */}
+      <Dialog open={!!detailStudentId} onOpenChange={(o) => { if (!o) setDetailStudentId(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {participation?.students.find((s) => s.id === detailStudentId)?.name ?? "학생"}의 질문과 댓글
+            </DialogTitle>
+          </DialogHeader>
+          {detailStudentId && (
+            studentQuestions(detailStudentId).length === 0 ? (
+              <p className="text-sm text-muted-foreground">작성한 질문이 없습니다.</p>
+            ) : (
+              <div className="space-y-3">
+                {studentQuestions(detailStudentId).map((q) => (
+                  <div key={q.id} className="rounded-lg border p-3">
+                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                      <span className={`text-xs px-2 py-0.5 rounded ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
+                    </div>
+                    <p className="text-sm font-medium">{q.content}</p>
+                    {q.comments && q.comments.length > 0 ? (
+                      <div className="mt-2 space-y-1.5 border-l-2 border-muted pl-3">
+                        {q.comments.map((c) => (
+                          <div key={c.id} className="text-sm">
+                            <span className="font-medium text-foreground">{c.author.name}</span>
+                            <span className="text-xs text-muted-foreground"> · {new Date(c.createdAt).toLocaleDateString("ko-KR")}</span>
+                            <p className="text-muted-foreground">{c.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-xs text-muted-foreground">아직 댓글이 없습니다</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* 수정 다이얼로그 */}
       <Dialog open={!!selectedQuestion} onOpenChange={() => setSelectedQuestion(null)}>
