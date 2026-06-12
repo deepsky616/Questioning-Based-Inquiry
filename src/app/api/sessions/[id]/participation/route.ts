@@ -77,19 +77,37 @@ export async function GET(
     // 7. 해당 세션의 모든 질문 조회
     const questions = await prisma.question.findMany({
       where: { sessionId: id },
-      select: { authorId: true, content: true },
+      select: { id: true, authorId: true, content: true },
     });
 
     // 8. 질문을 제출한 학생 ID Set 생성
     const submittedIds = new Set(questions.map((q) => q.authorId));
 
-    // 9. 학생 목록에 hasQuestion 및 questionContent 추가
+    // 8-1. 이 세션 질문들에 달린 댓글 / 좋아요 (학생별 활동 집계용)
+    const sessionQuestionIds = questions.map((q) => q.id);
+    const comments = sessionQuestionIds.length
+      ? await prisma.comment.findMany({
+          where: { questionId: { in: sessionQuestionIds } },
+          select: { authorId: true },
+        })
+      : [];
+    const likes = sessionQuestionIds.length
+      ? await prisma.questionLike.findMany({
+          where: { questionId: { in: sessionQuestionIds } },
+          select: { userId: true },
+        })
+      : [];
+
+    // 9. 학생별 활동 집계
     const studentList = students.map((s) => ({
       ...s,
       hasQuestion: submittedIds.has(s.id),
       questionContent:
         questions.find((q) => q.authorId === s.id)?.content?.slice(0, 50) ??
         null,
+      questionCount: questions.filter((q) => q.authorId === s.id).length,
+      commentCount: comments.filter((c) => c.authorId === s.id).length,
+      likeCount: likes.filter((l) => l.userId === s.id).length,
     }));
 
     // 10. 응답 반환
