@@ -449,29 +449,6 @@ export default function ExplorePage() {
             날짜·교과·주제별 조회
           </button>
         </div>
-
-        {/* 좋아요 정렬 */}
-        <div className="flex items-center gap-1.5 ml-auto">
-          <span className="text-xs text-gray-500">좋아요순</span>
-          <div className="flex rounded-md border border-gray-200 overflow-hidden">
-            {(["none", "desc", "asc"] as LikeSortOrder[]).map((order, i) => (
-              <button
-                key={order}
-                onClick={() => handleLikeSortChange(order)}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                  i > 0 ? "border-l border-gray-200" : ""
-                } ${
-                  likeSort === order
-                    ? "bg-rose-500 text-white"
-                    : "bg-white text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
-              </button>
-            ))}
-          </div>
-          <span className="text-sm text-gray-500">{filtered.length}개</span>
-        </div>
       </div>
 
       {/* 세션별 조회 UI */}
@@ -587,13 +564,31 @@ export default function ExplorePage() {
         onFilterCognitive={setFilterCognitive}
       />
 
-      {/* 전체 질문 목록 */}
+      {/* 전체 질문 목록 — 정렬(좋아요순) */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            전체 질문 목록{" "}
-            <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
-          </CardTitle>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <CardTitle className="text-base">
+              📝 전체 질문 목록{" "}
+              <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
+            </CardTitle>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">좋아요순</span>
+              <div className="flex rounded-md border overflow-hidden">
+                {(["none", "desc", "asc"] as LikeSortOrder[]).map((order, i) => (
+                  <button
+                    key={order}
+                    onClick={() => handleLikeSortChange(order)}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+                      likeSort === order ? "bg-rose-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <QuestionList list={displayed} />
