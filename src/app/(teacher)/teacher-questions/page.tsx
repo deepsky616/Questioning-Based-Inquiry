@@ -695,56 +695,6 @@ export default function QuestionsPage() {
         <p className="text-gray-600">세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
       </div>
 
-      {/* 정렬·뷰 모드 */}
-      <div className="flex items-center gap-3 flex-wrap justify-end">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-500">좋아요순</span>
-          <div className="flex rounded-md border border-gray-200 overflow-hidden">
-            {(["none", "desc", "asc"] as const).map((order, i) => (
-              <button
-                key={order}
-                onClick={() => {
-                  setLikeSort(order);
-                  fetchQuestions(selectedSessionId, { likeSort: order });
-                }}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                  i > 0 ? "border-l border-gray-200" : ""
-                } ${
-                  likeSort === order
-                    ? "bg-rose-500 text-white"
-                    : "bg-white text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
-              </button>
-            ))}
-          </div>
-        </div>
-        <span className="text-sm text-gray-500">{filtered.length}개</span>
-        <div className="flex rounded-md border border-gray-200 overflow-hidden">
-          <button
-            onClick={() => setViewMode("table")}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              viewMode === "table"
-                ? "bg-indigo-600 text-white"
-                : "bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            ☰ 목록
-          </button>
-          <button
-            onClick={() => setViewMode("cards")}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
-              viewMode === "cards"
-                ? "bg-indigo-600 text-white"
-                : "bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            ▦ 질문·댓글
-          </button>
-        </div>
-      </div>
-
       {/* 수업 세션 선택: 날짜·교과·주제로 좁혀서 단일 세션 선택 */}
       {sessions.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-400">
@@ -1029,6 +979,52 @@ export default function QuestionsPage() {
         </Card>
       )}
 
+      {/* 전체 질문 목록 — 정렬(좋아요순) · 보기 방식(목록/질문·댓글) */}
+      {currentSession && (
+        <div className="flex items-center gap-3 flex-wrap justify-between">
+          <span className="text-sm font-semibold text-foreground">📝 전체 질문 목록 <span className="font-normal text-muted-foreground">{filtered.length}개</span></span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">좋아요순</span>
+              <div className="flex rounded-md border overflow-hidden">
+                {(["none", "desc", "asc"] as const).map((order, i) => (
+                  <button
+                    key={order}
+                    onClick={() => {
+                      setLikeSort(order);
+                      fetchQuestions(selectedSessionId, { likeSort: order });
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+                      likeSort === order ? "bg-rose-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex rounded-md border overflow-hidden">
+              <button
+                onClick={() => setViewMode("table")}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  viewMode === "table" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                ☰ 목록
+              </button>
+              <button
+                onClick={() => setViewMode("cards")}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors border-l ${
+                  viewMode === "cards" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                ▦ 질문·댓글
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="text-center py-16 text-gray-400">로딩 중...</div>
       ) : viewMode === "cards" ? (
@@ -1056,13 +1052,7 @@ export default function QuestionsPage() {
       ) : (
         /* ── 전체 질문 목록: 분류1/분류2 필터 ── */
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">
-              전체 질문 목록
-              <span className="ml-2 text-sm font-normal text-muted-foreground">{displayed.length}개</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             {/* 분류 필터 칩 (통계 막대 클릭과 연동) */}
             <div className="flex flex-wrap items-center gap-1.5 mb-3">
               <span className="text-xs text-muted-foreground mr-0.5">분류1</span>
