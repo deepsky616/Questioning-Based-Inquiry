@@ -842,8 +842,8 @@ export default function QuestionsPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="text-left px-3 py-2 font-medium text-gray-600">학생</th>
                       <th className="text-left px-3 py-2 font-medium text-gray-600 w-24">학년·반·번호</th>
+                      <th className="text-left px-3 py-2 font-medium text-gray-600">학생</th>
                       <th className="text-left px-3 py-2 font-medium text-gray-600">질문 내용</th>
                       <th className="text-center px-3 py-2 font-medium text-gray-600 w-14">제출</th>
                     </tr>
@@ -859,7 +859,6 @@ export default function QuestionsPage() {
                       )
                       .map((s) => (
                         <tr key={s.id} className={s.hasQuestion ? "bg-white" : "bg-gray-50/50"}>
-                          <td className="px-3 py-2 font-medium text-gray-900">{s.name}</td>
                           <td className="px-3 py-2 text-xs text-gray-500">
                             {[
                               s.grade && `${s.grade}학년`,
@@ -869,6 +868,7 @@ export default function QuestionsPage() {
                               .filter(Boolean)
                               .join(" ")}
                           </td>
+                          <td className="px-3 py-2 font-medium text-gray-900">{s.name}</td>
                           <td className="px-3 py-2 text-gray-600 max-w-xs truncate">
                             {s.questionContent ? (
                               <span>
