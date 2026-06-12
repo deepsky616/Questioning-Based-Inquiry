@@ -205,7 +205,7 @@ function QuestionCard({
     <div
       className={
         isTeacherShared
-          ? "rounded-lg border-2 border-indigo-300 overflow-hidden bg-gradient-to-br from-indigo-50/60 to-white"
+          ? "rounded-lg border-2 border-indigo-300 overflow-hidden bg-gradient-to-br from-indigo-50/60 to-white dark:bg-none dark:bg-card"
           : "rounded-lg border border-gray-200 overflow-hidden"
       }
     >
