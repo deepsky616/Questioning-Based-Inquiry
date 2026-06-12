@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { BUILT_IN_GAMES } from "@/lib/question-games-data";
@@ -67,6 +67,18 @@ const ROOM_GAME_MAP: Record<string, RoomGameComponent> = {
 
 export default function GamePage({ params }: { params: { gameId: string } }) {
   const { gameId } = params;
+
+  // 질문놀이 게임 화면은 알록달록한 밝은 디자인(인라인 색 다수)이라,
+  // 다크 테마에서 글씨가 안 보이는 문제를 막기 위해 플레이 동안 라이트 모드로 고정한다.
+  useEffect(() => {
+    const html = document.documentElement;
+    const wasDark = html.classList.contains("dark");
+    if (wasDark) html.classList.remove("dark");
+    return () => {
+      if (wasDark) html.classList.add("dark");
+    };
+  }, []);
+
   const router = useRouter();
   const { data: session } = useSession();
   const myId = (session?.user as { id?: string } | undefined)?.id ?? "";

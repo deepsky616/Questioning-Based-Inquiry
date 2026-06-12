@@ -19,9 +19,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import DatePicker from "@/components/shared/DatePicker";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
+import { summarizeQuestionTypes } from "@/lib/stats-calc";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -31,7 +31,7 @@ import {
   matchesCognitiveCategory,
   normalizeCognitiveType,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
 
 interface QuestionSession {
@@ -141,8 +141,6 @@ export default function QuestionsPage() {
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("");
 
-  // 조회 모드: 세션별 | 세부(날짜·교과·주제)
-  const [questionLookupMode, setQuestionLookupMode] = useState<"session" | "detail">("session");
 
   // 날짜·교과·주제 필터 (세부 조회 모드용)
   const [filterDate, setFilterDate] = useState("");
@@ -206,36 +204,22 @@ export default function QuestionsPage() {
     fetchQuestions(val);
   };
 
-  const handleLookupModeChange = (mode: "session" | "detail") => {
-    setQuestionLookupMode(mode);
-    setSessionAnalysis(null);
-    setSessionAnalysisError(null);
-    setParticipation(null);
-    setShowParticipation(false);
-    resetBulkState();
-    if (mode === "session") {
-      if (selectedSessionId) fetchQuestions(selectedSessionId);
-      else setQuestions([]);
-    } else {
-      fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
+  // 날짜·교과·주제 필터로 세션 목록을 좁힌다(질문 직접 조회가 아니라 세션을 고르는 보조 필터)
+  const filterOptions = getSessionFilterOptions(sessions);
+  const filteredSessions = filterSessions(sessions, {
+    date: filterDate || undefined,
+    subject: filterSubject || undefined,
+    topic: filterTopic || undefined,
+  });
+
+  // 필터 변경으로 현재 선택 세션이 목록 밖이면 첫 세션으로 보정
+  useEffect(() => {
+    if (filteredSessions.length === 0) return;
+    if (!filteredSessions.some((s) => s.id === selectedSessionId)) {
+      handleSessionChange(filteredSessions[0].id);
     }
-  };
-
-  const handleApplyFilter = () => {
-    resetBulkState();
-    fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
-  };
-
-  const handleClearFilter = () => {
-    setFilterDate("");
-    setFilterSubject("");
-    setFilterTopic("");
-    resetBulkState();
-    fetchQuestions("all");
-  };
-
-  const hasActiveFilter = !!(filterDate.trim() || filterSubject.trim() || filterTopic.trim());
-  const uniqueSubjects = Array.from(new Set(sessions.map((s) => s.subject).filter(Boolean))).sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterDate, filterSubject, filterTopic]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -351,11 +335,7 @@ export default function QuestionsPage() {
         setSelectedIds(new Set());
         setBulkMsg(null);
         setShowBulkSuccess(false);
-        if (questionLookupMode === "session") {
-          fetchQuestions(selectedSessionId);
-        } else {
-          fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
-        }
+        fetchQuestions(selectedSessionId);
       }, 2000);
     } catch (err) {
       setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
@@ -387,11 +367,7 @@ export default function QuestionsPage() {
 
       setSelectedQuestion(null);
       setComment("");
-      if (questionLookupMode === "session") {
-        fetchQuestions(selectedSessionId);
-      } else {
-        fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic });
-      }
+      fetchQuestions(selectedSessionId);
     } catch (err) {
       setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : "저장에 실패했습니다" });
     } finally {
@@ -463,9 +439,7 @@ export default function QuestionsPage() {
       key === "cognitive" ? matchesCognitiveCategory(q.cognitive, value) : q[key] === value
     );
 
-  const currentSession = questionLookupMode === "session"
-    ? sessions.find((s) => s.id === selectedSessionId)
-    : undefined;
+  const currentSession = sessions.find((s) => s.id === selectedSessionId);
   const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
   const previewQuestions = selectedQuestions.slice(0, 3);
   const hiddenPreviewCount = Math.max(selectedQuestions.length - previewQuestions.length, 0);
@@ -497,7 +471,6 @@ export default function QuestionsPage() {
             </TableHead>
             <TableHead>학생</TableHead>
             <TableHead>질문 내용</TableHead>
-            {questionLookupMode === "detail" && <TableHead className="w-36">세션</TableHead>}
             <TableHead className="w-20">폐쇄/개방</TableHead>
             <TableHead className="w-24">인지 수준</TableHead>
             <TableHead className="w-16 text-center">좋아요</TableHead>
@@ -525,20 +498,22 @@ export default function QuestionsPage() {
                   </div>
                 )}
               </TableCell>
-              <TableCell className="max-w-xs">
-                <p className="truncate">{q.content}</p>
+              <TableCell className="max-w-sm">
+                <p className="whitespace-pre-wrap break-words text-sm">{q.content}</p>
+                {(q.comments?.length ?? 0) > 0 && (
+                  <div className="mt-1.5 space-y-1 border-l-2 border-muted pl-2">
+                    <p className="text-[11px] font-semibold text-muted-foreground">💬 댓글 {q.comments!.length}개</p>
+                    {q.comments!.slice(0, 3).map((c) => (
+                      <p key={c.id} className="text-[11px] text-muted-foreground break-words">
+                        <span className="font-medium text-foreground">{c.author.name}</span>: {c.content}
+                      </p>
+                    ))}
+                    {q.comments!.length > 3 && (
+                      <p className="text-[11px] text-muted-foreground">+{q.comments!.length - 3}개 더</p>
+                    )}
+                  </div>
+                )}
               </TableCell>
-              {questionLookupMode === "detail" && (
-                <TableCell>
-                  {q.session ? (
-                    <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded">
-                      {buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-gray-400">세션 없음</span>
-                  )}
-                </TableCell>
-              )}
               <TableCell>
                 <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
                   {CLOSURE_LABEL[q.closure]}
@@ -713,254 +688,116 @@ export default function QuestionsPage() {
         <p className="text-gray-600">세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
       </div>
 
-      {/* 조회 모드 전환 */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* 정렬·뷰 모드 */}
+      <div className="flex items-center gap-3 flex-wrap justify-end">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-gray-500">좋아요순</span>
+          <div className="flex rounded-md border border-gray-200 overflow-hidden">
+            {(["none", "desc", "asc"] as const).map((order, i) => (
+              <button
+                key={order}
+                onClick={() => {
+                  setLikeSort(order);
+                  fetchQuestions(selectedSessionId, { likeSort: order });
+                }}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  i > 0 ? "border-l border-gray-200" : ""
+                } ${
+                  likeSort === order
+                    ? "bg-rose-500 text-white"
+                    : "bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <span className="text-sm text-gray-500">{filtered.length}개</span>
         <div className="flex rounded-md border border-gray-200 overflow-hidden">
           <button
-            onClick={() => handleLookupModeChange("session")}
-            className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-              questionLookupMode === "session"
+            onClick={() => setViewMode("table")}
+            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+              viewMode === "table"
                 ? "bg-indigo-600 text-white"
                 : "bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
-            세션별 조회
+            ☰ 목록
           </button>
           <button
-            onClick={() => handleLookupModeChange("detail")}
-            className={`px-4 py-1.5 text-sm font-medium transition-colors border-l border-gray-200 ${
-              questionLookupMode === "detail"
+            onClick={() => setViewMode("cards")}
+            className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
+              viewMode === "cards"
                 ? "bg-indigo-600 text-white"
                 : "bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
-            날짜·교과·주제별 조회
+            ▦ 질문·댓글
           </button>
-        </div>
-        <div className="ml-auto flex items-center gap-3 flex-wrap">
-          {/* 좋아요 정렬 */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-gray-500">좋아요순</span>
-            <div className="flex rounded-md border border-gray-200 overflow-hidden">
-              {(["none", "desc", "asc"] as const).map((order, i) => (
-                <button
-                  key={order}
-                  onClick={() => {
-                    setLikeSort(order);
-                    if (questionLookupMode === "session") {
-                      fetchQuestions(selectedSessionId, { likeSort: order });
-                    } else {
-                      fetchQuestions("all", { date: filterDate, subject: filterSubject, topic: filterTopic, likeSort: order });
-                    }
-                  }}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                    i > 0 ? "border-l border-gray-200" : ""
-                  } ${
-                    likeSort === order
-                      ? "bg-rose-500 text-white"
-                      : "bg-white text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <span className="text-sm text-gray-500">{filtered.length}개</span>
-          <div className="flex rounded-md border border-gray-200 overflow-hidden">
-            <button
-              onClick={() => setViewMode("table")}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                viewMode === "table"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              ☰ 목록
-            </button>
-            <button
-              onClick={() => setViewMode("cards")}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-200 ${
-                viewMode === "cards"
-                  ? "bg-indigo-600 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              ▦ 질문·댓글
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* 세션별 조회: 세션 Select */}
-      {questionLookupMode === "session" && (
-        sessions.length === 0 ? (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-400">
-            등록된 세션이 없습니다. 세션을 먼저 추가해 주세요.
-          </div>
-        ) : (
-          <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-            <SelectTrigger className="w-80">
-              <SelectValue placeholder="세션 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              {sessions.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {buildSessionLabel(s.date, s.subject, s.topic)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )
-      )}
-
-      {/* 세부 조회: 날짜·교과·주제 필터 */}
-      {questionLookupMode === "detail" && (
-        <div className={`rounded-lg border p-3 ${hasActiveFilter ? "border-indigo-200 bg-indigo-50" : "border-gray-200 bg-gray-50"}`}>
+      {/* 수업 세션 선택: 날짜·교과·주제로 좁혀서 단일 세션 선택 */}
+      {sessions.length === 0 ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-400">
+          등록된 세션이 없습니다. 세션을 먼저 추가해 주세요.
+        </div>
+      ) : (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1 w-40">
+            <div className="flex flex-col gap-1 w-36">
               <label className="text-xs font-medium text-gray-600">날짜</label>
-              <DatePicker
-                value={filterDate}
-                onChange={setFilterDate}
-              />
+              <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 날짜</SelectItem>
+                  {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex flex-col gap-1 w-32">
               <label className="text-xs font-medium text-gray-600">교과</label>
-              {uniqueSubjects.length > 0 ? (
-                <Select
-                  value={filterSubject || "__all__"}
-                  onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}
-                >
-                  <SelectTrigger className="h-8 text-sm w-36 bg-white">
-                    <SelectValue placeholder="전체" />
-                  </SelectTrigger>
+              <Select value={filterSubject || "__all__"} onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 교과</SelectItem>
+                  {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 w-52">
+              <label className="text-xs font-medium text-gray-600">주제</label>
+              <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 주제</SelectItem>
+                  {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-0 flex-1">
+              <label className="text-xs font-medium text-gray-600">세션</label>
+              {filteredSessions.length === 0 ? (
+                <div className="h-8 flex items-center text-sm text-gray-400">조건에 맞는 세션이 없습니다</div>
+              ) : (
+                <Select value={selectedSessionId} onValueChange={handleSessionChange}>
+                  <SelectTrigger className="bg-white font-medium"><SelectValue placeholder="세션 선택" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">전체</SelectItem>
-                    {uniqueSubjects.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    {filteredSessions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              ) : (
-                <Input
-                  placeholder="예: 과학"
-                  value={filterSubject}
-                  onChange={(e) => setFilterSubject(e.target.value)}
-                  className="h-8 text-sm w-32 bg-white"
-                />
               )}
             </div>
-            <div className="flex flex-col gap-1 min-w-0">
-              <label className="text-xs font-medium text-gray-600">주제</label>
-              <Input
-                placeholder="예: 광합성과 에너지, 지구의 역사"
-                value={filterTopic}
-                onChange={(e) => setFilterTopic(e.target.value)}
-                className="h-8 text-sm w-64 bg-white"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" className="h-8" onClick={handleApplyFilter}>
-                조회
-              </Button>
-              {hasActiveFilter && (
-                <Button size="sm" variant="outline" className="h-8" onClick={handleClearFilter}>
-                  초기화
-                </Button>
-              )}
-            </div>
-            {hasActiveFilter && (
-              <span className="text-xs text-indigo-600 font-medium self-end pb-0.5">필터 적용 중</span>
-            )}
           </div>
+          <p className="text-xs text-gray-400 mt-2">💡 날짜·교과·주제로 좁혀도, 직접 세션을 골라도 결과는 같습니다.</p>
         </div>
       )}
 
-      {/* 세션 선택 시 통계 카드 */}
+      {/* 학생 참여 현황 */}
       {currentSession && (
-        <Card className="bg-indigo-50 border-indigo-200">
-          <CardContent className="pt-4 pb-3">
-            <p className="text-sm font-semibold text-indigo-800 mb-3">
-              {buildSessionLabel(currentSession.date, currentSession.subject, currentSession.topic)}
-            </p>
-            <div className="flex gap-2 flex-wrap">
-              <StatBadge label="전체" value={filtered.length} color="bg-white text-gray-700" />
-              <StatBadge label="폐쇄형" value={byType("closure", "closed").length} color="bg-blue-100 text-blue-700" />
-              <StatBadge label="개방형" value={byType("closure", "open").length} color="bg-green-100 text-green-700" />
-              <StatBadge label="사실적" value={byType("cognitive", "factual").length} color="bg-gray-100 text-gray-700" />
-              <StatBadge label="개념적" value={byType("cognitive", "conceptual").length} color="bg-purple-100 text-purple-700" />
-              <StatBadge label="논쟁적" value={byType("cognitive", "controversial").length} color="bg-orange-100 text-orange-700" />
-            </div>
-            <div className="mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isAnalyzingSession}
-                onClick={handleAnalyzeSession}
-                className="border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-100"
-              >
-                {isAnalyzingSession ? "분석 중..." : "✦ AI 세션 분석"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {currentSession && (sessionAnalysis || sessionAnalysisError) && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">AI 세션 분석 결과</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {sessionAnalysisError ? (
-              <p className="text-sm text-red-600">{sessionAnalysisError}</p>
-            ) : sessionAnalysis ? (
-              <>
-                <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1">
-                    질문 {sessionAnalysis.totalQuestions}개
-                  </span>
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1">
-                    댓글 {sessionAnalysis.totalComments ?? 0}개
-                  </span>
-                </div>
-                <div className="rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-800">
-                  {sessionAnalysis.summary}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {sessionAnalysis.themes.map((theme) => (
-                    <span
-                      key={theme}
-                      className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700"
-                    >
-                      {theme}
-                    </span>
-                  ))}
-                </div>
-                <div className="rounded-lg bg-amber-50 p-4">
-                  <p className="text-xs font-semibold text-amber-800">교사 시사점</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950">
-                    {sessionAnalysis.insights}
-                  </p>
-                </div>
-                {sessionAnalysis.commentInsights && (
-                  <div className="rounded-lg bg-emerald-50 p-4">
-                    <p className="text-xs font-semibold text-emerald-800">댓글 대화 분석</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950">
-                      {sessionAnalysis.commentInsights}
-                    </p>
-                  </div>
-                )}
-              </>
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* 참여 현황 패널 */}
-      {questionLookupMode === "session" && currentSession && (
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -1076,6 +913,103 @@ export default function QuestionsPage() {
         </Card>
       )}
 
+      {/* AI 세션 분석 */}
+      {currentSession && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">AI 세션 분석</CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isAnalyzingSession}
+                onClick={handleAnalyzeSession}
+                className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              >
+                {isAnalyzingSession ? "분석 중..." : "✦ 분석하기"}
+              </Button>
+            </div>
+          </CardHeader>
+          {(sessionAnalysis || sessionAnalysisError) && (
+            <CardContent className="space-y-4">
+              {sessionAnalysisError ? (
+                <p className="text-sm text-red-600">{sessionAnalysisError}</p>
+              ) : sessionAnalysis ? (
+                <>
+                  <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1">질문 {sessionAnalysis.totalQuestions}개</span>
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1">댓글 {sessionAnalysis.totalComments ?? 0}개</span>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-800">{sessionAnalysis.summary}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {sessionAnalysis.themes.map((theme) => (
+                      <span key={theme} className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">{theme}</span>
+                    ))}
+                  </div>
+                  <div className="rounded-lg bg-amber-50 p-4">
+                    <p className="text-xs font-semibold text-amber-800">교사 시사점</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950">{sessionAnalysis.insights}</p>
+                  </div>
+                  {sessionAnalysis.commentInsights && (
+                    <div className="rounded-lg bg-emerald-50 p-4">
+                      <p className="text-xs font-semibold text-emerald-800">댓글 대화 분석</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950">{sessionAnalysis.commentInsights}</p>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* 질문 분류 통계 현황 */}
+      {currentSession && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              📊 질문 분류 통계 현황 <span className="text-xs font-normal text-gray-400">· 총 {filtered.length}개</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const s = summarizeQuestionTypes(filtered);
+              const pct = (n: number) => (s.total ? Math.round((n / s.total) * 100) : 0);
+              const bars = (items: { name: string; value: number; color: string }[]) =>
+                items.map((it) => (
+                  <div key={it.name} className="flex items-center gap-2 mb-1.5">
+                    <span className="w-12 shrink-0 text-xs text-gray-500">{it.name}</span>
+                    <div className="flex-1 h-3.5 rounded bg-gray-100 overflow-hidden">
+                      <div style={{ width: `${pct(it.value)}%`, background: it.color, height: "100%" }} />
+                    </div>
+                    <span className="w-16 shrink-0 text-right text-xs font-semibold text-gray-600">{it.value} ({pct(it.value)}%)</span>
+                  </div>
+                ));
+              return (
+                <div className="grid md:grid-cols-2 gap-x-8 gap-y-2">
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold mb-2">분류1 — 폐쇄형 / 개방형</p>
+                    {bars([
+                      { name: "폐쇄형", value: s.closure.closed, color: "#3b82f6" },
+                      { name: "개방형", value: s.closure.open, color: "#10b981" },
+                    ])}
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁</p>
+                    {bars([
+                      { name: "사실적", value: s.cognitive.factual, color: "#94a3b8" },
+                      { name: "개념적", value: s.cognitive.conceptual, color: "#a855f7" },
+                      { name: "논쟁적", value: s.cognitive.controversial, color: "#f97316" },
+                    ])}
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
+
       {currentSession && (
         <div className="rounded-xl border bg-white p-4">
           <button
@@ -1125,55 +1059,9 @@ export default function QuestionsPage() {
         <div className="space-y-8">
           {filtered.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">
-              {questionLookupMode === "session" && !selectedSessionId
-                ? "세션을 선택해 주세요"
-                : "해당하는 질문이 없습니다"}
+              {!selectedSessionId ? "세션을 선택해 주세요" : "해당하는 질문이 없습니다"}
             </div>
-          ) : questionLookupMode === "detail" ? (
-            <>
-              {sessions.map((s) => {
-                const sessionQuestions = filtered.filter((q) => q.sessionId === s.id);
-                if (sessionQuestions.length === 0) return null;
-                return (
-                  <div key={s.id}>
-                    <div className="mb-3 flex items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm shadow-sm">
-                        📅
-                      </span>
-                      <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-indigo-700 shadow-sm">
-                        {buildSessionLabel(s.date, s.subject, s.topic)}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {sessionQuestions.length}개 질문 · 댓글 있는 질문 {countQuestionsWithComments(sessionQuestions)}개
-                      </span>
-                    </div>
-                    <QuestionCommentCards list={sessionQuestions} />
-                  </div>
-                );
-              })}
-              {(() => {
-                const noSession = filtered.filter((q) => !q.sessionId);
-                if (noSession.length === 0) return null;
-                return (
-                  <div>
-                    <div className="mb-3 flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm shadow-sm">
-                        📁
-                      </span>
-                      <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-gray-600 shadow-sm">
-                        세션 없는 질문
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {noSession.length}개 질문 · 댓글 있는 질문 {countQuestionsWithComments(noSession)}개
-                      </span>
-                    </div>
-                    <QuestionCommentCards list={noSession} />
-                  </div>
-                );
-              })()}
-            </>
           ) : (
-            /* 특정 세션 또는 세션 없음 */
             <div>
               {currentSession && (
                 <div className="flex items-center gap-3 mb-3">
@@ -1186,131 +1074,8 @@ export default function QuestionsPage() {
             </div>
           )}
         </div>
-      ) : questionLookupMode === "session" ? (
-        /* ── 세션별 조회 ── */
-        !currentSession ? (
-          <div className="text-center py-16 text-gray-400 text-sm">세션을 선택해 주세요</div>
-        ) : (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">
-              전체 질문 목록
-              <span className="ml-2 text-sm font-normal text-gray-500">
-                {filtered.length}개
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {filtered.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-sm">
-                이 세션에 등록된 질문이 없습니다
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="w-8">
-                      <input
-                        type="checkbox"
-                        checked={filtered.length > 0 && filtered.every((q) => selectedIds.has(q.id))}
-                        onChange={() =>
-                          filtered.every((q) => selectedIds.has(q.id))
-                            ? clearSelection()
-                            : selectAll(filtered)
-                        }
-                        className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
-                      />
-                    </TableHead>
-                    <TableHead className="w-28">학생</TableHead>
-                    <TableHead>질문 내용</TableHead>
-                    <TableHead className="w-20 text-center">폐쇄/개방</TableHead>
-                    <TableHead className="w-24 text-center">인지 수준</TableHead>
-                    <TableHead className="w-16 text-center">좋아요</TableHead>
-                    <TableHead className="w-20 text-center">공개</TableHead>
-                    <TableHead className="w-16 text-center">수정</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((q, i) => (
-                    <TableRow
-                      key={q.id}
-                      className={selectedIds.has(q.id) ? "bg-indigo-50/40" : i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
-                    >
-                      <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(q.id)}
-                          onChange={() => toggleSelect(q.id)}
-                          className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm font-medium">{q.author.name}</div>
-                        {q.author.className && (
-                          <div className="text-xs text-gray-400">
-                            {q.author.grade && `${q.author.grade}학년 `}
-                            {q.author.className}반
-                            {q.author.studentNumber && ` ${q.author.studentNumber}번`}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <p className="text-sm leading-snug whitespace-pre-wrap break-words max-w-md">
-                          {q.content}
-                        </p>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={`text-xs px-2 py-1 rounded font-medium ${CLOSURE_STYLE[q.closure]}`}>
-                          {CLOSURE_LABEL[q.closure]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className={`text-xs px-2 py-1 rounded font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
-                          {COGNITIVE_LABEL[q.cognitive]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="group relative inline-block">
-                          <span className="flex items-center gap-1 text-sm font-medium text-rose-500 justify-center">
-                            ❤️ {q.likeCount}
-                          </span>
-                          {(q.likedBy?.length ?? 0) > 0 && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-36 shadow-lg">
-                              <p className="font-semibold mb-1">좋아요한 학생</p>
-                              {q.likedBy!.map((u) => (
-                                <p key={u.id} className="truncate">{u.name}</p>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch
-                          checked={q.isPublic}
-                          onCheckedChange={() => handleToggleQuestionPublic(q)}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedQuestion(q);
-                            setCorrectionClosure(q.closure);
-                            setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
-                          }}
-                        >
-                          수정
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-        )
+      ) : !currentSession ? (
+        <div className="text-center py-16 text-gray-400 text-sm">세션을 선택해 주세요</div>
       ) : (
         /* ── 날짜·교과·주제별 조회: 분류별 탭 ── */
         <>
