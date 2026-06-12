@@ -77,6 +77,9 @@ interface ParticipantStudent {
   studentNumber: string | null;
   hasQuestion: boolean;
   questionContent: string | null;
+  questionCount: number;
+  commentCount: number;
+  likeCount: number;
 }
 
 interface ParticipationData {
@@ -120,7 +123,6 @@ export default function QuestionsPage() {
   const [showSequence, setShowSequence] = useState(false);
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
-  const [detailStudentId, setDetailStudentId] = useState<string | null>(null);
 
   // 일괄 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -193,7 +195,10 @@ export default function QuestionsPage() {
         }
       })
       .catch(() => setIsLoading(false));
-  }, [fetchQuestions]);
+    // 세션 목록은 최초 1회만 로드한다. (fetchQuestions가 likeSort로 재생성돼도
+    // 재실행되어 선택 세션이 초기화되지 않도록 deps를 비운다)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);
@@ -441,11 +446,6 @@ export default function QuestionsPage() {
     (filterCognitive === "all" || matchesCognitiveCategory(q.cognitive, filterCognitive))
   );
 
-  // 학생(작성자)별 질문·댓글 (참여 현황의 댓글수/상세에 사용)
-  const studentQuestions = (studentId: string) => filtered.filter((q) => q.author.id === studentId);
-  const studentCommentCount = (studentId: string) =>
-    studentQuestions(studentId).reduce((sum, q) => sum + (q.comments?.length ?? 0), 0);
-
   const currentSession = sessions.find((s) => s.id === selectedSessionId);
   const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
   const previewQuestions = selectedQuestions.slice(0, 3);
@@ -505,21 +505,23 @@ export default function QuestionsPage() {
                   </div>
                 )}
               </TableCell>
-              <TableCell className="max-w-sm">
-                <p className="whitespace-pre-wrap break-words text-sm">{q.content}</p>
-                {(q.comments?.length ?? 0) > 0 && (
-                  <div className="mt-1.5 space-y-1 border-l-2 border-muted pl-2">
-                    <p className="text-[11px] font-semibold text-muted-foreground">💬 댓글 {q.comments!.length}개</p>
-                    {q.comments!.slice(0, 3).map((c) => (
-                      <p key={c.id} className="text-[11px] text-muted-foreground break-words">
-                        <span className="font-medium text-foreground">{c.author.name}</span>: {c.content}
-                      </p>
-                    ))}
-                    {q.comments!.length > 3 && (
-                      <p className="text-[11px] text-muted-foreground">+{q.comments!.length - 3}개 더</p>
-                    )}
-                  </div>
-                )}
+              <TableCell className="max-w-md">
+                <div className="flex gap-3">
+                  <p className="flex-1 whitespace-pre-wrap break-words text-sm">{q.content}</p>
+                  {(q.comments?.length ?? 0) > 0 && (
+                    <div className="shrink-0 w-44 space-y-1 border-l-2 border-muted pl-2">
+                      <p className="text-[11px] font-semibold text-muted-foreground">💬 댓글 {q.comments!.length}개</p>
+                      {q.comments!.slice(0, 3).map((c) => (
+                        <p key={c.id} className="text-[11px] text-muted-foreground break-words">
+                          <span className="font-medium text-foreground">{c.author.name}</span>: {c.content}
+                        </p>
+                      ))}
+                      {q.comments!.length > 3 && (
+                        <p className="text-[11px] text-muted-foreground">+{q.comments!.length - 3}개 더</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </TableCell>
               <TableCell>
                 <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
@@ -801,7 +803,9 @@ export default function QuestionsPage() {
                     <tr>
                       <th className="text-left px-3 py-2 font-medium text-gray-600 w-24">학년·반·번호</th>
                       <th className="text-left px-3 py-2 font-medium text-gray-600">학생</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-600">질문 내용</th>
+                      <th className="text-center px-3 py-2 font-medium text-gray-600 w-16">질문 작성</th>
+                      <th className="text-center px-3 py-2 font-medium text-gray-600 w-16">댓글 작성</th>
+                      <th className="text-center px-3 py-2 font-medium text-gray-600 w-16">좋아요</th>
                       <th className="text-center px-3 py-2 font-medium text-gray-600 w-14">제출</th>
                     </tr>
                   </thead>
@@ -826,26 +830,9 @@ export default function QuestionsPage() {
                               .join(" ")}
                           </td>
                           <td className="px-3 py-2 font-medium text-gray-900">{s.name}</td>
-                          <td className="px-3 py-2 text-gray-600 max-w-xs">
-                            {s.questionContent ? (
-                              <div className="flex items-center gap-2">
-                                <span className="truncate flex-1">
-                                  &ldquo;{s.questionContent}
-                                  {s.questionContent.length >= 50 ? "..." : ""}&rdquo;
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => setDetailStudentId(s.id)}
-                                  title="질문과 댓글 상세 보기"
-                                  className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100"
-                                >
-                                  💬 {studentCommentCount(s.id)}
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="text-gray-300 text-xs">미작성</span>
-                            )}
-                          </td>
+                          <td className="px-3 py-2 text-center text-sm font-semibold text-gray-700">{s.questionCount}</td>
+                          <td className="px-3 py-2 text-center text-sm font-semibold text-indigo-600">{s.commentCount}</td>
+                          <td className="px-3 py-2 text-center text-sm font-semibold text-rose-500">{s.likeCount}</td>
                           <td className="px-3 py-2 text-center">
                             {s.hasQuestion ? (
                               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold">
@@ -1114,47 +1101,6 @@ export default function QuestionsPage() {
           audience="teacher"
         />
       )}
-
-      {/* 학생별 질문·댓글 상세 (참여 현황 댓글수 클릭) */}
-      <Dialog open={!!detailStudentId} onOpenChange={(o) => { if (!o) setDetailStudentId(null); }}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {participation?.students.find((s) => s.id === detailStudentId)?.name ?? "학생"}의 질문과 댓글
-            </DialogTitle>
-          </DialogHeader>
-          {detailStudentId && (
-            studentQuestions(detailStudentId).length === 0 ? (
-              <p className="text-sm text-muted-foreground">작성한 질문이 없습니다.</p>
-            ) : (
-              <div className="space-y-3">
-                {studentQuestions(detailStudentId).map((q) => (
-                  <div key={q.id} className="rounded-lg border p-3">
-                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                      <span className={`text-xs px-2 py-0.5 rounded ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
-                    </div>
-                    <p className="text-sm font-medium">{q.content}</p>
-                    {q.comments && q.comments.length > 0 ? (
-                      <div className="mt-2 space-y-1.5 border-l-2 border-muted pl-3">
-                        {q.comments.map((c) => (
-                          <div key={c.id} className="text-sm">
-                            <span className="font-medium text-foreground">{c.author.name}</span>
-                            <span className="text-xs text-muted-foreground"> · {new Date(c.createdAt).toLocaleDateString("ko-KR")}</span>
-                            <p className="text-muted-foreground">{c.content}</p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-xs text-muted-foreground">아직 댓글이 없습니다</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* 수정 다이얼로그 */}
       <Dialog open={!!selectedQuestion} onOpenChange={() => setSelectedQuestion(null)}>
