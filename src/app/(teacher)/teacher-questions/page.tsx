@@ -581,7 +581,7 @@ export default function QuestionsPage() {
 
           return (
             <div key={q.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="border-b bg-gradient-to-r from-indigo-50 via-white to-gray-50 px-4 py-4">
+              <div className="border-b bg-gradient-to-r from-indigo-50 via-white to-gray-50 dark:bg-none dark:bg-card px-4 py-4">
                 <div className="flex items-start gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white shadow-sm">
                     {initial}

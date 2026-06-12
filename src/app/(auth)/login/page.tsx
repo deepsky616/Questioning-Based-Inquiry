@@ -330,7 +330,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 dark:bg-none dark:bg-background p-4">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <section className="overflow-hidden rounded-2xl border border-white/70 bg-white/80 p-3 shadow-xl shadow-blue-100/70 sm:p-4">
           <div className="relative aspect-[3/2] rounded-xl bg-white">
