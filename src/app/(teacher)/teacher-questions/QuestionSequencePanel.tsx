@@ -3,15 +3,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { QuestionSequenceEditor } from "@/components/teacher/QuestionSequenceEditor";
-import type { SequenceInputQuestion, SequencedQuestion } from "@/lib/unit-sequence";
+import type { SequencedQuestion } from "@/lib/unit-sequence";
 
 export function QuestionSequencePanel({
-  sessionId, subject, topic, questions,
+  sessionId, subject, topic,
 }: {
   sessionId: string;
   subject?: string;
   topic?: string;
-  questions: SequenceInputQuestion[];
 }) {
   const [result, setResult] = useState<SequencedQuestion[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -43,16 +42,16 @@ export function QuestionSequencePanel({
   return (
     <div className="space-y-4">
       <QuestionSequenceEditor
-        initialQuestions={questions}
+        sessionId={sessionId}
         subject={subject}
         topic={topic}
         onChange={setResult}
       />
       <div className="flex items-center gap-3">
         <Button onClick={publish} disabled={isPublishing || result.length === 0} className="font-bold">
-          {isPublishing ? "배포 중..." : "학생에게 배포"}
+          {isPublishing ? "배포 중..." : "⑤ 학생에게 배포"}
         </Button>
-        {msg && <span className="text-sm text-gray-500">{msg}</span>}
+        {msg && <span className="text-sm text-muted-foreground">{msg}</span>}
       </div>
     </div>
   );
