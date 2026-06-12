@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -25,7 +24,6 @@ import { summarizeQuestionTypes } from "@/lib/stats-calc";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
-  COGNITIVE_CATEGORIES,
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
   matchesCognitiveCategory,
@@ -120,6 +118,8 @@ export default function QuestionsPage() {
   // 뷰 모드
   const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [showSequence, setShowSequence] = useState(false);
+  const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
+  const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
 
   // 일괄 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -434,10 +434,11 @@ export default function QuestionsPage() {
 
   const filtered = questions;
 
-  const byType = (key: "closure" | "cognitive", value: string) =>
-    filtered.filter((q) =>
-      key === "cognitive" ? matchesCognitiveCategory(q.cognitive, value) : q[key] === value
-    );
+  // 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 필터를 적용한 표시용 목록
+  const displayed = filtered.filter((q) =>
+    (filterClosure === "all" || q.closure === filterClosure) &&
+    (filterCognitive === "all" || matchesCognitiveCategory(q.cognitive, filterCognitive))
+  );
 
   const currentSession = sessions.find((s) => s.id === selectedSessionId);
   const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
@@ -976,32 +977,34 @@ export default function QuestionsPage() {
             {(() => {
               const s = summarizeQuestionTypes(filtered);
               const pct = (n: number) => (s.total ? Math.round((n / s.total) * 100) : 0);
-              const bars = (items: { name: string; value: number; color: string }[]) =>
-                items.map((it) => (
-                  <div key={it.name} className="flex items-center gap-2 mb-1.5">
-                    <span className="w-12 shrink-0 text-xs text-gray-500">{it.name}</span>
-                    <div className="flex-1 h-3.5 rounded bg-gray-100 overflow-hidden">
-                      <div style={{ width: `${pct(it.value)}%`, background: it.color, height: "100%" }} />
-                    </div>
-                    <span className="w-16 shrink-0 text-right text-xs font-semibold text-gray-600">{it.value} ({pct(it.value)}%)</span>
+              const bar = (name: string, value: number, color: string, active: boolean, onClick: () => void) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={onClick}
+                  className={`flex items-center gap-2 mb-1.5 w-full text-left rounded px-1.5 py-0.5 transition-colors ${active ? "ring-2 ring-indigo-400 bg-indigo-50/60" : "hover:bg-muted/60"}`}
+                >
+                  <span className="w-12 shrink-0 text-xs text-muted-foreground">{name}</span>
+                  <div className="flex-1 h-3.5 rounded bg-muted overflow-hidden">
+                    <div style={{ width: `${pct(value)}%`, background: color, height: "100%" }} />
                   </div>
-                ));
+                  <span className="w-16 shrink-0 text-right text-xs font-semibold text-foreground">{value} ({pct(value)}%)</span>
+                </button>
+              );
+              const toggleClosure = (v: "closed" | "open") => setFilterClosure(filterClosure === v ? "all" : v);
+              const toggleCognitive = (v: "factual" | "conceptual" | "controversial") => setFilterCognitive(filterCognitive === v ? "all" : v);
               return (
                 <div className="grid md:grid-cols-2 gap-x-8 gap-y-2">
                   <div>
-                    <p className="text-xs text-gray-400 font-semibold mb-2">분류1 — 폐쇄형 / 개방형</p>
-                    {bars([
-                      { name: "폐쇄형", value: s.closure.closed, color: "#3b82f6" },
-                      { name: "개방형", value: s.closure.open, color: "#10b981" },
-                    ])}
+                    <p className="text-xs text-muted-foreground font-semibold mb-2">분류1 — 폐쇄형 / 개방형 <span className="font-normal text-gray-400">(클릭해 필터)</span></p>
+                    {bar("폐쇄형", s.closure.closed, "#3b82f6", filterClosure === "closed", () => toggleClosure("closed"))}
+                    {bar("개방형", s.closure.open, "#10b981", filterClosure === "open", () => toggleClosure("open"))}
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁</p>
-                    {bars([
-                      { name: "사실적", value: s.cognitive.factual, color: "#94a3b8" },
-                      { name: "개념적", value: s.cognitive.conceptual, color: "#a855f7" },
-                      { name: "논쟁적", value: s.cognitive.controversial, color: "#f97316" },
-                    ])}
+                    <p className="text-xs text-muted-foreground font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁 <span className="font-normal text-gray-400">(클릭해 필터)</span></p>
+                    {bar("사실적", s.cognitive.factual, "#94a3b8", filterCognitive === "factual", () => toggleCognitive("factual"))}
+                    {bar("개념적", s.cognitive.conceptual, "#a855f7", filterCognitive === "conceptual", () => toggleCognitive("conceptual"))}
+                    {bar("논쟁적", s.cognitive.controversial, "#f97316", filterCognitive === "controversial", () => toggleCognitive("controversial"))}
                   </div>
                 </div>
               );
@@ -1015,7 +1018,7 @@ export default function QuestionsPage() {
       ) : viewMode === "cards" ? (
         /* ── 카드 뷰: 질문 + 댓글 한눈에 보기 ── */
         <div className="space-y-8">
-          {filtered.length === 0 ? (
+          {displayed.length === 0 ? (
             <div className="text-center py-16 text-gray-400 text-sm">
               {!selectedSessionId ? "세션을 선택해 주세요" : "해당하는 질문이 없습니다"}
             </div>
@@ -1024,64 +1027,46 @@ export default function QuestionsPage() {
               {currentSession && (
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-xs text-gray-400">
-                    댓글 있는 질문 {countQuestionsWithComments(filtered)}개 / 전체 {filtered.length}개
+                    댓글 있는 질문 {countQuestionsWithComments(displayed)}개 / 전체 {displayed.length}개
                   </span>
                 </div>
               )}
-              <QuestionCommentCards list={filtered} />
+              <QuestionCommentCards list={displayed} />
             </div>
           )}
         </div>
       ) : !currentSession ? (
         <div className="text-center py-16 text-gray-400 text-sm">세션을 선택해 주세요</div>
       ) : (
-        /* ── 날짜·교과·주제별 조회: 분류별 탭 ── */
-        <>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">분류 1 · 폐쇄형 / 개방형 질문</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="closed">
-                <TabsList>
-                  <TabsTrigger value="closed">
-                    폐쇄형 <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{byType("closure", "closed").length}</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="open">
-                    개방형 <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">{byType("closure", "open").length}</span>
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="closed"><QuestionTable list={byType("closure", "closed")} /></TabsContent>
-                <TabsContent value="open"><QuestionTable list={byType("closure", "open")} /></TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">분류 2 · 사실적 / 개념적 / 논쟁적 질문</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="factual">
-                <TabsList>
-                  {COGNITIVE_CATEGORIES.map((category) => (
-                    <TabsTrigger key={category.value} value={category.value}>
-                      {category.label}
-                      <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">
-                        {byType("cognitive", category.value).length}
-                      </span>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                {COGNITIVE_CATEGORIES.map((category) => (
-                  <TabsContent key={category.value} value={category.value}>
-                    <QuestionTable list={byType("cognitive", category.value)} />
-                  </TabsContent>
-                ))}
-              </Tabs>
-            </CardContent>
-          </Card>
-        </>
+        /* ── 전체 질문 목록: 분류1/분류2 필터 ── */
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              전체 질문 목록
+              <span className="ml-2 text-sm font-normal text-muted-foreground">{displayed.length}개</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* 분류 필터 칩 (통계 막대 클릭과 연동) */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-3">
+              <span className="text-xs text-muted-foreground mr-0.5">분류1</span>
+              {([["all", "전체"], ["closed", "폐쇄형"], ["open", "개방형"]] as const).map(([v, label]) => (
+                <button key={v} type="button" onClick={() => setFilterClosure(v)}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterClosure === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{label}</button>
+              ))}
+              <span className="text-xs text-muted-foreground mx-1">분류2</span>
+              {([["all", "전체"], ["factual", "사실적"], ["conceptual", "개념적"], ["controversial", "논쟁적"]] as const).map(([v, label]) => (
+                <button key={v} type="button" onClick={() => setFilterCognitive(v)}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterCognitive === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{label}</button>
+              ))}
+              {(filterClosure !== "all" || filterCognitive !== "all") && (
+                <button type="button" onClick={() => { setFilterClosure("all"); setFilterCognitive("all"); }}
+                  className="ml-1 text-xs font-medium text-indigo-600">초기화</button>
+              )}
+            </div>
+            <QuestionTable list={displayed} />
+          </CardContent>
+        </Card>
       )}
 
       {/* 질문 중심 탐구설계 (질문 목록 아래) */}
