@@ -5,14 +5,12 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { QuestionClassificationStats, applyClassificationFilter, type ClosureFilter, type CognitiveFilter } from "@/components/shared/QuestionClassificationStats";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
-  COGNITIVE_CATEGORIES,
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
-  matchesCognitiveCategory,
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsDesc } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
@@ -291,6 +289,8 @@ export default function ExplorePage() {
   const [filterTopic, setFilterTopic] = useState("");
   const [likeSort, setLikeSort] = useState<LikeSortOrder>("none");
   const [exploreCfg, setExploreCfg] = useState<{ likesEnabled: boolean; commentsEnabled: boolean }>({ likesEnabled: true, commentsEnabled: true });
+  const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
+  const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
 
   useEffect(() => {
     fetch("/api/explore-config")
@@ -392,10 +392,7 @@ export default function ExplorePage() {
     });
   const selectedSession = sessions.find((session) => session.id === selectedSessionId);
 
-  const byType = (key: "closure" | "cognitive", value: string) =>
-    filtered.filter((q) =>
-      key === "cognitive" ? matchesCognitiveCategory(q.cognitive, value) : q[key] === value
-    );
+  const displayed = applyClassificationFilter(filtered, filterClosure, filterCognitive);
 
   const Empty = () => (
     <div className="text-center py-8 text-gray-400 text-sm">
@@ -581,60 +578,25 @@ export default function ExplorePage() {
         />
       )}
 
-      {/* 분류 1: 폐쇄형 / 개방형 */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">분류 1 · 폐쇄형 / 개방형 질문</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="closed">
-            <TabsList>
-              <TabsTrigger value="closed">
-                폐쇄형 질문{" "}
-                <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                  {byType("closure", "closed").length}
-                </span>
-              </TabsTrigger>
-              <TabsTrigger value="open">
-                개방형 질문{" "}
-                <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                  {byType("closure", "open").length}
-                </span>
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="closed">
-              <QuestionList list={byType("closure", "closed")} />
-            </TabsContent>
-            <TabsContent value="open">
-              <QuestionList list={byType("closure", "open")} />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+      {/* 질문 분류 통계 현황 (막대/칩 클릭으로 필터) */}
+      <QuestionClassificationStats
+        questions={filtered}
+        filterClosure={filterClosure}
+        filterCognitive={filterCognitive}
+        onFilterClosure={setFilterClosure}
+        onFilterCognitive={setFilterCognitive}
+      />
 
-      {/* 분류 2: 사실적 / 개념적 / 논쟁적 */}
+      {/* 전체 질문 목록 */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">분류 2 · 사실적 / 개념적 / 논쟁적 질문</CardTitle>
+          <CardTitle className="text-base">
+            전체 질문 목록{" "}
+            <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="factual">
-            <TabsList>
-              {COGNITIVE_CATEGORIES.map((category) => (
-                <TabsTrigger key={category.value} value={category.value}>
-                  {category.label}
-                  <span className="ml-1.5 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">
-                    {byType("cognitive", category.value).length}
-                  </span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {COGNITIVE_CATEGORIES.map((category) => (
-              <TabsContent key={category.value} value={category.value}>
-                <QuestionList list={byType("cognitive", category.value)} />
-              </TabsContent>
-            ))}
-          </Tabs>
+          <QuestionList list={displayed} />
         </CardContent>
       </Card>
     </div>
