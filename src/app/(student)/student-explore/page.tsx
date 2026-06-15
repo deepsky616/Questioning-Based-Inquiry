@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { QuestionClassificationStats, applyClassificationFilter, type ClosureFilter, type CognitiveFilter } from "@/components/shared/QuestionClassificationStats";
+import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -16,7 +16,6 @@ import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSes
 import { getSessionUser } from "@/lib/auth-helpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
-import type { LikeSortOrder } from "@/lib/question-likes";
 
 interface QuestionSession {
   id: string;
@@ -44,6 +43,7 @@ interface Question {
   author: { id: string; name: string; className?: string };
   createdAt: string;
   likeCount: number;
+  commentCount?: number;
   myLike: boolean;
 }
 
@@ -286,7 +286,8 @@ export default function ExplorePage() {
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
-  const [likeSort, setLikeSort] = useState<LikeSortOrder>("none");
+  const [sortField, setSortField] = useState<SortField>("like");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [exploreCfg, setExploreCfg] = useState<{ likesEnabled: boolean; commentsEnabled: boolean }>({ likesEnabled: true, commentsEnabled: true });
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
@@ -301,22 +302,20 @@ export default function ExplorePage() {
   }, []);
 
   const fetchQuestions = useCallback(
-    (sessionId: string, opts?: { date?: string; subject?: string; topic?: string; likeSort?: LikeSortOrder }) => {
+    (sessionId: string, opts?: { date?: string; subject?: string; topic?: string }) => {
       setIsLoading(true);
       const params = new URLSearchParams({ isPublic: "true" });
       if (sessionId !== "all") params.set("sessionId", sessionId);
       if (opts?.date) params.set("date", opts.date);
       if (opts?.subject) params.set("subject", opts.subject);
       if (opts?.topic) params.set("topic", opts.topic);
-      const sort = opts?.likeSort ?? likeSort;
-      if (sort !== "none") params.set("likeSort", sort);
       fetch(`/api/questions?${params}`)
         .then((r) => r.json())
         .then(setQuestions)
         .catch(() => {})
         .finally(() => setIsLoading(false));
     },
-    [likeSort]
+    []
   );
 
   useEffect(() => {
@@ -331,11 +330,6 @@ export default function ExplorePage() {
     setQuestions((prev) =>
       prev.map((q) => (q.id === questionId ? { ...q, likeCount: newCount, myLike } : q))
     );
-  };
-
-  const handleLikeSortChange = (order: LikeSortOrder) => {
-    setLikeSort(order);
-    fetchQuestions(selectedSessionId, { likeSort: order });
   };
 
   const handleSessionChange = (val: string) => {
@@ -361,7 +355,8 @@ export default function ExplorePage() {
   }, [filterDate, filterSubject, filterTopic]);
 
   // 단원설계 질문(TEACHER_SHARED)을 일반 학생 질문과 같이 한 목록에 표시
-  // (정렬은 단원설계 질문이 위쪽에 오도록 우선순위 부여)
+  // (단원설계 질문이 위쪽에 오도록 우선순위를 두고, 그 안에서 좋아요순·댓글순 정렬)
+  const sortKey = (q: Question) => (sortField === "like" ? q.likeCount ?? 0 : q.commentCount ?? 0);
   const filtered = questions
     .filter(
       (q) =>
@@ -372,7 +367,7 @@ export default function ExplorePage() {
       const aPriority = a.source === "TEACHER_SHARED" ? 0 : 1;
       const bPriority = b.source === "TEACHER_SHARED" ? 0 : 1;
       if (aPriority !== bPriority) return aPriority - bPriority;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return sortDir === "desc" ? sortKey(b) - sortKey(a) : sortKey(a) - sortKey(b);
     });
   const selectedSession = sessions.find((session) => session.id === selectedSessionId);
 
@@ -491,40 +486,29 @@ export default function ExplorePage() {
         />
       )}
 
-      {/* 질문 분류 통계 현황 (막대/칩 클릭으로 필터) */}
-      <QuestionClassificationStats
-        questions={filtered}
-        filterClosure={filterClosure}
-        filterCognitive={filterCognitive}
-        onFilterClosure={setFilterClosure}
-        onFilterCognitive={setFilterCognitive}
-      />
+      {/* 질문 분류 통계 현황 (비율 막대, 표시 전용) */}
+      <QuestionClassificationStats questions={filtered} />
 
-      {/* 전체 질문 목록 — 정렬(좋아요순) */}
+      {/* 전체 질문 목록 — 분류 필터(분류1/분류2) + 정렬(좋아요순·댓글순) */}
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 space-y-2">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <CardTitle className="text-base">
               📝 전체 질문 목록{" "}
               <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
             </CardTitle>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">좋아요순</span>
-              <div className="flex rounded-md border overflow-hidden">
-                {(["none", "desc", "asc"] as LikeSortOrder[]).map((order, i) => (
-                  <button
-                    key={order}
-                    onClick={() => handleLikeSortChange(order)}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                      likeSort === order ? "bg-rose-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <QuestionSortControl
+              field={sortField}
+              dir={sortDir}
+              onChange={(f, d) => { setSortField(f); setSortDir(d); }}
+            />
           </div>
+          <ClassificationChips
+            filterClosure={filterClosure}
+            filterCognitive={filterCognitive}
+            onFilterClosure={setFilterClosure}
+            onFilterCognitive={setFilterCognitive}
+          />
         </CardHeader>
         <CardContent>
           <QuestionList list={displayed} />

@@ -21,6 +21,7 @@ import {
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
+import { QuestionSortControl, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -150,8 +151,9 @@ export default function QuestionsPage() {
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
 
-  // 좋아요 정렬
-  const [likeSort, setLikeSort] = useState<"none" | "desc" | "asc">("none");
+  // 전체 질문 목록 정렬 (좋아요순·댓글순)
+  const [sortField, setSortField] = useState<SortField>("like");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const resetBulkState = () => {
     setSelectedIds(new Set());
@@ -163,7 +165,7 @@ export default function QuestionsPage() {
 
   const fetchQuestions = useCallback((
     sessionId: string,
-    opts?: { date?: string; subject?: string; topic?: string; likeSort?: "none" | "desc" | "asc" }
+    opts?: { date?: string; subject?: string; topic?: string; sortField?: SortField; sortDir?: SortDir }
   ) => {
     setIsLoading(true);
     const params = new URLSearchParams();
@@ -171,14 +173,15 @@ export default function QuestionsPage() {
     if (opts?.date) params.append("date", opts.date);
     if (opts?.subject) params.append("subject", opts.subject);
     if (opts?.topic) params.append("topic", opts.topic);
-    const sort = opts?.likeSort ?? likeSort;
-    if (sort !== "none") params.append("likeSort", sort);
+    const field = opts?.sortField ?? sortField;
+    const dir = opts?.sortDir ?? sortDir;
+    params.append(field === "comment" ? "commentSort" : "likeSort", dir);
     fetch(`/api/questions?${params}`)
       .then((r) => r.json())
       .then(setQuestions)
       .catch(() => {})
       .finally(() => setIsLoading(false));
-  }, [likeSort]);
+  }, [sortField, sortDir]);
 
   useEffect(() => {
     fetch("/api/sessions")
@@ -195,7 +198,7 @@ export default function QuestionsPage() {
         }
       })
       .catch(() => setIsLoading(false));
-    // 세션 목록은 최초 1회만 로드한다. (fetchQuestions가 likeSort로 재생성돼도
+    // 세션 목록은 최초 1회만 로드한다. (fetchQuestions가 정렬 상태로 재생성돼도
     // 재실행되어 선택 세션이 초기화되지 않도록 deps를 비운다)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -207,7 +210,15 @@ export default function QuestionsPage() {
     setParticipation(null);
     setShowParticipation(false);
     resetBulkState();
-    fetchQuestions(val);
+    if (val === "all") {
+      fetchQuestions("all", {
+        date: filterDate || undefined,
+        subject: filterSubject || undefined,
+        topic: filterTopic || undefined,
+      });
+    } else {
+      fetchQuestions(val);
+    }
   };
 
   // 날짜·교과·주제 필터로 세션 목록을 좁힌다(질문 직접 조회가 아니라 세션을 고르는 보조 필터)
@@ -218,8 +229,16 @@ export default function QuestionsPage() {
     topic: filterTopic || undefined,
   });
 
-  // 필터 변경으로 현재 선택 세션이 목록 밖이면 첫 세션으로 보정
+  // 필터 변경 반영: 전체 세션이면 좁혀진 범위로 다시 조회, 특정 세션이면 목록 밖일 때 첫 세션으로 보정
   useEffect(() => {
+    if (selectedSessionId === "all") {
+      fetchQuestions("all", {
+        date: filterDate || undefined,
+        subject: filterSubject || undefined,
+        topic: filterTopic || undefined,
+      });
+      return;
+    }
     if (filteredSessions.length === 0) return;
     if (!filteredSessions.some((s) => s.id === selectedSessionId)) {
       handleSessionChange(filteredSessions[0].id);
@@ -447,6 +466,8 @@ export default function QuestionsPage() {
   );
 
   const currentSession = sessions.find((s) => s.id === selectedSessionId);
+  const isAll = selectedSessionId === "all";
+  const hasQuestionList = Boolean(currentSession) || isAll;
   const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
   const previewQuestions = selectedQuestions.slice(0, 3);
   const hiddenPreviewCount = Math.max(selectedQuestions.length - previewQuestions.length, 0);
@@ -743,6 +764,7 @@ export default function QuestionsPage() {
                 <Select value={selectedSessionId} onValueChange={handleSessionChange}>
                   <SelectTrigger className="bg-white font-medium"><SelectValue placeholder="세션 선택" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="all">전체 세션</SelectItem>
                     {filteredSessions.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
                     ))}
@@ -918,8 +940,8 @@ export default function QuestionsPage() {
         </Card>
       )}
 
-      {/* 질문 분류 통계 현황 */}
-      {currentSession && (
+      {/* 질문 분류 통계 현황 (비율 막대, 표시 전용) */}
+      {hasQuestionList && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
@@ -930,34 +952,27 @@ export default function QuestionsPage() {
             {(() => {
               const s = summarizeQuestionTypes(filtered);
               const pct = (n: number) => (s.total ? Math.round((n / s.total) * 100) : 0);
-              const bar = (name: string, value: number, color: string, active: boolean, onClick: () => void) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={onClick}
-                  className={`flex items-center gap-2 mb-1.5 w-full text-left rounded px-1.5 py-0.5 transition-colors ${active ? "ring-2 ring-indigo-400 bg-indigo-50/60" : "hover:bg-muted/60"}`}
-                >
+              const bar = (name: string, value: number, color: string) => (
+                <div key={name} className="flex items-center gap-2 mb-1.5 w-full px-1.5 py-0.5">
                   <span className="w-12 shrink-0 text-xs text-muted-foreground">{name}</span>
                   <div className="flex-1 h-3.5 rounded bg-muted overflow-hidden">
                     <div style={{ width: `${pct(value)}%`, background: color, height: "100%" }} />
                   </div>
                   <span className="w-16 shrink-0 text-right text-xs font-semibold text-foreground">{value} ({pct(value)}%)</span>
-                </button>
+                </div>
               );
-              const toggleClosure = (v: "closed" | "open") => setFilterClosure(filterClosure === v ? "all" : v);
-              const toggleCognitive = (v: "factual" | "conceptual" | "controversial") => setFilterCognitive(filterCognitive === v ? "all" : v);
               return (
                 <div className="grid md:grid-cols-2 gap-x-8 gap-y-2">
                   <div>
-                    <p className="text-xs text-muted-foreground font-semibold mb-2">분류1 — 폐쇄형 / 개방형 <span className="font-normal text-gray-400">(클릭해 필터)</span></p>
-                    {bar("폐쇄형", s.closure.closed, "#3b82f6", filterClosure === "closed", () => toggleClosure("closed"))}
-                    {bar("개방형", s.closure.open, "#10b981", filterClosure === "open", () => toggleClosure("open"))}
+                    <p className="text-xs text-muted-foreground font-semibold mb-2">분류1 — 폐쇄형 / 개방형</p>
+                    {bar("폐쇄형", s.closure.closed, "#3b82f6")}
+                    {bar("개방형", s.closure.open, "#10b981")}
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁 <span className="font-normal text-gray-400">(클릭해 필터)</span></p>
-                    {bar("사실적", s.cognitive.factual, "#94a3b8", filterCognitive === "factual", () => toggleCognitive("factual"))}
-                    {bar("개념적", s.cognitive.conceptual, "#a855f7", filterCognitive === "conceptual", () => toggleCognitive("conceptual"))}
-                    {bar("논쟁적", s.cognitive.controversial, "#f97316", filterCognitive === "controversial", () => toggleCognitive("controversial"))}
+                    <p className="text-xs text-muted-foreground font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁</p>
+                    {bar("사실적", s.cognitive.factual, "#94a3b8")}
+                    {bar("개념적", s.cognitive.conceptual, "#a855f7")}
+                    {bar("논쟁적", s.cognitive.controversial, "#f97316")}
                   </div>
                 </div>
               );
@@ -966,30 +981,20 @@ export default function QuestionsPage() {
         </Card>
       )}
 
-      {/* 전체 질문 목록 — 정렬(좋아요순) · 보기 방식(목록/질문·댓글) */}
-      {currentSession && (
+      {/* 전체 질문 목록 — 정렬(좋아요순·댓글순) · 보기 방식(목록/질문·댓글) */}
+      {hasQuestionList && (
         <div className="flex items-center gap-3 flex-wrap justify-between">
           <span className="text-sm font-semibold text-foreground">📝 전체 질문 목록 <span className="font-normal text-muted-foreground">{filtered.length}개</span></span>
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">좋아요순</span>
-              <div className="flex rounded-md border overflow-hidden">
-                {(["none", "desc", "asc"] as const).map((order, i) => (
-                  <button
-                    key={order}
-                    onClick={() => {
-                      setLikeSort(order);
-                      fetchQuestions(selectedSessionId, { likeSort: order });
-                    }}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                      likeSort === order ? "bg-rose-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <QuestionSortControl
+              field={sortField}
+              dir={sortDir}
+              onChange={(f, d) => {
+                setSortField(f);
+                setSortDir(d);
+                fetchQuestions(selectedSessionId, { sortField: f, sortDir: d });
+              }}
+            />
             <div className="flex rounded-md border overflow-hidden">
               <button
                 onClick={() => setViewMode("table")}
@@ -1023,7 +1028,7 @@ export default function QuestionsPage() {
             </div>
           ) : (
             <div>
-              {currentSession && (
+              {hasQuestionList && (
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-xs text-gray-400">
                     댓글 있는 질문 {countQuestionsWithComments(displayed)}개 / 전체 {displayed.length}개
@@ -1034,7 +1039,7 @@ export default function QuestionsPage() {
             </div>
           )}
         </div>
-      ) : !currentSession ? (
+      ) : !hasQuestionList ? (
         <div className="text-center py-16 text-gray-400 text-sm">세션을 선택해 주세요</div>
       ) : (
         /* ── 전체 질문 목록: 분류1/분류2 필터 ── */

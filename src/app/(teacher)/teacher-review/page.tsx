@@ -242,8 +242,7 @@ function PendingRow({
   const content = p.commentContent || p.questionContent;
   const targetLabel = p.relatedQuestionId ? "질문" : "답변";
   return (
-    <div className="rounded-xl border border-gray-100 p-3 space-y-2"
-      style={{ background: selected ? "#eef2ff" : "white" }}>
+    <div className={`rounded-xl border border-gray-100 p-3 space-y-2 ${selected ? "bg-indigo-50" : "bg-white"}`}>
       <div className="flex items-start gap-3">
         <input type="checkbox" checked={selected} onChange={onToggle} className="mt-1 w-4 h-4 accent-indigo-500" />
         <div className="flex-1 min-w-0">

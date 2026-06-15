@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import DatePicker from "@/components/shared/DatePicker";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import PublishQuestionsDialog from "./PublishQuestionsDialog";
-import { buildSessionLabel, isSessionAvailable, sortSessionsAsc } from "@/lib/sessions";
+import { buildSessionLabel, isSessionAvailable, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import {
   buildClassTargetValue,
   buildClassStudentTargetPayload,
@@ -54,6 +54,11 @@ export default function TeacherSessionsPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  // 세션 목록 조회/정렬 상태
+  const [listFilterDate, setListFilterDate] = useState("");
+  const [listFilterSubject, setListFilterSubject] = useState("");
+  const [listFilterTopic, setListFilterTopic] = useState("");
+  const [listSort, setListSort] = useState<"desc" | "asc">("desc");
 
   const targetClasses = useMemo(() => {
     if (teacherClasses.length > 0) return teacherClasses;
@@ -183,8 +188,16 @@ export default function TeacherSessionsPage() {
     }
   };
 
-  const activeSessions = sessions.filter((s) => isSessionAvailable(s.date));
-  const pastSessions = sessions.filter((s) => !isSessionAvailable(s.date));
+  // 세션 목록 조회 필터(날짜·교과·주제) + 정렬(날짜 최신순/오래된순)
+  const filterOptions = getSessionFilterOptions(sessions);
+  const visibleSessions = filterSessions(sessions, {
+    date: listFilterDate || undefined,
+    subject: listFilterSubject || undefined,
+    topic: listFilterTopic || undefined,
+  });
+  const sortedSessions = listSort === "asc" ? sortSessionsAsc(visibleSessions) : sortSessionsDesc(visibleSessions);
+  const activeSessions = sortedSessions.filter((s) => isSessionAvailable(s.date));
+  const pastSessions = sortedSessions.filter((s) => !isSessionAvailable(s.date));
 
   return (
     <div className="space-y-6">
@@ -286,6 +299,72 @@ export default function TeacherSessionsPage() {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* 세션 목록 조회/정렬 */}
+          <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-card p-3">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">날짜</span>
+              <Select value={listFilterDate || "__all__"} onValueChange={(v) => setListFilterDate(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-white w-36"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 날짜</SelectItem>
+                  {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">교과</span>
+              <Select value={listFilterSubject || "__all__"} onValueChange={(v) => setListFilterSubject(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-white w-32"><SelectValue placeholder="전체 교과" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 교과</SelectItem>
+                  {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">주제</span>
+              <Select value={listFilterTopic || "__all__"} onValueChange={(v) => setListFilterTopic(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-white w-40"><SelectValue placeholder="전체 주제" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 주제</SelectItem>
+                  {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">정렬</span>
+              <div className="flex rounded-md border overflow-hidden h-8">
+                {([["desc", "최신순"], ["asc", "오래된순"]] as const).map(([v, label], i) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setListSort(v)}
+                    className={`px-3 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+                      listSort === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {(listFilterDate || listFilterSubject || listFilterTopic) && (
+              <button
+                type="button"
+                onClick={() => { setListFilterDate(""); setListFilterSubject(""); setListFilterTopic(""); }}
+                className="h-8 text-xs font-medium text-indigo-600"
+              >
+                초기화
+              </button>
+            )}
+          </div>
+
+          {activeSessions.length === 0 && pastSessions.length === 0 && (
+            <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-400">
+              조건에 맞는 세션이 없습니다.
+            </div>
+          )}
+
           {activeSessions.length > 0 && (
             <Card>
               <CardHeader className="pb-2">

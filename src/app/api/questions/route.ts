@@ -110,6 +110,7 @@ export async function GET(req: Request) {
 
   const userId = session.user.id;
   const likeSortParam = searchParams.get("likeSort") as "asc" | "desc" | null;
+  const commentSortParam = searchParams.get("commentSort") as "asc" | "desc" | null;
 
   const questions = await prisma.question.findMany({
     where,
@@ -138,6 +139,7 @@ export async function GET(req: Request) {
   const enriched = questions.map((q) => ({
     ...q,
     likeCount: q.likes.length,
+    commentCount: q.comments.length,
     myLike: q.likes.some((l) => l.userId === userId),
     likedBy: role === "TEACHER"
       ? q.likes.map((l) => ({ id: l.user.id, name: l.user.name }))
@@ -145,7 +147,12 @@ export async function GET(req: Request) {
     likes: undefined,
   }));
 
-  if (likeSortParam === "desc") {
+  // 정렬 기준은 좋아요순·댓글순 중 하나만 적용한다(클라이언트가 단일 기준 전송).
+  if (commentSortParam === "desc") {
+    enriched.sort((a, b) => b.commentCount - a.commentCount);
+  } else if (commentSortParam === "asc") {
+    enriched.sort((a, b) => a.commentCount - b.commentCount);
+  } else if (likeSortParam === "desc") {
     enriched.sort((a, b) => b.likeCount - a.likeCount);
   } else if (likeSortParam === "asc") {
     enriched.sort((a, b) => a.likeCount - b.likeCount);

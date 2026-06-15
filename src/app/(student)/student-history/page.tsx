@@ -4,7 +4,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { QuestionClassificationStats, applyClassificationFilter, type ClosureFilter, type CognitiveFilter } from "@/components/shared/QuestionClassificationStats";
+import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
 import {
@@ -40,6 +40,7 @@ interface Question {
   isPublic: boolean;
   createdAt: string;
   likeCount?: number;
+  commentCount?: number;
   comments?: Comment[];
   session?: { id: string; date: string; subject: string; topic: string } | null;
 }
@@ -57,7 +58,8 @@ export default function HistoryPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
-  const [likeSort, setLikeSort] = useState<"none" | "desc" | "asc">("none");
+  const [sortField, setSortField] = useState<SortField>("like");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [commentsByQuestion, setCommentsByQuestion] = useState<Record<string, Comment[]>>({});
@@ -120,14 +122,10 @@ export default function HistoryPage() {
   const filtered = questions;
 
   const classified = applyClassificationFilter(filtered, filterClosure, filterCognitive);
-  const displayed =
-    likeSort === "none"
-      ? classified
-      : [...classified].sort((a, b) =>
-          likeSort === "desc"
-            ? (b.likeCount ?? 0) - (a.likeCount ?? 0)
-            : (a.likeCount ?? 0) - (b.likeCount ?? 0)
-        );
+  const sortKey = (q: Question) => (sortField === "like" ? q.likeCount ?? 0 : q.commentCount ?? 0);
+  const displayed = [...classified].sort((a, b) =>
+    sortDir === "desc" ? sortKey(b) - sortKey(a) : sortKey(a) - sortKey(b)
+  );
 
   const toggleComments = async (questionId: string) => {
     if (expandedQuestionId === questionId) {
@@ -355,40 +353,28 @@ export default function HistoryPage() {
         </CardContent>
       </Card>
 
-      {/* 분류 1: 폐쇄형 / 개방형 */}
-      {/* 질문 분류 통계 현황 (막대/칩 클릭으로 필터) */}
-      <QuestionClassificationStats
-        questions={filtered}
-        filterClosure={filterClosure}
-        filterCognitive={filterCognitive}
-        onFilterClosure={setFilterClosure}
-        onFilterCognitive={setFilterCognitive}
-      />
+      {/* 질문 분류 통계 현황 (비율 막대, 표시 전용) */}
+      <QuestionClassificationStats questions={filtered} />
 
-      {/* 전체 질문 목록 — 정렬(좋아요순) */}
+      {/* 전체 질문 목록 — 분류 필터(분류1/분류2) + 정렬(좋아요순·댓글순) */}
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 space-y-2">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <CardTitle className="text-base">
               📝 전체 질문 목록 <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
             </CardTitle>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">좋아요순</span>
-              <div className="flex rounded-md border overflow-hidden">
-                {(["none", "desc", "asc"] as const).map((order, i) => (
-                  <button
-                    key={order}
-                    onClick={() => setLikeSort(order)}
-                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                      likeSort === order ? "bg-rose-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {order === "none" ? "기본" : order === "desc" ? "많은 순 ↓" : "적은 순 ↑"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <QuestionSortControl
+              field={sortField}
+              dir={sortDir}
+              onChange={(f, d) => { setSortField(f); setSortDir(d); }}
+            />
           </div>
+          <ClassificationChips
+            filterClosure={filterClosure}
+            filterCognitive={filterCognitive}
+            onFilterClosure={setFilterClosure}
+            onFilterCognitive={setFilterCognitive}
+          />
         </CardHeader>
         <CardContent>
           <QuestionRows list={displayed} />
