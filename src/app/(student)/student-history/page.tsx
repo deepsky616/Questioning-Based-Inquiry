@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
@@ -60,6 +61,7 @@ export default function HistoryPage() {
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
   const [sortField, setSortField] = useState<SortField>("like");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [search, setSearch] = useState("");
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [commentsByQuestion, setCommentsByQuestion] = useState<Record<string, Comment[]>>({});
@@ -119,7 +121,9 @@ export default function HistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterDate, filterSubject, filterTopic]);
 
-  const filtered = questions;
+  const filtered = search.trim()
+    ? questions.filter((q) => q.content.toLowerCase().includes(search.trim().toLowerCase()))
+    : questions;
 
   const classified = applyClassificationFilter(filtered, filterClosure, filterCognitive);
   const sortKey = (q: Question) => (sortField === "like" ? q.likeCount ?? 0 : q.commentCount ?? 0);
@@ -374,6 +378,12 @@ export default function HistoryPage() {
             filterCognitive={filterCognitive}
             onFilterClosure={setFilterClosure}
             onFilterCognitive={setFilterCognitive}
+          />
+          <Input
+            placeholder="질문으로 검색..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 text-sm max-w-xs"
           />
         </CardHeader>
         <CardContent>

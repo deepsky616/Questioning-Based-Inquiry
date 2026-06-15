@@ -40,14 +40,14 @@ interface Question {
   cognitive: string;
   source?: string;
   inquiryType?: string | null;
-  author: { id: string; name: string; className?: string };
+  author: { id: string; name: string; className?: string; grade?: string; studentNumber?: string };
   createdAt: string;
   likeCount: number;
   commentCount?: number;
   myLike: boolean;
 }
 
-function CommentSection({ questionId }: { questionId: string }) {
+function CommentSection({ questionId, onCommentAdded }: { questionId: string; onCommentAdded?: () => void }) {
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -76,6 +76,7 @@ function CommentSection({ questionId }: { questionId: string }) {
       const created: Comment = await res.json();
       setComments((prev) => [...prev, created]);
       setNewComment("");
+      onCommentAdded?.();
     } catch {
     } finally {
       setIsPosting(false);
@@ -197,6 +198,7 @@ function QuestionCard({
   commentsEnabled: boolean;
 }) {
   const [showComments, setShowComments] = useState(false);
+  const [commentCount, setCommentCount] = useState(q.commentCount ?? 0);
   const isTeacherShared = q.source === "TEACHER_SHARED";
 
   return (
@@ -258,21 +260,28 @@ function QuestionCard({
             <div className="text-sm text-gray-600">
               {isTeacherShared ? `${q.author.name} 선생님` : q.author.name}
             </div>
-            {!isTeacherShared && q.author.className && (
-              <div className="text-xs text-gray-400">{q.author.className}</div>
+            {!isTeacherShared && (q.author.grade || q.author.className || q.author.studentNumber) && (
+              <div className="text-xs text-gray-400">
+                {q.author.grade && `${q.author.grade}학년 `}
+                {q.author.className && `${q.author.className}반`}
+                {q.author.studentNumber && ` ${q.author.studentNumber}번`}
+              </div>
             )}
           </div>
           {commentsEnabled && (
             <button
               onClick={() => setShowComments((v) => !v)}
-              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+              className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
             >
-              {showComments ? "댓글 닫기" : "댓글 보기"}
+              <span>💬 {commentCount}</span>
+              <span>{showComments ? "닫기" : "댓글"}</span>
             </button>
           )}
         </div>
       </div>
-      {commentsEnabled && showComments && <CommentSection questionId={q.id} />}
+      {commentsEnabled && showComments && (
+        <CommentSection questionId={q.id} onCommentAdded={() => setCommentCount((c) => c + 1)} />
+      )}
     </div>
   );
 }

@@ -155,6 +155,11 @@ export default function QuestionsPage() {
   const [sortField, setSortField] = useState<SortField>("like");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
+  // 질문/이름 검색
+  const [search, setSearch] = useState("");
+  // 댓글 보기 모달 대상
+  const [commentModalQ, setCommentModalQ] = useState<Question | null>(null);
+
   const resetBulkState = () => {
     setSelectedIds(new Set());
     setBulkPreviews(null);
@@ -457,7 +462,14 @@ export default function QuestionsPage() {
     }
   };
 
-  const filtered = questions;
+  const searchKeyword = search.trim().toLowerCase();
+  const filtered = searchKeyword
+    ? questions.filter(
+        (q) =>
+          q.content.toLowerCase().includes(searchKeyword) ||
+          q.author.name.toLowerCase().includes(searchKeyword),
+      )
+    : questions;
 
   // 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 필터를 적용한 표시용 목록
   const displayed = filtered.filter((q) =>
@@ -502,6 +514,7 @@ export default function QuestionsPage() {
             <TableHead className="w-20">폐쇄/개방</TableHead>
             <TableHead className="w-24">인지 수준</TableHead>
             <TableHead className="w-16 text-center">좋아요</TableHead>
+            <TableHead className="w-16 text-center">댓글</TableHead>
             <TableHead className="w-20">공개</TableHead>
             <TableHead className="w-16">수정</TableHead>
           </TableRow>
@@ -527,22 +540,7 @@ export default function QuestionsPage() {
                 )}
               </TableCell>
               <TableCell className="max-w-md">
-                <div className="flex gap-3">
-                  <p className="flex-1 whitespace-pre-wrap break-words text-sm">{q.content}</p>
-                  {(q.comments?.length ?? 0) > 0 && (
-                    <div className="shrink-0 w-44 space-y-1 border-l-2 border-muted pl-2">
-                      <p className="text-[11px] font-semibold text-muted-foreground">💬 댓글 {q.comments!.length}개</p>
-                      {q.comments!.slice(0, 3).map((c) => (
-                        <p key={c.id} className="text-[11px] text-muted-foreground break-words">
-                          <span className="font-medium text-foreground">{c.author.name}</span>: {c.content}
-                        </p>
-                      ))}
-                      {q.comments!.length > 3 && (
-                        <p className="text-[11px] text-muted-foreground">+{q.comments!.length - 3}개 더</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <p className="whitespace-pre-wrap break-words text-sm">{q.content}</p>
               </TableCell>
               <TableCell>
                 <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
@@ -568,6 +566,20 @@ export default function QuestionsPage() {
                     </div>
                   )}
                 </div>
+              </TableCell>
+              <TableCell className="text-center">
+                {(q.comments?.length ?? 0) > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setCommentModalQ(q)}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                    title="댓글 보기"
+                  >
+                    💬 {q.comments!.length}
+                  </button>
+                ) : (
+                  <span className="text-sm text-muted-foreground">💬 0</span>
+                )}
               </TableCell>
               <TableCell>
                 <Switch
@@ -984,7 +996,15 @@ export default function QuestionsPage() {
       {/* 전체 질문 목록 — 정렬(좋아요순·댓글순) · 보기 방식(목록/질문·댓글) */}
       {hasQuestionList && (
         <div className="flex items-center gap-3 flex-wrap justify-between">
-          <span className="text-sm font-semibold text-foreground">📝 전체 질문 목록 <span className="font-normal text-muted-foreground">{filtered.length}개</span></span>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-semibold text-foreground">📝 전체 질문 목록 <span className="font-normal text-muted-foreground">{filtered.length}개</span></span>
+            <Input
+              placeholder="질문 또는 이름으로 검색..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 text-sm w-56 bg-white"
+            />
+          </div>
           <div className="flex items-center gap-3 flex-wrap">
             <QuestionSortControl
               field={sortField}
@@ -1371,6 +1391,37 @@ export default function QuestionsPage() {
           </div>
         </div>
       )}
+
+      {/* 댓글 보기 모달 (댓글수 클릭 시) */}
+      <Dialog open={!!commentModalQ} onOpenChange={() => setCommentModalQ(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>💬 댓글 {commentModalQ?.comments?.length ?? 0}개</DialogTitle>
+          </DialogHeader>
+          {commentModalQ && (
+            <p className="text-sm text-muted-foreground border-b pb-2 whitespace-pre-wrap break-words">
+              {commentModalQ.content}
+            </p>
+          )}
+          <div className="max-h-[60vh] overflow-y-auto space-y-2">
+            {(commentModalQ?.comments?.length ?? 0) > 0 ? (
+              commentModalQ!.comments!.map((c) => (
+                <div key={c.id} className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-foreground">{c.author.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(c.createdAt).toLocaleDateString("ko-KR")}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 whitespace-pre-wrap break-words text-muted-foreground">{c.content}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">댓글이 없습니다</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
