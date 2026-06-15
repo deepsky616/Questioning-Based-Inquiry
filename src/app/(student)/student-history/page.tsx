@@ -4,10 +4,8 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { QuestionClassificationStats, applyClassificationFilter, type ClosureFilter, type CognitiveFilter } from "@/components/shared/QuestionClassificationStats";
-import DatePicker from "@/components/shared/DatePicker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
 import {
   CLOSURE_LABEL,
@@ -15,7 +13,7 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import {
   Table,
   TableBody,
@@ -61,14 +59,12 @@ export default function HistoryPage() {
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
   const [likeSort, setLikeSort] = useState<"none" | "desc" | "asc">("none");
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
-  const [search, setSearch] = useState("");
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [commentsByQuestion, setCommentsByQuestion] = useState<Record<string, Comment[]>>({});
   const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // 조회 모드
-  const [lookupMode, setLookupMode] = useState<"session" | "detail">("session");
   const [selectedSessionId, setSelectedSessionId] = useState("all");
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
@@ -99,36 +95,29 @@ export default function HistoryPage() {
       .catch(() => {});
   }, [user.id, fetchQuestions]);
 
-  const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
+  const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);
     fetchQuestions({ sessionId: val });
   };
 
-  const applyDetailFilter = () => {
-    fetchQuestions({ date: filterDate, subject: filterSubject, topic: filterTopic });
-  };
+  // 날짜·교과·주제로 세션 목록을 좁힌다(세션을 고르는 보조 필터, 교사 페이지와 동일)
+  const filterOptions = getSessionFilterOptions(sessions);
+  const filteredSessions = filterSessions(sessions, {
+    date: filterDate || undefined,
+    subject: filterSubject || undefined,
+    topic: filterTopic || undefined,
+  });
 
-  const clearDetailFilter = () => {
-    setFilterDate("");
-    setFilterSubject("");
-    setFilterTopic("");
-    fetchQuestions();
-  };
-
-  const switchMode = (m: "session" | "detail") => {
-    setLookupMode(m);
-    if (m === "session") {
-      setSelectedSessionId("all");
-      fetchQuestions();
-    } else {
-      clearDetailFilter();
+  // 필터로 선택 세션이 목록 밖이 되면 전체로 보정
+  useEffect(() => {
+    if (selectedSessionId === "all") return;
+    if (!filteredSessions.some((s) => s.id === selectedSessionId)) {
+      handleSessionChange("all");
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterDate, filterSubject, filterTopic]);
 
-  const filtered = questions.filter((q) =>
-    q.content.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = questions;
 
   const classified = applyClassificationFilter(filtered, filterClosure, filterCognitive);
   const displayed =
@@ -312,88 +301,59 @@ export default function HistoryPage() {
         </p>
       </div>
 
-      {/* 조회 모드 토글 + 필터 */}
+      {/* 조회 방법: 날짜·교과·주제로 좁혀 세션 선택 (교사 페이지와 동일) */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">조회 방법</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Button
-              variant={lookupMode === "session" ? "default" : "outline"}
-              size="sm"
-              onClick={() => switchMode("session")}
-            >
-              🗂️ 세션별 조회
-            </Button>
-            <Button
-              variant={lookupMode === "detail" ? "default" : "outline"}
-              size="sm"
-              onClick={() => switchMode("detail")}
-            >
-              🔍 날짜·교과·주제별 조회
-            </Button>
+        <CardContent>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1 w-36">
+              <label className="text-xs font-medium text-muted-foreground">날짜</label>
+              <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 날짜</SelectItem>
+                  {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 w-32">
+              <label className="text-xs font-medium text-muted-foreground">교과</label>
+              <Select value={filterSubject || "__all__"} onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 교과</SelectItem>
+                  {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 w-52">
+              <label className="text-xs font-medium text-muted-foreground">주제</label>
+              <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
+                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">전체 주제</SelectItem>
+                  {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-0 flex-1">
+              <label className="text-xs font-medium text-muted-foreground">세션</label>
+              <Select value={selectedSessionId} onValueChange={handleSessionChange}>
+                <SelectTrigger className="bg-background font-medium"><SelectValue placeholder="세션 선택" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">전체 세션</SelectItem>
+                  {filteredSessions.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
-          {lookupMode === "session" && (
-            <div className="space-y-2 max-w-md">
-              <Label className="text-sm">수업 세션 선택</Label>
-              <select
-                className="w-full border rounded-md px-3 py-2 text-sm bg-white"
-                value={selectedSessionId}
-                onChange={handleSessionChange}
-              >
-                <option value="all">전체 세션</option>
-                {sessions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {buildSessionLabel(s.date, s.subject, s.topic)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {lookupMode === "detail" && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label className="text-sm">날짜</Label>
-                <DatePicker value={filterDate} onChange={setFilterDate} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">교과</Label>
-                <Input
-                  placeholder="예) 과학"
-                  value={filterSubject}
-                  onChange={(e) => setFilterSubject(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-sm">주제</Label>
-                <Input
-                  placeholder="예) 빛의 굴절"
-                  value={filterTopic}
-                  onChange={(e) => setFilterTopic(e.target.value)}
-                />
-              </div>
-              <div className="sm:col-span-3 flex gap-2">
-                <Button size="sm" onClick={applyDetailFilter}>
-                  적용
-                </Button>
-                <Button size="sm" variant="outline" onClick={clearDetailFilter}>
-                  초기화
-                </Button>
-              </div>
-            </div>
-          )}
+          <p className="text-xs text-muted-foreground mt-2">💡 날짜·교과·주제로 좁혀도, 직접 세션을 골라도 결과는 같습니다.</p>
         </CardContent>
       </Card>
-
-      <Input
-        placeholder="질문 내용 검색..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
-      />
 
       {/* 분류 1: 폐쇄형 / 개방형 */}
       {/* 질문 분류 통계 현황 (막대/칩 클릭으로 필터) */}
