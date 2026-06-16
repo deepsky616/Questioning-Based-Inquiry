@@ -96,13 +96,16 @@ export function QuestionClassificationStats({
   const s = summarizeQuestionTypes(questions);
   const pct = (n: number) => (s.total ? Math.round((n / s.total) * 100) : 0);
 
-  const bar = (name: string, value: number, color: string) => (
-    <div key={name} className="flex items-center gap-2 mb-1.5 w-full px-1.5 py-0.5">
-      <span className="w-12 shrink-0 text-xs text-muted-foreground">{name}</span>
-      <div className="flex-1 h-3.5 rounded bg-muted overflow-hidden">
-        <div style={{ width: `${pct(value)}%`, background: color, height: "100%" }} />
+  const bar = (name: string, value: number, color: string, desc: string) => (
+    <div key={name} className="mb-2 w-full px-1.5">
+      <div className="flex items-center gap-2 py-0.5">
+        <span className="w-12 shrink-0 text-xs text-muted-foreground">{name}</span>
+        <div className="flex-1 h-3.5 rounded bg-muted overflow-hidden">
+          <div style={{ width: `${pct(value)}%`, background: color, height: "100%" }} />
+        </div>
+        <span className="w-16 shrink-0 text-right text-xs font-semibold text-foreground">{value} ({pct(value)}%)</span>
       </div>
-      <span className="w-16 shrink-0 text-right text-xs font-semibold text-foreground">{value} ({pct(value)}%)</span>
+      <p className="pl-14 text-[11px] leading-tight text-muted-foreground">{desc}</p>
     </div>
   );
 
@@ -112,18 +115,18 @@ export function QuestionClassificationStats({
         📊 질문 분류 통계 현황 <span className="text-xs font-normal text-muted-foreground">· 총 {s.total}개</span>
       </p>
 
-      {/* 비율 막대 (표시 전용) */}
+      {/* 비율 막대 + 분류 설명 (표시 전용, 학생 대시보드 설명과 통일) */}
       <div className="grid md:grid-cols-2 gap-x-8 gap-y-2">
         <div>
           <p className="text-xs text-muted-foreground font-semibold mb-2">분류1 — 폐쇄형 / 개방형</p>
-          {bar("폐쇄형", s.closure.closed, "#3b82f6")}
-          {bar("개방형", s.closure.open, "#10b981")}
+          {bar("폐쇄형", s.closure.closed, "#3b82f6", "정답이 하나로 정해진 질문")}
+          {bar("개방형", s.closure.open, "#10b981", "여러 답이 나올 수 있는 질문")}
         </div>
         <div>
           <p className="text-xs text-muted-foreground font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁</p>
-          {bar("사실적", s.cognitive.factual, "#94a3b8")}
-          {bar("개념적", s.cognitive.conceptual, "#a855f7")}
-          {bar("논쟁적", s.cognitive.controversial, "#f97316")}
+          {bar("사실적", s.cognitive.factual, "#94a3b8", "사실이나 정보를 확인하는 질문")}
+          {bar("개념적", s.cognitive.conceptual, "#a855f7", "원리와 이유를 생각하는 질문")}
+          {bar("논쟁적", s.cognitive.controversial, "#f97316", "내 생각·판단이 필요한 질문")}
         </div>
       </div>
     </div>
