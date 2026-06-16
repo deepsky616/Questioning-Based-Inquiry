@@ -32,7 +32,7 @@ describe("POST /api/sessions/[id]/analysis", () => {
     vi.clearAllMocks();
   });
 
-  it("세션 질문의 댓글까지 AI 분석 프롬프트에 포함하고 댓글 수를 반환한다", async () => {
+  it("학생 질문·배포 탐구설계 질문의 좋아요·댓글을 모두 분석하고 집계를 반환한다", async () => {
     mockAuth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
     mockFindSession.mockResolvedValue({
       id: "session-1",
@@ -44,7 +44,9 @@ describe("POST /api/sessions/[id]/analysis", () => {
           content: "광합성이란?",
           closure: "closed",
           cognitive: "factual",
+          source: "STUDENT",
           author: { role: "STUDENT" },
+          _count: { likes: 2 },
           comments: [
             {
               content: "엽록체에서 일어나요.",
@@ -60,11 +62,27 @@ describe("POST /api/sessions/[id]/analysis", () => {
           content: "교사가 작성한 안내 질문",
           closure: "open",
           cognitive: "conceptual",
+          source: "TEACHER",
           author: { role: "TEACHER" },
+          _count: { likes: 0 },
           comments: [
             {
               content: "교사 댓글입니다.",
               author: { name: "교사", role: "TEACHER" },
+            },
+          ],
+        },
+        {
+          content: "배포한 탐구질문: 광합성은 왜 중요할까?",
+          closure: "open",
+          cognitive: "conceptual",
+          source: "TEACHER_SHARED",
+          author: { role: "TEACHER" },
+          _count: { likes: 5 },
+          comments: [
+            {
+              content: "산소를 만들어서 중요해요.",
+              author: { name: "학생2", role: "STUDENT" },
             },
           ],
         },
@@ -81,6 +99,7 @@ describe("POST /api/sessions/[id]/analysis", () => {
             themes: ["광합성", "엽록체"],
             insights: "다음 수업에서 근거를 확장하면 좋습니다.",
             commentInsights: "학생 댓글은 사실 확인에서 개념 연결로 이동하고 있습니다.",
+            engagementInsights: "배포 질문에 좋아요가 몰렸고 참여가 활발합니다.",
           }),
       },
     });
@@ -94,11 +113,18 @@ describe("POST /api/sessions/[id]/analysis", () => {
     expect(res.status).toBe(200);
     expect(prompt).toContain("[댓글 1 · 학생 · 학생1] 엽록체에서 일어나요.");
     expect(prompt).not.toContain("좋아요. 빛 에너지도 연결해 봅시다.");
+    // 배포한 탐구설계 질문은 포함, 교사가 만든 일반 질문은 제외
+    expect(prompt).toContain("배포한 탐구질문: 광합성은 왜 중요할까?");
     expect(prompt).not.toContain("교사가 작성한 안내 질문");
     expect(prompt).not.toContain("교사 댓글입니다.");
-    expect(body.totalQuestions).toBe(1);
-    expect(body.totalComments).toBe(1);
+    // 좋아요 신호가 프롬프트에 들어간다
+    expect(prompt).toContain("❤️");
+    // 학생 질문 1개 + 배포 질문 1개 = 2개, 좋아요 2+5=7, 학생 댓글 2개
+    expect(body.totalQuestions).toBe(2);
+    expect(body.totalLikes).toBe(7);
+    expect(body.totalComments).toBe(2);
     expect(body.commentInsights).toContain("학생 댓글");
+    expect(body.engagementInsights).toContain("좋아요");
   });
 
   it("다른 교사의 세션이면 403을 반환한다", async () => {

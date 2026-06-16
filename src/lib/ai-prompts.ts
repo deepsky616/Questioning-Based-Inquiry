@@ -3,6 +3,9 @@ interface QuestionSummary {
   closure: string;
   cognitive: string;
   comments?: CommentSummary[];
+  // 좋아요 수(공감 신호)와 질문 종류(학생 질문 / 교사가 배포한 탐구설계 질문)
+  likeCount?: number;
+  kind?: "student" | "deployed";
 }
 
 interface CommentSummary {
@@ -78,6 +81,16 @@ export function buildSessionAnalysisPrompt(
   const totalComments = comments.length;
   const studentCommentCount = comments.filter((comment) => comment.authorRole === "STUDENT").length;
   const teacherCommentCount = comments.filter((comment) => comment.authorRole === "TEACHER").length;
+  const totalLikes = questions.reduce((sum, q) => sum + (q.likeCount ?? 0), 0);
+  // 공감을 많이 받은 질문 상위 3개(좋아요 1개 이상)
+  const topLiked = [...questions]
+    .filter((q) => (q.likeCount ?? 0) > 0)
+    .sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0))
+    .slice(0, 3);
+  const topLikedText =
+    topLiked.length > 0
+      ? topLiked.map((q) => `  - (❤️ ${q.likeCount}) ${q.content}`).join("\n")
+      : "  (좋아요를 받은 질문 없음)";
 
   const formatComment = (comment: CommentSummary, index: number) => {
     const roleLabel = comment.authorRole === "STUDENT" ? "학생" : "교사/AI";
@@ -93,19 +106,21 @@ export function buildSessionAnalysisPrompt(
             .slice(0, 8)
             .map(formatComment)
             .join("\n");
-          return `${i + 1}. [${q.closure === "closed" ? "폐쇄" : "개방"}·${
+          const kindLabel = q.kind === "deployed" ? "배포" : "학생";
+          return `${i + 1}. [${kindLabel}·${q.closure === "closed" ? "폐쇄" : "개방"}·${
             q.cognitive === "factual" ? "사실" :
             q.cognitive === "conceptual" ? "개념" : "논쟁"
-          }] ${q.content}${commentLines ? `\n${commentLines}` : "\n  (댓글 없음)"}`;
+          }·❤️${q.likeCount ?? 0}] ${q.content}${commentLines ? `\n${commentLines}` : "\n  (댓글 없음)"}`;
         }).join("\n")
       : "(질문 없음)";
 
-  return `당신은 교사의 수업 분석을 도와주는 교육 전문 AI입니다. 아래 수업 세션에서 학생들이 제출한 질문과 그 질문에 이어진 댓글 대화를 함께 분석해 주세요.
+  return `당신은 교사의 수업 분석을 도와주는 교육 전문 AI입니다. 아래 수업 세션에서 학생들이 제출한 질문과, 교사가 배포한 탐구설계 질문, 그리고 학생들이 누른 좋아요와 작성한 댓글 대화를 함께 분석해 주세요.
 
 [수업 정보]
 - 교과: ${subject}
 - 주제: ${topic || "미지정"}
-- 총 질문 수: ${total}개
+- 총 질문 수: ${total}개 (학생 질문 + 교사가 배포한 탐구설계 질문)
+- 총 좋아요 수: ${totalLikes}개
 - 총 댓글 수: ${totalComments}개
 - 학생 댓글 / 교사·AI 댓글: ${studentCommentCount} / ${teacherCommentCount}
 - 폐쇄형 / 개방형: ${closedCount} / ${openCount}
@@ -118,20 +133,29 @@ export function buildSessionAnalysisPrompt(
 - 개념적: 추론·분석·비교를 통해 개념과 원리의 관계를 탐색
 - 논쟁적: 판단·의견·가치 기준을 세워 여러 관점을 비교
 
-[학생 질문 및 댓글 흐름]
+[표기 안내]
+- 각 질문 앞 [ ] 안: 질문 종류(학생/배포)·폐쇄·개방·인지수준·좋아요 수(❤️)
+- "배포"는 교사가 탐구설계로 학생에게 배포한 질문, "학생"은 학생이 직접 만든 질문입니다.
+
+[공감(좋아요)을 많이 받은 질문]
+${topLikedText}
+
+[질문·좋아요·댓글 흐름]
 ${questionList}
 
 분석 관점:
 - 질문 자체의 수준과 분포를 해석하세요.
+- 좋아요(공감)가 어떤 질문에 몰렸는지로 학생들이 무엇에 흥미·공감했는지 해석하세요.
 - 학생 댓글에서 드러난 이해, 오개념, 추가 궁금증, 상호작용의 깊이를 해석하세요.
 - 교사·AI 댓글이 학생 사고를 확장하는 데 충분했는지도 간단히 판단하세요.
-- 댓글이 거의 없으면 다음 수업에서 댓글 참여를 촉진할 방법을 제안하세요.
+- 좋아요나 댓글 참여가 저조하면 다음 수업에서 참여를 높일 방법을 제안하세요.
 
 아래 JSON 형식으로만 응답하세요:
 {
-  "summary": "학생들이 어떤 내용에 관심을 가졌는지, 질문과 댓글 흐름이 어떤 의미인지 2~3문장으로 요약",
+  "summary": "학생들이 어떤 내용에 관심을 가졌는지, 질문·좋아요·댓글 흐름이 어떤 의미인지 2~3문장으로 요약",
   "themes": ["핵심 주제 키워드 3~5개"],
-  "insights": "질문 분포와 댓글 대화를 바탕으로 다음 수업 방향 2~3문장",
-  "commentInsights": "학생 댓글에서 드러난 이해 수준, 오개념, 상호작용 깊이, 댓글 참여를 높일 방법을 2~3문장"
+  "insights": "질문 분포와 대화를 바탕으로 다음 수업 방향 2~3문장",
+  "commentInsights": "학생 댓글에서 드러난 이해 수준, 오개념, 상호작용 깊이, 댓글 참여를 높일 방법을 2~3문장",
+  "engagementInsights": "좋아요·댓글 참여 양상(어떤 질문에 공감이 몰렸는지, 참여가 활발/저조한지)과 참여를 높일 방법을 2~3문장"
 }`;
 }
