@@ -521,17 +521,6 @@ export default function TeacherSessionsPage() {
   );
 }
 
-interface SessionAnalysisResult {
-  summary: string;
-  themes: string[];
-  insights: string;
-  commentInsights?: string;
-  engagementInsights?: string;
-  totalQuestions: number;
-  totalComments: number;
-  totalLikes?: number;
-}
-
 function SessionRow({
   session,
   onDelete,
@@ -549,35 +538,8 @@ function SessionRow({
   onToggleCommentsVisible: (id: string, current: boolean) => void;
   onPublish: (s: QuestionSession) => void;
 }) {
-  const [analysis, setAnalysis] = useState<SessionAnalysisResult | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisOpen, setAnalysisOpen] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-
-  const runAnalysis = async () => {
-    if (analysisOpen) {
-      setAnalysisOpen(false);
-      return;
-    }
-    setAnalysisOpen(true);
-    if (analysis || analyzing) return;
-    setAnalyzing(true);
-    setAnalysisError(null);
-    try {
-      const res = await fetch(`/api/sessions/${session.id}/analysis`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "분석에 실패했습니다");
-      setAnalysis(data);
-    } catch (e) {
-      setAnalysisError(e instanceof Error ? e.message : "분석에 실패했습니다");
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
   return (
-    <div className={session.isActive ? "bg-white" : "bg-gray-50"}>
-      <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "hover:bg-gray-50" : "hover:bg-gray-100"}`}>
+    <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}`}>
       <div className="flex items-center gap-3 min-w-0">
         <span className={`shrink-0 w-2 h-2 rounded-full ${session.isActive ? "bg-green-500" : "bg-gray-300"}`} />
         <div className="min-w-0">
@@ -612,14 +574,6 @@ function SessionRow({
         </div>
       </div>
       <div className="flex items-center gap-5 shrink-0">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 px-2 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-          onClick={runAnalysis}
-        >
-          🤖 AI 분석 {analysisOpen ? "▾" : "▸"}
-        </Button>
         {session.unitDesignId && (
           <Button
             variant="outline"
@@ -655,57 +609,6 @@ function SessionRow({
           삭제
         </Button>
       </div>
-      </div>
-
-      {/* AI 분석 결과 패널 (질문·좋아요·댓글 종합 분석) */}
-      {analysisOpen && (
-        <div className="border-t bg-emerald-50/40 px-4 py-3">
-          {analyzing ? (
-            <p className="text-sm text-gray-500">🤖 학생들의 질문·좋아요·댓글을 분석하는 중...</p>
-          ) : analysisError ? (
-            <p className="text-sm text-red-600">{analysisError}</p>
-          ) : analysis ? (
-            <div className="space-y-3 text-sm">
-              <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-                <span>질문 {analysis.totalQuestions}개</span>
-                <span>· 좋아요 {analysis.totalLikes ?? 0}개</span>
-                <span>· 댓글 {analysis.totalComments}개</span>
-              </div>
-              {analysis.themes.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {analysis.themes.map((t, i) => (
-                    <span key={i} className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">#{t}</span>
-                  ))}
-                </div>
-              )}
-              {analysis.summary && (
-                <div>
-                  <p className="font-semibold text-gray-800">📌 요약</p>
-                  <p className="text-gray-600">{analysis.summary}</p>
-                </div>
-              )}
-              {analysis.engagementInsights && (
-                <div>
-                  <p className="font-semibold text-gray-800">❤️ 좋아요·참여 분석</p>
-                  <p className="text-gray-600">{analysis.engagementInsights}</p>
-                </div>
-              )}
-              {analysis.commentInsights && (
-                <div>
-                  <p className="font-semibold text-gray-800">💬 댓글 분석</p>
-                  <p className="text-gray-600">{analysis.commentInsights}</p>
-                </div>
-              )}
-              {analysis.insights && (
-                <div>
-                  <p className="font-semibold text-gray-800">🧭 다음 수업 제안</p>
-                  <p className="text-gray-600">{analysis.insights}</p>
-                </div>
-              )}
-            </div>
-          ) : null}
-        </div>
-      )}
     </div>
   );
 }

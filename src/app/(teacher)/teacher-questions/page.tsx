@@ -73,8 +73,10 @@ interface SessionAnalysis {
   themes: string[];
   insights: string;
   commentInsights?: string;
+  engagementInsights?: string;
   totalQuestions: number;
   totalComments?: number;
+  totalLikes?: number;
 }
 
 interface ParticipantStudent {
@@ -794,21 +796,21 @@ export default function QuestionsPage() {
           {showParticipation && participation && (
             <CardContent>
               <div className="flex items-center gap-3 mb-4">
-                <span className="text-sm text-gray-600">
-                  <span className="font-semibold text-green-700">{participation.submittedCount}</span>
+                <span className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-green-700 dark:text-green-400">{participation.submittedCount}</span>
                   /{participation.totalStudents}명 제출
                 </span>
-                <div className="flex rounded-md border border-gray-200 overflow-hidden ml-auto">
+                <div className="flex rounded-md border border-border overflow-hidden ml-auto">
                   {(["all", "submitted", "not-submitted"] as const).map((f, i) => (
                     <button
                       key={f}
                       onClick={() => setParticipationFilter(f)}
                       className={`px-3 py-1 text-xs font-medium transition-colors ${
-                        i > 0 ? "border-l border-gray-200" : ""
+                        i > 0 ? "border-l border-border" : ""
                       } ${
                         participationFilter === f
                           ? "bg-indigo-600 text-white"
-                          : "bg-white text-gray-600 hover:bg-gray-50"
+                          : "bg-background text-muted-foreground hover:bg-muted"
                       }`}
                     >
                       {f === "all" ? "전체" : f === "submitted" ? "제출" : "미제출"}
@@ -816,19 +818,19 @@ export default function QuestionsPage() {
                   ))}
                 </div>
               </div>
-              <div className="rounded-lg border overflow-hidden">
+              <div className="rounded-lg border border-border overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-muted">
                     <tr>
-                      <th className="text-left px-3 py-2 font-medium text-gray-600 w-24">학년·반·번호</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-600">학생</th>
-                      <th className="text-center px-3 py-2 font-medium text-gray-600 w-16">질문 작성</th>
-                      <th className="text-center px-3 py-2 font-medium text-gray-600 w-16">댓글 작성</th>
-                      <th className="text-center px-3 py-2 font-medium text-gray-600 w-16">좋아요</th>
-                      <th className="text-center px-3 py-2 font-medium text-gray-600 w-14">제출</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground w-24">학년·반·번호</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">학생</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">질문 작성</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">댓글 작성</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">좋아요</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-14">제출</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-border">
                     {participation.students
                       .filter((s) =>
                         participationFilter === "all"
@@ -838,8 +840,8 @@ export default function QuestionsPage() {
                           : !s.hasQuestion
                       )
                       .map((s) => (
-                        <tr key={s.id} className={s.hasQuestion ? "bg-white" : "bg-gray-50/50"}>
-                          <td className="px-3 py-2 text-xs text-gray-500">
+                        <tr key={s.id} className={s.hasQuestion ? "bg-background" : "bg-muted/40"}>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">
                             {[
                               s.grade && `${s.grade}학년`,
                               s.className && `${s.className}반`,
@@ -848,17 +850,17 @@ export default function QuestionsPage() {
                               .filter(Boolean)
                               .join(" ")}
                           </td>
-                          <td className="px-3 py-2 font-medium text-gray-900">{s.name}</td>
-                          <td className="px-3 py-2 text-center text-sm font-semibold text-gray-700">{s.questionCount}</td>
-                          <td className="px-3 py-2 text-center text-sm font-semibold text-indigo-600">{s.commentCount}</td>
-                          <td className="px-3 py-2 text-center text-sm font-semibold text-rose-500">{s.likeCount}</td>
+                          <td className="px-3 py-2 font-medium text-foreground">{s.name}</td>
+                          <td className="px-3 py-2 text-center text-sm font-semibold text-foreground">{s.questionCount}</td>
+                          <td className="px-3 py-2 text-center text-sm font-semibold text-indigo-600 dark:text-indigo-400">{s.commentCount}</td>
+                          <td className="px-3 py-2 text-center text-sm font-semibold text-rose-500 dark:text-rose-400">{s.likeCount}</td>
                           <td className="px-3 py-2 text-center">
                             {s.hasQuestion ? (
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold">
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold dark:bg-green-950/50 dark:text-green-400">
                                 ✓
                               </span>
                             ) : (
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-400 text-xs">
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs">
                                 -
                               </span>
                             )}
@@ -874,7 +876,7 @@ export default function QuestionsPage() {
                     ? s.hasQuestion
                     : !s.hasQuestion
                 ).length === 0 && (
-                  <div className="text-center py-6 text-gray-400 text-sm">
+                  <div className="text-center py-6 text-muted-foreground text-sm">
                     {participationFilter === "submitted"
                       ? "제출한 학생이 없습니다"
                       : "미제출 학생이 없습니다"}
@@ -907,27 +909,34 @@ export default function QuestionsPage() {
           {(sessionAnalysis || sessionAnalysisError) && (
             <CardContent className="space-y-4">
               {sessionAnalysisError ? (
-                <p className="text-sm text-red-600">{sessionAnalysisError}</p>
+                <p className="text-sm text-red-600 dark:text-red-400">{sessionAnalysisError}</p>
               ) : sessionAnalysis ? (
                 <>
-                  <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1">질문 {sessionAnalysis.totalQuestions}개</span>
-                    <span className="rounded-full bg-gray-100 px-2.5 py-1">댓글 {sessionAnalysis.totalComments ?? 0}개</span>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">질문 {sessionAnalysis.totalQuestions}개</span>
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">좋아요 {sessionAnalysis.totalLikes ?? 0}개</span>
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">댓글 {sessionAnalysis.totalComments ?? 0}개</span>
                   </div>
-                  <div className="rounded-lg bg-gray-50 p-4 text-sm leading-6 text-gray-800">{sessionAnalysis.summary}</div>
+                  <div className="rounded-lg bg-muted p-4 text-sm leading-6 text-foreground">{sessionAnalysis.summary}</div>
                   <div className="flex flex-wrap gap-2">
                     {sessionAnalysis.themes.map((theme) => (
-                      <span key={theme} className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">{theme}</span>
+                      <span key={theme} className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">{theme}</span>
                     ))}
                   </div>
-                  <div className="rounded-lg bg-amber-50 p-4">
-                    <p className="text-xs font-semibold text-amber-800">교사 시사점</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950">{sessionAnalysis.insights}</p>
+                  <div className="rounded-lg bg-amber-50 p-4 dark:bg-amber-950/30">
+                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">교사 시사점</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950 dark:text-amber-100">{sessionAnalysis.insights}</p>
                   </div>
+                  {sessionAnalysis.engagementInsights && (
+                    <div className="rounded-lg bg-rose-50 p-4 dark:bg-rose-950/30">
+                      <p className="text-xs font-semibold text-rose-800 dark:text-rose-300">❤️ 좋아요·참여 분석</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-rose-950 dark:text-rose-100">{sessionAnalysis.engagementInsights}</p>
+                    </div>
+                  )}
                   {sessionAnalysis.commentInsights && (
-                    <div className="rounded-lg bg-emerald-50 p-4">
-                      <p className="text-xs font-semibold text-emerald-800">댓글 대화 분석</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950">{sessionAnalysis.commentInsights}</p>
+                    <div className="rounded-lg bg-emerald-50 p-4 dark:bg-emerald-950/30">
+                      <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">댓글 대화 분석</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950 dark:text-emerald-100">{sessionAnalysis.commentInsights}</p>
                     </div>
                   )}
                 </>
