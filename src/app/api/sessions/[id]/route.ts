@@ -18,6 +18,7 @@ const updateSchema = z.object({
     .array(z.object({ type: z.string(), content: z.string() }).passthrough())
     .optional(),
   defaultQuestionPublic: z.boolean().optional(),
+  likesVisibleToPeers: z.boolean().optional(),
   commentsVisibleToPeers: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });

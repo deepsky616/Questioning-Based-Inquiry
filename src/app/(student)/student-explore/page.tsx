@@ -40,6 +40,7 @@ interface Question {
   likeCount: number;
   commentCount?: number;
   myLike: boolean;
+  likesVisibleToPeers?: boolean;
 }
 
 
@@ -160,7 +161,7 @@ function QuestionCard({
             <span className={`text-xs px-2 py-1 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>
               {COGNITIVE_LABEL[q.cognitive]}
             </span>
-            {likesEnabled && (
+            {likesEnabled && q.likesVisibleToPeers !== false && (
               <LikeButton
                 questionId={q.id}
                 authorId={q.author.id}

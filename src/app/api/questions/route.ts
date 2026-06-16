@@ -122,7 +122,7 @@ export async function GET(req: Request) {
         select: { id: true, name: true, className: true, grade: true, studentNumber: true },
       },
       session: {
-        select: { id: true, date: true, subject: true, topic: true },
+        select: { id: true, date: true, subject: true, topic: true, likesVisibleToPeers: true },
       },
       comments: {
         include: {
@@ -143,6 +143,7 @@ export async function GET(req: Request) {
     ...q,
     likeCount: q.likes.length,
     commentCount: q.comments.length,
+    likesVisibleToPeers: q.session?.likesVisibleToPeers ?? true,
     myLike: q.likes.some((l) => l.userId === userId),
     likedBy: role === "TEACHER"
       ? q.likes.map((l) => ({ id: l.user.id, name: l.user.name }))

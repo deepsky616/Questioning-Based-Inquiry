@@ -13,6 +13,9 @@ const createSchema = z.object({
   targetStudentId: z.string().nullable().optional(),
   targetStudentIds: z.array(z.string()).optional().default([]),
   defaultQuestionPublic: z.boolean().optional().default(true),
+  likesVisibleToPeers: z.boolean().optional().default(true),
+  commentsVisibleToPeers: z.boolean().optional().default(false),
+  isActive: z.boolean().optional().default(true),
 });
 
 export async function GET() {
@@ -72,7 +75,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { date, subject, topic, targetType, targetGrade, targetClassName, targetStudentId, targetStudentIds, defaultQuestionPublic } =
+    const { date, subject, topic, targetType, targetGrade, targetClassName, targetStudentId, targetStudentIds, defaultQuestionPublic, likesVisibleToPeers, commentsVisibleToPeers, isActive } =
       createSchema.parse(body);
 
     const teacherId = (session.user as any).id as string;
@@ -90,6 +93,9 @@ export async function POST(req: Request) {
           ? targetStudentIds
           : [],
         defaultQuestionPublic,
+        likesVisibleToPeers,
+        commentsVisibleToPeers,
+        isActive,
       },
     });
     return NextResponse.json(newSession, { status: 201 });

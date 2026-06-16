@@ -29,6 +29,7 @@ interface QuestionSession {
   teacher: { name: string };
   unitDesignId?: string | null;
   defaultQuestionPublic: boolean;
+  likesVisibleToPeers: boolean;
   commentsVisibleToPeers: boolean;
   isActive: boolean;
   targetType?: string | null;
@@ -52,6 +53,9 @@ export default function TeacherSessionsPage() {
     subject: "",
     topic: "",
     defaultQuestionPublic: true,
+    likesVisibleToPeers: true,
+    commentsVisibleToPeers: false,
+    isActive: true,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -140,6 +144,9 @@ export default function TeacherSessionsPage() {
         subject: getSubjectsForGrade(getTargetGrade(prev.targetClassValue, targetClasses, students))[0] ?? "",
         topic: "",
         defaultQuestionPublic: true,
+        likesVisibleToPeers: true,
+        commentsVisibleToPeers: false,
+        isActive: true,
       }));
       setMsg({ type: "success", text: "세션이 추가됐습니다" });
     } catch {
@@ -202,6 +209,23 @@ export default function TeacherSessionsPage() {
     if (!res.ok) {
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, commentsVisibleToPeers: currentValue } : s))
+      );
+    }
+  };
+
+  const handleToggleLikes = async (id: string, currentValue: boolean) => {
+    const next = !currentValue;
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, likesVisibleToPeers: next } : s))
+    );
+    const res = await fetch(`/api/sessions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ likesVisibleToPeers: next }),
+    });
+    if (!res.ok) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, likesVisibleToPeers: currentValue } : s))
       );
     }
   };
@@ -280,17 +304,45 @@ export default function TeacherSessionsPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-800">이 세션 질문 기본 공개</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  켜면 학생이 이 세션에서 만든 질문이 저장 즉시 공개됩니다. 학생은 직접 변경할 수 없습니다.
-                </p>
+                <p className="text-sm font-medium text-gray-800">학생 활성화</p>
+                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 이 세션에서 질문을 작성할 수 있습니다.</p>
+              </div>
+              <Switch
+                checked={sessForm.isActive}
+                onCheckedChange={(v) => setSessForm((p) => ({ ...p, isActive: v }))}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-800">질문 공개</p>
+                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 만든 질문이 저장 즉시 공개됩니다. 학생은 직접 변경할 수 없습니다.</p>
               </div>
               <Switch
                 checked={sessForm.defaultQuestionPublic}
                 onCheckedChange={(v) => setSessForm((p) => ({ ...p, defaultQuestionPublic: v }))}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-800">좋아요 공개</p>
+                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 서로의 질문에 좋아요를 누르고 좋아요 수를 볼 수 있습니다.</p>
+              </div>
+              <Switch
+                checked={sessForm.likesVisibleToPeers}
+                onCheckedChange={(v) => setSessForm((p) => ({ ...p, likesVisibleToPeers: v }))}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-800">댓글 공개</p>
+                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 서로의 댓글(답변)을 볼 수 있습니다. 끄면 본인과 선생님 댓글만 보입니다.</p>
+              </div>
+              <Switch
+                checked={sessForm.commentsVisibleToPeers}
+                onCheckedChange={(v) => setSessForm((p) => ({ ...p, commentsVisibleToPeers: v }))}
               />
             </div>
           </div>
@@ -395,6 +447,7 @@ export default function TeacherSessionsPage() {
                   <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
                     <span className="w-16 text-center">학생 활성화</span>
                     <span className="w-16 text-center">질문 공개</span>
+                    <span className="w-16 text-center">좋아요 공개</span>
                     <span className="w-16 text-center">댓글 공개</span>
                   </div>
                 </div>
@@ -408,6 +461,7 @@ export default function TeacherSessionsPage() {
                       onDelete={handleDelete}
                       onToggleActive={handleToggleActive}
                       onTogglePublic={handleTogglePublic}
+                      onToggleLikes={handleToggleLikes}
                       onToggleCommentsVisible={handleToggleCommentsVisible}
                       onPublish={setPublishTarget}
                     />
@@ -429,6 +483,7 @@ export default function TeacherSessionsPage() {
                   <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
                     <span className="w-16 text-center">학생 활성화</span>
                     <span className="w-16 text-center">질문 공개</span>
+                    <span className="w-16 text-center">좋아요 공개</span>
                     <span className="w-16 text-center">댓글 공개</span>
                   </div>
                 </div>
@@ -442,6 +497,7 @@ export default function TeacherSessionsPage() {
                       onDelete={handleDelete}
                       onToggleActive={handleToggleActive}
                       onTogglePublic={handleTogglePublic}
+                      onToggleLikes={handleToggleLikes}
                       onToggleCommentsVisible={handleToggleCommentsVisible}
                       onPublish={setPublishTarget}
                     />
@@ -470,6 +526,7 @@ function SessionRow({
   onDelete,
   onToggleActive,
   onTogglePublic,
+  onToggleLikes,
   onToggleCommentsVisible,
   onPublish,
 }: {
@@ -477,6 +534,7 @@ function SessionRow({
   onDelete: (id: string) => void;
   onToggleActive: (id: string, current: boolean) => void;
   onTogglePublic: (id: string, current: boolean) => void;
+  onToggleLikes: (id: string, current: boolean) => void;
   onToggleCommentsVisible: (id: string, current: boolean) => void;
   onPublish: (s: QuestionSession) => void;
 }) {
@@ -494,6 +552,9 @@ function SessionRow({
             )}
             {!session.defaultQuestionPublic && (
               <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">질문 비공개</span>
+            )}
+            {!session.likesVisibleToPeers && (
+              <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded">좋아요 비공개</span>
             )}
             {!session.commentsVisibleToPeers && (
               <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">댓글 서로 비공개</span>
@@ -530,6 +591,10 @@ function SessionRow({
         <Switch
           checked={session.defaultQuestionPublic}
           onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)}
+        />
+        <Switch
+          checked={session.likesVisibleToPeers}
+          onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)}
         />
         <Switch
           checked={session.commentsVisibleToPeers}
