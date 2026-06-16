@@ -61,10 +61,10 @@ export function QuestionSequencePanel({
   }
 
   const toggles: [keyof DeploySettings, string, string][] = [
-    ["isActive", "학생 활성화", "학생이 이 세션에서 활동할 수 있어요"],
-    ["defaultQuestionPublic", "질문 공개", "배포 질문을 학생이 볼 수 있어요"],
-    ["likesVisibleToPeers", "좋아요 공개", "서로의 좋아요를 볼 수 있어요"],
-    ["commentsVisibleToPeers", "댓글 공개", "서로의 댓글을 볼 수 있어요(끄면 본인·선생님 댓글만)"],
+    ["isActive", "학생 활성화", "켜면 학생이 배포된 질문에 좋아요·댓글을 남길 수 있어요."],
+    ["defaultQuestionPublic", "질문 공개", "켜면 학생이 작성한 질문을 서로 볼 수 있어요. 끄면 본인 질문만 보여요."],
+    ["likesVisibleToPeers", "좋아요 공개", "켜면 학생이 서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요."],
+    ["commentsVisibleToPeers", "댓글 공개", "켜면 학생이 서로의 댓글을 볼 수 있어요. 끄면 본인·선생님 댓글만 보여요."],
   ];
 
   return (

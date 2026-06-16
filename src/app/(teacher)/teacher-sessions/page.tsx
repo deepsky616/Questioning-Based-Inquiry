@@ -308,7 +308,7 @@ export default function TeacherSessionsPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-800">학생 활성화</p>
-                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 이 세션에서 질문을 작성할 수 있습니다.</p>
+                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 이 세션에서 질문을 작성할 수 있어요.</p>
               </div>
               <Switch
                 checked={sessForm.isActive}
@@ -318,7 +318,7 @@ export default function TeacherSessionsPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-800">질문 공개</p>
-                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 만든 질문이 저장 즉시 공개됩니다. 학생은 직접 변경할 수 없습니다.</p>
+                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 작성한 질문을 서로 볼 수 있어요. 끄면 본인 질문만 보여요.</p>
               </div>
               <Switch
                 checked={sessForm.defaultQuestionPublic}
@@ -328,7 +328,7 @@ export default function TeacherSessionsPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-800">좋아요 공개</p>
-                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 서로의 질문에 좋아요를 누르고 좋아요 수를 볼 수 있습니다.</p>
+                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요.</p>
               </div>
               <Switch
                 checked={sessForm.likesVisibleToPeers}
@@ -338,7 +338,7 @@ export default function TeacherSessionsPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-medium text-gray-800">댓글 공개</p>
-                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 서로의 댓글(답변)을 볼 수 있습니다. 끄면 본인과 선생님 댓글만 보입니다.</p>
+                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 서로의 댓글을 볼 수 있어요. 끄면 본인·선생님 댓글만 보여요.</p>
               </div>
               <Switch
                 checked={sessForm.commentsVisibleToPeers}

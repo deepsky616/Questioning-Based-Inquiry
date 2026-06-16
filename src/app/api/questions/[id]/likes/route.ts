@@ -21,11 +21,16 @@ export async function POST(_req: Request, { params }: Params) {
   try {
     const question = await prisma.question.findUnique({
       where: { id: questionId },
-      select: { authorId: true, isPublic: true },
+      select: { authorId: true, isPublic: true, session: { select: { isActive: true } } },
     });
 
     if (!question) {
       return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
+    }
+
+    // 세션이 비활성화돼 있으면 학생은 좋아요를 누를 수 없다(댓글과 동일)
+    if (question.session && !question.session.isActive && role !== "TEACHER") {
+      return NextResponse.json({ error: "선생님이 아직 활동을 열지 않았어요." }, { status: 403 });
     }
 
     const check = canLikeQuestion({
