@@ -36,10 +36,13 @@ export async function GET(req: NextRequest) {
   const qIds = Array.from(new Set(logs.map((l) => l.relatedQuestionId).filter((x): x is string => !!x)));
   const cIds = Array.from(new Set(logs.map((l) => l.relatedCommentId).filter((x): x is string => !!x)));
   const [qMap, cMap] = await Promise.all([
-    prisma.question.findMany({ where: { id: { in: qIds } }, select: { id: true, content: true } }),
+    prisma.question.findMany({
+      where: { id: { in: qIds } },
+      select: { id: true, content: true, _count: { select: { likes: true } } },
+    }),
     prisma.comment.findMany({ where: { id: { in: cIds } }, select: { id: true, content: true } }),
   ]);
-  const qBy = new Map(qMap.map((q) => [q.id, q.content]));
+  const qBy = new Map(qMap.map((q) => [q.id, { content: q.content, likeCount: q._count.likes }]));
   const cBy = new Map(cMap.map((c) => [c.id, c.content]));
 
   return NextResponse.json({
@@ -55,7 +58,8 @@ export async function GET(req: NextRequest) {
       sessionId: l.sessionId,
       relatedQuestionId: l.relatedQuestionId,
       relatedCommentId: l.relatedCommentId,
-      questionContent: l.relatedQuestionId ? qBy.get(l.relatedQuestionId) ?? "" : "",
+      questionContent: l.relatedQuestionId ? qBy.get(l.relatedQuestionId)?.content ?? "" : "",
+      questionLikeCount: l.relatedQuestionId ? qBy.get(l.relatedQuestionId)?.likeCount ?? 0 : null,
       commentContent: l.relatedCommentId ? cBy.get(l.relatedCommentId) ?? "" : "",
       aiAnalysis: l.aiAnalysis,
       createdAt: l.createdAt,

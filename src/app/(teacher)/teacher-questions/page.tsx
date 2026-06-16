@@ -946,7 +946,7 @@ export default function QuestionsPage() {
       {hasQuestionList && (
         <div className="flex items-center gap-3 flex-wrap justify-between">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-semibold text-foreground">📝 전체 질문 목록 <span className="font-normal text-muted-foreground">{filtered.length}개</span></span>
+            <span className="text-sm font-semibold text-foreground">📝 전체 질문 목록 <span className="font-normal text-muted-foreground">총 {filtered.length}개</span></span>
             <Input
               placeholder="질문 또는 이름으로 검색..."
               value={search}
@@ -1014,9 +1014,11 @@ export default function QuestionsPage() {
           <button
             type="button"
             onClick={() => setShowSequence((v) => !v)}
-            className="text-sm font-bold text-indigo-600"
+            className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight text-indigo-700 hover:text-indigo-800 transition-colors"
           >
-            {showSequence ? "▾ 질문 중심 탐구설계 닫기" : "▸ 질문 중심 탐구설계 (묶기·순서·배포)"}
+            <span className="text-xl">🧩</span>
+            질문 중심 탐구설계
+            <span className="text-base text-indigo-400">{showSequence ? "▾" : "▸"}</span>
           </button>
           {showSequence && (
             <div className="mt-3">

@@ -509,7 +509,7 @@ export default function StudentsPage() {
                     {classLabel}
                   </span>
                   <span className="text-sm font-normal text-gray-500">
-                    {classStudents.length}명
+                    총 {classStudents.length}명
                   </span>
                 </CardTitle>
                 <CardDescription>

@@ -16,6 +16,7 @@ interface PendingLog {
   relatedQuestionId: string | null;
   relatedCommentId: string | null;
   questionContent: string;
+  questionLikeCount: number | null;
   commentContent: string;
   aiAnalysis: string | null;
   createdAt: string;
@@ -192,7 +193,7 @@ export default function TeacherReviewPage() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">AI 추천 보너스 ({normalRows.length})</CardTitle>
+            <CardTitle className="text-base">추천 보너스 · 총 {normalRows.length}개</CardTitle>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={toggleAll} disabled={normalRows.length === 0}>
                 {selected.size === pending.length ? "선택 해제" : "전체 선택"}
@@ -254,6 +255,9 @@ function PendingRow({
               {b.emoji} {b.label}
               {!isDup && <span className="ml-1">+{p.points}점</span>}
             </span>
+            {p.relatedQuestionId && p.questionLikeCount != null && (
+              <span className="text-xs font-medium text-rose-500">❤️ {p.questionLikeCount}</span>
+            )}
           </div>
           <div className="mt-1.5 text-xs">
             <span className="text-gray-400">{targetLabel}: </span>
