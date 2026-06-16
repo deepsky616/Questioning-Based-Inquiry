@@ -374,7 +374,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             return (
               <button key={c.id} onClick={() => !flipped && userFlip(c)}
                 disabled={flipped || revealed.length >= 2 || !isHumanTurn}
-                className="aspect-[3/4] rounded-xl border-2 flex items-center justify-center text-xs text-center p-1.5 transition-all"
+                className="aspect-[3/4] overflow-hidden rounded-xl border-2 flex items-center justify-center text-center p-2 transition-all"
                 style={{
                   background: tk ? "#dbeafe33" : flipped ? "#dbeafe" : "linear-gradient(135deg, #3b82f6, #2563eb)",
                   borderColor: tk ? "transparent" : flipped ? "#3b82f6" : "#1e40af",
@@ -383,7 +383,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
                   cursor: !isHumanTurn || flipped ? "default" : "pointer",
                 }}>
                 {flipped ? (
-                  <span className="text-[10px] leading-tight">{pair?.question ?? "?"}</span>
+                  <span className="text-sm sm:text-base font-semibold leading-snug break-keep">{pair?.question ?? "?"}</span>
                 ) : (
                   <span className="text-3xl">❓</span>
                 )}
@@ -404,7 +404,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             return (
               <button key={c.id} onClick={() => !flipped && userFlip(c)}
                 disabled={flipped || revealed.length !== 1 || !isHumanTurn}
-                className="aspect-[3/4] rounded-xl border-2 flex items-center justify-center text-xs text-center p-1.5 transition-all"
+                className="aspect-[3/4] overflow-hidden rounded-xl border-2 flex items-center justify-center text-center p-2 transition-all"
                 style={{
                   background: tk ? "#fef3c733" : flipped ? "#fef3c7" : "linear-gradient(135deg, #f59e0b, #d97706)",
                   borderColor: tk ? "transparent" : flipped ? "#f59e0b" : "#92400e",
@@ -413,7 +413,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
                   cursor: !isHumanTurn || flipped ? "default" : "pointer",
                 }}>
                 {flipped ? (
-                  <span className="text-[10px] leading-tight">{pair?.answer ?? "!"}</span>
+                  <span className="text-sm sm:text-base font-semibold leading-snug break-keep">{pair?.answer ?? "!"}</span>
                 ) : (
                   <span className="text-3xl">❗</span>
                 )}
