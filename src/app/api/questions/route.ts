@@ -111,6 +111,7 @@ export async function GET(req: Request) {
   const userId = session.user.id;
   const likeSortParam = searchParams.get("likeSort") as "asc" | "desc" | null;
   const commentSortParam = searchParams.get("commentSort") as "asc" | "desc" | null;
+  const studentSortParam = searchParams.get("studentSort") as "asc" | "desc" | null;
 
   const questions = await prisma.question.findMany({
     where,
@@ -147,8 +148,18 @@ export async function GET(req: Request) {
     likes: undefined,
   }));
 
-  // 정렬 기준은 좋아요순·댓글순 중 하나만 적용한다(클라이언트가 단일 기준 전송).
-  if (commentSortParam === "desc") {
+  // 정렬 기준은 학생순·좋아요순·댓글순 중 하나만 적용한다(클라이언트가 단일 기준 전송).
+  if (studentSortParam) {
+    const num = (v?: string | null) => {
+      const n = parseInt(v ?? "", 10);
+      return Number.isNaN(n) ? Number.POSITIVE_INFINITY : n;
+    };
+    const cmp = (a: typeof enriched[number], b: typeof enriched[number]) =>
+      num(a.author.grade) - num(b.author.grade) ||
+      num(a.author.className) - num(b.author.className) ||
+      num(a.author.studentNumber) - num(b.author.studentNumber);
+    enriched.sort((a, b) => (studentSortParam === "desc" ? -cmp(a, b) : cmp(a, b)));
+  } else if (commentSortParam === "desc") {
     enriched.sort((a, b) => b.commentCount - a.commentCount);
   } else if (commentSortParam === "asc") {
     enriched.sort((a, b) => a.commentCount - b.commentCount);

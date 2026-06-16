@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CommentThread } from "@/components/shared/CommentThread";
+import { formatDateTime } from "@/lib/datetime";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
@@ -64,8 +66,7 @@ export default function HistoryPage() {
   const [search, setSearch] = useState("");
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
-  const [commentsByQuestion, setCommentsByQuestion] = useState<Record<string, Comment[]>>({});
-  const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
+  const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // 조회 모드
@@ -131,26 +132,8 @@ export default function HistoryPage() {
     sortDir === "desc" ? sortKey(b) - sortKey(a) : sortKey(a) - sortKey(b)
   );
 
-  const toggleComments = async (questionId: string) => {
-    if (expandedQuestionId === questionId) {
-      setExpandedQuestionId(null);
-      return;
-    }
-
-    setExpandedQuestionId(questionId);
-    if (commentsByQuestion[questionId]) return;
-
-    setLoadingComments((prev) => ({ ...prev, [questionId]: true }));
-    try {
-      const res = await fetch(`/api/questions/${questionId}/comments`);
-      if (!res.ok) throw new Error("댓글을 불러오지 못했습니다");
-      const data: Comment[] = await res.json();
-      setCommentsByQuestion((prev) => ({ ...prev, [questionId]: data }));
-    } catch {
-      setCommentsByQuestion((prev) => ({ ...prev, [questionId]: [] }));
-    } finally {
-      setLoadingComments((prev) => ({ ...prev, [questionId]: false }));
-    }
+  const toggleComments = (questionId: string) => {
+    setExpandedQuestionId((prev) => (prev === questionId ? null : questionId));
   };
 
   const handleDelete = async (questionId: string) => {
@@ -185,7 +168,7 @@ export default function HistoryPage() {
             <TableHead className="w-24">인지 수준</TableHead>
             <TableHead className="w-24">공개</TableHead>
             <TableHead className="w-32">세션</TableHead>
-            <TableHead className="w-28">날짜</TableHead>
+            <TableHead className="w-36">작성 일시</TableHead>
             <TableHead className="w-16">좋아요</TableHead>
             <TableHead className="w-24">댓글</TableHead>
             <TableHead className="w-20">관리</TableHead>
@@ -193,10 +176,8 @@ export default function HistoryPage() {
         </TableHeader>
         <TableBody>
           {list.map((q, i) => {
-            const comments = commentsByQuestion[q.id] ?? q.comments ?? [];
-            const commentCount = comments.length;
+            const commentCount = commentCountOverride[q.id] ?? q.comments?.length ?? 0;
             const isExpanded = expandedQuestionId === q.id;
-            const isLoadingComments = loadingComments[q.id];
             const isDeleting = deletingId === q.id;
 
             return (
@@ -224,8 +205,8 @@ export default function HistoryPage() {
                   <TableCell className="text-xs text-gray-500 max-w-xs truncate">
                     {q.session ? buildSessionLabel(q.session.date, q.session.subject, q.session.topic) : "—"}
                   </TableCell>
-                  <TableCell className="text-sm text-gray-400">
-                    {new Date(q.createdAt).toLocaleDateString("ko-KR")}
+                  <TableCell className="text-xs text-gray-400 whitespace-nowrap">
+                    {formatDateTime(q.createdAt)}
                   </TableCell>
                   <TableCell className="text-sm text-rose-500">
                     ♥ {q.likeCount ?? 0}
@@ -261,29 +242,10 @@ export default function HistoryPage() {
                 {isExpanded && (
                   <TableRow>
                     <TableCell colSpan={10} className="bg-gray-50/70 px-6 py-4">
-                      {isLoadingComments ? (
-                        <div className="text-sm text-gray-400">댓글을 불러오는 중...</div>
-                      ) : comments.length === 0 ? (
-                        <div className="text-sm text-gray-400">댓글이 없습니다</div>
-                      ) : (
-                        <div className="space-y-3">
-                          {comments.map((comment) => (
-                            <div key={comment.id} className="rounded-md border bg-white p-3">
-                              <div className="flex items-center justify-between gap-3">
-                                <span className="text-sm font-medium text-gray-700">
-                                  {comment.author.name}
-                                </span>
-                                <span className="text-xs text-gray-400">
-                                  {new Date(comment.createdAt).toLocaleDateString("ko-KR")}
-                                </span>
-                              </div>
-                              <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800">
-                                {comment.content}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <CommentThread
+                        questionId={q.id}
+                        onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}
+                      />
                     </TableCell>
                   </TableRow>
                 )}
@@ -370,6 +332,7 @@ export default function HistoryPage() {
             <QuestionSortControl
               field={sortField}
               dir={sortDir}
+              showStudent={false}
               onChange={(f, d) => { setSortField(f); setSortDir(d); }}
             />
           </div>

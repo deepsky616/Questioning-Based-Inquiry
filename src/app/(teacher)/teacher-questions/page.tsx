@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Fragment, useEffect, useState, useCallback } from "react";
+import { CommentThread } from "@/components/shared/CommentThread";
+import { formatDateTime } from "@/lib/datetime";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,7 +33,7 @@ import {
   normalizeCognitiveType,
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
-import { formatBulkAiSummary, countQuestionsWithComments, validatePreviewAnswers } from "@/lib/questions";
+import { formatBulkAiSummary, validatePreviewAnswers } from "@/lib/questions";
 
 interface QuestionSession {
   id: string;
@@ -119,8 +121,6 @@ export default function QuestionsPage() {
   const [participationFilter, setParticipationFilter] = useState<"all" | "submitted" | "not-submitted">("all");
   const [showParticipation, setShowParticipation] = useState(false);
 
-  // 뷰 모드
-  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [showSequence, setShowSequence] = useState(false);
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
@@ -151,14 +151,15 @@ export default function QuestionsPage() {
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
 
-  // 전체 질문 목록 정렬 (좋아요순·댓글순)
-  const [sortField, setSortField] = useState<SortField>("like");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // 전체 질문 목록 정렬 (기본: 학생순 오름차순)
+  const [sortField, setSortField] = useState<SortField>("student");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   // 질문/이름 검색
   const [search, setSearch] = useState("");
-  // 댓글 보기 모달 대상
-  const [commentModalQ, setCommentModalQ] = useState<Question | null>(null);
+  // 댓글 인라인 펼침 대상 + 작성 후 댓글수 갱신
+  const [expandedCommentId, setExpandedCommentId] = useState<string | null>(null);
+  const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
 
   const resetBulkState = () => {
     setSelectedIds(new Set());
@@ -180,7 +181,8 @@ export default function QuestionsPage() {
     if (opts?.topic) params.append("topic", opts.topic);
     const field = opts?.sortField ?? sortField;
     const dir = opts?.sortDir ?? sortDir;
-    params.append(field === "comment" ? "commentSort" : "likeSort", dir);
+    const sortParam = field === "student" ? "studentSort" : field === "comment" ? "commentSort" : "likeSort";
+    params.append(sortParam, dir);
     fetch(`/api/questions?${params}`)
       .then((r) => r.json())
       .then(setQuestions)
@@ -192,15 +194,10 @@ export default function QuestionsPage() {
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((data: QuestionSession[]) => {
-        const sorted = sortSessionsAsc(data);
-        setSessions(sorted);
-        const defaultId = sorted[0]?.id ?? "";
-        setSelectedSessionId(defaultId);
-        if (defaultId) {
-          fetchQuestions(defaultId);
-        } else {
-          setIsLoading(false);
-        }
+        setSessions(sortSessionsAsc(data));
+        // 기본값: 날짜·교과·주제·세션 모두 전체
+        setSelectedSessionId("all");
+        fetchQuestions("all");
       })
       .catch(() => setIsLoading(false));
     // 세션 목록은 최초 1회만 로드한다. (fetchQuestions가 정렬 상태로 재생성돼도
@@ -521,7 +518,8 @@ export default function QuestionsPage() {
         </TableHeader>
         <TableBody>
           {list.map((q) => (
-            <TableRow key={q.id} className={selectedIds.has(q.id) ? "bg-indigo-50/40" : ""}>
+            <Fragment key={q.id}>
+            <TableRow className={selectedIds.has(q.id) ? "bg-indigo-50/40" : ""}>
               <TableCell>
                 <input
                   type="checkbox"
@@ -541,6 +539,7 @@ export default function QuestionsPage() {
               </TableCell>
               <TableCell className="max-w-md">
                 <p className="whitespace-pre-wrap break-words text-sm">{q.content}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(q.createdAt)}</p>
               </TableCell>
               <TableCell>
                 <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
@@ -568,18 +567,14 @@ export default function QuestionsPage() {
                 </div>
               </TableCell>
               <TableCell className="text-center">
-                {(q.comments?.length ?? 0) > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setCommentModalQ(q)}
-                    className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800"
-                    title="댓글 보기"
-                  >
-                    💬 {q.comments!.length}
-                  </button>
-                ) : (
-                  <span className="text-sm text-muted-foreground">💬 0</span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setExpandedCommentId((prev) => (prev === q.id ? null : q.id))}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                  title="댓글 보기·작성"
+                >
+                  💬 {commentCountOverride[q.id] ?? q.comments?.length ?? 0}
+                </button>
               </TableCell>
               <TableCell>
                 <Switch
@@ -601,127 +596,24 @@ export default function QuestionsPage() {
                 </Button>
               </TableCell>
             </TableRow>
+            {expandedCommentId === q.id && (
+              <TableRow>
+                <TableCell colSpan={9} className="bg-muted/30 px-6 py-4">
+                  <CommentThread
+                    questionId={q.id}
+                    preloaded={q.comments ?? []}
+                    onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}
+                  />
+                </TableCell>
+              </TableRow>
+            )}
+            </Fragment>
           ))}
         </TableBody>
       </Table>
     );
   };
 
-  const QuestionCommentCards = ({ list }: { list: Question[] }) => {
-    if (list.length === 0) return (
-      <div className="text-center py-8 text-gray-400 text-sm">해당하는 질문이 없습니다</div>
-    );
-    return (
-      <div className="space-y-4">
-        {list.map((q) => {
-          const studentInfo = [
-            q.author.grade ? `${q.author.grade}학년` : null,
-            q.author.className ? `${q.author.className}반` : null,
-            q.author.studentNumber ? `${q.author.studentNumber}번` : null,
-          ].filter(Boolean).join(" ");
-          const initial = q.author.name.trim().slice(0, 1) || "?";
-
-          return (
-            <div key={q.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-              <div className="border-b bg-gradient-to-r from-indigo-50 via-white to-gray-50 dark:bg-none dark:bg-card px-4 py-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white shadow-sm">
-                    {initial}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex items-center gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-900">{q.author.name}</p>
-                        {studentInfo && (
-                          <p className="text-xs text-gray-500">{studentInfo}</p>
-                        )}
-                      </div>
-                      <div className="ml-auto flex shrink-0 gap-1.5 flex-wrap justify-end">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${CLOSURE_STYLE[q.closure]}`}>
-                          {CLOSURE_LABEL[q.closure]}
-                        </span>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${COGNITIVE_STYLE[q.cognitive]}`}>
-                          {COGNITIVE_LABEL[q.cognitive]}
-                        </span>
-                        <div className="group relative">
-                          <span className="flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-600 cursor-default">
-                            ❤️ {q.likeCount}
-                          </span>
-                          {(q.likedBy?.length ?? 0) > 0 && (
-                            <div className="absolute bottom-full right-0 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-32 shadow-lg">
-                              <p className="font-semibold mb-1">좋아요한 학생</p>
-                              {q.likedBy!.map((u) => (
-                                <p key={u.id} className="truncate">{u.name}</p>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <label className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-600">
-                          공개
-                          <Switch
-                            checked={q.isPublic}
-                            onCheckedChange={() => handleToggleQuestionPublic(q)}
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <p className="break-words text-sm leading-relaxed text-gray-800">{q.content}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-2 px-4 py-3">
-                {(q.comments?.length ?? 0) === 0 ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-xs text-gray-400">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-gray-300 bg-white text-base leading-none text-gray-400">
-                      +
-                    </span>
-                    아직 댓글이 없습니다
-                  </div>
-                ) : (
-                  q.comments!.map((c) => {
-                    const isStudentComment = c.author.name === q.author.name;
-
-                    return (
-                      <div
-                        key={c.id}
-                        className={`rounded-lg border px-3 py-2.5 ${
-                          isStudentComment
-                            ? "border-gray-200 bg-gray-50"
-                            : "border-indigo-100 bg-indigo-50"
-                        }`}
-                      >
-                        <div className="mb-1 flex items-center gap-2">
-                          <span
-                            className={`text-xs font-semibold ${
-                              isStudentComment ? "text-gray-700" : "text-indigo-700"
-                            }`}
-                          >
-                            {c.author.name}
-                          </span>
-                          <span
-                            className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                              isStudentComment
-                                ? "bg-white text-gray-500"
-                                : "bg-white text-indigo-700"
-                            }`}
-                          >
-                            {isStudentComment ? "학생" : "교사 · AI"}
-                          </span>
-                        </div>
-                        <p className={`text-xs leading-relaxed ${isStudentComment ? "text-gray-700" : "text-indigo-950"}`}>
-                          {c.content}
-                        </p>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -1015,50 +907,12 @@ export default function QuestionsPage() {
                 fetchQuestions(selectedSessionId, { sortField: f, sortDir: d });
               }}
             />
-            <div className="flex rounded-md border overflow-hidden">
-              <button
-                onClick={() => setViewMode("table")}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                  viewMode === "table" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                ☰ 목록
-              </button>
-              <button
-                onClick={() => setViewMode("cards")}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors border-l ${
-                  viewMode === "cards" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                ▦ 질문·댓글
-              </button>
-            </div>
           </div>
         </div>
       )}
 
       {isLoading ? (
         <div className="text-center py-16 text-gray-400">로딩 중...</div>
-      ) : viewMode === "cards" ? (
-        /* ── 카드 뷰: 질문 + 댓글 한눈에 보기 ── */
-        <div className="space-y-8">
-          {displayed.length === 0 ? (
-            <div className="text-center py-16 text-gray-400 text-sm">
-              {!selectedSessionId ? "세션을 선택해 주세요" : "해당하는 질문이 없습니다"}
-            </div>
-          ) : (
-            <div>
-              {hasQuestionList && (
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-xs text-gray-400">
-                    댓글 있는 질문 {countQuestionsWithComments(displayed)}개 / 전체 {displayed.length}개
-                  </span>
-                </div>
-              )}
-              <QuestionCommentCards list={displayed} />
-            </div>
-          )}
-        </div>
       ) : !hasQuestionList ? (
         <div className="text-center py-16 text-gray-400 text-sm">세션을 선택해 주세요</div>
       ) : (
@@ -1391,37 +1245,6 @@ export default function QuestionsPage() {
           </div>
         </div>
       )}
-
-      {/* 댓글 보기 모달 (댓글수 클릭 시) */}
-      <Dialog open={!!commentModalQ} onOpenChange={() => setCommentModalQ(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>💬 댓글 {commentModalQ?.comments?.length ?? 0}개</DialogTitle>
-          </DialogHeader>
-          {commentModalQ && (
-            <p className="text-sm text-muted-foreground border-b pb-2 whitespace-pre-wrap break-words">
-              {commentModalQ.content}
-            </p>
-          )}
-          <div className="max-h-[60vh] overflow-y-auto space-y-2">
-            {(commentModalQ?.comments?.length ?? 0) > 0 ? (
-              commentModalQ!.comments!.map((c) => (
-                <div key={c.id} className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-foreground">{c.author.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(c.createdAt).toLocaleDateString("ko-KR")}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 whitespace-pre-wrap break-words text-muted-foreground">{c.content}</p>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">댓글이 없습니다</p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

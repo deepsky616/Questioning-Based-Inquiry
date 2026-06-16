@@ -4,8 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
+import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, compareByStudent, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -16,6 +15,8 @@ import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSes
 import { getSessionUser } from "@/lib/auth-helpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
+import { CommentThread } from "@/components/shared/CommentThread";
+import { formatDateTime } from "@/lib/datetime";
 
 interface QuestionSession {
   id: string;
@@ -26,12 +27,6 @@ interface QuestionSession {
   sharedQuestions?: Array<{ type: string; content: string }>;
 }
 
-interface Comment {
-  id: string;
-  content: string;
-  author: { id: string; name: string };
-  createdAt: string;
-}
 
 interface Question {
   id: string;
@@ -47,90 +42,6 @@ interface Question {
   myLike: boolean;
 }
 
-function CommentSection({ questionId, onCommentAdded }: { questionId: string; onCommentAdded?: () => void }) {
-  const { data: session } = useSession();
-  const user = getSessionUser(session);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [isLoadingComments, setIsLoadingComments] = useState(true);
-  const [newComment, setNewComment] = useState("");
-  const [isPosting, setIsPosting] = useState(false);
-
-  useEffect(() => {
-    fetch(`/api/questions/${questionId}/comments`)
-      .then((r) => r.json())
-      .then(setComments)
-      .catch(() => {})
-      .finally(() => setIsLoadingComments(false));
-  }, [questionId]);
-
-  const handleSubmit = async () => {
-    if (!newComment.trim()) return;
-    setIsPosting(true);
-    try {
-      const res = await fetch(`/api/questions/${questionId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newComment.trim() }),
-      });
-      if (!res.ok) throw new Error();
-      const created: Comment = await res.json();
-      setComments((prev) => [...prev, created]);
-      setNewComment("");
-      onCommentAdded?.();
-    } catch {
-    } finally {
-      setIsPosting(false);
-    }
-  };
-
-  if (isLoadingComments) {
-    return <div className="px-4 py-2 text-xs text-gray-400">댓글 로딩 중...</div>;
-  }
-
-  return (
-    <div className="border-t border-gray-200 bg-white px-4 pt-3 pb-4 space-y-3">
-      {comments.length === 0 ? (
-        <p className="text-xs text-gray-400">아직 댓글이 없습니다</p>
-      ) : (
-        <div className="space-y-2">
-          {comments.map((c) => (
-            <div key={c.id} className="flex gap-2 text-sm">
-              <span className="font-medium text-gray-700 shrink-0">{c.author.name}</span>
-              <span className="text-gray-600 flex-1">{c.content}</span>
-              <span className="text-xs text-gray-400 shrink-0">
-                {new Date(c.createdAt).toLocaleDateString("ko-KR")}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-      {user.id && (
-        <div className="flex gap-2 pt-1">
-          <Input
-            placeholder="댓글을 입력하세요..."
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit();
-              }
-            }}
-            className="text-sm h-8"
-          />
-          <Button
-            size="sm"
-            onClick={handleSubmit}
-            disabled={isPosting || !newComment.trim()}
-            className="h-8 shrink-0"
-          >
-            {isPosting ? "..." : "등록"}
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function LikeButton({
   questionId,
@@ -267,6 +178,7 @@ function QuestionCard({
                 {q.author.studentNumber && ` ${q.author.studentNumber}번`}
               </div>
             )}
+            <div className="text-xs text-gray-400 mt-0.5">{formatDateTime(q.createdAt)}</div>
           </div>
           {commentsEnabled && (
             <button
@@ -280,7 +192,9 @@ function QuestionCard({
         </div>
       </div>
       {commentsEnabled && showComments && (
-        <CommentSection questionId={q.id} onCommentAdded={() => setCommentCount((c) => c + 1)} />
+        <div className="border-t border-gray-200 bg-white px-4 pt-3 pb-4 dark:bg-card">
+          <CommentThread questionId={q.id} onCountChange={setCommentCount} />
+        </div>
       )}
     </div>
   );
@@ -376,6 +290,10 @@ export default function ExplorePage() {
       const aPriority = a.source === "TEACHER_SHARED" ? 0 : 1;
       const bPriority = b.source === "TEACHER_SHARED" ? 0 : 1;
       if (aPriority !== bPriority) return aPriority - bPriority;
+      if (sortField === "student") {
+        const c = compareByStudent(a.author, b.author);
+        return sortDir === "asc" ? c : -c;
+      }
       return sortDir === "desc" ? sortKey(b) - sortKey(a) : sortKey(a) - sortKey(b);
     });
   const selectedSession = sessions.find((session) => session.id === selectedSessionId);

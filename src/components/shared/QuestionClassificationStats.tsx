@@ -6,21 +6,39 @@ import { matchesCognitiveCategory } from "@/lib/question-labels";
 export type ClosureFilter = "all" | "closed" | "open";
 export type CognitiveFilter = "all" | "factual" | "conceptual" | "controversial";
 
-export type SortField = "like" | "comment";
+export type SortField = "student" | "like" | "comment";
 export type SortDir = "desc" | "asc";
 
+/** 학년 → 반 → 번호 순으로 비교한다(숫자 우선). 학생/교사 공용 */
+export function compareByStudent(
+  a: { grade?: string; className?: string; studentNumber?: string },
+  b: { grade?: string; className?: string; studentNumber?: string },
+): number {
+  const num = (v?: string) => {
+    const n = parseInt(v ?? "", 10);
+    return Number.isNaN(n) ? Number.POSITIVE_INFINITY : n;
+  };
+  return (
+    num(a.grade) - num(b.grade) ||
+    num(a.className) - num(b.className) ||
+    num(a.studentNumber) - num(b.studentNumber)
+  );
+}
+
 /**
- * 전체 질문 목록 정렬 컨트롤 — 기준(좋아요순/댓글순) + 방향(많은순↓/적은순↑).
- * 학생/교사 공용. 기본값은 좋아요 많은 순(like/desc).
+ * 전체 질문 목록 정렬 컨트롤 — 기준(학생순/좋아요순/댓글순) + 방향.
+ * 학생/교사 공용. 방향 레이블은 기준에 따라 달라진다(학생순=번호 오름/내림, 그 외=많은/적은).
  */
 export function QuestionSortControl({
   field,
   dir,
   onChange,
+  showStudent = true,
 }: {
   field: SortField;
   dir: SortDir;
   onChange: (field: SortField, dir: SortDir) => void;
+  showStudent?: boolean;
 }) {
   const seg = (active: boolean, label: string, onClick: () => void, first: boolean) => (
     <button
@@ -34,16 +52,20 @@ export function QuestionSortControl({
     </button>
   );
 
+  const ascLabel = field === "student" ? "번호 순 ↑" : "적은 순 ↑";
+  const descLabel = field === "student" ? "역순 ↓" : "많은 순 ↓";
+
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-xs text-muted-foreground">정렬</span>
       <div className="flex rounded-md border overflow-hidden">
-        {seg(field === "like", "좋아요순", () => onChange("like", dir), true)}
-        {seg(field === "comment", "댓글순", () => onChange("comment", dir), false)}
+        {showStudent && seg(field === "student", "학생순", () => onChange("student", field === "student" ? dir : "asc"), true)}
+        {seg(field === "like", "좋아요순", () => onChange("like", field === "like" ? dir : "desc"), !showStudent)}
+        {seg(field === "comment", "댓글순", () => onChange("comment", field === "comment" ? dir : "desc"), false)}
       </div>
       <div className="flex rounded-md border overflow-hidden">
-        {seg(dir === "desc", "많은 순 ↓", () => onChange(field, "desc"), true)}
-        {seg(dir === "asc", "적은 순 ↑", () => onChange(field, "asc"), false)}
+        {seg(dir === "desc", descLabel, () => onChange(field, "desc"), true)}
+        {seg(dir === "asc", ascLabel, () => onChange(field, "asc"), false)}
       </div>
     </div>
   );
