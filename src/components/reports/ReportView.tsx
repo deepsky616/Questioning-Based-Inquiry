@@ -18,6 +18,14 @@ export interface PerStudentRow {
   comments: number;
 }
 
+export interface SessionMeta { id: string; date: string; subject: string; topic: string }
+export interface SessionAnalysisResult {
+  summary?: string;
+  insights?: string;
+  commentInsights?: string;
+  engagementInsights?: string;
+}
+
 export interface ReportViewProps {
   scope: "student" | "class";
   title: string;
@@ -27,6 +35,8 @@ export interface ReportViewProps {
   monthly: SeriesPoint[];
   classification: QuestionTypeSummary;
   perStudent?: PerStudentRow[];
+  sessions?: SessionMeta[];
+  analyzeSession?: (sessionId: string) => Promise<SessionAnalysisResult | null>;
 }
 
 const METRICS: { key: keyof SeriesPoint; label: string; color: string }[] = [
@@ -48,7 +58,66 @@ function SummaryCard({ label, value, color }: { label: string; value: number; co
   );
 }
 
-export function ReportView({ scope, title, subtitle, totals, weekly, monthly, classification, perStudent }: ReportViewProps) {
+function SessionAnalysisRow({
+  session, analyze,
+}: { session: SessionMeta; analyze: (id: string) => Promise<SessionAnalysisResult | null> }) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<SessionAnalysisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const label = `${session.date} · ${session.subject}${session.topic ? ` - ${session.topic}` : ""}`;
+
+  const toggle = async () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (result || loading) return;
+    setLoading(true); setError(null);
+    try {
+      const r = await analyze(session.id);
+      if (r) setResult(r); else setError("분석 결과가 없어요");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "분석에 실패했어요");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const blocks: [string, string | undefined][] = [
+    ["📌 요약", result?.summary],
+    ["🧭 제안", result?.insights],
+    ["❤️ 좋아요·참여", result?.engagementInsights],
+    ["💬 댓글", result?.commentInsights],
+  ];
+
+  return (
+    <div className="rounded-lg border bg-background">
+      <button onClick={toggle} className="no-print flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
+        <span className="truncate text-sm font-medium text-foreground">{label}</span>
+        <span className="shrink-0 text-xs font-semibold text-emerald-600">🤖 AI 분석 {open ? "▾" : "▸"}</span>
+      </button>
+      {open && (
+        <div className="border-t px-3 py-2 text-sm">
+          {loading ? (
+            <p className="text-muted-foreground">🤖 분석하는 중...</p>
+          ) : error ? (
+            <p className="text-red-600">{error}</p>
+          ) : result ? (
+            <div className="space-y-2">
+              {blocks.filter(([, v]) => v).map(([h, v]) => (
+                <div key={h}>
+                  <p className="text-xs font-semibold text-foreground">{h}</p>
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{v}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ReportView({ scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession }: ReportViewProps) {
   const [range, setRange] = useState<ReportRange>("week");
   const series = range === "week" ? weekly : monthly;
 
@@ -142,6 +211,23 @@ export function ReportView({ scope, title, subtitle, totals, weekly, monthly, cl
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* 수업세션별 AI 분석 */}
+      {sessions && sessions.length > 0 && analyzeSession && (
+        <div className="rounded-xl border bg-card p-4">
+          <p className="mb-1 text-sm font-bold text-foreground">🤖 수업세션별 AI 분석</p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            {scope === "student"
+              ? "세션을 펼치면 내 질문·좋아요·댓글 활동을 AI가 분석해 줘요"
+              : "세션을 펼치면 학급의 질문·좋아요·댓글을 AI가 분석해 줘요"}
+          </p>
+          <div className="space-y-2">
+            {sessions.map((s) => (
+              <SessionAnalysisRow key={s.id} session={s} analyze={analyzeSession} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 학생별 표(교사용) */}
       {scope === "class" && perStudent && perStudent.length > 0 && (

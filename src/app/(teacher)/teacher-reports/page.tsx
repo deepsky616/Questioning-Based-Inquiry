@@ -1,12 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ReportView, type PerStudentRow, type ReportViewProps } from "@/components/reports/ReportView";
+import { ReportView, type PerStudentRow, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 
 interface ClassItem { grade: string; className: string; studentCount: number }
-interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle"> {
+interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
   klass: { grade: string; className: string; studentCount: number };
   perStudent: PerStudentRow[];
+  sessions?: SessionMeta[];
+}
+
+// 학급 리포트의 세션 분석은 기존 세션 분석(전체 학생) 엔드포인트를 재사용한다
+async function analyzeClassSession(sessionId: string): Promise<SessionAnalysisResult | null> {
+  const res = await fetch(`/api/sessions/${sessionId}/analysis`, { method: "POST" });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error || "분석 실패");
+  return {
+    summary: d.summary,
+    insights: d.insights,
+    commentInsights: d.commentInsights,
+    engagementInsights: d.engagementInsights,
+  };
 }
 
 export default function TeacherReportsPage() {
@@ -82,6 +96,8 @@ export default function TeacherReportsPage() {
           monthly={report.monthly}
           classification={report.classification}
           perStudent={report.perStudent}
+          sessions={report.sessions}
+          analyzeSession={analyzeClassSession}
         />
       )}
     </div>

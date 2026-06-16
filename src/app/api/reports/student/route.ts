@@ -21,12 +21,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "학생을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  const [questions, likesGiven, comments, likesReceived, commentsReceived] = await Promise.all([
+  const [questions, likesGiven, comments, likesReceived, commentsReceived, sessions] = await Promise.all([
     prisma.question.findMany({ where: { authorId: targetId }, select: { createdAt: true, closure: true, cognitive: true } }),
     prisma.questionLike.findMany({ where: { userId: targetId }, select: { createdAt: true } }),
     prisma.comment.findMany({ where: { authorId: targetId }, select: { createdAt: true } }),
     prisma.questionLike.findMany({ where: { question: { authorId: targetId } }, select: { createdAt: true } }),
     prisma.comment.findMany({ where: { question: { authorId: targetId } }, select: { createdAt: true } }),
+    // 학생이 참여한(질문·댓글·좋아요) 수업 세션
+    prisma.questionSession.findMany({
+      where: {
+        OR: [
+          { questions: { some: { authorId: targetId } } },
+          { questions: { some: { comments: { some: { authorId: targetId } } } } },
+          { questions: { some: { likes: { some: { userId: targetId } } } } },
+        ],
+      },
+      select: { id: true, date: true, subject: true, topic: true },
+      orderBy: { date: "desc" },
+    }),
   ]);
 
   const report = buildActivityReport({ questions, likesGiven, comments, likesReceived, commentsReceived });
@@ -37,6 +49,7 @@ export async function GET(req: NextRequest) {
       id: student.id, name: student.name, grade: student.grade,
       className: student.className, studentNumber: student.studentNumber, school: student.school,
     },
+    sessions,
     ...report,
   });
 }

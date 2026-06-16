@@ -1,10 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ReportView, type ReportViewProps } from "@/components/reports/ReportView";
+import { ReportView, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 
-interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle"> {
+interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
   student: { name: string; grade?: string | null; className?: string | null; studentNumber?: string | null };
+  sessions?: SessionMeta[];
+}
+
+async function analyzeStudentSession(sessionId: string): Promise<SessionAnalysisResult | null> {
+  const res = await fetch("/api/reports/student-session-analysis", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId }),
+  });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error || "분석 실패");
+  return { summary: d.summary, insights: d.insights };
 }
 
 export default function StudentReportPage() {
@@ -39,6 +51,8 @@ export default function StudentReportPage() {
       weekly={data.weekly}
       monthly={data.monthly}
       classification={data.classification}
+      sessions={data.sessions}
+      analyzeSession={analyzeStudentSession}
     />
   );
 }

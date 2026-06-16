@@ -159,3 +159,50 @@ ${questionList}
   "engagementInsights": "좋아요·댓글 참여 양상(어떤 질문에 공감이 몰렸는지, 참여가 활발/저조한지)과 참여를 높일 방법을 2~3문장"
 }`;
 }
+
+export interface StudentSessionActivity {
+  studentName: string;
+  subject: string;
+  topic: string;
+  questions: { content: string; closure: string; cognitive: string; likeCount: number; commentCount: number }[];
+  myComments: string[];
+  likesGiven: number;
+}
+
+/**
+ * 한 수업 세션에서 '특정 학생 본인'의 질문·좋아요·댓글 활동을 분석하는 프롬프트(학생 눈높이).
+ */
+export function buildStudentSessionPrompt(a: StudentSessionActivity): string {
+  const qList = a.questions.length > 0
+    ? a.questions.map((q, i) =>
+        `${i + 1}. [${q.closure === "closed" ? "폐쇄" : "개방"}·${
+          q.cognitive === "factual" ? "사실" : q.cognitive === "conceptual" ? "개념" : "논쟁"
+        }·❤️${q.likeCount}·💬${q.commentCount}] ${q.content}`,
+      ).join("\n")
+    : "(이 세션에서 직접 만든 질문 없음)";
+  const cList = a.myComments.length > 0
+    ? a.myComments.map((c, i) => `  ${i + 1}. ${c}`).join("\n")
+    : "(작성한 댓글 없음)";
+
+  return `당신은 초·중학생의 질문 활동을 따뜻하게 격려하고 도와주는 교육 AI입니다. 아래는 한 학생이 '${a.subject} - ${a.topic || "수업"}' 세션에서 한 활동입니다. 학생 본인이 읽을 글이니 쉽고 친근한 말투로, 칭찬과 구체적인 다음 도전 한 가지를 함께 알려주세요.
+
+[학생] ${a.studentName}
+[내가 만든 질문] (앞 [ ] 안: 폐쇄/개방·인지수준·받은 좋아요(❤️)·받은 댓글(💬))
+${qList}
+
+[내가 쓴 댓글]
+${cList}
+
+[내가 누른 좋아요 수] ${a.likesGiven}개
+
+분석 관점:
+- 어떤 유형(폐쇄/개방, 사실/개념/논쟁)의 질문을 주로 했는지, 좋은 점은 무엇인지.
+- 친구 질문에 좋아요·댓글로 얼마나 참여했는지.
+- 더 깊은 질문이나 활발한 참여를 위한 구체적이고 쉬운 다음 도전 한 가지.
+
+반드시 아래 JSON 형식으로만 응답하세요 (다른 말 없이):
+{
+  "summary": "이번 세션에서 내가 한 활동을 2~3문장으로 따뜻하게 정리",
+  "insights": "더 좋은 질문·활발한 참여를 위한 쉬운 다음 도전 1~2가지"
+}`;
+}

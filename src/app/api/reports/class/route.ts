@@ -60,6 +60,19 @@ export async function GET(req: NextRequest) {
 
   const report = buildActivityReport({ questions, likesGiven, comments, likesReceived, commentsReceived });
 
+  // 학급 학생들이 참여한 수업 세션
+  const sessions = await prisma.questionSession.findMany({
+    where: {
+      OR: [
+        { questions: { some: { authorId: { in: ids } } } },
+        { questions: { some: { comments: { some: { authorId: { in: ids } } } } } },
+        { questions: { some: { likes: { some: { userId: { in: ids } } } } } },
+      ],
+    },
+    select: { id: true, date: true, subject: true, topic: true },
+    orderBy: { date: "desc" },
+  });
+
   // 학생별 롤업(쓴 활동 기준)
   const perStudent = students.map((s) => ({
     id: s.id,
@@ -74,6 +87,7 @@ export async function GET(req: NextRequest) {
     scope: "class",
     klass: { grade, className, studentCount: students.length, school },
     perStudent,
+    sessions,
     ...report,
   });
 }
