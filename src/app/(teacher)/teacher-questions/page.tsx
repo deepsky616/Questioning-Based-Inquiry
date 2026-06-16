@@ -421,6 +421,18 @@ export default function QuestionsPage() {
     }
   };
 
+  const handleDeleteQuestion = async (question: Question) => {
+    if (!confirm(`'${question.author.name}' 학생의 질문을 삭제하시겠습니까?\n연결된 댓글도 함께 삭제되며 되돌릴 수 없습니다.`)) return;
+    try {
+      const res = await fetch(`/api/questions/${question.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setQuestions((prev) => prev.filter((q) => q.id !== question.id));
+      if (selectedQuestion?.id === question.id) setSelectedQuestion(null);
+    } catch {
+      alert("삭제에 실패했습니다");
+    }
+  };
+
   const handleAnalyzeSession = async () => {
     if (!currentSession) return;
 
@@ -513,7 +525,7 @@ export default function QuestionsPage() {
             <TableHead className="w-16 text-center">좋아요</TableHead>
             <TableHead className="w-16 text-center">댓글</TableHead>
             <TableHead className="w-20">공개</TableHead>
-            <TableHead className="w-16">수정</TableHead>
+            <TableHead className="w-28">관리</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -583,17 +595,27 @@ export default function QuestionsPage() {
                 />
               </TableCell>
               <TableCell>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedQuestion(q);
-                    setCorrectionClosure(q.closure);
-                    setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
-                  }}
-                >
-                  수정
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedQuestion(q);
+                      setCorrectionClosure(q.closure);
+                      setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
+                    }}
+                  >
+                    수정
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-500 border-red-200 hover:bg-red-50"
+                    onClick={() => handleDeleteQuestion(q)}
+                  >
+                    삭제
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
             {expandedCommentId === q.id && (

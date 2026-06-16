@@ -38,6 +38,8 @@ export function parseClassificationResponse(text: string): ClassificationResult 
       cognitiveScore,
       reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : "",
       ...(typeof parsed.feedback === "string" ? { feedback: parsed.feedback } : {}),
+      inappropriate: parsed.inappropriate === true,
+      inappropriateReason: typeof parsed.inappropriateReason === "string" ? parsed.inappropriateReason : "",
     };
   } catch {
     return null;
@@ -99,5 +101,7 @@ export function fallbackClassification(content: string): ClassificationResult {
     cognitiveScore,
     reasoning: "키워드 기반 자동 분류",
     feedback: feedbackMap[closure][cognitive],
+    inappropriate: false,
+    inappropriateReason: "",
   };
 }

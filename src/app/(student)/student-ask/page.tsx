@@ -6,9 +6,8 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { buildSessionLabel, buildSessionContextHint, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { buildSessionLabel, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { COGNITIVE_LABEL } from "@/lib/question-labels";
 
@@ -36,6 +35,8 @@ interface ClassificationResult {
   reasoning: string;
   feedback?: string;
   improvedExample?: string;
+  inappropriate?: boolean;
+  inappropriateReason?: string;
 }
 
 const TYPE_LABEL = COGNITIVE_LABEL;
@@ -49,7 +50,6 @@ export default function AskPage() {
   const [content, setContent] = useState("");
   const [existingQuestion, setExistingQuestion] = useState<{ id: string; content: string } | null>(null);
   const [isCheckingExisting, setIsCheckingExisting] = useState(false);
-  const [context, setContext] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ClassificationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -112,10 +112,6 @@ export default function AskPage() {
         .finally(() => setIsCheckingExisting(false));
     }
 
-    if (id && context.trim() === "") {
-      const s = sessions.find((s) => s.id === id);
-      if (s) setContext(buildSessionContextHint(s.subject, s.topic, s.teacher.name));
-    }
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
@@ -151,7 +147,7 @@ export default function AskPage() {
       const res = await fetch("/api/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, context }),
+        body: JSON.stringify({ content }),
       });
 
       if (!res.ok) {
@@ -172,6 +168,11 @@ export default function AskPage() {
   const handleSave = async () => {
     // issue #3: handler 단에서도 세션 필수 검증
     if (!canAsk || !result) return;
+    // 부적절한 질문은 저장 차단
+    if (result.inappropriate) {
+      alert("부적절한 내용이 감지되어 저장할 수 없습니다. 질문을 수정해 주세요.");
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -180,7 +181,6 @@ export default function AskPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
-          context,
           closure: result.closure,
           cognitive: result.cognitive,
           closureScore: result.closureScore,
@@ -418,22 +418,12 @@ export default function AskPage() {
             <p className="text-sm text-gray-500 text-right">{content.length}/500</p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="context">맥락 (선택)</Label>
-            <Input
-              id="context"
-              placeholder="예: 과학 시간에 우주에 대해 학습하다가..."
-              value={context}
-              onChange={(e) => setContext(e.target.value)}
-            />
-          </div>
-
           <Button
             onClick={handleClassify}
             disabled={isLoading || !canAsk || content.trim().length === 0}
             className="w-full"
           >
-            {isLoading ? "분석 중..." : "유형 분석하기"}
+            {isLoading ? "분석 중..." : "질문 분석하기"}
           </Button>
         </CardContent>
       </Card>
@@ -444,6 +434,14 @@ export default function AskPage() {
             <CardTitle>분석 결과</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {result.inappropriate && (
+              <div className="p-4 rounded-lg border border-red-300 bg-red-50">
+                <p className="text-sm font-bold text-red-700">⚠️ 부적절한 내용이 감지되었습니다</p>
+                <p className="text-sm text-red-600 mt-1">
+                  {result.inappropriateReason || "학습에 적절하지 않은 표현이 포함되어 있어요."} 질문을 수정한 뒤 다시 분석해 주세요. 부적절한 질문은 저장할 수 없습니다.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-blue-50 rounded-lg">
                 <div className="text-sm text-gray-600">폐쇄형/개방형</div>
@@ -513,7 +511,7 @@ export default function AskPage() {
               >
                 ✏️ 질문 다시 작성하기
               </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+              <Button onClick={handleSave} disabled={isSaving || result.inappropriate} className="flex-1">
                 {isSaving ? "저장 중..." : "💾 질문 저장하기"}
               </Button>
             </div>

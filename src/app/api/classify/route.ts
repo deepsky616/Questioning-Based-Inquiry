@@ -12,7 +12,6 @@ const classifySchema = z.object({
   apiKey: z.string().optional(),
   model: z.string().refine(isAllowedGeminiModel, "지원하지 않는 Gemini 모델입니다").optional(),
   content: z.string().min(1).max(500),
-  context: z.string().optional(),
 });
 
 const CLASSIFICATION_PROMPT = `당신은 초·중·고 수업에서 학생 질문을 분류하고 더 좋은 질문을 만들도록 돕는 선생님입니다.
@@ -42,8 +41,12 @@ const CLASSIFICATION_PROMPT = `당신은 초·중·고 수업에서 학생 질�
   "cognitiveScore": 0.0부터 1.0 사이의 숫자 (분류 확신도),
   "reasoning": "이 질문이 왜 이 유형으로 분류됐는지를 학생이 이해할 수 있는 쉬운 말로 60자 이내",
   "feedback": "학생을 응원하는 말로 시작해. 질문의 좋은 점을 구체적으로 1문장 칭찬하고, 닫힌 질문이거나 사실적 질문이면 어떻게 바꾸면 더 깊이 생각할 수 있는 질문이 되는지 친근한 말투로 1~2문장 조언해. 전체 150자 이내.",
-  "improvedExample": "closure가 closed이거나 cognitive가 factual인 경우에만 원래 질문을 개방형 또는 개념적·논쟁적 질문으로 발전시킨 예시 1개. 이미 open이고 cognitive가 conceptual 또는 controversial이면 빈 문자열(\"\")."
-}`;
+  "improvedExample": "closure가 closed이거나 cognitive가 factual인 경우에만 원래 질문을 개방형 또는 개념적·논쟁적 질문으로 발전시킨 예시 1개. 이미 open이고 cognitive가 conceptual 또는 controversial이면 빈 문자열(\"\").",
+  "inappropriate": "질문에 욕설·비속어·비방·차별·혐오·폭력·성적 표현 등 학습에 부적절한 내용이 있으면 true, 정상이면 false (불리언)",
+  "inappropriateReason": "inappropriate가 true일 때만 그 이유를 20자 이내로. 정상이면 빈 문자열(\"\")."
+}
+
+[중요] inappropriate가 true여도 closure·cognitive·score는 형식을 맞춰 채워라(분석은 항상 수행). 부적절 판단은 학습 맥락 기준으로 신중히 하되, 단순히 주제가 무겁거나 사회적 논쟁이 되는 질문(예: 환경·정치·역사 쟁점)은 부적절이 아니다.`;
 
 export async function POST(req: Request) {
   // 인증: 로그인한 사용자만 분류 요청 가능 (서버 저장 Gemini 키 남용 방지)
@@ -64,7 +67,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { apiKey: requestApiKey, model: requestModel, content, context } = classifySchema.parse(body);
+    const { apiKey: requestApiKey, model: requestModel, content } = classifySchema.parse(body);
 
     // 서버에 저장된 API 키 조회
     const [serverKeyRecord, serverModelRecord] = await Promise.all([
@@ -83,7 +86,7 @@ export async function POST(req: Request) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const genModel = genAI.getGenerativeModel({ model });
 
-    const fullPrompt = `${CLASSIFICATION_PROMPT}\n\n[분석할 질문]\n${content}${context ? `\n[맥락] ${context}` : ""}`;
+    const fullPrompt = `${CLASSIFICATION_PROMPT}\n\n[분석할 질문]\n${content}`;
 
     const result = await genModel.generateContent(fullPrompt);
     const text = result.response.text();
