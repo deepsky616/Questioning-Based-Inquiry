@@ -43,6 +43,9 @@ interface QuestionSession {
   teacher: { name: string };
   unitDesignId?: string | null;
   defaultQuestionPublic?: boolean;
+  likesVisibleToPeers?: boolean;
+  commentsVisibleToPeers?: boolean;
+  isActive?: boolean;
   sharedQuestions?: Array<{ type: string; content: string }>;
 }
 
@@ -1026,6 +1029,12 @@ export default function QuestionsPage() {
                 sessionId={currentSession.id}
                 subject={currentSession.subject}
                 topic={currentSession.topic}
+                initialSettings={{
+                  isActive: currentSession.isActive,
+                  defaultQuestionPublic: currentSession.defaultQuestionPublic,
+                  likesVisibleToPeers: currentSession.likesVisibleToPeers,
+                  commentsVisibleToPeers: currentSession.commentsVisibleToPeers,
+                }}
               />
             </div>
           )}
