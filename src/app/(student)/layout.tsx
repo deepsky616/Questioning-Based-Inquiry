@@ -16,6 +16,7 @@ const STUDENT_PAGES = [
   { href: "/student-ask", label: "질문하기" },
   { href: "/student-history", label: "내 질문" },
   { href: "/student-explore", label: "질문탐구" },
+  { href: "/student-report", label: "활동 리포트" },
   { href: "/student-settings", label: "설정" },
 ];
 

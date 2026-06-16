@@ -330,3 +330,30 @@
     box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6) !important;
   }
 }
+
+/* ── 활동 리포트 인쇄(PDF 저장) ── */
+@media print {
+  /* 네비/헤더/버튼 등 리포트 외 요소 숨김 */
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  /* 인쇄 시 여백·배경 정리 */
+  body {
+    background: #fff !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  /* 차트·카드가 페이지 경계에서 잘리지 않도록 */
+  .report-print .recharts-wrapper,
+  .report-print .rounded-xl {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  @page {
+    margin: 14mm;
+  }
+}
