@@ -24,6 +24,7 @@ export interface SessionAnalysisResult {
   insights?: string;
   commentInsights?: string;
   engagementInsights?: string;
+  relevanceInsights?: string;
 }
 
 export interface ReportViewProps {
@@ -87,6 +88,7 @@ function SessionAnalysisRow({
     ["🧭 제안", result?.insights],
     ["❤️ 좋아요·참여", result?.engagementInsights],
     ["💬 댓글", result?.commentInsights],
+    ["🎯 주제 연관성·성의", result?.relevanceInsights],
   ];
 
   return (

@@ -74,6 +74,7 @@ interface SessionAnalysis {
   insights: string;
   commentInsights?: string;
   engagementInsights?: string;
+  relevanceInsights?: string;
   totalQuestions: number;
   totalComments?: number;
   totalLikes?: number;
@@ -937,6 +938,12 @@ export default function QuestionsPage() {
                     <div className="rounded-lg bg-emerald-50 p-4 dark:bg-emerald-950/30">
                       <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">댓글 대화 분석</p>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950 dark:text-emerald-100">{sessionAnalysis.commentInsights}</p>
+                    </div>
+                  )}
+                  {sessionAnalysis.relevanceInsights && (
+                    <div className="rounded-lg bg-sky-50 p-4 dark:bg-sky-950/30">
+                      <p className="text-xs font-semibold text-sky-800 dark:text-sky-300">🎯 주제 연관성·성의 분석</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-sky-950 dark:text-sky-100">{sessionAnalysis.relevanceInsights}</p>
                     </div>
                   )}
                 </>

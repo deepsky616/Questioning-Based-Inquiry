@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       summary: parsed?.summary ?? "",
       insights: parsed?.insights ?? "",
+      relevanceInsights: parsed?.relevanceInsights ?? "",
       totals: { questions: questions.length, comments: myComments.length, likesGiven },
     });
   } catch (error) {

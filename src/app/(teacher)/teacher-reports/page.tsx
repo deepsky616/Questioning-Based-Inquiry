@@ -20,6 +20,7 @@ async function analyzeClassSession(sessionId: string): Promise<SessionAnalysisRe
     insights: d.insights,
     commentInsights: d.commentInsights,
     engagementInsights: d.engagementInsights,
+    relevanceInsights: d.relevanceInsights,
   };
 }
 
