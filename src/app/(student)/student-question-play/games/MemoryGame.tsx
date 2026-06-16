@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
 import { useSingleAward, AwardBadge } from "./useSingleAward";
@@ -383,7 +383,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
                   cursor: !isHumanTurn || flipped ? "default" : "pointer",
                 }}>
                 {flipped ? (
-                  <span className="text-sm sm:text-base font-semibold leading-snug break-keep">{pair?.question ?? "?"}</span>
+                  <AutoFitText text={pair?.question ?? "?"} />
                 ) : (
                   <span className="text-3xl">❓</span>
                 )}
@@ -413,7 +413,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
                   cursor: !isHumanTurn || flipped ? "default" : "pointer",
                 }}>
                 {flipped ? (
-                  <span className="text-sm sm:text-base font-semibold leading-snug break-keep">{pair?.answer ?? "!"}</span>
+                  <AutoFitText text={pair?.answer ?? "!"} />
                 ) : (
                   <span className="text-3xl">❗</span>
                 )}
@@ -430,6 +430,40 @@ export default function MemoryGame({ game, onBack, config }: Props) {
         {isAITurn && revealed.length > 0 && "🤖 AI가 카드를 뒤집고 있어요..."}
       </p>
     </div>
+  );
+}
+
+/**
+ * 카드 안에 글씨를 최대한 크게 채우되, 카드 밖으로 넘치지 않도록 폰트 크기를 자동 조절한다.
+ * 부모(카드)의 안쪽 크기에 맞을 때까지 글씨 크기를 줄인다.
+ */
+function AutoFitText({ text, max = 20, min = 9 }: { text: string; max?: number; min?: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    const fit = () => {
+      const el = ref.current;
+      const parent = el?.parentElement;
+      if (!el || !parent) return;
+      const cs = getComputedStyle(parent);
+      const maxW = parent.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const maxH = parent.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      let size = max;
+      el.style.fontSize = `${size}px`;
+      while (size > min && (el.scrollHeight > maxH || el.scrollWidth > maxW)) {
+        size -= 1;
+        el.style.fontSize = `${size}px`;
+      }
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [text, max, min]);
+
+  return (
+    <span ref={ref} className="block w-full font-semibold break-keep" style={{ lineHeight: 1.15 }}>
+      {text}
+    </span>
   );
 }
 
