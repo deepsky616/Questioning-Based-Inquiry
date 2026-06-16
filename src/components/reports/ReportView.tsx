@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -59,64 +59,25 @@ function SummaryCard({ label, value, color }: { label: string; value: number; co
   );
 }
 
-function SessionAnalysisRow({
-  session, analyze,
-}: { session: SessionMeta; analyze: (id: string) => Promise<SessionAnalysisResult | null> }) {
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<SessionAnalysisResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const label = `${session.date} · ${session.subject}${session.topic ? ` - ${session.topic}` : ""}`;
-
-  const toggle = async () => {
-    if (open) { setOpen(false); return; }
-    setOpen(true);
-    if (result || loading) return;
-    setLoading(true); setError(null);
-    try {
-      const r = await analyze(session.id);
-      if (r) setResult(r); else setError("분석 결과가 없어요");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "분석에 실패했어요");
-    } finally {
-      setLoading(false);
-    }
+const pad2 = (n: number) => String(n).padStart(2, "0");
+function mondayOf(d: Date): Date {
+  const x = new Date(d); x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+/** 세션 날짜를 주/월 기간 키·라벨로 변환 */
+function sessionPeriod(dateStr: string, mode: ReportRange): { key: string; label: string } {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return { key: "기타", label: "기타" };
+  if (mode === "month") {
+    return { key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`, label: `${d.getFullYear()}년 ${d.getMonth() + 1}월` };
+  }
+  const m = mondayOf(d);
+  const end = new Date(m); end.setDate(end.getDate() + 6);
+  return {
+    key: `${m.getFullYear()}-${pad2(m.getMonth() + 1)}-${pad2(m.getDate())}`,
+    label: `${m.getMonth() + 1}/${m.getDate()}~${end.getMonth() + 1}/${end.getDate()} 주`,
   };
-
-  const blocks: [string, string | undefined][] = [
-    ["📌 요약", result?.summary],
-    ["🧭 제안", result?.insights],
-    ["❤️ 좋아요·참여", result?.engagementInsights],
-    ["💬 댓글", result?.commentInsights],
-    ["🎯 주제 연관성·성의", result?.relevanceInsights],
-  ];
-
-  return (
-    <div className="rounded-lg border bg-background">
-      <button onClick={toggle} className="no-print flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
-        <span className="truncate text-sm font-medium text-foreground">{label}</span>
-        <span className="shrink-0 text-xs font-semibold text-emerald-600">🤖 AI 분석 {open ? "▾" : "▸"}</span>
-      </button>
-      {open && (
-        <div className="border-t px-3 py-2 text-sm">
-          {loading ? (
-            <p className="text-muted-foreground">🤖 분석하는 중...</p>
-          ) : error ? (
-            <p className="text-red-600">{error}</p>
-          ) : result ? (
-            <div className="space-y-2">
-              {blocks.filter(([, v]) => v).map(([h, v]) => (
-                <div key={h}>
-                  <p className="text-xs font-semibold text-foreground">{h}</p>
-                  <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{v}</p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export function ReportView({ scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession }: ReportViewProps) {
@@ -130,6 +91,68 @@ export function ReportView({ scope, title, subtitle, totals, weekly, monthly, cl
     { name: "개념적", value: classification.cognitive.conceptual, fill: "#a855f7" },
     { name: "논쟁적", value: classification.cognitive.controversial, fill: "#f97316" },
   ];
+
+  // ── 수업세션별 AI 분석 (기간 필터 + 전체 분석) ──
+  const allSessions = useMemo(() => sessions ?? [], [sessions]);
+  const [sessRange, setSessRange] = useState<ReportRange>("week");
+  const [period, setPeriod] = useState<string>("");
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const [res, setRes] = useState<Record<string, SessionAnalysisResult>>({});
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [errs, setErrs] = useState<Record<string, string>>({});
+  const [analyzingAll, setAnalyzingAll] = useState(false);
+
+  // 기간 목록(세션이 있는 주/월) — 최신순
+  const periods = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of allSessions) {
+      const p = sessionPeriod(s.date, sessRange);
+      if (!map.has(p.key)) map.set(p.key, p.label);
+    }
+    return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  }, [allSessions, sessRange]);
+
+  // 주별/월별 전환 시 최신 기간을 기본 선택
+  useEffect(() => {
+    if (periods.length > 0 && !periods.some(([k]) => k === period)) setPeriod(periods[0][0]);
+  }, [periods, period]);
+
+  const filteredSessions = allSessions.filter((s) => sessionPeriod(s.date, sessRange).key === period);
+
+  const analyzeOne = async (id: string) => {
+    if (!analyzeSession || res[id] || busy[id]) return;
+    setBusy((b) => ({ ...b, [id]: true })); setErrs((e) => ({ ...e, [id]: "" }));
+    try {
+      const r = await analyzeSession(id);
+      if (r) setRes((p) => ({ ...p, [id]: r })); else setErrs((e) => ({ ...e, [id]: "분석 결과가 없어요" }));
+    } catch (e) {
+      setErrs((x) => ({ ...x, [id]: e instanceof Error ? e.message : "분석 실패" }));
+    } finally {
+      setBusy((b) => ({ ...b, [id]: false }));
+    }
+  };
+  const toggleSession = (id: string) => {
+    setOpen((o) => ({ ...o, [id]: !o[id] }));
+    if (!res[id]) analyzeOne(id);
+  };
+  const analyzeAll = async () => {
+    if (!analyzeSession) return;
+    setAnalyzingAll(true);
+    for (const s of filteredSessions) {
+      setOpen((o) => ({ ...o, [s.id]: true }));
+      if (res[s.id]) continue;
+      setBusy((b) => ({ ...b, [s.id]: true })); setErrs((e) => ({ ...e, [s.id]: "" }));
+      try {
+        const r = await analyzeSession(s.id);
+        if (r) setRes((p) => ({ ...p, [s.id]: r }));
+      } catch (e) {
+        setErrs((x) => ({ ...x, [s.id]: e instanceof Error ? e.message : "분석 실패" }));
+      } finally {
+        setBusy((b) => ({ ...b, [s.id]: false }));
+      }
+    }
+    setAnalyzingAll(false);
+  };
 
   return (
     <div className="report-print space-y-6">
@@ -214,20 +237,83 @@ export function ReportView({ scope, title, subtitle, totals, weekly, monthly, cl
         </ResponsiveContainer>
       </div>
 
-      {/* 수업세션별 AI 분석 */}
-      {sessions && sessions.length > 0 && analyzeSession && (
+      {/* 수업세션별 AI 분석 (기간 필터 + 전체 분석) */}
+      {allSessions.length > 0 && analyzeSession && (
         <div className="rounded-xl border bg-card p-4">
           <p className="mb-1 text-sm font-bold text-foreground">🤖 수업세션별 AI 분석</p>
           <p className="mb-3 text-xs text-muted-foreground">
             {scope === "student"
-              ? "세션을 펼치면 내 질문·좋아요·댓글 활동을 AI가 분석해 줘요"
-              : "세션을 펼치면 학급의 질문·좋아요·댓글을 AI가 분석해 줘요"}
+              ? "주별/월별 기간을 골라 그 기간의 수업세션을 AI가 분석해 줘요"
+              : "주별/월별 기간을 골라 그 기간의 학급 수업세션을 AI가 분석해 줘요"}
           </p>
-          <div className="space-y-2">
-            {sessions.map((s) => (
-              <SessionAnalysisRow key={s.id} session={s} analyze={analyzeSession} />
-            ))}
+
+          <div className="no-print mb-3 flex flex-wrap items-center gap-2">
+            <div className="flex rounded-md border overflow-hidden">
+              <button
+                onClick={() => setSessRange("week")}
+                className={`px-3 py-1.5 text-xs font-medium ${sessRange === "week" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+              >주별</button>
+              <button
+                onClick={() => setSessRange("month")}
+                className={`px-3 py-1.5 text-xs font-medium border-l ${sessRange === "month" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+              >월별</button>
+            </div>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="rounded-md border bg-background px-2 py-1.5 text-xs text-foreground"
+            >
+              {periods.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            <Button size="sm" variant="outline" disabled={analyzingAll || filteredSessions.length === 0} onClick={analyzeAll} className="font-semibold">
+              {analyzingAll ? "분석 중..." : "📋 전체 분석"}
+            </Button>
+            <span className="text-xs text-muted-foreground">{filteredSessions.length}개 세션</span>
           </div>
+
+          {filteredSessions.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">이 기간에 진행한 수업세션이 없어요</p>
+          ) : (
+            <div className="space-y-2">
+              {filteredSessions.map((s) => {
+                const r = res[s.id];
+                const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
+                const blocks: [string, string | undefined][] = [
+                  ["📌 요약", r?.summary],
+                  ["🧭 제안", r?.insights],
+                  ["❤️ 좋아요·참여", r?.engagementInsights],
+                  ["💬 댓글", r?.commentInsights],
+                  ["🎯 주제 연관성·성의", r?.relevanceInsights],
+                ];
+                return (
+                  <div key={s.id} className="rounded-lg border bg-background">
+                    <button onClick={() => toggleSession(s.id)} className="no-print flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
+                      <span className="truncate text-sm font-medium text-foreground">{label}</span>
+                      <span className="shrink-0 text-xs font-semibold text-emerald-600">🤖 {open[s.id] ? "▾" : "▸"}</span>
+                    </button>
+                    {open[s.id] && (
+                      <div className="border-t px-3 py-2 text-sm">
+                        {busy[s.id] ? (
+                          <p className="text-muted-foreground">🤖 분석하는 중...</p>
+                        ) : errs[s.id] ? (
+                          <p className="text-red-600">{errs[s.id]}</p>
+                        ) : r ? (
+                          <div className="space-y-2">
+                            {blocks.filter(([, v]) => v).map(([h, v]) => (
+                              <div key={h}>
+                                <p className="text-xs font-semibold text-foreground">{h}</p>
+                                <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{v}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
