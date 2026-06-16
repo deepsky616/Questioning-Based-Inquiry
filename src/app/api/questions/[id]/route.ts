@@ -9,6 +9,7 @@ const patchQuestionSchema = z.object({
   closure: z.enum(["closed", "open"]).optional(),
   cognitive: z.enum(["factual", "conceptual", "controversial"]).optional(),
   isPublic: z.boolean().optional(),
+  flagged: z.boolean().optional(),
 });
 
 async function canTeacherManageQuestion(teacherId: string, questionId: string) {
@@ -105,7 +106,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const { closure, cognitive, isPublic } = data;
 
     const patchedFields = Object.keys(data).filter((k) =>
-      ["closure", "cognitive", "isPublic"].includes(k)
+      ["closure", "cognitive", "isPublic", "flagged"].includes(k)
     );
 
     const existing = await prisma.question.findUnique({ where: { id: params.id } });
@@ -127,6 +128,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
         ...(closure !== undefined && { closure }),
         ...(cognitive !== undefined && { cognitive }),
         ...(isPublic !== undefined && { isPublic }),
+        ...(data.flagged !== undefined && { flagged: data.flagged }),
       },
       include: {
         author: {

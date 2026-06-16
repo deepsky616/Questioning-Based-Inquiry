@@ -168,11 +168,6 @@ export default function AskPage() {
   const handleSave = async () => {
     // issue #3: handler 단에서도 세션 필수 검증
     if (!canAsk || !result) return;
-    // 부적절한 질문은 저장 차단
-    if (result.inappropriate) {
-      alert("부적절한 내용이 감지되어 저장할 수 없습니다. 질문을 수정해 주세요.");
-      return;
-    }
 
     setIsSaving(true);
     try {
@@ -186,6 +181,8 @@ export default function AskPage() {
           closureScore: result.closureScore,
           cognitiveScore: result.cognitiveScore,
           sessionId: selectedSessionId,
+          flagged: result.inappropriate ?? false,
+          flagReason: result.inappropriateReason ?? "",
         }),
       });
 
@@ -438,7 +435,7 @@ export default function AskPage() {
               <div className="p-4 rounded-lg border border-red-300 bg-red-50">
                 <p className="text-sm font-bold text-red-700">⚠️ 부적절한 내용이 감지되었습니다</p>
                 <p className="text-sm text-red-600 mt-1">
-                  {result.inappropriateReason || "학습에 적절하지 않은 표현이 포함되어 있어요."} 질문을 수정한 뒤 다시 분석해 주세요. 부적절한 질문은 저장할 수 없습니다.
+                  {result.inappropriateReason || "학습에 적절하지 않은 표현이 포함되어 있어요."} 질문을 수정해 다시 분석하는 것을 권장합니다. 이대로 저장하면 선생님이 검토하게 됩니다.
                 </p>
               </div>
             )}
@@ -511,7 +508,7 @@ export default function AskPage() {
               >
                 ✏️ 질문 다시 작성하기
               </Button>
-              <Button onClick={handleSave} disabled={isSaving || result.inappropriate} className="flex-1">
+              <Button onClick={handleSave} disabled={isSaving} className="flex-1">
                 {isSaving ? "저장 중..." : "💾 질문 저장하기"}
               </Button>
             </div>

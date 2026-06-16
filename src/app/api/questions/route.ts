@@ -20,6 +20,8 @@ const createQuestionSchema = z.object({
   closureScore: z.number().min(0).max(1).optional(),
   cognitiveScore: z.number().min(0).max(1).optional(),
   sessionId: z.string().optional(),
+  flagged: z.boolean().optional(),
+  flagReason: z.string().optional(),
 });
 
 export async function GET(req: Request) {
@@ -219,6 +221,8 @@ export async function POST(req: Request) {
         defaultIsPublic: selectedSession?.defaultQuestionPublic ?? false,
       }),
       normalizedContent: normalized,
+      flagged: data.flagged ?? false,
+      flagReason: data.flagReason || null,
     };
 
     const question = await prisma.question.create({

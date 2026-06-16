@@ -12,6 +12,8 @@ export interface ThreadComment {
   content: string;
   author: { name: string };
   createdAt: string;
+  flagged?: boolean;
+  flagReason?: string;
 }
 
 /**
@@ -25,10 +27,12 @@ export function CommentThread({
   questionId,
   preloaded,
   onCountChange,
+  canModerate = false,
 }: {
   questionId: string;
   preloaded?: ThreadComment[];
   onCountChange?: (count: number) => void;
+  canModerate?: boolean;
 }) {
   const { data: session } = useSession();
   const user = getSessionUser(session);
@@ -78,6 +82,35 @@ export function CommentThread({
     }
   };
 
+  const clearFlag = async (commentId: string) => {
+    try {
+      const res = await fetch(`/api/questions/${questionId}/comments/${commentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flagged: false }),
+      });
+      if (!res.ok) throw new Error();
+      setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, flagged: false } : c)));
+    } catch {
+      // 무시
+    }
+  };
+
+  const deleteComment = async (commentId: string) => {
+    if (!confirm("이 댓글을 삭제하시겠습니까?")) return;
+    try {
+      const res = await fetch(`/api/questions/${questionId}/comments/${commentId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setComments((prev) => {
+        const next = prev.filter((c) => c.id !== commentId);
+        onCountChange?.(next.length);
+        return next;
+      });
+    } catch {
+      alert("댓글 삭제에 실패했습니다");
+    }
+  };
+
   if (isLoading) {
     return <div className="text-sm text-muted-foreground">댓글 불러오는 중...</div>;
   }
@@ -89,14 +122,33 @@ export function CommentThread({
       ) : (
         <div className="space-y-2">
           {comments.map((c) => (
-            <div key={c.id} className="rounded-md border bg-white p-3 dark:bg-card">
+            <div key={c.id} className={`rounded-md border p-3 dark:bg-card ${c.flagged ? "border-red-300 bg-red-50" : "bg-white"}`}>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium text-foreground">{c.author.name}</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-foreground">{c.author.name}</span>
+                  {c.flagged && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                      ⚠️ {c.flagReason || "부적절 의심"}
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs text-muted-foreground">
                   {formatDateTime(c.createdAt)}
                 </span>
               </div>
               <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{c.content}</p>
+              {canModerate && (
+                <div className="mt-1.5 flex items-center gap-3">
+                  {c.flagged && (
+                    <button type="button" onClick={() => clearFlag(c.id)} className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800">
+                      ✓ 이상없음
+                    </button>
+                  )}
+                  <button type="button" onClick={() => deleteComment(c.id)} className="text-[11px] font-medium text-red-500 hover:text-red-700">
+                    🗑 삭제
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -135,6 +135,8 @@ model Question {
   likes    QuestionLike[] @relation("QuestionLikes")
 
   isPublic  Boolean  @default(false) @map("is_public")
+  flagged    Boolean @default(false) @map("flagged")
+  flagReason String? @map("flag_reason")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -151,6 +153,8 @@ model Comment {
   author     User     @relation("CommentAuthor", fields: [authorId], references: [id])
   questionId String   @map("question_id")
   question   Question @relation("QuestionComments", fields: [questionId], references: [id])
+  flagged    Boolean  @default(false) @map("flagged")
+  flagReason String?  @map("flag_reason")
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([questionId, authorId, normalizedContent])

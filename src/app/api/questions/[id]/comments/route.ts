@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canCreateComment } from "@/lib/questions";
 import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
+import { checkProfanity } from "@/lib/profanity";
 import { resolveStudentExploreConfig } from "@/lib/explore-config";
 import { Prisma } from "@prisma/client";
 
@@ -139,12 +140,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       }
     }
 
+    const { flagged, reason } = checkProfanity(content.trim());
     const comment = await prisma.comment.create({
       data: {
         content: content.trim(),
         normalizedContent: normalized,
         authorId: userId,
         questionId: params.id,
+        flagged,
+        flagReason: reason,
       } as Prisma.CommentUncheckedCreateInput,
       include: { author: { select: { id: true, name: true } } },
     });

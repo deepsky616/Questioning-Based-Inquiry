@@ -57,8 +57,10 @@ interface Question {
   session: { id: string; date: string; subject: string; topic: string } | null;
   author: { id: string; name: string; className?: string; grade?: string; studentNumber?: string };
   isPublic: boolean;
+  flagged?: boolean;
+  flagReason?: string;
   createdAt: string;
-  comments?: Array<{ id: string; content: string; author: { name: string }; createdAt: string }>;
+  comments?: Array<{ id: string; content: string; author: { name: string }; createdAt: string; flagged?: boolean; flagReason?: string }>;
   likeCount: number;
   likedBy?: Array<{ id: string; name: string }>;
 }
@@ -160,6 +162,8 @@ export default function QuestionsPage() {
   // 댓글 인라인 펼침 대상 + 작성 후 댓글수 갱신
   const [expandedCommentId, setExpandedCommentId] = useState<string | null>(null);
   const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
+  // 부적절 의심만 보기 필터
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
 
   const resetBulkState = () => {
     setSelectedIds(new Set());
@@ -433,6 +437,20 @@ export default function QuestionsPage() {
     }
   };
 
+  const handleClearFlag = async (question: Question) => {
+    try {
+      const res = await fetch(`/api/questions/${question.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ flagged: false }),
+      });
+      if (!res.ok) throw new Error();
+      setQuestions((prev) => prev.map((q) => (q.id === question.id ? { ...q, flagged: false } : q)));
+    } catch {
+      alert("처리에 실패했습니다");
+    }
+  };
+
   const handleAnalyzeSession = async () => {
     if (!currentSession) return;
 
@@ -483,8 +501,10 @@ export default function QuestionsPage() {
   // 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 필터를 적용한 표시용 목록
   const displayed = filtered.filter((q) =>
     (filterClosure === "all" || q.closure === filterClosure) &&
-    (filterCognitive === "all" || matchesCognitiveCategory(q.cognitive, filterCognitive))
+    (filterCognitive === "all" || matchesCognitiveCategory(q.cognitive, filterCognitive)) &&
+    (!showFlaggedOnly || q.flagged || (q.comments?.some((c) => c.flagged) ?? false))
   );
+  const flaggedCount = filtered.filter((q) => q.flagged || (q.comments?.some((c) => c.flagged) ?? false)).length;
 
   const currentSession = sessions.find((s) => s.id === selectedSessionId);
   const isAll = selectedSessionId === "all";
@@ -550,6 +570,20 @@ export default function QuestionsPage() {
                 )}
               </TableCell>
               <TableCell className="max-w-md">
+                {q.flagged && (
+                  <div className="mb-1.5 flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                      ⚠️ {q.flagReason || "부적절 의심"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleClearFlag(q)}
+                      className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800"
+                    >
+                      ✓ 이상없음
+                    </button>
+                  </div>
+                )}
                 <p className="whitespace-pre-wrap break-words text-sm">{q.content}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(q.createdAt)}</p>
               </TableCell>
@@ -624,6 +658,7 @@ export default function QuestionsPage() {
                   <CommentThread
                     questionId={q.id}
                     preloaded={q.comments ?? []}
+                    canModerate
                     onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}
                   />
                 </TableCell>
@@ -918,6 +953,16 @@ export default function QuestionsPage() {
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 text-sm w-56 bg-white"
             />
+            <button
+              type="button"
+              onClick={() => setShowFlaggedOnly((v) => !v)}
+              className={`h-8 rounded-md border px-3 text-xs font-medium transition-colors ${
+                showFlaggedOnly ? "border-red-400 bg-red-500 text-white" : "bg-white text-red-600 border-red-200 hover:bg-red-50"
+              }`}
+              title="AI·사전이 부적절로 의심한 질문·댓글만 모아 봅니다"
+            >
+              ⚠️ 부적절 의심만 {flaggedCount > 0 && `(${flaggedCount})`}
+            </button>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <QuestionSortControl
