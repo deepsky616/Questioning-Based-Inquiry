@@ -9,6 +9,7 @@ import { StatBar } from "@/components/shared/StatBar";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
 import PointsCard from "@/components/shared/PointsCard";
+import { RankingPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 
 interface Question {
   id: string;
@@ -190,6 +191,12 @@ export default function StudentDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* 순위 (개인: 우리반/교내/전체 · 반: 교내/전체) */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <RankingPanel highlightSelf defaultScope="class" />
+        <ClassRankingPanel highlightSelf defaultScope="school" />
+      </div>
         </>
       )}
     </div>

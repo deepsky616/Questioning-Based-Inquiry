@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { StatBar } from "@/components/shared/StatBar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { RankingPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 
 interface TeacherClass {
   grade: string;
@@ -262,6 +263,27 @@ export default function TeacherDashboard() {
               )}
             </CardContent>
           </Card>
+
+          {/* 순위 (개인: 우리반/교내/전체 · 반: 교내/전체) — 선택 학급 기준 */}
+          {(() => {
+            const [selGrade, selClassName] =
+              selectedClass !== "all" ? selectedClass.split("|") : [undefined, undefined];
+            return (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <RankingPanel
+                  gradeParam={selGrade}
+                  classNameParam={selClassName}
+                  defaultScope={selectedClass !== "all" ? "class" : "school"}
+                />
+                <ClassRankingPanel
+                  gradeParam={selGrade}
+                  classNameParam={selClassName}
+                  highlightSelf={selectedClass !== "all"}
+                  defaultScope="school"
+                />
+              </div>
+            );
+          })()}
         </>
       )}
     </div>
