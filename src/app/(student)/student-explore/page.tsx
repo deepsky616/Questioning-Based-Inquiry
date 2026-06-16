@@ -287,19 +287,16 @@ export default function ExplorePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterDate, filterSubject, filterTopic]);
 
-  // 단원설계 질문(TEACHER_SHARED)을 일반 학생 질문과 같이 한 목록에 표시
-  // (단원설계 질문이 위쪽에 오도록 우선순위를 두고, 그 안에서 좋아요순·댓글순 정렬)
+  // 배포된 탐구 질문(TEACHER_SHARED)은 학생 탐구설계 화면에서만 다루므로 질문탐구 목록에서는 제외한다
   const sortKey = (q: Question) => (sortField === "like" ? q.likeCount ?? 0 : q.commentCount ?? 0);
   const filtered = questions
     .filter(
       (q) =>
-        q.content.toLowerCase().includes(search.toLowerCase()) ||
-        q.author.name.toLowerCase().includes(search.toLowerCase())
+        q.source !== "TEACHER_SHARED" &&
+        (q.content.toLowerCase().includes(search.toLowerCase()) ||
+          q.author.name.toLowerCase().includes(search.toLowerCase()))
     )
     .sort((a, b) => {
-      const aPriority = a.source === "TEACHER_SHARED" ? 0 : 1;
-      const bPriority = b.source === "TEACHER_SHARED" ? 0 : 1;
-      if (aPriority !== bPriority) return aPriority - bPriority;
       if (sortField === "student") {
         const c = compareByStudent(a.author, b.author);
         return sortDir === "asc" ? c : -c;

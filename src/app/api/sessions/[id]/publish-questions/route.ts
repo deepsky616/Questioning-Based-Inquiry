@@ -13,23 +13,36 @@ export async function GET(
 ) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = (session.user as { id: string }).id;
 
   const sessionId = params.id;
-  const published = await prisma.question.findMany({
-    where: { sessionId, source: "TEACHER_SHARED" },
-    select: {
-      id: true, content: true, inquiryType: true, createdAt: true,
-      _count: { select: { comments: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const [published, sessionRec] = await Promise.all([
+    prisma.question.findMany({
+      where: { sessionId, source: "TEACHER_SHARED" },
+      select: {
+        id: true, content: true, inquiryType: true, closure: true, cognitive: true, createdAt: true,
+        _count: { select: { comments: true, likes: true } },
+        likes: { where: { userId }, select: { id: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.questionSession.findUnique({
+      where: { id: sessionId },
+      select: { likesVisibleToPeers: true, commentsVisibleToPeers: true },
+    }),
+  ]);
 
   return NextResponse.json({
     published: published.map((q) => ({
       id: q.id, content: q.content, type: q.inquiryType,
+      closure: q.closure, cognitive: q.cognitive,
+      likeCount: q._count.likes,
       commentCount: q._count.comments,
+      myLike: q.likes.length > 0,
       createdAt: q.createdAt,
     })),
+    likesVisible: sessionRec?.likesVisibleToPeers ?? true,
+    commentsVisible: sessionRec?.commentsVisibleToPeers ?? false,
   });
 }
 
