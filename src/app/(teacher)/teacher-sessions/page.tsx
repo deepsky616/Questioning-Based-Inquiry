@@ -29,6 +29,7 @@ interface QuestionSession {
   teacher: { name: string };
   unitDesignId?: string | null;
   defaultQuestionPublic: boolean;
+  commentsVisibleToPeers: boolean;
   isActive: boolean;
   targetType?: string | null;
   targetGrade?: string | null;
@@ -184,6 +185,23 @@ export default function TeacherSessionsPage() {
     if (!res.ok) {
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, defaultQuestionPublic: currentValue } : s))
+      );
+    }
+  };
+
+  const handleToggleCommentsVisible = async (id: string, currentValue: boolean) => {
+    const next = !currentValue;
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, commentsVisibleToPeers: next } : s))
+    );
+    const res = await fetch(`/api/sessions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commentsVisibleToPeers: next }),
+    });
+    if (!res.ok) {
+      setSessions((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, commentsVisibleToPeers: currentValue } : s))
       );
     }
   };
@@ -372,11 +390,12 @@ export default function TeacherSessionsPage() {
                   <CardTitle className="text-base flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
                     생성된 수업 세션
-                    <span className="text-sm font-normal text-gray-500">({activeSessions.length}개)</span>
+                    <span className="text-sm font-normal text-gray-500">총 {activeSessions.length}개</span>
                   </CardTitle>
                   <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
                     <span className="w-16 text-center">학생 활성화</span>
                     <span className="w-16 text-center">질문 공개</span>
+                    <span className="w-16 text-center">댓글 공개</span>
                   </div>
                 </div>
               </CardHeader>
@@ -389,6 +408,7 @@ export default function TeacherSessionsPage() {
                       onDelete={handleDelete}
                       onToggleActive={handleToggleActive}
                       onTogglePublic={handleTogglePublic}
+                      onToggleCommentsVisible={handleToggleCommentsVisible}
                       onPublish={setPublishTarget}
                     />
                   ))}
@@ -404,11 +424,12 @@ export default function TeacherSessionsPage() {
                   <CardTitle className="text-base flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
                     수업 세션 목록
-                    <span className="text-sm font-normal text-gray-500">({pastSessions.length}개)</span>
+                    <span className="text-sm font-normal text-gray-500">총 {pastSessions.length}개</span>
                   </CardTitle>
                   <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
                     <span className="w-16 text-center">학생 활성화</span>
                     <span className="w-16 text-center">질문 공개</span>
+                    <span className="w-16 text-center">댓글 공개</span>
                   </div>
                 </div>
               </CardHeader>
@@ -421,6 +442,7 @@ export default function TeacherSessionsPage() {
                       onDelete={handleDelete}
                       onToggleActive={handleToggleActive}
                       onTogglePublic={handleTogglePublic}
+                      onToggleCommentsVisible={handleToggleCommentsVisible}
                       onPublish={setPublishTarget}
                     />
                   ))}
@@ -448,12 +470,14 @@ function SessionRow({
   onDelete,
   onToggleActive,
   onTogglePublic,
+  onToggleCommentsVisible,
   onPublish,
 }: {
   session: QuestionSession;
   onDelete: (id: string) => void;
   onToggleActive: (id: string, current: boolean) => void;
   onTogglePublic: (id: string, current: boolean) => void;
+  onToggleCommentsVisible: (id: string, current: boolean) => void;
   onPublish: (s: QuestionSession) => void;
 }) {
   return (
@@ -470,6 +494,9 @@ function SessionRow({
             )}
             {!session.defaultQuestionPublic && (
               <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">질문 비공개</span>
+            )}
+            {!session.commentsVisibleToPeers && (
+              <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">댓글 서로 비공개</span>
             )}
             {session.unitDesignId && (
               <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">탐구 질문 수업</span>
@@ -503,6 +530,10 @@ function SessionRow({
         <Switch
           checked={session.defaultQuestionPublic}
           onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)}
+        />
+        <Switch
+          checked={session.commentsVisibleToPeers}
+          onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)}
         />
         <Button
           variant="ghost"

@@ -18,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     where: { id: params.id },
     include: {
       author: { select: { id: true, role: true, school: true, grade: true, className: true } },
-      session: { select: { id: true, isActive: true } },
+      session: { select: { id: true, isActive: true, commentsVisibleToPeers: true } },
     },
   });
   if (!question) {
@@ -50,24 +50,25 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     // (날짜/교과/주제 검색에서는 전체 세션이 조회 대상이므로 댓글도 그대로 노출)
   }
 
-  // 댓글 조회 — 학생이면 본인이거나 같은 학교/학년/반 학생 댓글만
+  // 댓글 조회 권한
+  // - 세션의 commentsVisibleToPeers=true: 같은 학교/학년/반 학생끼리 댓글 공유
+  // - false(기본): 다른 학생 댓글은 숨기고 학생은 본인 댓글 + 교사 댓글만 본다
+  const peersVisible = question.session?.commentsVisibleToPeers ?? false;
   let commentWhere: Record<string, unknown> = { questionId: params.id };
   if (userRole === "STUDENT") {
     const me = await prisma.user.findUnique({
       where: { id: userId },
       select: { school: true, grade: true, className: true },
     });
-    if (me?.school && me.grade && me.className) {
-      commentWhere = {
-        questionId: params.id,
-        author: {
-          OR: [
-            { id: userId },
-            { role: "STUDENT", school: me.school, grade: me.grade, className: me.className },
-            { role: "TEACHER", school: me.school },
-          ],
-        },
-      };
+    if (me?.school) {
+      const orConds: Record<string, unknown>[] = [
+        { id: userId },
+        { role: "TEACHER", school: me.school },
+      ];
+      if (peersVisible && me.grade && me.className) {
+        orConds.push({ role: "STUDENT", school: me.school, grade: me.grade, className: me.className });
+      }
+      commentWhere = { questionId: params.id, author: { OR: orConds } };
     } else {
       commentWhere = { questionId: params.id, authorId: userId };
     }

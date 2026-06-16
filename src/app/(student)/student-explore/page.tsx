@@ -148,6 +148,11 @@ function QuestionCard({
           <p className={isTeacherShared ? "text-gray-900 font-medium" : "text-gray-900"}>
             {q.content}
           </p>
+          {isTeacherShared && commentsEnabled && (
+            <div className="mt-2 rounded-md bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
+              ✍️ 선생님의 탐구 질문이에요. 아래 <b>답변하기</b>를 눌러 내 생각을 댓글로 남겨보세요!
+            </div>
+          )}
           <div className="flex gap-2 mt-2 flex-wrap items-center">
             <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
               {CLOSURE_LABEL[q.closure]}
@@ -183,10 +188,14 @@ function QuestionCard({
           {commentsEnabled && (
             <button
               onClick={() => setShowComments((v) => !v)}
-              className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+              className={`flex items-center gap-1 text-xs font-medium transition-colors ${
+                isTeacherShared && !showComments
+                  ? "rounded-full bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700"
+                  : "text-indigo-600 hover:text-indigo-800"
+              }`}
             >
               <span>💬 {commentCount}</span>
-              <span>{showComments ? "닫기" : "댓글"}</span>
+              <span>{showComments ? "닫기" : isTeacherShared ? "답변하기" : "댓글"}</span>
             </button>
           )}
         </div>

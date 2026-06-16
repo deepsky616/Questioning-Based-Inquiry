@@ -108,6 +108,7 @@ model QuestionSession {
   unitDesignId    String?    @map("unit_design_id")
   sharedQuestions Json       @default("[]") @map("shared_questions")
   defaultQuestionPublic Boolean @default(false) @map("default_question_public")
+  commentsVisibleToPeers Boolean @default(false) @map("comments_visible_to_peers")
   isActive        Boolean    @default(true)  @map("is_active")
   createdAt       DateTime   @default(now()) @map("created_at")
 
