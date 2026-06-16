@@ -85,7 +85,7 @@ export async function GET(req: Request) {
     },
     include: {
       author: {
-        select: { id: true, name: true, className: true },
+        select: { id: true, name: true, className: true, grade: true, studentNumber: true },
       },
     },
     orderBy: { createdAt: "asc" },
@@ -115,7 +115,7 @@ export async function GET(req: Request) {
       ...q,
       closure: q.closure as "closed" | "open",
       cognitive: q.cognitive as "factual" | "conceptual" | "controversial",
-      author: { id: q.author.id, name: q.author.name, className: q.author.className },
+      author: { id: q.author.id, name: q.author.name, className: q.author.className, grade: q.author.grade, studentNumber: q.author.studentNumber },
     }))
   );
 
@@ -130,7 +130,7 @@ export async function GET(req: Request) {
       ...q,
       closure: q.closure as "closed" | "open",
       cognitive: q.cognitive as "factual" | "conceptual" | "controversial",
-      author: { id: q.author.id, name: q.author.name, className: q.author.className },
+      author: { id: q.author.id, name: q.author.name, className: q.author.className, grade: q.author.grade, studentNumber: q.author.studentNumber },
     }))
   );
 

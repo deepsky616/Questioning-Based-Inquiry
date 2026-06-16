@@ -25,6 +25,8 @@ interface Stats {
     studentId: string;
     name: string;
     className?: string;
+    grade?: string;
+    studentNumber?: string;
     total: number;
     distribution: { closed: number; open: number };
     cognitiveDistribution: { factual: number; conceptual: number; controversial: number };
@@ -238,8 +240,12 @@ export default function TeacherDashboard() {
                       <TableRow key={s.studentId}>
                         <TableCell>
                           <div className="font-medium">{s.name}</div>
-                          {s.className && (
-                            <div className="text-xs text-gray-400">{s.className}</div>
+                          {(s.grade || s.className || s.studentNumber) && (
+                            <div className="text-xs text-gray-400">
+                              {s.grade && `${s.grade}학년 `}
+                              {s.className && `${s.className}반`}
+                              {s.studentNumber && ` ${s.studentNumber}번`}
+                            </div>
                           )}
                         </TableCell>
                         <TableCell className="text-right font-bold">{s.total}</TableCell>

@@ -8,6 +8,8 @@ export interface QuestionForStats {
     id: string;
     name: string;
     className: string | null;
+    grade?: string | null;
+    studentNumber?: string | null;
   };
 }
 
@@ -15,6 +17,8 @@ export interface StudentStat {
   studentId: string;
   name: string;
   className: string | null;
+  grade?: string | null;
+  studentNumber?: string | null;
   total: number;
   distribution: { closed: number; open: number };
   cognitiveDistribution: { factual: number; conceptual: number; controversial: number };
@@ -69,6 +73,8 @@ export function aggregateByStudent(questions: QuestionForStats[]): Omit<StudentS
         studentId: sid,
         name: q.author.name,
         className: q.author.className,
+        grade: q.author.grade ?? null,
+        studentNumber: q.author.studentNumber ?? null,
         total: 0,
         distribution: { closed: 0, open: 0 },
         cognitiveDistribution: { factual: 0, conceptual: 0, controversial: 0 },
