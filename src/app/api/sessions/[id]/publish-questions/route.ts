@@ -74,18 +74,29 @@ export async function POST(
   }
 
   // 신규: 질문 중심 탐구설계 시퀀스 배포 (그룹/순서 포함)
+  // 재배포 시 데이터 무결성 원칙:
+  //  - 시퀀스의 모든 질문을 TEACHER_SHARED로 배포(학생이 좋아요·댓글로 참여 가능)
+  //  - content가 같은 기존 질문은 재사용하여 이미 받은 좋아요·댓글을 그대로 유지
+  //  - 새 시퀀스에서 빠졌더라도 좋아요·댓글이 있으면 절대 삭제하지 않음(손실 방지)
+  //  - 참여가 전혀 없는(좋아요 0·댓글 0) 빠진 질문만 정리해 목록을 깔끔히 유지
   if (Array.isArray(body.sequence)) {
     const seq = normalizeSharedQuestions(body.sequence as SharedQuestionItem[]);
 
-    // 교사 추가 질문만 TEACHER_SHARED Question으로 멱등 생성
-    const existingShared = await prisma.question.findMany({
+    const existing = await prisma.question.findMany({
       where: { sessionId, source: "TEACHER_SHARED" },
-      select: { content: true },
+      select: {
+        id: true,
+        content: true,
+        _count: { select: { likes: true, comments: true } },
+      },
     });
-    const existingSet = new Set(existingShared.map((q) => q.content.trim()));
-    const teacherNew = seq.filter((q) => q.source === "teacher" && !existingSet.has(q.content.trim()));
+    const existingByContent = new Map(existing.map((q) => [q.content.trim(), q]));
+    const seqContents = new Set(seq.map((q) => q.content.trim()));
+
+    // 아직 배포되지 않은 질문만 새로 생성(기존 질문은 그대로 두어 좋아요·댓글 유지)
+    const toCreate = seq.filter((q) => !existingByContent.has(q.content.trim()));
     await Promise.all(
-      teacherNew.map((q) =>
+      toCreate.map((q) =>
         prisma.question.create({
           data: {
             content: q.content.trim(),
@@ -101,13 +112,32 @@ export async function POST(
       ),
     );
 
+    // 새 시퀀스에서 빠졌고 참여 기록도 전혀 없는 질문만 정리(좋아요·댓글이 있으면 보존)
+    const removable = existing.filter(
+      (q) =>
+        !seqContents.has(q.content.trim()) &&
+        q._count.likes === 0 &&
+        q._count.comments === 0,
+    );
+    if (removable.length > 0) {
+      await prisma.question.deleteMany({
+        where: { id: { in: removable.map((q) => q.id) }, source: "TEACHER_SHARED" },
+      });
+    }
+
     // sharedQuestions에 전체 시퀀스(그룹/순서) 저장
     await prisma.questionSession.update({
       where: { id: sessionId },
       data: { sharedQuestions: seq as unknown as Prisma.InputJsonValue },
     });
 
-    return NextResponse.json({ ok: true, count: seq.length });
+    return NextResponse.json({
+      ok: true,
+      count: seq.length,
+      created: toCreate.length,
+      reused: seq.length - toCreate.length,
+      cleaned: removable.length,
+    });
   }
 
   // 이미 배포된 교사 질문 조회
