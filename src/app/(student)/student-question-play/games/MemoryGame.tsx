@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
 import { useSingleAward, AwardBadge } from "./useSingleAward";
+import { GameResultReview } from "./GameResultReview";
 import {
   MEMORY_DIFFICULTY, MemoryDifficulty, QAPair,
   pickFallbackPairs, parseAIPairs, shuffle,
@@ -254,6 +255,15 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             ))}
           </div>
         )}
+
+        {/* 질문-대답 짝 정리 */}
+        <GameResultReview
+          title="📋 오늘의 질문-대답 짝"
+          accentColor={game.accentColor}
+          entries={pairs.map((p) => ({ q: p.question, a: p.answer }))}
+          qPrefix="💧"
+          aPrefix="⭐"
+        />
 
         {/* 적립 결과 */}
         <AwardBadge result={awardResult} />

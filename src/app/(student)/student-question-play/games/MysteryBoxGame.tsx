@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
 import { useSingleAward, AwardBadge } from "./useSingleAward";
+import { GameResultReview } from "./GameResultReview";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -395,6 +396,11 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             {hasTurns && winner ? `👑 ${winner} 승리!` : `${qaList.length}개의 질문으로 맞혔어요!`}
             {isAI && <><br/><span className="text-indigo-500 font-bold">AI를 이겼어요! 🏆</span></>}
           </p>
+          <GameResultReview
+            title="📋 주고받은 질문"
+            accentColor={game.accentColor}
+            entries={qaList.map((qa) => ({ q: hasTurns ? `${qa.asker} · ${qa.question}` : qa.question, a: String(qa.answer) }))}
+          />
           <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>
@@ -415,6 +421,11 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             <h2 className="text-4xl font-black text-gray-800">{itemName}</h2>
             <p className="text-gray-400 text-sm mt-1">({isAI ? aiItem?.category : localItem?.hint})</p>
           </div>
+          <GameResultReview
+            title="📋 주고받은 질문"
+            accentColor={game.accentColor}
+            entries={qaList.map((qa) => ({ q: hasTurns ? `${qa.asker} · ${qa.question}` : qa.question, a: String(qa.answer) }))}
+          />
           <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>

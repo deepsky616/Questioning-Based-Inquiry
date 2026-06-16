@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, playerColorById } from "./roomShared";
+import { GameResultReview } from "./GameResultReview";
 import { AI_BONUS_TYPES, BonusKey, SYSTEM_BONUS, BASE_POINTS } from "@/lib/points-policy";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
@@ -235,6 +236,13 @@ export default function RoomResult({
           </>
         )}
       </div>
+
+      {/* 우리가 만든 질문 정리 */}
+      <GameResultReview
+        title="📋 우리가 만든 질문"
+        accentColor={game.accentColor}
+        entries={questions.map((q) => ({ q: `${q.playerName} · ${q.question}` }))}
+      />
 
       {/* 대기실 복귀 */}
       {isHost ? (
