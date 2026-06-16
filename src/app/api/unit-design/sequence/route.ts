@@ -20,6 +20,10 @@ const sequenceSchema = z.object({
   additionalQuestions: z.array(z.string().min(1).max(500)).optional().default([]),
   // merge: 비슷한 질문을 1개로 통합 변형 / sort: 통합 없이 흐름 기준 정렬
   mode: z.enum(["merge", "sort"]).optional().default("sort"),
+  // sort 모드에서 이미 묶은 결과를 다시 정렬할 때 그 질문 목록을 전달한다(없으면 원본 학생 질문을 정렬)
+  currentQuestions: z
+    .array(z.object({ content: z.string().min(1), type: z.string().optional(), source: z.string().optional() }))
+    .optional(),
 });
 
 function normalizeSequencedQuestions(
@@ -87,27 +91,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "수업세션을 찾을 수 없습니다" }, { status: 404 });
     }
 
-    const studentQuestions = await prisma.question.findMany({
-      where: { sessionId: data.sessionId },
-      select: { id: true, content: true, cognitive: true, context: true, createdAt: true },
-      orderBy: { createdAt: "asc" },
-    });
-
-    const questions: SequenceInputQuestion[] = [
-      ...studentQuestions.map((question) => ({
-        id: question.id,
-        content: question.content,
-        cognitive: question.cognitive,
-        context: question.context,
-        source: "student" as const,
-      })),
-      ...data.additionalQuestions.map((content, index) => ({
-        id: `teacher-${Date.now()}-${index}`,
-        content,
-        cognitive: null,
-        source: "teacher" as const,
-      })),
-    ].filter((question) => question.content.trim().length > 0);
+    let questions: SequenceInputQuestion[];
+    if (data.mode === "sort" && data.currentQuestions && data.currentQuestions.length > 0) {
+      // 이미 묶은 결과를 다시 정렬: 원본 대신 전달받은 질문 목록을 정렬한다
+      questions = data.currentQuestions
+        .map((q, index) => ({
+          id: `cur-${index + 1}`,
+          content: q.content,
+          cognitive: q.type ?? null,
+          source: q.source === "teacher" ? ("teacher" as const) : ("student" as const),
+        }))
+        .filter((question) => question.content.trim().length > 0);
+    } else {
+      const studentQuestions = await prisma.question.findMany({
+        where: { sessionId: data.sessionId },
+        select: { id: true, content: true, cognitive: true, context: true, createdAt: true },
+        orderBy: { createdAt: "asc" },
+      });
+      questions = [
+        ...studentQuestions.map((question) => ({
+          id: question.id,
+          content: question.content,
+          cognitive: question.cognitive,
+          context: question.context,
+          source: "student" as const,
+        })),
+        ...data.additionalQuestions.map((content, index) => ({
+          id: `teacher-${Date.now()}-${index}`,
+          content,
+          cognitive: null,
+          source: "teacher" as const,
+        })),
+      ].filter((question) => question.content.trim().length > 0);
+    }
 
     if (questions.length === 0) {
       return NextResponse.json({ error: "분류할 질문이 없습니다" }, { status: 400 });

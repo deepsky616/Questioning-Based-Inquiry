@@ -35,6 +35,8 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
   const [teacherInput, setTeacherInput] = useState("");
   const [generatedBy, setGeneratedBy] = useState<"ai" | "rules" | "">("");
   const [error, setError] = useState<string | null>(null);
+  // ① 묶기를 한 번이라도 실행해야 ② 흐름 정렬을 켤 수 있다(순차 진행)
+  const [merged, setMerged] = useState(false);
 
   const update = useCallback((next: SequencedQuestion[]) => {
     setSequenced(next);
@@ -42,19 +44,27 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
   }, [onChange]);
 
   // sequence API는 sessionId로 학생 질문을 직접 조회하고, 교사 추가 질문은 additionalQuestions로 받는다.
-  async function runSequence(additional: string[] = additionalQuestions, mode: "merge" | "sort" = "sort") {
+  async function runSequence(
+    additional: string[] = additionalQuestions,
+    mode: "merge" | "sort" = "sort",
+    current?: SequencedQuestion[],
+  ) {
     setIsRunning(true);
     setError(null);
     try {
       const res = await fetch("/api/unit-design/sequence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, flowId, additionalQuestions: additional, subject, topic, mode }),
+        body: JSON.stringify({
+          sessionId, flowId, additionalQuestions: additional, subject, topic, mode,
+          currentQuestions: current?.map((q) => ({ content: q.content, type: q.type, source: q.source })),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "정리에 실패했습니다");
       update(data.sequencedQuestions ?? []);
       setGeneratedBy(data.generatedBy ?? "rules");
+      if (mode === "merge") setMerged(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "정리에 실패했습니다");
     }
@@ -100,7 +110,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
             ))}
           </SelectContent>
         </Select>
-        <Button onClick={() => runSequence(additionalQuestions, "sort")} disabled={isRunning} variant="outline" className="gap-1.5">
+        <Button onClick={() => runSequence(additionalQuestions, "sort", sequenced)} disabled={isRunning || !merged} variant="outline" className="gap-1.5">
           <ListOrdered className="h-4 w-4" /> ② 흐름 기준 정렬
         </Button>
         {isRunning && <RotateCw className="h-4 w-4 animate-spin text-muted-foreground" />}
