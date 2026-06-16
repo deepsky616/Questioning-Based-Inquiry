@@ -42,14 +42,14 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
   }, [onChange]);
 
   // sequence API는 sessionId로 학생 질문을 직접 조회하고, 교사 추가 질문은 additionalQuestions로 받는다.
-  async function runSequence(additional: string[] = additionalQuestions) {
+  async function runSequence(additional: string[] = additionalQuestions, mode: "merge" | "sort" = "sort") {
     setIsRunning(true);
     setError(null);
     try {
       const res = await fetch("/api/unit-design/sequence", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, flowId, additionalQuestions: additional, subject, topic }),
+        body: JSON.stringify({ sessionId, flowId, additionalQuestions: additional, subject, topic, mode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "정리에 실패했습니다");
@@ -68,7 +68,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
     const next = [...additionalQuestions, content];
     setAdditionalQuestions(next);
     setTeacherInput("");
-    runSequence(next);
+    runSequence(next, "merge");
   }
 
   function handleDrop(targetIndex: number) {
@@ -85,7 +85,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
     <div className="space-y-4">
       {/* ① 묶기 + ② 흐름 정렬 */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
-        <Button onClick={() => runSequence()} disabled={isRunning} className="gap-1.5">
+        <Button onClick={() => runSequence(additionalQuestions, "merge")} disabled={isRunning} className="gap-1.5">
           <Layers className="h-4 w-4" /> ① 비슷한 질문 묶기
         </Button>
         <span className="text-muted-foreground text-xs">→</span>
@@ -100,7 +100,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
             ))}
           </SelectContent>
         </Select>
-        <Button onClick={() => runSequence()} disabled={isRunning} variant="outline" className="gap-1.5">
+        <Button onClick={() => runSequence(additionalQuestions, "sort")} disabled={isRunning} variant="outline" className="gap-1.5">
           <ListOrdered className="h-4 w-4" /> ② 흐름 기준 정렬
         </Button>
         {isRunning && <RotateCw className="h-4 w-4 animate-spin text-muted-foreground" />}

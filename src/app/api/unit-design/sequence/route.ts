@@ -18,9 +18,15 @@ const sequenceSchema = z.object({
   sessionId: z.string().min(1),
   flowId: z.string().min(1).default("cognitive-development"),
   additionalQuestions: z.array(z.string().min(1).max(500)).optional().default([]),
+  // merge: 비슷한 질문을 1개로 통합 변형 / sort: 통합 없이 흐름 기준 정렬
+  mode: z.enum(["merge", "sort"]).optional().default("sort"),
 });
 
-function normalizeSequencedQuestions(value: unknown, sourceQuestions: SequenceInputQuestion[]): SequencedQuestion[] {
+function normalizeSequencedQuestions(
+  value: unknown,
+  sourceQuestions: SequenceInputQuestion[],
+  mode: "merge" | "sort" = "sort",
+): SequencedQuestion[] {
   if (!Array.isArray(value)) return [];
   const sourceById = new Map(sourceQuestions.map((question) => [question.id, question]));
 
@@ -28,7 +34,8 @@ function normalizeSequencedQuestions(value: unknown, sourceQuestions: SequenceIn
     .map((item, index) => {
       if (!item || typeof item !== "object") return null;
       const raw = item as Record<string, unknown>;
-      const id = typeof raw.id === "string" ? raw.id : sourceQuestions[index]?.id;
+      // 통합(merge) 모드에서는 새 통합 질문이므로 원본 id가 없으면 새 id를 부여한다
+      const id = typeof raw.id === "string" ? raw.id : (mode === "merge" ? `merged-${index + 1}` : sourceQuestions[index]?.id);
       const source = id ? sourceById.get(id) : undefined;
       const content = typeof raw.content === "string" ? raw.content : source?.content;
       if (!id || !content) return null;
@@ -125,13 +132,18 @@ export async function POST(req: Request) {
             subject: questionSession.subject,
             topic: questionSession.topic,
             questions,
+            mode: data.mode,
           }),
         );
         const text = result.response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
-        const aiQuestions = normalizeSequencedQuestions(parsed?.sequencedQuestions, questions);
-        if (aiQuestions.length === questions.length) {
+        const aiQuestions = normalizeSequencedQuestions(parsed?.sequencedQuestions, questions, data.mode);
+        // 정렬 모드는 질문 수가 유지돼야 하지만, 통합 모드는 줄어들 수 있다
+        const ok = data.mode === "merge"
+          ? aiQuestions.length > 0 && aiQuestions.length <= questions.length
+          : aiQuestions.length === questions.length;
+        if (ok) {
           sequencedQuestions = aiQuestions;
           generatedBy = "ai";
         }

@@ -178,7 +178,9 @@ export function buildSequencePrompt(params: {
   subject: string;
   topic: string;
   questions: SequenceInputQuestion[];
+  mode?: "merge" | "sort";
 }) {
+  const mode = params.mode ?? "sort";
   const selectedFlow = getUnitFlow(params.flowId);
   const criteria = UNIT_FLOW_GROUPS.map((group) => {
     const flows = group.flows
@@ -191,8 +193,12 @@ export function buildSequencePrompt(params: {
     .map((question, index) => `${index + 1}. [id=${question.id ?? `manual-${index + 1}`}] [인지=${question.cognitive ?? "unknown"}] ${question.content}`)
     .join("\n");
 
+  const intro = mode === "merge"
+    ? "학생들이 만든 비슷한 질문들을 하나의 대표 질문으로 통합하고, 교사가 선택한 단원 설계 흐름에 따라 수업 순서를 정하세요."
+    : "학생들이 만든 질문을 비슷한 내용끼리 유목화하고, 교사가 선택한 단원 설계 흐름에 따라 수업 순서 우선순위를 정하세요.";
+
   return `당신은 학생 질문 기반 단원 설계 전문가입니다.
-학생들이 만든 질문을 비슷한 내용끼리 유목화하고, 교사가 선택한 단원 설계 흐름에 따라 수업 순서 우선순위를 정하세요.
+${intro}
 
 [교과] ${params.subject || "미지정"}
 [단원/주제] ${params.topic || "미지정"}
@@ -207,13 +213,20 @@ ${selectedFlow.description}
 [학생 및 교사 추가 질문]
 ${questionList}
 
-작업 규칙:
+${mode === "merge"
+  ? `작업 규칙:
+- 의미가 비슷한 질문들은 하나의 대표 질문으로 통합하세요. 통합 질문의 content에는 묶인 질문들의 핵심 내용이 빠짐없이 담겨야 합니다.
+- 통합한 질문만 출력하세요(원본 여러 개 → 통합 1개). 비슷한 질문이 없으면 원래 질문을 그대로 두세요.
+- contentGroup에는 어떤 주제로 묶었는지 쓰세요.
+- priority는 실제 수업 순서이며 1부터 연속된 숫자로 부여하세요.
+- lessonPhase는 12자 이내 한국어, rationale은 한 문장, type은 factual/conceptual/controversial/student 중 가장 가까운 값.`
+  : `작업 규칙:
 - 질문은 의미가 비슷하면 같은 contentGroup으로 묶으세요.
 - 모든 질문을 빠짐없이 포함하세요.
 - priority는 실제 수업 순서이며 1부터 연속된 숫자로 부여하세요.
 - lessonPhase는 해당 질문이 수업에서 맡는 역할을 12자 이내 한국어로 쓰세요.
 - rationale은 왜 그 위치인지 한 문장으로 설명하세요.
-- type은 factual, conceptual, controversial, student 중 가장 가까운 값을 쓰세요.
+- type은 factual, conceptual, controversial, student 중 가장 가까운 값을 쓰세요.`}
 
 아래 JSON만 출력하세요:
 {"sequencedQuestions":[
