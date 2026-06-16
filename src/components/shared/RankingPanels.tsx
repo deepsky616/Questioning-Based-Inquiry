@@ -84,16 +84,19 @@ export function RankingPanel({
   classNameParam,
   highlightSelf = false,
   defaultScope = "class",
+  showStudentNumber = false,
 }: {
   gradeParam?: string;
   classNameParam?: string;
   highlightSelf?: boolean;
   defaultScope?: IndivScope;
+  showStudentNumber?: boolean;
 }) {
   const [scope, setScope] = useState<IndivScope>(defaultScope);
   const [data, setData] = useState<IndivData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const selfRef = useRef<HTMLTableRowElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsLoading(true);
@@ -108,16 +111,25 @@ export function RankingPanel({
   }, [scope, gradeParam, classNameParam]);
 
   useEffect(() => {
-    if (highlightSelf && selfRef.current) {
-      selfRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
+    // 페이지 전체가 아니라 순위 목록 컨테이너 안에서만 본인 행이 보이도록 스크롤한다
+    // (scrollIntoView는 페이지가 통째로 이 패널로 점프하는 문제가 있어 사용하지 않는다)
+    if (highlightSelf && selfRef.current && containerRef.current) {
+      const c = containerRef.current;
+      const cRect = c.getBoundingClientRect();
+      const rRect = selfRef.current.getBoundingClientRect();
+      c.scrollTop += rRect.top - cRect.top - cRect.height / 2 + rRect.height / 2;
     }
   }, [data, highlightSelf]);
 
-  const sub = (s: { school: string | null; grade: string | null; className: string | null; studentNumber: string | null }) => {
-    if (scope === "all") return [s.school, s.grade && `${s.grade}학년`, s.className && `${s.className}반`].filter(Boolean).join(" ");
-    if (scope === "school") return [s.grade && `${s.grade}학년`, s.className && `${s.className}반`].filter(Boolean).join(" ");
-    return s.studentNumber ? `${s.studentNumber}번` : "";
-  };
+  const sub = (s: { school: string | null; grade: string | null; className: string | null; studentNumber: string | null }) =>
+    [
+      s.school,
+      s.grade && `${s.grade}학년`,
+      s.className && `${s.className}반`,
+      showStudentNumber && s.studentNumber ? `${s.studentNumber}번` : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
 
   const selfInList = data?.students.some((s) => s.id === data.me.id);
 
@@ -145,7 +157,7 @@ export function RankingPanel({
       ) : !data || data.students.length === 0 ? (
         <div className="py-8 text-center text-sm text-muted-foreground">표시할 순위가 없습니다</div>
       ) : (
-        <div className="max-h-80 overflow-y-auto">
+        <div ref={containerRef} className="max-h-80 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card">
               <tr className="text-xs text-muted-foreground border-b">
@@ -207,6 +219,7 @@ export function ClassRankingPanel({
   const [data, setData] = useState<ClassData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const selfRef = useRef<HTMLTableRowElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsLoading(true);
@@ -221,8 +234,13 @@ export function ClassRankingPanel({
   }, [scope, gradeParam, classNameParam]);
 
   useEffect(() => {
-    if (highlightSelf && selfRef.current) {
-      selfRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
+    // 페이지 전체가 아니라 순위 목록 컨테이너 안에서만 본인 행이 보이도록 스크롤한다
+    // (scrollIntoView는 페이지가 통째로 이 패널로 점프하는 문제가 있어 사용하지 않는다)
+    if (highlightSelf && selfRef.current && containerRef.current) {
+      const c = containerRef.current;
+      const cRect = c.getBoundingClientRect();
+      const rRect = selfRef.current.getBoundingClientRect();
+      c.scrollTop += rRect.top - cRect.top - cRect.height / 2 + rRect.height / 2;
     }
   }, [data, highlightSelf]);
 
@@ -260,7 +278,7 @@ export function ClassRankingPanel({
       ) : !data || data.classes.length === 0 ? (
         <div className="py-8 text-center text-sm text-muted-foreground">표시할 순위가 없습니다</div>
       ) : (
-        <div className="max-h-80 overflow-y-auto">
+        <div ref={containerRef} className="max-h-80 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card">
               <tr className="text-xs text-muted-foreground border-b">

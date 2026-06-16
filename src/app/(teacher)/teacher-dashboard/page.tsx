@@ -34,6 +34,7 @@ interface Stats {
     trend: number | null;
   }>;
   timeline: Array<{ date: string; count: number }>;
+  school?: string | null;
   teacherClasses: TeacherClass[];
 }
 
@@ -127,7 +128,7 @@ export default function TeacherDashboard() {
             <SelectItem value="all">전체 담당 학급</SelectItem>
             {teacherClasses.map((tc) => (
               <SelectItem key={classKey(tc)} value={classKey(tc)}>
-                {tc.grade}학년 {tc.className}
+                {stats?.school ? `${stats.school} ` : ""}{tc.grade}학년 {tc.className}반
               </SelectItem>
             ))}
           </SelectContent>

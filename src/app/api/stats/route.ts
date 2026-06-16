@@ -140,6 +140,7 @@ export async function GET(req: Request) {
     byCognitive,
     byStudent,
     timeline,
+    school, // 교사 소속 학교 (학급 드롭다운 표기용)
     teacherClasses, // 프론트엔드 학급 드롭다운 구성용
   });
 }

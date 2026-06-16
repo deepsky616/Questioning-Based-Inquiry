@@ -70,7 +70,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* 포인트 카드 */}
-      <PointsCard myId={user.id} />
+      <PointsCard />
 
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">로딩 중...</div>
@@ -199,7 +199,7 @@ export default function StudentDashboard() {
 
       {/* 순위 (개인: 우리반/교내/전체 · 반: 교내/전체) */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <RankingPanel highlightSelf defaultScope="class" />
+        <RankingPanel highlightSelf defaultScope="class" showStudentNumber />
         <ClassRankingPanel highlightSelf defaultScope="school" />
       </div>
         </>

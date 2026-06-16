@@ -18,9 +18,8 @@ interface PointLog {
   createdAt: string;
 }
 
-interface LeaderboardEntry { id: string; name: string; grade: string | null; className: string | null; totalPoints: number }
 interface LeaderboardMe { rank: number | null; totalPoints: number }
-interface LeaderboardResp { scope: string; students: LeaderboardEntry[]; total: number; me?: LeaderboardMe }
+interface LeaderboardResp { scope: string; me?: LeaderboardMe }
 
 function relativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -39,17 +38,18 @@ function bonusLabel(bonusType: string): { label: string; emoji: string } {
     const def = AI_BONUS_TYPES[bonusType as BonusKey];
     return { label: def.label, emoji: def.emoji };
   }
+  if (bonusType === "QUESTION_WRITE") return { label: "수업세션 질문 작성", emoji: "✏️" };
+  if (bonusType === "COMMENT_WRITE") return { label: "친구 질문에 답변 작성", emoji: "💬" };
   if (bonusType === "PARTICIPATION") return { label: "게임 참여", emoji: "✋" };
   if (bonusType === "VALID_QUESTIONS") return { label: "좋은 질문", emoji: "❓" };
   if (bonusType === "COMPLETION") return { label: "게임 완료", emoji: "✅" };
   if (bonusType === "WINNER") return { label: "우승", emoji: "👑" };
-  return { label: bonusType, emoji: "🎯" };
+  return { label: "포인트 획득", emoji: "🎯" };
 }
 
-export default function PointsCard({ myId }: { myId: string }) {
+export default function PointsCard() {
   const [totalPoints, setTotalPoints] = useState(0);
   const [recent, setRecent] = useState<PointLog[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardResp | null>(null);
   const [ranks, setRanks] = useState<{ class: number | null; school: number | null; all: number | null }>({
     class: null, school: null, all: null,
   });
@@ -60,7 +60,10 @@ export default function PointsCard({ myId }: { myId: string }) {
     let cancelled = false;
     const fetchAll = async () => {
       try {
-        const [meRes, classLb, schoolLb, allLb] = await Promise.all([
+        const [meRes, classLb, schoolLb, allLb]: [
+          { totalPoints?: number; recent?: PointLog[] },
+          LeaderboardResp, LeaderboardResp, LeaderboardResp,
+        ] = await Promise.all([
           fetch("/api/points/me").then((r) => r.json()),
           fetch("/api/points/leaderboard?scope=class").then((r) => r.json()),
           fetch("/api/points/leaderboard?scope=school").then((r) => r.json()),
@@ -69,7 +72,6 @@ export default function PointsCard({ myId }: { myId: string }) {
         if (cancelled) return;
         setTotalPoints(meRes.totalPoints ?? 0);
         setRecent(meRes.recent ?? []);
-        setLeaderboard(classLb);
         setRanks({
           class: classLb?.me?.rank ?? null,
           school: schoolLb?.me?.rank ?? null,
@@ -82,9 +84,6 @@ export default function PointsCard({ myId }: { myId: string }) {
     const iv = setInterval(fetchAll, POLL_MS);
     return () => { cancelled = true; clearInterval(iv); };
   }, []);
-
-  const myRank = ranks.class;
-  const topStudents = leaderboard?.students.slice(0, 5) ?? [];
 
   const rankText = (v: number | null) => (v != null ? `${v}등` : "-");
 
@@ -111,44 +110,12 @@ export default function PointsCard({ myId }: { myId: string }) {
         </button>
       </div>
 
-      {/* 우리 반 순위 */}
-      <div className="md:col-span-2 rounded-2xl p-5 bg-white border border-gray-100 shadow-sm">
-        <h3 className="font-black text-gray-800 text-sm mb-3">🏆 우리 반 순위</h3>
-        {topStudents.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-4">아직 점수가 없어요</p>
-        ) : (
-          <div className="space-y-1.5">
-            {topStudents.map((s, i) => {
-              const isMe = s.id === myId;
-              return (
-                <div key={s.id}
-                  className="flex items-center gap-3 rounded-lg px-2 py-1.5"
-                  style={{ background: isMe ? "#ede9fe" : "transparent" }}>
-                  <span className="text-sm w-7 text-center">
-                    {["🥇", "🥈", "🥉"][i] ?? <span className="text-gray-400">{i + 1}</span>}
-                  </span>
-                  <span className={`flex-1 text-sm ${isMe ? "font-black text-indigo-700" : "text-gray-700"}`}>
-                    {s.name}{isMe && <span className="text-xs ml-1">(나)</span>}
-                  </span>
-                  <span className="font-black text-sm text-indigo-600">{s.totalPoints}</span>
-                </div>
-              );
-            })}
-            {myRank != null && myRank > 5 && (
-              <div className="flex items-center gap-3 rounded-lg px-2 py-1.5 bg-indigo-50 mt-1">
-                <span className="text-sm w-7 text-center text-indigo-600">{myRank}</span>
-                <span className="flex-1 text-sm font-black text-indigo-700">나</span>
-                <span className="font-black text-sm text-indigo-600">{totalPoints}</span>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* 최근 받은 포인트 */}
-      {recent.length > 0 && (
-        <div className="md:col-span-3 rounded-2xl p-5 bg-white border border-gray-100 shadow-sm">
-          <h3 className="font-black text-gray-800 text-sm mb-3">📜 최근 받은 포인트</h3>
+      <div className="md:col-span-2 rounded-2xl p-5 bg-white border border-gray-100 shadow-sm">
+        <h3 className="font-black text-gray-800 text-sm mb-3">📜 최근 받은 포인트</h3>
+        {recent.length === 0 ? (
+          <p className="text-gray-400 text-sm text-center py-6">아직 받은 포인트가 없어요. 질문·댓글을 작성하거나 질문놀이에 참여해 보세요!</p>
+        ) : (
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {recent.slice(0, 8).map((log) => {
               const b = bonusLabel(log.bonusType);
@@ -187,8 +154,8 @@ export default function PointsCard({ myId }: { myId: string }) {
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 포인트 획득 방법 안내 */}
       <Dialog open={showGuide} onOpenChange={setShowGuide}>
@@ -200,8 +167,8 @@ export default function PointsCard({ myId }: { myId: string }) {
             <div className="rounded-lg border bg-card p-3">
               <p className="font-semibold text-foreground">✏️ 질문·댓글 쓰기</p>
               <ul className="mt-1 space-y-0.5 text-muted-foreground">
-                <li>질문 작성 <b className="text-indigo-600">+{ACTIVITY_BASE_POINTS.QUESTION_WRITE}점</b></li>
-                <li>댓글 작성 <b className="text-indigo-600">+{ACTIVITY_BASE_POINTS.COMMENT_WRITE}점</b></li>
+                <li>수업세션 질문 작성 <b className="text-indigo-600">+{ACTIVITY_BASE_POINTS.QUESTION_WRITE}점</b></li>
+                <li>친구 질문에 답변(댓글) 작성 <b className="text-indigo-600">+{ACTIVITY_BASE_POINTS.COMMENT_WRITE}점</b></li>
               </ul>
             </div>
             <div className="rounded-lg border bg-card p-3">
