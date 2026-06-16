@@ -241,7 +241,7 @@ export default function HistoryPage() {
                 </TableRow>
                 {isExpanded && (
                   <TableRow>
-                    <TableCell colSpan={10} className="bg-gray-50/70 px-6 py-4">
+                    <TableCell colSpan={10} className="bg-muted/30 px-6 py-4">
                       <CommentThread
                         questionId={q.id}
                         onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}

@@ -71,10 +71,29 @@ export default function TeacherDashboard() {
   }, [stats, selectedClass]);
 
   const getTrendLabel = (trend: number | null) => {
-    if (trend === null) return <span className="text-gray-400 text-xs">신규</span>;
-    if (trend > 0) return <span className="text-green-600 text-xs font-medium">▲{trend}%</span>;
-    if (trend < 0) return <span className="text-red-500 text-xs font-medium">▼{Math.abs(trend)}%</span>;
-    return <span className="text-gray-400 text-xs">-</span>;
+    if (trend === null)
+      return (
+        <span className="text-blue-500 text-xs font-medium" title="기간 후반에 처음 질문을 작성했어요">
+          🆕 새로 참여
+        </span>
+      );
+    if (trend > 0)
+      return (
+        <span className="text-green-600 text-xs font-medium" title="기간 전반보다 후반에 질문을 더 많이 썼어요">
+          ▲ 활발해짐 {trend}%
+        </span>
+      );
+    if (trend < 0)
+      return (
+        <span className="text-red-500 text-xs font-medium" title="기간 전반보다 후반에 질문이 줄었어요">
+          ▼ 줄어듦 {Math.abs(trend)}%
+        </span>
+      );
+    return (
+      <span className="text-gray-400 text-xs" title="기간 전반과 후반의 질문 수가 비슷해요">
+        — 비슷함
+      </span>
+    );
   };
 
   const teacherClasses = stats?.teacherClasses ?? [];
@@ -233,7 +252,9 @@ export default function TeacherDashboard() {
                       <TableHead className="text-right text-gray-500">사실적</TableHead>
                       <TableHead className="text-right text-purple-600">개념적</TableHead>
                       <TableHead className="text-right text-orange-600">논쟁적</TableHead>
-                      <TableHead className="text-right">추세</TableHead>
+                      <TableHead className="text-right whitespace-nowrap" title="선택한 기간을 절반으로 나눠, 전반 대비 후반의 질문 작성량 변화를 보여줍니다">
+                        질문 활동 추세
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -255,7 +276,7 @@ export default function TeacherDashboard() {
                         <TableCell className="text-right text-gray-500">{s.cognitiveDistribution.factual}</TableCell>
                         <TableCell className="text-right text-purple-600">{s.cognitiveDistribution.conceptual}</TableCell>
                         <TableCell className="text-right text-orange-600">{s.cognitiveDistribution.controversial}</TableCell>
-                        <TableCell className="text-right">{getTrendLabel(s.trend)}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">{getTrendLabel(s.trend)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
