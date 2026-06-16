@@ -127,6 +127,9 @@ export default function QuestionsPage() {
   const [showParticipation, setShowParticipation] = useState(false);
 
   const [showSequence, setShowSequence] = useState(false);
+  // 배포한 탐구설계 목록에서 "수정"을 누른 세션(인라인 패널 열림)
+  const [editDeploySessionId, setEditDeploySessionId] = useState<string | null>(null);
+  const [deletingDeployId, setDeletingDeployId] = useState<string | null>(null);
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
 
@@ -211,6 +214,36 @@ export default function QuestionsPage() {
     // 재실행되어 선택 세션이 초기화되지 않도록 deps를 비운다)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 배포 삭제·재배포 후 세션 목록(sharedQuestions)을 최신화한다(선택/조회 상태는 유지)
+  const reloadSessions = useCallback(
+    () =>
+      fetch("/api/sessions")
+        .then((r) => r.json())
+        .then((data: QuestionSession[]) => setSessions(sortSessionsAsc(data)))
+        .catch(() => {}),
+    [],
+  );
+
+  // 배포한 탐구설계 전체 삭제
+  const handleDeleteDeploy = async (sessionId: string) => {
+    if (!window.confirm("이 세션의 배포한 탐구설계를 삭제할까요? 학생이 남긴 좋아요·댓글도 함께 삭제됩니다.")) return;
+    setDeletingDeployId(sessionId);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/publish-questions`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+      if (!res.ok) throw new Error();
+      if (editDeploySessionId === sessionId) setEditDeploySessionId(null);
+      await reloadSessions();
+    } catch {
+      window.alert("삭제에 실패했습니다");
+    } finally {
+      setDeletingDeployId(null);
+    }
+  };
 
   const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);
@@ -1035,11 +1068,99 @@ export default function QuestionsPage() {
                   likesVisibleToPeers: currentSession.likesVisibleToPeers,
                   commentsVisibleToPeers: currentSession.commentsVisibleToPeers,
                 }}
+                onDeployed={reloadSessions}
               />
             </div>
           )}
         </div>
       )}
+
+      {/* 배포한 탐구설계 목록 (수업세션별) */}
+      {(() => {
+        const deployed = sessions.filter((s) => (s.sharedQuestions?.length ?? 0) > 0);
+        if (deployed.length === 0) return null;
+        return (
+          <div className="rounded-xl border bg-card p-4">
+            <div className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight text-emerald-700">
+              <span className="text-xl">📋</span>
+              배포한 탐구설계
+              <span className="text-sm font-semibold text-emerald-500">총 {deployed.length}개</span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              수업세션별로 학생에게 배포한 탐구 질문 목록입니다. 수정 후 재배포하거나 삭제할 수 있어요.
+            </p>
+            <div className="mt-3 space-y-2">
+              {deployed.map((s) => {
+                const isEditing = editDeploySessionId === s.id;
+                return (
+                  <div key={s.id} className="rounded-lg border bg-background">
+                    <div className="flex flex-wrap items-center justify-between gap-2 p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">
+                          {buildSessionLabel(s.date, s.subject, s.topic)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          질문 {s.sharedQuestions?.length ?? 0}개
+                          {" · "}
+                          {s.isActive ? "학생 활동 켜짐" : "학생 활동 꺼짐"}
+                          {" · 좋아요 "}{s.likesVisibleToPeers ? "공개" : "비공개"}
+                          {" · 댓글 "}{s.commentsVisibleToPeers ? "공개" : "비공개"}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          variant={isEditing ? "secondary" : "outline"}
+                          size="sm"
+                          onClick={() => setEditDeploySessionId(isEditing ? null : s.id)}
+                        >
+                          {isEditing ? "닫기" : "수정"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                          disabled={deletingDeployId === s.id}
+                          onClick={() => handleDeleteDeploy(s.id)}
+                        >
+                          {deletingDeployId === s.id ? "삭제 중..." : "삭제"}
+                        </Button>
+                      </div>
+                    </div>
+                    {/* 배포된 질문 미리보기 */}
+                    {!isEditing && (
+                      <ol className="list-decimal space-y-1 border-t px-7 py-2 text-sm text-muted-foreground">
+                        {(s.sharedQuestions ?? []).slice(0, 5).map((q, i) => (
+                          <li key={i} className="line-clamp-1">{q.content}</li>
+                        ))}
+                        {(s.sharedQuestions?.length ?? 0) > 5 && (
+                          <li className="list-none text-xs">…외 {(s.sharedQuestions?.length ?? 0) - 5}개</li>
+                        )}
+                      </ol>
+                    )}
+                    {/* 수정: 탐구설계 패널을 다시 열어 수정 후 재배포 */}
+                    {isEditing && (
+                      <div className="border-t p-3">
+                        <QuestionSequencePanel
+                          sessionId={s.id}
+                          subject={s.subject}
+                          topic={s.topic}
+                          initialSettings={{
+                            isActive: s.isActive,
+                            defaultQuestionPublic: s.defaultQuestionPublic,
+                            likesVisibleToPeers: s.likesVisibleToPeers,
+                            commentsVisibleToPeers: s.commentsVisibleToPeers,
+                          }}
+                          onDeployed={reloadSessions}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {currentSession && currentSession.unitDesignId && (
         <InquiryFlowGraph

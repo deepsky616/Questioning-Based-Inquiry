@@ -11,7 +11,7 @@ vi.mock("@/lib/db", () => ({
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { POST } from "@/app/api/sessions/[id]/publish-questions/route";
+import { POST, DELETE } from "@/app/api/sessions/[id]/publish-questions/route";
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockSessFind = prisma.questionSession.findUnique as ReturnType<typeof vi.fn>;
@@ -23,6 +23,13 @@ const mockQDelete = prisma.question.deleteMany as ReturnType<typeof vi.fn>;
 function req(body: unknown) {
   return new NextRequest("http://localhost/api/sessions/s1/publish-questions", {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+function delReq(body: unknown) {
+  return new NextRequest("http://localhost/api/sessions/s1/publish-questions", {
+    method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -103,6 +110,31 @@ describe("POST publish-questions (sequence 분기)", () => {
   it("권한 없는 세션이면 403", async () => {
     mockSessFind.mockResolvedValue({ id: "s1", teacherId: "other", sharedQuestions: [] });
     const res = await POST(req({ sequence: [{ type: "factual", content: "A" }] }), ctx);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("DELETE publish-questions (배포 취소)", () => {
+  it("all:true면 세션의 TEACHER_SHARED 질문을 모두 삭제하고 sharedQuestions를 비운다", async () => {
+    mockQDelete.mockResolvedValue({ count: 3 });
+    const res = await DELETE(delReq({ all: true }), ctx);
+    expect(res.status).toBe(200);
+    // 세션 전체 삭제(questionIds 조건 없이 sessionId+source로 삭제)
+    expect(mockQDelete).toHaveBeenCalledWith({
+      where: { sessionId: "s1", source: "TEACHER_SHARED" },
+    });
+    // sharedQuestions를 빈 배열로 초기화
+    expect(mockSessUpdate.mock.calls[0][0].data.sharedQuestions).toEqual([]);
+  });
+
+  it("all도 questionIds도 없으면 400", async () => {
+    const res = await DELETE(delReq({}), ctx);
+    expect(res.status).toBe(400);
+  });
+
+  it("권한 없는 세션이면 403", async () => {
+    mockSessFind.mockResolvedValue({ id: "s1", teacherId: "other" });
+    const res = await DELETE(delReq({ all: true }), ctx);
     expect(res.status).toBe(403);
   });
 });

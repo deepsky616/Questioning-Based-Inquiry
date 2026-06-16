@@ -14,12 +14,13 @@ interface DeploySettings {
 }
 
 export function QuestionSequencePanel({
-  sessionId, subject, topic, initialSettings,
+  sessionId, subject, topic, initialSettings, onDeployed,
 }: {
   sessionId: string;
   subject?: string;
   topic?: string;
   initialSettings?: Partial<DeploySettings>;
+  onDeployed?: () => void;
 }) {
   const [result, setResult] = useState<SequencedQuestion[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -54,6 +55,7 @@ export function QuestionSequencePanel({
       });
       if (!res.ok) throw new Error();
       setMsg("학생에게 배포했습니다");
+      onDeployed?.();
     } catch {
       setMsg("배포에 실패했습니다");
     }

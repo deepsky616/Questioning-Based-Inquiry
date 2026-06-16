@@ -183,8 +183,9 @@ export async function POST(
   });
 }
 
-// 배포 취소 (선택된 교사 질문 삭제)
-// DELETE body: { questionIds: [...] }
+// 배포 취소
+// DELETE body: { questionIds: [...] }  선택된 교사 질문만 삭제
+//             | { all: true }          이 세션의 배포 전체 삭제(탐구설계 배포 취소)
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -197,8 +198,9 @@ export async function DELETE(
 
   const sessionId = params.id;
   const body = await req.json().catch(() => ({}));
+  const deleteAll = body.all === true;
   const questionIds = Array.isArray(body.questionIds) ? body.questionIds.filter((x: unknown) => typeof x === "string") : [];
-  if (questionIds.length === 0) return NextResponse.json({ error: "선택된 질문 없음" }, { status: 400 });
+  if (!deleteAll && questionIds.length === 0) return NextResponse.json({ error: "선택된 질문 없음" }, { status: 400 });
 
   // 세션 권한 검증
   const qs = await prisma.questionSession.findUnique({
@@ -208,6 +210,18 @@ export async function DELETE(
   if (!qs) return NextResponse.json({ error: "세션 없음" }, { status: 404 });
   if (qs.teacherId !== teacherId) {
     return NextResponse.json({ error: "권한 없음" }, { status: 403 });
+  }
+
+  // 배포 전체 삭제: TEACHER_SHARED 질문 모두 제거 + sharedQuestions 비우기
+  if (deleteAll) {
+    const removed = await prisma.question.deleteMany({
+      where: { sessionId, source: "TEACHER_SHARED" },
+    });
+    await prisma.questionSession.update({
+      where: { id: sessionId },
+      data: { sharedQuestions: [] as unknown as Prisma.InputJsonValue },
+    });
+    return NextResponse.json({ ok: true, deleted: removed.count, all: true });
   }
 
   // TEACHER_SHARED 만 삭제 가능
