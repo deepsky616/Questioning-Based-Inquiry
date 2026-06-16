@@ -95,7 +95,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
     <div className="space-y-4">
       {/* ① 묶기 + ② 흐름 정렬 */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
-        <Button onClick={() => runSequence(additionalQuestions, "merge")} disabled={isRunning} className="gap-1.5">
+        <Button onClick={() => runSequence(additionalQuestions, "merge")} disabled={isRunning} className="gap-1.5 font-semibold">
           <Layers className="h-4 w-4" /> ① 비슷한 질문 묶기
         </Button>
         <span className="text-muted-foreground text-xs">→</span>
@@ -110,7 +110,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
             ))}
           </SelectContent>
         </Select>
-        <Button onClick={() => runSequence(additionalQuestions, "sort", sequenced)} disabled={isRunning || !merged} variant="outline" className="gap-1.5">
+        <Button onClick={() => runSequence(additionalQuestions, "sort", sequenced)} disabled={isRunning || !merged} className="gap-1.5 font-semibold">
           <ListOrdered className="h-4 w-4" /> ② 흐름 기준 정렬
         </Button>
         {isRunning && <RotateCw className="h-4 w-4 animate-spin text-muted-foreground" />}

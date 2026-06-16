@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { QuestionSequenceEditor } from "@/components/teacher/QuestionSequenceEditor";
@@ -94,8 +95,8 @@ export function QuestionSequencePanel({
         ))}
       </div>
       <div className="flex items-center gap-3">
-        <Button onClick={publish} disabled={isPublishing || result.length === 0} className="font-bold">
-          {isPublishing ? "배포 중..." : "⑤ 학생에게 배포"}
+        <Button onClick={publish} disabled={isPublishing || result.length === 0} className="gap-1.5 font-semibold">
+          <Send className="h-4 w-4" /> {isPublishing ? "배포 중..." : "⑤ 학생에게 배포"}
         </Button>
         {msg && <span className="text-sm text-muted-foreground">{msg}</span>}
       </div>
