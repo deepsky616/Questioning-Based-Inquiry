@@ -15,13 +15,15 @@ interface DeploySettings {
 }
 
 export function QuestionSequencePanel({
-  sessionId, subject, topic, initialSettings, onDeployed,
+  sessionId, subject, topic, initialSettings, onDeployed, initialQuestions, editMode,
 }: {
   sessionId: string;
   subject?: string;
   topic?: string;
   initialSettings?: Partial<DeploySettings>;
   onDeployed?: () => void;
+  initialQuestions?: SequencedQuestion[];
+  editMode?: boolean;
 }) {
   const [result, setResult] = useState<SequencedQuestion[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -77,6 +79,8 @@ export function QuestionSequencePanel({
         subject={subject}
         topic={topic}
         onChange={setResult}
+        initialQuestions={initialQuestions}
+        editMode={editMode}
       />
       {/* ③ 배포 설정 토글 */}
       <div className="rounded-lg border bg-muted/30 p-3 space-y-2">

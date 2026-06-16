@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { GripVertical, Layers, ListOrdered, Plus, RotateCw, Trash2 } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import { Check, GripVertical, Layers, ListOrdered, Pencil, Plus, RotateCw, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +17,9 @@ export interface QuestionSequenceEditorProps {
   subject?: string;
   topic?: string;
   onChange: (result: SequencedQuestion[]) => void;
+  // 편집 모드: 기존 배포 질문을 그대로 불러와 시작(묶기 없이 수정·삭제·추가·정렬·재배포)
+  initialQuestions?: SequencedQuestion[];
+  editMode?: boolean;
 }
 
 function reorder<T>(list: T[], from: number, to: number): T[] {
@@ -26,22 +29,43 @@ function reorder<T>(list: T[], from: number, to: number): T[] {
   return copy;
 }
 
-export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: QuestionSequenceEditorProps) {
+export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, initialQuestions, editMode }: QuestionSequenceEditorProps) {
   const [flowId, setFlowId] = useState<string>(UNIT_FLOW_OPTIONS[0].id);
-  const [sequenced, setSequenced] = useState<SequencedQuestion[]>([]);
+  const [sequenced, setSequenced] = useState<SequencedQuestion[]>(initialQuestions ?? []);
   const [additionalQuestions, setAdditionalQuestions] = useState<string[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [teacherInput, setTeacherInput] = useState("");
   const [generatedBy, setGeneratedBy] = useState<"ai" | "rules" | "">("");
   const [error, setError] = useState<string | null>(null);
-  // ① 묶기를 한 번이라도 실행해야 ② 흐름 정렬을 켤 수 있다(순차 진행)
-  const [merged, setMerged] = useState(false);
+  // ① 묶기를 한 번이라도 실행해야 ② 흐름 정렬을 켤 수 있다(순차 진행). 편집 모드는 이미 질문이 있으므로 켜둔다.
+  const [merged, setMerged] = useState(Boolean(editMode));
+  // 인라인 내용 편집 상태
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
 
   const update = useCallback((next: SequencedQuestion[]) => {
     setSequenced(next);
     onChange(next);
   }, [onChange]);
+
+  // 편집 모드: 마운트 시 기존 질문을 부모(result)에 즉시 반영해 재배포 버튼을 활성화
+  useEffect(() => {
+    if (editMode && initialQuestions && initialQuestions.length > 0) {
+      onChange(initialQuestions);
+    }
+    // 최초 1회만 (initialQuestions/onChange 변화로 재실행되지 않도록)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function saveEdit(id: string) {
+    const content = editValue.trim();
+    if (content) {
+      update(sequenced.map((q) => (q.id === id ? { ...q, content } : q)));
+    }
+    setEditingId(null);
+    setEditValue("");
+  }
 
   // sequence API는 sessionId로 학생 질문을 직접 조회하고, 교사 추가 질문은 additionalQuestions로 받는다.
   async function runSequence(
@@ -71,13 +95,29 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
     setIsRunning(false);
   }
 
-  // ③ 교사 질문 추가 → additionalQuestions에 넣고 즉시 재정리(학생+교사 질문 함께 묶음)
+  // ③ 교사 질문 추가
   function handleAddTeacher() {
     const content = teacherInput.trim();
     if (!content) return;
+    setTeacherInput("");
+    if (editMode) {
+      // 편집 모드: 묶기 없이 현재 목록 맨 뒤에 그대로 추가
+      const newQuestion: SequencedQuestion = {
+        id: `added-${Date.now()}`,
+        type: "student",
+        content,
+        source: "teacher",
+        contentGroup: "추가 질문",
+        priority: sequenced.length + 1,
+        lessonPhase: "탐구",
+        rationale: "교사가 직접 추가한 질문",
+      };
+      update([...sequenced, newQuestion]);
+      return;
+    }
+    // 생성 모드: additionalQuestions에 넣고 즉시 재정리(학생+교사 질문 함께 묶음)
     const next = [...additionalQuestions, content];
     setAdditionalQuestions(next);
-    setTeacherInput("");
     runSequence(next, "merge");
   }
 
@@ -93,12 +133,16 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
 
   return (
     <div className="space-y-4">
-      {/* ① 묶기 + ② 흐름 정렬 */}
+      {/* ① 묶기 + ② 흐름 정렬 (편집 모드에서는 묶기 없이 흐름 정렬만) */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
-        <Button onClick={() => runSequence(additionalQuestions, "merge")} disabled={isRunning} className="gap-1.5 font-semibold">
-          <Layers className="h-4 w-4" /> ① 비슷한 질문 묶기
-        </Button>
-        <span className="text-muted-foreground text-xs">→</span>
+        {!editMode && (
+          <>
+            <Button onClick={() => runSequence(additionalQuestions, "merge")} disabled={isRunning} className="gap-1.5 font-semibold">
+              <Layers className="h-4 w-4" /> ① 비슷한 질문 묶기
+            </Button>
+            <span className="text-muted-foreground text-xs">→</span>
+          </>
+        )}
         <Select value={flowId} onValueChange={setFlowId}>
           <SelectTrigger className="h-9 w-56 bg-background"><SelectValue placeholder="탐구 흐름 기준" /></SelectTrigger>
           <SelectContent>
@@ -152,28 +196,53 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange }: 
 
       {/* ④ 드래그로 순서 정렬 */}
       <div className="space-y-2">
-        {sequenced.map((q, index) => (
+        {sequenced.map((q, index) => {
+          const isEditing = editingId === q.id;
+          return (
           <div
             key={q.id}
-            draggable
+            draggable={!isEditing}
             onDragStart={() => setDragIndex(index)}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDrop(index)}
             className="flex items-center gap-3 rounded-lg border bg-card p-3"
           >
             <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-foreground text-xs text-background">{index + 1}</span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">{q.content}</p>
-              <p className="text-xs text-muted-foreground">{q.contentGroup}{q.source === "teacher" ? " · 교사 추가" : ""}</p>
-            </div>
-            <button onClick={() => removeAt(index)} className="text-muted-foreground hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs text-background">{index + 1}</span>
+            {isEditing ? (
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <Input
+                  autoFocus
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); saveEdit(q.id); }
+                    if (e.key === "Escape") { setEditingId(null); setEditValue(""); }
+                  }}
+                  className="h-8"
+                />
+                <button onClick={() => saveEdit(q.id)} className="shrink-0 text-emerald-600 hover:text-emerald-700" title="저장"><Check className="h-4 w-4" /></button>
+                <button onClick={() => { setEditingId(null); setEditValue(""); }} className="shrink-0 text-muted-foreground hover:text-foreground" title="취소"><X className="h-4 w-4" /></button>
+              </div>
+            ) : (
+              <>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">{q.content}</p>
+                  <p className="text-xs text-muted-foreground">{q.contentGroup}{q.source === "teacher" ? " · 교사 추가" : ""}</p>
+                </div>
+                <button onClick={() => { setEditingId(q.id); setEditValue(q.content); }} className="shrink-0 text-muted-foreground hover:text-indigo-600" title="내용 수정"><Pencil className="h-4 w-4" /></button>
+                <button onClick={() => removeAt(index)} className="shrink-0 text-muted-foreground hover:text-red-500" title="삭제"><Trash2 className="h-4 w-4" /></button>
+              </>
+            )}
           </div>
-        ))}
+          );
+        })}
         {sequenced.length === 0 && (
           <p className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
             <Plus className="mx-auto mb-1 h-4 w-4" />
-            ‘① 비슷한 질문 묶기’를 눌러 이 세션의 학생 질문을 묶어보세요
+            {editMode
+              ? "‘③ 추가’로 질문을 넣거나 위 버튼으로 정렬해 보세요"
+              : "‘① 비슷한 질문 묶기’를 눌러 이 세션의 학생 질문을 묶어보세요"}
           </p>
         )}
       </div>

@@ -46,7 +46,7 @@ interface QuestionSession {
   likesVisibleToPeers?: boolean;
   commentsVisibleToPeers?: boolean;
   isActive?: boolean;
-  sharedQuestions?: Array<{ type: string; content: string }>;
+  sharedQuestions?: Array<{ type: string; content: string; contentGroup?: string; source?: "student" | "teacher"; priority?: number }>;
 }
 
 interface Question {
@@ -1153,6 +1153,17 @@ export default function QuestionsPage() {
                           sessionId={s.id}
                           subject={s.subject}
                           topic={s.topic}
+                          editMode
+                          initialQuestions={(s.sharedQuestions ?? []).map((q, i) => ({
+                            id: `deployed-${i}`,
+                            type: q.type || "student",
+                            content: q.content,
+                            source: q.source === "teacher" ? "teacher" : "student",
+                            contentGroup: q.contentGroup || "수업 순서",
+                            priority: q.priority ?? i + 1,
+                            lessonPhase: "탐구",
+                            rationale: "",
+                          }))}
                           initialSettings={{
                             isActive: s.isActive,
                             defaultQuestionPublic: s.defaultQuestionPublic,
