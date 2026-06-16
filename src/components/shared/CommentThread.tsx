@@ -10,7 +10,7 @@ import { formatDateTime } from "@/lib/datetime";
 export interface ThreadComment {
   id: string;
   content: string;
-  author: { name: string };
+  author: { id?: string; name: string };
   createdAt: string;
   flagged?: boolean;
   flagReason?: string;
@@ -40,6 +40,8 @@ export function CommentThread({
   const [isLoading, setIsLoading] = useState(!preloaded);
   const [text, setText] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
 
   useEffect(() => {
     if (preloaded) return;
@@ -96,6 +98,24 @@ export function CommentThread({
     }
   };
 
+  const saveEdit = async (commentId: string) => {
+    if (!editText.trim()) return;
+    try {
+      const res = await fetch(`/api/questions/${questionId}/comments/${commentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editText.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      const updated: ThreadComment = await res.json();
+      setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, content: updated.content } : c)));
+      setEditingId(null);
+      setEditText("");
+    } catch {
+      alert("댓글 수정에 실패했습니다");
+    }
+  };
+
   const deleteComment = async (commentId: string) => {
     if (!confirm("이 댓글을 삭제하시겠습니까?")) return;
     try {
@@ -121,7 +141,10 @@ export function CommentThread({
         <p className="text-sm text-muted-foreground">아직 댓글이 없습니다</p>
       ) : (
         <div className="space-y-2">
-          {comments.map((c) => (
+          {comments.map((c) => {
+            const isMine = !!user.id && c.author.id === user.id;
+            const isEditing = editingId === c.id;
+            return (
             <div key={c.id} className={`rounded-md border p-3 dark:bg-card ${c.flagged ? "border-red-300 bg-red-50" : "bg-white"}`}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -136,21 +159,46 @@ export function CommentThread({
                   {formatDateTime(c.createdAt)}
                 </span>
               </div>
-              <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{c.content}</p>
-              {canModerate && (
+              {isEditing ? (
+                <div className="mt-1.5 flex gap-2">
+                  <Input
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEdit(c.id); }
+                      if (e.key === "Escape") { setEditingId(null); setEditText(""); }
+                    }}
+                    className="h-8 text-sm"
+                    autoFocus
+                  />
+                  <Button size="sm" onClick={() => saveEdit(c.id)} disabled={!editText.trim()} className="h-8 shrink-0">저장</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditText(""); }} className="h-8 shrink-0">취소</Button>
+                </div>
+              ) : (
+                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{c.content}</p>
+              )}
+              {!isEditing && (isMine || canModerate) && (
                 <div className="mt-1.5 flex items-center gap-3">
-                  {c.flagged && (
+                  {isMine && (
+                    <button type="button" onClick={() => { setEditingId(c.id); setEditText(c.content); }} className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
+                      ✏️ 수정
+                    </button>
+                  )}
+                  {canModerate && c.flagged && (
                     <button type="button" onClick={() => clearFlag(c.id)} className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800">
                       ✓ 이상없음
                     </button>
                   )}
-                  <button type="button" onClick={() => deleteComment(c.id)} className="text-[11px] font-medium text-red-500 hover:text-red-700">
-                    🗑 삭제
-                  </button>
+                  {(isMine || canModerate) && (
+                    <button type="button" onClick={() => deleteComment(c.id)} className="text-[11px] font-medium text-red-500 hover:text-red-700">
+                      🗑 삭제
+                    </button>
+                  )}
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
       {user.id && (

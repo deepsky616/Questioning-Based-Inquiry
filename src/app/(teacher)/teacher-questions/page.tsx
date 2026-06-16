@@ -60,7 +60,7 @@ interface Question {
   flagged?: boolean;
   flagReason?: string;
   createdAt: string;
-  comments?: Array<{ id: string; content: string; author: { name: string }; createdAt: string; flagged?: boolean; flagReason?: string }>;
+  comments?: Array<{ id: string; content: string; author: { id?: string; name: string }; createdAt: string; flagged?: boolean; flagReason?: string }>;
   likeCount: number;
   likedBy?: Array<{ id: string; name: string }>;
 }
