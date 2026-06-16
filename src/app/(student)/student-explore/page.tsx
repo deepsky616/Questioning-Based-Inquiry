@@ -382,14 +382,6 @@ export default function ExplorePage() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-2">💡 날짜·교과·주제로 좁혀도, 직접 세션을 골라도 결과는 같습니다.</p>
-          <div className="mt-3">
-            <Input
-              placeholder="질문 또는 이름으로 검색..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="max-w-sm"
-            />
-          </div>
         </CardContent>
       </Card>
 
@@ -420,10 +412,18 @@ export default function ExplorePage() {
       <Card>
         <CardHeader className="pb-2 space-y-2">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <CardTitle className="text-base">
-              📝 전체 질문 목록{" "}
-              <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
-            </CardTitle>
+            <div className="flex items-center gap-3 flex-wrap">
+              <CardTitle className="text-base">
+                📝 전체 질문 목록{" "}
+                <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
+              </CardTitle>
+              <Input
+                placeholder="질문 또는 이름으로 검색..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 text-sm w-56 bg-background"
+              />
+            </div>
             <QuestionSortControl
               field={sortField}
               dir={sortDir}

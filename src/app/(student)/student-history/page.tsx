@@ -326,9 +326,17 @@ export default function HistoryPage() {
       <Card>
         <CardHeader className="pb-2 space-y-2">
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <CardTitle className="text-base">
-              📝 전체 질문 목록 <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
-            </CardTitle>
+            <div className="flex items-center gap-3 flex-wrap">
+              <CardTitle className="text-base">
+                📝 전체 질문 목록 <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
+              </CardTitle>
+              <Input
+                placeholder="질문으로 검색..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 text-sm w-56 bg-background"
+              />
+            </div>
             <QuestionSortControl
               field={sortField}
               dir={sortDir}
@@ -341,12 +349,6 @@ export default function HistoryPage() {
             filterCognitive={filterCognitive}
             onFilterClosure={setFilterClosure}
             onFilterCognitive={setFilterCognitive}
-          />
-          <Input
-            placeholder="질문으로 검색..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 text-sm max-w-xs"
           />
         </CardHeader>
         <CardContent>
