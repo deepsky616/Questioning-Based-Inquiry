@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import { canCreateComment } from "@/lib/questions";
 import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { checkProfanity } from "@/lib/profanity";
-import { resolveStudentExploreConfig } from "@/lib/explore-config";
 import { Prisma } from "@prisma/client";
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -112,14 +111,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     if (question.session && !question.session.isActive && userRole !== "TEACHER") {
       return NextResponse.json({ error: "비활성화된 세션에서는 댓글을 작성할 수 없습니다" }, { status: 403 });
-    }
-
-    // 학생: 본인 교사가 댓글 기능을 비활성화했으면 차단
-    if (userRole === "STUDENT") {
-      const cfg = await resolveStudentExploreConfig(prisma, userId);
-      if (!cfg.commentsEnabled) {
-        return NextResponse.json({ error: "선생님께서 댓글 기능을 꺼두셨어요." }, { status: 403 });
-      }
     }
 
     // 중복 검사 (학생 + 같은 질문 + 정규화 동일)

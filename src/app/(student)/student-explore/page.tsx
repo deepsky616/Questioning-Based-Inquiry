@@ -221,18 +221,10 @@ export default function ExplorePage() {
   const [filterTopic, setFilterTopic] = useState("");
   const [sortField, setSortField] = useState<SortField>("like");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [exploreCfg, setExploreCfg] = useState<{ likesEnabled: boolean; commentsEnabled: boolean }>({ likesEnabled: true, commentsEnabled: true });
+  // 좋아요·댓글 사용 여부는 수업세션/질문 단위 공개 설정으로 제어한다(전역 explore 설정 폐지)
+  const exploreCfg = { likesEnabled: true, commentsEnabled: true };
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
-
-  useEffect(() => {
-    fetch("/api/explore-config")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d && typeof d.likesEnabled === "boolean") setExploreCfg(d);
-      })
-      .catch(() => {});
-  }, []);
 
   const fetchQuestions = useCallback(
     (sessionId: string, opts?: { date?: string; subject?: string; topic?: string }) => {

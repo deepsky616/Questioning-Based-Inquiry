@@ -13,10 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { DEFAULT_GEMINI_MODEL, GEMINI_MODELS } from "@/lib/api-config";
 import { buildTeacherClassLabel, resolveClassInputMode } from "@/lib/teacher";
-import { EXPLORE_CONFIG_DEFAULT, type ExploreConfig } from "@/lib/explore-config";
 
 interface BulkStudent {
   studentNumber: string;
@@ -45,43 +43,6 @@ export default function TeacherSettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // 질문탐구 설정
-  const [exploreConfig, setExploreConfig] = useState<ExploreConfig>(EXPLORE_CONFIG_DEFAULT);
-  const [exploreSaving, setExploreSaving] = useState(false);
-  const [exploreMessage, setExploreMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/teacher/explore-config")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d && typeof d.likesEnabled === "boolean") setExploreConfig(d);
-      })
-      .catch(() => {});
-  }, []);
-
-  async function saveExploreConfig(next: ExploreConfig) {
-    setExploreSaving(true);
-    setExploreMessage(null);
-    try {
-      const res = await fetch("/api/teacher/explore-config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(next),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setExploreConfig(data);
-        setExploreMessage("저장됐어요");
-        setTimeout(() => setExploreMessage(null), 2000);
-      } else {
-        setExploreMessage("저장 실패");
-      }
-    } catch {
-      setExploreMessage("네트워크 오류");
-    } finally {
-      setExploreSaving(false);
-    }
-  }
 
   // 일괄 학생 등록 상태
   const [bulkSchool, setBulkSchool] = useState("");
@@ -310,43 +271,6 @@ export default function TeacherSettingsPage() {
               <p className="text-sm text-gray-400 pt-1">등록된 담당 학급 정보가 없습니다.</p>
             )}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* 질문탐구 설정 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>질문탐구 설정</CardTitle>
-          <CardDescription>
-            학생들이 질문탐구 페이지에서 좋아요·댓글 기능을 사용할 수 있는지 설정합니다.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 p-4">
-            <div>
-              <p className="font-bold text-gray-800 text-sm">❤️ 좋아요 기능</p>
-              <p className="text-xs text-gray-500 mt-0.5">학생이 친구 질문에 좋아요를 누를 수 있어요.</p>
-            </div>
-            <Switch
-              checked={exploreConfig.likesEnabled}
-              disabled={exploreSaving}
-              onCheckedChange={(v) => saveExploreConfig({ ...exploreConfig, likesEnabled: v })}
-            />
-          </div>
-          <div className="flex items-center justify-between rounded-xl bg-gray-50 border border-gray-100 p-4">
-            <div>
-              <p className="font-bold text-gray-800 text-sm">💬 댓글(답변) 기능</p>
-              <p className="text-xs text-gray-500 mt-0.5">학생이 친구 질문이나 선생님 배포 질문에 댓글을 달 수 있어요.</p>
-            </div>
-            <Switch
-              checked={exploreConfig.commentsEnabled}
-              disabled={exploreSaving}
-              onCheckedChange={(v) => saveExploreConfig({ ...exploreConfig, commentsEnabled: v })}
-            />
-          </div>
-          {exploreMessage && (
-            <p className="text-xs text-emerald-600 font-medium">{exploreMessage}</p>
-          )}
         </CardContent>
       </Card>
 
