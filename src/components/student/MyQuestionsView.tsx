@@ -55,7 +55,7 @@ interface Comment {
   createdAt: string;
 }
 
-export default function HistoryPage() {
+export function MyQuestionsView() {
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -258,12 +258,9 @@ export default function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">내 질문</h2>
-        <p className="text-gray-600">
-          작성한 질문을 조회하고, 분류·세션별로 확인하거나 삭제할 수 있어요 · 총 {questions.length}개
-        </p>
-      </div>
+      <p className="text-sm text-gray-600">
+        작성한 질문을 조회하고, 분류·세션별로 확인하거나 삭제할 수 있어요 · 총 {questions.length}개
+      </p>
 
       {/* 조회 방법: 날짜·교과·주제로 좁혀 세션 선택 (교사 페이지와 동일) */}
       <Card>

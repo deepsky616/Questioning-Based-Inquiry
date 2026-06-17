@@ -210,7 +210,7 @@ function QuestionCard({
   );
 }
 
-export default function ExplorePage() {
+export function ExploreQuestionsView() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("all");
@@ -323,12 +323,9 @@ export default function ExplorePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">질문 탐구</h2>
-        <p className="text-gray-600">
-          다른 학생들의 질문을 살펴보고 댓글을 남겨보세요 · 공개 {questions.length}개
-        </p>
-      </div>
+      <p className="text-sm text-gray-600">
+        다른 학생들의 질문을 살펴보고 좋아요·댓글을 남겨보세요 · 공개 {questions.length}개
+      </p>
 
       {/* 조회 방법: 날짜·교과·주제로 좁혀 세션 선택 (교사 페이지와 동일) */}
       <Card>

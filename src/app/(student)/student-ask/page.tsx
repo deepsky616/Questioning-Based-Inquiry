@@ -187,7 +187,7 @@ export default function AskPage() {
       });
 
       if (!res.ok) throw new Error("저장 실패");
-      router.push("/student-history");
+      router.push("/student-questions");
     } catch {
       alert("저장 중 오류가 발생했습니다");
     } finally {

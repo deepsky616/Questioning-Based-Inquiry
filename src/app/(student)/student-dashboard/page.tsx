@@ -190,7 +190,7 @@ export default function StudentDashboard() {
             </div>
           )}
           <div className="mt-4">
-            <Link href="/student-history">
+            <Link href="/student-questions">
               <Button variant="outline">전체 질문 보기</Button>
             </Link>
           </div>
