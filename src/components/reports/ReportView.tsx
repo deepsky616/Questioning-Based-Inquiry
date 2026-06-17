@@ -38,6 +38,9 @@ export interface ReportViewProps {
   perStudent?: PerStudentRow[];
   sessions?: SessionMeta[];
   analyzeSession?: (sessionId: string) => Promise<SessionAnalysisResult | null>;
+  // 추세 차트 부제(관점에 따라 다르게). 기본은 학생 본인 관점.
+  participationLabel?: string;
+  receptionLabel?: string;
 }
 
 const METRICS: { key: keyof SeriesPoint; label: string; color: string }[] = [
@@ -80,7 +83,10 @@ function sessionPeriod(dateStr: string, mode: ReportRange): { key: string; label
   };
 }
 
-export function ReportView({ scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession }: ReportViewProps) {
+export function ReportView({
+  scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession,
+  participationLabel = "내가 만든 활동", receptionLabel = "내 질문이 받은 반응",
+}: ReportViewProps) {
   const [range, setRange] = useState<ReportRange>("week");
   const series = range === "week" ? weekly : monthly;
 
@@ -189,7 +195,7 @@ export function ReportView({ scope, title, subtitle, totals, weekly, monthly, cl
 
       {/* 참여 추세 */}
       <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">📈 참여 추세 ({range === "week" ? "주별" : "월별"}) · 내가 만든 활동</p>
+        <p className="mb-3 text-sm font-bold text-foreground">📈 참여 추세 ({range === "week" ? "주별" : "월별"}) · {participationLabel}</p>
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -206,7 +212,7 @@ export function ReportView({ scope, title, subtitle, totals, weekly, monthly, cl
 
       {/* 호응 추세 */}
       <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">💛 호응 추세 ({range === "week" ? "주별" : "월별"}) · 내 질문이 받은 반응</p>
+        <p className="mb-3 text-sm font-bold text-foreground">💛 호응 추세 ({range === "week" ? "주별" : "월별"}) · {receptionLabel}</p>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -242,12 +248,12 @@ export function ReportView({ scope, title, subtitle, totals, weekly, monthly, cl
         <div className="rounded-xl border bg-card p-4">
           <p className="mb-1 text-sm font-bold text-foreground">🤖 수업세션별 AI 분석</p>
           <p className="mb-3 text-xs text-muted-foreground">
-            {scope === "student"
-              ? "주별/월별 기간을 골라 그 기간의 수업세션을 AI가 분석해 줘요"
-              : "주별/월별 기간을 골라 그 기간의 학급 수업세션을 AI가 분석해 줘요"}
+            세션을 펼치면 개별 분석, ‘전체 분석’은 선택한 주/월에 진행한 세션을 한꺼번에 분석해요
           </p>
 
-          <div className="no-print mb-3 flex flex-wrap items-center gap-2">
+          {/* 전체 분석: 주별/월별 기간 선택 후 일괄 분석 (개별 목록은 그대로 유지) */}
+          <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
+            <span className="text-xs font-semibold text-foreground">전체 분석</span>
             <div className="flex rounded-md border overflow-hidden">
               <button
                 onClick={() => setSessRange("week")}
@@ -265,55 +271,51 @@ export function ReportView({ scope, title, subtitle, totals, weekly, monthly, cl
             >
               {periods.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
-            <Button size="sm" variant="outline" disabled={analyzingAll || filteredSessions.length === 0} onClick={analyzeAll} className="font-semibold">
-              {analyzingAll ? "분석 중..." : "📋 전체 분석"}
+            <Button size="sm" disabled={analyzingAll || filteredSessions.length === 0} onClick={analyzeAll} className="font-semibold">
+              {analyzingAll ? "분석 중..." : `📋 전체 분석 (${filteredSessions.length}개)`}
             </Button>
-            <span className="text-xs text-muted-foreground">{filteredSessions.length}개 세션</span>
           </div>
 
-          {filteredSessions.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">이 기간에 진행한 수업세션이 없어요</p>
-          ) : (
-            <div className="space-y-2">
-              {filteredSessions.map((s) => {
-                const r = res[s.id];
-                const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
-                const blocks: [string, string | undefined][] = [
-                  ["📌 요약", r?.summary],
-                  ["🧭 제안", r?.insights],
-                  ["❤️ 좋아요·참여", r?.engagementInsights],
-                  ["💬 댓글", r?.commentInsights],
-                  ["🎯 주제 연관성·성의", r?.relevanceInsights],
-                ];
-                return (
-                  <div key={s.id} className="rounded-lg border bg-background">
-                    <button onClick={() => toggleSession(s.id)} className="no-print flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
-                      <span className="truncate text-sm font-medium text-foreground">{label}</span>
-                      <span className="shrink-0 text-xs font-semibold text-emerald-600">🤖 {open[s.id] ? "▾" : "▸"}</span>
-                    </button>
-                    {open[s.id] && (
-                      <div className="border-t px-3 py-2 text-sm">
-                        {busy[s.id] ? (
-                          <p className="text-muted-foreground">🤖 분석하는 중...</p>
-                        ) : errs[s.id] ? (
-                          <p className="text-red-600">{errs[s.id]}</p>
-                        ) : r ? (
-                          <div className="space-y-2">
-                            {blocks.filter(([, v]) => v).map(([h, v]) => (
-                              <div key={h}>
-                                <p className="text-xs font-semibold text-foreground">{h}</p>
-                                <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{v}</p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* 수업세션별 개별 분석 목록(전체 표시) */}
+          <div className="space-y-2">
+            {allSessions.map((s) => {
+              const r = res[s.id];
+              const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
+              const blocks: [string, string | undefined][] = [
+                ["📌 요약", r?.summary],
+                ["🧭 제안", r?.insights],
+                ["❤️ 좋아요·참여", r?.engagementInsights],
+                ["💬 댓글", r?.commentInsights],
+                ["🎯 주제 연관성·성의", r?.relevanceInsights],
+              ];
+              return (
+                <div key={s.id} className="rounded-lg border bg-background">
+                  <button onClick={() => toggleSession(s.id)} className="no-print flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
+                    <span className="truncate text-sm font-medium text-foreground">{label}</span>
+                    <span className="shrink-0 text-xs font-semibold text-emerald-600">🤖 {open[s.id] ? "▾" : "▸"}</span>
+                  </button>
+                  {open[s.id] && (
+                    <div className="border-t px-3 py-2 text-sm">
+                      {busy[s.id] ? (
+                        <p className="text-muted-foreground">🤖 분석하는 중...</p>
+                      ) : errs[s.id] ? (
+                        <p className="text-red-600">{errs[s.id]}</p>
+                      ) : r ? (
+                        <div className="space-y-2">
+                          {blocks.filter(([, v]) => v).map(([h, v]) => (
+                            <div key={h}>
+                              <p className="text-xs font-semibold text-foreground">{h}</p>
+                              <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{v}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
