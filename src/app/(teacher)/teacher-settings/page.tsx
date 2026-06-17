@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
 import {
   Select,
   SelectContent,
@@ -273,6 +274,8 @@ export default function TeacherSettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <PasswordChangeCard />
 
       {/* 일괄 학생 등록 */}
       <Card>
