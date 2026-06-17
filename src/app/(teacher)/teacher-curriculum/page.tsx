@@ -100,6 +100,12 @@ const KNOWLEDGE_ITEM_LIMIT = 12;
 const PROCESS_ITEM_LIMIT = 12;
 const VALUE_ITEM_LIMIT = 8;
 
+// 오늘 날짜(YYYY-MM-DD, 로컬 기준)
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // ── 교육과정 상수 ──────────────────────────────────────────────────────
 const GRADE_RANGES = ["1-2", "3-4", "5-6"] as const;
 
@@ -144,7 +150,7 @@ export default function CurriculumPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveTitle, setSaveTitle] = useState("");
   const [saveGrade, setSaveGrade] = useState("");
-  const [saveDate, setSaveDate] = useState("");
+  const [saveDate, setSaveDate] = useState(todayStr);
   const [savedList, setSavedList] = useState<SavedInquiryDesign[]>([]);
   const [mainTab, setMainTab] = useState<"create" | "saved">("create");
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
@@ -464,7 +470,7 @@ export default function CurriculumPage() {
         const savedDesign: SavedInquiryDesign | null = data.design ?? null;
         setSaveTitle("");
         setSaveGrade("");
-        setSaveDate("");
+        setSaveDate(todayStr());
         fetchSaved();
         if (savedDesign?.id) {
           setSavedList((prev) => [
@@ -1421,7 +1427,7 @@ export default function CurriculumPage() {
             {/* 저장 — 날짜·학년·교과·주제 결정 후 저장 */}
             <div className="border-t pt-4 space-y-3">
               <p className="text-sm font-semibold text-gray-800">저장 정보</p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.1fr_0.7fr_0.8fr_2.4fr]">
                 <div className="space-y-1">
                   <Label>날짜</Label>
                   <DatePicker value={saveDate} onChange={setSaveDate} placeholder="수업 날짜 선택" />
