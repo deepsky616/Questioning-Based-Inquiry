@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageNav } from "@/components/shared/PageNav";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { FlaggedAlertBell } from "@/components/teacher/FlaggedAlertBell";
 import { getSessionUser } from "@/lib/auth-helpers";
 
 const TEACHER_PAGES = [
@@ -64,6 +65,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
               </nav>
             </div>
             <div className="flex items-center space-x-4">
+              <FlaggedAlertBell />
               <ThemeToggle />
               <span className="text-sm text-muted-foreground">{user.name} 선생님</span>
               <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>

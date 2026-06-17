@@ -177,6 +177,13 @@ export default function QuestionsPage() {
   // 부적절 의심만 보기 필터
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
 
+  // 알림에서 ?flagged=1로 들어오면 부적절 의심 필터를 켠다(useSearchParams 대신 마운트 시 읽어 Suspense 회피)
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("flagged") === "1") {
+      setShowFlaggedOnly(true);
+    }
+  }, []);
+
   const resetBulkState = () => {
     setSelectedIds(new Set());
     setBulkPreviews(null);
