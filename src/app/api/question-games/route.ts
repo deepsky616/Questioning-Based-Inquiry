@@ -6,6 +6,7 @@ import {
   AnyGame,
   GameVisibility,
   isGameVisibleToStudent,
+  sortGamesByOrder,
 } from "@/lib/question-games-data";
 
 export async function GET() {
@@ -78,5 +79,14 @@ export async function GET() {
     });
   });
 
-  return NextResponse.json(filtered.sort((a, b) => a.order - b.order));
+  // 담당 교사가 지정한 순서(첫 교사 기준) 적용
+  let orderIds: string[] | null = null;
+  for (const teacherId of teacherIds) {
+    const orderConfig = await prisma.systemConfig.findUnique({ where: { key: `question_game_order_${teacherId}` } });
+    if (orderConfig) {
+      try { orderIds = JSON.parse(orderConfig.value) as string[]; break; } catch {}
+    }
+  }
+
+  return NextResponse.json(sortGamesByOrder(filtered, orderIds));
 }

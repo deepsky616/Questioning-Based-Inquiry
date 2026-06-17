@@ -104,6 +104,27 @@ export default function TeacherQuestionPlayPage() {
   const publicCount = games.filter((g) => getVis(g.id).type !== "hidden").length;
   const hiddenCount = games.filter((g) => getVis(g.id).type === "hidden").length;
 
+  // 드래그앤드롭 순서 변경(전체 탭에서만). 저장하면 학생 목록에도 반영
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const saveOrder = async (ordered: AnyGame[]) => {
+    await fetch("/api/teacher/question-games/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order: ordered.map((g) => g.id) }),
+    }).catch(() => {});
+  };
+  const handleDropAt = (targetIndex: number) => {
+    if (dragIndex === null || dragIndex === targetIndex) { setDragIndex(null); return; }
+    setGames((prev) => {
+      const copy = [...prev];
+      const [moved] = copy.splice(dragIndex, 1);
+      copy.splice(targetIndex, 0, moved);
+      saveOrder(copy);
+      return copy;
+    });
+    setDragIndex(null);
+  };
+
   return (
     <div className="space-y-6">
       {/* 페이지 헤더 */}
@@ -152,15 +173,23 @@ export default function TeacherQuestionPlayPage() {
       )}
 
       {/* 게임 카드 그리드 */}
+      {!isLoading && tab === "all" && (
+        <p className="text-xs text-gray-500 mb-2">↕️ 카드를 드래그해 순서를 바꾸면 학생 질문놀이 목록에도 같은 순서로 표시돼요.</p>
+      )}
       {!isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((game) => {
+          {filtered.map((game, index) => {
             const vis = getVis(game.id);
             const visInfo = VIS_LABEL[vis.type];
+            const dndEnabled = tab === "all";
             return (
               <div
                 key={game.id}
-                className="rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow"
+                draggable={dndEnabled}
+                onDragStart={() => dndEnabled && setDragIndex(index)}
+                onDragOver={(e) => { if (dndEnabled) e.preventDefault(); }}
+                onDrop={() => dndEnabled && handleDropAt(index)}
+                className={`rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow ${dndEnabled ? "cursor-move" : ""} ${dragIndex === index ? "opacity-50 ring-2 ring-indigo-400" : ""}`}
               >
                 {/* 카드 헤더 */}
                 <div

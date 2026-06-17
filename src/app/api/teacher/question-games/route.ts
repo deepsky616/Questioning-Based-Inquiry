@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { BUILT_IN_GAMES, AnyGame, GameVisibility } from "@/lib/question-games-data";
+import { BUILT_IN_GAMES, AnyGame, GameVisibility, sortGamesByOrder } from "@/lib/question-games-data";
 import { randomBytes } from "crypto";
 
 export async function GET() {
@@ -15,9 +15,10 @@ export async function GET() {
   }
   const teacherId = (session.user as { id: string }).id;
 
-  const [visConfig, gamesConfig] = await Promise.all([
+  const [visConfig, gamesConfig, orderConfig] = await Promise.all([
     prisma.systemConfig.findUnique({ where: { key: `question_game_vis_${teacherId}` } }),
     prisma.systemConfig.findUnique({ where: { key: `question_game_custom_${teacherId}` } }),
+    prisma.systemConfig.findUnique({ where: { key: `question_game_order_${teacherId}` } }),
   ]);
 
   const visibilityMap: Record<string, GameVisibility> = visConfig
@@ -35,7 +36,10 @@ export async function GET() {
       })()
     : [];
 
-  const allGames = [...BUILT_IN_GAMES, ...customGames];
+  let orderIds: string[] | null = null;
+  if (orderConfig) { try { orderIds = JSON.parse(orderConfig.value) as string[]; } catch {} }
+
+  const allGames = sortGamesByOrder([...BUILT_IN_GAMES, ...customGames], orderIds);
   return NextResponse.json({ games: allGames, visibilityMap });
 }
 

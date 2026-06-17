@@ -1,3 +1,17 @@
+// 교사가 지정한 순서(gameId 배열)대로 정렬. 순서에 없는 게임은 기본 order로 뒤에 둔다.
+export function sortGamesByOrder<T extends { id: string; order: number }>(
+  games: T[],
+  orderIds?: string[] | null,
+): T[] {
+  if (!orderIds || orderIds.length === 0) return [...games].sort((a, b) => a.order - b.order);
+  const idx = new Map(orderIds.map((id, i) => [id, i]));
+  return [...games].sort((a, b) => {
+    const ia = idx.has(a.id) ? idx.get(a.id)! : 1000 + a.order;
+    const ib = idx.has(b.id) ? idx.get(b.id)! : 1000 + b.order;
+    return ia - ib;
+  });
+}
+
 export interface BuiltInGame {
   id: string;
   title: string;
