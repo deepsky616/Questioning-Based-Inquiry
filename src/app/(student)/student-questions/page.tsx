@@ -10,7 +10,7 @@ type Tab = "mine" | "explore" | "design";
 const TABS: { value: Tab; label: string }[] = [
   { value: "mine", label: "📝 내 질문" },
   { value: "explore", label: "🔎 전체 질문 탐구" },
-  { value: "design", label: "🧩 탐구설계" },
+  { value: "design", label: "🧩 수업 탐구 질문" },
 ];
 
 export default function StudentQuestionsPage() {
@@ -20,7 +20,7 @@ export default function StudentQuestionsPage() {
     <div className="space-y-5">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">질문탐구</h2>
-        <p className="text-gray-600">내 질문을 관리하고, 친구들의 질문을 탐구하고, 선생님이 배포한 탐구설계에 참여해 보세요</p>
+        <p className="text-gray-600">내 질문을 관리하고, 친구들의 질문을 탐구하고, 선생님이 배포한 수업 탐구 질문에 참여해 보세요</p>
       </div>
 
       <div className="flex flex-wrap rounded-md border overflow-hidden w-fit">

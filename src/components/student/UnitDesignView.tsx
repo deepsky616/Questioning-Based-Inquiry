@@ -143,8 +143,8 @@ export function UnitDesignView() {
       ) : sessions.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-gray-500">
-            <p className="font-medium mb-1">배포된 탐구설계가 없습니다</p>
-            <p className="text-sm text-gray-400">선생님이 탐구설계를 배포하면 여기에 표시됩니다</p>
+            <p className="font-medium mb-1">배포된 수업 탐구 질문이 없습니다</p>
+            <p className="text-sm text-gray-400">선생님이 수업 탐구 질문을 배포하면 여기에 표시됩니다</p>
           </CardContent>
         </Card>
       ) : (
