@@ -211,6 +211,18 @@ export default function TeacherSessionsPage() {
     }
   };
 
+  // 날짜·교과·주제 수정 저장 (탐구질문 세션은 교과 제외)
+  const handleEditSave = async (id: string, patch: { date: string; subject?: string; topic: string }): Promise<boolean> => {
+    const res = await fetch(`/api/sessions/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) return false;
+    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+    return true;
+  };
+
   const handleToggleLikes = async (id: string, currentValue: boolean) => {
     const next = !currentValue;
     setSessions((prev) =>
@@ -442,11 +454,12 @@ export default function TeacherSessionsPage() {
                     오늘·예정 수업
                     <span className="text-sm font-normal text-gray-500">총 {activeSessions.length}개</span>
                   </CardTitle>
-                  <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
+                  <div className="hidden sm:flex items-center gap-5 text-xs text-gray-400">
                     <span className="w-16 text-center">학생 활성화</span>
                     <span className="w-16 text-center">질문 공개</span>
                     <span className="w-16 text-center">좋아요 공개</span>
                     <span className="w-16 text-center">댓글 공개</span>
+                    <span className="w-24 text-center">관리</span>
                   </div>
                 </div>
               </CardHeader>
@@ -461,6 +474,7 @@ export default function TeacherSessionsPage() {
                       onTogglePublic={handleTogglePublic}
                       onToggleLikes={handleToggleLikes}
                       onToggleCommentsVisible={handleToggleCommentsVisible}
+                      onEditSave={handleEditSave}
                     />
                   ))}
                 </div>
@@ -477,11 +491,12 @@ export default function TeacherSessionsPage() {
                     지난 수업
                     <span className="text-sm font-normal text-gray-500">총 {pastSessions.length}개</span>
                   </CardTitle>
-                  <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
+                  <div className="hidden sm:flex items-center gap-5 text-xs text-gray-400">
                     <span className="w-16 text-center">학생 활성화</span>
                     <span className="w-16 text-center">질문 공개</span>
                     <span className="w-16 text-center">좋아요 공개</span>
                     <span className="w-16 text-center">댓글 공개</span>
+                    <span className="w-24 text-center">관리</span>
                   </div>
                 </div>
               </CardHeader>
@@ -496,6 +511,7 @@ export default function TeacherSessionsPage() {
                       onTogglePublic={handleTogglePublic}
                       onToggleLikes={handleToggleLikes}
                       onToggleCommentsVisible={handleToggleCommentsVisible}
+                      onEditSave={handleEditSave}
                     />
                   ))}
                 </div>
@@ -515,6 +531,7 @@ function SessionRow({
   onTogglePublic,
   onToggleLikes,
   onToggleCommentsVisible,
+  onEditSave,
 }: {
   session: QuestionSession;
   onDelete: (id: string) => void;
@@ -522,68 +539,118 @@ function SessionRow({
   onTogglePublic: (id: string, current: boolean) => void;
   onToggleLikes: (id: string, current: boolean) => void;
   onToggleCommentsVisible: (id: string, current: boolean) => void;
+  onEditSave: (id: string, patch: { date: string; subject?: string; topic: string }) => Promise<boolean>;
 }) {
+  const isDesignSession = !!session.unitDesignId;
+  const [editing, setEditing] = useState(false);
+  const [eDate, setEDate] = useState(session.date);
+  const [eSubject, setESubject] = useState(session.subject);
+  const [eTopic, setETopic] = useState(session.topic);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEdit = () => {
+    setEDate(session.date);
+    setESubject(session.subject);
+    setETopic(session.topic);
+    setEditing(true);
+  };
+  const saveEdit = async () => {
+    if (!eDate || !eTopic.trim() || (!isDesignSession && !eSubject.trim())) return;
+    setSavingEdit(true);
+    const ok = await onEditSave(session.id, {
+      date: eDate,
+      topic: eTopic.trim(),
+      ...(isDesignSession ? {} : { subject: eSubject.trim() }),
+    });
+    setSavingEdit(false);
+    if (ok) setEditing(false);
+  };
+
   return (
-    <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}`}>
-      <div className="flex items-center gap-3 min-w-0">
-        <span className={`shrink-0 w-2 h-2 rounded-full ${session.isActive ? "bg-green-500" : "bg-gray-300"}`} />
-        <div className="min-w-0">
-          <p className={`text-sm font-medium truncate ${session.isActive ? "text-gray-900" : "text-gray-400"}`}>
-            {buildSessionLabel(session.date, session.subject, session.topic)}
-          </p>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            {!session.isActive && (
-              <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">학생 비활성</span>
-            )}
-            {!session.defaultQuestionPublic && (
-              <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">질문 비공개</span>
-            )}
-            {!session.likesVisibleToPeers && (
-              <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded">좋아요 비공개</span>
-            )}
-            {!session.commentsVisibleToPeers && (
-              <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">댓글 서로 비공개</span>
-            )}
-            {session.unitDesignId && (
-              <span className="text-xs font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">🧩 탐구질문 수업</span>
-            )}
-            <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
-              {buildTargetLabel({
-                targetType: session.targetType,
-                targetGrade: session.targetGrade,
-                targetClassName: session.targetClassName,
-                targetStudentName: session.targetStudent?.name,
-              })}
-            </span>
+    <div className={session.isActive ? "bg-white" : "bg-gray-50"}>
+      <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "hover:bg-gray-50" : "hover:bg-gray-100"}`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className={`shrink-0 w-2 h-2 rounded-full ${session.isActive ? "bg-green-500" : "bg-gray-300"}`} />
+          <div className="min-w-0">
+            <p className={`text-sm font-medium truncate ${session.isActive ? "text-gray-900" : "text-gray-400"}`}>
+              {buildSessionLabel(session.date, session.subject, session.topic)}
+            </p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {!session.isActive && (
+                <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">학생 비활성</span>
+              )}
+              {!session.defaultQuestionPublic && (
+                <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">질문 비공개</span>
+              )}
+              {!session.likesVisibleToPeers && (
+                <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded">좋아요 비공개</span>
+              )}
+              {!session.commentsVisibleToPeers && (
+                <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">댓글 서로 비공개</span>
+              )}
+              {isDesignSession && (
+                <span className="text-xs font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">🧩 탐구질문 수업</span>
+              )}
+              <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                {buildTargetLabel({
+                  targetType: session.targetType,
+                  targetGrade: session.targetGrade,
+                  targetClassName: session.targetClassName,
+                  targetStudentName: session.targetStudent?.name,
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-5 shrink-0">
+          <div className="w-16 flex justify-center"><Switch checked={session.isActive} onCheckedChange={() => onToggleActive(session.id, session.isActive)} /></div>
+          <div className="w-16 flex justify-center"><Switch checked={session.defaultQuestionPublic} onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)} /></div>
+          <div className="w-16 flex justify-center"><Switch checked={session.likesVisibleToPeers} onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)} /></div>
+          <div className="w-16 flex justify-center"><Switch checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} /></div>
+          <div className="w-24 flex justify-end gap-1">
+            <Button variant="ghost" size="sm" className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 h-7 px-2 text-xs" onClick={openEdit}>
+              수정
+            </Button>
+            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2 text-xs" onClick={() => onDelete(session.id)}>
+              삭제
+            </Button>
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-5 shrink-0">
-        <Switch
-          checked={session.isActive}
-          onCheckedChange={() => onToggleActive(session.id, session.isActive)}
-        />
-        <Switch
-          checked={session.defaultQuestionPublic}
-          onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)}
-        />
-        <Switch
-          checked={session.likesVisibleToPeers}
-          onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)}
-        />
-        <Switch
-          checked={session.commentsVisibleToPeers}
-          onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2 text-xs"
-          onClick={() => onDelete(session.id)}
-        >
-          삭제
-        </Button>
-      </div>
+
+      {editing && (
+        <div className="border-t bg-indigo-50/40 px-4 py-3">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">날짜</Label>
+              <DatePicker value={eDate} onChange={setEDate} placeholder="날짜 선택" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">교과</Label>
+              <Input
+                className="h-9 w-32 bg-background"
+                value={isDesignSession ? session.subject : eSubject}
+                disabled={isDesignSession}
+                onChange={(e) => setESubject(e.target.value)}
+                placeholder="교과"
+              />
+            </div>
+            <div className="space-y-1 min-w-0 flex-1">
+              <Label className="text-xs">주제</Label>
+              <Input className="h-9 bg-background" value={eTopic} onChange={(e) => setETopic(e.target.value)} placeholder="주제" />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" disabled={savingEdit} onClick={saveEdit} className="font-semibold">
+                {savingEdit ? "저장 중..." : "저장"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setEditing(false)}>취소</Button>
+            </div>
+          </div>
+          {isDesignSession && (
+            <p className="mt-1 text-xs text-muted-foreground">🧩 탐구질문 수업은 날짜·주제만 수정할 수 있어요(교과 고정).</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
