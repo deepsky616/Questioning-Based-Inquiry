@@ -16,7 +16,7 @@ async function analyzeStudentSession(sessionId: string): Promise<SessionAnalysis
   });
   const d = await res.json();
   if (!res.ok) throw new Error(d.error || "분석 실패");
-  return { summary: d.summary, insights: d.insights, relevanceInsights: d.relevanceInsights };
+  return { summary: d.summary, insights: d.insights, relevanceInsights: d.relevanceInsights, growthInsights: d.growthInsights, rewriteExample: d.rewriteExample };
 }
 
 export default function StudentReportPage() {

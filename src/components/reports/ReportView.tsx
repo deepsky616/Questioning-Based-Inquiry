@@ -25,6 +25,13 @@ export interface SessionAnalysisResult {
   commentInsights?: string;
   engagementInsights?: string;
   relevanceInsights?: string;
+  // 교사 전체 세션
+  balanceInsights?: string;
+  bestQuestion?: string;
+  nextQuestions?: string;
+  // 학생 본인
+  growthInsights?: string;
+  rewriteExample?: string;
 }
 
 export interface ReportViewProps {
@@ -286,10 +293,15 @@ export function ReportView({
               const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
               const blocks: [string, string | undefined][] = [
                 ["📌 요약", r?.summary],
-                ["🧭 제안", r?.insights],
+                ["⚖️ 질문 유형 균형", r?.balanceInsights],
+                ["⭐ 베스트 질문", r?.bestQuestion],
+                ["📈 지난 세션 대비 성장", r?.growthInsights],
+                ["✍️ 더 좋은 질문으로", r?.rewriteExample],
                 ["❤️ 좋아요·참여", r?.engagementInsights],
                 ["💬 댓글", r?.commentInsights],
                 ["🎯 주제 연관성·성의", r?.relevanceInsights],
+                ["➡️ 다음 수업 발문", r?.nextQuestions],
+                ["🧭 제안", r?.insights],
               ];
               return (
                 <div key={s.id} className="rounded-lg border bg-background">

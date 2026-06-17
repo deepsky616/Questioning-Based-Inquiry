@@ -19,7 +19,11 @@ async function analyzeClassSession(sessionId: string): Promise<SessionAnalysisRe
   const res = await fetch(`/api/sessions/${sessionId}/analysis`, { method: "POST" });
   const d = await res.json();
   if (!res.ok) throw new Error(d.error || "분석 실패");
-  return { summary: d.summary, insights: d.insights, commentInsights: d.commentInsights, engagementInsights: d.engagementInsights, relevanceInsights: d.relevanceInsights };
+  return {
+    summary: d.summary, insights: d.insights, commentInsights: d.commentInsights,
+    engagementInsights: d.engagementInsights, relevanceInsights: d.relevanceInsights,
+    balanceInsights: d.balanceInsights, bestQuestion: d.bestQuestion, nextQuestions: d.nextQuestions,
+  };
 }
 // 특정 학생 세션 분석(교사가 그 학생을 지정해서 봄)
 function analyzeStudentSessionFor(studentId: string) {
@@ -31,7 +35,7 @@ function analyzeStudentSessionFor(studentId: string) {
     });
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || "분석 실패");
-    return { summary: d.summary, insights: d.insights, relevanceInsights: d.relevanceInsights };
+    return { summary: d.summary, insights: d.insights, relevanceInsights: d.relevanceInsights, growthInsights: d.growthInsights, rewriteExample: d.rewriteExample };
   };
 }
 

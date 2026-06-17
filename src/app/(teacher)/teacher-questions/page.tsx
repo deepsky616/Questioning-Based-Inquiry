@@ -75,6 +75,9 @@ interface SessionAnalysis {
   commentInsights?: string;
   engagementInsights?: string;
   relevanceInsights?: string;
+  balanceInsights?: string;
+  bestQuestion?: string;
+  nextQuestions?: string;
   totalQuestions: number;
   totalComments?: number;
   totalLikes?: number;
@@ -924,10 +927,28 @@ export default function QuestionsPage() {
                       <span key={theme} className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">{theme}</span>
                     ))}
                   </div>
+                  {sessionAnalysis.balanceInsights && (
+                    <div className="rounded-lg bg-violet-50 p-4 dark:bg-violet-950/30">
+                      <p className="text-xs font-semibold text-violet-800 dark:text-violet-300">⚖️ 질문 유형 균형 진단</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-violet-950 dark:text-violet-100">{sessionAnalysis.balanceInsights}</p>
+                    </div>
+                  )}
+                  {sessionAnalysis.bestQuestion && (
+                    <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950/30">
+                      <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-300">⭐ 베스트 질문</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-yellow-950 dark:text-yellow-100">{sessionAnalysis.bestQuestion}</p>
+                    </div>
+                  )}
                   <div className="rounded-lg bg-amber-50 p-4 dark:bg-amber-950/30">
                     <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">교사 시사점</p>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950 dark:text-amber-100">{sessionAnalysis.insights}</p>
                   </div>
+                  {sessionAnalysis.nextQuestions && (
+                    <div className="rounded-lg bg-indigo-50 p-4 dark:bg-indigo-950/30">
+                      <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-300">➡️ 다음 수업 발문 제안</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-indigo-950 dark:text-indigo-100">{sessionAnalysis.nextQuestions}</p>
+                    </div>
+                  )}
                   {sessionAnalysis.engagementInsights && (
                     <div className="rounded-lg bg-rose-50 p-4 dark:bg-rose-950/30">
                       <p className="text-xs font-semibold text-rose-800 dark:text-rose-300">❤️ 좋아요·참여 분석</p>

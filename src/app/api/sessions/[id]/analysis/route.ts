@@ -110,6 +110,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       commentInsights?: string;
       engagementInsights?: string;
       relevanceInsights?: string;
+      balanceInsights?: string;
+      bestQuestion?: string;
+      nextQuestions?: string;
     };
 
     return NextResponse.json({
@@ -119,6 +122,9 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       commentInsights: parsed.commentInsights ?? "",
       engagementInsights: parsed.engagementInsights ?? "",
       relevanceInsights: parsed.relevanceInsights ?? "",
+      balanceInsights: parsed.balanceInsights ?? "",
+      bestQuestion: parsed.bestQuestion ?? "",
+      nextQuestions: parsed.nextQuestions ?? "",
       totalQuestions: questions.length,
       totalComments,
       totalLikes,

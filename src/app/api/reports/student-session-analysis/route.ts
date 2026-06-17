@@ -48,6 +48,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "이 세션에서 한 활동이 없어요" }, { status: 400 });
   }
 
+  // 지난 세션 대비 성장 비교용: 이 세션을 제외한 학생의 누적 질문 분포
+  const priorQuestions = await prisma.question.findMany({
+    where: { authorId: targetId, sessionId: { not: sessionId } },
+    select: { closure: true, cognitive: true },
+  });
+  const prior = {
+    totalQuestions: priorQuestions.length,
+    open: priorQuestions.filter((q) => q.closure === "open").length,
+    conceptual: priorQuestions.filter((q) => q.cognitive === "conceptual").length,
+    controversial: priorQuestions.filter((q) => q.cognitive === "controversial").length,
+  };
+
   const apiKeyRecord = await prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } });
   if (!apiKeyRecord?.value) {
     return NextResponse.json({ error: "AI 설정이 필요합니다. 선생님께 API 키 설정을 요청하세요." }, { status: 400 });
@@ -67,6 +79,7 @@ export async function POST(req: NextRequest) {
       })),
       myComments: myComments.map((c) => c.content),
       likesGiven,
+      prior,
     });
     const result = await model.generateContent(prompt);
     const text = result.response.text().trim();
@@ -77,6 +90,8 @@ export async function POST(req: NextRequest) {
       summary: parsed?.summary ?? "",
       insights: parsed?.insights ?? "",
       relevanceInsights: parsed?.relevanceInsights ?? "",
+      growthInsights: parsed?.growthInsights ?? "",
+      rewriteExample: parsed?.rewriteExample ?? "",
       totals: { questions: questions.length, comments: myComments.length, likesGiven },
     });
   } catch (error) {
