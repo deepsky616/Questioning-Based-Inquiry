@@ -281,11 +281,13 @@ export default function QuestionsPage() {
 
   // 날짜·교과·주제 필터로 세션 목록을 좁힌다(질문 직접 조회가 아니라 세션을 고르는 보조 필터)
   const filterOptions = getSessionFilterOptions(sessions);
+  // 탐구질문에서 생성한 수업세션(unitDesignId)은 질문 조회에서 제외한다(학생 '수업 탐구 질문'에서만 다룸)
+  const curriculumSessionIds = new Set(sessions.filter((s) => s.unitDesignId).map((s) => s.id));
   const filteredSessions = filterSessions(sessions, {
     date: filterDate || undefined,
     subject: filterSubject || undefined,
     topic: filterTopic || undefined,
-  });
+  }).filter((s) => !curriculumSessionIds.has(s.id));
 
   // 필터 변경 반영: 전체 세션이면 좁혀진 범위로 다시 조회, 특정 세션이면 목록 밖일 때 첫 세션으로 보정
   useEffect(() => {
@@ -542,13 +544,15 @@ export default function QuestionsPage() {
   };
 
   const searchKeyword = search.trim().toLowerCase();
+  // 탐구질문 생성 세션의 질문은 조회 대상에서 제외
+  const visibleQuestions = questions.filter((q) => !curriculumSessionIds.has(q.session?.id ?? q.sessionId ?? ""));
   const filtered = searchKeyword
-    ? questions.filter(
+    ? visibleQuestions.filter(
         (q) =>
           q.content.toLowerCase().includes(searchKeyword) ||
           q.author.name.toLowerCase().includes(searchKeyword),
       )
-    : questions;
+    : visibleQuestions;
 
   // 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 필터를 적용한 표시용 목록
   const displayed = filtered.filter((q) =>

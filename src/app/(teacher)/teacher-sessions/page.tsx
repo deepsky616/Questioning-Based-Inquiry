@@ -560,7 +560,7 @@ function SessionRow({
               <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">댓글 서로 비공개</span>
             )}
             {session.unitDesignId && (
-              <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">탐구 질문 수업</span>
+              <span className="text-xs font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">🧩 탐구질문 수업</span>
             )}
             <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
               {buildTargetLabel({
