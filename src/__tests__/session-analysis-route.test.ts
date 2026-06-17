@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGenerateContent = vi.hoisted(() => vi.fn());
+const aiState = vi.hoisted(() => ({ apiKey: "test-api-key" as string | null, model: "gemini-2.5-flash" }));
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/lib/resolve-ai-config", () => ({
+  resolveUserAiConfig: vi.fn(async () => ({ ...aiState })),
+}));
 vi.mock("@/lib/db", () => ({
   prisma: {
     questionSession: { findUnique: vi.fn() },
@@ -30,6 +34,7 @@ const mockFindConfig = prisma.systemConfig.findUnique as ReturnType<typeof vi.fn
 describe("POST /api/sessions/[id]/analysis", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    aiState.apiKey = "test-api-key";
   });
 
   it("학생 질문·배포 탐구설계 질문의 좋아요·댓글을 모두 분석하고 집계를 반환한다", async () => {

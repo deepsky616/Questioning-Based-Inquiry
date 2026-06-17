@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { prisma } from "@/lib/db";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { resolveGeminiModel } from "@/lib/api-config";
 
 const SYSTEM_PROMPT = `당신은 초등학생과 중학생을 위한 질문놀이 파트너입니다.
 - 쉽고 친근한 말투로 대화하세요.
@@ -82,20 +81,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
   }
 
-  const [apiKeyRecord, modelRecord] = await Promise.all([
-    prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
-    prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
-  ]);
-
-  if (!apiKeyRecord?.value) {
+  const aiCfg = await resolveUserAiConfig((session.user as { id: string }).id);
+  if (!aiCfg.apiKey) {
     return NextResponse.json(
       { error: "AI 모델이 설정되지 않았습니다. 선생님께 API 키 설정을 요청하세요." },
       { status: 503 }
     );
   }
 
-  const model = resolveGeminiModel(modelRecord?.value);
-  const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
+  const model = aiCfg.model;
+  const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
   const gemini = genAI.getGenerativeModel({
     model,
     systemInstruction: SYSTEM_PROMPT,

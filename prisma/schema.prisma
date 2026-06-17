@@ -20,6 +20,10 @@ model User {
 
   school String? @map("school")
 
+  // 교사별 AI 설정(자신의 담당 학급 학생과 공유)
+  aiApiKey String? @map("ai_api_key")
+  aiModel  String? @map("ai_model")
+
   totalPoints Int @default(0) @map("total_points")
 
   questions           Question[]           @relation("QuestionAuthor")

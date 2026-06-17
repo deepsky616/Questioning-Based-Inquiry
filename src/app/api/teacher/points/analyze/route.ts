@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { resolveGeminiModel } from "@/lib/api-config";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import {
   ACTIVITY_BONUS_TYPES, VALID_ACTIVITY_BONUS,
   MAX_ACTIVITY_BONUS_PER_STUDENT,
@@ -94,16 +94,13 @@ export async function POST(req: NextRequest) {
     });
   });
 
-  // AI 호출
-  const [apiKeyRec, modelRec] = await Promise.all([
-    prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
-    prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
-  ]);
+  // AI 호출 (교사 본인 설정)
+  const aiCfg = await resolveUserAiConfig(teacherId);
 
   let aiResp: AIResp | null = null;
-  if (apiKeyRec?.value) {
-    const genAI = new GoogleGenerativeAI(apiKeyRec.value);
-    const model = resolveGeminiModel(modelRec?.value);
+  if (aiCfg.apiKey) {
+    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
+    const model = aiCfg.model;
     const gemini = genAI.getGenerativeModel({ model, systemInstruction: SYS });
 
     const qBlock = questions.map((q) =>

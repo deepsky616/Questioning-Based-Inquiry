@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { resolveGeminiModel } from "@/lib/api-config";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import {
   BASE_POINTS,
   AI_BONUS_TYPES,
@@ -85,15 +85,12 @@ function tryParseAI(text: string): AIVerdictResponse | null {
   }
 }
 
-async function callAI(req: AwardRequest): Promise<AIVerdictResponse | null> {
-  const [apiKeyRecord, modelRecord] = await Promise.all([
-    prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
-    prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
-  ]);
-  if (!apiKeyRecord?.value) return null;
+async function callAI(req: AwardRequest, userId: string): Promise<AIVerdictResponse | null> {
+  const aiCfg = await resolveUserAiConfig(userId);
+  if (!aiCfg.apiKey) return null;
 
-  const model = resolveGeminiModel(modelRecord?.value);
-  const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
+  const model = aiCfg.model;
+  const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
   const gemini = genAI.getGenerativeModel({ model, systemInstruction: AI_SYSTEM });
   try {
     const result = await gemini.generateContent(buildPrompt(req));
@@ -225,7 +222,7 @@ export async function POST(req: NextRequest) {
     gameId, roomCode,
     topic: body.topic,
     contributions: contributions as StudentContribution[],
-  });
+  }, (session.user as { id: string }).id);
   const { awards, bestQuestion, summary } = buildAwardList(
     { gameId, roomCode, topic: body.topic, contributions: contributions as StudentContribution[] },
     ai

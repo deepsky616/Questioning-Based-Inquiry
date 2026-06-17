@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
-import { resolveGeminiModel } from "@/lib/api-config";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { buildStudentSessionPrompt } from "@/lib/ai-prompts";
 import { logger } from "@/lib/logger";
 
@@ -60,15 +60,14 @@ export async function POST(req: NextRequest) {
     controversial: priorQuestions.filter((q) => q.cognitive === "controversial").length,
   };
 
-  const apiKeyRecord = await prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } });
-  if (!apiKeyRecord?.value) {
+  const aiCfg = await resolveUserAiConfig(targetId);
+  if (!aiCfg.apiKey) {
     return NextResponse.json({ error: "AI 설정이 필요합니다. 선생님께 API 키 설정을 요청하세요." }, { status: 400 });
   }
-  const modelRecord = await prisma.systemConfig.findUnique({ where: { key: "gemini_model" } });
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
-    const model = genAI.getGenerativeModel({ model: resolveGeminiModel(modelRecord?.value) });
+    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
+    const model = genAI.getGenerativeModel({ model: aiCfg.model });
     const prompt = buildStudentSessionPrompt({
       studentName: student.name,
       subject: qSession.subject,

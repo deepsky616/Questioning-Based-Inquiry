@@ -2,8 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // vi.hoisted로 생성자 mock을 팩토리 밖에서 접근 가능하게 선언
 const mockGenerateContent = vi.hoisted(() => vi.fn());
+const aiState = vi.hoisted(() => ({ apiKey: "test-api-key" as string | null, model: "gemini-2.5-flash" }));
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/lib/resolve-ai-config", () => ({
+  resolveUserAiConfig: vi.fn(async () => ({ ...aiState })),
+}));
 vi.mock("@/lib/db", () => ({
   prisma: {
     $queryRaw: vi.fn(),
@@ -72,6 +76,7 @@ function makeDesignSessionRequest(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  aiState.apiKey = "test-api-key";
 });
 
 // ─── GET /api/unit-design ─────────────────────────────────────────────────────
@@ -389,7 +394,7 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
 
   it("API 키가 없으면 400을 반환한다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
-    mockFindUnique.mockResolvedValue(null);
+    aiState.apiKey = null;
 
     const res = await generatePOST(makeRequest({ ...GENERATE_BASE, step: "keywords" }));
     expect(res.status).toBe(400);

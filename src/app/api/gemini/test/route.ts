@@ -4,8 +4,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { prisma } from "@/lib/db";
 import { isAllowedGeminiModel } from "@/lib/api-config";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { classifyGeminiError } from "@/lib/gemini-error";
 
 const testSchema = z.object({
@@ -33,10 +33,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "API 키는 10자 이상이어야 합니다" }, { status: 400 });
     }
 
-    const savedApiKey = trimmedApiKey
-      ? null
-      : await prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } });
-    const resolvedApiKey = trimmedApiKey || savedApiKey?.value;
+    // 입력한 키가 있으면 그 키로, 없으면 교사 본인이 저장한 키로 테스트
+    const savedCfg = trimmedApiKey ? null : await resolveUserAiConfig((session.user as { id: string }).id);
+    const resolvedApiKey = trimmedApiKey || savedCfg?.apiKey;
 
     if (!resolvedApiKey) {
       return NextResponse.json({ success: false, error: "API 키를 입력해 주세요" }, { status: 400 });

@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { fallbackClassification, parseClassificationResponse } from "@/lib/classify";
 import { isAllowedGeminiModel, resolveApiKey, resolveGeminiModel } from "@/lib/api-config";
-import { prisma } from "@/lib/db";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 
 const classifySchema = z.object({
   apiKey: z.string().optional(),
@@ -69,14 +69,10 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { apiKey: requestApiKey, model: requestModel, content } = classifySchema.parse(body);
 
-    // 서버에 저장된 API 키 조회
-    const [serverKeyRecord, serverModelRecord] = await Promise.all([
-      prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
-      prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
-    ]);
-
-    const apiKey = resolveApiKey(requestApiKey, serverKeyRecord?.value);
-    const model = resolveGeminiModel(requestModel || serverModelRecord?.value);
+    // 작업 사용자(학생→담당 교사, 교사→본인) 기준 AI 설정
+    const serverCfg = await resolveUserAiConfig(userId);
+    const apiKey = resolveApiKey(requestApiKey, serverCfg.apiKey ?? undefined);
+    const model = requestModel ? resolveGeminiModel(requestModel) : serverCfg.model;
 
     // API 키가 없으면 키워드 기반 fallback 분류
     if (!apiKey) {

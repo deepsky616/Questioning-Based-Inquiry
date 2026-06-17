@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
-import { resolveGeminiModel } from "@/lib/api-config";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -63,12 +63,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: "세션 분석 권한이 없습니다" }, { status: 403 });
   }
 
-  const [apiKeyRecord, modelRecord] = await Promise.all([
-    prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
-    prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
-  ]);
-
-  if (!apiKeyRecord?.value) {
+  const aiCfg = await resolveUserAiConfig(teacherId);
+  if (!aiCfg.apiKey) {
     return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
   }
 
@@ -93,8 +89,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   const totalLikes = questions.reduce((count, question) => count + question.likeCount, 0);
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
-    const model = genAI.getGenerativeModel({ model: resolveGeminiModel(modelRecord?.value) });
+    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
+    const model = genAI.getGenerativeModel({ model: aiCfg.model });
 
     const prompt = buildSessionAnalysisPrompt(questions, questionSession.subject, questionSession.topic);
     const result = await model.generateContent(prompt);

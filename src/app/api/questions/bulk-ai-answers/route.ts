@@ -7,7 +7,7 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildAnswerPrompt } from "@/lib/ai-prompts";
 import { validateBulkAiRequest } from "@/lib/questions";
-import { resolveGeminiModel } from "@/lib/api-config";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 
 const schema = z.object({
   questionIds: z.array(z.string()).min(1),
@@ -38,12 +38,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    const [apiKeyRecord, modelRecord] = await Promise.all([
-      prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
-      prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
-    ]);
-
-    if (!apiKeyRecord?.value) {
+    const aiCfg = await resolveUserAiConfig(userId);
+    if (!aiCfg.apiKey) {
       return NextResponse.json(
         { error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." },
         { status: 400 }
@@ -55,8 +51,8 @@ export async function POST(req: Request) {
       select: { id: true, content: true, context: true, closure: true, cognitive: true },
     });
 
-    const genAI = new GoogleGenerativeAI(apiKeyRecord.value);
-    const model = genAI.getGenerativeModel({ model: resolveGeminiModel(modelRecord?.value) });
+    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
+    const model = genAI.getGenerativeModel({ model: aiCfg.model });
 
     // 각 질문에 대해 AI 답변 동시 생성
     const aiResults = await Promise.allSettled(

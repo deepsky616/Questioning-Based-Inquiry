@@ -487,7 +487,7 @@ export default function TeacherSettingsPage() {
         <CardHeader>
           <CardTitle>Gemini AI 설정</CardTitle>
           <CardDescription>
-            여기서 설정한 API 키는 서버에 안전하게 저장되며, 모든 학생이 별도 설정 없이 AI 분류를 사용할 수 있습니다.
+            여기서 설정한 API 키는 서버에 안전하게 저장되며, <b>선생님이 담당하는 학급의 학생들</b>이 별도 설정 없이 이 키로 AI 기능을 사용합니다. (교사마다 자신의 API 키를 따로 설정합니다)
             <br />
             <a
               href="https://aistudio.google.com/app/apikey"

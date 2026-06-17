@@ -4,7 +4,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
-import { resolveGeminiModel } from "@/lib/api-config";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { logger } from "@/lib/logger";
 import {
   buildSequencePrompt,
@@ -133,15 +133,12 @@ export async function POST(req: Request) {
     let sequencedQuestions = fallbackSequenceQuestions(questions, flow.id);
     let generatedBy: "ai" | "rules" = "rules";
 
-    const [keyRecord, modelRecord] = await Promise.all([
-      prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
-      prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
-    ]);
+    const aiCfg = await resolveUserAiConfig(user.id);
 
-    if (keyRecord?.value) {
+    if (aiCfg.apiKey) {
       try {
-        const genAI = new GoogleGenerativeAI(keyRecord.value);
-        const model = genAI.getGenerativeModel({ model: resolveGeminiModel(modelRecord?.value) });
+        const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
+        const model = genAI.getGenerativeModel({ model: aiCfg.model });
         const result = await model.generateContent(
           buildSequencePrompt({
             flowId: flow.id,

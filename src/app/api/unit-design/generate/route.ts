@@ -4,9 +4,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { prisma } from "@/lib/db";
+import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { buildPrompt, unitDesignGenerateSchema } from "@/lib/unit-design-prompt";
-import { resolveGeminiModel } from "@/lib/api-config";
 import { extractJsonObject } from "@/lib/json-extract";
 
 export async function POST(req: Request) {
@@ -27,17 +26,13 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = unitDesignGenerateSchema.parse(body);
 
-    const [keyRecord, modelRecord] = await Promise.all([
-      prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
-      prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
-    ]);
-
-    if (!keyRecord?.value) {
+    const aiCfg = await resolveUserAiConfig((session.user as { id: string }).id);
+    if (!aiCfg.apiKey) {
       return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
     }
 
-    const genAI = new GoogleGenerativeAI(keyRecord.value);
-    const model = genAI.getGenerativeModel({ model: resolveGeminiModel(modelRecord?.value) });
+    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
+    const model = genAI.getGenerativeModel({ model: aiCfg.model });
 
     const prompt = buildPrompt(data);
 
