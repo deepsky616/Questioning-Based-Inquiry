@@ -81,7 +81,7 @@ function LikeButton({
   );
 }
 
-export default function StudentUnitDesignPage() {
+export function UnitDesignView() {
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState("");
@@ -136,10 +136,7 @@ export default function StudentUnitDesignPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">질문 중심 탐구설계</h2>
-        <p className="text-gray-600">선생님이 배포한 탐구 질문에 좋아요·댓글로 참여해 보세요</p>
-      </div>
+      <p className="text-sm text-gray-600">선생님이 배포한 탐구 질문에 좋아요·댓글로 참여해 보세요</p>
 
       {isLoading ? (
         <div className="text-center py-16 text-gray-400">로딩 중...</div>

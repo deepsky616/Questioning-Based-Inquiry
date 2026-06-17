@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
+import { PointReviewView } from "@/components/teacher/PointReviewView";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
 import { QuestionSortControl, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import {
@@ -176,6 +177,8 @@ export default function QuestionsPage() {
   const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
   // 부적절 의심만 보기 필터
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  // 상단 탭: 질문 조회 / AI 추천 포인트
+  const [topTab, setTopTab] = useState<"questions" | "review">("questions");
 
   // 알림에서 ?flagged=1로 들어오면 부적절 의심 필터를 켠다(useSearchParams 대신 마운트 시 읽어 Suspense 회피)
   useEffect(() => {
@@ -728,6 +731,27 @@ export default function QuestionsPage() {
         <p className="text-gray-600">세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
       </div>
 
+      <div className="flex rounded-md border overflow-hidden w-fit">
+        <button
+          type="button"
+          onClick={() => setTopTab("questions")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${topTab === "questions" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+        >
+          📋 질문 조회
+        </button>
+        <button
+          type="button"
+          onClick={() => setTopTab("review")}
+          className={`px-4 py-2 text-sm font-medium border-l transition-colors ${topTab === "review" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+        >
+          🎯 AI 추천 포인트
+        </button>
+      </div>
+
+      {topTab === "review" ? (
+        <PointReviewView />
+      ) : (
+      <>
       {/* 수업 세션 선택: 날짜·교과·주제로 좁혀서 단일 세션 선택 */}
       {sessions.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-400">
@@ -1498,6 +1522,8 @@ export default function QuestionsPage() {
             )}
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

@@ -35,7 +35,7 @@ function bonusLabel(bt: string): { label: string; emoji: string; color: string }
   return { label: bt, emoji: "🎯", color: "#6366f1" };
 }
 
-export default function TeacherReviewPage() {
+export function PointReviewView() {
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("all");
   const [pending, setPending] = useState<PendingLog[]>([]);
@@ -124,12 +124,9 @@ export default function TeacherReviewPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">🤖 AI 포인트 검토</h2>
-        <p className="text-gray-600 text-sm mt-1">
-          학생의 질문·답변을 AI가 채점한 후보를 확인하고 승인하세요. 최종 결정은 선생님께 있어요.
-        </p>
-      </div>
+      <p className="text-gray-600 text-sm">
+        학생의 질문·답변을 AI가 채점한 후보를 확인하고 승인하세요. 최종 결정은 선생님께 있어요.
+      </p>
 
       {/* 세션 선택 + 분석 실행 */}
       <Card>

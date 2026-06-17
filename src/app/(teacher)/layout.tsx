@@ -16,7 +16,6 @@ const TEACHER_PAGES = [
   { href: "/teacher-question-play", label: "질문놀이" },
   { href: "/teacher-sessions", label: "수업세션" },
   { href: "/teacher-questions", label: "질문조회" },
-  { href: "/teacher-review", label: "AI검토" },
   { href: "/teacher-curriculum", label: "탐구질문" },
   { href: "/teacher-reports", label: "활동 리포트" },
   { href: "/teacher-settings", label: "설정" },
