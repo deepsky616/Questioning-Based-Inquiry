@@ -439,7 +439,7 @@ export default function TeacherSessionsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                    진행 중·예정 수업
+                    오늘·예정 수업
                     <span className="text-sm font-normal text-gray-500">총 {activeSessions.length}개</span>
                   </CardTitle>
                   <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
