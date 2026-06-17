@@ -248,10 +248,10 @@ export function ReportView({
         <div className="rounded-xl border bg-card p-4">
           <p className="mb-1 text-sm font-bold text-foreground">🤖 수업세션별 AI 분석</p>
           <p className="mb-3 text-xs text-muted-foreground">
-            세션을 펼치면 개별 분석, ‘전체 분석’은 선택한 주/월에 진행한 세션을 한꺼번에 분석해요
+            주별/월별 기간을 고르면 그 기간의 수업세션만 보여요. 세션을 펼치면 개별 분석, ‘전체 분석’은 그 기간 세션을 한꺼번에 분석해요
           </p>
 
-          {/* 전체 분석: 주별/월별 기간 선택 후 일괄 분석 (개별 목록은 그대로 유지) */}
+          {/* 주별/월별 기간 선택 + 그 기간 일괄 분석 */}
           <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
             <span className="text-xs font-semibold text-foreground">전체 분석</span>
             <div className="flex rounded-md border overflow-hidden">
@@ -276,9 +276,12 @@ export function ReportView({
             </Button>
           </div>
 
-          {/* 수업세션별 개별 분석 목록(전체 표시) */}
+          {/* 수업세션별 개별 분석 목록(선택한 주/월의 세션만 표시) */}
+          {filteredSessions.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">이 기간에 진행한 수업세션이 없어요</p>
+          ) : (
           <div className="space-y-2">
-            {allSessions.map((s) => {
+            {filteredSessions.map((s) => {
               const r = res[s.id];
               const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
               const blocks: [string, string | undefined][] = [
@@ -316,6 +319,7 @@ export function ReportView({
               );
             })}
           </div>
+          )}
         </div>
       )}
 
