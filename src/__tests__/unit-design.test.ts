@@ -15,6 +15,7 @@ vi.mock("@/lib/db", () => ({
     $executeRawUnsafe: vi.fn(),
     systemConfig: { findUnique: vi.fn() },
     questionSession: { create: vi.fn() },
+    question: { create: vi.fn() },
   },
 }));
 vi.mock("@google/generative-ai", () => ({
@@ -320,6 +321,9 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
         targetStudentId: null,
         targetStudentIds: [],
         defaultQuestionPublic: true,
+        isActive: true,
+        likesVisibleToPeers: true,
+        commentsVisibleToPeers: false,
       },
     });
   });

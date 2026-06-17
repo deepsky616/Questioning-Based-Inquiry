@@ -4,6 +4,7 @@ vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   prisma: {
     questionSession: { create: vi.fn() },
+    question: { create: vi.fn() },
     teacherClass: { findMany: vi.fn() },
     $queryRaw: vi.fn().mockResolvedValue([{
       id: "ud-1",

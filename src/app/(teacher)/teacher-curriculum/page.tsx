@@ -147,6 +147,9 @@ export default function CurriculumPage() {
   const [sessionDate, setSessionDate] = useState("");
   const [sessionTopic, setSessionTopic] = useState("");
   const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(true);
+  const [sessionIsActive, setSessionIsActive] = useState(true);
+  const [sessionLikesVisible, setSessionLikesVisible] = useState(true);
+  const [sessionCommentsVisible, setSessionCommentsVisible] = useState(false);
   const [selectedSavedQuestionKeys, setSelectedSavedQuestionKeys] = useState<Set<string>>(new Set());
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [createdSessionMessage, setCreatedSessionMessage] = useState("");
@@ -508,6 +511,9 @@ export default function CurriculumPage() {
           date: sessionDate,
           topic: sessionTopic.trim(),
           defaultQuestionPublic,
+          isActive: sessionIsActive,
+          likesVisibleToPeers: sessionLikesVisible,
+          commentsVisibleToPeers: sessionCommentsVisible,
           sharedQuestions: selectedQuestions,
         }),
       });
@@ -629,22 +635,27 @@ export default function CurriculumPage() {
                           </div>
                         </div>
 
-                        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <p className="text-sm font-medium text-gray-800">이 세션 질문 기본 공개</p>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                켜면 학생이 이 탐구 질문 수업에서 만든 질문이 저장 즉시 공개됩니다.
-                              </p>
+                        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 space-y-2">
+                          {([
+                            ["isActive", "학생 활성화", "켜면 학생이 배포된 질문에 좋아요·댓글을 남길 수 있어요.", sessionIsActive, setSessionIsActive],
+                            ["defaultQuestionPublic", "질문 공개", "켜면 학생이 작성한 질문을 서로 볼 수 있어요. 끄면 본인 질문만 보여요.", defaultQuestionPublic, setDefaultQuestionPublic],
+                            ["likesVisibleToPeers", "좋아요 공개", "켜면 학생이 서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요.", sessionLikesVisible, setSessionLikesVisible],
+                            ["commentsVisibleToPeers", "댓글 공개", "켜면 학생이 서로의 댓글을 볼 수 있어요. 끄면 본인·선생님 댓글만 보여요.", sessionCommentsVisible, setSessionCommentsVisible],
+                          ] as const).map(([key, label, desc, value, setter]) => (
+                            <div key={key} className="flex items-center justify-between gap-4">
+                              <div>
+                                <p className="text-sm font-medium text-gray-800">{label}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                              </div>
+                              <Switch
+                                checked={value}
+                                onCheckedChange={(checked) => {
+                                  setter(checked);
+                                  setCreatedSessionMessage("");
+                                }}
+                              />
                             </div>
-                            <Switch
-                              checked={defaultQuestionPublic}
-                              onCheckedChange={(checked) => {
-                                setDefaultQuestionPublic(checked);
-                                setCreatedSessionMessage("");
-                              }}
-                            />
-                          </div>
+                          ))}
                         </div>
 
                         <div className="flex items-center gap-3">

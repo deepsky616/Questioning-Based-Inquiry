@@ -18,6 +18,9 @@ const createSessionSchema = z.object({
   targetStudentId: z.string().nullable().optional(),
   targetStudentIds: z.array(z.string()).optional().default([]),
   defaultQuestionPublic: z.boolean().optional().default(true),
+  isActive: z.boolean().optional().default(true),
+  likesVisibleToPeers: z.boolean().optional().default(true),
+  commentsVisibleToPeers: z.boolean().optional().default(false),
   sharedQuestions: z.array(inquiryQuestionSchema).min(1),
 });
 
@@ -97,8 +100,29 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         targetStudentId: data.targetType === "STUDENT" ? data.targetStudentId ?? null : null,
         targetStudentIds: ["CLASS", "STUDENT", "CUSTOM"].includes(data.targetType) ? data.targetStudentIds : [],
         defaultQuestionPublic: data.defaultQuestionPublic,
+        isActive: data.isActive,
+        likesVisibleToPeers: data.likesVisibleToPeers,
+        commentsVisibleToPeers: data.commentsVisibleToPeers,
       },
     });
+
+    // 배포 질문을 TEACHER_SHARED Question으로 생성 → 학생이 좋아요·댓글로 참여 가능(수업 탐구 질문)
+    await Promise.all(
+      selectedQuestions.map((q) =>
+        prisma.question.create({
+          data: {
+            content: q.content,
+            closure: "open",
+            cognitive: "conceptual",
+            source: "TEACHER_SHARED",
+            inquiryType: q.type,
+            isPublic: true,
+            authorId: teacherId,
+            sessionId: newSession.id,
+          },
+        }),
+      ),
+    );
 
     return NextResponse.json(newSession, { status: 201 });
   } catch (error) {
