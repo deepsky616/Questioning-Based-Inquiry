@@ -205,7 +205,9 @@ export function RankingPanel({
 
 interface ClassRankRow {
   id: string;
+  name: string;
   studentNumber: string | null;
+  totalPoints: number;
   classRank: number;
   schoolRank: number;
   allRank: number;
@@ -264,7 +266,7 @@ export function StudentRankPanel({
         🏆 학생 순위
         {klassLabel && <span className="text-xs font-normal text-muted-foreground"> · {klassLabel} · 총 {data?.total ?? 0}명</span>}
       </p>
-      <p className="text-xs text-muted-foreground">출석번호순 · 우리반/교내/전체 순위</p>
+      <p className="text-xs text-muted-foreground">출석번호순 · 이름·포인트·우리반/교내/전체 순위</p>
       {isLoading ? (
         <div className="py-8 text-center text-sm text-muted-foreground">불러오는 중...</div>
       ) : !data || data.students.length === 0 ? (
@@ -274,7 +276,9 @@ export function StudentRankPanel({
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card">
               <tr className="text-xs text-muted-foreground border-b">
-                <th className="w-16 py-1.5 text-center font-medium">번호</th>
+                <th className="w-12 py-1.5 text-center font-medium">번호</th>
+                <th className="py-1.5 text-left font-medium">이름</th>
+                <th className="py-1.5 text-right font-medium pr-1">포인트</th>
                 <th className="py-1.5 text-center font-medium">우리반</th>
                 <th className="py-1.5 text-center font-medium">교내</th>
                 <th className="py-1.5 text-center font-medium">전체</th>
@@ -287,10 +291,12 @@ export function StudentRankPanel({
                   ref={s.isMe ? selfRef : undefined}
                   className={`border-b last:border-0 ${s.isMe ? "bg-indigo-50 dark:bg-indigo-500/15 ring-1 ring-indigo-400" : ""}`}
                 >
-                  <td className="py-1.5 text-center font-semibold text-foreground">
-                    {s.studentNumber ?? "-"}
+                  <td className="py-1.5 text-center font-semibold text-foreground">{s.studentNumber ?? "-"}</td>
+                  <td className="py-1.5 text-left">
+                    <span className="font-medium text-foreground">{s.name}</span>
                     {s.isMe && <span className="ml-1 text-xs text-indigo-600">(나)</span>}
                   </td>
+                  <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{s.totalPoints}</td>
                   <td className="py-1.5 text-center text-indigo-600 dark:text-indigo-400 font-bold">{s.classRank}</td>
                   <td className="py-1.5 text-center text-foreground">{s.schoolRank}</td>
                   <td className="py-1.5 text-center text-foreground">{s.allRank}</td>
