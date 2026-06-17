@@ -159,7 +159,7 @@ export default function CurriculumPage() {
   const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(true);
   const [sessionIsActive, setSessionIsActive] = useState(true);
   const [sessionLikesVisible, setSessionLikesVisible] = useState(true);
-  const [sessionCommentsVisible, setSessionCommentsVisible] = useState(false);
+  const [sessionCommentsVisible, setSessionCommentsVisible] = useState(true);
   const [selectedSavedQuestionKeys, setSelectedSavedQuestionKeys] = useState<Set<string>>(new Set());
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [createdSessionMessage, setCreatedSessionMessage] = useState("");

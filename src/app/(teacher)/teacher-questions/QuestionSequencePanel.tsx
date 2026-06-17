@@ -32,7 +32,7 @@ export function QuestionSequencePanel({
     isActive: initialSettings?.isActive ?? true,
     defaultQuestionPublic: initialSettings?.defaultQuestionPublic ?? true,
     likesVisibleToPeers: initialSettings?.likesVisibleToPeers ?? true,
-    commentsVisibleToPeers: initialSettings?.commentsVisibleToPeers ?? false,
+    commentsVisibleToPeers: initialSettings?.commentsVisibleToPeers ?? true,
   });
 
   async function publish() {

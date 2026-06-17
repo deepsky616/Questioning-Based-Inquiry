@@ -9,7 +9,6 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DatePicker from "@/components/shared/DatePicker";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
-import PublishQuestionsDialog from "./PublishQuestionsDialog";
 import { buildSessionLabel, isSessionAvailable, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import {
   buildClassTargetValue,
@@ -45,7 +44,6 @@ export default function TeacherSessionsPage() {
   const [students, setStudents] = useState<SessionTargetStudent[]>([]);
   const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [publishTarget, setPublishTarget] = useState<QuestionSession | null>(null);
   const [sessForm, setSessForm] = useState({
     targetClassValue: "all",
     selectedStudentIds: [] as string[],
@@ -54,7 +52,7 @@ export default function TeacherSessionsPage() {
     topic: "",
     defaultQuestionPublic: true,
     likesVisibleToPeers: true,
-    commentsVisibleToPeers: false,
+    commentsVisibleToPeers: true,
     isActive: true,
   });
   const [isSaving, setIsSaving] = useState(false);
@@ -145,7 +143,7 @@ export default function TeacherSessionsPage() {
         topic: "",
         defaultQuestionPublic: true,
         likesVisibleToPeers: true,
-        commentsVisibleToPeers: false,
+        commentsVisibleToPeers: true,
         isActive: true,
       }));
       setMsg({ type: "success", text: "세션이 추가됐습니다" });
@@ -441,7 +439,7 @@ export default function TeacherSessionsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                    생성된 수업 세션
+                    진행 중·예정 수업
                     <span className="text-sm font-normal text-gray-500">총 {activeSessions.length}개</span>
                   </CardTitle>
                   <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
@@ -463,7 +461,6 @@ export default function TeacherSessionsPage() {
                       onTogglePublic={handleTogglePublic}
                       onToggleLikes={handleToggleLikes}
                       onToggleCommentsVisible={handleToggleCommentsVisible}
-                      onPublish={setPublishTarget}
                     />
                   ))}
                 </div>
@@ -477,7 +474,7 @@ export default function TeacherSessionsPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
-                    수업 세션 목록
+                    지난 수업
                     <span className="text-sm font-normal text-gray-500">총 {pastSessions.length}개</span>
                   </CardTitle>
                   <div className="flex items-center gap-5 pr-12 text-xs text-gray-400">
@@ -499,7 +496,6 @@ export default function TeacherSessionsPage() {
                       onTogglePublic={handleTogglePublic}
                       onToggleLikes={handleToggleLikes}
                       onToggleCommentsVisible={handleToggleCommentsVisible}
-                      onPublish={setPublishTarget}
                     />
                   ))}
                 </div>
@@ -507,15 +503,6 @@ export default function TeacherSessionsPage() {
             </Card>
           )}
         </div>
-      )}
-
-      {publishTarget && publishTarget.unitDesignId && (
-        <PublishQuestionsDialog
-          sessionId={publishTarget.id}
-          sessionLabel={buildSessionLabel(publishTarget.date, publishTarget.subject, publishTarget.topic)}
-          unitDesignId={publishTarget.unitDesignId}
-          onClose={() => setPublishTarget(null)}
-        />
       )}
     </div>
   );
@@ -528,7 +515,6 @@ function SessionRow({
   onTogglePublic,
   onToggleLikes,
   onToggleCommentsVisible,
-  onPublish,
 }: {
   session: QuestionSession;
   onDelete: (id: string) => void;
@@ -536,7 +522,6 @@ function SessionRow({
   onTogglePublic: (id: string, current: boolean) => void;
   onToggleLikes: (id: string, current: boolean) => void;
   onToggleCommentsVisible: (id: string, current: boolean) => void;
-  onPublish: (s: QuestionSession) => void;
 }) {
   return (
     <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}`}>
@@ -574,16 +559,6 @@ function SessionRow({
         </div>
       </div>
       <div className="flex items-center gap-5 shrink-0">
-        {session.unitDesignId && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-            onClick={() => onPublish(session)}
-          >
-            📤 질문 배포
-          </Button>
-        )}
         <Switch
           checked={session.isActive}
           onCheckedChange={() => onToggleActive(session.id, session.isActive)}

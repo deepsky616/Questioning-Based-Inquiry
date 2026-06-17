@@ -87,7 +87,7 @@ export function UnitDesignView() {
   const [selectedId, setSelectedId] = useState("");
   const [published, setPublished] = useState<Published[]>([]);
   const [likesVisible, setLikesVisible] = useState(true);
-  const [commentsVisible, setCommentsVisible] = useState(false);
+  const [commentsVisible, setCommentsVisible] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export function UnitDesignView() {
       .then((d) => {
         setPublished(Array.isArray(d.published) ? d.published : []);
         setLikesVisible(d.likesVisible ?? true);
-        setCommentsVisible(d.commentsVisible ?? false);
+        setCommentsVisible(d.commentsVisible ?? true);
       })
       .catch(() => setPublished([]));
   }, [selectedId]);

@@ -42,7 +42,7 @@ export async function GET(
       createdAt: q.createdAt,
     })),
     likesVisible: sessionRec?.likesVisibleToPeers ?? true,
-    commentsVisible: sessionRec?.commentsVisibleToPeers ?? false,
+    commentsVisible: sessionRec?.commentsVisibleToPeers ?? true,
   });
 }
 

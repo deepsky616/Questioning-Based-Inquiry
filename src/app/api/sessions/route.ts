@@ -14,7 +14,7 @@ const createSchema = z.object({
   targetStudentIds: z.array(z.string()).optional().default([]),
   defaultQuestionPublic: z.boolean().optional().default(true),
   likesVisibleToPeers: z.boolean().optional().default(true),
-  commentsVisibleToPeers: z.boolean().optional().default(false),
+  commentsVisibleToPeers: z.boolean().optional().default(true),
   isActive: z.boolean().optional().default(true),
 });
 

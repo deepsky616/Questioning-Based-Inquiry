@@ -323,7 +323,7 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
         defaultQuestionPublic: true,
         isActive: true,
         likesVisibleToPeers: true,
-        commentsVisibleToPeers: false,
+        commentsVisibleToPeers: true,
       },
     });
   });

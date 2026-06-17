@@ -20,7 +20,7 @@ const createSessionSchema = z.object({
   defaultQuestionPublic: z.boolean().optional().default(true),
   isActive: z.boolean().optional().default(true),
   likesVisibleToPeers: z.boolean().optional().default(true),
-  commentsVisibleToPeers: z.boolean().optional().default(false),
+  commentsVisibleToPeers: z.boolean().optional().default(true),
   sharedQuestions: z.array(inquiryQuestionSchema).min(1),
 });
 
