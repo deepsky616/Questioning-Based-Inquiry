@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
+import { StudentPasswordResetCard } from "@/components/teacher/StudentPasswordResetCard";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import {
   Select,
@@ -282,6 +283,8 @@ export default function TeacherSettingsPage() {
       </Card>
 
       <PasswordChangeCard />
+
+      <StudentPasswordResetCard />
 
       {/* 일괄 학생 등록 */}
       <Card>
