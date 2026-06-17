@@ -8,23 +8,26 @@ import { validatePasswordPolicy } from "@/lib/password-policy";
 
 const studentSchema = z.object({
   role: z.literal("STUDENT"),
-  name: z.string().min(2),
-  school: z.string().min(1),
-  grade: z.string().min(1),
-  className: z.string().min(1),
-  studentNumber: z.string().min(1),
-  password: z.string().min(1),
+  name: z.string().min(2, "이름을 2자 이상 입력해 주세요"),
+  school: z.string().min(1, "학교를 입력해 주세요"),
+  grade: z.string().min(1, "학년을 입력해 주세요"),
+  className: z.string().min(1, "반을 입력해 주세요"),
+  studentNumber: z.string().min(1, "번호를 입력해 주세요"),
+  password: z.string().min(1, "비밀번호를 입력해 주세요"),
 });
 
 const teacherSchema = z.object({
   role: z.literal("TEACHER"),
-  email: z.string().email(),
-  name: z.string().min(2),
-  school: z.string().min(1),
+  email: z.string().email("올바른 이메일 주소를 입력해 주세요"),
+  name: z.string().min(2, "이름을 2자 이상 입력해 주세요"),
+  school: z.string().min(1, "학교를 입력해 주세요"),
   teacherClasses: z.array(
-    z.object({ grade: z.string().min(1), className: z.string().min(1) })
-  ).min(1),
-  password: z.string().min(1),
+    z.object({
+      grade: z.string().min(1, "담당 학급의 학년을 입력해 주세요"),
+      className: z.string().min(1, "담당 학급의 반을 입력해 주세요"),
+    })
+  ).min(1, "담당 학급을 1개 이상 추가해 주세요"),
+  password: z.string().min(1, "비밀번호를 입력해 주세요"),
 });
 
 const registerSchema = z.discriminatedUnion("role", [studentSchema, teacherSchema]);
@@ -87,7 +90,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ id: user.id, name: user.name, role: user.role });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
+      // 어떤 항목이 잘못됐는지 구체적으로 안내
+      const first = error.errors[0];
+      return NextResponse.json({ error: first?.message ?? "입력 형식이 올바르지 않습니다" }, { status: 400 });
     }
     logger.error("Registration error:", error);
     return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });

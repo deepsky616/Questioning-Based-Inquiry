@@ -41,14 +41,17 @@ function RegisterContent() {
     e.preventDefault();
     const { email, school, grade, className, studentNumber, name, password, confirmPassword } = form;
 
-    if (role === "STUDENT" && (!school || !grade || !className || !studentNumber || !name || !password)) {
-      setError("모든 항목을 입력해 주세요");
-      return;
+    // 항목별로 무엇이 비었는지 구체적으로 안내
+    const missing = (label: string) => { setError(`${label}을(를) 입력해 주세요`); };
+    if (!name) { missing("이름"); return; }
+    if (!school) { missing("학교"); return; }
+    if (role === "STUDENT") {
+      if (!grade) { missing("학년"); return; }
+      if (!className) { missing("반"); return; }
+      if (!studentNumber) { missing("번호"); return; }
     }
-    if (role === "TEACHER" && (!email || !school || !name || !password)) {
-      setError("모든 항목을 입력해 주세요");
-      return;
-    }
+    if (role === "TEACHER" && !email) { missing("이메일"); return; }
+    if (!password) { missing("비밀번호"); return; }
     if (role === "TEACHER" && !email.includes("@")) {
       setError("올바른 이메일을 입력해 주세요");
       return;
