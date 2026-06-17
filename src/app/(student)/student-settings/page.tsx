@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/types/user";
 
 interface ExtendedUser {
@@ -20,24 +21,51 @@ export default function SettingsPage() {
   const { data: session } = useSession();
   const user = session?.user as ExtendedUser | undefined;
 
-  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
-  const [aiModel, setAiModel] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => {
-    fetch("/api/config")
-      .then((r) => r.json())
-      .then((data) => {
-        setAiConfigured(data.configured);
-        setAiModel(data.model);
-      })
-      .catch(() => setAiConfigured(false));
-  }, []);
+  async function handleChangePassword() {
+    setMsg(null);
+    if (!currentPassword || !newPassword) {
+      setMsg({ type: "error", text: "현재 비밀번호와 새 비밀번호를 입력하세요" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      setMsg({ type: "error", text: "새 비밀번호는 6자 이상이어야 합니다" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setMsg({ type: "error", text: "새 비밀번호와 확인이 일치하지 않습니다" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/account/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "변경에 실패했습니다");
+      setMsg({ type: "success", text: "비밀번호가 변경되었습니다. 다음 로그인부터 새 비밀번호를 사용하세요." });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (e) {
+      setMsg({ type: "error", text: e instanceof Error ? e.message : "변경에 실패했습니다" });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">설정</h2>
-        <p className="text-gray-600">계정 정보를 확인하세요</p>
+        <p className="text-gray-600">계정 정보를 확인하고 비밀번호를 변경할 수 있어요</p>
       </div>
 
       <Card>
@@ -86,28 +114,35 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>AI 분류 상태</CardTitle>
-          <CardDescription>교사가 설정한 AI를 사용합니다</CardDescription>
+          <CardTitle>비밀번호 변경</CardTitle>
+          <CardDescription>현재 비밀번호를 확인한 뒤 새 비밀번호로 바꿔요</CardDescription>
         </CardHeader>
-        <CardContent>
-          {aiConfigured === null && (
-            <p className="text-sm text-gray-500">확인 중...</p>
-          )}
-          {aiConfigured === true && (
-            <div className="p-3 rounded-lg bg-green-50 border border-green-200">
-              <p className="text-sm font-medium text-green-800">AI 분류가 활성화됐습니다</p>
-              {aiModel && (
-                <p className="text-xs text-green-600 mt-0.5">사용 모델: {aiModel}</p>
-              )}
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="cur">현재 비밀번호</Label>
+            <Input id="cur" type="password" value={currentPassword} autoComplete="current-password"
+              onChange={(e) => setCurrentPassword(e.target.value)} placeholder="현재 비밀번호" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="new">새 비밀번호</Label>
+              <Input id="new" type="password" value={newPassword} autoComplete="new-password"
+                onChange={(e) => setNewPassword(e.target.value)} placeholder="6자 이상" />
             </div>
-          )}
-          {aiConfigured === false && (
-            <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
-              <p className="text-sm text-yellow-800">
-                교사가 AI 설정을 아직 등록하지 않았습니다. AI 분류 대신 키워드 기반 분류가 사용됩니다.
-              </p>
+            <div className="space-y-2">
+              <Label htmlFor="confirm">새 비밀번호 확인</Label>
+              <Input id="confirm" type="password" value={confirmPassword} autoComplete="new-password"
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleChangePassword(); }}
+                placeholder="새 비밀번호 다시 입력" />
             </div>
+          </div>
+          {msg && (
+            <p className={`text-sm ${msg.type === "success" ? "text-green-600" : "text-red-600"}`}>{msg.text}</p>
           )}
+          <Button onClick={handleChangePassword} disabled={saving} className="font-semibold">
+            {saving ? "변경 중..." : "비밀번호 변경"}
+          </Button>
         </CardContent>
       </Card>
     </div>
