@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AI_BONUS_TYPES, BonusKey, GAME_LABEL, BASE_POINTS } from "@/lib/points-policy";
+import { AI_BONUS_TYPES, GAME_LABEL, BASE_POINTS, pointBonusLabel } from "@/lib/points-policy";
 import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -33,19 +33,7 @@ function relativeTime(iso: string): string {
   return `${d}일 전`;
 }
 
-function bonusLabel(bonusType: string): { label: string; emoji: string } {
-  if (bonusType in AI_BONUS_TYPES) {
-    const def = AI_BONUS_TYPES[bonusType as BonusKey];
-    return { label: def.label, emoji: def.emoji };
-  }
-  if (bonusType === "QUESTION_WRITE") return { label: "수업세션 질문 작성", emoji: "✏️" };
-  if (bonusType === "COMMENT_WRITE") return { label: "친구 질문에 답변 작성", emoji: "💬" };
-  if (bonusType === "PARTICIPATION") return { label: "게임 참여", emoji: "✋" };
-  if (bonusType === "VALID_QUESTIONS") return { label: "좋은 질문", emoji: "❓" };
-  if (bonusType === "COMPLETION") return { label: "게임 완료", emoji: "✅" };
-  if (bonusType === "WINNER") return { label: "우승", emoji: "👑" };
-  return { label: "포인트 획득", emoji: "🎯" };
-}
+const bonusLabel = pointBonusLabel;
 
 export default function PointsCard() {
   const [totalPoints, setTotalPoints] = useState(0);

@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { buildTeacherClassLabel } from "@/lib/teacher";
-import { AI_BONUS_TYPES, BonusKey, GAME_LABEL } from "@/lib/points-policy";
+import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
 
 /* ─── 타입 ─── */
 interface Student {
@@ -204,20 +204,6 @@ function StudentDetailDialog({
     } catch {} finally { setSaving(false); }
   }
 
-  function bonusLabel(bonusType: string): { label: string; emoji: string } {
-    if (bonusType in AI_BONUS_TYPES) {
-      const def = AI_BONUS_TYPES[bonusType as BonusKey];
-      return { label: def.label, emoji: def.emoji };
-    }
-    if (bonusType === "PARTICIPATION") return { label: "참여", emoji: "✋" };
-    if (bonusType === "VALID_QUESTIONS") return { label: "유효 질문", emoji: "❓" };
-    if (bonusType === "COMPLETION") return { label: "완료", emoji: "✅" };
-    if (bonusType === "WINNER") return { label: "우승", emoji: "👑" };
-    if (bonusType === "TEACHER_GRANT") return { label: "교사 지급", emoji: "🎁" };
-    if (bonusType === "TEACHER_REVOKE") return { label: "교사 회수", emoji: "↩️" };
-    return { label: bonusType, emoji: "🎯" };
-  }
-
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -319,14 +305,17 @@ function StudentDetailDialog({
                 {stats.recentPoints.length === 0 ? (
                   <p className="text-xs text-gray-400">없음</p>
                 ) : stats.recentPoints.map((p) => {
-                  const b = bonusLabel(p.bonusType);
+                  const b = pointBonusLabel(p.bonusType);
+                  const game = GAME_LABEL[p.gameId];
+                  const showReason = p.reason && p.reason !== b.label;
                   return (
                     <div key={p.id} className="text-xs flex items-center gap-1 text-gray-700">
-                      <span>{b.emoji}</span>
-                      <span className="truncate flex-1">
-                        {b.label} · {GAME_LABEL[p.gameId] ?? p.gameId}
-                      </span>
-                      <span className={`font-bold ${p.points >= 0 ? "text-indigo-600" : "text-red-500"}`}>
+                      <span className="shrink-0">{b.emoji}</span>
+                      <span className="font-medium shrink-0">{b.label}</span>
+                      {game && <span className="text-gray-400 shrink-0">· {game}</span>}
+                      {showReason && <span className="text-gray-400 truncate flex-1">· {p.reason}</span>}
+                      {!showReason && <span className="flex-1" />}
+                      <span className={`font-bold shrink-0 ${p.points >= 0 ? "text-indigo-600" : "text-red-500"}`}>
                         {p.points > 0 ? `+${p.points}` : p.points}
                       </span>
                     </div>

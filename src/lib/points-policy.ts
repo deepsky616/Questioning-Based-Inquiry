@@ -71,6 +71,25 @@ export const GAME_LABEL: Record<string, string> = {
   "mystery-box": "미스터리 박스",
 };
 
+// ── 포인트 이력 표시용 한글 라벨 (학생 대시보드·교사 학생관리 공용) ──
+export function pointBonusLabel(bonusType: string): { label: string; emoji: string } {
+  if (bonusType in AI_BONUS_TYPES) {
+    const def = AI_BONUS_TYPES[bonusType as BonusKey];
+    return { label: def.label, emoji: def.emoji };
+  }
+  switch (bonusType) {
+    case "QUESTION_WRITE": return { label: "수업세션 질문 작성", emoji: "✏️" };
+    case "COMMENT_WRITE": return { label: "친구 질문에 답변 작성", emoji: "💬" };
+    case "PARTICIPATION": return { label: "게임 참여", emoji: "✋" };
+    case "VALID_QUESTIONS": return { label: "좋은 질문", emoji: "❓" };
+    case "COMPLETION": return { label: "게임 완료", emoji: "✅" };
+    case "WINNER": return { label: "우승", emoji: "👑" };
+    case "TEACHER_GRANT": return { label: "교사 지급", emoji: "🎁" };
+    case "TEACHER_REVOKE": return { label: "교사 회수", emoji: "↩️" };
+    default: return { label: "포인트 획득", emoji: "🎯" };
+  }
+}
+
 // ── 유효 질문 판정 (서버에서 재검증) ─────────────────────
 export function isValidQuestionForm(text: string): boolean {
   const t = text.trim();
