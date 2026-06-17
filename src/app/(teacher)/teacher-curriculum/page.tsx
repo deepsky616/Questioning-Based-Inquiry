@@ -503,7 +503,7 @@ export default function CurriculumPage() {
   const handleSelectSavedDesign = (design: SavedInquiryDesign) => {
     setSelectedSavedId((prev) => (prev === design.id ? null : design.id));
     setCreatedSessionMessage("");
-    setSessionTopic(design.title);
+    setSessionTopic("");
     if (design.sessionDate) setSessionDate(design.sessionDate);
     setSelectedSavedQuestionKeys(new Set(design.inquiryQuestions.map(getQuestionKey)));
   };
