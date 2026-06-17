@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
+import { validatePasswordPolicy } from "@/lib/password-policy";
 import {
   Select,
   SelectContent,
@@ -49,7 +50,7 @@ export default function TeacherSettingsPage() {
   const [bulkSchool, setBulkSchool] = useState("");
   const [bulkGrade, setBulkGrade] = useState("");
   const [bulkClass, setBulkClass] = useState("");
-  const [bulkPassword, setBulkPassword] = useState("0000");
+  const [bulkPassword, setBulkPassword] = useState("");
   const [bulkText, setBulkText] = useState("");
   const [isBulkSaving, setIsBulkSaving] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -187,6 +188,11 @@ export default function TeacherSettingsPage() {
   const handleBulkRegister = async () => {
     if (!bulkSchool || !bulkGrade || !bulkClass) {
       setBulkMessage({ type: "error", text: "학교, 학년, 반을 입력해 주세요" });
+      return;
+    }
+    const passwordError = validatePasswordPolicy(bulkPassword);
+    if (passwordError) {
+      setBulkMessage({ type: "error", text: `기본 비밀번호: ${passwordError}` });
       return;
     }
     const students = parseBulkText();
@@ -368,11 +374,15 @@ export default function TeacherSettingsPage() {
             <Label htmlFor="bulkPassword">기본 비밀번호</Label>
             <Input
               id="bulkPassword"
-              placeholder="0000"
+              placeholder="예: Hanbit2026!"
               value={bulkPassword}
               onChange={(e) => setBulkPassword(e.target.value)}
             />
-            <p className="text-xs text-gray-500">학생들이 처음 로그인할 때 사용할 비밀번호입니다</p>
+            <div className="rounded-md border bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground space-y-0.5">
+              <p>학생들이 처음 로그인할 때 사용할 비밀번호예요. 비밀번호 규칙을 따라야 합니다.</p>
+              <p>숫자 + 영문 대/소문자 + 특수문자, 3가지를 조합하여 8~16자 (사용 가능 특수문자: <span className="font-mono">! @ # $ % ^ &amp; * ( ) _ +</span>)</p>
+              <p className="text-amber-600">💡 전원 같은 비밀번호로 만들어지니, 학생들이 로그인 후 [설정]에서 각자 바꾸도록 안내해 주세요.</p>
+            </div>
           </div>
 
           <div className="space-y-2">

@@ -6,12 +6,13 @@ import { auth } from "@/lib/auth";
 import { sendBulkStudentSummaryEmail } from "@/lib/email";
 import { partitionStudents, buildStudentCreateData } from "@/lib/student-registration";
 import { formatErrorBody } from "@/lib/api-error";
+import { validatePasswordPolicy } from "@/lib/password-policy";
 
 const bulkSchema = z.object({
   school: z.string().min(1),
   grade: z.string().min(1),
   className: z.string().min(1),
-  defaultPassword: z.string().min(4),
+  defaultPassword: z.string().min(1),
   students: z
     .array(
       z.object({
@@ -31,6 +32,11 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { school, grade, className, defaultPassword, students } = bulkSchema.parse(body);
+
+    const passwordError = validatePasswordPolicy(defaultPassword);
+    if (passwordError) {
+      return NextResponse.json({ error: `기본 비밀번호: ${passwordError}` }, { status: 400 });
+    }
 
     const classInfo = { school, grade, className };
     const allNumbers = students.map((s) => s.studentNumber);
