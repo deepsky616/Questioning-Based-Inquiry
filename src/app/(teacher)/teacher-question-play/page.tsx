@@ -137,10 +137,10 @@ export default function TeacherQuestionPlayPage() {
     <div className="space-y-6">
       {/* 페이지 헤더 */}
       <div>
-        <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+        <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
           🎮 질문놀이 관리
         </h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <p className="text-muted-foreground text-sm mt-1">
           학생들에게 질문놀이를 공개해보세요
         </p>
       </div>
@@ -182,7 +182,7 @@ export default function TeacherQuestionPlayPage() {
 
       {/* 게임 카드 그리드 */}
       {!isLoading && tab === "all" && (
-        <p className="text-xs text-gray-500 mb-2">↕️ 카드를 드래그해 순서를 바꾸면 학생 질문놀이 목록에도 같은 순서로 표시돼요.</p>
+        <p className="text-xs text-muted-foreground mb-2">↕️ 카드를 드래그해 순서를 바꾸면 학생 질문놀이 목록에도 같은 순서로 표시돼요.</p>
       )}
       {!isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -197,7 +197,7 @@ export default function TeacherQuestionPlayPage() {
                 onDragStart={() => dndEnabled && setDragIndex(index)}
                 onDragOver={(e) => { if (dndEnabled) e.preventDefault(); }}
                 onDrop={() => dndEnabled && handleDropAt(index)}
-                className={`rounded-2xl overflow-hidden border border-gray-100 bg-white shadow-sm hover:shadow-md transition-shadow ${dndEnabled ? "cursor-move" : ""} ${dragIndex === index ? "opacity-50 ring-2 ring-indigo-400" : ""}`}
+                className={`rounded-2xl overflow-hidden border border-border bg-card shadow-sm hover:shadow-md transition-shadow ${dndEnabled ? "cursor-move" : ""} ${dragIndex === index ? "opacity-50 ring-2 ring-indigo-400" : ""}`}
               >
                 {/* 카드 헤더 */}
                 <div
@@ -229,14 +229,14 @@ export default function TeacherQuestionPlayPage() {
 
                 {/* 카드 바디 */}
                 <div className="p-4">
-                  <p className="text-gray-500 text-sm mb-3 line-clamp-2 leading-relaxed">
+                  <p className="text-muted-foreground text-sm mb-3 line-clamp-2 leading-relaxed">
                     {game.description}
                   </p>
                   <div className="flex gap-2 mb-3">
-                    <span className="text-xs bg-gray-50 border border-gray-100 rounded-full px-2.5 py-0.5 text-gray-500">
+                    <span className="text-xs bg-muted border border-border rounded-full px-2.5 py-0.5 text-muted-foreground">
                       👥 {game.playerCount}
                     </span>
-                    <span className="text-xs bg-gray-50 border border-gray-100 rounded-full px-2.5 py-0.5 text-gray-500">
+                    <span className="text-xs bg-muted border border-border rounded-full px-2.5 py-0.5 text-muted-foreground">
                       ⏱ {game.duration}
                     </span>
                   </div>
@@ -246,11 +246,11 @@ export default function TeacherQuestionPlayPage() {
                     const st = statsByGame[game.id];
                     const rate = st && st.plays > 0 ? Math.round((st.completions / st.plays) * 100) : 0;
                     return (
-                      <div className="mb-3 rounded-xl bg-indigo-50/60 px-3 py-2 text-xs text-indigo-900">
+                      <div className="mb-3 rounded-xl bg-indigo-50/60 px-3 py-2 text-xs text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
                         {st && st.plays > 0 ? (
                           <span>참여 <b>{st.participants}</b>명 · 플레이 <b>{st.plays}</b>회 · 완료율 <b>{rate}%</b></span>
                         ) : (
-                          <span className="text-gray-400">아직 참여 기록이 없어요</span>
+                          <span className="text-gray-400 dark:text-gray-500">아직 참여 기록이 없어요</span>
                         )}
                       </div>
                     );
@@ -309,20 +309,20 @@ export default function TeacherQuestionPlayPage() {
                   </DialogTitle>
                 </DialogHeader>
                 {!st || st.students.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-gray-400">아직 참여한 학생이 없어요</p>
+                  <p className="py-8 text-center text-sm text-muted-foreground">아직 참여한 학생이 없어요</p>
                 ) : (
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-gray-100 px-2.5 py-1">참여 {st.participants}명</span>
-                      <span className="rounded-full bg-gray-100 px-2.5 py-1">플레이 {st.plays}회</span>
-                      <span className="rounded-full bg-gray-100 px-2.5 py-1">완료율 {rate}%</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">참여 {st.participants}명</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">플레이 {st.plays}회</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">완료율 {rate}%</span>
                       {st.lastPlayedAt && (
-                        <span className="rounded-full bg-gray-100 px-2.5 py-1">최근 {new Date(st.lastPlayedAt).toLocaleDateString("ko-KR")}</span>
+                        <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">최근 {new Date(st.lastPlayedAt).toLocaleDateString("ko-KR")}</span>
                       )}
                     </div>
-                    <div className="max-h-72 overflow-y-auto rounded-lg border">
+                    <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-gray-50 text-xs text-gray-500">
+                        <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
                           <tr>
                             <th className="px-3 py-2 text-left">학생</th>
                             <th className="px-3 py-2 text-right">플레이</th>
@@ -330,16 +330,16 @@ export default function TeacherQuestionPlayPage() {
                             <th className="px-3 py-2 text-right">포인트</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y divide-border">
                           {st.students.map((s) => (
                             <tr key={s.id}>
                               <td className="px-3 py-2">
-                                {s.studentNumber ? <span className="text-gray-400 mr-1">{s.studentNumber}.</span> : null}
-                                <span className="font-medium text-gray-800">{s.name}</span>
+                                {s.studentNumber ? <span className="text-muted-foreground mr-1">{s.studentNumber}.</span> : null}
+                                <span className="font-medium text-foreground">{s.name}</span>
                               </td>
-                              <td className="px-3 py-2 text-right font-semibold text-indigo-600">{s.plays}</td>
-                              <td className="px-3 py-2 text-right text-emerald-600">{s.completions}</td>
-                              <td className="px-3 py-2 text-right font-bold text-rose-500">{s.points}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-indigo-600 dark:text-indigo-400">{s.plays}</td>
+                              <td className="px-3 py-2 text-right text-emerald-600 dark:text-emerald-400">{s.completions}</td>
+                              <td className="px-3 py-2 text-right font-bold text-rose-500 dark:text-rose-400">{s.points}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -372,17 +372,17 @@ export default function TeacherQuestionPlayPage() {
                   return (
                     <button
                       key={type}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left"
+                      className="w-full flex items-center gap-3 p-3 rounded-xl border-2 border-border transition-all text-left hover:bg-muted/50"
                       style={{
-                        borderColor: selected ? info.color : "#e5e7eb",
-                        background: selected ? `${info.color}10` : "white",
+                        borderColor: selected ? info.color : undefined,
+                        background: selected ? `${info.color}1a` : undefined,
                       }}
                       onClick={() => setEditVis({ type })}
                     >
                       <span className="text-2xl">{info.emoji}</span>
                       <div>
-                        <p className="font-bold text-gray-800 text-sm">{info.label}</p>
-                        <p className="text-gray-400 text-xs">
+                        <p className="font-bold text-foreground text-sm">{info.label}</p>
+                        <p className="text-muted-foreground text-xs">
                           {type === "all" && "모든 학생이 볼 수 있어요"}
                           {type === "classes" && "특정 학급 학생만 볼 수 있어요"}
                           {type === "students" && "특정 학생만 볼 수 있어요"}
@@ -397,7 +397,7 @@ export default function TeacherQuestionPlayPage() {
               {/* 학급 선택 */}
               {editVis.type === "classes" && teacherClasses.length > 0 && (
                 <div className="mt-4">
-                  <Label className="text-sm font-bold text-gray-700 mb-2 block">
+                  <Label className="text-sm font-bold text-foreground mb-2 block">
                     공개할 학급 선택
                   </Label>
                   <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
@@ -407,7 +407,7 @@ export default function TeacherQuestionPlayPage() {
                       return (
                         <label
                           key={key}
-                          className="flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer hover:bg-gray-50 text-sm"
+                          className="flex items-center gap-2 p-2.5 rounded-lg border border-border cursor-pointer hover:bg-muted text-sm text-foreground"
                         >
                           <input
                             type="checkbox"
@@ -434,7 +434,7 @@ export default function TeacherQuestionPlayPage() {
               {/* 학생 선택 */}
               {editVis.type === "students" && students.length > 0 && (
                 <div className="mt-4">
-                  <Label className="text-sm font-bold text-gray-700 mb-2 block">
+                  <Label className="text-sm font-bold text-foreground mb-2 block">
                     공개할 학생 선택
                   </Label>
                   <div className="max-h-48 overflow-y-auto space-y-1">
@@ -443,7 +443,7 @@ export default function TeacherQuestionPlayPage() {
                       return (
                         <label
                           key={s.id}
-                          className="flex items-center gap-2 p-2 rounded-lg border cursor-pointer hover:bg-gray-50 text-sm"
+                          className="flex items-center gap-2 p-2 rounded-lg border border-border cursor-pointer hover:bg-muted text-sm text-foreground"
                         >
                           <input
                             type="checkbox"
@@ -460,7 +460,7 @@ export default function TeacherQuestionPlayPage() {
                             className="accent-purple-500"
                           />
                           <span className="font-medium">{s.name}</span>
-                          <span className="text-gray-400 text-xs ml-auto">
+                          <span className="text-muted-foreground text-xs ml-auto">
                             {s.grade}학년 {s.className}반
                           </span>
                         </label>
