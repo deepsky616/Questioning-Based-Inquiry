@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { sendTeacherWelcomeEmail } from "@/lib/email";
+import { validatePasswordPolicy } from "@/lib/password-policy";
 
 const studentSchema = z.object({
   role: z.literal("STUDENT"),
@@ -12,7 +13,7 @@ const studentSchema = z.object({
   grade: z.string().min(1),
   className: z.string().min(1),
   studentNumber: z.string().min(1),
-  password: z.string().min(4),
+  password: z.string().min(1),
 });
 
 const teacherSchema = z.object({
@@ -23,7 +24,7 @@ const teacherSchema = z.object({
   teacherClasses: z.array(
     z.object({ grade: z.string().min(1), className: z.string().min(1) })
   ).min(1),
-  password: z.string().min(6),
+  password: z.string().min(1),
 });
 
 const registerSchema = z.discriminatedUnion("role", [studentSchema, teacherSchema]);
@@ -32,6 +33,9 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const data = registerSchema.parse(body);
+
+    const policyError = validatePasswordPolicy(data.password);
+    if (policyError) return NextResponse.json({ error: policyError }, { status: 400 });
 
     if (data.role === "STUDENT") {
       const existingStudent = await prisma.user.findFirst({

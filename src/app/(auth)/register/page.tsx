@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { validateTeacherClasses, buildTeacherClassLabel } from "@/lib/teacher";
+import { validatePasswordPolicy } from "@/lib/password-policy";
 
 function RegisterContent() {
   const router = useRouter();
@@ -56,8 +57,9 @@ function RegisterContent() {
       const classError = validateTeacherClasses(teacherClasses);
       if (classError) { setError(classError); return; }
     }
-    if (password.length < (role === "TEACHER" ? 6 : 4)) {
-      setError(role === "TEACHER" ? "비밀번호는 6자 이상이어야 합니다" : "비밀번호는 4자 이상이어야 합니다");
+    const passwordError = validatePasswordPolicy(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     if (password !== confirmPassword) {
@@ -211,12 +213,18 @@ function RegisterContent() {
 
             <div className="space-y-2">
               <Label htmlFor="password">비밀번호</Label>
-              <Input id="password" name="password" type="password" placeholder={role === "TEACHER" ? "6자 이상" : "4자 이상"} value={form.password} onChange={handleChange} />
+              <Input id="password" name="password" type="password" placeholder="8~16자, 숫자+영문+특수문자" value={form.password} onChange={handleChange} />
+              <div className="rounded-md border bg-muted/40 p-2.5 text-[11px] leading-5 text-muted-foreground space-y-0.5">
+                <p>숫자 + 영문 대/소문자 + 특수문자, 3가지를 조합하여 8~16자로 입력해주세요.</p>
+                <p>· 사용 가능한 특수문자: <span className="font-mono">! @ # $ % ^ &amp; * ( ) _ +</span></p>
+                <p>· 예시: <span className="font-mono">edunet0079!</span>, <span className="font-mono">@1544EDUNET</span></p>
+                <p className="text-amber-600">⚠ 생년월일·전화번호 등 개인정보, 연속·반복된 문자는 피해주세요.</p>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">비밀번호 확인</Label>
-              <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••" value={form.confirmPassword} onChange={handleChange} />
+              <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="비밀번호 다시 입력" value={form.confirmPassword} onChange={handleChange} />
             </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
