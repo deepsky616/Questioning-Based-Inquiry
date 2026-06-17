@@ -20,6 +20,8 @@ const saveSchema = z.object({
   curriculumAreaId: z.string().optional(),
   subject: z.string(),
   gradeRange: z.string(),
+  grade: z.string().optional(),
+  sessionDate: z.string().optional(),
   area: z.string(),
   coreIdea: z.string(),
   selectedKeywords: z.array(z.string()),
@@ -39,12 +41,14 @@ export async function GET(req: Request) {
       title: string;
       subject: string;
       grade_range: string;
+      grade: string | null;
+      session_date: string | null;
       area: string;
       inquiry_questions: unknown;
       created_at: Date;
     }[]
   >`
-    SELECT id, title, subject, grade_range, area, inquiry_questions, created_at
+    SELECT id, title, subject, grade_range, grade, session_date, area, inquiry_questions, created_at
     FROM unit_designs
     WHERE teacher_id = ${teacherId}
     ORDER BY created_at DESC
@@ -53,7 +57,7 @@ export async function GET(req: Request) {
   return NextResponse.json(
     designs.map((d) => ({
       id: d.id, title: d.title, subject: d.subject,
-      gradeRange: d.grade_range, area: d.area,
+      gradeRange: d.grade_range, grade: d.grade, sessionDate: d.session_date, area: d.area,
       inquiryQuestions: Array.isArray(d.inquiry_questions) ? d.inquiry_questions : [],
       createdAt: d.created_at,
     }))
@@ -76,11 +80,11 @@ export async function POST(req: Request) {
       `INSERT INTO unit_designs
          (id, teacher_id, curriculum_area_id, title, subject, grade_range, area,
           core_idea, selected_keywords, core_sentences, essential_questions, inquiry_questions,
-          created_at, updated_at)
+          grade, session_date, created_at, updated_at)
        VALUES
          (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
           $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb,
-          now(), now())
+          $12, $13, now(), now())
        RETURNING id`,
       teacherId,
       data.curriculumAreaId ?? null,
@@ -92,7 +96,9 @@ export async function POST(req: Request) {
       JSON.stringify(data.selectedKeywords),
       JSON.stringify(data.coreSentences),
       JSON.stringify(data.essentialQuestions),
-      JSON.stringify(data.inquiryQuestions)
+      JSON.stringify(data.inquiryQuestions),
+      data.grade ?? null,
+      data.sessionDate ?? null
     );
 
     const designId = inserted[0]?.id ?? null;
@@ -106,6 +112,8 @@ export async function POST(req: Request) {
             title: data.title,
             subject: data.subject,
             gradeRange: data.gradeRange,
+            grade: data.grade ?? null,
+            sessionDate: data.sessionDate ?? null,
             area: data.area,
             inquiryQuestions: data.inquiryQuestions,
           }

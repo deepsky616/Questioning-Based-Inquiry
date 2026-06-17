@@ -67,6 +67,8 @@ interface SavedInquiryDesign {
   title: string;
   subject: string;
   gradeRange: string;
+  grade?: string | null;
+  sessionDate?: string | null;
   area: string;
   inquiryQuestions: InquiryQuestion[];
   createdAt?: string;
@@ -141,8 +143,10 @@ export default function CurriculumPage() {
   const [step, setStep] = useState<Step>(1);
   const [isSaving, setIsSaving] = useState(false);
   const [saveTitle, setSaveTitle] = useState("");
+  const [saveGrade, setSaveGrade] = useState("");
+  const [saveDate, setSaveDate] = useState("");
   const [savedList, setSavedList] = useState<SavedInquiryDesign[]>([]);
-  const [showSaved, setShowSaved] = useState(false);
+  const [mainTab, setMainTab] = useState<"create" | "saved">("create");
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
   const [sessionDate, setSessionDate] = useState("");
   const [sessionTopic, setSessionTopic] = useState("");
@@ -433,7 +437,7 @@ export default function CurriculumPage() {
   };
 
   const handleSave = async () => {
-    if (!curriculumData || !saveTitle.trim() || selectedInquiryQuestions.length === 0) return;
+    if (!curriculumData || !saveTitle.trim() || !saveGrade || !saveDate || selectedInquiryQuestions.length === 0) return;
     setIsSaving(true);
     setCreatedSessionMessage("");
     try {
@@ -445,6 +449,8 @@ export default function CurriculumPage() {
           curriculumAreaId: curriculumData.id,
           subject: curriculumData.subject,
           gradeRange: curriculumData.gradeRange,
+          grade: saveGrade,
+          sessionDate: saveDate,
           area: curriculumData.area,
           coreIdea: curriculumData.coreIdea,
           selectedKeywords,
@@ -457,13 +463,15 @@ export default function CurriculumPage() {
         const data = await res.json();
         const savedDesign: SavedInquiryDesign | null = data.design ?? null;
         setSaveTitle("");
+        setSaveGrade("");
+        setSaveDate("");
         fetchSaved();
         if (savedDesign?.id) {
           setSavedList((prev) => [
             { ...savedDesign, createdAt: new Date().toISOString() },
             ...prev.filter((design) => design.id !== savedDesign.id),
           ]);
-          setShowSaved(true);
+          setMainTab("saved");
           setSelectedSavedId(savedDesign.id);
           setSelectedSavedQuestionKeys(new Set(savedDesign.inquiryQuestions.map(getQuestionKey)));
         }
@@ -490,6 +498,7 @@ export default function CurriculumPage() {
     setSelectedSavedId((prev) => (prev === design.id ? null : design.id));
     setCreatedSessionMessage("");
     setSessionTopic(design.title);
+    if (design.sessionDate) setSessionDate(design.sessionDate);
     setSelectedSavedQuestionKeys(new Set(design.inquiryQuestions.map(getQuestionKey)));
   };
 
@@ -543,18 +552,31 @@ export default function CurriculumPage() {
   // ── 렌더 ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">탐구 질문 도우미</h2>
-          <p className="text-gray-600">교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => setShowSaved(!showSaved)}>
-          저장된 탐구 질문 {savedList.length > 0 ? `(${savedList.length})` : ""}
-        </Button>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">탐구 질문 도우미</h2>
+        <p className="text-gray-600">교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
+      </div>
+
+      {/* 탭: 탐구질문 만들기 / 저장된 탐구질문 */}
+      <div className="flex rounded-md border overflow-hidden w-fit">
+        <button
+          type="button"
+          onClick={() => setMainTab("create")}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${mainTab === "create" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+        >
+          ✏️ 탐구질문 만들기
+        </button>
+        <button
+          type="button"
+          onClick={() => setMainTab("saved")}
+          className={`px-4 py-2 text-sm font-medium border-l transition-colors ${mainTab === "saved" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+        >
+          📁 저장된 탐구질문{savedList.length > 0 ? ` (${savedList.length})` : ""}
+        </button>
       </div>
 
       {/* 저장 목록 */}
-      {showSaved && (
+      {mainTab === "saved" && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">저장된 탐구 질문</CardTitle>
@@ -575,7 +597,7 @@ export default function CurriculumPage() {
                       >
                         <span className="block truncate font-medium text-sm text-gray-900">{d.title}</span>
                         <span className="text-xs text-gray-400">
-                          {d.subject} · {d.gradeRange}학년군 · {d.area} · 탐구질문 {d.inquiryQuestions.length}개
+                          {d.sessionDate ? `${d.sessionDate} · ` : ""}{d.subject} · {d.grade ? `${d.grade}학년` : `${d.gradeRange}학년군`} · {d.area} · 탐구질문 {d.inquiryQuestions.length}개
                         </span>
                       </button>
                       <button onClick={() => handleDelete(d.id)} className="text-xs text-red-400 hover:text-red-600">삭제</button>
@@ -688,7 +710,9 @@ export default function CurriculumPage() {
         </Card>
       )}
 
-      {/* 단계 진행 표시 */}
+      {/* 탐구질문 만들기 (단계 진행) */}
+      {mainTab === "create" && (
+      <>
       <div className="flex gap-1">
         {([1, 2, 3, 4, 5] as Step[]).map((s) => (
           <div
@@ -1394,25 +1418,51 @@ export default function CurriculumPage() {
               </div>
             ))}
 
-            {/* 저장 */}
+            {/* 저장 — 날짜·학년·교과·주제 결정 후 저장 */}
             <div className="border-t pt-4 space-y-3">
-              <div className="flex gap-2 items-center">
-                <Input
-                  placeholder="탐구 질문 이름 입력 (예: 5학년 과학 생명 탐구)"
-                  value={saveTitle}
-                  onChange={(e) => setSaveTitle(e.target.value)}
-                />
-                <Button
-                  onClick={handleSave}
-                  disabled={isSaving || !saveTitle.trim() || selectedInquiryQuestions.length === 0}
-                  className="shrink-0"
-                >
-                  {isSaving ? "저장 중..." : "저장"}
-                </Button>
+              <p className="text-sm font-semibold text-gray-800">저장 정보</p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-1">
+                  <Label>날짜</Label>
+                  <DatePicker value={saveDate} onChange={setSaveDate} placeholder="수업 날짜 선택" />
+                </div>
+                <div className="space-y-1">
+                  <Label>학년</Label>
+                  <select
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    value={saveGrade}
+                    onChange={(e) => setSaveGrade(e.target.value)}
+                  >
+                    <option value="">학년 선택</option>
+                    {(curriculumData?.gradeRange.split("-") ?? []).map((g) => (
+                      <option key={g} value={g}>{g}학년</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label>교과</Label>
+                  <Input value={curriculumData?.subject ?? ""} disabled className="bg-gray-100" />
+                </div>
+                <div className="space-y-1">
+                  <Label>주제</Label>
+                  <Input
+                    placeholder="예: 생명 탐구"
+                    value={saveTitle}
+                    onChange={(e) => setSaveTitle(e.target.value)}
+                  />
+                </div>
               </div>
+              <Button
+                onClick={handleSave}
+                disabled={isSaving || !saveTitle.trim() || !saveGrade || !saveDate || selectedInquiryQuestions.length === 0}
+              >
+                {isSaving ? "저장 중..." : "저장"}
+              </Button>
             </div>
           </CardContent>
         </Card>
+      )}
+      </>
       )}
     </div>
   );

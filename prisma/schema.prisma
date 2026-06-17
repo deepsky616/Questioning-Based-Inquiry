@@ -210,6 +210,8 @@ model UnitDesign {
   title              String          @map("title")
   subject            String          @map("subject")
   gradeRange         String          @map("grade_range")
+  grade              String?         @map("grade")          // 개별 학년(저장 시 선택)
+  sessionDate        String?         @map("session_date")   // 수업 예정 날짜(저장 시 선택)
   area               String          @map("area")
   coreIdea           String          @db.Text @map("core_idea")
   selectedKeywords   Json            @map("selected_keywords")   // string[]
