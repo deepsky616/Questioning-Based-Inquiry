@@ -254,8 +254,8 @@ export default function TeacherSessionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">수업 세션</h2>
-        <p className="text-gray-600">수업 세션을 만들고 관리하세요. 학생들이 질문할 때 세션을 선택할 수 있습니다.</p>
+        <h2 className="text-2xl font-bold text-foreground">수업 세션</h2>
+        <p className="text-muted-foreground">수업 세션을 만들고 관리하세요. 학생들이 질문할 때 세션을 선택할 수 있습니다.</p>
       </div>
 
       {/* 새 세션 만들기 */}
@@ -567,31 +567,31 @@ function SessionRow({
   };
 
   return (
-    <div className={session.isActive ? "bg-white" : "bg-gray-50"}>
-      <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "hover:bg-gray-50" : "hover:bg-gray-100"}`}>
+    <div className={session.isActive ? "bg-card" : "bg-muted/40"}>
+      <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "hover:bg-muted/50" : "hover:bg-muted"}`}>
         <div className="flex items-center gap-3 min-w-0">
-          <span className={`shrink-0 w-2 h-2 rounded-full ${session.isActive ? "bg-green-500" : "bg-gray-300"}`} />
+          <span className={`shrink-0 w-2 h-2 rounded-full ${session.isActive ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} />
           <div className="min-w-0">
-            <p className={`text-sm font-medium truncate ${session.isActive ? "text-gray-900" : "text-gray-400"}`}>
+            <p className={`text-sm font-medium truncate ${session.isActive ? "text-foreground" : "text-muted-foreground"}`}>
               {buildSessionLabel(session.date, session.subject, session.topic)}
             </p>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {!session.isActive && (
-                <span className="text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded">학생 비활성</span>
+                <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">학생 비활성</span>
               )}
               {!session.defaultQuestionPublic && (
-                <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded">질문 비공개</span>
+                <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded dark:bg-orange-950/40 dark:text-orange-300">질문 비공개</span>
               )}
               {!session.likesVisibleToPeers && (
-                <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded">좋아요 비공개</span>
+                <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded dark:bg-amber-950/40 dark:text-amber-300">좋아요 비공개</span>
               )}
               {!session.commentsVisibleToPeers && (
-                <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">댓글 서로 비공개</span>
+                <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded dark:bg-rose-950/40 dark:text-rose-300">댓글 서로 비공개</span>
               )}
               {isDesignSession && (
                 <span className="text-xs font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">🧩 탐구질문 수업</span>
               )}
-              <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+              <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded dark:bg-slate-800 dark:text-slate-300">
                 {buildTargetLabel({
                   targetType: session.targetType,
                   targetGrade: session.targetGrade,
@@ -619,7 +619,7 @@ function SessionRow({
       </div>
 
       {editing && (
-        <div className="border-t bg-indigo-50/40 px-4 py-3">
+        <div className="border-t bg-indigo-50/40 dark:bg-indigo-950/30 px-4 py-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
               <Label className="text-xs">날짜</Label>
