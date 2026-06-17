@@ -28,6 +28,8 @@ interface Student {
   grade: string;
   className: string;
 }
+interface StudentPlay { id: string; name: string; studentNumber: string | null; plays: number; completions: number; points: number }
+interface GameStat { participants: number; plays: number; completions: number; lastPlayedAt: string | null; students: StudentPlay[] }
 
 const VIS_LABEL: Record<VisType, { label: string; emoji: string; color: string }> = {
   all:      { label: "전체공개", emoji: "🌍", color: "#10b981" },
@@ -45,6 +47,10 @@ export default function TeacherQuestionPlayPage() {
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
 
+  // 참여 통계
+  const [statsByGame, setStatsByGame] = useState<Record<string, GameStat>>({});
+  const [statsDialogGame, setStatsDialogGame] = useState<AnyGame | null>(null);
+
   // 가시성 편집 다이얼로그
   const [visDialogGame, setVisDialogGame] = useState<AnyGame | null>(null);
   const [editVis, setEditVis] = useState<GameVisibility>({ type: "all" });
@@ -55,12 +61,14 @@ export default function TeacherQuestionPlayPage() {
     Promise.all([
       fetch("/api/teacher/question-games").then((r) => r.json()),
       fetch("/api/teacher/students").then((r) => r.json()),
+      fetch("/api/teacher/question-games/stats").then((r) => r.json()),
     ])
-      .then(([gamesData, studentsData]) => {
+      .then(([gamesData, studentsData, statsData]) => {
         setGames(gamesData.games ?? []);
         setVisibilityMap(gamesData.visibilityMap ?? {});
         setTeacherClasses(studentsData.teacherClasses ?? []);
         setStudents(studentsData.students ?? []);
+        setStatsByGame(statsData.byGame ?? {});
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -224,7 +232,7 @@ export default function TeacherQuestionPlayPage() {
                   <p className="text-gray-500 text-sm mb-3 line-clamp-2 leading-relaxed">
                     {game.description}
                   </p>
-                  <div className="flex gap-2 mb-4">
+                  <div className="flex gap-2 mb-3">
                     <span className="text-xs bg-gray-50 border border-gray-100 rounded-full px-2.5 py-0.5 text-gray-500">
                       👥 {game.playerCount}
                     </span>
@@ -233,8 +241,31 @@ export default function TeacherQuestionPlayPage() {
                     </span>
                   </div>
 
+                  {/* 참여 요약 */}
+                  {(() => {
+                    const st = statsByGame[game.id];
+                    const rate = st && st.plays > 0 ? Math.round((st.completions / st.plays) * 100) : 0;
+                    return (
+                      <div className="mb-3 rounded-xl bg-indigo-50/60 px-3 py-2 text-xs text-indigo-900">
+                        {st && st.plays > 0 ? (
+                          <span>참여 <b>{st.participants}</b>명 · 플레이 <b>{st.plays}</b>회 · 완료율 <b>{rate}%</b></span>
+                        ) : (
+                          <span className="text-gray-400">아직 참여 기록이 없어요</span>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* 액션 버튼 */}
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs rounded-xl"
+                      onClick={() => setStatsDialogGame(game)}
+                    >
+                      📊 참여 현황
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -263,6 +294,64 @@ export default function TeacherQuestionPlayPage() {
           })}
         </div>
       )}
+
+      {/* ── 참여 현황 다이얼로그 ── */}
+      <Dialog open={!!statsDialogGame} onOpenChange={(o) => { if (!o) setStatsDialogGame(null); }}>
+        <DialogContent className="max-w-lg">
+          {statsDialogGame && (() => {
+            const st = statsByGame[statsDialogGame.id];
+            const rate = st && st.plays > 0 ? Math.round((st.completions / st.plays) * 100) : 0;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <span>{statsDialogGame.emoji}</span> {statsDialogGame.title} 참여 현황
+                  </DialogTitle>
+                </DialogHeader>
+                {!st || st.students.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-gray-400">아직 참여한 학생이 없어요</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full bg-gray-100 px-2.5 py-1">참여 {st.participants}명</span>
+                      <span className="rounded-full bg-gray-100 px-2.5 py-1">플레이 {st.plays}회</span>
+                      <span className="rounded-full bg-gray-100 px-2.5 py-1">완료율 {rate}%</span>
+                      {st.lastPlayedAt && (
+                        <span className="rounded-full bg-gray-100 px-2.5 py-1">최근 {new Date(st.lastPlayedAt).toLocaleDateString("ko-KR")}</span>
+                      )}
+                    </div>
+                    <div className="max-h-72 overflow-y-auto rounded-lg border">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-gray-50 text-xs text-gray-500">
+                          <tr>
+                            <th className="px-3 py-2 text-left">학생</th>
+                            <th className="px-3 py-2 text-right">플레이</th>
+                            <th className="px-3 py-2 text-right">완료</th>
+                            <th className="px-3 py-2 text-right">포인트</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {st.students.map((s) => (
+                            <tr key={s.id}>
+                              <td className="px-3 py-2">
+                                {s.studentNumber ? <span className="text-gray-400 mr-1">{s.studentNumber}.</span> : null}
+                                <span className="font-medium text-gray-800">{s.name}</span>
+                              </td>
+                              <td className="px-3 py-2 text-right font-semibold text-indigo-600">{s.plays}</td>
+                              <td className="px-3 py-2 text-right text-emerald-600">{s.completions}</td>
+                              <td className="px-3 py-2 text-right font-bold text-rose-500">{s.points}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       {/* ── 가시성 편집 다이얼로그 ── */}
       <Dialog open={!!visDialogGame} onOpenChange={(o) => { if (!o) setVisDialogGame(null); }}>
