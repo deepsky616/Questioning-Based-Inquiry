@@ -203,6 +203,107 @@ export function RankingPanel({
   );
 }
 
+interface ClassRankRow {
+  id: string;
+  studentNumber: string | null;
+  classRank: number;
+  schoolRank: number;
+  allRank: number;
+  isMe: boolean;
+}
+interface ClassRankData {
+  klass: { school: string | null; grade: string; className: string } | null;
+  students: ClassRankRow[];
+  total: number;
+}
+
+/**
+ * 학생 순위 패널 — 같은 학교·학년·반 학생만 출석번호순으로,
+ * 우리반/교내/전체 순위를 숫자로 표시한다(다른 학급 학생은 보이지 않음).
+ */
+export function StudentRankPanel({
+  gradeParam,
+  classNameParam,
+  highlightSelf = false,
+}: {
+  gradeParam?: string;
+  classNameParam?: string;
+  highlightSelf?: boolean;
+}) {
+  const [data, setData] = useState<ClassRankData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const selfRef = useRef<HTMLTableRowElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsLoading(true);
+    const params = new URLSearchParams();
+    if (gradeParam) params.set("grade", gradeParam);
+    if (classNameParam) params.set("className", classNameParam);
+    fetch(`/api/points/class-ranks?${params}`)
+      .then((r) => r.json())
+      .then(setData)
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  }, [gradeParam, classNameParam]);
+
+  useEffect(() => {
+    if (highlightSelf && selfRef.current && containerRef.current) {
+      const c = containerRef.current;
+      const cRect = c.getBoundingClientRect();
+      const rRect = selfRef.current.getBoundingClientRect();
+      c.scrollTop += rRect.top - cRect.top - cRect.height / 2 + rRect.height / 2;
+    }
+  }, [data, highlightSelf]);
+
+  const klassLabel = data?.klass ? `${data.klass.grade}학년 ${data.klass.className}반` : "";
+
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <p className="text-sm font-bold text-foreground">
+        🏆 학생 순위
+        {klassLabel && <span className="text-xs font-normal text-muted-foreground"> · {klassLabel} · 총 {data?.total ?? 0}명</span>}
+      </p>
+      <p className="text-xs text-muted-foreground">출석번호순 · 우리반/교내/전체 순위</p>
+      {isLoading ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">불러오는 중...</div>
+      ) : !data || data.students.length === 0 ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">표시할 순위가 없습니다</div>
+      ) : (
+        <div ref={containerRef} className="max-h-80 overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-card">
+              <tr className="text-xs text-muted-foreground border-b">
+                <th className="w-16 py-1.5 text-center font-medium">번호</th>
+                <th className="py-1.5 text-center font-medium">우리반</th>
+                <th className="py-1.5 text-center font-medium">교내</th>
+                <th className="py-1.5 text-center font-medium">전체</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.students.map((s) => (
+                <tr
+                  key={s.id}
+                  ref={s.isMe ? selfRef : undefined}
+                  className={`border-b last:border-0 ${s.isMe ? "bg-indigo-50 dark:bg-indigo-500/15 ring-1 ring-indigo-400" : ""}`}
+                >
+                  <td className="py-1.5 text-center font-semibold text-foreground">
+                    {s.studentNumber ?? "-"}
+                    {s.isMe && <span className="ml-1 text-xs text-indigo-600">(나)</span>}
+                  </td>
+                  <td className="py-1.5 text-center text-indigo-600 dark:text-indigo-400 font-bold">{s.classRank}</td>
+                  <td className="py-1.5 text-center text-foreground">{s.schoolRank}</td>
+                  <td className="py-1.5 text-center text-foreground">{s.allRank}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** 반 순위 패널 (교내/전체). 평균 포인트 기준. 본인 반(또는 지정 학급) 강조·스크롤. */
 export function ClassRankingPanel({
   gradeParam,

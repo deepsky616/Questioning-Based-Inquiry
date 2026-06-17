@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { StatBar } from "@/components/shared/StatBar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RankingPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
+import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 
 interface TeacherClass {
   grade: string;
@@ -292,10 +292,9 @@ export default function TeacherDashboard() {
               selectedClass !== "all" ? selectedClass.split("|") : [undefined, undefined];
             return (
               <div className="grid gap-4 lg:grid-cols-2">
-                <RankingPanel
+                <StudentRankPanel
                   gradeParam={selGrade}
                   classNameParam={selClassName}
-                  defaultScope={selectedClass !== "all" ? "class" : "school"}
                 />
                 <ClassRankingPanel
                   gradeParam={selGrade}
