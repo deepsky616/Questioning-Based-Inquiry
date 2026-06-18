@@ -283,6 +283,8 @@ export default function TeacherSettingsPage() {
         </CardContent>
       </Card>
 
+      <PasswordChangeCard />
+
       {/* 학생 관리 — 일괄 등록 / 비밀번호 재설정 탭 */}
       <Card>
         <CardHeader>
@@ -431,8 +433,6 @@ export default function TeacherSettingsPage() {
           </Tabs>
         </CardContent>
       </Card>
-
-      <PasswordChangeCard />
 
       <Card>
         <CardHeader>
