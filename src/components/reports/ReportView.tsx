@@ -59,6 +59,16 @@ const RECEIVED: { key: keyof SeriesPoint; label: string; color: string }[] = [
   { key: "likesReceived", label: "받은 좋아요", color: "#f59e0b" },
   { key: "commentsReceived", label: "받은 댓글", color: "#8b5cf6" },
 ];
+// 분류 추세(누적 막대) — 분류1/분류2를 기간별로 쌓는다. 색은 분류 통계 카드와 동일.
+const CLOSURE_TREND: { key: keyof SeriesPoint; label: string; color: string }[] = [
+  { key: "closed", label: "폐쇄형", color: "#3b82f6" },
+  { key: "open", label: "개방형", color: "#10b981" },
+];
+const COGNITIVE_TREND: { key: keyof SeriesPoint; label: string; color: string }[] = [
+  { key: "factual", label: "사실적", color: "#94a3b8" },
+  { key: "conceptual", label: "개념적", color: "#a855f7" },
+  { key: "controversial", label: "논쟁적", color: "#f97316" },
+];
 
 function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -246,6 +256,40 @@ export function ReportView({
             <Bar dataKey="value" name="질문 수" radius={[4, 4, 0, 0]}>
               {classData.map((d, i) => <Cell key={i} fill={d.fill} />)}
             </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* 분류1 추세 (폐쇄형/개방형 누적 막대) */}
+      <div className="rounded-xl border bg-card p-4">
+        <p className="mb-3 text-sm font-bold text-foreground">📊 분류1 추세 ({range === "week" ? "주별" : "월별"}) · 폐쇄형 / 개방형</p>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+            <Tooltip />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            {CLOSURE_TREND.map((m) => (
+              <Bar key={m.key} dataKey={m.key} name={m.label} stackId="closure" fill={m.color} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* 분류2 추세 (사실/개념/논쟁 누적 막대) */}
+      <div className="rounded-xl border bg-card p-4">
+        <p className="mb-3 text-sm font-bold text-foreground">📊 분류2 추세 ({range === "week" ? "주별" : "월별"}) · 사실 / 개념 / 논쟁</p>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+            <Tooltip />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            {COGNITIVE_TREND.map((m) => (
+              <Bar key={m.key} dataKey={m.key} name={m.label} stackId="cognitive" fill={m.color} />
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -10,6 +10,12 @@ export interface SeriesPoint {
   comments: number;
   likesReceived: number;
   commentsReceived: number;
+  // 분류 추세(누적 막대용) — 기간별 질문을 분류1/분류2로 집계
+  closed: number;
+  open: number;
+  factual: number;
+  conceptual: number;
+  controversial: number;
 }
 
 export interface ReportTotals {
@@ -93,6 +99,25 @@ function countInto(buckets: Bucket[], dates: (string | Date)[]): number[] {
   return counts;
 }
 
+/** 기간별로 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 질문 수를 집계한다 */
+function classifyInto(
+  buckets: Bucket[],
+  questions: ActivityInput["questions"],
+): { closed: number[]; open: number[]; factual: number[]; conceptual: number[]; controversial: number[] } {
+  const zero = () => new Array(buckets.length).fill(0);
+  const out = { closed: zero(), open: zero(), factual: zero(), conceptual: zero(), controversial: zero() };
+  for (const q of questions) {
+    const t = new Date(q.createdAt).getTime();
+    const i = buckets.findIndex((b) => t >= b.start && t < b.end);
+    if (i === -1) continue;
+    if (q.closure === "closed" || q.closure === "open") out[q.closure][i]++;
+    if (q.cognitive === "factual" || q.cognitive === "conceptual" || q.cognitive === "controversial") {
+      out[q.cognitive][i]++;
+    }
+  }
+  return out;
+}
+
 function buildSeries(input: ActivityInput, range: ReportRange, count: number, now?: Date): SeriesPoint[] {
   const buckets = buildBuckets(range, count, now);
   const q = countInto(buckets, input.questions.map((x) => x.createdAt));
@@ -100,6 +125,7 @@ function buildSeries(input: ActivityInput, range: ReportRange, count: number, no
   const c = countInto(buckets, input.comments.map((x) => x.createdAt));
   const lr = countInto(buckets, input.likesReceived.map((x) => x.createdAt));
   const cr = countInto(buckets, input.commentsReceived.map((x) => x.createdAt));
+  const cls = classifyInto(buckets, input.questions);
   return buckets.map((b, i) => ({
     key: b.key,
     label: b.label,
@@ -108,6 +134,11 @@ function buildSeries(input: ActivityInput, range: ReportRange, count: number, no
     comments: c[i],
     likesReceived: lr[i],
     commentsReceived: cr[i],
+    closed: cls.closed[i],
+    open: cls.open[i],
+    factual: cls.factual[i],
+    conceptual: cls.conceptual[i],
+    controversial: cls.controversial[i],
   }));
 }
 
