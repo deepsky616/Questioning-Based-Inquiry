@@ -366,9 +366,11 @@ export default function TeacherSessionsPage() {
           등록된 세션이 없습니다. 위에서 새 세션을 추가해 보세요.
         </div>
       ) : (
-        <div className="space-y-4">
-          {/* 세션 목록 조회/정렬 — 필터(왼쪽) · 정렬(오른쪽) */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-card p-3">
+        <Card>
+          <CardHeader className="pb-3 space-y-3">
+            <CardTitle className="text-base">수업 세션 목록</CardTitle>
+            {/* 조회(필터, 왼쪽) · 정렬(오른쪽) */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             {/* 필터 그룹 */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-muted-foreground">조회</span>
@@ -423,23 +425,23 @@ export default function TeacherSessionsPage() {
               </div>
             </div>
           </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {activeSessions.length === 0 && pastSessions.length === 0 && (
+              <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+                조건에 맞는 세션이 없습니다.
+              </div>
+            )}
 
-          {activeSessions.length === 0 && pastSessions.length === 0 && (
-            <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-400">
-              조건에 맞는 세션이 없습니다.
-            </div>
-          )}
-
-          {activeSessions.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
+            {activeSessions.length > 0 && (
+              <section>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
                     오늘·예정 수업
-                    <span className="text-sm font-normal text-gray-500">총 {activeSessions.length}개</span>
-                  </CardTitle>
-                  <div className="hidden sm:flex items-center gap-5 text-xs text-gray-400">
+                    <span className="text-xs font-normal text-muted-foreground">총 {activeSessions.length}개</span>
+                  </h3>
+                  <div className="hidden sm:flex items-center gap-5 text-xs text-muted-foreground">
                     <span className="w-16 text-center">학생 활성화</span>
                     <span className="w-16 text-center">질문 공개</span>
                     <span className="w-16 text-center">좋아요 공개</span>
@@ -447,9 +449,7 @@ export default function TeacherSessionsPage() {
                     <span className="w-24 text-center">관리</span>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y rounded-lg border overflow-hidden">
+                <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
                   {activeSessions.map((s) => (
                     <SessionRow
                       key={s.id}
@@ -463,20 +463,18 @@ export default function TeacherSessionsPage() {
                     />
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </section>
+            )}
 
-          {pastSessions.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />
+            {pastSessions.length > 0 && (
+              <section>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 inline-block" />
                     지난 수업
-                    <span className="text-sm font-normal text-gray-500">총 {pastSessions.length}개</span>
-                  </CardTitle>
-                  <div className="hidden sm:flex items-center gap-5 text-xs text-gray-400">
+                    <span className="text-xs font-normal text-muted-foreground">총 {pastSessions.length}개</span>
+                  </h3>
+                  <div className="hidden sm:flex items-center gap-5 text-xs text-muted-foreground">
                     <span className="w-16 text-center">학생 활성화</span>
                     <span className="w-16 text-center">질문 공개</span>
                     <span className="w-16 text-center">좋아요 공개</span>
@@ -484,9 +482,7 @@ export default function TeacherSessionsPage() {
                     <span className="w-24 text-center">관리</span>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y rounded-lg border overflow-hidden">
+                <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
                   {pastSessions.map((s) => (
                     <SessionRow
                       key={s.id}
@@ -500,10 +496,10 @@ export default function TeacherSessionsPage() {
                     />
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+              </section>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   );
