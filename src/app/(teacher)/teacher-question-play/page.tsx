@@ -28,8 +28,9 @@ interface Student {
   grade: string;
   className: string;
 }
-interface StudentPlay { id: string; name: string; studentNumber: string | null; plays: number; completions: number; points: number }
-interface GameStat { participants: number; plays: number; completions: number; lastPlayedAt: string | null; students: StudentPlay[] }
+interface StudentPlay { id: string; name: string; studentNumber: string | null; plays: number; completions: number; points: number; goodQuestions: number }
+interface StudentLite { id: string; name: string; studentNumber: string | null }
+interface GameStat { participants: number; plays: number; completions: number; goodQuestions: number; lastPlayedAt: string | null; students: StudentPlay[]; nonParticipants: StudentLite[] }
 
 const VIS_LABEL: Record<VisType, { label: string; emoji: string; color: string }> = {
   all:      { label: "전체공개", emoji: "🌍", color: "#10b981" },
@@ -248,7 +249,7 @@ export default function TeacherQuestionPlayPage() {
                     return (
                       <div className="mb-3 rounded-xl bg-indigo-50/60 px-3 py-2 text-xs text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
                         {st && st.plays > 0 ? (
-                          <span>참여 <b>{st.participants}</b>명 · 플레이 <b>{st.plays}</b>회 · 완료율 <b>{rate}%</b></span>
+                          <span>참여 <b>{st.participants}</b>명 · 플레이 <b>{st.plays}</b>회 · 완료율 <b>{rate}%</b> · 좋은질문 <b>{st.goodQuestions}</b>개</span>
                         ) : (
                           <span className="text-gray-400 dark:text-gray-500">아직 참여 기록이 없어요</span>
                         )}
@@ -316,17 +317,19 @@ export default function TeacherQuestionPlayPage() {
                       <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">참여 {st.participants}명</span>
                       <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">플레이 {st.plays}회</span>
                       <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">완료율 {rate}%</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">좋은 질문 {st.goodQuestions}개</span>
                       {st.lastPlayedAt && (
                         <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">최근 {new Date(st.lastPlayedAt).toLocaleDateString("ko-KR")}</span>
                       )}
                     </div>
-                    <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
+                    <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
                           <tr>
                             <th className="px-3 py-2 text-left">학생</th>
                             <th className="px-3 py-2 text-right">플레이</th>
                             <th className="px-3 py-2 text-right">완료</th>
+                            <th className="px-3 py-2 text-right">좋은질문</th>
                             <th className="px-3 py-2 text-right">포인트</th>
                           </tr>
                         </thead>
@@ -339,12 +342,27 @@ export default function TeacherQuestionPlayPage() {
                               </td>
                               <td className="px-3 py-2 text-right font-semibold text-indigo-600 dark:text-indigo-400">{s.plays}</td>
                               <td className="px-3 py-2 text-right text-emerald-600 dark:text-emerald-400">{s.completions}</td>
+                              <td className="px-3 py-2 text-right text-amber-600 dark:text-amber-400">{s.goodQuestions}</td>
                               <td className="px-3 py-2 text-right font-bold text-rose-500 dark:text-rose-400">{s.points}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
+
+                    {/* 미참여 학생 */}
+                    {st.nonParticipants.length > 0 && (
+                      <div className="rounded-lg border border-border p-3">
+                        <p className="text-xs font-semibold text-foreground mb-1.5">아직 참여하지 않은 학생 · {st.nonParticipants.length}명</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {st.nonParticipants.map((s) => (
+                            <span key={s.id} className="text-xs rounded-full bg-muted text-muted-foreground px-2 py-0.5">
+                              {s.studentNumber ? `${s.studentNumber}. ` : ""}{s.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
