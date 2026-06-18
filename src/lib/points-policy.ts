@@ -65,6 +65,8 @@ export const GAME_LABEL: Record<string, string> = {
   relay: "질문 릴레이",
   kaba: "까바놀이",
   dice: "질문 주사위",
+  memory: "질문-대답 짝 찾기",
+  "story-dice": "이야기 주사위",
   "hot-potato": "뜨거운 감자",
   bingo: "질문 빙고",
   ladder: "질문 사다리",
@@ -76,6 +78,14 @@ export function pointBonusLabel(bonusType: string): { label: string; emoji: stri
   if (bonusType in AI_BONUS_TYPES) {
     const def = AI_BONUS_TYPES[bonusType as BonusKey];
     return { label: def.label, emoji: def.emoji };
+  }
+  // 혼자/AI 모드 단일 놀이: ACTIVITY_SOLO_<gameId> / ACTIVITY_AI_<gameId>
+  if (bonusType.startsWith("ACTIVITY_SOLO_") || bonusType.startsWith("ACTIVITY_AI_")) {
+    const isSolo = bonusType.startsWith("ACTIVITY_SOLO_");
+    const gameId = bonusType.slice(isSolo ? "ACTIVITY_SOLO_".length : "ACTIVITY_AI_".length);
+    const gameName = GAME_LABEL[gameId];
+    const mode = isSolo ? "혼자 모드" : "AI 모드";
+    return { label: gameName ? `${mode} · ${gameName}` : `${mode} 놀이`, emoji: isSolo ? "🙋" : "🤖" };
   }
   switch (bonusType) {
     case "QUESTION_WRITE": return { label: "수업세션 질문 작성", emoji: "✏️" };

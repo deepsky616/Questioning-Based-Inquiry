@@ -307,7 +307,8 @@ function StudentDetailDialog({
                 ) : stats.recentPoints.map((p) => {
                   const b = pointBonusLabel(p.bonusType);
                   const game = GAME_LABEL[p.gameId];
-                  const showReason = p.reason && p.reason !== b.label;
+                  // instance:<UUID>는 중복 지급 방지용 내부 키이므로 표시하지 않는다
+                  const showReason = p.reason && p.reason !== b.label && !p.reason.startsWith("instance:");
                   return (
                     <div key={p.id} className="text-xs flex items-center gap-1 text-gray-700">
                       <span className="shrink-0">{b.emoji}</span>

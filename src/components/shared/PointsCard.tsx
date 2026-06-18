@@ -110,7 +110,8 @@ export default function PointsCard() {
               const game = GAME_LABEL[log.gameId];
               const isPending = log.status === "PENDING";
               const isRejected = log.status === "REJECTED";
-              const showReason = log.reason && log.reason !== b.label;
+              // instance:<UUID>는 중복 지급 방지용 내부 키이므로 표시하지 않는다
+              const showReason = log.reason && log.reason !== b.label && !log.reason.startsWith("instance:");
               return (
                 <div key={log.id}
                   className={`flex items-center gap-2 text-sm py-1 ${isRejected ? "opacity-40" : ""}`}>
