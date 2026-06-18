@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { StatBar } from "@/components/shared/StatBar";
+import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
 import PointsCard from "@/components/shared/PointsCard";
@@ -90,28 +91,36 @@ export default function StudentDashboard() {
           <CardTitle className="text-base">분류 1 · 폐쇄형 / 개방형 질문</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                  <span className="text-sm font-medium">폐쇄형 질문</span>
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <ClassificationDonut
+              slices={[
+                { name: "폐쇄형", value: stats.byClosure.closed, fill: "#3b82f6" },
+                { name: "개방형", value: stats.byClosure.open, fill: "#22c55e" },
+              ]}
+            />
+            <div className="grid grid-cols-2 gap-6 flex-1 w-full">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
+                    <span className="text-sm font-medium">폐쇄형 질문</span>
+                  </div>
+                  <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
                 </div>
-                <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
+                <StatBar value={stats.byClosure.closed} total={stats.total} color="bg-blue-500" />
+                <p className="text-xs text-muted-foreground">정답이 하나로 정해진 질문이에요 (예: &ldquo;물의 끓는점은?&rdquo;)</p>
               </div>
-              <StatBar value={stats.byClosure.closed} total={stats.total} color="bg-blue-500" />
-              <p className="text-xs text-muted-foreground">정답이 하나로 정해진 질문이에요 (예: &ldquo;물의 끓는점은?&rdquo;)</p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-                  <span className="text-sm font-medium">개방형 질문</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+                    <span className="text-sm font-medium">개방형 질문</span>
+                  </div>
+                  <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
                 </div>
-                <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
+                <StatBar value={stats.byClosure.open} total={stats.total} color="bg-green-500" />
+                <p className="text-xs text-muted-foreground">여러 답이 나올 수 있는 질문이에요 (예: &ldquo;물이 없으면 어떻게 될까?&rdquo;)</p>
               </div>
-              <StatBar value={stats.byClosure.open} total={stats.total} color="bg-green-500" />
-              <p className="text-xs text-muted-foreground">여러 답이 나올 수 있는 질문이에요 (예: &ldquo;물이 없으면 어떻게 될까?&rdquo;)</p>
             </div>
           </div>
         </CardContent>
@@ -123,39 +132,48 @@ export default function StudentDashboard() {
           <CardTitle className="text-base">분류 2 · 사실적 / 개념적 / 논쟁적 질문</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
-                  <span className="text-sm font-medium">사실적</span>
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <ClassificationDonut
+              slices={[
+                { name: "사실적", value: stats.byCognitive.factual, fill: "#94a3b8" },
+                { name: "개념적", value: stats.byCognitive.conceptual, fill: "#a855f7" },
+                { name: "논쟁적", value: stats.byCognitive.controversial, fill: "#f97316" },
+              ]}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1 w-full">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
+                    <span className="text-sm font-medium">사실적</span>
+                  </div>
+                  <span className="text-2xl font-bold text-gray-700">{stats.byCognitive.factual}</span>
                 </div>
-                <span className="text-2xl font-bold text-gray-700">{stats.byCognitive.factual}</span>
+                <StatBar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
+                <p className="text-xs text-muted-foreground">사실이나 정보를 확인하는 질문</p>
               </div>
-              <StatBar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
-              <p className="text-xs text-muted-foreground">사실이나 정보를 확인하는 질문</p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
-                  <span className="text-sm font-medium">개념적</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
+                    <span className="text-sm font-medium">개념적</span>
+                  </div>
+                  <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.conceptual}</span>
                 </div>
-                <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.conceptual}</span>
+                <StatBar value={stats.byCognitive.conceptual} total={stats.total} color="bg-purple-500" />
+                <p className="text-xs text-muted-foreground">원리와 이유를 생각하는 질문</p>
               </div>
-              <StatBar value={stats.byCognitive.conceptual} total={stats.total} color="bg-purple-500" />
-              <p className="text-xs text-muted-foreground">원리와 이유를 생각하는 질문</p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
-                  <span className="text-sm font-medium">논쟁적</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
+                    <span className="text-sm font-medium">논쟁적</span>
+                  </div>
+                  <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.controversial}</span>
                 </div>
-                <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.controversial}</span>
+                <StatBar value={stats.byCognitive.controversial} total={stats.total} color="bg-orange-500" />
+                <p className="text-xs text-muted-foreground">내 생각·판단이 필요한 질문</p>
               </div>
-              <StatBar value={stats.byCognitive.controversial} total={stats.total} color="bg-orange-500" />
-              <p className="text-xs text-muted-foreground">내 생각·판단이 필요한 질문</p>
             </div>
           </div>
         </CardContent>
