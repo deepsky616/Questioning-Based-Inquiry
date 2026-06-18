@@ -24,6 +24,7 @@ import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import { PointReviewView } from "@/components/teacher/PointReviewView";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
+import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { QuestionSortControl, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import {
   CLOSURE_LABEL,
@@ -1031,17 +1032,40 @@ export default function QuestionsPage() {
                 </div>
               );
               return (
-                <div className="grid md:grid-cols-2 gap-x-8 gap-y-2">
+                <div className="grid md:grid-cols-2 gap-x-8 gap-y-4">
                   <div>
                     <p className="text-xs text-muted-foreground font-semibold mb-2">분류1 — 폐쇄형 / 개방형</p>
-                    {bar("폐쇄형", s.closure.closed, "#3b82f6")}
-                    {bar("개방형", s.closure.open, "#10b981")}
+                    <div className="flex items-center gap-3">
+                      <ClassificationDonut
+                        size={108}
+                        slices={[
+                          { name: "폐쇄형", value: s.closure.closed, fill: "#3b82f6" },
+                          { name: "개방형", value: s.closure.open, fill: "#10b981" },
+                        ]}
+                      />
+                      <div className="flex-1 min-w-0">
+                        {bar("폐쇄형", s.closure.closed, "#3b82f6")}
+                        {bar("개방형", s.closure.open, "#10b981")}
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁</p>
-                    {bar("사실적", s.cognitive.factual, "#94a3b8")}
-                    {bar("개념적", s.cognitive.conceptual, "#a855f7")}
-                    {bar("논쟁적", s.cognitive.controversial, "#f97316")}
+                    <div className="flex items-center gap-3">
+                      <ClassificationDonut
+                        size={108}
+                        slices={[
+                          { name: "사실적", value: s.cognitive.factual, fill: "#94a3b8" },
+                          { name: "개념적", value: s.cognitive.conceptual, fill: "#a855f7" },
+                          { name: "논쟁적", value: s.cognitive.controversial, fill: "#f97316" },
+                        ]}
+                      />
+                      <div className="flex-1 min-w-0">
+                        {bar("사실적", s.cognitive.factual, "#94a3b8")}
+                        {bar("개념적", s.cognitive.conceptual, "#a855f7")}
+                        {bar("논쟁적", s.cognitive.controversial, "#f97316")}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
