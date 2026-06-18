@@ -82,21 +82,23 @@ export function QuestionSequencePanel({
         initialQuestions={initialQuestions}
         editMode={editMode}
       />
-      {/* ③ 배포 설정 토글 */}
+      {/* ③ 배포 설정 토글 (2×2) */}
       <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
         <p className="text-sm font-semibold text-foreground">③ 배포 설정</p>
-        {toggles.map(([key, label, desc]) => (
-          <div key={key} className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm text-foreground">{label}</p>
-              <p className="text-xs text-muted-foreground">{desc}</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {toggles.map(([key, label, desc]) => (
+            <div key={key} className="rounded-md border border-border bg-background p-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-foreground">{label}</p>
+                <Switch
+                  checked={settings[key]}
+                  onCheckedChange={(v) => setSettings((s) => ({ ...s, [key]: v }))}
+                />
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground leading-snug">{desc}</p>
             </div>
-            <Switch
-              checked={settings[key]}
-              onCheckedChange={(v) => setSettings((s) => ({ ...s, [key]: v }))}
-            />
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
       <div className="flex items-center gap-3">
         <Button onClick={publish} disabled={isPublishing || result.length === 0} className="gap-1.5 font-semibold">
