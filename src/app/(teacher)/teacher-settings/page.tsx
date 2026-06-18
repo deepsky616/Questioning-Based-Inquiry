@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
 import { StudentPasswordResetCard } from "@/components/teacher/StudentPasswordResetCard";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import {
   Select,
@@ -282,19 +283,21 @@ export default function TeacherSettingsPage() {
         </CardContent>
       </Card>
 
-      <PasswordChangeCard />
-
-      <StudentPasswordResetCard />
-
-      {/* 일괄 학생 등록 */}
+      {/* 학생 관리 — 일괄 등록 / 비밀번호 재설정 탭 */}
       <Card>
         <CardHeader>
-          <CardTitle>학생 일괄 등록</CardTitle>
-          <CardDescription>
-            반 학생 전체를 한번에 등록합니다. 기본 비밀번호로 계정이 생성됩니다.
-          </CardDescription>
+          <CardTitle>학생 관리</CardTitle>
+          <CardDescription>담당 학급 학생을 일괄 등록하거나 비밀번호를 재설정합니다.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
+          <Tabs defaultValue="bulk">
+            <TabsList>
+              <TabsTrigger value="bulk">일괄 등록</TabsTrigger>
+              <TabsTrigger value="reset">비밀번호 재설정</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="bulk" className="space-y-4">
+              <p className="text-sm text-muted-foreground">반 학생 전체를 한번에 등록합니다. 기본 비밀번호로 계정이 생성됩니다.</p>
           {(() => {
             const mode = resolveClassInputMode(teacherClasses);
             return (
@@ -420,8 +423,16 @@ export default function TeacherSettingsPage() {
               {bulkMessage.text}
             </div>
           )}
+            </TabsContent>
+
+            <TabsContent value="reset">
+              <StudentPasswordResetCard embedded />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
+
+      <PasswordChangeCard />
 
       <Card>
         <CardHeader>

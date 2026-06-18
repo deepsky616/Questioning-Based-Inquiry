@@ -16,7 +16,7 @@ interface StudentRow {
   studentNumber: string;
 }
 
-export function StudentPasswordResetCard() {
+export function StudentPasswordResetCard({ embedded = false }: { embedded?: boolean } = {}) {
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [classKey, setClassKey] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -106,13 +106,8 @@ export function StudentPasswordResetCard() {
     }
   }
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>학생 비밀번호 재설정</CardTitle>
-        <CardDescription>비밀번호를 잊은 담당 학생을 골라(여러 명 가능) 새 비밀번호로 재설정해요</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const body = (
+    <div className="space-y-4">
         {students.length === 0 ? (
           <p className="text-sm text-muted-foreground">담당 학생이 없습니다.</p>
         ) : (
@@ -168,7 +163,25 @@ export function StudentPasswordResetCard() {
             </Button>
           </>
         )}
-      </CardContent>
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-muted-foreground">비밀번호를 잊은 담당 학생을 골라(여러 명 가능) 새 비밀번호로 재설정해요</p>
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>학생 비밀번호 재설정</CardTitle>
+        <CardDescription>비밀번호를 잊은 담당 학생을 골라(여러 명 가능) 새 비밀번호로 재설정해요</CardDescription>
+      </CardHeader>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }
