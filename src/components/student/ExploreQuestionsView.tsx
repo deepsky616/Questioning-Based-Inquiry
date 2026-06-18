@@ -366,11 +366,11 @@ export function ExploreQuestionsView() {
               </Select>
             </div>
             <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label className="text-xs font-medium text-muted-foreground">세션</label>
+              <label className="text-xs font-medium text-muted-foreground">수업 세션</label>
               <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                <SelectTrigger className="bg-background font-medium"><SelectValue placeholder="세션 선택" /></SelectTrigger>
+                <SelectTrigger className="bg-background font-medium"><SelectValue placeholder="수업 세션 선택" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">전체 세션</SelectItem>
+                  <SelectItem value="all">전체 수업 세션</SelectItem>
                   {filteredSessions.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
                   ))}
@@ -378,7 +378,7 @@ export function ExploreQuestionsView() {
               </Select>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">💡 날짜·교과·주제로 좁혀도, 직접 세션을 골라도 결과는 같습니다.</p>
+          <p className="text-xs text-muted-foreground mt-2">💡 날짜·교과·주제로 좁혀도, 직접 수업 세션을 골라도 결과는 같습니다.</p>
         </CardContent>
       </Card>
 

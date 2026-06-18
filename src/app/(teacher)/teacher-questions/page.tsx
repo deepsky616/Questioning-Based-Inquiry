@@ -732,7 +732,7 @@ export default function QuestionsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">질문 조회</h2>
-        <p className="text-gray-600">세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
+        <p className="text-gray-600">수업 세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
       </div>
 
       <div className="flex rounded-md border overflow-hidden w-fit">
@@ -759,7 +759,7 @@ export default function QuestionsPage() {
       {/* 수업 세션 선택: 날짜·교과·주제로 좁혀서 단일 세션 선택 */}
       {sessions.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-400">
-          등록된 세션이 없습니다. 세션을 먼저 추가해 주세요.
+          등록된 수업 세션이 없습니다. 수업 세션을 먼저 추가해 주세요.
         </div>
       ) : (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -795,14 +795,14 @@ export default function QuestionsPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label className="text-xs font-medium text-gray-600">세션</label>
+              <label className="text-xs font-medium text-gray-600">수업 세션</label>
               {filteredSessions.length === 0 ? (
-                <div className="h-8 flex items-center text-sm text-gray-400">조건에 맞는 세션이 없습니다</div>
+                <div className="h-8 flex items-center text-sm text-gray-400">조건에 맞는 수업 세션이 없습니다</div>
               ) : (
                 <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                  <SelectTrigger className="bg-white font-medium"><SelectValue placeholder="세션 선택" /></SelectTrigger>
+                  <SelectTrigger className="bg-white font-medium"><SelectValue placeholder="수업 세션 선택" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">전체 세션</SelectItem>
+                    <SelectItem value="all">전체 수업 세션</SelectItem>
                     {filteredSessions.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
                     ))}
@@ -811,7 +811,7 @@ export default function QuestionsPage() {
               )}
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2">💡 날짜·교과·주제로 좁혀도, 직접 세션을 골라도 결과는 같습니다.</p>
+          <p className="text-xs text-gray-400 mt-2">💡 날짜·교과·주제로 좁혀도, 직접 수업 세션을 골라도 결과는 같습니다.</p>
         </div>
       )}
 
@@ -1089,7 +1089,7 @@ export default function QuestionsPage() {
       {isLoading ? (
         <div className="text-center py-16 text-gray-400">로딩 중...</div>
       ) : !hasQuestionList ? (
-        <div className="text-center py-16 text-gray-400 text-sm">세션을 선택해 주세요</div>
+        <div className="text-center py-16 text-gray-400 text-sm">수업 세션을 선택해 주세요</div>
       ) : (
         /* ── 전체 질문 목록: 분류1/분류2 필터 ── */
         <Card>
@@ -1280,7 +1280,7 @@ export default function QuestionsPage() {
                 </p>
                 {selectedQuestion.session && (
                   <p className="text-xs text-indigo-600 mt-1">
-                    세션: {buildSessionLabel(selectedQuestion.session.date, selectedQuestion.session.subject, selectedQuestion.session.topic)}
+                    수업 세션: {buildSessionLabel(selectedQuestion.session.date, selectedQuestion.session.subject, selectedQuestion.session.topic)}
                   </p>
                 )}
               </div>

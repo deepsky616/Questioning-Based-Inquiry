@@ -333,7 +333,7 @@ export default function AskPage() {
               disabled={filteredSessions.length === 0}
             >
               {filteredSessions.length === 0 ? (
-                <option value="">조건에 맞는 세션이 없습니다</option>
+                <option value="">조건에 맞는 수업 세션이 없습니다</option>
               ) : (
                 filteredSessions.map((s) => (
                   <option key={s.id} value={s.id}>
