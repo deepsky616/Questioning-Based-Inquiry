@@ -262,7 +262,7 @@ export default function TeacherQuestionPlayPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-xs rounded-xl"
+                      className="flex-1 text-xs rounded-xl"
                       onClick={() => setStatsDialogGame(game)}
                     >
                       📊 참여 현황
