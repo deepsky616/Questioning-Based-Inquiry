@@ -265,8 +265,8 @@ export default function TeacherSessionsPage() {
           <CardDescription>날짜·교과·주제를 입력하면 학생 화면에서 선택 가능한 세션이 생성됩니다</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* 날짜·교과·주제 */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {/* 날짜·교과·주제 (주제를 더 넓게) */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_2fr]">
             <div className="space-y-1">
               <Label>날짜</Label>
               <DatePicker
