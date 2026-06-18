@@ -367,41 +367,47 @@ export default function TeacherSessionsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* 세션 목록 조회/정렬 */}
-          <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-card p-3">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">날짜</span>
+          {/* 세션 목록 조회/정렬 — 필터(왼쪽) · 정렬(오른쪽) */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-card p-3">
+            {/* 필터 그룹 */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">조회</span>
               <Select value={listFilterDate || "__all__"} onValueChange={(v) => setListFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-white w-36"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm bg-background w-32"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">전체 날짜</SelectItem>
                   {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">교과</span>
               <Select value={listFilterSubject || "__all__"} onValueChange={(v) => setListFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-white w-32"><SelectValue placeholder="전체 교과" /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm bg-background w-28"><SelectValue placeholder="전체 교과" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">전체 교과</SelectItem>
                   {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">주제</span>
               <Select value={listFilterTopic || "__all__"} onValueChange={(v) => setListFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-white w-40"><SelectValue placeholder="전체 주제" /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm bg-background w-36"><SelectValue placeholder="전체 주제" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">전체 주제</SelectItem>
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {(listFilterDate || listFilterSubject || listFilterTopic) && (
+                <button
+                  type="button"
+                  onClick={() => { setListFilterDate(""); setListFilterSubject(""); setListFilterTopic(""); }}
+                  className="h-9 px-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                >
+                  초기화
+                </button>
+              )}
             </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">정렬</span>
-              <div className="flex rounded-md border overflow-hidden h-8">
+
+            {/* 정렬 그룹 (오른쪽) */}
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground">정렬</span>
+              <div className="flex rounded-md border overflow-hidden h-9">
                 {([["desc", "최신순"], ["asc", "오래된순"]] as const).map(([v, label], i) => (
                   <button
                     key={v}
@@ -416,15 +422,6 @@ export default function TeacherSessionsPage() {
                 ))}
               </div>
             </div>
-            {(listFilterDate || listFilterSubject || listFilterTopic) && (
-              <button
-                type="button"
-                onClick={() => { setListFilterDate(""); setListFilterSubject(""); setListFilterTopic(""); }}
-                className="h-8 text-xs font-medium text-indigo-600"
-              >
-                초기화
-              </button>
-            )}
           </div>
 
           {activeSessions.length === 0 && pastSessions.length === 0 && (
