@@ -314,46 +314,26 @@ export default function TeacherSessionsPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-3">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-800">학생 활성화</p>
-                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 이 세션에서 질문을 작성할 수 있어요.</p>
-              </div>
-              <Switch
-                checked={sessForm.isActive}
-                onCheckedChange={(v) => setSessForm((p) => ({ ...p, isActive: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-800">질문 공개</p>
-                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 작성한 질문을 서로 볼 수 있어요. 끄면 본인 질문만 보여요.</p>
-              </div>
-              <Switch
-                checked={sessForm.defaultQuestionPublic}
-                onCheckedChange={(v) => setSessForm((p) => ({ ...p, defaultQuestionPublic: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-800">좋아요 공개</p>
-                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요.</p>
-              </div>
-              <Switch
-                checked={sessForm.likesVisibleToPeers}
-                onCheckedChange={(v) => setSessForm((p) => ({ ...p, likesVisibleToPeers: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-800">댓글 공개</p>
-                <p className="text-xs text-gray-500 mt-0.5">켜면 학생이 서로의 댓글을 볼 수 있어요. 끄면 본인·선생님 댓글만 보여요.</p>
-              </div>
-              <Switch
-                checked={sessForm.commentsVisibleToPeers}
-                onCheckedChange={(v) => setSessForm((p) => ({ ...p, commentsVisibleToPeers: v }))}
-              />
+          <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-2">
+            <p className="text-sm font-semibold text-foreground">공개 설정</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {([
+                ["isActive", "학생 활성화", "학생이 이 세션에서 질문을 작성할 수 있어요.", sessForm.isActive],
+                ["defaultQuestionPublic", "질문 공개", "학생이 작성한 질문을 서로 볼 수 있어요. (끄면 본인 질문만)", sessForm.defaultQuestionPublic],
+                ["likesVisibleToPeers", "좋아요 공개", "서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요.", sessForm.likesVisibleToPeers],
+                ["commentsVisibleToPeers", "댓글 공개", "서로의 댓글을 볼 수 있어요. (끄면 본인·선생님 댓글만)", sessForm.commentsVisibleToPeers],
+              ] as const).map(([key, label, desc, value]) => (
+                <div key={key} className="rounded-md border border-border bg-background p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-foreground">{label}</p>
+                    <Switch
+                      checked={value}
+                      onCheckedChange={(v) => setSessForm((p) => ({ ...p, [key]: v }))}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground leading-snug">{desc}</p>
+                </div>
+              ))}
             </div>
           </div>
 
