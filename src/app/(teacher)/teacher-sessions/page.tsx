@@ -265,19 +265,8 @@ export default function TeacherSessionsPage() {
           <CardDescription>날짜·교과·주제를 입력하면 학생 화면에서 선택 가능한 세션이 생성됩니다</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1.4fr_1fr_1fr_2fr]">
-            <SessionTargetSelector
-              classes={targetClasses}
-              students={students}
-              targetClassValue={sessForm.targetClassValue}
-              selectedStudentIds={sessForm.selectedStudentIds}
-              onTargetClassChange={(targetClassValue, selectedStudentIds) =>
-                setSessForm((prev) => ({ ...prev, targetClassValue, selectedStudentIds }))
-              }
-              onSelectedStudentIdsChange={(selectedStudentIds) =>
-                setSessForm((prev) => ({ ...prev, selectedStudentIds }))
-              }
-            />
+          {/* 날짜·교과·주제 */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-1">
               <Label>날짜</Label>
               <DatePicker
@@ -314,26 +303,45 @@ export default function TeacherSessionsPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-2">
-            <p className="text-sm font-semibold text-foreground">공개 설정</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {([
-                ["isActive", "학생 활성화", "학생이 이 세션에서 질문을 작성할 수 있어요.", sessForm.isActive],
-                ["defaultQuestionPublic", "질문 공개", "학생이 작성한 질문을 서로 볼 수 있어요. (끄면 본인 질문만)", sessForm.defaultQuestionPublic],
-                ["likesVisibleToPeers", "좋아요 공개", "서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요.", sessForm.likesVisibleToPeers],
-                ["commentsVisibleToPeers", "댓글 공개", "서로의 댓글을 볼 수 있어요. (끄면 본인·선생님 댓글만)", sessForm.commentsVisibleToPeers],
-              ] as const).map(([key, label, desc, value]) => (
-                <div key={key} className="rounded-md border border-border bg-background p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-foreground">{label}</p>
-                    <Switch
-                      checked={value}
-                      onCheckedChange={(v) => setSessForm((p) => ({ ...p, [key]: v }))}
-                    />
+          {/* 대상 선택 + 공개 설정 (좌우 배치) */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label>대상 선택</Label>
+              <SessionTargetSelector
+                classes={targetClasses}
+                students={students}
+                targetClassValue={sessForm.targetClassValue}
+                selectedStudentIds={sessForm.selectedStudentIds}
+                onTargetClassChange={(targetClassValue, selectedStudentIds) =>
+                  setSessForm((prev) => ({ ...prev, targetClassValue, selectedStudentIds }))
+                }
+                onSelectedStudentIdsChange={(selectedStudentIds) =>
+                  setSessForm((prev) => ({ ...prev, selectedStudentIds }))
+                }
+              />
+            </div>
+
+            <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-2">
+              <p className="text-sm font-semibold text-foreground">공개 설정</p>
+              <div className="space-y-2">
+                {([
+                  ["isActive", "학생 활성화", "학생이 이 세션에서 질문을 작성할 수 있어요.", sessForm.isActive],
+                  ["defaultQuestionPublic", "질문 공개", "학생이 작성한 질문을 서로 볼 수 있어요. (끄면 본인 질문만)", sessForm.defaultQuestionPublic],
+                  ["likesVisibleToPeers", "좋아요 공개", "서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요.", sessForm.likesVisibleToPeers],
+                  ["commentsVisibleToPeers", "댓글 공개", "서로의 댓글을 볼 수 있어요. (끄면 본인·선생님 댓글만)", sessForm.commentsVisibleToPeers],
+                ] as const).map(([key, label, desc, value]) => (
+                  <div key={key} className="rounded-md border border-border bg-background p-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-foreground">{label}</p>
+                      <Switch
+                        checked={value}
+                        onCheckedChange={(v) => setSessForm((p) => ({ ...p, [key]: v }))}
+                      />
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground leading-snug">{desc}</p>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground leading-snug">{desc}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
