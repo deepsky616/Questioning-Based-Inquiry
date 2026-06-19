@@ -396,7 +396,7 @@ export default function AskPage() {
           {/* 이미 제출한 질문 배너 */}
           {existingQuestion && !isCheckingExisting && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-              이 세션에 이미 질문을 작성했습니다: <strong>"{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? '...' : ''}"</strong>
+              이 세션에 이미 질문을 작성했습니다: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? '...' : ''}&rdquo;</strong>
               <br />
               <span className="text-xs text-amber-600">새 질문을 작성하면 기존 질문과 별도로 저장됩니다.</span>
             </div>

@@ -341,7 +341,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
                   </p>
                   {localResult === "incorrect" && (
                     <p className="text-gray-500 text-sm mt-2">
-                      '~나요?', '~인가요?' 처럼 끝을 바꿔봐요 😊
+                      &lsquo;~나요?&rsquo;, &lsquo;~인가요?&rsquo; 처럼 끝을 바꿔봐요 😊
                     </p>
                   )}
                 </div>
