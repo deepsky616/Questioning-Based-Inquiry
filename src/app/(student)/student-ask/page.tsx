@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { buildSessionLabel, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { COGNITIVE_LABEL } from "@/lib/question-labels";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SharedQuestion {
   type: string;
@@ -48,6 +49,7 @@ export default function AskPage() {
   const user = getSessionUser(authSession);
 
   const [content, setContent] = useState("");
+  const { toast } = useToast();
   const [existingQuestion, setExistingQuestion] = useState<{ id: string; content: string } | null>(null);
   const [isCheckingExisting, setIsCheckingExisting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -138,7 +140,7 @@ export default function AskPage() {
     // issue #3: handler 단에서도 세션 필수 검증
     if (!canAsk) return;
     if (content.trim().length === 0) {
-      alert("질문을 입력해 주세요");
+      toast({ variant: "destructive", description: "질문을 입력해 주세요" });
       return;
     }
 
@@ -159,7 +161,7 @@ export default function AskPage() {
       setResult(data);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "분류 중 오류가 발생했습니다";
-      alert(msg);
+      toast({ variant: "destructive", description: msg });
     } finally {
       setIsLoading(false);
     }
@@ -189,7 +191,7 @@ export default function AskPage() {
       if (!res.ok) throw new Error("저장 실패");
       router.push("/student-questions");
     } catch {
-      alert("저장 중 오류가 발생했습니다");
+      toast({ variant: "destructive", description: "저장 중 오류가 발생했습니다" });
     } finally {
       setIsSaving(false);
     }

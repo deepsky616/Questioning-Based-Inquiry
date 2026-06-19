@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import DatePicker from "@/components/shared/DatePicker";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { useToast } from "@/components/ui/use-toast";
 import {
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
@@ -149,6 +150,7 @@ function sortAreasByOrder(areas: { id: string; area: string }[], subject: string
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
 export default function CurriculumPage() {
   const [step, setStep] = useState<Step>(1);
+  const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [saveTitle, setSaveTitle] = useState("");
   const [saveGrade, setSaveGrade] = useState("");
@@ -358,7 +360,7 @@ export default function CurriculumPage() {
       const parts = [err.error || "AI 생성 오류"];
       if (err.detail) parts.push(`\n자세한 원인:\n${err.detail}`);
       if (err.rawPreview) parts.push(`\nAI 응답 일부:\n${err.rawPreview}`);
-      alert(parts.join("\n"));
+      toast({ variant: "destructive", description: parts.join("\n") });
       return null;
     }
     return res.json();
@@ -484,7 +486,7 @@ export default function CurriculumPage() {
           setSelectedSavedQuestionKeys(new Set(savedDesign.inquiryQuestions.map(getQuestionKey)));
         }
       } else {
-        alert("저장 실패");
+        toast({ variant: "destructive", description: "저장 실패" });
       }
     } finally {
       setIsSaving(false);
@@ -538,7 +540,7 @@ export default function CurriculumPage() {
         setCreatedSessionMessage(`${sessionDate} ${selectedSavedDesign.subject} 수업 세션에 탐구 질문을 제시했습니다.`);
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.error || "수업 세션 생성 실패");
+        toast({ variant: "destructive", description: data.error || "수업 세션 생성 실패" });
       }
     } finally {
       setIsCreatingSession(false);

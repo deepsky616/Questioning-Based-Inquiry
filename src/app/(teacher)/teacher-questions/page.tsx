@@ -38,6 +38,7 @@ import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSess
 import { formatBulkAiSummary, validatePreviewAnswers } from "@/lib/questions";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { useToast } from "@/components/ui/use-toast";
 
 interface QuestionSession {
   id: string;
@@ -118,6 +119,7 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [correctionClosure, setCorrectionClosure] = useState("");
@@ -260,7 +262,7 @@ export default function QuestionsPage() {
       if (editDeploySessionId === sessionId) setEditDeploySessionId(null);
       await reloadSessions();
     } catch {
-      window.alert("삭제에 실패했습니다");
+      toast({ variant: "destructive", description: "삭제에 실패했습니다" });
     } finally {
       setDeletingDeployId(null);
     }
@@ -492,7 +494,7 @@ export default function QuestionsPage() {
       setQuestions((prev) => prev.filter((q) => q.id !== question.id));
       if (selectedQuestion?.id === question.id) setSelectedQuestion(null);
     } catch {
-      alert("삭제에 실패했습니다");
+      toast({ variant: "destructive", description: "삭제에 실패했습니다" });
     }
   };
 
@@ -506,7 +508,7 @@ export default function QuestionsPage() {
       if (!res.ok) throw new Error();
       setQuestions((prev) => prev.map((q) => (q.id === question.id ? { ...q, flagged: false } : q)));
     } catch {
-      alert("처리에 실패했습니다");
+      toast({ variant: "destructive", description: "처리에 실패했습니다" });
     }
   };
 

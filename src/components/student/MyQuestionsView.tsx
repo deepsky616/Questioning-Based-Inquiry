@@ -19,6 +19,7 @@ import {
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Table,
   TableBody,
@@ -62,6 +63,7 @@ export function MyQuestionsView() {
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const { toast } = useToast();
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
   const [sortField, setSortField] = useState<SortField>("like");
@@ -153,10 +155,10 @@ export function MyQuestionsView() {
         setExpandedQuestionId((prev) => (prev === questionId ? null : prev));
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data?.error ?? "삭제에 실패했습니다.");
+        toast({ variant: "destructive", description: data?.error ?? "삭제에 실패했습니다." });
       }
     } catch {
-      alert("네트워크 오류가 발생했습니다.");
+      toast({ variant: "destructive", description: "네트워크 오류가 발생했습니다." });
     } finally {
       setDeletingId(null);
     }

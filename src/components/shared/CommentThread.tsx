@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { formatDateTime } from "@/lib/datetime";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { useToast } from "@/components/ui/use-toast";
 
 export interface ThreadComment {
   id: string;
@@ -38,6 +39,7 @@ export function CommentThread({
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const [comments, setComments] = useState<ThreadComment[]>(preloaded ?? []);
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(!preloaded);
   const [text, setText] = useState("");
   const [isPosting, setIsPosting] = useState(false);
@@ -113,7 +115,7 @@ export function CommentThread({
       setEditingId(null);
       setEditText("");
     } catch {
-      alert("댓글 수정에 실패했습니다");
+      toast({ variant: "destructive", description: "댓글 수정에 실패했습니다" });
     }
   };
 
@@ -130,7 +132,7 @@ export function CommentThread({
         return next;
       });
     } catch {
-      alert("댓글 삭제에 실패했습니다");
+      toast({ variant: "destructive", description: "댓글 삭제에 실패했습니다" });
     }
   };
 

@@ -60,7 +60,6 @@ export default function TeacherSessionsPage() {
     isActive: true,
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   // 세션 목록 조회/정렬 상태
   const [listFilterDate, setListFilterDate] = useState("");
   const [listFilterSubject, setListFilterSubject] = useState("");
@@ -114,15 +113,14 @@ export default function TeacherSessionsPage() {
 
   const handleCreate = async () => {
     if (!sessForm.date || !sessForm.subject.trim() || !sessForm.topic.trim()) {
-      setMsg({ type: "error", text: "날짜, 교과, 주제는 필수입니다" });
+      toast({ variant: "destructive", description: "날짜, 교과, 주제는 필수입니다" });
       return;
     }
     if (sessForm.targetClassValue !== "all" && sessForm.selectedStudentIds.length === 0) {
-      setMsg({ type: "error", text: "배포할 학생을 1명 이상 선택하세요" });
+      toast({ variant: "destructive", description: "배포할 학생을 1명 이상 선택하세요" });
       return;
     }
     setIsSaving(true);
-    setMsg(null);
     try {
       const res = await fetch("/api/sessions", {
         method: "POST",
@@ -150,9 +148,9 @@ export default function TeacherSessionsPage() {
         commentsVisibleToPeers: true,
         isActive: true,
       }));
-      setMsg({ type: "success", text: "세션이 추가됐습니다" });
+      toast({ variant: "success", description: "세션이 추가됐습니다" });
     } catch {
-      setMsg({ type: "error", text: "세션 저장에 실패했습니다" });
+      toast({ variant: "destructive", description: "세션 저장에 실패했습니다" });
     } finally {
       setIsSaving(false);
     }
@@ -362,11 +360,6 @@ export default function TeacherSessionsPage() {
             <Button onClick={handleCreate} disabled={isSaving}>
               {isSaving ? "저장 중..." : "세션 추가"}
             </Button>
-            {msg && (
-              <span className={`text-sm ${msg.type === "success" ? "text-green-700" : "text-red-600"}`}>
-                {msg.text}
-              </span>
-            )}
           </div>
         </CardContent>
       </Card>
