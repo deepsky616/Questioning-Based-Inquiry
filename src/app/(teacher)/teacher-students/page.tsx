@@ -510,10 +510,10 @@ export default function StudentsPage() {
                     <TableRow>
                       <TableHead className="w-12">번호</TableHead>
                       <TableHead>이름</TableHead>
-                      <TableHead className="text-right">질문</TableHead>
-                      <TableHead className="text-right">답변</TableHead>
-                      <TableHead className="text-right">포인트</TableHead>
-                      <TableHead className="text-right w-20">상세</TableHead>
+                      <TableHead className="text-right w-16">질문</TableHead>
+                      <TableHead className="text-right w-16">답변</TableHead>
+                      <TableHead className="text-right w-20">포인트</TableHead>
+                      <TableHead className="text-right w-24">상세</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
