@@ -10,6 +10,7 @@ import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
 import { StudentPasswordResetCard } from "@/components/teacher/StudentPasswordResetCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { useToast } from "@/components/ui/use-toast";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import {
   Select,
@@ -33,6 +34,7 @@ interface TeacherClass {
 
 export default function TeacherSettingsPage() {
   const { data: session } = useSession();
+  const { toast } = useToast();
   const user = session?.user as { name?: string; email?: string; school?: string };
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
 
@@ -46,7 +48,6 @@ export default function TeacherSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
 
   // 일괄 학생 등록 상태
@@ -56,7 +57,6 @@ export default function TeacherSettingsPage() {
   const [bulkPassword, setBulkPassword] = useState("");
   const [bulkText, setBulkText] = useState("");
   const [isBulkSaving, setIsBulkSaving] = useState(false);
-  const [bulkMessage, setBulkMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/config")
@@ -84,16 +84,15 @@ export default function TeacherSettingsPage() {
 
   const handleTest = async () => {
     if (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) {
-      setMessage({ type: "error", text: "API 키를 입력해 주세요 (10자 이상)" });
+      toast({ variant: "destructive", description: "API 키를 입력해 주세요 (10자 이상)" });
       return;
     }
     if (apiKey && apiKey.length < 10) {
-      setMessage({ type: "error", text: "API 키는 10자 이상이어야 합니다" });
+      toast({ variant: "destructive", description: "API 키는 10자 이상이어야 합니다" });
       return;
     }
 
     setIsTesting(true);
-    setMessage(null);
 
     try {
       const res = await fetch("/api/gemini/test", {
@@ -103,18 +102,18 @@ export default function TeacherSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setMessage({ type: "success", text: `연결 성공! 모델: ${selectedModel}` });
+        toast({ variant: "success", description: `연결 성공! 모델: ${selectedModel}` });
       } else {
         // 콘솔에도 진단 정보 전체 출력
         console.error(`[gemini/test] HTTP ${res.status}`, data);
         const parts = [data.error || "연결 실패"];
         if (data.action) parts.push(`→ ${data.action}`);
         if (data.detail) parts.push(`\n자세한 원인: ${data.detail}`);
-        setMessage({ type: "error", text: parts.join("\n") });
+        toast({ variant: "destructive", description: parts.join("\n") });
       }
     } catch (e) {
       console.error("[gemini/test] network error", e);
-      setMessage({ type: "error", text: "테스트 요청 자체가 실패했어요. 네트워크를 확인해주세요." });
+      toast({ variant: "destructive", description: "테스트 요청 자체가 실패했어요. 네트워크를 확인해주세요." });
     } finally {
       setIsTesting(false);
     }
@@ -122,16 +121,15 @@ export default function TeacherSettingsPage() {
 
   const handleSave = async () => {
     if (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) {
-      setMessage({ type: "error", text: "API 키를 입력해 주세요 (10자 이상)" });
+      toast({ variant: "destructive", description: "API 키를 입력해 주세요 (10자 이상)" });
       return;
     }
     if (apiKey && apiKey.length < 10) {
-      setMessage({ type: "error", text: "API 키는 10자 이상이어야 합니다" });
+      toast({ variant: "destructive", description: "API 키는 10자 이상이어야 합니다" });
       return;
     }
 
     setIsSaving(true);
-    setMessage(null);
 
     try {
       const res = await fetch("/api/config", {
@@ -149,9 +147,9 @@ export default function TeacherSettingsPage() {
         model: data.model ?? selectedModel,
       });
       setApiKey("");
-      setMessage({ type: "success", text: "AI 설정이 저장됐습니다. 저장된 API 키는 유지되고 선택한 모델이 적용됩니다." });
+      toast({ variant: "success", description: "AI 설정이 저장됐습니다. 저장된 API 키는 유지되고 선택한 모델이 적용됩니다." });
     } catch (error) {
-      setMessage({ type: "error", text: error instanceof Error ? error.message : "설정 저장에 실패했습니다" });
+      toast({ variant: "destructive", description: error instanceof Error ? error.message : "설정 저장에 실패했습니다" });
     } finally {
       setIsSaving(false);
     }
@@ -165,9 +163,9 @@ export default function TeacherSettingsPage() {
       await fetch("/api/config", { method: "DELETE" });
       setCurrentConfig({ configured: false, maskedApiKey: null, model: DEFAULT_GEMINI_MODEL });
       setSelectedModel(DEFAULT_GEMINI_MODEL);
-      setMessage({ type: "success", text: "AI 설정이 삭제됐습니다" });
+      toast({ variant: "success", description: "AI 설정이 삭제됐습니다" });
     } catch {
-      setMessage({ type: "error", text: "삭제에 실패했습니다" });
+      toast({ variant: "destructive", description: "삭제에 실패했습니다" });
     } finally {
       setIsDeleting(false);
     }
@@ -190,22 +188,21 @@ export default function TeacherSettingsPage() {
 
   const handleBulkRegister = async () => {
     if (!bulkSchool || !bulkGrade || !bulkClass) {
-      setBulkMessage({ type: "error", text: "학교, 학년, 반을 입력해 주세요" });
+      toast({ variant: "destructive", description: "학교, 학년, 반을 입력해 주세요" });
       return;
     }
     const passwordError = validatePasswordPolicy(bulkPassword);
     if (passwordError) {
-      setBulkMessage({ type: "error", text: `기본 비밀번호: ${passwordError}` });
+      toast({ variant: "destructive", description: `기본 비밀번호: ${passwordError}` });
       return;
     }
     const students = parseBulkText();
     if (students.length === 0) {
-      setBulkMessage({ type: "error", text: "학생 목록을 입력해 주세요 (번호 이름 형식)" });
+      toast({ variant: "destructive", description: "학생 목록을 입력해 주세요 (번호 이름 형식)" });
       return;
     }
 
     setIsBulkSaving(true);
-    setBulkMessage(null);
 
     try {
       const res = await fetch("/api/students/bulk", {
@@ -221,16 +218,13 @@ export default function TeacherSettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setBulkMessage({ type: "error", text: data.error || "등록 실패" });
+        toast({ variant: "destructive", description: data.error || "등록 실패" });
       } else {
-        setBulkMessage({
-          type: "success",
-          text: `등록 완료: ${data.created}명 신규, ${data.skipped}명 중복 건너뜀${data.errors?.length ? ` / 오류 ${data.errors.length}건` : ""}`,
-        });
+        toast({ variant: "success", description: `등록 완료: ${data.created}명 신규, ${data.skipped}명 중복 건너뜀${data.errors?.length ? ` / 오류 ${data.errors.length}건` : ""}` });
         if (data.created > 0) setBulkText("");
       }
     } catch {
-      setBulkMessage({ type: "error", text: "서버 오류가 발생했습니다" });
+      toast({ variant: "destructive", description: "서버 오류가 발생했습니다" });
     } finally {
       setIsBulkSaving(false);
     }
@@ -413,16 +407,6 @@ export default function TeacherSettingsPage() {
               <span className="text-sm text-muted-foreground">{parseBulkText().length}명 입력됨</span>
             )}
           </div>
-
-          {bulkMessage && (
-            <div className={`p-3 rounded-lg text-sm ${
-              bulkMessage.type === "success"
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}>
-              {bulkMessage.text}
-            </div>
-          )}
             </TabsContent>
 
             <TabsContent value="reset">
@@ -486,7 +470,6 @@ export default function TeacherSettingsPage() {
               value={apiKey}
               onChange={(e) => {
                 setApiKey(e.target.value);
-                setMessage(null);
               }}
             />
             {currentConfig?.configured && (
@@ -500,7 +483,6 @@ export default function TeacherSettingsPage() {
             <Label htmlFor="model">사용 모델</Label>
             <Select value={selectedModel} onValueChange={(v) => {
               setSelectedModel(v);
-              setMessage(null);
             }}>
               <SelectTrigger>
                 <SelectValue />
@@ -530,16 +512,6 @@ export default function TeacherSettingsPage() {
               {isSaving ? "저장 중..." : "저장"}
             </Button>
           </div>
-
-          {message && (
-            <div className={`p-3 rounded-lg text-sm whitespace-pre-line ${
-              message.type === "success"
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-red-50 text-red-700 border border-red-200"
-            }`}>
-              {message.text}
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
