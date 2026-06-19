@@ -262,7 +262,7 @@ export default function TeacherSettingsPage() {
                 {teacherClasses.map((c) => (
                   <span
                     key={`${c.grade}-${c.className}`}
-                    className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700 ring-1 ring-inset ring-blue-200"
+                    className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950/40 px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-200"
                   >
                     {buildTeacherClassLabel(c.grade, c.className)}
                   </span>
@@ -434,7 +434,7 @@ export default function TeacherSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {currentConfig?.configured && (
-            <div className="p-3 rounded-lg bg-green-50 border border-green-200 flex items-center justify-between">
+            <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-500/30 flex items-center justify-between">
               <div>
             <p className="text-sm font-medium text-green-800">AI 분류가 활성화됐습니다</p>
                 <p className="text-xs text-green-600 mt-0.5">
@@ -454,7 +454,7 @@ export default function TeacherSettingsPage() {
           )}
 
           {!currentConfig?.configured && (
-            <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+            <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/40 border border-yellow-200 dark:border-yellow-500/30">
               <p className="text-sm text-yellow-800">AI 설정이 없습니다. API 키를 입력해 학생들이 AI 분류를 사용할 수 있게 하세요.</p>
             </div>
           )}

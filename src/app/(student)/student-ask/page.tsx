@@ -225,7 +225,7 @@ export default function AskPage() {
         <div>
           <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
         </div>
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-950/40">
           <CardContent className="p-6 text-center text-red-700 text-sm">
             수업 세션 정보를 불러오지 못했습니다. 페이지를 새로고침해 주세요.
           </CardContent>
@@ -241,7 +241,7 @@ export default function AskPage() {
         <div>
           <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
         </div>
-        <Card className="border-yellow-200 bg-yellow-50">
+        <Card className="border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/40">
           <CardContent className="p-6 text-center text-yellow-800">
             <p className="font-medium">아직 수업 세션이 없습니다</p>
             <p className="text-sm mt-1 text-yellow-700">
@@ -261,7 +261,7 @@ export default function AskPage() {
       </div>
 
       {aiConfigured === false && (
-        <Card className="border-yellow-200 bg-yellow-50">
+        <Card className="border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/40">
           <CardContent className="p-4">
             <p className="text-yellow-800 text-sm">
               교사가 AI 설정을 아직 등록하지 않았습니다. AI 분류 대신 키워드 기반 분류가 사용됩니다.
@@ -271,7 +271,7 @@ export default function AskPage() {
       )}
 
       {aiConfigured === true && (
-        <Card className="border-green-200 bg-green-50">
+        <Card className="border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-950/40">
           <CardContent className="p-4">
             <p className="text-green-800 text-sm">AI 분류가 활성화됐습니다.</p>
           </CardContent>
@@ -344,7 +344,7 @@ export default function AskPage() {
             </select>
 
             {selectedSession && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 space-y-1">
+              <div className="rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-3 space-y-1">
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">현재 수업 세션</p>
                 <p className="text-sm font-medium text-blue-900">
                   {selectedSession.subject}
@@ -371,7 +371,7 @@ export default function AskPage() {
           {selectedSession &&
             Array.isArray(selectedSession.sharedQuestions) &&
             selectedSession.sharedQuestions.filter((q) => q.content?.trim()).length > 0 && (
-              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 space-y-2">
+              <div className="rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4 space-y-2">
                 <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
                   선생님의 탐구 질문
                 </p>
@@ -395,7 +395,7 @@ export default function AskPage() {
 
           {/* 이미 제출한 질문 배너 */}
           {existingQuestion && !isCheckingExisting && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
               이 세션에 이미 질문을 작성했습니다: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? '...' : ''}&rdquo;</strong>
               <br />
               <span className="text-xs text-amber-600">새 질문을 작성하면 기존 질문과 별도로 저장됩니다.</span>
@@ -432,7 +432,7 @@ export default function AskPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {result.inappropriate && (
-              <div className="p-4 rounded-lg border border-red-300 bg-red-50">
+              <div className="p-4 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/40">
                 <p className="text-sm font-bold text-red-700">⚠️ 부적절한 내용이 감지되었습니다</p>
                 <p className="text-sm text-red-600 mt-1">
                   {result.inappropriateReason || "학습에 적절하지 않은 표현이 포함되어 있어요."} 질문을 수정해 다시 분석하는 것을 권장합니다. 이대로 저장하면 선생님이 검토하게 됩니다.
@@ -440,7 +440,7 @@ export default function AskPage() {
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-blue-50 rounded-lg">
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
                 <div className="text-sm text-muted-foreground">폐쇄형/개방형</div>
                 <div className="text-xl font-bold text-blue-700">
                   {result.closure === "closed" ? "닫힌 질문" : "열린 질문"}
@@ -452,7 +452,7 @@ export default function AskPage() {
                   신뢰도: {Math.round(result.closureScore * 100)}%
                 </div>
               </div>
-              <div className="p-4 bg-purple-50 rounded-lg">
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/40 rounded-lg">
                 <div className="text-sm text-muted-foreground">인지적 수준</div>
                 <div className="text-xl font-bold text-purple-700">
                   {COGNITIVE_LABEL[result.cognitive] ?? result.cognitive}
@@ -474,7 +474,7 @@ export default function AskPage() {
             </div>
 
             {result.feedback && (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg">
                 <div className="text-sm font-medium text-amber-800 mb-1">
                   더 좋은 질문을 위한 제안
                 </div>
@@ -483,7 +483,7 @@ export default function AskPage() {
             )}
 
             {result.improvedExample && result.improvedExample.trim() && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="p-4 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-500/30 rounded-lg">
                 <div className="text-sm font-medium text-green-800 mb-2">
                   이렇게 바꿔보면 어떨까요?
                 </div>

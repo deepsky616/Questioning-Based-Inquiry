@@ -42,9 +42,9 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 const TYPE_STYLE: Record<string, string> = {
-  factual: "bg-blue-50 text-blue-700 border-blue-200",
+  factual: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30",
   conceptual: "bg-violet-50 text-violet-700 border-violet-200",
-  controversial: "bg-amber-50 text-amber-700 border-amber-200",
+  controversial: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30",
   student: "bg-muted/40 text-foreground border-border",
 };
 
@@ -161,7 +161,7 @@ export function UnitDesignView() {
                   type="button"
                   onClick={() => setSelectedId(session.id)}
                   className={`w-full rounded-md border p-3 text-left transition-colors ${
-                    selectedSession?.id === session.id ? "border-indigo-300 bg-indigo-50" : "bg-card hover:bg-muted/40"
+                    selectedSession?.id === session.id ? "border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40" : "bg-card hover:bg-muted/40"
                   }`}
                 >
                   <div className="flex items-start gap-2">
@@ -207,7 +207,7 @@ export function UnitDesignView() {
                                 {TYPE_LABEL[question.type] ?? question.type}
                               </span>
                               {question.contentGroup && (
-                                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                                <span className="rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-300">
                                   {question.contentGroup}
                                 </span>
                               )}

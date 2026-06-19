@@ -92,9 +92,9 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  factual: "bg-blue-50 border-blue-200 text-blue-800",
-  conceptual: "bg-purple-50 border-purple-200 text-purple-800",
-  controversial: "bg-orange-50 border-orange-200 text-orange-800",
+  factual: "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-500/30 text-blue-800 dark:text-blue-300",
+  conceptual: "bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-300",
+  controversial: "bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-500/30 text-orange-800 dark:text-orange-300",
 };
 
 const KNOWLEDGE_ITEM_LIMIT = 12;
@@ -700,7 +700,7 @@ export default function CurriculumPage() {
                         </div>
 
                         {createdSessionMessage && (
-                          <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                          <div className="rounded-md border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm text-green-800 dark:text-green-300">
                             {createdSessionMessage}
                           </div>
                         )}
@@ -788,7 +788,7 @@ export default function CurriculumPage() {
           {curriculumData && (
             <div className="space-y-3 mt-2">
               {/* 핵심아이디어 (선택 가능) */}
-              <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+              <div className="rounded-lg border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div>
                     <p className="text-xs font-semibold text-indigo-600">핵심아이디어</p>
@@ -978,7 +978,7 @@ export default function CurriculumPage() {
               {(curriculumData.middleKnowledgeItems?.length > 0 ||
                 curriculumData.middleProcessItems?.length > 0 ||
                 curriculumData.middleValueItems?.length > 0) && (
-                <details className="rounded-lg border border-amber-200 bg-amber-50">
+                <details className="rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-950/40">
                   <summary className="px-4 py-2 text-xs font-semibold text-amber-700 cursor-pointer select-none">
                     ▶ 중학교 연계 내용요소 (선행 학습 여부 점검용 — 수업에서 직접 다루지 않음)
                   </summary>
@@ -1023,7 +1023,7 @@ export default function CurriculumPage() {
 
               {/* 단원 선택 (단원 데이터가 있는 교과만 표시) */}
               {curriculumData.units.length > 0 && (
-                <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 space-y-3">
+                <div className="rounded-lg border border-blue-100 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-blue-700">단원 선택</p>
                     <div className="flex gap-2">
@@ -1122,7 +1122,7 @@ export default function CurriculumPage() {
                             key={`${achievement.code}-${achievement.content}`}
                             className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer transition-colors ${
                               selected
-                                ? "border-indigo-200 bg-indigo-50"
+                                ? "border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40"
                                 : "border-border bg-card hover:border-indigo-200"
                             }`}
                           >
@@ -1213,7 +1213,7 @@ export default function CurriculumPage() {
             </div>
 
             {selectedKeywords.length > 0 && (
-              <div className="rounded-md bg-indigo-50 px-4 py-2">
+              <div className="rounded-md bg-indigo-50 dark:bg-indigo-950/40 px-4 py-2">
                 <span className="text-xs text-indigo-600 font-medium">선택된 핵심어: </span>
                 <span className="text-sm text-indigo-800">{selectedKeywords.join(", ")}</span>
               </div>

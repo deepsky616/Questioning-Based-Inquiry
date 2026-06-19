@@ -154,7 +154,7 @@ export function PointReviewView() {
             <Button variant="outline" onClick={loadPending}>새로고침</Button>
           </div>
           {message && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-3 py-2 text-sm">
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl px-3 py-2 text-sm">
               {message}
             </div>
           )}
@@ -240,7 +240,7 @@ function PendingRow({
   const content = p.commentContent || p.questionContent;
   const targetLabel = p.relatedQuestionId ? "질문" : "답변";
   return (
-    <div className={`rounded-xl border border-border p-3 space-y-2 ${selected ? "bg-indigo-50" : "bg-card"}`}>
+    <div className={`rounded-xl border border-border p-3 space-y-2 ${selected ? "bg-indigo-50 dark:bg-indigo-950/40" : "bg-card"}`}>
       <div className="flex items-start gap-3">
         <input type="checkbox" checked={selected} onChange={onToggle} className="mt-1 w-4 h-4 accent-indigo-500" />
         <div className="flex-1 min-w-0">

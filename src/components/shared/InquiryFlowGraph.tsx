@@ -41,7 +41,7 @@ export function InquiryFlowGraph({
 
   return (
     <div className="rounded-xl border border-indigo-100 bg-card shadow-sm">
-      <div className="border-b border-indigo-100 bg-indigo-50 px-4 py-3">
+      <div className="border-b border-indigo-100 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 px-4 py-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-sm font-semibold text-indigo-900">{title}</p>

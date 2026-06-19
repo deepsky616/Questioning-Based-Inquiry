@@ -137,7 +137,7 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
           <div className="py-12 text-center text-muted-foreground text-sm">단원설계를 불러오는 중...</div>
         ) : (
           <>
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm text-indigo-700">
+            <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 rounded-xl p-3 text-sm text-indigo-700 dark:text-indigo-300">
               📚 <strong>{unit.title}</strong>
               <span className="text-indigo-500 ml-2">· 총 {allInquiry.length}개 질문</span>
               {newCount > 0 && (
@@ -146,7 +146,7 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
             </div>
 
             {message && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-3 py-2 text-sm">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl px-3 py-2 text-sm">
                 ✅ {message}
               </div>
             )}
