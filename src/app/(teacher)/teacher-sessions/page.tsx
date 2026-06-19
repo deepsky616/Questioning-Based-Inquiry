@@ -11,6 +11,7 @@ import DatePicker from "@/components/shared/DatePicker";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { buildSessionLabel, isSessionAvailable, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { useToast } from "@/components/ui/use-toast";
 import {
   buildClassTargetValue,
   buildClassStudentTargetPayload,
@@ -41,6 +42,7 @@ interface QuestionSession {
 }
 
 export default function TeacherSessionsPage() {
+  const { toast } = useToast();
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [students, setStudents] = useState<SessionTargetStudent[]>([]);
   const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
@@ -155,9 +157,15 @@ export default function TeacherSessionsPage() {
     }
   };
 
+  const toggleFailed = () => toast({ variant: "destructive", description: "변경에 실패했어요. 잠시 후 다시 시도해 주세요." });
+
   const handleDelete = async (id: string) => {
     if (!confirm("이 세션을 삭제하시겠습니까? 연결된 질문은 세션 없음 상태가 됩니다.")) return;
-    await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" }).catch(() => null);
+    if (!res || !res.ok) {
+      toast({ variant: "destructive", description: "세션 삭제에 실패했어요." });
+      return;
+    }
     setSessions((prev) => prev.filter((s) => s.id !== id));
   };
 
@@ -172,6 +180,7 @@ export default function TeacherSessionsPage() {
       body: JSON.stringify({ isActive: next }),
     });
     if (!res.ok) {
+      toggleFailed();
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, isActive: currentValue } : s))
       );
@@ -189,6 +198,7 @@ export default function TeacherSessionsPage() {
       body: JSON.stringify({ defaultQuestionPublic: next }),
     });
     if (!res.ok) {
+      toggleFailed();
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, defaultQuestionPublic: currentValue } : s))
       );
@@ -206,6 +216,7 @@ export default function TeacherSessionsPage() {
       body: JSON.stringify({ commentsVisibleToPeers: next }),
     });
     if (!res.ok) {
+      toggleFailed();
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, commentsVisibleToPeers: currentValue } : s))
       );
@@ -219,7 +230,7 @@ export default function TeacherSessionsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    if (!res.ok) return false;
+    if (!res.ok) { toggleFailed(); return false; }
     setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
     return true;
   };
@@ -235,6 +246,7 @@ export default function TeacherSessionsPage() {
       body: JSON.stringify({ likesVisibleToPeers: next }),
     });
     if (!res.ok) {
+      toggleFailed();
       setSessions((prev) =>
         prev.map((s) => (s.id === id ? { ...s, likesVisibleToPeers: currentValue } : s))
       );

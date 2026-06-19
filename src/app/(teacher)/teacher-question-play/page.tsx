@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/components/ui/use-toast";
 import {
   AnyGame,
   GameVisibility,
@@ -40,6 +41,7 @@ const VIS_LABEL: Record<VisType, { label: string; emoji: string; color: string }
 };
 
 export default function TeacherQuestionPlayPage() {
+  const { toast } = useToast();
   const [games, setGames] = useState<AnyGame[]>([]);
   const [visibilityMap, setVisibilityMap] = useState<Record<string, GameVisibility>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -82,21 +84,29 @@ export default function TeacherQuestionPlayPage() {
     if (!visDialogGame) return;
     setVisSaving(true);
     try {
-      await fetch(`/api/teacher/question-games/${visDialogGame.id}`, {
+      const res = await fetch(`/api/teacher/question-games/${visDialogGame.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visibility: editVis }),
       });
+      if (!res.ok) throw new Error();
       setVisibilityMap((prev) => ({ ...prev, [visDialogGame.id]: editVis }));
       setVisDialogGame(null);
-    } catch {}
+      toast({ variant: "success", description: "공개 설정을 저장했어요." });
+    } catch {
+      toast({ variant: "destructive", description: "공개 설정 저장에 실패했어요." });
+    }
     setVisSaving(false);
   }
 
   // 게임 삭제
   async function deleteGame(game: AnyGame) {
     if (!confirm(`"${game.title}" 놀이를 삭제할까요?`)) return;
-    await fetch(`/api/teacher/question-games/${game.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/teacher/question-games/${game.id}`, { method: "DELETE" }).catch(() => null);
+    if (!res || !res.ok) {
+      toast({ variant: "destructive", description: "놀이 삭제에 실패했어요." });
+      return;
+    }
     load();
   }
 
