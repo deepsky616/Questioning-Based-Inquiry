@@ -2,10 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 
 const POLL_MS = 25000;
 
 interface FlaggedCount { total: number; questions: number; comments: number }
+
+async function fetchFlaggedCount(): Promise<FlaggedCount> {
+  const res = await fetch("/api/teacher/flagged-count");
+  if (!res.ok) throw new Error("flagged-count 실패");
+  return res.json();
+}
 
 /**
  * 교사 알림 벨 — 담당 학생의 부적절 의심(flagged) 질문·댓글 수를 주기적으로 폴링한다.
@@ -13,42 +20,32 @@ interface FlaggedCount { total: number; questions: number; comments: number }
  */
 export function FlaggedAlertBell() {
   const router = useRouter();
-  const [count, setCount] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   const prevRef = useRef<number | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 폴링을 react-query로: 백그라운드 탭 자동 일시정지 + 캐시 공유
+  const { data } = useQuery({
+    queryKey: ["flagged-count"],
+    queryFn: fetchFlaggedCount,
+    refetchInterval: POLL_MS,
+    refetchOnWindowFocus: true,
+  });
+  const count = data?.total ?? 0;
+
+  // 첫 응답은 기준값만 잡고, 이후 증가했을 때만 알림 토스트를 띄운다.
   useEffect(() => {
-    let cancelled = false;
-
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/teacher/flagged-count");
-        if (!res.ok) return;
-        const d: FlaggedCount = await res.json();
-        if (cancelled) return;
-        setCount(d.total);
-        // 첫 폴링은 기준값만 잡고 토스트를 띄우지 않는다. 이후 증가 시에만 알림.
-        if (prevRef.current !== null && d.total > prevRef.current) {
-          const added = d.total - prevRef.current;
-          setToast(`⚠️ 부적절 의심 질문·댓글 ${added}건이 새로 감지됐어요`);
-          if (toastTimer.current) clearTimeout(toastTimer.current);
-          toastTimer.current = setTimeout(() => setToast(null), 6000);
-        }
-        prevRef.current = d.total;
-      } catch {
-        // 무시
-      }
-    };
-
-    poll();
-    const id = setInterval(poll, POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
+    if (data === undefined) return;
+    if (prevRef.current !== null && data.total > prevRef.current) {
+      const added = data.total - prevRef.current;
+      setToast(`⚠️ 부적절 의심 질문·댓글 ${added}건이 새로 감지됐어요`);
       if (toastTimer.current) clearTimeout(toastTimer.current);
-    };
-  }, []);
+      toastTimer.current = setTimeout(() => setToast(null), 6000);
+    }
+    prevRef.current = data.total;
+  }, [data]);
+
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   const goReview = () => {
     setToast(null);

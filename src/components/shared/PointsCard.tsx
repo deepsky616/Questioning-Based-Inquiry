@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AI_BONUS_TYPES, GAME_LABEL, BASE_POINTS, pointBonusLabel } from "@/lib/points-policy";
 import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -35,43 +36,41 @@ function relativeTime(iso: string): string {
 
 const bonusLabel = pointBonusLabel;
 
+async function fetchPointsCard() {
+  const [meRes, classLb, schoolLb, allLb]: [
+    { totalPoints?: number; recent?: PointLog[] },
+    LeaderboardResp, LeaderboardResp, LeaderboardResp,
+  ] = await Promise.all([
+    fetch("/api/points/me").then((r) => r.json()),
+    fetch("/api/points/leaderboard?scope=class").then((r) => r.json()),
+    fetch("/api/points/leaderboard?scope=school").then((r) => r.json()),
+    fetch("/api/points/leaderboard?scope=all").then((r) => r.json()),
+  ]);
+  return {
+    totalPoints: meRes.totalPoints ?? 0,
+    recent: meRes.recent ?? [],
+    ranks: {
+      class: classLb?.me?.rank ?? null,
+      school: schoolLb?.me?.rank ?? null,
+      all: allLb?.me?.rank ?? null,
+    },
+  };
+}
+
 export default function PointsCard() {
-  const [totalPoints, setTotalPoints] = useState(0);
-  const [recent, setRecent] = useState<PointLog[]>([]);
-  const [ranks, setRanks] = useState<{ class: number | null; school: number | null; all: number | null }>({
-    class: null, school: null, all: null,
-  });
-  const [loaded, setLoaded] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchAll = async () => {
-      try {
-        const [meRes, classLb, schoolLb, allLb]: [
-          { totalPoints?: number; recent?: PointLog[] },
-          LeaderboardResp, LeaderboardResp, LeaderboardResp,
-        ] = await Promise.all([
-          fetch("/api/points/me").then((r) => r.json()),
-          fetch("/api/points/leaderboard?scope=class").then((r) => r.json()),
-          fetch("/api/points/leaderboard?scope=school").then((r) => r.json()),
-          fetch("/api/points/leaderboard?scope=all").then((r) => r.json()),
-        ]);
-        if (cancelled) return;
-        setTotalPoints(meRes.totalPoints ?? 0);
-        setRecent(meRes.recent ?? []);
-        setRanks({
-          class: classLb?.me?.rank ?? null,
-          school: schoolLb?.me?.rank ?? null,
-          all: allLb?.me?.rank ?? null,
-        });
-      } catch {}
-      finally { if (!cancelled) setLoaded(true); }
-    };
-    fetchAll();
-    const iv = setInterval(fetchAll, POLL_MS);
-    return () => { cancelled = true; clearInterval(iv); };
-  }, []);
+  // 폴링을 react-query로: 백그라운드 탭에선 자동 일시정지, 창 포커스 시 갱신
+  const { data, isSuccess } = useQuery({
+    queryKey: ["points-card"],
+    queryFn: fetchPointsCard,
+    refetchInterval: POLL_MS,
+    refetchOnWindowFocus: true,
+  });
+  const totalPoints = data?.totalPoints ?? 0;
+  const recent = data?.recent ?? [];
+  const ranks = data?.ranks ?? { class: null, school: null, all: null };
+  const loaded = isSuccess;
 
   const rankText = (v: number | null) => (v != null ? `${v}등` : "-");
 
