@@ -9,6 +9,7 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   sanitizeStudentNumberInput,
   STUDENT_LOGIN_AUTOCOMPLETE,
@@ -334,10 +335,13 @@ export default function LoginPage() {
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.15fr_0.85fr]">
         <section className="overflow-hidden rounded-2xl border border-white/70 bg-white/80 p-3 shadow-xl shadow-blue-100/70 sm:p-4">
           <div className="relative aspect-[3/2] rounded-xl bg-white">
-            <img
+            <Image
               src="/login-inquiry-hero.png"
               alt="질문에서 탐구로 이어지는 학습 여정 일러스트"
-              className="h-full w-full object-contain"
+              fill
+              sizes="(max-width: 1024px) 100vw, 60vw"
+              className="object-contain"
+              priority
             />
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent p-5 text-white">
               <p className="text-sm font-medium opacity-90">Question Lab</p>
