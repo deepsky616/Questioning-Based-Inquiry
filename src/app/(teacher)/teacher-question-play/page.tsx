@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -269,6 +270,13 @@ export default function TeacherQuestionPlayPage() {
                       </div>
                     );
                   })()}
+
+                  {/* 체험하기 (기본 제공 놀이만, 솔로 미리보기 · 점수 미적립) */}
+                  {game.isBuiltIn && (
+                    <Button asChild variant="gradient" size="sm" className="w-full text-xs rounded-xl mb-2">
+                      <Link href={`/teacher-question-play/${game.id}/preview`}>🎮 체험하기</Link>
+                    </Button>
+                  )}
 
                   {/* 액션 버튼 */}
                   <div className="flex gap-2">

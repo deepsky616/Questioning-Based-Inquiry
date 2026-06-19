@@ -22,6 +22,11 @@ export async function POST(req: NextRequest) {
   }
   const userId = (session.user as { id: string }).id;
 
+  // 학생만 포인트 적립. 교사 미리보기/체험은 적립·기록 없이 통과시킨다.
+  if ((session.user as { role?: string }).role !== "STUDENT") {
+    return NextResponse.json({ awarded: 0, preview: true });
+  }
+
   const body = (await req.json().catch(() => ({}))) as Partial<SingleAwardBody>;
   const mode = body.mode === "solo" || body.mode === "ai" ? body.mode : null;
   const gameId = typeof body.gameId === "string" ? body.gameId : "";
