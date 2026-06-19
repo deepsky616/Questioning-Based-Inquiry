@@ -1,12 +1,32 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 export interface DonutSlice {
   name: string;
   value: number;
   /** 조각 색(hex). 대시보드 카드 색 매핑과 동일하게 맞춘다. */
   fill: string;
+}
+
+// 조각 호버 시 이름·개수·비율 표시 (테마 토큰 적용)
+function DonutTooltip({ active, payload, total }: {
+  active?: boolean;
+  payload?: Array<{ payload: DonutSlice }>;
+  total?: number;
+}) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  const pct = total ? Math.round((d.value / total) * 100) : 0;
+  return (
+    <div className="rounded-md border border-border bg-card px-2.5 py-1.5 text-xs shadow-md">
+      <span className="inline-flex items-center gap-1.5">
+        <span className="h-2 w-2 rounded-full" style={{ background: d.fill }} />
+        <span className="font-medium text-foreground">{d.name}</span>
+        <span className="text-muted-foreground">{d.value}개 ({pct}%)</span>
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -49,6 +69,7 @@ export function ClassificationDonut({
               <Cell key={i} fill={hasData ? d.fill : "hsl(var(--muted))"} />
             ))}
           </Pie>
+          {hasData && <Tooltip content={<DonutTooltip total={total} />} />}
         </PieChart>
       </ResponsiveContainer>
       {/* 가운데 총계 */}
