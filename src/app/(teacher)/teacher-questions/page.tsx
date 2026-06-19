@@ -585,7 +585,7 @@ export default function QuestionsPage() {
         해당하는 질문이 없습니다
       </div>
     ) : (
-      <Table>
+      <div className="overflow-x-auto"><Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-8">
@@ -725,7 +725,7 @@ export default function QuestionsPage() {
             </Fragment>
           ))}
         </TableBody>
-      </Table>
+      </Table></div>
     );
   };
 

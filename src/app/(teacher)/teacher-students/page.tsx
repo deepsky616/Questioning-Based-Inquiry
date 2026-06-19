@@ -505,7 +505,7 @@ export default function StudentsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
+                <div className="overflow-x-auto"><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">번호</TableHead>
@@ -546,7 +546,7 @@ export default function StudentsPage() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </Table></div>
               </CardContent>
             </Card>
           );

@@ -162,7 +162,7 @@ export function MyQuestionsView() {
     list.length === 0 ? (
       <div className="text-center py-8 text-muted-foreground text-sm">해당하는 질문이 없습니다</div>
     ) : (
-      <Table>
+      <div className="overflow-x-auto"><Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">#</TableHead>
@@ -256,7 +256,7 @@ export function MyQuestionsView() {
             );
           })}
         </TableBody>
-      </Table>
+      </Table></div>
     );
 
   return (

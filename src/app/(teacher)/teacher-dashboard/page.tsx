@@ -259,7 +259,7 @@ export default function TeacherDashboard() {
               {stats.byStudent.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">데이터가 없습니다</div>
               ) : (
-                <Table>
+                <div className="overflow-x-auto"><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>학생</TableHead>
@@ -297,7 +297,7 @@ export default function TeacherDashboard() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </Table></div>
               )}
             </CardContent>
           </Card>
