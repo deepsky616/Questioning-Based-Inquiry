@@ -183,7 +183,7 @@ function StudentLoginForm() {
       {/* 아이디 저장 */}
       <SaveIdCheckbox id="s-save-id" checked={saveId} onChange={handleSaveIdChange} />
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
+      <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "로그인 중..." : "학생 로그인"}
       </Button>
     </form>
@@ -281,7 +281,7 @@ function TeacherLoginForm() {
         </Link>
       </div>
 
-      <Button type="submit" className="w-full" disabled={isSubmitting}>
+      <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "로그인 중..." : "교사 로그인"}
       </Button>
     </form>

@@ -230,7 +230,7 @@ function RegisterContent() {
               <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="비밀번호 다시 입력" value={form.confirmPassword} onChange={handleChange} />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "처리 중..." : "회원가입"}
             </Button>
           </form>
