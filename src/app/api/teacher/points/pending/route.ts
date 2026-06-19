@@ -45,6 +45,25 @@ export async function GET(req: NextRequest) {
   const qBy = new Map(qMap.map((q) => [q.id, { content: q.content, likeCount: q._count.likes }]));
   const cBy = new Map(cMap.map((c) => [c.id, c.content]));
 
+  // 이미 승인된 포인트(중복 지급 방지용 안내): 같은 학생의 APPROVED 내역을
+  // 같은 작성물(질문/댓글) 또는 같은 수업세션 기준으로 합산해 보여준다.
+  const studentIds = Array.from(new Set(logs.map((l) => l.studentId)));
+  const pendingSessionIds = Array.from(new Set(logs.map((l) => l.sessionId).filter((x): x is string => !!x)));
+  const approved = studentIds.length > 0
+    ? await prisma.pointLog.findMany({
+        where: {
+          status: "APPROVED",
+          studentId: { in: studentIds },
+          OR: [
+            ...(pendingSessionIds.length ? [{ sessionId: { in: pendingSessionIds } }] : []),
+            { relatedQuestionId: { in: qIds.length ? qIds : ["__none__"] } },
+            { relatedCommentId: { in: cIds.length ? cIds : ["__none__"] } },
+          ],
+        },
+        select: { studentId: true, sessionId: true, points: true, relatedQuestionId: true, relatedCommentId: true },
+      })
+    : [];
+
   return NextResponse.json({
     pending: logs.map((l) => ({
       id: l.id,
@@ -63,6 +82,16 @@ export async function GET(req: NextRequest) {
       commentContent: l.relatedCommentId ? cBy.get(l.relatedCommentId) ?? "" : "",
       aiAnalysis: l.aiAnalysis,
       createdAt: l.createdAt,
+      // 이미 승인된 포인트: 같은 작성물 / 같은 수업세션 기준 합산
+      alreadyForTarget: approved
+        .filter((a) =>
+          a.studentId === l.studentId &&
+          ((l.relatedQuestionId && a.relatedQuestionId === l.relatedQuestionId) ||
+            (l.relatedCommentId && a.relatedCommentId === l.relatedCommentId)))
+        .reduce((sum, a) => sum + a.points, 0),
+      alreadyInSession: approved
+        .filter((a) => a.studentId === l.studentId && l.sessionId && a.sessionId === l.sessionId)
+        .reduce((sum, a) => sum + a.points, 0),
     })),
   });
 }

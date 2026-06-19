@@ -20,6 +20,8 @@ interface PendingLog {
   commentContent: string;
   aiAnalysis: string | null;
   createdAt: string;
+  alreadyForTarget: number;
+  alreadyInSession: number;
 }
 
 function bonusLabel(bt: string): { label: string; emoji: string; color: string } {
@@ -254,6 +256,17 @@ function PendingRow({
             </span>
             {p.relatedQuestionId && p.questionLikeCount != null && (
               <span className="text-xs font-medium text-rose-500">❤️ {p.questionLikeCount}</span>
+            )}
+            {/* 중복 지급 방지 안내: 같은 작성물/세션에서 이미 승인된 포인트 */}
+            {p.alreadyForTarget > 0 && (
+              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                ⚠️ 이 {targetLabel}으로 이미 +{p.alreadyForTarget}점
+              </span>
+            )}
+            {p.alreadyForTarget === 0 && p.alreadyInSession > 0 && (
+              <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                이 수업세션 누적 +{p.alreadyInSession}점
+              </span>
             )}
           </div>
           <div className="mt-1.5 text-xs">
