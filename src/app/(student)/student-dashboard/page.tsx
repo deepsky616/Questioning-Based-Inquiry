@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
+import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
 import PointsCard from "@/components/shared/PointsCard";
@@ -74,7 +75,7 @@ export default function StudentDashboard() {
       <PointsCard />
 
       {isLoading ? (
-        <div className="text-center py-12 text-muted-foreground">로딩 중...</div>
+        <DashboardSkeleton />
       ) : (
         <>
       {/* 총 질문 수 */}

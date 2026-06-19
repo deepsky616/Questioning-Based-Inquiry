@@ -12,6 +12,7 @@ import {
 import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 
@@ -135,7 +136,7 @@ export default function TeacherDashboard() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
+        <DashboardSkeleton />
       ) : !stats ? (
         <div className="text-center py-16 text-muted-foreground">통계를 불러올 수 없습니다</div>
       ) : (
