@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { formatDateTime } from "@/lib/datetime";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
 import {
@@ -160,7 +161,7 @@ export function MyQuestionsView() {
 
   const QuestionRows = ({ list }: { list: Question[] }) =>
     list.length === 0 ? (
-      <div className="text-center py-8 text-muted-foreground text-sm">해당하는 질문이 없습니다</div>
+      <EmptyState icon="📝" title="해당하는 질문이 없습니다" description="다른 조건으로 조회해 보세요" />
     ) : (
       <div className="overflow-x-auto"><Table>
         <TableHeader>

@@ -14,6 +14,7 @@ import {
 import { buildTeacherClassLabel } from "@/lib/teacher";
 import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 /* ─── 타입 ─── */
 interface Student {
@@ -219,19 +220,19 @@ function StudentDetailDialog({
 
         {/* 누적 통계 */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3 text-center">
+          <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 p-3 text-center">
             <p className="text-xs text-indigo-500 font-medium">총 질문</p>
             <p className="text-2xl font-black text-indigo-700">
               {stats?.student.questionCount ?? student.questionCount}
             </p>
           </div>
-          <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-center">
+          <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-500/30 p-3 text-center">
             <p className="text-xs text-emerald-500 font-medium">총 답변</p>
             <p className="text-2xl font-black text-emerald-700">
               {stats?.student.commentCount ?? student.commentCount}
             </p>
           </div>
-          <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center">
+          <div className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-500/30 p-3 text-center">
             <p className="text-xs text-amber-500 font-medium">총 포인트</p>
             <p className="text-2xl font-black text-amber-700">
               {stats?.student.totalPoints ?? student.totalPoints}
@@ -329,7 +330,7 @@ function StudentDetailDialog({
         )}
 
         {/* 포인트 수동 지급/회수 */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-xl p-4 space-y-3">
           <h3 className="font-black text-amber-700 text-sm">🎁 포인트 수동 지급 / 회수</h3>
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -420,15 +421,15 @@ export default function StudentsPage() {
           <p className="text-xs text-muted-foreground font-medium">전체 학생</p>
           <p className="text-2xl font-black text-foreground mt-1">{students.length}명</p>
         </div>
-        <div className="rounded-2xl bg-indigo-50 border border-indigo-100 p-4 text-center">
+        <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 p-4 text-center">
           <p className="text-xs text-indigo-500 font-medium">총 질문</p>
           <p className="text-2xl font-black text-indigo-700 mt-1">{totalQ}</p>
         </div>
-        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-4 text-center">
+        <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-500/30 p-4 text-center">
           <p className="text-xs text-emerald-500 font-medium">총 답변</p>
           <p className="text-2xl font-black text-emerald-700 mt-1">{totalC}</p>
         </div>
-        <div className="rounded-2xl bg-amber-50 border border-amber-100 p-4 text-center">
+        <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-500/30 p-4 text-center">
           <p className="text-xs text-amber-500 font-medium">총 포인트 / 평균</p>
           <p className="text-2xl font-black text-amber-700 mt-1">
             {totalP}<span className="text-sm font-normal text-amber-500 ml-1">/ {avgP}</span>
@@ -456,7 +457,7 @@ export default function StudentsPage() {
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                   filterClass === key
                     ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                    : "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100"
                 }`}>
                 {buildTeacherClassLabel(tc.grade, tc.className)}
               </button>
@@ -476,13 +477,12 @@ export default function StudentsPage() {
       {isLoading ? (
         <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
       ) : students.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">
-          <p className="font-medium mb-1">등록된 학생이 없습니다</p>
-          <p className="text-sm text-muted-foreground">같은 학교·학년·반 학생이 회원가입하면 표시됩니다</p>
+        <Card><CardContent className="p-0">
+          <EmptyState icon="🧑‍🏫" title="등록된 학생이 없습니다" description="같은 학교·학년·반 학생이 회원가입하면 표시됩니다" />
         </CardContent></Card>
       ) : filtered.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-muted-foreground">
-          <p className="font-medium mb-1">검색 결과가 없습니다</p>
+        <Card><CardContent className="p-0">
+          <EmptyState icon="🔍" title="검색 결과가 없습니다" description="다른 이름이나 학급으로 다시 찾아보세요" />
         </CardContent></Card>
       ) : (
         Object.entries(grouped).map(([classLabel, classStudents]) => {

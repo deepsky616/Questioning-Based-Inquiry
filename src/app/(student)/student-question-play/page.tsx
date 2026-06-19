@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AnyGame } from "@/lib/question-games-data";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function StudentQuestionPlayPage() {
   const [games, setGames] = useState<AnyGame[]>([]);
@@ -60,11 +61,7 @@ export default function StudentQuestionPlayPage() {
       )}
 
       {!isLoading && games.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="text-6xl">😢</div>
-          <p className="text-gray-500 text-lg font-medium">아직 공개된 놀이가 없어요</p>
-          <p className="text-gray-400 text-sm">선생님께 질문놀이 공개를 요청해보세요!</p>
-        </div>
+        <EmptyState icon="😢" title="아직 공개된 놀이가 없어요" description="선생님께 질문놀이 공개를 요청해보세요!" className="py-24" />
       )}
 
       {!isLoading && games.length > 0 && (

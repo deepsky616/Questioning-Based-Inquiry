@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AI_BONUS_TYPES, GAME_LABEL, BASE_POINTS, pointBonusLabel } from "@/lib/points-policy";
 import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 const POLL_MS = 5000;
 
@@ -101,7 +102,7 @@ export default function PointsCard() {
       <div className="md:col-span-2 rounded-2xl p-5 bg-card border border-border shadow-sm">
         <h3 className="font-black text-foreground text-sm mb-3">📜 최근 받은 포인트</h3>
         {recent.length === 0 ? (
-          <p className="text-muted-foreground text-sm text-center py-6">아직 받은 포인트가 없어요. 질문·댓글을 작성하거나 질문놀이에 참여해 보세요!</p>
+          <EmptyState icon="⭐" title="아직 받은 포인트가 없어요" description="질문·댓글을 작성하거나 질문놀이에 참여해 보세요!" />
         ) : (
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {recent.slice(0, 8).map((log) => {

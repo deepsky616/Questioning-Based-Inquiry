@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, compareByStudent, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -124,7 +125,7 @@ function QuestionCard({
       <div
         className={
           isTeacherShared
-            ? "p-4 bg-indigo-50/30 flex justify-between items-start gap-4"
+            ? "p-4 bg-indigo-50 dark:bg-indigo-950/40/30 flex justify-between items-start gap-4"
             : "p-4 bg-muted/40 flex justify-between items-start gap-4"
         }
       >
@@ -136,7 +137,7 @@ function QuestionCard({
                 📌 단원설계 질문
               </span>
             ) : (
-              <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+              <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/30">
                 ✏️ 학생 질문
               </span>
             )}
@@ -301,9 +302,7 @@ export function ExploreQuestionsView() {
   const displayed = applyClassificationFilter(filtered, filterClosure, filterCognitive);
 
   const Empty = () => (
-    <div className="text-center py-8 text-muted-foreground text-sm">
-      {search ? "검색 결과가 없습니다" : "해당하는 질문이 없습니다"}
-    </div>
+    <EmptyState icon="🔍" title={search ? "검색 결과가 없습니다" : "해당하는 질문이 없습니다"} description="조건을 바꾸거나 검색어를 지워보세요" />
   );
 
   const QuestionList = ({ list }: { list: Question[] }) =>
