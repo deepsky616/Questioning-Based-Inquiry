@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
 import type { UserRole } from "@/types/user";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 interface ExtendedUser {
   name?: string;
@@ -22,10 +23,7 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">설정</h2>
-        <p className="text-muted-foreground">계정 정보를 확인하고 비밀번호를 변경할 수 있어요</p>
-      </div>
+      <PageHeader title="설정" description="계정 정보를 확인하고 비밀번호를 변경할 수 있어요" />
 
       <Card>
         <CardHeader>

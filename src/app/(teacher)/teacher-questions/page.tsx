@@ -36,6 +36,7 @@ import {
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { formatBulkAiSummary, validatePreviewAnswers } from "@/lib/questions";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 interface QuestionSession {
   id: string;
@@ -731,10 +732,7 @@ export default function QuestionsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">질문 조회</h2>
-        <p className="text-muted-foreground">수업 세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
-      </div>
+      <PageHeader title="질문 조회" description="수업 세션을 선택해 학생 질문을 체계적으로 확인하세요" />
 
       <div className="flex rounded-md border overflow-hidden w-fit">
         <button

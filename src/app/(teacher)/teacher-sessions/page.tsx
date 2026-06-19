@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import DatePicker from "@/components/shared/DatePicker";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { buildSessionLabel, isSessionAvailable, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { PageHeader } from "@/components/shared/PageHeader";
 import {
   buildClassTargetValue,
   buildClassStudentTargetPayload,
@@ -253,10 +254,7 @@ export default function TeacherSessionsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">수업 세션</h2>
-        <p className="text-muted-foreground">수업 세션을 만들고 관리하세요. 학생들이 질문할 때 세션을 선택할 수 있습니다.</p>
-      </div>
+      <PageHeader title="수업 세션" description="수업 세션을 만들고 관리하세요. 학생들이 질문할 때 세션을 선택할 수 있습니다." />
 
       {/* 새 세션 만들기 */}
       <Card>

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import DatePicker from "@/components/shared/DatePicker";
+import { PageHeader } from "@/components/shared/PageHeader";
 import {
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
@@ -558,10 +559,7 @@ export default function CurriculumPage() {
   // ── 렌더 ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">탐구 질문 도우미</h2>
-        <p className="text-muted-foreground">교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
-      </div>
+      <PageHeader title="탐구 질문 도우미" description="교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문" />
 
       {/* 탭: 탐구질문 만들기 / 저장된 탐구질문 */}
       <div className="flex rounded-md border overflow-hidden w-fit">

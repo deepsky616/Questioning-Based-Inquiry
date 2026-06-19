@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 
@@ -102,10 +103,7 @@ export default function TeacherDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">교사 대시보드</h2>
-        <p className="text-muted-foreground">담당 학생들의 질문 통계를 확인하세요</p>
-      </div>
+      <PageHeader title="교사 대시보드" description="담당 학생들의 질문 통계를 확인하세요" />
 
       {/* 필터 */}
       <div className="flex gap-3">

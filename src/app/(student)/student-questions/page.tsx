@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MyQuestionsView } from "@/components/student/MyQuestionsView";
 import { ExploreQuestionsView } from "@/components/student/ExploreQuestionsView";
 import { UnitDesignView } from "@/components/student/UnitDesignView";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 type Tab = "mine" | "explore" | "design";
 
@@ -18,10 +19,7 @@ export default function StudentQuestionsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">질문탐구</h2>
-        <p className="text-muted-foreground">내 질문을 관리하고, 친구들의 질문을 탐구하고, 선생님이 배포한 수업 탐구 질문에 참여해 보세요</p>
-      </div>
+      <PageHeader title="질문탐구" description="내 질문을 관리하고, 친구들의 질문을 탐구하고, 선생님이 배포한 수업 탐구 질문에 참여해 보세요" />
 
       <div className="flex flex-wrap rounded-md border overflow-hidden w-fit">
         {TABS.map((t, i) => (

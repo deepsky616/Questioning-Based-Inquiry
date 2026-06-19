@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { buildTeacherClassLabel } from "@/lib/teacher";
 import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 /* ─── 타입 ─── */
 interface Student {
@@ -411,10 +412,7 @@ export default function StudentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">학생 관리</h2>
-        <p className="text-muted-foreground">담당 학생의 질문·답변·포인트 활동을 한눈에 확인하세요</p>
-      </div>
+      <PageHeader title="학생 관리" description="담당 학생의 질문·답변·포인트 활동을 한눈에 확인하세요" />
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

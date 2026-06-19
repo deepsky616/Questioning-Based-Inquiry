@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
 import { StudentPasswordResetCard } from "@/components/teacher/StudentPasswordResetCard";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import {
   Select,
@@ -237,10 +238,7 @@ export default function TeacherSettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">설정</h2>
-        <p className="text-muted-foreground">교사 계정 정보 및 AI 설정을 관리하세요</p>
-      </div>
+      <PageHeader title="설정" description="교사 계정 정보 및 AI 설정을 관리하세요" />
 
       <Card>
         <CardHeader>
