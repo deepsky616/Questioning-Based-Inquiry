@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { DEFAULT_GEMINI_MODEL, GEMINI_MODELS } from "@/lib/api-config";
 import { buildTeacherClassLabel, resolveClassInputMode } from "@/lib/teacher";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 
 interface BulkStudent {
   studentNumber: string;
@@ -155,8 +156,10 @@ export default function TeacherSettingsPage() {
     }
   };
 
+  const confirm = useConfirm();
+
   const handleDelete = async () => {
-    if (!confirm("AI 설정을 삭제하면 학생들이 AI 분류를 사용할 수 없습니다. 계속하시겠습니까?")) return;
+    if (!(await confirm({ description: "AI 설정을 삭제하면 학생들이 AI 분류를 사용할 수 없습니다. 계속하시겠습니까?", confirmText: "삭제", destructive: true }))) return;
 
     setIsDeleting(true);
     try {

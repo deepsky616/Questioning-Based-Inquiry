@@ -37,6 +37,7 @@ import {
 import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { formatBulkAiSummary, validatePreviewAnswers } from "@/lib/questions";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 
 interface QuestionSession {
   id: string;
@@ -244,8 +245,10 @@ export default function QuestionsPage() {
   );
 
   // 배포한 탐구설계 전체 삭제
+  const confirm = useConfirm();
+
   const handleDeleteDeploy = async (sessionId: string) => {
-    if (!window.confirm("이 세션의 배포한 탐구설계를 삭제할까요? 학생이 남긴 좋아요·댓글도 함께 삭제됩니다.")) return;
+    if (!(await confirm({ description: "이 세션의 배포한 탐구설계를 삭제할까요? 학생이 남긴 좋아요·댓글도 함께 삭제됩니다.", confirmText: "삭제", destructive: true }))) return;
     setDeletingDeployId(sessionId);
     try {
       const res = await fetch(`/api/sessions/${sessionId}/publish-questions`, {
@@ -482,7 +485,7 @@ export default function QuestionsPage() {
   };
 
   const handleDeleteQuestion = async (question: Question) => {
-    if (!confirm(`'${question.author.name}' 학생의 질문을 삭제하시겠습니까?\n연결된 댓글도 함께 삭제되며 되돌릴 수 없습니다.`)) return;
+    if (!(await confirm({ description: `'${question.author.name}' 학생의 질문을 삭제하시겠습니까?\n연결된 댓글도 함께 삭제되며 되돌릴 수 없습니다.`, confirmText: "삭제", destructive: true }))) return;
     try {
       const res = await fetch(`/api/questions/${question.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();

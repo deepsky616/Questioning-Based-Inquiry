@@ -12,6 +12,7 @@ import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector
 import { buildSessionLabel, isSessionAvailable, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import {
   buildClassTargetValue,
   buildClassStudentTargetPayload,
@@ -159,8 +160,10 @@ export default function TeacherSessionsPage() {
 
   const toggleFailed = () => toast({ variant: "destructive", description: "변경에 실패했어요. 잠시 후 다시 시도해 주세요." });
 
+  const confirm = useConfirm();
+
   const handleDelete = async (id: string) => {
-    if (!confirm("이 세션을 삭제하시겠습니까? 연결된 질문은 세션 없음 상태가 됩니다.")) return;
+    if (!(await confirm({ description: "이 세션을 삭제하시겠습니까? 연결된 질문은 세션 없음 상태가 됩니다.", confirmText: "삭제", destructive: true }))) return;
     const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" }).catch(() => null);
     if (!res || !res.ok) {
       toast({ variant: "destructive", description: "세션 삭제에 실패했어요." });

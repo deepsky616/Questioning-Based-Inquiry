@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import DatePicker from "@/components/shared/DatePicker";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import {
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
@@ -544,8 +545,10 @@ export default function CurriculumPage() {
     }
   };
 
+  const confirm = useConfirm();
+
   const handleDelete = async (id: string) => {
-    if (!confirm("삭제하시겠습니까?")) return;
+    if (!(await confirm({ description: "삭제하시겠습니까?", confirmText: "삭제", destructive: true }))) return;
     await fetch(`/api/unit-design/${id}`, { method: "DELETE" });
     if (selectedSavedId === id) {
       setSelectedSavedId(null);

@@ -5,6 +5,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 
 interface InquiryQuestion { type: string; content: string }
 interface UnitDesign {
@@ -104,9 +105,11 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
     } finally { setBusy(false); }
   }
 
+  const confirm = useConfirm();
+
   async function revoke(qId: string, commentCount: number) {
     if (commentCount > 0) {
-      const ok = confirm(`이 질문에 ${commentCount}개의 답변이 있어요. 정말 배포 취소(삭제)할까요?`);
+      const ok = await confirm({ description: `이 질문에 ${commentCount}개의 답변이 있어요. 정말 배포 취소(삭제)할까요?`, confirmText: "배포 취소", destructive: true });
       if (!ok) return;
     }
     setBusy(true);

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import {
   AnyGame,
   GameVisibility,
@@ -100,8 +101,10 @@ export default function TeacherQuestionPlayPage() {
   }
 
   // 게임 삭제
+  const confirm = useConfirm();
+
   async function deleteGame(game: AnyGame) {
-    if (!confirm(`"${game.title}" 놀이를 삭제할까요?`)) return;
+    if (!(await confirm({ description: `"${game.title}" 놀이를 삭제할까요?`, confirmText: "삭제", destructive: true }))) return;
     const res = await fetch(`/api/teacher/question-games/${game.id}`, { method: "DELETE" }).catch(() => null);
     if (!res || !res.ok) {
       toast({ variant: "destructive", description: "놀이 삭제에 실패했어요." });

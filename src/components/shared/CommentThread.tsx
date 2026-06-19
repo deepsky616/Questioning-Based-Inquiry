@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { formatDateTime } from "@/lib/datetime";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 
 export interface ThreadComment {
   id: string;
@@ -116,8 +117,10 @@ export function CommentThread({
     }
   };
 
+  const confirm = useConfirm();
+
   const deleteComment = async (commentId: string) => {
-    if (!confirm("이 댓글을 삭제하시겠습니까?")) return;
+    if (!(await confirm({ description: "이 댓글을 삭제하시겠습니까?", confirmText: "삭제", destructive: true }))) return;
     try {
       const res = await fetch(`/api/questions/${questionId}/comments/${commentId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();

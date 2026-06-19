@@ -18,6 +18,7 @@ import {
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import {
   Table,
   TableBody,
@@ -140,8 +141,10 @@ export function MyQuestionsView() {
     setExpandedQuestionId((prev) => (prev === questionId ? null : questionId));
   };
 
+  const confirm = useConfirm();
+
   const handleDelete = async (questionId: string) => {
-    if (!confirm("이 질문을 정말 삭제할까요? 작성한 댓글도 모두 함께 사라집니다.")) return;
+    if (!(await confirm({ description: "이 질문을 정말 삭제할까요? 작성한 댓글도 모두 함께 사라집니다.", confirmText: "삭제", destructive: true }))) return;
     setDeletingId(questionId);
     try {
       const res = await fetch(`/api/questions/${questionId}`, { method: "DELETE" });
