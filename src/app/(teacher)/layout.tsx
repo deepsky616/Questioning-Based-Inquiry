@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { PageNav } from "@/components/shared/PageNav";
-import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { AppNav } from "@/components/shared/AppNav";
 import { FlaggedAlertBell } from "@/components/teacher/FlaggedAlertBell";
 import { getSessionUser } from "@/lib/auth-helpers";
 
@@ -46,34 +44,12 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-card shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-8">
-              <h1 className="text-xl font-bold text-primary">Question Lab</h1>
-              <nav className="flex space-x-1">
-                {TEACHER_PAGES.map((p) => (
-                  <Link
-                    key={p.href}
-                    href={p.href}
-                    className="text-muted-foreground hover:text-primary px-3 py-2 rounded-md text-sm font-medium"
-                  >
-                    {p.label}
-                  </Link>
-                ))}
-              </nav>
-            </div>
-            <div className="flex items-center space-x-4">
-              <FlaggedAlertBell />
-              <ThemeToggle />
-              <span className="text-sm text-muted-foreground">{user.name} 선생님</span>
-              <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
-                로그아웃
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppNav
+        pages={TEACHER_PAGES}
+        userName={user.name ?? ""}
+        roleSuffix="선생님"
+        extra={<FlaggedAlertBell />}
+      />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
         <PageNav pages={TEACHER_PAGES} />

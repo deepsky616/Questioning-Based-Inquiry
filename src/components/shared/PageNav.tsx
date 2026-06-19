@@ -17,7 +17,7 @@ export function PageNav({ pages }: PageNavProps) {
   const isHome = currentIndex === 0;
 
   return (
-    <div className="mt-8 pt-4 border-t border-gray-200 flex items-center justify-between">
+    <div className="mt-8 pt-4 border-t border-border flex items-center justify-between">
       <div className="flex gap-2">
         {!isHome && (
           <Link href={home.href}>
@@ -35,7 +35,7 @@ export function PageNav({ pages }: PageNavProps) {
         )}
       </div>
 
-      <span className="text-xs text-gray-400">
+      <span className="text-xs text-muted-foreground">
         {currentIndex + 1} / {pages.length}
       </span>
 
