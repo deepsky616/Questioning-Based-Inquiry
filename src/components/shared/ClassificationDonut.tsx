@@ -19,10 +19,10 @@ function DonutTooltip({ active, payload, total }: {
   const d = payload[0].payload;
   const pct = total ? Math.round((d.value / total) * 100) : 0;
   return (
-    <div className="rounded-md border border-border bg-card px-2.5 py-1.5 text-xs shadow-md">
+    <div className="relative z-50 whitespace-nowrap rounded-md border border-border bg-card px-2.5 py-1.5 text-xs shadow-lg">
       <span className="inline-flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full" style={{ background: d.fill }} />
-        <span className="font-medium text-foreground">{d.name}</span>
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.fill }} />
+        <span className="font-semibold text-foreground">{d.name}</span>
         <span className="text-muted-foreground">{d.value}개 ({pct}%)</span>
       </span>
     </div>
@@ -69,7 +69,14 @@ export function ClassificationDonut({
               <Cell key={i} fill={hasData ? d.fill : "hsl(var(--muted))"} />
             ))}
           </Pie>
-          {hasData && <Tooltip content={<DonutTooltip total={total} />} />}
+          {hasData && (
+            <Tooltip
+              content={<DonutTooltip total={total} />}
+              wrapperStyle={{ zIndex: 50, outline: "none" }}
+              allowEscapeViewBox={{ x: true, y: true }}
+              offset={12}
+            />
+          )}
         </PieChart>
       </ResponsiveContainer>
       {/* 가운데 총계 */}
