@@ -160,7 +160,7 @@ export function MyQuestionsView() {
 
   const QuestionRows = ({ list }: { list: Question[] }) =>
     list.length === 0 ? (
-      <div className="text-center py-8 text-gray-400 text-sm">해당하는 질문이 없습니다</div>
+      <div className="text-center py-8 text-muted-foreground text-sm">해당하는 질문이 없습니다</div>
     ) : (
       <Table>
         <TableHeader>
@@ -186,7 +186,7 @@ export function MyQuestionsView() {
             return (
               <Fragment key={q.id}>
                 <TableRow>
-                  <TableCell className="text-gray-400">{i + 1}</TableCell>
+                  <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                   <TableCell className="max-w-xs">
                     <p className="truncate">{q.content}</p>
                   </TableCell>
@@ -201,14 +201,14 @@ export function MyQuestionsView() {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <span className={`text-xs px-2 py-1 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                    <span className={`text-xs px-2 py-1 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>
                       {q.isPublic ? "공개" : "비공개"}
                     </span>
                   </TableCell>
-                  <TableCell className="text-xs text-gray-500 max-w-xs truncate">
+                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
                     {q.session ? buildSessionLabel(q.session.date, q.session.subject, q.session.topic) : "—"}
                   </TableCell>
-                  <TableCell className="text-xs text-gray-400 whitespace-nowrap">
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {formatDateTime(q.createdAt)}
                   </TableCell>
                   <TableCell className="text-sm text-rose-500">
@@ -221,7 +221,7 @@ export function MyQuestionsView() {
                       size="sm"
                       className={
                         commentCount === 0
-                          ? "h-8 border-gray-200 bg-gray-50 text-gray-400 hover:bg-gray-50 hover:text-gray-500"
+                          ? "h-8 border-border bg-muted/40 text-muted-foreground hover:bg-muted/40 hover:text-muted-foreground"
                           : "h-8"
                       }
                       onClick={() => toggleComments(q.id)}
@@ -261,7 +261,7 @@ export function MyQuestionsView() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-600">
+      <p className="text-sm text-muted-foreground">
         작성한 질문을 조회하고, 분류·세션별로 확인하거나 삭제할 수 있어요 · 총 {questions.length}개
       </p>
 

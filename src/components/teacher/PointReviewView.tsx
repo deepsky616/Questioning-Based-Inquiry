@@ -124,7 +124,7 @@ export function PointReviewView() {
 
   return (
     <div className="space-y-6">
-      <p className="text-gray-600 text-sm">
+      <p className="text-muted-foreground text-sm">
         학생의 질문·답변을 AI가 채점한 후보를 확인하고 승인하세요. 최종 결정은 선생님께 있어요.
       </p>
 
@@ -135,7 +135,7 @@ export function PointReviewView() {
           <CardDescription>세션을 고르고 [AI 채점] 버튼을 누르면 학생 활동을 분석합니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <select className="border rounded-md px-3 py-2 text-sm bg-white w-full"
+          <select className="border rounded-md px-3 py-2 text-sm bg-card w-full"
             value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)}>
             <option value="all">전체 (대기 중인 후보만 표시)</option>
             {sessions.map((s) => (
@@ -209,7 +209,7 @@ export function PointReviewView() {
         </CardHeader>
         <CardContent className="space-y-2">
           {normalRows.length === 0 ? (
-            <p className="text-center py-8 text-gray-400 text-sm">대기 중인 보너스가 없어요</p>
+            <p className="text-center py-8 text-muted-foreground text-sm">대기 중인 보너스가 없어요</p>
           ) : normalRows.map((p) => (
             <PendingRow key={p.id} p={p} selected={selected.has(p.id)}
               onToggle={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
@@ -240,13 +240,13 @@ function PendingRow({
   const content = p.commentContent || p.questionContent;
   const targetLabel = p.relatedQuestionId ? "질문" : "답변";
   return (
-    <div className={`rounded-xl border border-gray-100 p-3 space-y-2 ${selected ? "bg-indigo-50" : "bg-white"}`}>
+    <div className={`rounded-xl border border-border p-3 space-y-2 ${selected ? "bg-indigo-50" : "bg-card"}`}>
       <div className="flex items-start gap-3">
         <input type="checkbox" checked={selected} onChange={onToggle} className="mt-1 w-4 h-4 accent-indigo-500" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-gray-800 text-sm">{p.studentName}</span>
-            <span className="text-xs text-gray-400">{p.grade}학년 {p.className}반</span>
+            <span className="font-bold text-foreground text-sm">{p.studentName}</span>
+            <span className="text-xs text-muted-foreground">{p.grade}학년 {p.className}반</span>
             <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
               style={{ background: b.color }}>
               {b.emoji} {b.label}
@@ -257,11 +257,11 @@ function PendingRow({
             )}
           </div>
           <div className="mt-1.5 text-xs">
-            <span className="text-gray-400">{targetLabel}: </span>
-            <span className="text-gray-700">{content || "(내용 없음)"}</span>
+            <span className="text-muted-foreground">{targetLabel}: </span>
+            <span className="text-foreground">{content || "(내용 없음)"}</span>
           </div>
           {p.reason && (
-            <div className="mt-1 text-xs text-gray-500 bg-gray-50 rounded px-2 py-1">
+            <div className="mt-1 text-xs text-muted-foreground bg-muted/40 rounded px-2 py-1">
               💬 {p.reason}
             </div>
           )}

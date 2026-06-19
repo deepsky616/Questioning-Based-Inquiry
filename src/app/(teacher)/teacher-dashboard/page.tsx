@@ -92,7 +92,7 @@ export default function TeacherDashboard() {
         </span>
       );
     return (
-      <span className="text-gray-400 text-xs" title="기간 전반과 후반의 질문 수가 비슷해요">
+      <span className="text-muted-foreground text-xs" title="기간 전반과 후반의 질문 수가 비슷해요">
         — 비슷함
       </span>
     );
@@ -103,8 +103,8 @@ export default function TeacherDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">교사 대시보드</h2>
-        <p className="text-gray-600">담당 학생들의 질문 통계를 확인하세요</p>
+        <h2 className="text-2xl font-bold text-foreground">교사 대시보드</h2>
+        <p className="text-muted-foreground">담당 학생들의 질문 통계를 확인하세요</p>
       </div>
 
       {/* 필터 */}
@@ -137,9 +137,9 @@ export default function TeacherDashboard() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-16 text-gray-400">로딩 중...</div>
+        <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
       ) : !stats ? (
-        <div className="text-center py-16 text-gray-400">통계를 불러올 수 없습니다</div>
+        <div className="text-center py-16 text-muted-foreground">통계를 불러올 수 없습니다</div>
       ) : (
         <>
           {/* 총 질문 수 */}
@@ -147,10 +147,10 @@ export default function TeacherDashboard() {
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div>
-                  <p className="text-sm text-gray-500">총 질문 수</p>
+                  <p className="text-sm text-muted-foreground">총 질문 수</p>
                   <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
                 </div>
-                <div className="text-xs text-gray-400 border-l pl-4">
+                <div className="text-xs text-muted-foreground border-l pl-4">
                   {period === "week" && "최근 1주 기준"}
                   {period === "month" && "최근 1개월 기준"}
                   {period === "semester" && "최근 6개월 기준"}
@@ -223,7 +223,7 @@ export default function TeacherDashboard() {
                         <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
                         <span className="text-sm font-medium">사실적 질문</span>
                       </div>
-                      <span className="text-2xl font-bold text-gray-700">{stats.byCognitive.factual}</span>
+                      <span className="text-2xl font-bold text-foreground">{stats.byCognitive.factual}</span>
                     </div>
                     <StatBar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
                   </div>
@@ -259,7 +259,7 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent>
               {stats.byStudent.length === 0 ? (
-                <div className="text-center py-8 text-gray-400">데이터가 없습니다</div>
+                <div className="text-center py-8 text-muted-foreground">데이터가 없습니다</div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -268,7 +268,7 @@ export default function TeacherDashboard() {
                       <TableHead className="text-right">총</TableHead>
                       <TableHead className="text-right text-blue-600">폐쇄형</TableHead>
                       <TableHead className="text-right text-green-600">개방형</TableHead>
-                      <TableHead className="text-right text-gray-500">사실적</TableHead>
+                      <TableHead className="text-right text-muted-foreground">사실적</TableHead>
                       <TableHead className="text-right text-purple-600">개념적</TableHead>
                       <TableHead className="text-right text-orange-600">논쟁적</TableHead>
                       <TableHead className="text-right whitespace-nowrap" title="선택한 기간을 절반으로 나눠, 전반 대비 후반의 질문 작성량 변화를 보여줍니다">
@@ -282,7 +282,7 @@ export default function TeacherDashboard() {
                         <TableCell>
                           <div className="font-medium">{s.name}</div>
                           {(s.grade || s.className || s.studentNumber) && (
-                            <div className="text-xs text-gray-400">
+                            <div className="text-xs text-muted-foreground">
                               {s.grade && `${s.grade}학년 `}
                               {s.className && `${s.className}반`}
                               {s.studentNumber && ` ${s.studentNumber}번`}
@@ -292,7 +292,7 @@ export default function TeacherDashboard() {
                         <TableCell className="text-right font-bold">{s.total}</TableCell>
                         <TableCell className="text-right text-blue-600">{s.distribution.closed}</TableCell>
                         <TableCell className="text-right text-green-600">{s.distribution.open}</TableCell>
-                        <TableCell className="text-right text-gray-500">{s.cognitiveDistribution.factual}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{s.cognitiveDistribution.factual}</TableCell>
                         <TableCell className="text-right text-purple-600">{s.cognitiveDistribution.conceptual}</TableCell>
                         <TableCell className="text-right text-orange-600">{s.cognitiveDistribution.controversial}</TableCell>
                         <TableCell className="text-right whitespace-nowrap">{getTrendLabel(s.trend)}</TableCell>

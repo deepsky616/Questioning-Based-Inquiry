@@ -238,8 +238,8 @@ export default function TeacherSettingsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">설정</h2>
-        <p className="text-gray-600">교사 계정 정보 및 AI 설정을 관리하세요</p>
+        <h2 className="text-2xl font-bold text-foreground">설정</h2>
+        <p className="text-muted-foreground">교사 계정 정보 및 AI 설정을 관리하세요</p>
       </div>
 
       <Card>
@@ -277,7 +277,7 @@ export default function TeacherSettingsPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-400 pt-1">등록된 담당 학급 정보가 없습니다.</p>
+              <p className="text-sm text-muted-foreground pt-1">등록된 담당 학급 정보가 없습니다.</p>
             )}
           </div>
         </CardContent>
@@ -402,8 +402,8 @@ export default function TeacherSettingsPage() {
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
             />
-            <p className="text-xs text-gray-500">
-              형식: <code className="bg-gray-100 px-1 rounded">번호 이름</code> (탭, 쉼표, 공백 모두 구분자로 사용 가능)
+            <p className="text-xs text-muted-foreground">
+              형식: <code className="bg-muted px-1 rounded">번호 이름</code> (탭, 쉼표, 공백 모두 구분자로 사용 가능)
             </p>
           </div>
 
@@ -412,7 +412,7 @@ export default function TeacherSettingsPage() {
               {isBulkSaving ? "등록 중..." : `${parseBulkText().length}명 일괄 등록`}
             </Button>
             {bulkText && (
-              <span className="text-sm text-gray-500">{parseBulkText().length}명 입력됨</span>
+              <span className="text-sm text-muted-foreground">{parseBulkText().length}명 입력됨</span>
             )}
           </div>
 
@@ -492,7 +492,7 @@ export default function TeacherSettingsPage() {
               }}
             />
             {currentConfig?.configured && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 비워두고 저장하면 기존 API 키는 그대로 유지되고 모델만 변경됩니다.
               </p>
             )}

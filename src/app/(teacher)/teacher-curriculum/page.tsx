@@ -559,8 +559,8 @@ export default function CurriculumPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">탐구 질문 도우미</h2>
-        <p className="text-gray-600">교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
+        <h2 className="text-2xl font-bold text-foreground">탐구 질문 도우미</h2>
+        <p className="text-muted-foreground">교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문</p>
       </div>
 
       {/* 탭: 탐구질문 만들기 / 저장된 탐구질문 */}
@@ -590,7 +590,7 @@ export default function CurriculumPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {savedList.length === 0 ? (
-              <p className="text-gray-400 text-sm">저장된 탐구 질문이 없습니다.</p>
+              <p className="text-muted-foreground text-sm">저장된 탐구 질문이 없습니다.</p>
             ) : (
               <ul className="divide-y rounded-md border">
                 {savedList.map((d) => (
@@ -601,8 +601,8 @@ export default function CurriculumPage() {
                         onClick={() => handleSelectSavedDesign(d)}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <span className="block truncate font-medium text-sm text-gray-900">{d.title}</span>
-                        <span className="text-xs text-gray-400">
+                        <span className="block truncate font-medium text-sm text-foreground">{d.title}</span>
+                        <span className="text-xs text-muted-foreground">
                           {d.sessionDate ? `${d.sessionDate} · ` : ""}{d.subject} · {d.grade ? `${d.grade}학년` : `${d.gradeRange}학년군`} · {d.area} · 탐구질문 {d.inquiryQuestions.length}개
                         </span>
                       </button>
@@ -610,10 +610,10 @@ export default function CurriculumPage() {
                     </div>
 
                     {selectedSavedId === d.id && (
-                      <div className="mt-3 space-y-3 rounded-md bg-gray-50 p-3">
+                      <div className="mt-3 space-y-3 rounded-md bg-muted/40 p-3">
                         <div className="space-y-2">
                           {d.inquiryQuestions.length === 0 ? (
-                            <p className="text-sm text-gray-400">저장된 탐구질문이 없습니다.</p>
+                            <p className="text-sm text-muted-foreground">저장된 탐구질문이 없습니다.</p>
                           ) : (
                             d.inquiryQuestions.map((question, i) => (
                               <label key={`${question.type}-${i}`} className="flex items-start gap-2">
@@ -623,7 +623,7 @@ export default function CurriculumPage() {
                                   checked={selectedSavedQuestionKeys.has(getQuestionKey(question))}
                                   onChange={() => toggleSavedQuestion(question)}
                                 />
-                                <span className="text-sm text-gray-800">
+                                <span className="text-sm text-foreground">
                                   <span className="font-medium text-indigo-600 mr-1">
                                     [{TYPE_LABEL[question.type]}]
                                   </span>
@@ -648,7 +648,7 @@ export default function CurriculumPage() {
                           </div>
                           <div className="space-y-1">
                             <Label>교과</Label>
-                            <Input value={d.subject} disabled className="bg-gray-100" />
+                            <Input value={d.subject} disabled className="bg-muted" />
                           </div>
                           <div className="space-y-1">
                             <Label>주제</Label>
@@ -663,7 +663,7 @@ export default function CurriculumPage() {
                           </div>
                         </div>
 
-                        <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 space-y-2">
+                        <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-2">
                           {([
                             ["isActive", "학생 활성화", "켜면 학생이 배포된 질문에 좋아요·댓글을 남길 수 있어요.", sessionIsActive, setSessionIsActive],
                             ["defaultQuestionPublic", "질문 공개", "켜면 학생이 작성한 질문을 서로 볼 수 있어요. 끄면 본인 질문만 보여요.", defaultQuestionPublic, setDefaultQuestionPublic],
@@ -672,8 +672,8 @@ export default function CurriculumPage() {
                           ] as const).map(([key, label, desc, value, setter]) => (
                             <div key={key} className="flex items-center justify-between gap-4">
                               <div>
-                                <p className="text-sm font-medium text-gray-800">{label}</p>
-                                <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                                <p className="text-sm font-medium text-foreground">{label}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
                               </div>
                               <Switch
                                 checked={value}
@@ -728,7 +728,7 @@ export default function CurriculumPage() {
                 ? "bg-indigo-600 text-white"
                 : step > s
                 ? "bg-indigo-100 text-indigo-700"
-                : "bg-gray-100 text-gray-400"
+                : "bg-muted text-muted-foreground"
             }`}
           >
             {s}. {STEP_LABELS[s]}
@@ -785,7 +785,7 @@ export default function CurriculumPage() {
             </div>
           </div>
 
-          {loadingCurriculum && <p className="text-sm text-gray-400">교육과정 데이터 로딩 중...</p>}
+          {loadingCurriculum && <p className="text-sm text-muted-foreground">교육과정 데이터 로딩 중...</p>}
 
           {curriculumData && (
             <div className="space-y-3 mt-2">
@@ -828,7 +828,7 @@ export default function CurriculumPage() {
                         }
                         className="mt-0.5 h-3.5 w-3.5 rounded border-indigo-300 text-indigo-600 cursor-pointer flex-shrink-0"
                       />
-                      <label htmlFor={`core-${i}`} className="text-sm text-gray-800 cursor-pointer leading-snug">
+                      <label htmlFor={`core-${i}`} className="text-sm text-foreground cursor-pointer leading-snug">
                         {line}
                       </label>
                     </li>
@@ -839,9 +839,9 @@ export default function CurriculumPage() {
               {/* 내용 요소 표 (선택 가능) */}
               <div className="rounded-lg border overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-muted/40">
                     <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">
+                      <th className="px-4 py-2 text-left font-medium text-muted-foreground w-1/3 border-r">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span>지식·이해</span>
                           <span className="flex gap-1.5">
@@ -852,7 +852,7 @@ export default function CurriculumPage() {
                             >
                               전체 선택
                             </button>
-                            <span className="text-xs text-gray-300 font-normal">|</span>
+                            <span className="text-xs text-muted-foreground font-normal">|</span>
                             <button
                               type="button"
                               onClick={() => setSelectedKnowledge([])}
@@ -863,7 +863,7 @@ export default function CurriculumPage() {
                           </span>
                         </div>
                       </th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3 border-r">
+                      <th className="px-4 py-2 text-left font-medium text-muted-foreground w-1/3 border-r">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span>과정·기능</span>
                           <span className="flex gap-1.5">
@@ -874,7 +874,7 @@ export default function CurriculumPage() {
                             >
                               전체 선택
                             </button>
-                            <span className="text-xs text-gray-300 font-normal">|</span>
+                            <span className="text-xs text-muted-foreground font-normal">|</span>
                             <button
                               type="button"
                               onClick={() => setSelectedProcess([])}
@@ -885,7 +885,7 @@ export default function CurriculumPage() {
                           </span>
                         </div>
                       </th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-600 w-1/3">
+                      <th className="px-4 py-2 text-left font-medium text-muted-foreground w-1/3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span>가치·태도</span>
                           <span className="flex gap-1.5">
@@ -896,7 +896,7 @@ export default function CurriculumPage() {
                             >
                               전체 선택
                             </button>
-                            <span className="text-xs text-gray-300 font-normal">|</span>
+                            <span className="text-xs text-muted-foreground font-normal">|</span>
                             <button
                               type="button"
                               onClick={() => setSelectedValue([])}
@@ -924,9 +924,9 @@ export default function CurriculumPage() {
                                     toggleContentItem(prev, item)
                                   )
                                 }
-                                className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
+                                className="h-3.5 w-3.5 rounded border-input cursor-pointer flex-shrink-0"
                               />
-                              <label htmlFor={`k-${i}`} className="text-gray-700 cursor-pointer text-xs leading-snug">{item}</label>
+                              <label htmlFor={`k-${i}`} className="text-foreground cursor-pointer text-xs leading-snug">{item}</label>
                             </li>
                           ))}
                         </ul>
@@ -944,9 +944,9 @@ export default function CurriculumPage() {
                                     toggleContentItem(prev, item)
                                   )
                                 }
-                                className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
+                                className="h-3.5 w-3.5 rounded border-input cursor-pointer flex-shrink-0"
                               />
-                              <label htmlFor={`p-${i}`} className="text-gray-700 cursor-pointer text-xs leading-snug">{item}</label>
+                              <label htmlFor={`p-${i}`} className="text-foreground cursor-pointer text-xs leading-snug">{item}</label>
                             </li>
                           ))}
                         </ul>
@@ -964,9 +964,9 @@ export default function CurriculumPage() {
                                     toggleContentItem(prev, item)
                                   )
                                 }
-                                className="h-3.5 w-3.5 rounded border-gray-300 cursor-pointer flex-shrink-0"
+                                className="h-3.5 w-3.5 rounded border-input cursor-pointer flex-shrink-0"
                               />
-                              <label htmlFor={`v-${i}`} className="text-gray-700 cursor-pointer text-xs leading-snug">{item}</label>
+                              <label htmlFor={`v-${i}`} className="text-foreground cursor-pointer text-xs leading-snug">{item}</label>
                             </li>
                           ))}
                         </ul>
@@ -1061,7 +1061,7 @@ export default function CurriculumPage() {
                           className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                             selected
                               ? "bg-blue-600 text-white border-blue-600"
-                              : "bg-white text-gray-600 border-gray-300 hover:border-blue-400"
+                              : "bg-card text-muted-foreground border-input hover:border-blue-400"
                           }`}
                         >
                           {u.unitName}
@@ -1083,13 +1083,13 @@ export default function CurriculumPage() {
                 <div className="rounded-lg border p-4 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <p className="text-xs font-semibold text-gray-600">
+                      <p className="text-xs font-semibold text-muted-foreground">
                         성취기준 선택
                         <span className="ml-2 text-indigo-500 font-normal">
                           {getSelectedAchievements().length} / {getFilteredAchievements().length}개 선택
                         </span>
                       </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         선택한 성취기준만 핵심어 추천 분석에 반영됩니다
                       </p>
                     </div>
@@ -1101,7 +1101,7 @@ export default function CurriculumPage() {
                       >
                         전체 선택
                       </button>
-                      <span className="text-xs text-gray-300">|</span>
+                      <span className="text-xs text-muted-foreground">|</span>
                       <button
                         type="button"
                         onClick={() => setSelectedAchievementCodes([])}
@@ -1113,7 +1113,7 @@ export default function CurriculumPage() {
                   </div>
 
                   {getFilteredAchievements().length === 0 ? (
-                    <p className="text-sm text-gray-400">단원을 선택하면 성취기준이 표시됩니다</p>
+                    <p className="text-sm text-muted-foreground">단원을 선택하면 성취기준이 표시됩니다</p>
                   ) : (
                     (() => {
                       const groups = getFilteredAchievementGroups();
@@ -1125,7 +1125,7 @@ export default function CurriculumPage() {
                             className={`flex items-start gap-2 rounded-md border p-3 cursor-pointer transition-colors ${
                               selected
                                 ? "border-indigo-200 bg-indigo-50"
-                                : "border-gray-200 bg-white hover:border-indigo-200"
+                                : "border-border bg-card hover:border-indigo-200"
                             }`}
                           >
                             <input
@@ -1138,7 +1138,7 @@ export default function CurriculumPage() {
                                 )
                               }
                             />
-                            <span className="text-sm text-gray-700 leading-snug">
+                            <span className="text-sm text-foreground leading-snug">
                               <span className="font-mono text-indigo-600 mr-2">{achievement.code}</span>
                               {achievement.content}
                             </span>
@@ -1195,7 +1195,7 @@ export default function CurriculumPage() {
                   className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                     selectedKeywords.includes(kw)
                       ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-white text-gray-600 border-gray-300 hover:border-indigo-400"
+                      : "bg-card text-muted-foreground border-input hover:border-indigo-400"
                   }`}
                 >
                   {kw}
@@ -1240,7 +1240,7 @@ export default function CurriculumPage() {
             <CardDescription>다음 단계에 반영할 핵심 문장을 선택하고 직접 수정할 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{selectedCoreSentences.length}개 선택됨</span>
               <span className="flex gap-2">
                 <button
@@ -1250,7 +1250,7 @@ export default function CurriculumPage() {
                 >
                   전체 선택
                 </button>
-                <span className="text-gray-300">|</span>
+                <span className="text-muted-foreground">|</span>
                 <button
                   type="button"
                   onClick={() => setSelectedCoreSentenceIndices([])}
@@ -1303,7 +1303,7 @@ export default function CurriculumPage() {
             <CardDescription>탐구 질문 생성에 반영할 핵심 질문을 선택하고 직접 수정할 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{selectedEssentialQuestions.length}개 선택됨</span>
               <span className="flex gap-2">
                 <button
@@ -1313,7 +1313,7 @@ export default function CurriculumPage() {
                 >
                   전체 선택
                 </button>
-                <span className="text-gray-300">|</span>
+                <span className="text-muted-foreground">|</span>
                 <button
                   type="button"
                   onClick={() => setSelectedEssentialQuestionIndices([])}
@@ -1366,7 +1366,7 @@ export default function CurriculumPage() {
             <CardDescription>저장할 사실적·개념적·논쟁적 질문을 선택하고 직접 수정할 수 있습니다.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>{selectedInquiryQuestions.length}개 선택됨</span>
               <span className="flex gap-2">
                 <button
@@ -1376,7 +1376,7 @@ export default function CurriculumPage() {
                 >
                   전체 선택
                 </button>
-                <span className="text-gray-300">|</span>
+                <span className="text-muted-foreground">|</span>
                 <button
                   type="button"
                   onClick={() => setSelectedInquiryQuestionIndices([])}
@@ -1388,7 +1388,7 @@ export default function CurriculumPage() {
             </div>
             {(["factual", "conceptual", "controversial"] as const).map((type) => (
               <div key={type}>
-                <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+                <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
                   {TYPE_LABEL[type]}
                 </p>
                 <div className="space-y-2">
@@ -1426,7 +1426,7 @@ export default function CurriculumPage() {
 
             {/* 저장 — 날짜·학년·교과·주제 결정 후 저장 */}
             <div className="border-t pt-4 space-y-3">
-              <p className="text-sm font-semibold text-gray-800">저장 정보</p>
+              <p className="text-sm font-semibold text-foreground">저장 정보</p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.1fr_0.7fr_0.8fr_2.4fr]">
                 <div className="space-y-1">
                   <Label>날짜</Label>
@@ -1447,7 +1447,7 @@ export default function CurriculumPage() {
                 </div>
                 <div className="space-y-1">
                   <Label>교과</Label>
-                  <Input value={curriculumData?.subject ?? ""} disabled className="bg-gray-100" />
+                  <Input value={curriculumData?.subject ?? ""} disabled className="bg-muted" />
                 </div>
                 <div className="space-y-1">
                   <Label>주제</Label>

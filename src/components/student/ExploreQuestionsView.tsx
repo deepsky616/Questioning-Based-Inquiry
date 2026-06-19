@@ -88,8 +88,8 @@ function LikeButton({
         myLike
           ? "bg-rose-100 text-rose-600 hover:bg-rose-200"
           : isSelf
-          ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-          : "bg-gray-100 text-gray-500 hover:bg-rose-50 hover:text-rose-500"
+          ? "bg-muted text-muted-foreground cursor-not-allowed"
+          : "bg-muted text-muted-foreground hover:bg-rose-50 hover:text-rose-500"
       } ${isPending ? "opacity-50" : ""}`}
     >
       <span>{myLike ? "❤️" : "🤍"}</span>
@@ -118,14 +118,14 @@ function QuestionCard({
       className={
         isTeacherShared
           ? "rounded-lg border-2 border-indigo-300 overflow-hidden bg-gradient-to-br from-indigo-50/60 to-white dark:bg-none dark:bg-card"
-          : "rounded-lg border border-gray-200 overflow-hidden"
+          : "rounded-lg border border-border overflow-hidden"
       }
     >
       <div
         className={
           isTeacherShared
             ? "p-4 bg-indigo-50/30 flex justify-between items-start gap-4"
-            : "p-4 bg-gray-50 flex justify-between items-start gap-4"
+            : "p-4 bg-muted/40 flex justify-between items-start gap-4"
         }
       >
         <div className="flex-1 min-w-0">
@@ -146,7 +146,7 @@ function QuestionCard({
               </span>
             )}
           </div>
-          <p className={isTeacherShared ? "text-gray-900 font-medium" : "text-gray-900"}>
+          <p className={isTeacherShared ? "text-foreground font-medium" : "text-foreground"}>
             {q.content}
           </p>
           {isTeacherShared && commentsEnabled && (
@@ -174,17 +174,17 @@ function QuestionCard({
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <div className="text-right">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-muted-foreground">
               {isTeacherShared ? `${q.author.name} 선생님` : q.author.name}
             </div>
             {!isTeacherShared && (q.author.grade || q.author.className || q.author.studentNumber) && (
-              <div className="text-xs text-gray-400">
+              <div className="text-xs text-muted-foreground">
                 {q.author.grade && `${q.author.grade}학년 `}
                 {q.author.className && `${q.author.className}반`}
                 {q.author.studentNumber && ` ${q.author.studentNumber}번`}
               </div>
             )}
-            <div className="text-xs text-gray-400 mt-0.5">{formatDateTime(q.createdAt)}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(q.createdAt)}</div>
           </div>
           {commentsEnabled && (
             <button
@@ -202,7 +202,7 @@ function QuestionCard({
         </div>
       </div>
       {commentsEnabled && showComments && (
-        <div className="border-t border-gray-200 bg-white px-4 pt-3 pb-4 dark:bg-card">
+        <div className="border-t border-border bg-white px-4 pt-3 pb-4 dark:bg-card">
           <CommentThread questionId={q.id} onCountChange={setCommentCount} />
         </div>
       )}
@@ -301,7 +301,7 @@ export function ExploreQuestionsView() {
   const displayed = applyClassificationFilter(filtered, filterClosure, filterCognitive);
 
   const Empty = () => (
-    <div className="text-center py-8 text-gray-400 text-sm">
+    <div className="text-center py-8 text-muted-foreground text-sm">
       {search ? "검색 결과가 없습니다" : "해당하는 질문이 없습니다"}
     </div>
   );
@@ -319,12 +319,12 @@ export function ExploreQuestionsView() {
     );
 
   if (isLoading) {
-    return <div className="text-center py-16 text-gray-400">로딩 중...</div>;
+    return <div className="text-center py-16 text-muted-foreground">로딩 중...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-600">
+      <p className="text-sm text-muted-foreground">
         다른 학생들의 질문을 살펴보고 좋아요·댓글을 남겨보세요 · 공개 {questions.length}개
       </p>
 

@@ -209,10 +209,10 @@ export default function AskPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">질문하기</h2>
+          <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
         </div>
         <Card>
-          <CardContent className="p-6 text-center text-gray-400 text-sm">수업 세션 확인 중...</CardContent>
+          <CardContent className="p-6 text-center text-muted-foreground text-sm">수업 세션 확인 중...</CardContent>
         </Card>
       </div>
     );
@@ -223,7 +223,7 @@ export default function AskPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">질문하기</h2>
+          <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
         </div>
         <Card className="border-red-200 bg-red-50">
           <CardContent className="p-6 text-center text-red-700 text-sm">
@@ -239,7 +239,7 @@ export default function AskPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">질문하기</h2>
+          <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
         </div>
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="p-6 text-center text-yellow-800">
@@ -256,8 +256,8 @@ export default function AskPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">질문하기</h2>
-        <p className="text-gray-600">질문을 입력하면 유형을 분석해 드립니다</p>
+        <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
+        <p className="text-muted-foreground">질문을 입력하면 유형을 분석해 드립니다</p>
       </div>
 
       {aiConfigured === false && (
@@ -412,7 +412,7 @@ export default function AskPage() {
               onChange={(e) => setContent(e.target.value)}
               rows={4}
             />
-            <p className="text-sm text-gray-500 text-right">{content.length}/500</p>
+            <p className="text-sm text-muted-foreground text-right">{content.length}/500</p>
           </div>
 
           <Button
@@ -441,19 +441,19 @@ export default function AskPage() {
             )}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-blue-50 rounded-lg">
-                <div className="text-sm text-gray-600">폐쇄형/개방형</div>
+                <div className="text-sm text-muted-foreground">폐쇄형/개방형</div>
                 <div className="text-xl font-bold text-blue-700">
                   {result.closure === "closed" ? "닫힌 질문" : "열린 질문"}
                 </div>
                 <div className="text-sm text-blue-600 mt-0.5">
                   {result.closure === "closed" ? "정해진 답이 있어요" : "다양한 답이 가능해요"}
                 </div>
-                <div className="text-sm text-gray-500 mt-1">
+                <div className="text-sm text-muted-foreground mt-1">
                   신뢰도: {Math.round(result.closureScore * 100)}%
                 </div>
               </div>
               <div className="p-4 bg-purple-50 rounded-lg">
-                <div className="text-sm text-gray-600">인지적 수준</div>
+                <div className="text-sm text-muted-foreground">인지적 수준</div>
                 <div className="text-xl font-bold text-purple-700">
                   {COGNITIVE_LABEL[result.cognitive] ?? result.cognitive}
                 </div>
@@ -462,15 +462,15 @@ export default function AskPage() {
                   {result.cognitive === "conceptual" && "추론하고 분석하는 질문이에요"}
                   {result.cognitive === "controversial" && "스스로 판단하는 질문이에요"}
                 </div>
-                <div className="text-sm text-gray-500 mt-1">
+                <div className="text-sm text-muted-foreground mt-1">
                   신뢰도: {Math.round(result.cognitiveScore * 100)}%
                 </div>
               </div>
             </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="text-sm font-medium text-gray-700">분류 근거</div>
-              <p className="text-gray-600 mt-1">{result.reasoning}</p>
+            <div className="p-4 bg-muted/40 rounded-lg">
+              <div className="text-sm font-medium text-foreground">분류 근거</div>
+              <p className="text-muted-foreground mt-1">{result.reasoning}</p>
             </div>
 
             {result.feedback && (
@@ -492,7 +492,7 @@ export default function AskPage() {
               </div>
             )}
 
-            <div className="p-4 border rounded-lg bg-gray-50 text-sm text-gray-600">
+            <div className="p-4 border rounded-lg bg-muted/40 text-sm text-muted-foreground">
               질문 공개 여부는 선생님이 수업 세션에서 설정합니다.
             </div>
 

@@ -31,7 +31,7 @@ export default function DatePicker({ value, onChange, placeholder = "날짜 선�
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className={`h-8 w-full justify-start text-left text-sm font-normal ${!value ? "text-gray-400" : ""}`}
+          className={`h-8 w-full justify-start text-left text-sm font-normal ${!value ? "text-muted-foreground" : ""}`}
         >
           📅 {displayLabel}
         </Button>
@@ -46,7 +46,7 @@ export default function DatePicker({ value, onChange, placeholder = "날짜 선�
         {value && (
           <div className="border-t px-3 py-2">
             <button
-              className="text-xs text-gray-400 hover:text-gray-600"
+              className="text-xs text-muted-foreground hover:text-muted-foreground"
               onClick={() => { onChange(""); setOpen(false); }}
             >
               선택 초기화

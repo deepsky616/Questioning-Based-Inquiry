@@ -99,10 +99,10 @@ export default function PointsCard() {
       </div>
 
       {/* 최근 받은 포인트 */}
-      <div className="md:col-span-2 rounded-2xl p-5 bg-white border border-gray-100 shadow-sm">
-        <h3 className="font-black text-gray-800 text-sm mb-3">📜 최근 받은 포인트</h3>
+      <div className="md:col-span-2 rounded-2xl p-5 bg-card border border-border shadow-sm">
+        <h3 className="font-black text-foreground text-sm mb-3">📜 최근 받은 포인트</h3>
         {recent.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-6">아직 받은 포인트가 없어요. 질문·댓글을 작성하거나 질문놀이에 참여해 보세요!</p>
+          <p className="text-muted-foreground text-sm text-center py-6">아직 받은 포인트가 없어요. 질문·댓글을 작성하거나 질문놀이에 참여해 보세요!</p>
         ) : (
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {recent.slice(0, 8).map((log) => {
@@ -116,10 +116,10 @@ export default function PointsCard() {
                 <div key={log.id}
                   className={`flex items-center gap-2 text-sm py-1 ${isRejected ? "opacity-40" : ""}`}>
                   <span className="text-base shrink-0">{b.emoji}</span>
-                  <span className="text-gray-700 font-medium shrink-0">{b.label}</span>
-                  {game && <span className="text-gray-400 text-xs shrink-0">· {game}</span>}
+                  <span className="text-foreground font-medium shrink-0">{b.label}</span>
+                  {game && <span className="text-muted-foreground text-xs shrink-0">· {game}</span>}
                   {showReason ? (
-                    <span className="text-gray-400 text-xs flex-1 truncate">· {log.reason}</span>
+                    <span className="text-muted-foreground text-xs flex-1 truncate">· {log.reason}</span>
                   ) : (
                     <span className="flex-1" />
                   )}
@@ -129,13 +129,13 @@ export default function PointsCard() {
                     </span>
                   )}
                   {isRejected && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 shrink-0">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">
                       거부됨
                     </span>
                   )}
-                  <span className="text-gray-400 text-xs shrink-0">{relativeTime(log.createdAt)}</span>
+                  <span className="text-muted-foreground text-xs shrink-0">{relativeTime(log.createdAt)}</span>
                   <span className={`font-black w-12 text-right shrink-0 ${
-                    isPending ? "text-amber-500" : isRejected ? "text-gray-400" : "text-indigo-600"
+                    isPending ? "text-amber-500" : isRejected ? "text-muted-foreground" : "text-indigo-600"
                   }`}>
                     {isPending ? `(+${log.points})` : `+${log.points}`}
                   </span>

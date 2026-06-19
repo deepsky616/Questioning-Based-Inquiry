@@ -82,20 +82,20 @@ export function SessionTargetSelector({
           ))}
         </SelectContent>
       </Select>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-muted-foreground">
         {buildClassSelectionLabel({ targetClassValue, selectedStudentIds, students })}
       </p>
 
       {targetClassValue !== "all" && (
-        <div className="max-h-44 overflow-auto rounded-md border bg-white">
-          <label className="flex cursor-pointer items-center gap-2 border-b px-3 py-2 text-sm font-medium text-gray-700">
+        <div className="max-h-44 overflow-auto rounded-md border bg-card">
+          <label className="flex cursor-pointer items-center gap-2 border-b px-3 py-2 text-sm font-medium text-foreground">
             <input type="checkbox" checked={isAllChecked} onChange={toggleAll} />
             전체 선택
           </label>
           {selectedClassStudents.map((student) => (
             <label
               key={student.id}
-              className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/40"
             >
               <input
                 type="checkbox"
@@ -108,7 +108,7 @@ export function SessionTargetSelector({
             </label>
           ))}
           {selectedClassStudents.length === 0 && (
-            <div className="px-3 py-4 text-center text-sm text-gray-400">학생이 없습니다</div>
+            <div className="px-3 py-4 text-center text-sm text-muted-foreground">학생이 없습니다</div>
           )}
         </div>
       )}

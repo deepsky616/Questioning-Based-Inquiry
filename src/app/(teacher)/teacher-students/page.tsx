@@ -137,7 +137,7 @@ function BarChart({
           const h = max === 0 ? 0 : (v / max) * 100;
           return (
             <div key={d.key} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-              <div className="text-xs font-bold text-gray-600 h-4">
+              <div className="text-xs font-bold text-muted-foreground h-4">
                 {v > 0 ? v : ""}
               </div>
               <div
@@ -153,7 +153,7 @@ function BarChart({
           );
         })}
       </div>
-      <div className="flex justify-between text-[10px] text-gray-500 px-1">
+      <div className="flex justify-between text-[10px] text-muted-foreground px-1">
         {data.map((d) => (
           <div key={d.key} className="flex-1 text-center truncate">{d.label}</div>
         ))}
@@ -210,7 +210,7 @@ function StudentDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span>{student.name}</span>
-            <span className="text-sm font-normal text-gray-500">
+            <span className="text-sm font-normal text-muted-foreground">
               {buildTeacherClassLabel(student.grade, student.className)} · {student.studentNumber}번
             </span>
           </DialogTitle>
@@ -239,7 +239,7 @@ function StudentDetailDialog({
         </div>
 
         {/* 기간/지표 토글 + 차트 */}
-        <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
+        <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-1">
               {(["month", "week", "dow"] as Period[]).map((p) => (
@@ -270,7 +270,7 @@ function StudentDetailDialog({
           </div>
 
           {!stats ? (
-            <div className="h-40 flex items-center justify-center text-gray-400 text-sm">로딩 중...</div>
+            <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">로딩 중...</div>
           ) : (
             <BarChart data={series} metric={metric} />
           )}
@@ -279,42 +279,42 @@ function StudentDetailDialog({
         {/* 최근 활동 */}
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-white border border-gray-100 rounded-xl p-3">
+            <div className="bg-card border border-border rounded-xl p-3">
               <h4 className="text-xs font-black text-indigo-600 mb-2">📝 최근 질문</h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {stats.recentQuestions.length === 0 ? (
-                  <p className="text-xs text-gray-400">없음</p>
+                  <p className="text-xs text-muted-foreground">없음</p>
                 ) : stats.recentQuestions.map((q) => (
-                  <div key={q.id} className="text-xs text-gray-700 truncate">{q.content}</div>
+                  <div key={q.id} className="text-xs text-foreground truncate">{q.content}</div>
                 ))}
               </div>
             </div>
-            <div className="bg-white border border-gray-100 rounded-xl p-3">
+            <div className="bg-card border border-border rounded-xl p-3">
               <h4 className="text-xs font-black text-emerald-600 mb-2">💬 최근 답변</h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {stats.recentComments.length === 0 ? (
-                  <p className="text-xs text-gray-400">없음</p>
+                  <p className="text-xs text-muted-foreground">없음</p>
                 ) : stats.recentComments.map((c) => (
-                  <div key={c.id} className="text-xs text-gray-700 truncate">{c.content}</div>
+                  <div key={c.id} className="text-xs text-foreground truncate">{c.content}</div>
                 ))}
               </div>
             </div>
-            <div className="bg-white border border-gray-100 rounded-xl p-3">
+            <div className="bg-card border border-border rounded-xl p-3">
               <h4 className="text-xs font-black text-amber-600 mb-2">🏆 최근 포인트</h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {stats.recentPoints.length === 0 ? (
-                  <p className="text-xs text-gray-400">없음</p>
+                  <p className="text-xs text-muted-foreground">없음</p>
                 ) : stats.recentPoints.map((p) => {
                   const b = pointBonusLabel(p.bonusType);
                   const game = GAME_LABEL[p.gameId];
                   // instance:<UUID>는 중복 지급 방지용 내부 키이므로 표시하지 않는다
                   const showReason = p.reason && p.reason !== b.label && !p.reason.startsWith("instance:");
                   return (
-                    <div key={p.id} className="text-xs flex items-center gap-1 text-gray-700">
+                    <div key={p.id} className="text-xs flex items-center gap-1 text-foreground">
                       <span className="shrink-0">{b.emoji}</span>
                       <span className="font-medium shrink-0">{b.label}</span>
-                      {game && <span className="text-gray-400 shrink-0">· {game}</span>}
-                      {showReason && <span className="text-gray-400 truncate flex-1">· {p.reason}</span>}
+                      {game && <span className="text-muted-foreground shrink-0">· {game}</span>}
+                      {showReason && <span className="text-muted-foreground truncate flex-1">· {p.reason}</span>}
                       {!showReason && <span className="flex-1" />}
                       <span className={`font-bold shrink-0 ${p.points >= 0 ? "text-indigo-600" : "text-red-500"}`}>
                         {p.points > 0 ? `+${p.points}` : p.points}
@@ -412,15 +412,15 @@ export default function StudentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">학생 관리</h2>
-        <p className="text-gray-600">담당 학생의 질문·답변·포인트 활동을 한눈에 확인하세요</p>
+        <h2 className="text-2xl font-bold text-foreground">학생 관리</h2>
+        <p className="text-muted-foreground">담당 학생의 질문·답변·포인트 활동을 한눈에 확인하세요</p>
       </div>
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4 text-center">
-          <p className="text-xs text-gray-500 font-medium">전체 학생</p>
-          <p className="text-2xl font-black text-gray-800 mt-1">{students.length}명</p>
+        <div className="rounded-2xl bg-muted/40 border border-border p-4 text-center">
+          <p className="text-xs text-muted-foreground font-medium">전체 학생</p>
+          <p className="text-2xl font-black text-foreground mt-1">{students.length}명</p>
         </div>
         <div className="rounded-2xl bg-indigo-50 border border-indigo-100 p-4 text-center">
           <p className="text-xs text-indigo-500 font-medium">총 질문</p>
@@ -446,7 +446,7 @@ export default function StudentsPage() {
             className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
               filterClass === "all"
                 ? "bg-indigo-600 text-white border-indigo-600"
-                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+                : "bg-card text-muted-foreground border-border hover:border-indigo-300"
             }`}>
             전체
           </button>
@@ -476,14 +476,14 @@ export default function StudentsPage() {
       />
 
       {isLoading ? (
-        <div className="text-center py-16 text-gray-400">로딩 중...</div>
+        <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
       ) : students.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-gray-500">
+        <Card><CardContent className="py-12 text-center text-muted-foreground">
           <p className="font-medium mb-1">등록된 학생이 없습니다</p>
-          <p className="text-sm text-gray-400">같은 학교·학년·반 학생이 회원가입하면 표시됩니다</p>
+          <p className="text-sm text-muted-foreground">같은 학교·학년·반 학생이 회원가입하면 표시됩니다</p>
         </CardContent></Card>
       ) : filtered.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-gray-500">
+        <Card><CardContent className="py-12 text-center text-muted-foreground">
           <p className="font-medium mb-1">검색 결과가 없습니다</p>
         </CardContent></Card>
       ) : (
@@ -498,7 +498,7 @@ export default function StudentsPage() {
                   <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-sm font-semibold">
                     {classLabel}
                   </span>
-                  <span className="text-sm font-normal text-gray-500">
+                  <span className="text-sm font-normal text-muted-foreground">
                     총 {classStudents.length}명
                   </span>
                 </CardTitle>
@@ -520,22 +520,22 @@ export default function StudentsPage() {
                   </TableHeader>
                   <TableBody>
                     {classStudents.map((s) => (
-                      <TableRow key={s.id} className="cursor-pointer hover:bg-gray-50"
+                      <TableRow key={s.id} className="cursor-pointer hover:bg-muted/40"
                         onClick={() => setSelected(s)}>
-                        <TableCell className="text-gray-500">{s.studentNumber}</TableCell>
+                        <TableCell className="text-muted-foreground">{s.studentNumber}</TableCell>
                         <TableCell className="font-medium">{s.name}</TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-semibold ${s.questionCount > 0 ? "text-indigo-600" : "text-gray-400"}`}>
+                          <span className={`font-semibold ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>
                             {s.questionCount}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-semibold ${s.commentCount > 0 ? "text-emerald-600" : "text-gray-400"}`}>
+                          <span className={`font-semibold ${s.commentCount > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
                             {s.commentCount}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
-                          <span className={`font-semibold ${s.totalPoints > 0 ? "text-amber-600" : "text-gray-400"}`}>
+                          <span className={`font-semibold ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
                             {s.totalPoints}
                           </span>
                         </TableCell>

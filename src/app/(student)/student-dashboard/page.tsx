@@ -64,23 +64,23 @@ export default function StudentDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">
+        <h2 className="text-2xl font-bold text-foreground">
           안녕하세요, {user.name} 학생!
         </h2>
-        <p className="text-gray-600">오늘도 좋은 질문을 만들어 보세요</p>
+        <p className="text-muted-foreground">오늘도 좋은 질문을 만들어 보세요</p>
       </div>
 
       {/* 포인트 카드 */}
       <PointsCard />
 
       {isLoading ? (
-        <div className="text-center py-12 text-gray-400">로딩 중...</div>
+        <div className="text-center py-12 text-muted-foreground">로딩 중...</div>
       ) : (
         <>
       {/* 총 질문 수 */}
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-gray-500">내가 작성한 총 질문 수</p>
+          <p className="text-sm text-muted-foreground">내가 작성한 총 질문 수</p>
           <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
         </CardContent>
       </Card>
@@ -147,7 +147,7 @@ export default function StudentDashboard() {
                     <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
                     <span className="text-sm font-medium">사실적</span>
                   </div>
-                  <span className="text-2xl font-bold text-gray-700">{stats.byCognitive.factual}</span>
+                  <span className="text-2xl font-bold text-foreground">{stats.byCognitive.factual}</span>
                 </div>
                 <StatBar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
                 <p className="text-xs text-muted-foreground">사실이나 정보를 확인하는 질문</p>
@@ -187,14 +187,14 @@ export default function StudentDashboard() {
         </CardHeader>
         <CardContent>
           {questions.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-muted-foreground">
               아직 질문이 없습니다. 첫 질문을 작성해 보세요!
             </div>
           ) : (
             <div className="space-y-3">
               {questions.map((q) => (
-                <div key={q.id} className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-gray-900 line-clamp-1">{q.content}</p>
+                <div key={q.id} className="p-4 bg-muted/40 rounded-lg">
+                  <p className="text-foreground line-clamp-1">{q.content}</p>
                   <div className="flex gap-2 mt-2">
                     <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
                       {CLOSURE_LABEL[q.closure]}

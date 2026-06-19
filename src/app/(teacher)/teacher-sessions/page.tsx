@@ -360,9 +360,9 @@ export default function TeacherSessionsPage() {
 
       {/* 세션 목록 */}
       {isLoading ? (
-        <div className="text-center py-8 text-gray-400">로딩 중...</div>
+        <div className="text-center py-8 text-muted-foreground">로딩 중...</div>
       ) : sessions.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-400">
+        <div className="rounded-lg border border-dashed border-input p-8 text-center text-sm text-muted-foreground">
           등록된 세션이 없습니다. 위에서 새 세션을 추가해 보세요.
         </div>
       ) : (

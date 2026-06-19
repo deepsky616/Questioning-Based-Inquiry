@@ -251,7 +251,7 @@ export default function TeacherQuestionPlayPage() {
                         {st && st.plays > 0 ? (
                           <span>참여 <b>{st.participants}</b>명 · 플레이 <b>{st.plays}</b>회 · 완료율 <b>{rate}%</b> · 좋은질문 <b>{st.goodQuestions}</b>개</span>
                         ) : (
-                          <span className="text-gray-400 dark:text-gray-500">아직 참여 기록이 없어요</span>
+                          <span className="text-muted-foreground dark:text-muted-foreground">아직 참여 기록이 없어요</span>
                         )}
                       </div>
                     );

@@ -130,11 +130,11 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
           <DialogTitle className="flex items-center gap-2">
             <span>📤 단원설계 질문 배포</span>
           </DialogTitle>
-          <p className="text-sm text-gray-500 mt-1">{sessionLabel}</p>
+          <p className="text-sm text-muted-foreground mt-1">{sessionLabel}</p>
         </DialogHeader>
 
         {!unit ? (
-          <div className="py-12 text-center text-gray-400 text-sm">단원설계를 불러오는 중...</div>
+          <div className="py-12 text-center text-muted-foreground text-sm">단원설계를 불러오는 중...</div>
         ) : (
           <>
             <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-sm text-indigo-700">
@@ -154,7 +154,7 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
             {/* 질문 목록 */}
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {allInquiry.length === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-8">
+                <p className="text-muted-foreground text-sm text-center py-8">
                   이 단원설계에 작성된 탐구 질문이 없어요
                 </p>
               ) : allInquiry.map((q, idx) => {
@@ -178,12 +178,12 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
                         className="mt-1 w-4 h-4 accent-indigo-500"
                       />
                       <div className="flex-1 min-w-0">
-                        <span className="text-xs font-bold text-gray-500">{q.type}</span>
-                        <p className="text-gray-800 text-sm mt-0.5">{q.content}</p>
+                        <span className="text-xs font-bold text-muted-foreground">{q.type}</span>
+                        <p className="text-foreground text-sm mt-0.5">{q.content}</p>
                         {isPublished && (
                           <div className="flex items-center gap-3 mt-1.5">
                             <span className="text-xs text-emerald-600 font-bold">✅ 배포됨</span>
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-muted-foreground">
                               💬 답변 {pub.commentCount}개
                             </span>
                             <button
@@ -202,14 +202,14 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
             </div>
 
             {/* 액션 */}
-            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+            <div className="flex items-center justify-between pt-2 border-t border-border">
               <button
                 onClick={selectAllNew}
                 disabled={newCount === 0}
-                className="text-xs text-indigo-600 hover:underline disabled:text-gray-400 disabled:no-underline">
+                className="text-xs text-indigo-600 hover:underline disabled:text-muted-foreground disabled:no-underline">
                 미배포 전체 선택 ({newCount})
               </button>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-muted-foreground">
                 선택: {selected.size}개
               </span>
             </div>

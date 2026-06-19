@@ -580,7 +580,7 @@ export default function QuestionsPage() {
   const QuestionTable = ({ list }: { list: Question[] }) => {
     const allChecked = list.length > 0 && list.every((q) => selectedIds.has(q.id));
     return list.length === 0 ? (
-      <div className="text-center py-8 text-gray-400 text-sm">
+      <div className="text-center py-8 text-muted-foreground text-sm">
         해당하는 질문이 없습니다
       </div>
     ) : (
@@ -592,7 +592,7 @@ export default function QuestionsPage() {
                 type="checkbox"
                 checked={allChecked}
                 onChange={() => allChecked ? clearSelection() : selectAll(list)}
-                className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
+                className="h-4 w-4 rounded border-input accent-indigo-600"
               />
             </TableHead>
             <TableHead>학생</TableHead>
@@ -614,13 +614,13 @@ export default function QuestionsPage() {
                   type="checkbox"
                   checked={selectedIds.has(q.id)}
                   onChange={() => toggleSelect(q.id)}
-                  className="h-4 w-4 rounded border-gray-300 accent-indigo-600"
+                  className="h-4 w-4 rounded border-input accent-indigo-600"
                 />
               </TableCell>
               <TableCell>
                 <div className="text-sm font-medium">{q.author.name}</div>
                 {q.author.className && (
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-muted-foreground">
                     {q.author.grade && `${q.author.grade}학년 `}{q.author.className}반
                     {q.author.studentNumber && ` ${q.author.studentNumber}번`}
                   </div>
@@ -732,8 +732,8 @@ export default function QuestionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">질문 조회</h2>
-        <p className="text-gray-600">수업 세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
+        <h2 className="text-2xl font-bold text-foreground">질문 조회</h2>
+        <p className="text-muted-foreground">수업 세션을 선택해 학생 질문을 체계적으로 확인하세요</p>
       </div>
 
       <div className="flex rounded-md border overflow-hidden w-fit">
@@ -759,16 +759,16 @@ export default function QuestionsPage() {
       <>
       {/* 수업 세션 선택: 날짜·교과·주제로 좁혀서 단일 세션 선택 */}
       {sessions.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-400">
+        <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
           등록된 수업 세션이 없습니다. 수업 세션을 먼저 추가해 주세요.
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+        <div className="rounded-lg border border-border bg-muted/40 p-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 w-36">
-              <label className="text-xs font-medium text-gray-600">날짜</label>
+              <label className="text-xs font-medium text-muted-foreground">날짜</label>
               <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">전체 날짜</SelectItem>
                   {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
@@ -776,9 +776,9 @@ export default function QuestionsPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-32">
-              <label className="text-xs font-medium text-gray-600">교과</label>
+              <label className="text-xs font-medium text-muted-foreground">교과</label>
               <Select value={filterSubject || "__all__"} onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder="전체" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">전체 교과</SelectItem>
                   {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -786,9 +786,9 @@ export default function QuestionsPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-52">
-              <label className="text-xs font-medium text-gray-600">주제</label>
+              <label className="text-xs font-medium text-muted-foreground">주제</label>
               <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-white"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder="전체" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">전체 주제</SelectItem>
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -796,12 +796,12 @@ export default function QuestionsPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label className="text-xs font-medium text-gray-600">수업 세션</label>
+              <label className="text-xs font-medium text-muted-foreground">수업 세션</label>
               {filteredSessions.length === 0 ? (
-                <div className="h-8 flex items-center text-sm text-gray-400">조건에 맞는 수업 세션이 없습니다</div>
+                <div className="h-8 flex items-center text-sm text-muted-foreground">조건에 맞는 수업 세션이 없습니다</div>
               ) : (
                 <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                  <SelectTrigger className="bg-white font-medium"><SelectValue placeholder="수업 세션 선택" /></SelectTrigger>
+                  <SelectTrigger className="bg-card font-medium"><SelectValue placeholder="수업 세션 선택" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">전체 수업 세션</SelectItem>
                     {filteredSessions.map((s) => (
@@ -812,7 +812,7 @@ export default function QuestionsPage() {
               )}
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2">💡 날짜·교과·주제로 좁혀도, 직접 수업 세션을 골라도 결과는 같습니다.</p>
+          <p className="text-xs text-muted-foreground mt-2">💡 날짜·교과·주제로 좁혀도, 직접 수업 세션을 골라도 결과는 같습니다.</p>
         </div>
       )}
 
@@ -1015,7 +1015,7 @@ export default function QuestionsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
-              📊 질문 분류 통계 현황 <span className="text-xs font-normal text-gray-400">· 총 {filtered.length}개</span>
+              📊 질문 분류 통계 현황 <span className="text-xs font-normal text-muted-foreground">· 총 {filtered.length}개</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1083,7 +1083,7 @@ export default function QuestionsPage() {
               placeholder="질문 또는 이름으로 검색..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 text-sm w-56 bg-white"
+              className="h-8 text-sm w-56 bg-card"
             />
             <button
               type="button"
@@ -1111,9 +1111,9 @@ export default function QuestionsPage() {
       )}
 
       {isLoading ? (
-        <div className="text-center py-16 text-gray-400">로딩 중...</div>
+        <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
       ) : !hasQuestionList ? (
-        <div className="text-center py-16 text-gray-400 text-sm">수업 세션을 선택해 주세요</div>
+        <div className="text-center py-16 text-muted-foreground text-sm">수업 세션을 선택해 주세요</div>
       ) : (
         /* ── 전체 질문 목록: 분류1/분류2 필터 ── */
         <Card>
@@ -1295,10 +1295,10 @@ export default function QuestionsPage() {
           </DialogHeader>
           {selectedQuestion && (
             <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="p-4 bg-muted/40 rounded-lg">
                 <p className="font-medium">질문 내용</p>
-                <p className="mt-1 text-gray-800">{selectedQuestion.content}</p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="mt-1 text-foreground">{selectedQuestion.content}</p>
+                <p className="text-sm text-muted-foreground mt-1">
                   작성자: {selectedQuestion.author.name}
                   {selectedQuestion.author.className && ` (${selectedQuestion.author.className})`}
                 </p>
@@ -1386,14 +1386,14 @@ export default function QuestionsPage() {
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>AI 개별 답변 미리보기 및 확인</DialogTitle>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               각 학생의 질문에 맞게 AI가 생성한 답변입니다. 내용을 검토하고 필요시 수정 후 전송하세요.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
                 답변 준비 {bulkPreviewReady}/{bulkPreviewTotal}
               </span>
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                 전송 대기 {bulkPreviewTotal}개
               </span>
               {bulkPreviewOverLimit > 0 && (
@@ -1410,27 +1410,27 @@ export default function QuestionsPage() {
               const initial = preview.authorName.trim().slice(0, 1) || "?";
 
               return (
-                <div key={preview.questionId} className="overflow-hidden rounded-xl border bg-gray-50">
-                  <div className="border-b bg-white px-4 py-3">
+                <div key={preview.questionId} className="overflow-hidden rounded-xl border bg-muted/40">
+                  <div className="border-b bg-card px-4 py-3">
                     <div className="mb-2 flex items-center gap-3">
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white shadow-sm">
                         {initial}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-gray-900">{preview.authorName}</p>
+                        <p className="truncate text-sm font-semibold text-foreground">{preview.authorName}</p>
                         {preview.authorInfo && (
-                          <p className="text-xs text-gray-400">{preview.authorInfo}</p>
+                          <p className="text-xs text-muted-foreground">{preview.authorInfo}</p>
                         )}
                       </div>
                     </div>
-                    <p className="text-sm leading-relaxed text-gray-700">{preview.questionContent}</p>
+                    <p className="text-sm leading-relaxed text-foreground">{preview.questionContent}</p>
                   </div>
                   <div className="px-4 py-3">
                     <div className="mb-1.5 flex items-center justify-between gap-3">
                       <p className="text-xs font-semibold text-indigo-600">AI 생성 답변 (수정 가능)</p>
                       <span
                         className={`text-xs font-medium ${
-                          answerLength > 150 ? "text-amber-700" : "text-gray-400"
+                          answerLength > 150 ? "text-amber-700" : "text-muted-foreground"
                         }`}
                       >
                         {answerLength}/150자
