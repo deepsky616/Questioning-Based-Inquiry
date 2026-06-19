@@ -56,7 +56,7 @@ export default function StudentQuestionPlayPage() {
       {isLoading && (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <div className="text-5xl animate-bounce">🎲</div>
-          <p className="text-gray-500 font-medium">놀이를 불러오는 중...</p>
+          <p className="text-muted-foreground font-medium">놀이를 불러오는 중...</p>
         </div>
       )}
 
@@ -97,7 +97,7 @@ export default function StudentQuestionPlayPage() {
               </div>
 
               <div className="px-2">
-                <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-bold"
                     style={{ background: selectedGame.accentColor }}>!</span>
                   게임 방법
@@ -109,7 +109,7 @@ export default function StudentQuestionPlayPage() {
                         style={{ background: selectedGame.accentColor }}>
                         {idx + 1}
                       </span>
-                      <span className="text-gray-700 text-sm leading-relaxed">{step}</span>
+                      <span className="text-foreground text-sm leading-relaxed">{step}</span>
                     </li>
                   ))}
                 </ol>
@@ -139,7 +139,7 @@ function GameCard({ game, index, onSelect }: { game: AnyGame; index: number; onS
   const [hovered, setHovered] = useState(false);
   return (
     <div
-      className="rounded-2xl overflow-hidden bg-white border border-gray-100 cursor-pointer"
+      className="rounded-2xl overflow-hidden bg-card border border-border cursor-pointer"
       style={{
         boxShadow: hovered ? "0 20px 40px rgba(0,0,0,0.12)" : "0 4px 16px rgba(0,0,0,0.06)",
         transform: hovered ? "translateY(-4px)" : "translateY(0)",
@@ -174,13 +174,13 @@ function GameCard({ game, index, onSelect }: { game: AnyGame; index: number; onS
         )}
       </div>
       <div className="p-5">
-        <h3 className="text-xl font-black text-gray-900 mb-1.5">{game.title}</h3>
-        <p className="text-gray-500 text-sm mb-4 leading-relaxed line-clamp-2">{game.description}</p>
+        <h3 className="text-xl font-black text-foreground mb-1.5">{game.title}</h3>
+        <p className="text-muted-foreground text-sm mb-4 leading-relaxed line-clamp-2">{game.description}</p>
         <div className="flex flex-wrap gap-2 mb-4">
-          <span className="flex items-center gap-1 bg-gray-50 border border-gray-100 text-gray-500 text-xs px-2.5 py-1 rounded-full">
+          <span className="flex items-center gap-1 bg-muted/40 border border-border text-muted-foreground text-xs px-2.5 py-1 rounded-full">
             👥 {game.playerCount}
           </span>
-          <span className="flex items-center gap-1 bg-gray-50 border border-gray-100 text-gray-500 text-xs px-2.5 py-1 rounded-full">
+          <span className="flex items-center gap-1 bg-muted/40 border border-border text-muted-foreground text-xs px-2.5 py-1 rounded-full">
             ⏱ {game.duration}
           </span>
         </div>

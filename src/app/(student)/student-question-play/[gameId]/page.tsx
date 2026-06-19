@@ -124,7 +124,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
         <div className="text-6xl">😢</div>
-        <p className="text-gray-500 text-lg font-medium">게임을 찾을 수 없어요</p>
+        <p className="text-muted-foreground text-lg font-medium">게임을 찾을 수 없어요</p>
         <button className="mt-2 text-sm text-white px-5 py-2.5 rounded-xl font-bold"
           style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
           onClick={handleBack}>
@@ -183,7 +183,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
     return (
       <div className="max-w-lg mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => setRoomStep(null)} className="text-gray-400 hover:text-gray-600 text-sm">← 뒤로</button>
+          <button onClick={() => setRoomStep(null)} className="text-muted-foreground hover:text-gray-600 text-sm">← 뒤로</button>
           <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
             style={{ background: game.gradientCss }}>
             <span className="text-4xl">{game.emoji}</span>
@@ -203,36 +203,36 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
           <button
             onClick={handleCreateRoom}
             disabled={actionLoading}
-            className="bg-white rounded-2xl shadow-sm border-2 border-gray-100 p-6 flex items-center gap-5 transition-all hover:scale-[1.02] hover:shadow-md text-left"
+            className="bg-card rounded-2xl shadow-sm border-2 border-border p-6 flex items-center gap-5 transition-all hover:scale-[1.02] hover:shadow-md text-left"
             style={{ opacity: actionLoading ? 0.6 : 1 }}>
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0"
               style={{ background: game.gradientCss }}>
               🏠
             </div>
             <div>
-              <h3 className="font-black text-gray-800 text-lg">방 개설하기</h3>
-              <p className="text-gray-500 text-sm">새 방을 만들고 방 코드를 친구에게 알려줘요</p>
+              <h3 className="font-black text-foreground text-lg">방 개설하기</h3>
+              <p className="text-muted-foreground text-sm">새 방을 만들고 방 코드를 친구에게 알려줘요</p>
             </div>
           </button>
 
           {/* 방 참가 */}
           <button
             onClick={() => setRoomStep("join")}
-            className="bg-white rounded-2xl shadow-sm border-2 border-gray-100 p-6 flex items-center gap-5 transition-all hover:scale-[1.02] hover:shadow-md text-left">
+            className="bg-card rounded-2xl shadow-sm border-2 border-border p-6 flex items-center gap-5 transition-all hover:scale-[1.02] hover:shadow-md text-left">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0"
               style={{ background: game.gradientCss }}>
               🔑
             </div>
             <div>
-              <h3 className="font-black text-gray-800 text-lg">방 코드 입력</h3>
-              <p className="text-gray-500 text-sm">친구가 알려준 방 코드로 참가해요</p>
+              <h3 className="font-black text-foreground text-lg">방 코드 입력</h3>
+              <p className="text-muted-foreground text-sm">친구가 알려준 방 코드로 참가해요</p>
             </div>
           </button>
         </div>
 
         {actionLoading && (
-          <div className="flex items-center justify-center gap-2 text-gray-400 text-sm">
-            <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+            <span className="w-4 h-4 border-2 border-input border-t-transparent rounded-full animate-spin" />
             방을 만드는 중...
           </div>
         )}
@@ -245,7 +245,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
     return (
       <div className="max-w-lg mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => { setRoomStep("choice"); setJoinCode(""); }} className="text-gray-400 hover:text-gray-600 text-sm">← 뒤로</button>
+          <button onClick={() => { setRoomStep("choice"); setJoinCode(""); }} className="text-muted-foreground hover:text-gray-600 text-sm">← 뒤로</button>
           <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
             style={{ background: game.gradientCss }}>
             <span className="text-4xl">🔑</span>
@@ -260,7 +260,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-sm">❌ {roomError}</div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-5">
           <input
             type="text"
             inputMode="numeric"
@@ -289,7 +289,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">← 목록</button>
+        <button onClick={handleBack} className="text-muted-foreground hover:text-gray-600 text-sm">← 목록</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>
@@ -300,8 +300,8 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-        <h2 className="font-black text-gray-800 text-lg">어떻게 놀이할까요?</h2>
+      <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-4">
+        <h2 className="font-black text-foreground text-lg">어떻게 놀이할까요?</h2>
 
         <div className="grid grid-cols-3 gap-3">
           {[
@@ -317,15 +317,15 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
                 background: mode === m.value ? `${game.accentColor}12` : "white",
               }}>
               <span className="text-3xl">{m.emoji}</span>
-              <span className="font-bold text-gray-800 text-sm">{m.label}</span>
-              <span className="text-gray-400 text-xs text-center leading-tight">{m.desc}</span>
+              <span className="font-bold text-foreground text-sm">{m.label}</span>
+              <span className="text-muted-foreground text-xs text-center leading-tight">{m.desc}</span>
             </button>
           ))}
         </div>
 
         {/* 친구 모드: 방 안내 */}
         {mode === "friend" && (
-          <div className="pt-2 border-t border-gray-100">
+          <div className="pt-2 border-t border-border">
             <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
               <span className="text-2xl">👥</span>
               <div>
@@ -338,7 +338,7 @@ export default function GamePage({ params }: { params: { gameId: string } }) {
 
         {/* 솔로/AI 모드: 내 이름 */}
         {(mode === "solo" || mode === "ai") && (
-          <div className="space-y-3 pt-2 border-t border-gray-100">
+          <div className="space-y-3 pt-2 border-t border-border">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0"
                 style={{ background: game.accentColor }}>
