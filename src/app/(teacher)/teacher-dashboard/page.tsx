@@ -16,6 +16,7 @@ import { PendingReviewBanner } from "@/components/teacher/PendingReviewBanner";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface TeacherClass {
   grade: string;
@@ -261,7 +262,7 @@ export default function TeacherDashboard() {
             </CardHeader>
             <CardContent>
               {stats.byStudent.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">데이터가 없습니다</div>
+                <EmptyState icon="📊" title="데이터가 없습니다" />
               ) : (
                 <div className="overflow-x-auto"><Table>
                   <TableHeader>

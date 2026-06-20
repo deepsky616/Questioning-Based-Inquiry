@@ -12,6 +12,7 @@ import { getSessionUser } from "@/lib/auth-helpers";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
 import PointsCard from "@/components/shared/PointsCard";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface Question {
   id: string;
@@ -188,9 +189,7 @@ export default function StudentDashboard() {
         </CardHeader>
         <CardContent>
           {questions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              아직 질문이 없습니다. 첫 질문을 작성해 보세요!
-            </div>
+            <EmptyState icon="✏️" title="아직 질문이 없어요" description="첫 질문을 작성해 보세요!" />
           ) : (
             <div className="space-y-3">
               {questions.map((q) => (

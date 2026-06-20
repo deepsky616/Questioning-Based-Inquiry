@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/shared/theme-provider";
 import type { ReportRange, SeriesPoint, ReportTotals } from "@/lib/report-stats";
 import type { QuestionTypeSummary } from "@/lib/stats-calc";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export interface PerStudentRow {
   id: string;
@@ -346,7 +347,7 @@ export function ReportView({
 
           {/* 수업세션별 개별 분석 목록(선택한 주/월의 세션만 표시) */}
           {filteredSessions.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">이 기간에 진행한 수업세션이 없어요</p>
+            <EmptyState icon="🗓️" title="이 기간에 진행한 수업세션이 없어요" />
           ) : (
           <div className="space-y-2">
             {filteredSessions.map((s) => {

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
 import { groupSharedQuestions } from "@/lib/shared-questions";
 import { CommentThread } from "@/components/shared/CommentThread";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface SharedQuestion {
   type: string;
@@ -142,9 +143,8 @@ export function UnitDesignView() {
         <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
       ) : sessions.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <p className="font-medium mb-1">배포된 수업 탐구 질문이 없습니다</p>
-            <p className="text-sm text-muted-foreground">선생님이 수업 탐구 질문을 배포하면 여기에 표시됩니다</p>
+          <CardContent className="p-0">
+            <EmptyState icon="📚" title="배포된 수업 탐구 질문이 없습니다" description="선생님이 수업 탐구 질문을 배포하면 여기에 표시됩니다" />
           </CardContent>
         </Card>
       ) : (

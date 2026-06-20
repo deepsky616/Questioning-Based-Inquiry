@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 type IndivScope = "class" | "school" | "all";
 type ClassScope = "school" | "all";
@@ -155,7 +156,7 @@ export function RankingPanel({
       {isLoading ? (
         <div className="py-8 text-center text-sm text-muted-foreground">불러오는 중...</div>
       ) : !data || data.students.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">표시할 순위가 없습니다</div>
+        <EmptyState icon="🏆" title="표시할 순위가 없습니다" />
       ) : (
         <div ref={containerRef} className="max-h-80 overflow-y-auto">
           <table className="w-full text-sm">
@@ -270,7 +271,7 @@ export function StudentRankPanel({
       {isLoading ? (
         <div className="py-8 text-center text-sm text-muted-foreground">불러오는 중...</div>
       ) : !data || data.students.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">표시할 순위가 없습니다</div>
+        <EmptyState icon="🏆" title="표시할 순위가 없습니다" />
       ) : (
         <div ref={containerRef} className="max-h-80 overflow-y-auto">
           <table className="w-full text-sm">
@@ -383,7 +384,7 @@ export function ClassRankingPanel({
       {isLoading ? (
         <div className="py-8 text-center text-sm text-muted-foreground">불러오는 중...</div>
       ) : !data || data.classes.length === 0 ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">표시할 순위가 없습니다</div>
+        <EmptyState icon="🏆" title="표시할 순위가 없습니다" />
       ) : (
         <div ref={containerRef} className="max-h-80 overflow-y-auto">
           <table className="w-full text-sm">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ACTIVITY_BONUS_TYPES } from "@/lib/activity-bonus-policy";
 import { buildSessionLabel } from "@/lib/sessions";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface SessionItem { id: string; date: string; subject: string; topic: string }
 interface PendingLog {
@@ -211,7 +212,7 @@ export function PointReviewView() {
         </CardHeader>
         <CardContent className="space-y-2">
           {normalRows.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground text-sm">대기 중인 보너스가 없어요</p>
+            <EmptyState icon="✅" title="대기 중인 보너스가 없어요" />
           ) : normalRows.map((p) => (
             <PendingRow key={p.id} p={p} selected={selected.has(p.id)}
               onToggle={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}

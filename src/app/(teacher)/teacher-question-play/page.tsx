@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   AnyGame,
   GameVisibility,
@@ -331,7 +332,7 @@ export default function TeacherQuestionPlayPage() {
                   </DialogTitle>
                 </DialogHeader>
                 {!st || st.students.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">아직 참여한 학생이 없어요</p>
+                  <EmptyState icon="🎮" title="아직 참여한 학생이 없어요" />
                 ) : (
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2 text-xs">
