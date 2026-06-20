@@ -49,7 +49,7 @@ interface ClassificationSummary {
 interface StudentStats {
   student: Student & {
     totalPoints: number; questionCount: number; commentCount: number;
-    likesReceived: number; commentsReceived: number; goodQuestions: number;
+    likesReceived: number; commentsReceived: number; goodQuestions: number; gamePlays: number;
   };
   classification: ClassificationSummary;
   events: RawEvent[];
@@ -262,8 +262,8 @@ function StudentDetailDialog({
           </div>
         </div>
 
-        {/* 받은 호응 + 좋은 질문 */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* 받은 호응 + 좋은 질문 + 질문놀이 참여 */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-500/30 p-3 text-center">
             <p className="text-xs text-rose-500 font-medium">받은 좋아요</p>
             <p className="text-2xl font-black text-rose-600">{stats?.student.likesReceived ?? "-"}</p>
@@ -275,6 +275,10 @@ function StudentDetailDialog({
           <div className="rounded-xl bg-violet-50 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-500/30 p-3 text-center">
             <p className="text-xs text-violet-500 font-medium">좋은 질문</p>
             <p className="text-2xl font-black text-violet-600">{stats?.student.goodQuestions ?? "-"}</p>
+          </div>
+          <div className="rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-500/30 p-3 text-center">
+            <p className="text-xs text-teal-500 font-medium">질문놀이 참여</p>
+            <p className="text-2xl font-black text-teal-600">{stats?.student.gamePlays ?? "-"}</p>
           </div>
         </div>
 

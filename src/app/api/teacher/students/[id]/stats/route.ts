@@ -93,6 +93,13 @@ export async function GET(
     select: { relatedQuestionId: true },
   });
   const goodQuestions = new Set(approvedQ.map((p) => p.relatedQuestionId)).size;
+  // 질문놀이 참여 횟수: 멀티(PARTICIPATION) + 솔로/AI(ACTIVITY_SOLO·ACTIVITY_AI) 1판당 1건
+  const gamePlays = await prisma.pointLog.count({
+    where: {
+      studentId,
+      OR: [{ bonusType: "PARTICIPATION" }, { gameId: "ACTIVITY_SOLO" }, { gameId: "ACTIVITY_AI" }],
+    },
+  });
   // 질문 분류 분포(분류1 폐쇄/개방, 분류2 사실/개념/논쟁)
   const classification = summarizeQuestionTypes(
     questions.map((q) => ({ closure: q.closure ?? "", cognitive: q.cognitive ?? "" })),
@@ -111,6 +118,7 @@ export async function GET(
       likesReceived,
       commentsReceived,
       goodQuestions,
+      gamePlays,
     },
     classification,
     events,
