@@ -58,6 +58,21 @@ export async function GET() {
     orderBy: [{ grade: "asc" }, { className: "asc" }, { studentNumber: "asc" }],
   });
 
+  // 마지막 활동일(질문·댓글 중 최신) — 학생별 max createdAt
+  const ids = students.map((s) => s.id);
+  const [qMax, cMax] = ids.length
+    ? await Promise.all([
+        prisma.question.groupBy({ by: ["authorId"], where: { authorId: { in: ids } }, _max: { createdAt: true } }),
+        prisma.comment.groupBy({ by: ["authorId"], where: { authorId: { in: ids } }, _max: { createdAt: true } }),
+      ])
+    : [[], []];
+  const lastActivity = new Map<string, number>();
+  for (const r of qMax) if (r._max.createdAt) lastActivity.set(r.authorId, r._max.createdAt.getTime());
+  for (const r of cMax) {
+    const t = r._max.createdAt?.getTime();
+    if (t && t > (lastActivity.get(r.authorId) ?? 0)) lastActivity.set(r.authorId, t);
+  }
+
   return NextResponse.json({
     students: students.map((s) => ({
       id: s.id,
@@ -70,6 +85,7 @@ export async function GET() {
       commentCount: s._count.comments,
       pointLogCount: s._count.pointLogs,
       totalPoints: s.totalPoints,
+      lastActivityAt: lastActivity.has(s.id) ? new Date(lastActivity.get(s.id)!).toISOString() : null,
     })),
     teacherClasses,
   });

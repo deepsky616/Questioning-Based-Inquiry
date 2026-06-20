@@ -15,12 +15,25 @@ import { buildTeacherClassLabel } from "@/lib/teacher";
 import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
+
+/** ISO 날짜 → "오늘 / N일 전 / -" */
+function lastActiveLabel(iso?: string | null): string {
+  if (!iso) return "-";
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (d <= 0) return "오늘";
+  if (d === 1) return "어제";
+  if (d < 30) return `${d}일 전`;
+  if (d < 365) return `${Math.floor(d / 30)}개월 전`;
+  return `${Math.floor(d / 365)}년 전`;
+}
 
 /* ─── 타입 ─── */
 interface Student {
   id: string; name: string; grade: string; className: string;
   studentNumber: string; school: string;
   questionCount: number; commentCount: number; pointLogCount: number; totalPoints: number;
+  lastActivityAt?: string | null;
 }
 interface TeacherClass { grade: string; className: string }
 
@@ -28,8 +41,17 @@ interface RawEvent { type: "question" | "comment" | "point"; createdAt: string; 
 interface PointLogItem { id: string; createdAt: string; points: number; gameId: string; bonusType: string; reason: string }
 interface QuestionItem { id: string; createdAt: string; content: string; closure: string; cognitive: string }
 interface CommentItem { id: string; createdAt: string; content: string }
+interface ClassificationSummary {
+  total: number;
+  closure: { closed: number; open: number };
+  cognitive: { factual: number; conceptual: number; controversial: number };
+}
 interface StudentStats {
-  student: Student & { totalPoints: number; questionCount: number; commentCount: number };
+  student: Student & {
+    totalPoints: number; questionCount: number; commentCount: number;
+    likesReceived: number; commentsReceived: number; goodQuestions: number;
+  };
+  classification: ClassificationSummary;
   events: RawEvent[];
   recentQuestions: QuestionItem[];
   recentComments: CommentItem[];
@@ -239,6 +261,61 @@ function StudentDetailDialog({
             </p>
           </div>
         </div>
+
+        {/* 받은 호응 + 좋은 질문 */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-500/30 p-3 text-center">
+            <p className="text-xs text-rose-500 font-medium">받은 좋아요</p>
+            <p className="text-2xl font-black text-rose-600">{stats?.student.likesReceived ?? "-"}</p>
+          </div>
+          <div className="rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-500/30 p-3 text-center">
+            <p className="text-xs text-sky-500 font-medium">받은 답변</p>
+            <p className="text-2xl font-black text-sky-600">{stats?.student.commentsReceived ?? "-"}</p>
+          </div>
+          <div className="rounded-xl bg-violet-50 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-500/30 p-3 text-center">
+            <p className="text-xs text-violet-500 font-medium">좋은 질문</p>
+            <p className="text-2xl font-black text-violet-600">{stats?.student.goodQuestions ?? "-"}</p>
+          </div>
+        </div>
+
+        {/* 질문 분류 분포 */}
+        {stats && stats.classification.total > 0 && (
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-sm font-bold text-foreground mb-3">📊 질문 분류 분포</p>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3">
+                <ClassificationDonut
+                  size={104}
+                  slices={[
+                    { name: "폐쇄형", value: stats.classification.closure.closed, fill: "#3b82f6" },
+                    { name: "개방형", value: stats.classification.closure.open, fill: "#10b981" },
+                  ]}
+                />
+                <div className="text-xs space-y-1">
+                  <p className="font-semibold text-muted-foreground">분류1</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />폐쇄형 {stats.classification.closure.closed}</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />개방형 {stats.classification.closure.open}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <ClassificationDonut
+                  size={104}
+                  slices={[
+                    { name: "사실적", value: stats.classification.cognitive.factual, fill: "#94a3b8" },
+                    { name: "개념적", value: stats.classification.cognitive.conceptual, fill: "#a855f7" },
+                    { name: "논쟁적", value: stats.classification.cognitive.controversial, fill: "#f97316" },
+                  ]}
+                />
+                <div className="text-xs space-y-1">
+                  <p className="font-semibold text-muted-foreground">분류2</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1.5" />사실적 {stats.classification.cognitive.factual}</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1.5" />개념적 {stats.classification.cognitive.conceptual}</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-orange-500 mr-1.5" />논쟁적 {stats.classification.cognitive.controversial}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 기간/지표 토글 + 차트 */}
         <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
@@ -513,6 +590,7 @@ export default function StudentsPage() {
                       <TableHead className="text-right w-16">질문</TableHead>
                       <TableHead className="text-right w-16">답변</TableHead>
                       <TableHead className="text-right w-20">포인트</TableHead>
+                      <TableHead className="text-right w-24 hidden sm:table-cell">마지막 활동</TableHead>
                       <TableHead className="text-right w-24">상세</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -536,6 +614,9 @@ export default function StudentsPage() {
                           <span className={`font-semibold ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
                             {s.totalPoints}
                           </span>
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground hidden sm:table-cell">
+                          {lastActiveLabel(s.lastActivityAt)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button size="sm" variant="outline"

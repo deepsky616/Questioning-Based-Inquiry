@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { summarizeQuestionTypes } from "@/lib/stats-calc";
 
 interface RawEvent { type: "question" | "comment" | "point"; createdAt: string; weight: number; meta?: Record<string, unknown> }
 
@@ -46,7 +47,10 @@ export async function GET(
   const [questions, comments, pointLogs] = await Promise.all([
     prisma.question.findMany({
       where: { authorId: studentId },
-      select: { id: true, createdAt: true, content: true, closure: true, cognitive: true },
+      select: {
+        id: true, createdAt: true, content: true, closure: true, cognitive: true,
+        _count: { select: { likes: true, comments: true } },
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.comment.findMany({
@@ -80,6 +84,20 @@ export async function GET(
     })),
   ];
 
+  // 받은 호응(학생 질문에 달린 좋아요·댓글 합)
+  const likesReceived = questions.reduce((sum, q) => sum + q._count.likes, 0);
+  const commentsReceived = questions.reduce((sum, q) => sum + q._count.comments, 0);
+  // 좋은 질문 수 = 교사가 승인한 보너스가 달린 서로 다른 질문 수
+  const approvedQ = await prisma.pointLog.findMany({
+    where: { studentId, status: "APPROVED", relatedQuestionId: { not: null } },
+    select: { relatedQuestionId: true },
+  });
+  const goodQuestions = new Set(approvedQ.map((p) => p.relatedQuestionId)).size;
+  // 질문 분류 분포(분류1 폐쇄/개방, 분류2 사실/개념/논쟁)
+  const classification = summarizeQuestionTypes(
+    questions.map((q) => ({ closure: q.closure ?? "", cognitive: q.cognitive ?? "" })),
+  );
+
   return NextResponse.json({
     student: {
       id: student.id,
@@ -90,7 +108,11 @@ export async function GET(
       totalPoints: student.totalPoints,
       questionCount: questions.length,
       commentCount: comments.length,
+      likesReceived,
+      commentsReceived,
+      goodQuestions,
     },
+    classification,
     events,
     recentQuestions: questions.slice(0, 10),
     recentComments: comments.slice(0, 10),
