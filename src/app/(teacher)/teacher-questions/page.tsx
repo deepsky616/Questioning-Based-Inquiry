@@ -39,6 +39,7 @@ import { formatBulkAiSummary, validatePreviewAnswers } from "@/lib/questions";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface QuestionSession {
   id: string;
@@ -586,9 +587,7 @@ export default function QuestionsPage() {
   const QuestionTable = ({ list }: { list: Question[] }) => {
     const allChecked = list.length > 0 && list.every((q) => selectedIds.has(q.id));
     return list.length === 0 ? (
-      <div className="text-center py-8 text-muted-foreground text-sm">
-        해당하는 질문이 없습니다
-      </div>
+      <EmptyState icon="🔍" title="해당하는 질문이 없습니다" />
     ) : (
       <div className="overflow-x-auto"><Table>
         <TableHeader>
@@ -919,11 +918,7 @@ export default function QuestionsPage() {
                     ? s.hasQuestion
                     : !s.hasQuestion
                 ).length === 0 && (
-                  <div className="text-center py-6 text-muted-foreground text-sm">
-                    {participationFilter === "submitted"
-                      ? "제출한 학생이 없습니다"
-                      : "미제출 학생이 없습니다"}
-                  </div>
+                  <EmptyState icon="🧑‍🎓" title={participationFilter === "submitted" ? "제출한 학생이 없습니다" : "미제출 학생이 없습니다"} />
                 )}
               </div>
             </CardContent>

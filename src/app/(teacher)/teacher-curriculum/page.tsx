@@ -10,6 +10,7 @@ import DatePicker from "@/components/shared/DatePicker";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
@@ -593,7 +594,7 @@ export default function CurriculumPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {savedList.length === 0 ? (
-              <p className="text-muted-foreground text-sm">저장된 탐구 질문이 없습니다.</p>
+              <EmptyState icon="📭" title="저장된 탐구 질문이 없습니다" />
             ) : (
               <ul className="divide-y rounded-md border">
                 {savedList.map((d) => (

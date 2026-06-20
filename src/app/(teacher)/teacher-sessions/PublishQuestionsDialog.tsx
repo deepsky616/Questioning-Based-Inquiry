@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface InquiryQuestion { type: string; content: string }
 interface UnitDesign {
@@ -157,9 +158,7 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
             {/* 질문 목록 */}
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {allInquiry.length === 0 ? (
-                <p className="text-muted-foreground text-sm text-center py-8">
-                  이 단원설계에 작성된 탐구 질문이 없어요
-                </p>
+                <EmptyState icon="📭" title="이 단원설계에 작성된 탐구 질문이 없어요" />
               ) : allInquiry.map((q, idx) => {
                 const key = q.content.trim();
                 const pub = publishedByContent.get(key);

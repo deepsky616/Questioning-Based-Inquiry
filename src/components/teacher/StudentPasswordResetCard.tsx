@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { validatePasswordPolicy } from "@/lib/password-policy";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface StudentRow {
   id: string;
@@ -109,7 +110,7 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
   const body = (
     <div className="space-y-4">
         {students.length === 0 ? (
-          <p className="text-sm text-muted-foreground">담당 학생이 없습니다.</p>
+          <EmptyState icon="🧑‍🏫" title="담당 학생이 없습니다" />
         ) : (
           <>
             {classOptions.length > 1 && (
