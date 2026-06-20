@@ -115,32 +115,31 @@ export default function PointsCard() {
               return (
                 <div key={log.id}
                   className={`flex items-center gap-2 text-sm py-1 ${isRejected ? "opacity-40" : ""}`}>
-                  {/* 왼쪽: 획득 경로(이모지·라벨·게임·사유) — 남는 공간을 채우고 길면 줄임 */}
+                  {/* 획득 경로: 이모지·라벨·게임은 내용 너비로 왼쪽에 붙는다 */}
                   <span className="text-base shrink-0">{b.emoji}</span>
-                  <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                    <span className="text-foreground font-medium truncate">{b.label}</span>
-                    {game && <span className="text-muted-foreground text-xs shrink-0">· {game}</span>}
-                    {showReason && <span className="text-muted-foreground text-xs truncate">· {log.reason}</span>}
-                  </div>
-                  {/* 오른쪽: 상태 배지 + 시간 + 포인트를 한 묶음으로 */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {isPending && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                        선생님 승인 대기
-                      </span>
-                    )}
-                    {isRejected && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                        거부됨
-                      </span>
-                    )}
-                    <span className="text-muted-foreground text-xs">{relativeTime(log.createdAt)}</span>
-                    <span className={`font-black w-11 text-right ${
-                      isPending ? "text-amber-500" : isRejected ? "text-muted-foreground" : "text-indigo-600"
-                    }`}>
-                      {isPending ? `(+${log.points})` : `+${log.points}`}
+                  <span className="text-foreground font-medium shrink-0">{b.label}</span>
+                  {game && <span className="text-muted-foreground text-xs shrink-0">· {game}</span>}
+                  {/* 사유는 있을 때만 남는 여백을 흡수(없으면 시간·포인트가 라벨 바로 뒤에 붙음) */}
+                  {showReason && (
+                    <span className="text-muted-foreground text-xs flex-1 min-w-0 truncate">· {log.reason}</span>
+                  )}
+                  {/* 상태 배지 + 시간 + 포인트 묶음 */}
+                  {isPending && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 shrink-0">
+                      선생님 승인 대기
                     </span>
-                  </div>
+                  )}
+                  {isRejected && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">
+                      거부됨
+                    </span>
+                  )}
+                  <span className="text-muted-foreground text-xs shrink-0">{relativeTime(log.createdAt)}</span>
+                  <span className={`font-black text-right shrink-0 ${
+                    isPending ? "text-amber-500" : isRejected ? "text-muted-foreground" : "text-indigo-600"
+                  }`}>
+                    {isPending ? `(+${log.points})` : `+${log.points}`}
+                  </span>
                 </div>
               );
             })}
