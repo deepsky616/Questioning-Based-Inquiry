@@ -147,12 +147,12 @@ export default function TeacherDashboard() {
           {/* 총 질문 수 */}
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">총 질문 수</p>
                   <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
                 </div>
-                <div className="text-xs text-muted-foreground border-l pl-4">
+                <div className="text-xs text-muted-foreground text-right">
                   {period === "week" && "최근 1주 기준"}
                   {period === "month" && "최근 1개월 기준"}
                   {period === "semester" && "최근 6개월 기준"}
