@@ -393,13 +393,12 @@ function StudentDetailDialog({
                   // instance:<UUID>는 중복 지급 방지용 내부 키이므로 표시하지 않는다
                   const showReason = p.reason && p.reason !== b.label && !p.reason.startsWith("instance:");
                   return (
-                    <div key={p.id} className="text-xs flex items-center gap-1 text-foreground">
+                    <div key={p.id} className="text-xs flex items-center gap-1.5 text-foreground">
                       <span className="shrink-0">{b.emoji}</span>
                       <span className="font-medium shrink-0">{b.label}</span>
                       {game && <span className="text-muted-foreground shrink-0">· {game}</span>}
-                      {showReason && <span className="text-muted-foreground truncate flex-1">· {p.reason}</span>}
-                      {!showReason && <span className="flex-1" />}
-                      <span className={`font-bold shrink-0 ${p.points >= 0 ? "text-indigo-600" : "text-red-500"}`}>
+                      {showReason && <span className="text-muted-foreground truncate flex-1 min-w-0">· {p.reason}</span>}
+                      <span className={`font-bold shrink-0 ${!showReason ? "ml-1" : ""} ${p.points >= 0 ? "text-indigo-600" : "text-red-500"}`}>
                         {p.points > 0 ? `+${p.points}` : p.points}
                       </span>
                     </div>
