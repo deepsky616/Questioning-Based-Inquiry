@@ -94,6 +94,12 @@ const TYPE_LABEL: Record<string, string> = {
   controversial: "논쟁적 질문",
 };
 
+const TYPE_DESC: Record<string, string> = {
+  factual: "사실이나 정보를 확인하는 질문",
+  conceptual: "원리와 이유를 생각하는 질문",
+  controversial: "내 생각·판단이 필요한 질문",
+};
+
 const TYPE_COLOR: Record<string, string> = {
   factual: "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-500/30 text-blue-800 dark:text-blue-300",
   conceptual: "bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-300",
@@ -1392,8 +1398,9 @@ export default function CurriculumPage() {
             </div>
             {(["factual", "conceptual", "controversial"] as const).map((type) => (
               <div key={type}>
-                <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">
                   {TYPE_LABEL[type]}
+                  <span className="ml-1.5 font-normal text-muted-foreground/80">· {TYPE_DESC[type]}</span>
                 </p>
                 <div className="space-y-2">
                   {inquiryQuestions
