@@ -357,3 +357,12 @@
     margin: 14mm;
   }
 }
+
+/* 가로 스크롤 네비 등에서 스크롤바 숨김(스크롤은 가능) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -41,17 +41,17 @@ export function AppNav({
   return (
     <header className="bg-card shadow-sm border-b sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <div className="flex items-center gap-8 min-w-0">
+        <div className="flex justify-between items-center gap-3 h-16">
+          {/* 왼쪽: 브랜드 + 인라인 네비(남는 공간 내에서만, 길면 가로 스크롤) */}
+          <div className="flex items-center gap-4 xl:gap-6 min-w-0 flex-1">
             <h1 className="text-xl font-bold text-primary shrink-0">Question Lab</h1>
-            {/* 데스크톱 인라인 네비 */}
-            <nav className="hidden md:flex space-x-1">
+            <nav className="hidden lg:flex items-center gap-1 min-w-0 overflow-x-auto no-scrollbar">
               {pages.map((p) => (
                 <Link
                   key={p.href}
                   href={p.href}
                   className={cn(
-                    "px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    "shrink-0 whitespace-nowrap px-2.5 py-2 rounded-md text-sm font-medium transition-colors",
                     isActive(p.href)
                       ? "bg-muted text-primary"
                       : "text-muted-foreground hover:text-primary hover:bg-muted/60",
@@ -63,28 +63,29 @@ export function AppNav({
             </nav>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
+          {/* 오른쪽: 도구 — 항상 고정폭(네비에 절대 안 가려짐) */}
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {extra}
             <LanguageToggle />
             <ThemeToggle />
-            <span className="hidden sm:inline text-sm text-muted-foreground truncate max-w-[8rem]">
+            <span className="hidden xl:inline text-sm text-muted-foreground truncate max-w-[8rem]">
               {userName} {roleSuffix}
             </span>
             <Button
               variant="outline"
               size="sm"
-              className="hidden md:inline-flex"
+              className="hidden lg:inline-flex"
               onClick={() => signOut({ callbackUrl: "/login" })}
             >
               {t("logout")}
             </Button>
-            {/* 모바일 햄버거 */}
+            {/* 햄버거: 인라인 네비가 숨는 lg 미만에서 표시 */}
             <button
               type="button"
               aria-label={open ? t("closeMenu") : t("openMenu")}
               aria-expanded={open}
               onClick={() => setOpen((v) => !v)}
-              className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted"
+              className="lg:hidden inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted"
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -92,9 +93,9 @@ export function AppNav({
         </div>
       </div>
 
-      {/* 모바일 펼침 메뉴 */}
+      {/* 펼침 메뉴 (lg 미만) */}
       {open && (
-        <div className="md:hidden border-t bg-card">
+        <div className="lg:hidden border-t bg-card">
           <nav className="max-w-7xl mx-auto px-4 py-2 space-y-1">
             {pages.map((p) => (
               <Link
