@@ -81,26 +81,6 @@ interface SavedInquiryDesign {
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
-const STEP_LABELS: Record<Step, string> = {
-  1: "교육과정 탐색",
-  2: "핵심어 선택",
-  3: "핵심 문장",
-  4: "핵심 질문",
-  5: "탐구 질문",
-};
-
-const TYPE_LABEL: Record<string, string> = {
-  factual: "사실적 질문",
-  conceptual: "개념적 질문",
-  controversial: "논쟁적 질문",
-};
-
-const TYPE_DESC: Record<string, string> = {
-  factual: "사실이나 정보를 확인하는 질문",
-  conceptual: "원리와 이유를 생각하는 질문",
-  controversial: "내 생각·판단이 필요한 질문",
-};
-
 const TYPE_COLOR: Record<string, string> = {
   factual: "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-500/30 text-blue-800 dark:text-blue-300",
   conceptual: "bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-300",
@@ -158,6 +138,13 @@ function sortAreasByOrder(areas: { id: string; area: string }[], subject: string
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
 export default function CurriculumPage() {
   const tPages = useTranslations("pages");
+  const t = useTranslations("curriculum");
+  const tc = useTranslations("common");
+  const tCls = useTranslations("classification");
+  const tSeq = useTranslations("sequencePanel");
+  const stepLabel = (n: Step) => t(`step${n}`);
+  const typeLabel = (type: string) => `${tCls(`${type}.label`)} ${tc("questionWord")}`;
+  const typeDesc = (type: string) => tCls(`${type}.desc`);
   const [step, setStep] = useState<Step>(1);
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -366,9 +353,9 @@ export default function CurriculumPage() {
       const err = await res.json().catch(() => ({}));
       // 브라우저 콘솔에 진단 정보 전체 출력 (네트워크 탭에서도 확인 가능)
       console.error(`[unit-design/generate] HTTP ${res.status}`, err);
-      const parts = [err.error || "AI 생성 오류"];
-      if (err.detail) parts.push(`\n자세한 원인:\n${err.detail}`);
-      if (err.rawPreview) parts.push(`\nAI 응답 일부:\n${err.rawPreview}`);
+      const parts = [err.error || t("aiGenError")];
+      if (err.detail) parts.push(`\n${t("detailLabel")}\n${err.detail}`);
+      if (err.rawPreview) parts.push(`\n${t("rawLabel")}\n${err.rawPreview}`);
       toast({ variant: "destructive", description: parts.join("\n") });
       return null;
     }
@@ -495,7 +482,7 @@ export default function CurriculumPage() {
           setSelectedSavedQuestionKeys(new Set(savedDesign.inquiryQuestions.map(getQuestionKey)));
         }
       } else {
-        toast({ variant: "destructive", description: "저장 실패" });
+        toast({ variant: "destructive", description: t("saveFailed") });
       }
     } finally {
       setIsSaving(false);
@@ -546,10 +533,10 @@ export default function CurriculumPage() {
         }),
       });
       if (res.ok) {
-        setCreatedSessionMessage(`${sessionDate} ${selectedSavedDesign.subject} 수업 세션에 탐구 질문을 제시했습니다.`);
+        setCreatedSessionMessage(t("sessionCreated", { date: sessionDate, subject: selectedSavedDesign.subject }));
       } else {
         const data = await res.json().catch(() => ({}));
-        toast({ variant: "destructive", description: data.error || "수업 세션 생성 실패" });
+        toast({ variant: "destructive", description: data.error || t("sessionCreateFailed") });
       }
     } finally {
       setIsCreatingSession(false);
@@ -559,7 +546,7 @@ export default function CurriculumPage() {
   const confirm = useConfirm();
 
   const handleDelete = async (id: string) => {
-    if (!(await confirm({ description: "삭제하시겠습니까?", confirmText: "삭제", destructive: true }))) return;
+    if (!(await confirm({ description: t("deleteConfirm"), confirmText: tc("delete"), destructive: true }))) return;
     await fetch(`/api/unit-design/${id}`, { method: "DELETE" });
     if (selectedSavedId === id) {
       setSelectedSavedId(null);
@@ -582,14 +569,14 @@ export default function CurriculumPage() {
           onClick={() => setMainTab("create")}
           className={`px-4 py-2 text-sm font-medium transition-colors ${mainTab === "create" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
         >
-          ✏️ 탐구질문 만들기
+          {t("tabCreate")}
         </button>
         <button
           type="button"
           onClick={() => setMainTab("saved")}
           className={`px-4 py-2 text-sm font-medium border-l transition-colors ${mainTab === "saved" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
         >
-          📁 저장된 탐구질문{savedList.length > 0 ? ` (${savedList.length})` : ""}
+          {t("tabSaved")}{savedList.length > 0 ? ` (${savedList.length})` : ""}
         </button>
       </div>
 
@@ -597,12 +584,12 @@ export default function CurriculumPage() {
       {mainTab === "saved" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">저장된 탐구 질문</CardTitle>
-            <CardDescription>저장된 질문을 확인하고 원하는 날짜의 수업 세션에 제시할 질문을 선택하세요</CardDescription>
+            <CardTitle className="text-base">{t("savedTitle")}</CardTitle>
+            <CardDescription>{t("savedDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {savedList.length === 0 ? (
-              <EmptyState icon="📭" title="저장된 탐구 질문이 없습니다" />
+              <EmptyState icon="📭" title={t("savedEmpty")} />
             ) : (
               <ul className="divide-y rounded-md border">
                 {savedList.map((d) => (
@@ -615,17 +602,17 @@ export default function CurriculumPage() {
                       >
                         <span className="block truncate font-medium text-sm text-foreground">{d.title}</span>
                         <span className="text-xs text-muted-foreground">
-                          {d.sessionDate ? `${d.sessionDate} · ` : ""}{d.subject} · {d.grade ? `${d.grade}학년` : `${d.gradeRange}학년군`} · {d.area} · 탐구질문 {d.inquiryQuestions.length}개
+                          {d.sessionDate ? `${d.sessionDate} · ` : ""}{d.subject} · {d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange })} · {d.area} · {t("inquiryCount", { count: d.inquiryQuestions.length })}
                         </span>
                       </button>
-                      <button onClick={() => handleDelete(d.id)} className="text-xs text-red-400 hover:text-red-600">삭제</button>
+                      <button onClick={() => handleDelete(d.id)} className="text-xs text-red-400 hover:text-red-600">{tc("delete")}</button>
                     </div>
 
                     {selectedSavedId === d.id && (
                       <div className="mt-3 space-y-3 rounded-md bg-muted/40 p-3">
                         <div className="space-y-2">
                           {d.inquiryQuestions.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">저장된 탐구질문이 없습니다.</p>
+                            <p className="text-sm text-muted-foreground">{t("noSavedInquiry")}</p>
                           ) : (
                             d.inquiryQuestions.map((question, i) => (
                               <label key={`${question.type}-${i}`} className="flex items-start gap-2">
@@ -637,7 +624,7 @@ export default function CurriculumPage() {
                                 />
                                 <span className="text-sm text-foreground">
                                   <span className="font-medium text-indigo-600 mr-1">
-                                    [{TYPE_LABEL[question.type]}]
+                                    [{typeLabel(question.type)}]
                                   </span>
                                   {question.content}
                                 </span>
@@ -648,39 +635,39 @@ export default function CurriculumPage() {
 
                         <div className="grid gap-3 border-t pt-3 sm:grid-cols-[1fr_1fr_2fr]">
                           <div className="space-y-1">
-                            <Label>수업 날짜</Label>
+                            <Label>{t("sessionDate")}</Label>
                             <DatePicker
                               value={sessionDate}
                               onChange={(v) => {
                                 setSessionDate(v);
                                 setCreatedSessionMessage("");
                               }}
-                              placeholder="수업 날짜 선택"
+                              placeholder={t("pickSessionDate")}
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label>교과</Label>
+                            <Label>{t("subject")}</Label>
                             <Input value={d.subject} disabled className="bg-muted" />
                           </div>
                           <div className="space-y-1">
-                            <Label>주제</Label>
+                            <Label>{t("topic")}</Label>
                             <Input
                               value={sessionTopic}
                               onChange={(e) => {
                                 setSessionTopic(e.target.value);
                                 setCreatedSessionMessage("");
                               }}
-                              placeholder="수업 주제 (예: 광합성과 에너지)"
+                              placeholder={t("topicPlaceholder")}
                             />
                           </div>
                         </div>
 
                         <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-2">
                           {([
-                            ["isActive", "학생 활성화", "켜면 학생이 배포된 질문에 좋아요·댓글을 남길 수 있어요.", sessionIsActive, setSessionIsActive],
-                            ["defaultQuestionPublic", "질문 공개", "켜면 학생이 작성한 질문을 서로 볼 수 있어요. 끄면 본인 질문만 보여요.", defaultQuestionPublic, setDefaultQuestionPublic],
-                            ["likesVisibleToPeers", "좋아요 공개", "켜면 학생이 서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요.", sessionLikesVisible, setSessionLikesVisible],
-                            ["commentsVisibleToPeers", "댓글 공개", "켜면 학생이 서로의 댓글을 볼 수 있어요. 끄면 본인·선생님 댓글만 보여요.", sessionCommentsVisible, setSessionCommentsVisible],
+                            ["isActive", tSeq("activeLabel"), tSeq("activeDesc"), sessionIsActive, setSessionIsActive],
+                            ["defaultQuestionPublic", tSeq("publicLabel"), tSeq("publicDesc"), defaultQuestionPublic, setDefaultQuestionPublic],
+                            ["likesVisibleToPeers", tSeq("likesLabel"), tSeq("likesDesc"), sessionLikesVisible, setSessionLikesVisible],
+                            ["commentsVisibleToPeers", tSeq("commentsLabel"), tSeq("commentsDesc"), sessionCommentsVisible, setSessionCommentsVisible],
                           ] as const).map(([key, label, desc, value, setter]) => (
                             <div key={key} className="flex items-center justify-between gap-4">
                               <div>
@@ -709,7 +696,7 @@ export default function CurriculumPage() {
                               selectedSavedQuestionKeys.size === 0
                             }
                           >
-                            {isCreatingSession ? "세션 생성 중..." : "선택 질문으로 수업 세션 만들기"}
+                            {isCreatingSession ? t("creatingSession") : t("createSessionBtn")}
                           </Button>
                         </div>
 
@@ -743,7 +730,7 @@ export default function CurriculumPage() {
                 : "bg-muted text-muted-foreground"
             }`}
           >
-            {s}. {STEP_LABELS[s]}
+            {s}. {stepLabel(s)}
           </div>
         ))}
       </div>
@@ -751,53 +738,53 @@ export default function CurriculumPage() {
       {/* ── Step 1: 교육과정 탐색 ── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">1단계 · 교육과정 탐색</CardTitle>
-          <CardDescription>교과 · 학년군 · 영역을 선택하면 2022 개정 교육과정 데이터를 표로 보여줍니다</CardDescription>
+          <CardTitle className="text-base">{t("step1Title")}</CardTitle>
+          <CardDescription>{t("step1Desc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label>학년군</Label>
+              <Label>{t("gradeRange")}</Label>
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={selGrade}
                 onChange={(e) => setSelGrade(e.target.value)}
               >
-                <option value="">학년군 선택</option>
+                <option value="">{t("selectGradeRange")}</option>
                 {GRADE_RANGES.map((g) => (
-                  <option key={g} value={g}>{g}학년군</option>
+                  <option key={g} value={g}>{t("gradeRangeOption", { g })}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
-              <Label>교과</Label>
+              <Label>{t("subject")}</Label>
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={selSubject}
                 onChange={(e) => setSelSubject(e.target.value)}
                 disabled={!selGrade}
               >
-                <option value="">교과 선택</option>
+                <option value="">{t("selectSubject")}</option>
                 {(SUBJECTS_BY_GRADE[selGrade] ?? []).map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
-              <Label>영역</Label>
+              <Label>{t("area")}</Label>
               <select
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={selAreaId}
                 onChange={(e) => setSelAreaId(e.target.value)}
                 disabled={!selSubject}
               >
-                <option value="">영역 선택</option>
+                <option value="">{t("selectArea")}</option>
                 {areas.map((a) => <option key={a.id} value={a.id}>{a.area}</option>)}
               </select>
             </div>
           </div>
 
-          {loadingCurriculum && <p className="text-sm text-muted-foreground">교육과정 데이터 로딩 중...</p>}
+          {loadingCurriculum && <p className="text-sm text-muted-foreground">{t("loadingCurriculum")}</p>}
 
           {curriculumData && (
             <div className="space-y-3 mt-2">
@@ -805,8 +792,8 @@ export default function CurriculumPage() {
               <div className="rounded-lg border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div>
-                    <p className="text-xs font-semibold text-indigo-600">핵심아이디어</p>
-                    <span className="text-xs text-indigo-400">수업에서 중점 다룰 항목을 체크하세요</span>
+                    <p className="text-xs font-semibold text-indigo-600">{t("coreIdea")}</p>
+                    <span className="text-xs text-indigo-400">{t("coreIdeaHint")}</span>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -814,7 +801,7 @@ export default function CurriculumPage() {
                       onClick={() => setSelectedCoreIdeaLines(splitCoreIdeaLines(curriculumData.coreIdea))}
                       className="text-xs text-indigo-600 hover:text-indigo-800 underline"
                     >
-                      전체 선택
+                      {t("selectAll")}
                     </button>
                     <span className="text-xs text-indigo-300">|</span>
                     <button
@@ -822,7 +809,7 @@ export default function CurriculumPage() {
                       onClick={() => setSelectedCoreIdeaLines([])}
                       className="text-xs text-indigo-600 hover:text-indigo-800 underline"
                     >
-                      전체 해제
+                      {t("deselectAll")}
                     </button>
                   </div>
                 </div>
@@ -855,14 +842,14 @@ export default function CurriculumPage() {
                     <tr>
                       <th className="px-4 py-2 text-left font-medium text-muted-foreground w-1/3 border-r">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span>지식·이해</span>
+                          <span>{t("knowledge")}</span>
                           <span className="flex gap-1.5">
                             <button
                               type="button"
                               onClick={() => setSelectedKnowledge(selectAllContentItems(curriculumData.knowledgeItems, KNOWLEDGE_ITEM_LIMIT))}
                               className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
                             >
-                              전체 선택
+                              {t("selectAll")}
                             </button>
                             <span className="text-xs text-muted-foreground font-normal">|</span>
                             <button
@@ -870,21 +857,21 @@ export default function CurriculumPage() {
                               onClick={() => setSelectedKnowledge([])}
                               className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
                             >
-                              전체 해제
+                              {t("deselectAll")}
                             </button>
                           </span>
                         </div>
                       </th>
                       <th className="px-4 py-2 text-left font-medium text-muted-foreground w-1/3 border-r">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span>과정·기능</span>
+                          <span>{t("process")}</span>
                           <span className="flex gap-1.5">
                             <button
                               type="button"
                               onClick={() => setSelectedProcess(selectAllContentItems(curriculumData.processItems, PROCESS_ITEM_LIMIT))}
                               className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
                             >
-                              전체 선택
+                              {t("selectAll")}
                             </button>
                             <span className="text-xs text-muted-foreground font-normal">|</span>
                             <button
@@ -892,21 +879,21 @@ export default function CurriculumPage() {
                               onClick={() => setSelectedProcess([])}
                               className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
                             >
-                              전체 해제
+                              {t("deselectAll")}
                             </button>
                           </span>
                         </div>
                       </th>
                       <th className="px-4 py-2 text-left font-medium text-muted-foreground w-1/3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span>가치·태도</span>
+                          <span>{t("value")}</span>
                           <span className="flex gap-1.5">
                             <button
                               type="button"
                               onClick={() => setSelectedValue(selectAllContentItems(curriculumData.valueItems, VALUE_ITEM_LIMIT))}
                               className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
                             >
-                              전체 선택
+                              {t("selectAll")}
                             </button>
                             <span className="text-xs text-muted-foreground font-normal">|</span>
                             <button
@@ -914,7 +901,7 @@ export default function CurriculumPage() {
                               onClick={() => setSelectedValue([])}
                               className="text-xs text-indigo-600 hover:text-indigo-800 underline font-normal"
                             >
-                              전체 해제
+                              {t("deselectAll")}
                             </button>
                           </span>
                         </div>
@@ -994,15 +981,15 @@ export default function CurriculumPage() {
                 curriculumData.middleValueItems?.length > 0) && (
                 <details className="rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-950/40">
                   <summary className="px-4 py-2 text-xs font-semibold text-amber-700 cursor-pointer select-none">
-                    ▶ 중학교 연계 내용요소 (선행 학습 여부 점검용 — 수업에서 직접 다루지 않음)
+                    {t("middleSchoolLink")}
                   </summary>
                   <div className="border-t border-amber-200 overflow-hidden">
                     <table className="w-full text-xs">
                       <thead className="bg-amber-100">
                         <tr>
-                          <th className="px-3 py-1.5 text-left font-medium text-amber-700 w-1/3 border-r border-amber-200">지식·이해</th>
-                          <th className="px-3 py-1.5 text-left font-medium text-amber-700 w-1/3 border-r border-amber-200">과정·기능</th>
-                          <th className="px-3 py-1.5 text-left font-medium text-amber-700 w-1/3">가치·태도</th>
+                          <th className="px-3 py-1.5 text-left font-medium text-amber-700 w-1/3 border-r border-amber-200">{t("knowledge")}</th>
+                          <th className="px-3 py-1.5 text-left font-medium text-amber-700 w-1/3 border-r border-amber-200">{t("process")}</th>
+                          <th className="px-3 py-1.5 text-left font-medium text-amber-700 w-1/3">{t("value")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1039,24 +1026,24 @@ export default function CurriculumPage() {
               {curriculumData.units.length > 0 && (
                 <div className="rounded-lg border border-blue-100 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-blue-700">단원 선택</p>
+                    <p className="text-xs font-semibold text-blue-700">{t("unitSelect")}</p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setSelectedUnitCodes(curriculumData.units.map((u) => u.unitCode))}
                         className="text-xs text-blue-600 hover:text-blue-800 underline"
                       >
-                        전체 선택
+                        {t("selectAll")}
                       </button>
                       <span className="text-xs text-blue-300">|</span>
                       <button
                         onClick={() => setSelectedUnitCodes([])}
                         className="text-xs text-blue-600 hover:text-blue-800 underline"
                       >
-                        전체 해제
+                        {t("deselectAll")}
                       </button>
                     </div>
                   </div>
-                  <p className="text-xs text-blue-500">수업할 단원을 선택하면 해당 단원의 성취기준만 표시됩니다</p>
+                  <p className="text-xs text-blue-500">{t("unitSelectHint")}</p>
                   <div className="flex flex-wrap gap-2">
                     {curriculumData.units.map((u) => {
                       const selected = selectedUnitCodes.includes(u.unitCode);
@@ -1083,8 +1070,8 @@ export default function CurriculumPage() {
                   </div>
                   {selectedUnitCodes.length > 0 && (
                     <p className="text-xs text-blue-600">
-                      {selectedUnitCodes.length}개 단원 선택됨 ·{" "}
-                      {getFilteredAchievements().length}개 성취기준 적용
+                      {t("unitsSelected", { count: selectedUnitCodes.length })} ·{" "}
+                      {t("achievementsApplied", { count: getFilteredAchievements().length })}
                     </p>
                   )}
                 </div>
@@ -1096,13 +1083,13 @@ export default function CurriculumPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-xs font-semibold text-muted-foreground">
-                        성취기준 선택
+                        {t("achievementSelect")}
                         <span className="ml-2 text-indigo-500 font-normal">
-                          {getSelectedAchievements().length} / {getFilteredAchievements().length}개 선택
+                          {t("selectedRatio", { a: getSelectedAchievements().length, b: getFilteredAchievements().length })}
                         </span>
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        선택한 성취기준만 핵심어 추천 분석에 반영됩니다
+                        {t("achievementHint")}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -1111,7 +1098,7 @@ export default function CurriculumPage() {
                         onClick={() => setSelectedAchievementCodes(selectAllAchievementCodes(getFilteredAchievements()))}
                         className="text-xs text-indigo-600 hover:text-indigo-800 underline"
                       >
-                        전체 선택
+                        {t("selectAll")}
                       </button>
                       <span className="text-xs text-muted-foreground">|</span>
                       <button
@@ -1119,13 +1106,13 @@ export default function CurriculumPage() {
                         onClick={() => setSelectedAchievementCodes([])}
                         className="text-xs text-indigo-600 hover:text-indigo-800 underline"
                       >
-                        전체 해제
+                        {t("deselectAll")}
                       </button>
                     </div>
                   </div>
 
                   {getFilteredAchievements().length === 0 ? (
-                    <p className="text-sm text-muted-foreground">단원을 선택하면 성취기준이 표시됩니다</p>
+                    <p className="text-sm text-muted-foreground">{t("selectUnitFirst")}</p>
                   ) : (
                     (() => {
                       const groups = getFilteredAchievementGroups();
@@ -1184,7 +1171,7 @@ export default function CurriculumPage() {
                 disabled={loadingKeywords || getSelectedAchievements().length === 0}
                 className="w-full"
               >
-                {loadingKeywords ? "AI 핵심어 분석 중..." : "다음 단계: 핵심어 추천받기 →"}
+                {loadingKeywords ? t("loadingKeywords") : t("nextKeywords")}
               </Button>
             </div>
           )}
@@ -1195,8 +1182,8 @@ export default function CurriculumPage() {
       {step >= 2 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">2단계 · 핵심어(개념) 선택</CardTitle>
-            <CardDescription>AI가 추천한 핵심어를 선택하거나 직접 추가하세요</CardDescription>
+            <CardTitle className="text-base">{t("step2Title")}</CardTitle>
+            <CardDescription>{t("step2Desc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -1217,18 +1204,18 @@ export default function CurriculumPage() {
 
             <div className="flex gap-2">
               <Input
-                placeholder="핵심어 직접 추가..."
+                placeholder={t("keywordPlaceholder")}
                 value={customKeyword}
                 onChange={(e) => setCustomKeyword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addCustomKeyword()}
                 className="max-w-xs"
               />
-              <Button variant="outline" size="sm" onClick={addCustomKeyword}>추가</Button>
+              <Button variant="outline" size="sm" onClick={addCustomKeyword}>{t("addBtn")}</Button>
             </div>
 
             {selectedKeywords.length > 0 && (
               <div className="rounded-md bg-indigo-50 dark:bg-indigo-950/40 px-4 py-2">
-                <span className="text-xs text-indigo-600 font-medium">선택된 핵심어: </span>
+                <span className="text-xs text-indigo-600 font-medium">{t("selectedKeywords")}</span>
                 <span className="text-sm text-indigo-800">{selectedKeywords.join(", ")}</span>
               </div>
             )}
@@ -1238,7 +1225,7 @@ export default function CurriculumPage() {
               disabled={loadingSentences || selectedKeywords.length === 0}
               className="w-full"
             >
-              {loadingSentences ? "핵심 문장 생성 중..." : "다음 단계: 핵심 문장 생성하기 →"}
+              {loadingSentences ? t("loadingSentences") : t("nextSentences")}
             </Button>
           </CardContent>
         </Card>
@@ -1248,19 +1235,19 @@ export default function CurriculumPage() {
       {step >= 3 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">3단계 · 핵심 문장</CardTitle>
-            <CardDescription>다음 단계에 반영할 핵심 문장을 선택하고 직접 수정할 수 있습니다.</CardDescription>
+            <CardTitle className="text-base">{t("step3Title")}</CardTitle>
+            <CardDescription>{t("step3Desc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{selectedCoreSentences.length}개 선택됨</span>
+              <span>{t("selectedCount", { count: selectedCoreSentences.length })}</span>
               <span className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedCoreSentenceIndices(selectAllIndices(coreSentences))}
                   className="text-indigo-600 hover:text-indigo-800 underline"
                 >
-                  전체 선택
+                  {t("selectAll")}
                 </button>
                 <span className="text-muted-foreground">|</span>
                 <button
@@ -1268,7 +1255,7 @@ export default function CurriculumPage() {
                   onClick={() => setSelectedCoreSentenceIndices([])}
                   className="text-indigo-600 hover:text-indigo-800 underline"
                 >
-                  전체 해제
+                  {t("deselectAll")}
                 </button>
               </span>
             </div>
@@ -1281,7 +1268,7 @@ export default function CurriculumPage() {
                   onChange={() =>
                     setSelectedCoreSentenceIndices((prev) => toggleSelectedIndex(prev, i))
                   }
-                  aria-label={`${i + 1}번 핵심 문장 선택`}
+                  aria-label={t("selectSentenceAria", { n: i + 1 })}
                 />
                 <span className="mt-2.5 text-xs font-bold text-indigo-500 shrink-0">{i + 1}</span>
                 <textarea
@@ -1301,7 +1288,7 @@ export default function CurriculumPage() {
               disabled={loadingQuestions || selectedCoreSentences.length === 0}
               className="w-full"
             >
-              {loadingQuestions ? "핵심 질문 도출 중..." : "다음 단계: 핵심 질문 도출하기 →"}
+              {loadingQuestions ? t("loadingQuestions") : t("nextQuestions")}
             </Button>
           </CardContent>
         </Card>
@@ -1311,19 +1298,19 @@ export default function CurriculumPage() {
       {step >= 4 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">4단계 · 핵심 질문</CardTitle>
-            <CardDescription>탐구 질문 생성에 반영할 핵심 질문을 선택하고 직접 수정할 수 있습니다.</CardDescription>
+            <CardTitle className="text-base">{t("step4Title")}</CardTitle>
+            <CardDescription>{t("step4Desc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{selectedEssentialQuestions.length}개 선택됨</span>
+              <span>{t("selectedCount", { count: selectedEssentialQuestions.length })}</span>
               <span className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedEssentialQuestionIndices(selectAllIndices(essentialQuestions))}
                   className="text-indigo-600 hover:text-indigo-800 underline"
                 >
-                  전체 선택
+                  {t("selectAll")}
                 </button>
                 <span className="text-muted-foreground">|</span>
                 <button
@@ -1331,7 +1318,7 @@ export default function CurriculumPage() {
                   onClick={() => setSelectedEssentialQuestionIndices([])}
                   className="text-indigo-600 hover:text-indigo-800 underline"
                 >
-                  전체 해제
+                  {t("deselectAll")}
                 </button>
               </span>
             </div>
@@ -1344,7 +1331,7 @@ export default function CurriculumPage() {
                   onChange={() =>
                     setSelectedEssentialQuestionIndices((prev) => toggleSelectedIndex(prev, i))
                   }
-                  aria-label={`${i + 1}번 핵심 질문 선택`}
+                  aria-label={t("selectQuestionAria", { n: i + 1 })}
                 />
                 <span className="mt-2.5 text-xs font-bold text-indigo-500 shrink-0">Q{i + 1}</span>
                 <textarea
@@ -1364,7 +1351,7 @@ export default function CurriculumPage() {
               disabled={loadingInquiry || selectedEssentialQuestions.length === 0}
               className="w-full"
             >
-              {loadingInquiry ? "탐구 질문 생성 중..." : "다음 단계: 탐구 질문 구체화하기 →"}
+              {loadingInquiry ? t("loadingInquiry") : t("nextInquiry")}
             </Button>
           </CardContent>
         </Card>
@@ -1374,19 +1361,19 @@ export default function CurriculumPage() {
       {step >= 5 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">5단계 · 탐구 질문</CardTitle>
-            <CardDescription>저장할 사실적·개념적·논쟁적 질문을 선택하고 직접 수정할 수 있습니다.</CardDescription>
+            <CardTitle className="text-base">{t("step5Title")}</CardTitle>
+            <CardDescription>{t("step5Desc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{selectedInquiryQuestions.length}개 선택됨</span>
+              <span>{t("selectedCount", { count: selectedInquiryQuestions.length })}</span>
               <span className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setSelectedInquiryQuestionIndices(selectAllIndices(inquiryQuestions))}
                   className="text-indigo-600 hover:text-indigo-800 underline"
                 >
-                  전체 선택
+                  {t("selectAll")}
                 </button>
                 <span className="text-muted-foreground">|</span>
                 <button
@@ -1394,15 +1381,15 @@ export default function CurriculumPage() {
                   onClick={() => setSelectedInquiryQuestionIndices([])}
                   className="text-indigo-600 hover:text-indigo-800 underline"
                 >
-                  전체 해제
+                  {t("deselectAll")}
                 </button>
               </span>
             </div>
             {(["factual", "conceptual", "controversial"] as const).map((type) => (
               <div key={type}>
                 <p className="text-xs font-semibold text-muted-foreground mb-2">
-                  {TYPE_LABEL[type]}
-                  <span className="ml-1.5 font-normal text-muted-foreground/80">· {TYPE_DESC[type]}</span>
+                  {typeLabel(type)}
+                  <span className="ml-1.5 font-normal text-muted-foreground/80">· {typeDesc(type)}</span>
                 </p>
                 <div className="space-y-2">
                   {inquiryQuestions
@@ -1419,7 +1406,7 @@ export default function CurriculumPage() {
                               toggleSelectedIndex(prev, idx)
                             )
                           }
-                          aria-label={`${TYPE_LABEL[type]} 선택`}
+                          aria-label={t("selectType", { type: typeLabel(type) })}
                         />
                         <textarea
                           className="w-full bg-transparent text-sm resize-none outline-none"
@@ -1439,33 +1426,33 @@ export default function CurriculumPage() {
 
             {/* 저장 — 날짜·학년·교과·주제 결정 후 저장 */}
             <div className="border-t pt-4 space-y-3">
-              <p className="text-sm font-semibold text-foreground">저장 정보</p>
+              <p className="text-sm font-semibold text-foreground">{t("saveInfo")}</p>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.1fr_0.7fr_0.8fr_2.4fr]">
                 <div className="space-y-1">
-                  <Label>날짜</Label>
-                  <DatePicker value={saveDate} onChange={setSaveDate} placeholder="수업 날짜 선택" />
+                  <Label>{t("date")}</Label>
+                  <DatePicker value={saveDate} onChange={setSaveDate} placeholder={t("pickSessionDate")} />
                 </div>
                 <div className="space-y-1">
-                  <Label>학년</Label>
+                  <Label>{t("grade")}</Label>
                   <select
                     className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                     value={saveGrade}
                     onChange={(e) => setSaveGrade(e.target.value)}
                   >
-                    <option value="">학년 선택</option>
+                    <option value="">{t("selectGrade")}</option>
                     {(curriculumData?.gradeRange.split("-") ?? []).map((g) => (
-                      <option key={g} value={g}>{g}학년</option>
+                      <option key={g} value={g}>{t("gradeOption", { g })}</option>
                     ))}
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label>교과</Label>
+                  <Label>{t("subject")}</Label>
                   <Input value={curriculumData?.subject ?? ""} disabled className="bg-muted" />
                 </div>
                 <div className="space-y-1">
-                  <Label>주제</Label>
+                  <Label>{t("topic")}</Label>
                   <Input
-                    placeholder="예: 생명 탐구"
+                    placeholder={t("saveTopicPlaceholder")}
                     value={saveTitle}
                     onChange={(e) => setSaveTitle(e.target.value)}
                   />
@@ -1475,7 +1462,7 @@ export default function CurriculumPage() {
                 onClick={handleSave}
                 disabled={isSaving || !saveTitle.trim() || !saveGrade || !saveDate || selectedInquiryQuestions.length === 0}
               >
-                {isSaving ? "저장 중..." : "저장"}
+                {isSaving ? t("saving") : tc("save")}
               </Button>
             </div>
           </CardContent>
