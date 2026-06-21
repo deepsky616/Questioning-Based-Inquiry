@@ -17,6 +17,24 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 
+/** 분류1(폐쇄/개방) 미니 분포 막대 — 질문 유형을 한눈에 */
+function ClosureMiniBar({ dist }: { dist?: { closed: number; open: number } }) {
+  const closed = dist?.closed ?? 0;
+  const open = dist?.open ?? 0;
+  const total = closed + open;
+  if (total === 0) return <span className="text-xs text-muted-foreground">-</span>;
+  const cp = Math.round((closed / total) * 100);
+  return (
+    <div
+      className="mx-auto flex h-2.5 w-16 overflow-hidden rounded-full bg-muted"
+      title={`폐쇄형 ${closed} · 개방형 ${open}`}
+    >
+      <div style={{ width: `${cp}%`, background: "#3b82f6" }} />
+      <div style={{ width: `${100 - cp}%`, background: "#10b981" }} />
+    </div>
+  );
+}
+
 /** ISO 날짜 → "오늘 / N일 전 / -" */
 function lastActiveLabel(iso?: string | null): string {
   if (!iso) return "-";
@@ -34,6 +52,7 @@ interface Student {
   studentNumber: string; school: string;
   questionCount: number; commentCount: number; pointLogCount: number; totalPoints: number;
   lastActivityAt?: string | null;
+  closureDist?: { closed: number; open: number };
 }
 interface TeacherClass { grade: string; className: string }
 
@@ -591,6 +610,7 @@ export default function StudentsPage() {
                       <TableHead className="w-14 text-center">번호</TableHead>
                       <TableHead>이름</TableHead>
                       <TableHead className="text-center w-20">질문</TableHead>
+                      <TableHead className="text-center w-24 hidden md:table-cell" title="폐쇄형(파랑) / 개방형(초록) 비율">질문 유형</TableHead>
                       <TableHead className="text-center w-20">답변</TableHead>
                       <TableHead className="text-center w-20">포인트</TableHead>
                       <TableHead className="text-center w-24 hidden sm:table-cell">마지막 활동</TableHead>
@@ -607,6 +627,9 @@ export default function StudentsPage() {
                           <span className={`font-semibold ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>
                             {s.questionCount}
                           </span>
+                        </TableCell>
+                        <TableCell className="text-center hidden md:table-cell">
+                          <ClosureMiniBar dist={s.closureDist} />
                         </TableCell>
                         <TableCell className="text-center">
                           <span className={`font-semibold ${s.commentCount > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>

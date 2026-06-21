@@ -73,6 +73,22 @@ export async function GET() {
     if (t && t > (lastActivity.get(r.authorId) ?? 0)) lastActivity.set(r.authorId, t);
   }
 
+  // 분류1(폐쇄/개방) 학생별 분포 — 목록 미니 막대용
+  const closureRows = ids.length
+    ? await prisma.question.groupBy({
+        by: ["authorId", "closure"],
+        where: { authorId: { in: ids } },
+        _count: { _all: true },
+      })
+    : [];
+  const closureDist = new Map<string, { closed: number; open: number }>();
+  for (const r of closureRows) {
+    const cur = closureDist.get(r.authorId) ?? { closed: 0, open: 0 };
+    if (r.closure === "closed") cur.closed += r._count._all;
+    else if (r.closure === "open") cur.open += r._count._all;
+    closureDist.set(r.authorId, cur);
+  }
+
   return NextResponse.json({
     students: students.map((s) => ({
       id: s.id,
@@ -86,6 +102,7 @@ export async function GET() {
       pointLogCount: s._count.pointLogs,
       totalPoints: s.totalPoints,
       lastActivityAt: lastActivity.has(s.id) ? new Date(lastActivity.get(s.id)!).toISOString() : null,
+      closureDist: closureDist.get(s.id) ?? { closed: 0, open: 0 },
     })),
     teacherClasses,
   });
