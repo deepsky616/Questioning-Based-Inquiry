@@ -12,7 +12,6 @@ import {
 import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { PendingReviewBanner } from "@/components/teacher/PendingReviewBanner";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
@@ -107,8 +106,6 @@ export default function TeacherDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader title="교사 대시보드" description="담당 학생들의 질문 통계를 확인하세요" />
-
-      <PendingReviewBanner />
 
       {/* 필터 */}
       <div className="flex gap-3">

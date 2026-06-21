@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { PageNav } from "@/components/shared/PageNav";
 import { AppNav } from "@/components/shared/AppNav";
-import { FlaggedAlertBell } from "@/components/teacher/FlaggedAlertBell";
+import { NotificationBell } from "@/components/teacher/NotificationBell";
 import { getSessionUser } from "@/lib/auth-helpers";
 
 const TEACHER_PAGES = [
@@ -48,7 +48,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         pages={TEACHER_PAGES}
         userName={user.name ?? ""}
         roleSuffix="선생님"
-        extra={<FlaggedAlertBell />}
+        extra={<NotificationBell />}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}

@@ -186,11 +186,14 @@ export default function QuestionsPage() {
   // 상단 탭: 질문 조회 / AI 추천 포인트
   const [topTab, setTopTab] = useState<"questions" | "review">("questions");
 
-  // 알림에서 ?flagged=1로 들어오면 부적절 의심 필터를 켠다(useSearchParams 대신 마운트 시 읽어 Suspense 회피)
+  // 알림에서 들어온 쿼리 처리(마운트 시 1회 읽어 Suspense 회피)
+  //  - ?flagged=1: 부적절 의심 필터 켜기
+  //  - ?tab=review: AI 추천 포인트 탭으로 이동
   useEffect(() => {
-    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("flagged") === "1") {
-      setShowFlaggedOnly(true);
-    }
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("flagged") === "1") setShowFlaggedOnly(true);
+    if (params.get("tab") === "review") setTopTab("review");
   }, []);
 
   const resetBulkState = () => {
