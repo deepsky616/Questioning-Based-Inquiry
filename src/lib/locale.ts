@@ -36,9 +36,29 @@ export function parseAcceptLanguage(header?: string | null): string {
   return DEFAULT_LOCALE;
 }
 
-/** 요청 헤더에서 사용자 언어 코드를 얻는다. */
+/** Cookie 헤더에서 NEXT_LOCALE 값을 읽는다(앱 언어 토글이 설정한 쿠키). */
+function parseLocaleCookie(cookieHeader?: string | null): string | null {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === "NEXT_LOCALE") {
+      const val = decodeURIComponent(v.join("=")).toLowerCase();
+      if (val in LANGUAGE_NAME) return val;
+    }
+  }
+  return null;
+}
+
+/**
+ * 요청에서 사용자 언어 코드를 얻는다.
+ * 우선순위: 앱 언어 토글 쿠키(NEXT_LOCALE) → 브라우저 Accept-Language → ko.
+ * (UI는 쿠키 기준이므로 AI 출력도 쿠키를 우선해 일관성을 맞춘다)
+ */
 export function getRequestLocale(req: Request): string {
-  return parseAcceptLanguage(req.headers.get("accept-language"));
+  return (
+    parseLocaleCookie(req.headers.get("cookie")) ??
+    parseAcceptLanguage(req.headers.get("accept-language"))
+  );
 }
 
 export function languageName(locale: string): string {
