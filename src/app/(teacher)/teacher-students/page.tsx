@@ -588,40 +588,40 @@ export default function StudentsPage() {
                 <div className="overflow-x-auto"><Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12">번호</TableHead>
+                      <TableHead className="w-14 text-center">번호</TableHead>
                       <TableHead>이름</TableHead>
-                      <TableHead className="text-right w-16">질문</TableHead>
-                      <TableHead className="text-right w-16">답변</TableHead>
-                      <TableHead className="text-right w-20">포인트</TableHead>
-                      <TableHead className="text-right w-24 hidden sm:table-cell">마지막 활동</TableHead>
-                      <TableHead className="text-right w-24">상세</TableHead>
+                      <TableHead className="text-center w-20">질문</TableHead>
+                      <TableHead className="text-center w-20">답변</TableHead>
+                      <TableHead className="text-center w-20">포인트</TableHead>
+                      <TableHead className="text-center w-24 hidden sm:table-cell">마지막 활동</TableHead>
+                      <TableHead className="text-center w-20">상세</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {classStudents.map((s) => (
                       <TableRow key={s.id} className="cursor-pointer hover:bg-muted/40"
                         onClick={() => setSelected(s)}>
-                        <TableCell className="text-muted-foreground">{s.studentNumber}</TableCell>
+                        <TableCell className="text-center text-muted-foreground">{s.studentNumber}</TableCell>
                         <TableCell className="font-medium">{s.name}</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">
                           <span className={`font-semibold ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>
                             {s.questionCount}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">
                           <span className={`font-semibold ${s.commentCount > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
                             {s.commentCount}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">
                           <span className={`font-semibold ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
                             {s.totalPoints}
                           </span>
                         </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground hidden sm:table-cell">
+                        <TableCell className="text-center text-xs text-muted-foreground hidden sm:table-cell">
                           {lastActiveLabel(s.lastActivityAt)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">
                           <Button size="sm" variant="outline"
                             onClick={(e) => { e.stopPropagation(); setSelected(s); }}>
                             상세
