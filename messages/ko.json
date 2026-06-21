@@ -25,7 +25,22 @@
     "edit": "수정",
     "loading": "로딩 중...",
     "search": "검색",
-    "language": "언어"
+    "language": "언어",
+    "all": "전체",
+    "reset": "초기화"
+  },
+  "classification": {
+    "category1": "분류1",
+    "category2": "분류2",
+    "category1Sub": "질문의 형태",
+    "category2Sub": "생각의 깊이",
+    "closure": "폐쇄형 / 개방형",
+    "cognitive": "사실 / 개념 / 논쟁",
+    "closed": { "label": "폐쇄형", "desc": "정답이 하나로 정해진 질문" },
+    "open": { "label": "개방형", "desc": "여러 답이 나올 수 있는 질문" },
+    "factual": { "label": "사실적", "desc": "사실이나 정보를 확인하는 질문" },
+    "conceptual": { "label": "개념적", "desc": "원리와 이유를 생각하는 질문" },
+    "controversial": { "label": "논쟁적", "desc": "내 생각·판단이 필요한 질문" }
   },
   "pages": {
     "teacherDashboard": {

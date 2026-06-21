@@ -25,7 +25,22 @@
     "edit": "Edit",
     "loading": "Loading...",
     "search": "Search",
-    "language": "Language"
+    "language": "Language",
+    "all": "All",
+    "reset": "Reset"
+  },
+  "classification": {
+    "category1": "Type 1",
+    "category2": "Type 2",
+    "category1Sub": "Question form",
+    "category2Sub": "Depth of thinking",
+    "closure": "Closed / Open",
+    "cognitive": "Factual / Conceptual / Debatable",
+    "closed": { "label": "Closed", "desc": "A question with a single correct answer" },
+    "open": { "label": "Open", "desc": "A question that allows many possible answers" },
+    "factual": { "label": "Factual", "desc": "A question that checks facts or information" },
+    "conceptual": { "label": "Conceptual", "desc": "A question that explores principles and reasons" },
+    "controversial": { "label": "Debatable", "desc": "A question that requires your own judgment" }
   },
   "pages": {
     "teacherDashboard": {

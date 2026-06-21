@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
 import { matchesCognitiveCategory } from "@/lib/question-labels";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
@@ -94,6 +95,7 @@ export function QuestionClassificationStats({
 }: {
   questions: { closure: string; cognitive: string }[];
 }) {
+  const t = useTranslations("classification");
   const s = summarizeQuestionTypes(questions);
   const pct = (n: number) => (s.total ? Math.round((n / s.total) * 100) : 0);
 
@@ -119,36 +121,36 @@ export function QuestionClassificationStats({
       {/* 도넛 + 비율 막대 + 분류 설명 (표시 전용, 학생 대시보드 설명과 통일) */}
       <div className="grid md:grid-cols-2 gap-x-8 gap-y-4">
         <div>
-          <p className="text-xs text-muted-foreground font-semibold mb-2">분류1 — 폐쇄형 / 개방형</p>
+          <p className="text-xs text-muted-foreground font-semibold mb-2">{t("category1")} — {t("closure")}</p>
           <div className="flex items-center gap-3">
             <ClassificationDonut
               size={108}
               slices={[
-                { name: "폐쇄형", value: s.closure.closed, fill: "#3b82f6" },
-                { name: "개방형", value: s.closure.open, fill: "#10b981" },
+                { name: t("closed.label"), value: s.closure.closed, fill: "#3b82f6" },
+                { name: t("open.label"), value: s.closure.open, fill: "#10b981" },
               ]}
             />
             <div className="flex-1 min-w-0">
-              {bar("폐쇄형", s.closure.closed, "#3b82f6", "정답이 하나로 정해진 질문")}
-              {bar("개방형", s.closure.open, "#10b981", "여러 답이 나올 수 있는 질문")}
+              {bar(t("closed.label"), s.closure.closed, "#3b82f6", t("closed.desc"))}
+              {bar(t("open.label"), s.closure.open, "#10b981", t("open.desc"))}
             </div>
           </div>
         </div>
         <div>
-          <p className="text-xs text-muted-foreground font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁</p>
+          <p className="text-xs text-muted-foreground font-semibold mb-2">{t("category2")} — {t("cognitive")}</p>
           <div className="flex items-center gap-3">
             <ClassificationDonut
               size={108}
               slices={[
-                { name: "사실적", value: s.cognitive.factual, fill: "#94a3b8" },
-                { name: "개념적", value: s.cognitive.conceptual, fill: "#a855f7" },
-                { name: "논쟁적", value: s.cognitive.controversial, fill: "#f97316" },
+                { name: t("factual.label"), value: s.cognitive.factual, fill: "#94a3b8" },
+                { name: t("conceptual.label"), value: s.cognitive.conceptual, fill: "#a855f7" },
+                { name: t("controversial.label"), value: s.cognitive.controversial, fill: "#f97316" },
               ]}
             />
             <div className="flex-1 min-w-0">
-              {bar("사실적", s.cognitive.factual, "#94a3b8", "사실이나 정보를 확인하는 질문")}
-              {bar("개념적", s.cognitive.conceptual, "#a855f7", "원리와 이유를 생각하는 질문")}
-              {bar("논쟁적", s.cognitive.controversial, "#f97316", "내 생각·판단이 필요한 질문")}
+              {bar(t("factual.label"), s.cognitive.factual, "#94a3b8", t("factual.desc"))}
+              {bar(t("conceptual.label"), s.cognitive.conceptual, "#a855f7", t("conceptual.desc"))}
+              {bar(t("controversial.label"), s.cognitive.controversial, "#f97316", t("controversial.desc"))}
             </div>
           </div>
         </div>
@@ -171,6 +173,8 @@ export function ClassificationChips({
   onFilterClosure: (v: ClosureFilter) => void;
   onFilterCognitive: (v: CognitiveFilter) => void;
 }) {
+  const t = useTranslations("classification");
+  const tc = useTranslations("common");
   const chip = (active: boolean, label: string, onClick: () => void) => (
     <button
       type="button"
@@ -183,17 +187,17 @@ export function ClassificationChips({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-muted-foreground mr-0.5">분류1</span>
-      {chip(filterClosure === "all", "전체", () => onFilterClosure("all"))}
-      {chip(filterClosure === "closed", "폐쇄형", () => onFilterClosure("closed"))}
-      {chip(filterClosure === "open", "개방형", () => onFilterClosure("open"))}
-      <span className="text-xs text-muted-foreground mx-1">분류2</span>
-      {chip(filterCognitive === "all", "전체", () => onFilterCognitive("all"))}
-      {chip(filterCognitive === "factual", "사실적", () => onFilterCognitive("factual"))}
-      {chip(filterCognitive === "conceptual", "개념적", () => onFilterCognitive("conceptual"))}
-      {chip(filterCognitive === "controversial", "논쟁적", () => onFilterCognitive("controversial"))}
+      <span className="text-xs text-muted-foreground mr-0.5">{t("category1")}</span>
+      {chip(filterClosure === "all", tc("all"), () => onFilterClosure("all"))}
+      {chip(filterClosure === "closed", t("closed.label"), () => onFilterClosure("closed"))}
+      {chip(filterClosure === "open", t("open.label"), () => onFilterClosure("open"))}
+      <span className="text-xs text-muted-foreground mx-1">{t("category2")}</span>
+      {chip(filterCognitive === "all", tc("all"), () => onFilterCognitive("all"))}
+      {chip(filterCognitive === "factual", t("factual.label"), () => onFilterCognitive("factual"))}
+      {chip(filterCognitive === "conceptual", t("conceptual.label"), () => onFilterCognitive("conceptual"))}
+      {chip(filterCognitive === "controversial", t("controversial.label"), () => onFilterCognitive("controversial"))}
       {(filterClosure !== "all" || filterCognitive !== "all") && (
-        <button type="button" onClick={() => { onFilterClosure("all"); onFilterCognitive("all"); }} className="ml-1 text-xs font-medium text-indigo-600">초기화</button>
+        <button type="button" onClick={() => { onFilterClosure("all"); onFilterCognitive("all"); }} className="ml-1 text-xs font-medium text-indigo-600">{tc("reset")}</button>
       )}
     </div>
   );

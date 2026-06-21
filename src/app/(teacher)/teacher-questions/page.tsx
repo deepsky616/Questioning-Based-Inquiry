@@ -121,6 +121,7 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 
 export default function QuestionsPage() {
   const tPages = useTranslations("pages");
+  const tCls = useTranslations("classification");
   const [questions, setQuestions] = useState<Question[]>([]);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -1040,36 +1041,36 @@ export default function QuestionsPage() {
               return (
                 <div className="grid md:grid-cols-2 gap-x-8 gap-y-4">
                   <div>
-                    <p className="text-xs text-muted-foreground font-semibold mb-2">분류1 — 폐쇄형 / 개방형</p>
+                    <p className="text-xs text-muted-foreground font-semibold mb-2">{tCls("category1")} — {tCls("closure")}</p>
                     <div className="flex items-center gap-3">
                       <ClassificationDonut
                         size={108}
                         slices={[
-                          { name: "폐쇄형", value: s.closure.closed, fill: "#3b82f6" },
-                          { name: "개방형", value: s.closure.open, fill: "#10b981" },
+                          { name: tCls("closed.label"), value: s.closure.closed, fill: "#3b82f6" },
+                          { name: tCls("open.label"), value: s.closure.open, fill: "#10b981" },
                         ]}
                       />
                       <div className="flex-1 min-w-0">
-                        {bar("폐쇄형", s.closure.closed, "#3b82f6", "정답이 하나로 정해진 질문")}
-                        {bar("개방형", s.closure.open, "#10b981", "여러 답이 나올 수 있는 질문")}
+                        {bar(tCls("closed.label"), s.closure.closed, "#3b82f6", tCls("closed.desc"))}
+                        {bar(tCls("open.label"), s.closure.open, "#10b981", tCls("open.desc"))}
                       </div>
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground font-semibold mb-2">분류2 — 사실 / 개념 / 논쟁</p>
+                    <p className="text-xs text-muted-foreground font-semibold mb-2">{tCls("category2")} — {tCls("cognitive")}</p>
                     <div className="flex items-center gap-3">
                       <ClassificationDonut
                         size={108}
                         slices={[
-                          { name: "사실적", value: s.cognitive.factual, fill: "#94a3b8" },
-                          { name: "개념적", value: s.cognitive.conceptual, fill: "#a855f7" },
-                          { name: "논쟁적", value: s.cognitive.controversial, fill: "#f97316" },
+                          { name: tCls("factual.label"), value: s.cognitive.factual, fill: "#94a3b8" },
+                          { name: tCls("conceptual.label"), value: s.cognitive.conceptual, fill: "#a855f7" },
+                          { name: tCls("controversial.label"), value: s.cognitive.controversial, fill: "#f97316" },
                         ]}
                       />
                       <div className="flex-1 min-w-0">
-                        {bar("사실적", s.cognitive.factual, "#94a3b8", "사실이나 정보를 확인하는 질문")}
-                        {bar("개념적", s.cognitive.conceptual, "#a855f7", "원리와 이유를 생각하는 질문")}
-                        {bar("논쟁적", s.cognitive.controversial, "#f97316", "내 생각·판단이 필요한 질문")}
+                        {bar(tCls("factual.label"), s.cognitive.factual, "#94a3b8", tCls("factual.desc"))}
+                        {bar(tCls("conceptual.label"), s.cognitive.conceptual, "#a855f7", tCls("conceptual.desc"))}
+                        {bar(tCls("controversial.label"), s.cognitive.controversial, "#f97316", tCls("controversial.desc"))}
                       </div>
                     </div>
                   </div>
