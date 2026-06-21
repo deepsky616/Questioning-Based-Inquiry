@@ -110,7 +110,25 @@
     "addClass": "+ Add grade/class",
     "alreadyHaveAccount": "Already have an account?",
     "login": "Log in",
-    "fieldRequired": "Please enter {field}"
+    "fieldRequired": "Please enter {field}",
+    "requestFailed": "Could not process the request",
+    "resetLinkSent": "If this is a registered teacher email, we've sent a password reset link.",
+    "forgotPasswordDesc": "We'll send a reset link to your teacher account email",
+    "teacherEmail": "Teacher email",
+    "sending": "Sending...",
+    "getResetLink": "Get reset link",
+    "invalidResetLink": "The reset link is invalid",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "changeFailed": "Could not change the password",
+    "passwordChanged": "Your password has been changed",
+    "setNewPassword": "Set a new password",
+    "setNewPasswordDesc": "Enter a new password for your teacher account",
+    "newPassword": "New password",
+    "newPasswordConfirm": "Confirm new password",
+    "min6": "At least 6 characters",
+    "changing": "Changing...",
+    "changePassword": "Change password",
+    "backToLogin": "Back to login"
   },
   "pages": {
     "teacherDashboard": {
