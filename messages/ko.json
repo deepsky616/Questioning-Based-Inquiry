@@ -27,7 +27,8 @@
     "search": "검색",
     "language": "언어",
     "all": "전체",
-    "reset": "초기화"
+    "reset": "초기화",
+    "questionWord": "질문"
   },
   "classification": {
     "category1": "분류1",
@@ -36,6 +37,8 @@
     "category2Sub": "생각의 깊이",
     "closure": "폐쇄형 / 개방형",
     "cognitive": "사실 / 개념 / 논쟁",
+    "card1": "분류 1 · 폐쇄형 / 개방형 질문",
+    "card2": "분류 2 · 사실적 / 개념적 / 논쟁적 질문",
     "closed": { "label": "폐쇄형", "desc": "정답이 하나로 정해진 질문" },
     "open": { "label": "개방형", "desc": "여러 답이 나올 수 있는 질문" },
     "factual": { "label": "사실적", "desc": "사실이나 정보를 확인하는 질문" },

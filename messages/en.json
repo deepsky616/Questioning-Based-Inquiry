@@ -27,7 +27,8 @@
     "search": "Search",
     "language": "Language",
     "all": "All",
-    "reset": "Reset"
+    "reset": "Reset",
+    "questionWord": "question"
   },
   "classification": {
     "category1": "Type 1",
@@ -36,6 +37,8 @@
     "category2Sub": "Depth of thinking",
     "closure": "Closed / Open",
     "cognitive": "Factual / Conceptual / Debatable",
+    "card1": "Type 1 · Closed / Open Questions",
+    "card2": "Type 2 · Factual / Conceptual / Debatable Questions",
     "closed": { "label": "Closed", "desc": "A question with a single correct answer" },
     "open": { "label": "Open", "desc": "A question that allows many possible answers" },
     "factual": { "label": "Factual", "desc": "A question that checks facts or information" },
