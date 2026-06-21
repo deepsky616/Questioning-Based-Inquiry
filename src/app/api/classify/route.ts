@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { fallbackClassification, parseClassificationResponse } from "@/lib/classify";
 import { isAllowedGeminiModel, resolveApiKey, resolveGeminiModel } from "@/lib/api-config";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
+import { getRequestLocale, languageDirective } from "@/lib/locale";
 
 const classifySchema = z.object({
   apiKey: z.string().optional(),
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const genModel = genAI.getGenerativeModel({ model });
 
-    const fullPrompt = `${CLASSIFICATION_PROMPT}\n\n[분석할 질문]\n${content}`;
+    const fullPrompt = `${CLASSIFICATION_PROMPT}\n\n[분석할 질문]\n${content}${languageDirective(getRequestLocale(req))}`;
 
     const result = await genModel.generateContent(fullPrompt);
     const text = result.response.text();

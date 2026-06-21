@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { buildAnswerPrompt } from "@/lib/ai-prompts";
 import { validateBulkAiRequest } from "@/lib/questions";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
+import { getRequestLocale, languageDirective } from "@/lib/locale";
 
 const schema = z.object({
   questionIds: z.array(z.string()).min(1),
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
           q.cognitive ?? undefined,
           q.context ?? undefined
         );
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent(prompt + languageDirective(getRequestLocale(req)));
         return { id: q.id, answer: result.response.text().trim() };
       })
     );

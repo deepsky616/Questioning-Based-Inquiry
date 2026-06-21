@@ -7,6 +7,7 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { buildPrompt, unitDesignGenerateSchema } from "@/lib/unit-design-prompt";
 import { extractJsonObject } from "@/lib/json-extract";
+import { getRequestLocale, languageDirective } from "@/lib/locale";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
 
     let text: string;
     try {
-      const result = await model.generateContent(prompt);
+      const result = await model.generateContent(prompt + languageDirective(getRequestLocale(req)));
       text = result.response.text();
     } catch (aiErr) {
       const detail = aiErr instanceof Error ? aiErr.message : String(aiErr);

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { buildStudentSessionPrompt } from "@/lib/ai-prompts";
 import { logger } from "@/lib/logger";
+import { getRequestLocale, languageDirective } from "@/lib/locale";
 
 // 한 수업 세션에서 '학생 본인'의 질문·좋아요·댓글 활동을 AI가 분석
 // POST body: { sessionId, studentId? }  studentId는 교사가 특정 학생을 볼 때만
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
       likesGiven,
       prior,
     });
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(prompt + languageDirective(getRequestLocale(req)));
     const text = result.response.text().trim();
     const match = text.match(/\{[\s\S]*\}/);
     const parsed = match ? JSON.parse(match[0]) : null;

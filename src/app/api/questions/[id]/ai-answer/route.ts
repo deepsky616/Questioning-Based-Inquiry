@@ -6,8 +6,9 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildAnswerPrompt } from "@/lib/ai-prompts";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
+import { getRequestLocale, languageDirective } from "@/lib/locale";
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,7 +42,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       question.cognitive ?? undefined,
       question.context ?? undefined
     );
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(prompt + languageDirective(getRequestLocale(req)));
     const answer = result.response.text().trim();
 
     return NextResponse.json({ answer });

@@ -6,6 +6,7 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { logger } from "@/lib/logger";
+import { getRequestLocale, languageDirective } from "@/lib/locale";
 import {
   buildSequencePrompt,
   fallbackSequenceQuestions,
@@ -146,7 +147,7 @@ export async function POST(req: Request) {
             topic: questionSession.topic,
             questions,
             mode: data.mode,
-          }),
+          }) + languageDirective(getRequestLocale(req)),
         );
         const text = result.response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getRequestLocale, languageDirective } from "@/lib/locale";
 
 const SYSTEM_PROMPT = `당신은 초등학생과 중학생을 위한 질문놀이 파트너입니다.
 - 쉽고 친근한 말투로 대화하세요.
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
   const userPrompt = promptFn(context);
 
   try {
-    const result = await gemini.generateContent(userPrompt);
+    const result = await gemini.generateContent(userPrompt + languageDirective(getRequestLocale(req)));
     const text = result.response.text().trim();
 
     // JSON 응답 파싱이 필요한 액션들

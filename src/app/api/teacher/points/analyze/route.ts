@@ -10,6 +10,7 @@ import {
 } from "@/lib/activity-bonus-policy";
 import { normalizeContent } from "@/lib/content-normalize";
 import { Prisma } from "@prisma/client";
+import { getRequestLocale, languageDirective } from "@/lib/locale";
 
 const SYS = `당신은 초·중학생 질문기반 탐구 수업을 따뜻하게 평가하는 선생님입니다.
 - 모든 학생을 격려하되, 두드러진 사례만 보너스로 줍니다.
@@ -139,7 +140,7 @@ ${cBlock || "(없음)"}
 }`;
 
     try {
-      const result = await gemini.generateContent(prompt);
+      const result = await gemini.generateContent(prompt + languageDirective(getRequestLocale(req)));
       const text = result.response.text();
       const match = text.match(/\{[\s\S]*\}/);
       if (match) aiResp = JSON.parse(match[0]);
