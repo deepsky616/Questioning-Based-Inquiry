@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ReportView, type PerStudentRow, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { useTranslations } from "next-intl";
 
 interface ClassItem { grade: string; className: string; studentCount: number }
 interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
@@ -41,6 +42,7 @@ function analyzeStudentSessionFor(studentId: string) {
 }
 
 export default function TeacherReportsPage() {
+  const tPages = useTranslations("pages");
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selected, setSelected] = useState<string>(""); // "grade|className"
   const [view, setView] = useState<"class" | "student">("class");
@@ -91,7 +93,7 @@ export default function TeacherReportsPage() {
   return (
     <div className="space-y-5">
       <div className="no-print">
-        <PageHeader title="학급 활동 리포트" description="학급별 또는 학생별로 질문·좋아요·댓글 추세와 AI 분석을 볼 수 있어요" />
+        <PageHeader title={tPages("teacherReports.title")} description={tPages("teacherReports.description")} />
 
         {classes.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">

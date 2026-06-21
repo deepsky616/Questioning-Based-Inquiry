@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useTranslations } from "next-intl";
 import {
   buildClassTargetValue,
   buildClassStudentTargetPayload,
@@ -44,6 +45,7 @@ interface QuestionSession {
 }
 
 export default function TeacherSessionsPage() {
+  const tPages = useTranslations("pages");
   const { toast } = useToast();
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [students, setStudents] = useState<SessionTargetStudent[]>([]);
@@ -268,7 +270,7 @@ export default function TeacherSessionsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="수업 세션" description="수업 세션을 만들고 관리하세요. 학생들이 질문할 때 세션을 선택할 수 있습니다." />
+      <PageHeader title={tPages("teacherSessions.title")} description={tPages("teacherSessions.description")} />
 
       {/* 새 세션 만들기 */}
       <Card>

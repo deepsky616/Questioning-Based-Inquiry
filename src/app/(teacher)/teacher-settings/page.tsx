@@ -22,6 +22,7 @@ import {
 import { DEFAULT_GEMINI_MODEL, GEMINI_MODELS } from "@/lib/api-config";
 import { buildTeacherClassLabel, resolveClassInputMode } from "@/lib/teacher";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { useTranslations } from "next-intl";
 
 interface BulkStudent {
   studentNumber: string;
@@ -34,6 +35,7 @@ interface TeacherClass {
 }
 
 export default function TeacherSettingsPage() {
+  const tPages = useTranslations("pages");
   const { data: session } = useSession();
   const { toast } = useToast();
   const user = session?.user as { name?: string; email?: string; school?: string };
@@ -235,7 +237,7 @@ export default function TeacherSettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <PageHeader title="설정" description="교사 계정 정보 및 AI 설정을 관리하세요" />
+      <PageHeader title={tPages("teacherSettings.title")} description={tPages("teacherSettings.description")} />
 
       <Card>
         <CardHeader>

@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useTranslations } from "next-intl";
 import {
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
@@ -156,6 +157,7 @@ function sortAreasByOrder(areas: { id: string; area: string }[], subject: string
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
 export default function CurriculumPage() {
+  const tPages = useTranslations("pages");
   const [step, setStep] = useState<Step>(1);
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -571,7 +573,7 @@ export default function CurriculumPage() {
   // ── 렌더 ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
-      <PageHeader title="탐구 질문 도우미" description="교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문" />
+      <PageHeader title={tPages("teacherCurriculum.title")} description={tPages("teacherCurriculum.description")} />
 
       {/* 탭: 탐구질문 만들기 / 저장된 탐구질문 */}
       <div className="flex rounded-md border overflow-hidden w-fit">

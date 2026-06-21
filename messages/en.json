@@ -26,5 +26,43 @@
     "loading": "Loading...",
     "search": "Search",
     "language": "Language"
+  },
+  "pages": {
+    "teacherDashboard": {
+      "title": "Teacher Dashboard",
+      "description": "Check question statistics for your students"
+    },
+    "teacherStudents": {
+      "title": "Student Management",
+      "description": "See your students' questions, answers, and point activity at a glance"
+    },
+    "teacherSessions": {
+      "title": "Class Sessions",
+      "description": "Create and manage class sessions. Students choose a session when they ask questions."
+    },
+    "teacherQuestions": {
+      "title": "Browse Questions",
+      "description": "Select a class session to review student questions systematically"
+    },
+    "teacherCurriculum": {
+      "title": "Inquiry Question Helper",
+      "description": "Curriculum analysis → achievement standards → key terms → key sentences → key questions → inquiry questions"
+    },
+    "teacherReports": {
+      "title": "Class Activity Report",
+      "description": "View question, like, and comment trends and AI analysis by class or by student"
+    },
+    "teacherSettings": {
+      "title": "Settings",
+      "description": "Manage your teacher account and AI settings"
+    },
+    "studentQuestions": {
+      "title": "Explore Questions",
+      "description": "Manage your own questions, explore your friends' questions, and join the inquiry questions your teacher shared"
+    },
+    "studentSettings": {
+      "title": "Settings",
+      "description": "View your account info and change your password"
+    }
   }
 }

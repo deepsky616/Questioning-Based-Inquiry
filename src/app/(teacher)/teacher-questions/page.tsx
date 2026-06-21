@@ -40,6 +40,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useTranslations } from "next-intl";
 
 interface QuestionSession {
   id: string;
@@ -119,6 +120,7 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 }
 
 export default function QuestionsPage() {
+  const tPages = useTranslations("pages");
   const [questions, setQuestions] = useState<Question[]>([]);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -739,7 +741,7 @@ export default function QuestionsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="질문 조회" description="수업 세션을 선택해 학생 질문을 체계적으로 확인하세요" />
+      <PageHeader title={tPages("teacherQuestions.title")} description={tPages("teacherQuestions.description")} />
 
       <div className="flex rounded-md border overflow-hidden w-fit">
         <button

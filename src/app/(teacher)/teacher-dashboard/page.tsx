@@ -16,6 +16,7 @@ import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useTranslations } from "next-intl";
 
 interface TeacherClass {
   grade: string;
@@ -48,6 +49,7 @@ function classKey(tc: TeacherClass) {
 }
 
 export default function TeacherDashboard() {
+  const tPages = useTranslations("pages");
   const [stats, setStats] = useState<Stats | null>(null);
   const [period, setPeriod] = useState("month");
   const [selectedClass, setSelectedClass] = useState("all");
@@ -105,7 +107,7 @@ export default function TeacherDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="교사 대시보드" description="담당 학생들의 질문 통계를 확인하세요" />
+      <PageHeader title={tPages("teacherDashboard.title")} description={tPages("teacherDashboard.description")} />
 
       {/* 필터 */}
       <div className="flex gap-3">

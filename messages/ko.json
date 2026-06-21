@@ -26,5 +26,43 @@
     "loading": "로딩 중...",
     "search": "검색",
     "language": "언어"
+  },
+  "pages": {
+    "teacherDashboard": {
+      "title": "교사 대시보드",
+      "description": "담당 학생들의 질문 통계를 확인하세요"
+    },
+    "teacherStudents": {
+      "title": "학생 관리",
+      "description": "담당 학생의 질문·답변·포인트 활동을 한눈에 확인하세요"
+    },
+    "teacherSessions": {
+      "title": "수업 세션",
+      "description": "수업 세션을 만들고 관리하세요. 학생들이 질문할 때 세션을 선택할 수 있습니다."
+    },
+    "teacherQuestions": {
+      "title": "질문 조회",
+      "description": "수업 세션을 선택해 학생 질문을 체계적으로 확인하세요"
+    },
+    "teacherCurriculum": {
+      "title": "탐구 질문 도우미",
+      "description": "교육과정 분석 → 성취기준 선택 → 핵심어 → 핵심 문장 → 핵심 질문 → 탐구 질문"
+    },
+    "teacherReports": {
+      "title": "학급 활동 리포트",
+      "description": "학급별 또는 학생별로 질문·좋아요·댓글 추세와 AI 분석을 볼 수 있어요"
+    },
+    "teacherSettings": {
+      "title": "설정",
+      "description": "교사 계정 정보 및 AI 설정을 관리하세요"
+    },
+    "studentQuestions": {
+      "title": "질문탐구",
+      "description": "내 질문을 관리하고, 친구들의 질문을 탐구하고, 선생님이 배포한 수업 탐구 질문에 참여해 보세요"
+    },
+    "studentSettings": {
+      "title": "설정",
+      "description": "계정 정보를 확인하고 비밀번호를 변경할 수 있어요"
+    }
   }
 }

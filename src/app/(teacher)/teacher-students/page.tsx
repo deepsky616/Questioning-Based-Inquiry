@@ -16,6 +16,7 @@ import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
+import { useTranslations } from "next-intl";
 
 /** ISO 날짜 → "오늘 / N일 전 / -" */
 function lastActiveLabel(iso?: string | null): string {
@@ -443,6 +444,7 @@ function StudentDetailDialog({
 
 /* ─── 메인 페이지 ─── */
 export default function StudentsPage() {
+  const tPages = useTranslations("pages");
   const [students, setStudents] = useState<Student[]>([]);
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -493,7 +495,7 @@ export default function StudentsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="학생 관리" description="담당 학생의 질문·답변·포인트 활동을 한눈에 확인하세요" />
+      <PageHeader title={tPages("teacherStudents.title")} description={tPages("teacherStudents.description")} />
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

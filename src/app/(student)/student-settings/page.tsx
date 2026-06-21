@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
 import type { UserRole } from "@/types/user";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { useTranslations } from "next-intl";
 
 interface ExtendedUser {
   name?: string;
@@ -18,12 +19,13 @@ interface ExtendedUser {
 }
 
 export default function SettingsPage() {
+  const tPages = useTranslations("pages");
   const { data: session } = useSession();
   const user = session?.user as ExtendedUser | undefined;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <PageHeader title="설정" description="계정 정보를 확인하고 비밀번호를 변경할 수 있어요" />
+      <PageHeader title={tPages("studentSettings.title")} description={tPages("studentSettings.description")} />
 
       <Card>
         <CardHeader>
