@@ -10,6 +10,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import {
   sanitizeStudentNumberInput,
   STUDENT_LOGIN_AUTOCOMPLETE,
@@ -31,6 +32,7 @@ function SaveIdCheckbox({
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const t = useTranslations("auth");
   return (
     <label htmlFor={id} className="flex items-center gap-2 cursor-pointer select-none w-fit">
       <input
@@ -40,12 +42,13 @@ function SaveIdCheckbox({
         onChange={(e) => onChange(e.target.checked)}
         className="w-4 h-4 rounded cursor-pointer accent-primary"
       />
-      <span className="text-sm text-muted-foreground">아이디 저장</span>
+      <span className="text-sm text-muted-foreground">{t("saveId")}</span>
     </label>
   );
 }
 
 function StudentLoginForm() {
+  const t = useTranslations("auth");
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,7 +93,7 @@ function StudentLoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.school || !form.grade || !form.className || !form.studentNumber || !form.password) {
-      setError("모든 항목을 입력해 주세요");
+      setError(t("fillAll"));
       return;
     }
     setIsSubmitting(true);
@@ -108,7 +111,7 @@ function StudentLoginForm() {
 
     setIsSubmitting(false);
     if (result?.error) {
-      setError("학교·학년·반·번호 또는 비밀번호가 올바르지 않습니다");
+      setError(t("studentLoginError"));
       return;
     }
 
@@ -137,16 +140,16 @@ function StudentLoginForm() {
         <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
       )}
       <div className="space-y-2">
-        <Label htmlFor="s-school">학교</Label>
+        <Label htmlFor="s-school">{t("school")}</Label>
         <Input
-          id="s-school" name="school" placeholder="한빛초등학교"
+          id="s-school" name="school" placeholder={t("schoolPlaceholder")}
           value={form.school} onChange={handleChange}
           autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.school}
         />
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-2">
-          <Label htmlFor="s-grade">학년</Label>
+          <Label htmlFor="s-grade">{t("grade")}</Label>
           <Input
             id="s-grade" name="grade" placeholder="3"
             value={form.grade} onChange={handleChange}
@@ -155,7 +158,7 @@ function StudentLoginForm() {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="s-class">반</Label>
+          <Label htmlFor="s-class">{t("className")}</Label>
           <Input
             id="s-class" name="className" placeholder="2"
             value={form.className} onChange={handleChange}
@@ -164,7 +167,7 @@ function StudentLoginForm() {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="s-number">번호</Label>
+          <Label htmlFor="s-number">{t("studentNumber")}</Label>
           <Input
             id="s-number" name="studentNumber" placeholder="15"
             value={form.studentNumber} onChange={handleChange}
@@ -173,7 +176,7 @@ function StudentLoginForm() {
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="s-password">비밀번호</Label>
+        <Label htmlFor="s-password">{t("password")}</Label>
         <Input
           id="s-password" name="password" type="password" placeholder="••••"
           value={form.password} onChange={handleChange}
@@ -185,13 +188,14 @@ function StudentLoginForm() {
       <SaveIdCheckbox id="s-save-id" checked={saveId} onChange={handleSaveIdChange} />
 
       <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "로그인 중..." : "학생 로그인"}
+        {isSubmitting ? t("loggingIn") : t("studentLogin")}
       </Button>
     </form>
   );
 }
 
 function TeacherLoginForm() {
+  const t = useTranslations("auth");
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -222,7 +226,7 @@ function TeacherLoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.email || !form.password) {
-      setError("이메일과 비밀번호를 입력해 주세요");
+      setError(t("fillEmailPassword"));
       return;
     }
     setIsSubmitting(true);
@@ -237,7 +241,7 @@ function TeacherLoginForm() {
 
     setIsSubmitting(false);
     if (result?.error) {
-      setError("이메일 또는 비밀번호가 올바르지 않습니다");
+      setError(t("loginError"));
       return;
     }
 
@@ -258,7 +262,7 @@ function TeacherLoginForm() {
         <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
       )}
       <div className="space-y-2">
-        <Label htmlFor="t-email">이메일</Label>
+        <Label htmlFor="t-email">{t("email")}</Label>
         <Input
           id="t-email" name="email" type="email" placeholder="teacher@school.kr"
           value={form.email} onChange={handleChange}
@@ -266,7 +270,7 @@ function TeacherLoginForm() {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="t-password">비밀번호</Label>
+        <Label htmlFor="t-password">{t("password")}</Label>
         <Input
           id="t-password" name="password" type="password" placeholder="••••••"
           value={form.password} onChange={handleChange}
@@ -278,18 +282,19 @@ function TeacherLoginForm() {
       <div className="flex items-center justify-between">
         <SaveIdCheckbox id="t-save-id" checked={saveId} onChange={handleSaveIdChange} />
         <Link href="/forgot-password" className="text-sm text-primary hover:underline">
-          비밀번호 찾기
+          {t("forgotPassword")}
         </Link>
       </div>
 
       <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? "로그인 중..." : "교사 로그인"}
+        {isSubmitting ? t("loggingIn") : t("teacherLogin")}
       </Button>
     </form>
   );
 }
 
 function LoginContent() {
+  const t = useTranslations("auth");
   const searchParams = useSearchParams();
   const initialLoginType = searchParams.get("type") === "teacher" ? "teacher" : "student";
   const [loginType, setLoginType] = useState<"student" | "teacher">(initialLoginType);
@@ -298,13 +303,13 @@ function LoginContent() {
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl text-center">Question Lab</CardTitle>
-        <CardDescription className="text-center">질문기반 탐구수업 웹앱</CardDescription>
+        <CardDescription className="text-center">{t("tagline")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs value={loginType} onValueChange={(value) => setLoginType(value as "student" | "teacher")}>
           <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="student">학생 로그인</TabsTrigger>
-            <TabsTrigger value="teacher">교사 로그인</TabsTrigger>
+            <TabsTrigger value="student">{t("studentLogin")}</TabsTrigger>
+            <TabsTrigger value="teacher">{t("teacherLogin")}</TabsTrigger>
           </TabsList>
           <TabsContent value="student">
             <StudentLoginForm />
@@ -316,12 +321,12 @@ function LoginContent() {
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
         <div className="text-sm text-muted-foreground text-center">
-          {loginType === "teacher" ? "교사 계정이 없으신가요?" : "학생 계정이 없으신가요?"}{" "}
+          {loginType === "teacher" ? t("noTeacherAccount") : t("noStudentAccount")}{" "}
           <Link
             href={loginType === "teacher" ? "/register?role=teacher" : "/register?role=student"}
             className="text-primary hover:underline"
           >
-            {loginType === "teacher" ? "교사 회원가입" : "학생 회원가입"}
+            {loginType === "teacher" ? t("teacherSignup") : t("studentSignup")}
           </Link>
         </div>
       </CardFooter>
@@ -330,6 +335,7 @@ function LoginContent() {
 }
 
 export default function LoginPage() {
+  const t = useTranslations("auth");
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 dark:bg-none dark:bg-background p-4">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.15fr_0.85fr]">
@@ -337,7 +343,7 @@ export default function LoginPage() {
           <div className="relative aspect-[3/2] rounded-xl bg-white">
             <Image
               src="/login-inquiry-hero.png"
-              alt="질문에서 탐구로 이어지는 학습 여정 일러스트"
+              alt={t("heroAlt")}
               fill
               sizes="(max-width: 1024px) 100vw, 60vw"
               className="object-contain"
@@ -346,14 +352,14 @@ export default function LoginPage() {
             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent p-5 text-white">
               <p className="text-sm font-medium opacity-90">Question Lab</p>
               <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-3xl">
-                질문에서 시작해 탐구로 이어지는 수업
+                {t("heroTitle")}
               </h1>
             </div>
           </div>
         </section>
 
         <div className="flex justify-center">
-          <Suspense fallback={<div className="text-muted-foreground">로딩 중...</div>}>
+          <Suspense fallback={<div className="text-muted-foreground">{t("loading")}</div>}>
             <LoginContent />
           </Suspense>
         </div>

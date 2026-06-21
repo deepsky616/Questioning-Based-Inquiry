@@ -10,8 +10,10 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { validateTeacherClasses, buildTeacherClassLabel } from "@/lib/teacher";
 import { validatePasswordPolicy } from "@/lib/password-policy";
+import { useTranslations } from "next-intl";
 
 function RegisterContent() {
+  const t = useTranslations("auth");
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialRole = searchParams.get("role") === "teacher" ? "TEACHER" : "STUDENT";
@@ -42,18 +44,18 @@ function RegisterContent() {
     const { email, school, grade, className, studentNumber, name, password, confirmPassword } = form;
 
     // 항목별로 무엇이 비었는지 구체적으로 안내
-    const missing = (label: string) => { setError(`${label}을(를) 입력해 주세요`); };
-    if (!name) { missing("이름"); return; }
-    if (!school) { missing("학교"); return; }
+    const missing = (label: string) => { setError(t("fieldRequired", { field: label })); };
+    if (!name) { missing(t("name")); return; }
+    if (!school) { missing(t("school")); return; }
     if (role === "STUDENT") {
-      if (!grade) { missing("학년"); return; }
-      if (!className) { missing("반"); return; }
-      if (!studentNumber) { missing("번호"); return; }
+      if (!grade) { missing(t("grade")); return; }
+      if (!className) { missing(t("className")); return; }
+      if (!studentNumber) { missing(t("studentNumber")); return; }
     }
-    if (role === "TEACHER" && !email) { missing("이메일"); return; }
-    if (!password) { missing("비밀번호"); return; }
+    if (role === "TEACHER" && !email) { missing(t("email")); return; }
+    if (!password) { missing(t("password")); return; }
     if (role === "TEACHER" && !email.includes("@")) {
-      setError("올바른 이메일을 입력해 주세요");
+      setError(t("invalidEmail"));
       return;
     }
     if (role === "TEACHER") {
@@ -66,7 +68,7 @@ function RegisterContent() {
       return;
     }
     if (password !== confirmPassword) {
-      setError("비밀번호가 일치하지 않습니다");
+      setError(t("passwordMismatch"));
       return;
     }
 
@@ -86,13 +88,13 @@ function RegisterContent() {
 
       if (!res.ok) {
         const result = await res.json();
-        setError(result.error || "회원가입에 실패했습니다");
+        setError(result.error || t("signupFailed"));
         return;
       }
 
       router.push(`/login?registered=true&type=${role === "TEACHER" ? "teacher" : "student"}`);
     } catch {
-      setError("서버 오류가 발생했습니다");
+      setError(t("serverError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -104,7 +106,7 @@ function RegisterContent() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl text-center">Question Lab</CardTitle>
           <CardDescription className="text-center">
-            {role === "TEACHER" ? "교사 계정 만들기" : "학생 계정 만들기"}
+            {role === "TEACHER" ? t("createTeacherAccount") : t("createStudentAccount")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -115,27 +117,27 @@ function RegisterContent() {
 
             <Tabs value={role} onValueChange={(value) => { setRole(value as "STUDENT" | "TEACHER"); setError(null); }}>
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="STUDENT">학생 회원가입</TabsTrigger>
-                <TabsTrigger value="TEACHER">교사 회원가입</TabsTrigger>
+                <TabsTrigger value="STUDENT">{t("studentSignup")}</TabsTrigger>
+                <TabsTrigger value="TEACHER">{t("teacherSignup")}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="STUDENT" className="mt-4 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="school">학교</Label>
-                  <Input id="school" name="school" placeholder="한빛초등학교" value={form.school} onChange={handleChange} />
+                  <Label htmlFor="school">{t("school")}</Label>
+                  <Input id="school" name="school" placeholder={t("schoolPlaceholder")} value={form.school} onChange={handleChange} />
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="grade">학년</Label>
+                    <Label htmlFor="grade">{t("grade")}</Label>
                     <Input id="grade" name="grade" placeholder="3" value={form.grade} onChange={handleChange} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="className">반</Label>
+                    <Label htmlFor="className">{t("className")}</Label>
                     <Input id="className" name="className" placeholder="2" value={form.className} onChange={handleChange} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="studentNumber">번호</Label>
+                    <Label htmlFor="studentNumber">{t("studentNumber")}</Label>
                     <Input id="studentNumber" name="studentNumber" placeholder="15" value={form.studentNumber} onChange={handleChange} />
                   </div>
                 </div>
@@ -143,22 +145,22 @@ function RegisterContent() {
 
               <TabsContent value="TEACHER" className="mt-4 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">이메일</Label>
+                  <Label htmlFor="email">{t("email")}</Label>
                   <Input id="email" name="email" type="email" placeholder="teacher@school.kr" value={form.email} onChange={handleChange} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="teacher-school">학교</Label>
-                  <Input id="teacher-school" name="school" placeholder="한빛초등학교" value={form.school} onChange={handleChange} />
+                  <Label htmlFor="teacher-school">{t("school")}</Label>
+                  <Input id="teacher-school" name="school" placeholder={t("schoolPlaceholder")} value={form.school} onChange={handleChange} />
                 </div>
 
                 {/* 담당 학년·반 다중 선택 */}
                 <div className="space-y-2">
-                  <Label>담당 학년·반 <span className="text-red-500">*</span></Label>
+                  <Label>{t("teacherClassLabel")} <span className="text-red-500">*</span></Label>
                   <div className="space-y-2">
                     {teacherClasses.map((tc, idx) => (
                       <div key={idx} className="flex items-center gap-2">
                         <Input
-                          placeholder="학년 (예: 3)"
+                          placeholder={t("gradePlaceholderShort")}
                           value={tc.grade}
                           onChange={(e) => {
                             const updated = [...teacherClasses];
@@ -168,9 +170,9 @@ function RegisterContent() {
                           }}
                           className="w-24"
                         />
-                        <span className="text-sm text-gray-500">학년</span>
+                        <span className="text-sm text-gray-500">{t("grade")}</span>
                         <Input
-                          placeholder="반 (예: 2)"
+                          placeholder={t("classPlaceholderShort")}
                           value={tc.className}
                           onChange={(e) => {
                             const updated = [...teacherClasses];
@@ -180,7 +182,7 @@ function RegisterContent() {
                           }}
                           className="w-24"
                         />
-                        <span className="text-sm text-gray-500">반</span>
+                        <span className="text-sm text-gray-500">{t("className")}</span>
                         {teacherClasses.length > 1 && (
                           <button
                             type="button"
@@ -202,7 +204,7 @@ function RegisterContent() {
                       onClick={() => setTeacherClasses([...teacherClasses, { grade: "", className: "" }])}
                       className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
                     >
-                      + 학년·반 추가
+                      {t("addClass")}
                     </button>
                   </div>
                 </div>
@@ -210,36 +212,36 @@ function RegisterContent() {
             </Tabs>
 
             <div className="space-y-2">
-              <Label htmlFor="name">이름</Label>
-              <Input id="name" name="name" placeholder={role === "TEACHER" ? "김선생" : "홍길동"} value={form.name} onChange={handleChange} />
+              <Label htmlFor="name">{t("name")}</Label>
+              <Input id="name" name="name" placeholder={role === "TEACHER" ? t("namePlaceholderTeacher") : t("namePlaceholderStudent")} value={form.name} onChange={handleChange} />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">비밀번호</Label>
-              <Input id="password" name="password" type="password" placeholder="8~16자, 숫자+영문+특수문자" value={form.password} onChange={handleChange} />
+              <Label htmlFor="password">{t("password")}</Label>
+              <Input id="password" name="password" type="password" placeholder={t("passwordHint")} value={form.password} onChange={handleChange} />
               <div className="rounded-md border bg-muted/40 p-2.5 text-[11px] leading-5 text-muted-foreground space-y-0.5">
-                <p>숫자 + 영문 대/소문자 + 특수문자, 3가지를 조합하여 8~16자로 입력해주세요.</p>
-                <p>· 사용 가능한 특수문자: <span className="font-mono">! @ # $ % ^ &amp; * ( ) _ +</span></p>
-                <p>· 예시: <span className="font-mono">edunet0079!</span>, <span className="font-mono">@1544EDUNET</span></p>
-                <p className="text-amber-600">⚠ 생년월일·전화번호 등 개인정보, 연속·반복된 문자는 피해주세요.</p>
+                <p>{t("passwordRule")}</p>
+                <p>{t("passwordAllowed")}<span className="font-mono">! @ # $ % ^ &amp; * ( ) _ +</span></p>
+                <p>{t("passwordExample")}<span className="font-mono">edunet0079!</span>, <span className="font-mono">@1544EDUNET</span></p>
+                <p className="text-amber-600">{t("passwordWarning")}</p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">비밀번호 확인</Label>
-              <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="비밀번호 다시 입력" value={form.confirmPassword} onChange={handleChange} />
+              <Label htmlFor="confirmPassword">{t("passwordConfirm")}</Label>
+              <Input id="confirmPassword" name="confirmPassword" type="password" placeholder={t("passwordConfirmPlaceholder")} value={form.confirmPassword} onChange={handleChange} />
             </div>
 
             <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "처리 중..." : "회원가입"}
+              {isSubmitting ? t("processing") : t("signup")}
             </Button>
           </form>
         </CardContent>
         <CardFooter>
           <div className="text-sm text-muted-foreground text-center w-full">
-            이미 계정이 있으신가요?{" "}
+            {t("alreadyHaveAccount")}{" "}
             <Link href="/login" className="text-primary hover:underline">
-              로그인
+              {t("login")}
             </Link>
           </div>
         </CardFooter>
@@ -249,8 +251,9 @@ function RegisterContent() {
 }
 
 export default function RegisterPage() {
+  const t = useTranslations("auth");
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">로딩 중...</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">{t("loading")}</div>}>
       <RegisterContent />
     </Suspense>
   );

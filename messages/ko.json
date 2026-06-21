@@ -40,11 +40,77 @@
     "card1": "분류 1 · 폐쇄형 / 개방형 질문",
     "card2": "분류 2 · 사실적 / 개념적 / 논쟁적 질문",
     "guideTitle": "질문 분류 안내",
-    "closed": { "label": "폐쇄형", "desc": "정답이 하나로 정해진 질문" },
-    "open": { "label": "개방형", "desc": "여러 답이 나올 수 있는 질문" },
-    "factual": { "label": "사실적", "desc": "사실이나 정보를 확인하는 질문" },
-    "conceptual": { "label": "개념적", "desc": "원리와 이유를 생각하는 질문" },
-    "controversial": { "label": "논쟁적", "desc": "내 생각·판단이 필요한 질문" }
+    "closed": {
+      "label": "폐쇄형",
+      "desc": "정답이 하나로 정해진 질문"
+    },
+    "open": {
+      "label": "개방형",
+      "desc": "여러 답이 나올 수 있는 질문"
+    },
+    "factual": {
+      "label": "사실적",
+      "desc": "사실이나 정보를 확인하는 질문"
+    },
+    "conceptual": {
+      "label": "개념적",
+      "desc": "원리와 이유를 생각하는 질문"
+    },
+    "controversial": {
+      "label": "논쟁적",
+      "desc": "내 생각·판단이 필요한 질문"
+    }
+  },
+  "auth": {
+    "tagline": "질문기반 탐구수업 웹앱",
+    "studentLogin": "학생 로그인",
+    "teacherLogin": "교사 로그인",
+    "studentSignup": "학생 회원가입",
+    "teacherSignup": "교사 회원가입",
+    "school": "학교",
+    "grade": "학년",
+    "className": "반",
+    "studentNumber": "번호",
+    "email": "이메일",
+    "password": "비밀번호",
+    "passwordConfirm": "비밀번호 확인",
+    "name": "이름",
+    "saveId": "아이디 저장",
+    "loggingIn": "로그인 중...",
+    "loading": "로딩 중...",
+    "fillAll": "모든 항목을 입력해 주세요",
+    "studentLoginError": "학교·학년·반·번호 또는 비밀번호가 올바르지 않습니다",
+    "fillEmailPassword": "이메일과 비밀번호를 입력해 주세요",
+    "loginError": "이메일 또는 비밀번호가 올바르지 않습니다",
+    "noTeacherAccount": "교사 계정이 없으신가요?",
+    "noStudentAccount": "학생 계정이 없으신가요?",
+    "heroAlt": "질문에서 탐구로 이어지는 학습 여정 일러스트",
+    "schoolPlaceholder": "한빛초등학교",
+    "createTeacherAccount": "교사 계정 만들기",
+    "createStudentAccount": "학생 계정 만들기",
+    "invalidEmail": "올바른 이메일을 입력해 주세요",
+    "passwordMismatch": "비밀번호가 일치하지 않습니다",
+    "signupFailed": "회원가입에 실패했습니다",
+    "serverError": "서버 오류가 발생했습니다",
+    "teacherClassLabel": "담당 학년·반",
+    "gradePlaceholderShort": "학년 (예: 3)",
+    "classPlaceholderShort": "반 (예: 2)",
+    "namePlaceholderTeacher": "김선생",
+    "namePlaceholderStudent": "홍길동",
+    "passwordHint": "8~16자, 숫자+영문+특수문자",
+    "passwordRule": "숫자 + 영문 대/소문자 + 특수문자, 3가지를 조합하여 8~16자로 입력해주세요.",
+    "passwordAllowed": "· 사용 가능한 특수문자: ",
+    "passwordExample": "· 예시: ",
+    "passwordWarning": "⚠ 생년월일·전화번호 등 개인정보, 연속·반복된 문자는 피해주세요.",
+    "passwordConfirmPlaceholder": "비밀번호 다시 입력",
+    "processing": "처리 중...",
+    "signup": "회원가입",
+    "heroTitle": "질문에서 시작해 탐구로 이어지는 수업",
+    "forgotPassword": "비밀번호 찾기",
+    "addClass": "+ 학년·반 추가",
+    "alreadyHaveAccount": "이미 계정이 있으신가요?",
+    "login": "로그인",
+    "fieldRequired": "{field}을(를) 입력해 주세요"
   },
   "pages": {
     "teacherDashboard": {

@@ -40,11 +40,77 @@
     "card1": "Type 1 · Closed / Open Questions",
     "card2": "Type 2 · Factual / Conceptual / Debatable Questions",
     "guideTitle": "Question Classification Guide",
-    "closed": { "label": "Closed", "desc": "A question with a single correct answer" },
-    "open": { "label": "Open", "desc": "A question that allows many possible answers" },
-    "factual": { "label": "Factual", "desc": "A question that checks facts or information" },
-    "conceptual": { "label": "Conceptual", "desc": "A question that explores principles and reasons" },
-    "controversial": { "label": "Debatable", "desc": "A question that requires your own judgment" }
+    "closed": {
+      "label": "Closed",
+      "desc": "A question with a single correct answer"
+    },
+    "open": {
+      "label": "Open",
+      "desc": "A question that allows many possible answers"
+    },
+    "factual": {
+      "label": "Factual",
+      "desc": "A question that checks facts or information"
+    },
+    "conceptual": {
+      "label": "Conceptual",
+      "desc": "A question that explores principles and reasons"
+    },
+    "controversial": {
+      "label": "Debatable",
+      "desc": "A question that requires your own judgment"
+    }
+  },
+  "auth": {
+    "tagline": "Inquiry-based learning through questions",
+    "studentLogin": "Student Login",
+    "teacherLogin": "Teacher Login",
+    "studentSignup": "Student Sign up",
+    "teacherSignup": "Teacher Sign up",
+    "school": "School",
+    "grade": "Grade",
+    "className": "Class",
+    "studentNumber": "Number",
+    "email": "Email",
+    "password": "Password",
+    "passwordConfirm": "Confirm password",
+    "name": "Name",
+    "saveId": "Remember me",
+    "loggingIn": "Logging in...",
+    "loading": "Loading...",
+    "fillAll": "Please fill in all fields",
+    "studentLoginError": "School, grade, class, number, or password is incorrect",
+    "fillEmailPassword": "Please enter your email and password",
+    "loginError": "Email or password is incorrect",
+    "noTeacherAccount": "Don't have a teacher account?",
+    "noStudentAccount": "Don't have a student account?",
+    "heroAlt": "Illustration of a learning journey from questions to inquiry",
+    "schoolPlaceholder": "Hanbit Elementary School",
+    "createTeacherAccount": "Create teacher account",
+    "createStudentAccount": "Create student account",
+    "invalidEmail": "Please enter a valid email",
+    "passwordMismatch": "Passwords do not match",
+    "signupFailed": "Sign up failed",
+    "serverError": "A server error occurred",
+    "teacherClassLabel": "Grade & class in charge",
+    "gradePlaceholderShort": "Grade (e.g., 3)",
+    "classPlaceholderShort": "Class (e.g., 2)",
+    "namePlaceholderTeacher": "Ms. Kim",
+    "namePlaceholderStudent": "John Doe",
+    "passwordHint": "8-16 chars, numbers + letters + symbols",
+    "passwordRule": "Combine all three (numbers + upper/lowercase letters + symbols), 8-16 characters.",
+    "passwordAllowed": "· Allowed symbols: ",
+    "passwordExample": "· Example: ",
+    "passwordWarning": "⚠ Avoid personal info like birthdays or phone numbers, and sequential or repeated characters.",
+    "passwordConfirmPlaceholder": "Re-enter password",
+    "processing": "Processing...",
+    "signup": "Sign up",
+    "heroTitle": "Lessons that start with questions and lead to inquiry",
+    "forgotPassword": "Forgot password",
+    "addClass": "+ Add grade/class",
+    "alreadyHaveAccount": "Already have an account?",
+    "login": "Log in",
+    "fieldRequired": "Please enter {field}"
   },
   "pages": {
     "teacherDashboard": {
