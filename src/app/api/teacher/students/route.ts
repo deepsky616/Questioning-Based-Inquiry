@@ -73,29 +73,6 @@ export async function GET() {
     if (t && t > (lastActivity.get(r.authorId) ?? 0)) lastActivity.set(r.authorId, t);
   }
 
-  // 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 학생별 분포 — 목록 미니 막대용
-  const [closureRows, cognitiveRows] = ids.length
-    ? await Promise.all([
-        prisma.question.groupBy({ by: ["authorId", "closure"], where: { authorId: { in: ids } }, _count: { _all: true } }),
-        prisma.question.groupBy({ by: ["authorId", "cognitive"], where: { authorId: { in: ids } }, _count: { _all: true } }),
-      ])
-    : [[], []];
-  const closureDist = new Map<string, { closed: number; open: number }>();
-  for (const r of closureRows) {
-    const cur = closureDist.get(r.authorId) ?? { closed: 0, open: 0 };
-    if (r.closure === "closed") cur.closed += r._count._all;
-    else if (r.closure === "open") cur.open += r._count._all;
-    closureDist.set(r.authorId, cur);
-  }
-  const cognitiveDist = new Map<string, { factual: number; conceptual: number; controversial: number }>();
-  for (const r of cognitiveRows) {
-    const cur = cognitiveDist.get(r.authorId) ?? { factual: 0, conceptual: 0, controversial: 0 };
-    if (r.cognitive === "factual") cur.factual += r._count._all;
-    else if (r.cognitive === "conceptual") cur.conceptual += r._count._all;
-    else if (r.cognitive === "controversial") cur.controversial += r._count._all;
-    cognitiveDist.set(r.authorId, cur);
-  }
-
   return NextResponse.json({
     students: students.map((s) => ({
       id: s.id,
@@ -109,8 +86,6 @@ export async function GET() {
       pointLogCount: s._count.pointLogs,
       totalPoints: s.totalPoints,
       lastActivityAt: lastActivity.has(s.id) ? new Date(lastActivity.get(s.id)!).toISOString() : null,
-      closureDist: closureDist.get(s.id) ?? { closed: 0, open: 0 },
-      cognitiveDist: cognitiveDist.get(s.id) ?? { factual: 0, conceptual: 0, controversial: 0 },
     })),
     teacherClasses,
   });
