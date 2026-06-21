@@ -273,13 +273,13 @@ export default function TeacherDashboard() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>학생</TableHead>
-                      <TableHead className="text-right">총</TableHead>
-                      <TableHead className="text-right text-blue-600">폐쇄형</TableHead>
-                      <TableHead className="text-right text-green-600">개방형</TableHead>
-                      <TableHead className="text-right text-muted-foreground">사실적</TableHead>
-                      <TableHead className="text-right text-purple-600">개념적</TableHead>
-                      <TableHead className="text-right text-orange-600">논쟁적</TableHead>
-                      <TableHead className="text-right whitespace-nowrap" title="선택한 기간을 절반으로 나눠, 전반 대비 후반의 질문 작성량 변화를 보여줍니다">
+                      <TableHead className="text-center w-12">총</TableHead>
+                      <TableHead className="text-center w-16 text-blue-600">폐쇄형</TableHead>
+                      <TableHead className="text-center w-16 text-green-600">개방형</TableHead>
+                      <TableHead className="text-center w-16 text-muted-foreground">사실적</TableHead>
+                      <TableHead className="text-center w-16 text-purple-600">개념적</TableHead>
+                      <TableHead className="text-center w-16 text-orange-600">논쟁적</TableHead>
+                      <TableHead className="text-center w-28 whitespace-nowrap" title="선택한 기간을 절반으로 나눠, 전반 대비 후반의 질문 작성량 변화를 보여줍니다">
                         질문 활동 추세
                       </TableHead>
                     </TableRow>
@@ -297,13 +297,13 @@ export default function TeacherDashboard() {
                             </div>
                           )}
                         </TableCell>
-                        <TableCell className="text-right font-bold">{s.total}</TableCell>
-                        <TableCell className="text-right text-blue-600">{s.distribution.closed}</TableCell>
-                        <TableCell className="text-right text-green-600">{s.distribution.open}</TableCell>
-                        <TableCell className="text-right text-muted-foreground">{s.cognitiveDistribution.factual}</TableCell>
-                        <TableCell className="text-right text-purple-600">{s.cognitiveDistribution.conceptual}</TableCell>
-                        <TableCell className="text-right text-orange-600">{s.cognitiveDistribution.controversial}</TableCell>
-                        <TableCell className="text-right whitespace-nowrap">{getTrendLabel(s.trend)}</TableCell>
+                        <TableCell className="text-center font-bold">{s.total}</TableCell>
+                        <TableCell className="text-center text-blue-600">{s.distribution.closed}</TableCell>
+                        <TableCell className="text-center text-green-600">{s.distribution.open}</TableCell>
+                        <TableCell className="text-center text-muted-foreground">{s.cognitiveDistribution.factual}</TableCell>
+                        <TableCell className="text-center text-purple-600">{s.cognitiveDistribution.conceptual}</TableCell>
+                        <TableCell className="text-center text-orange-600">{s.cognitiveDistribution.controversial}</TableCell>
+                        <TableCell className="text-center whitespace-nowrap">{getTrendLabel(s.trend)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
