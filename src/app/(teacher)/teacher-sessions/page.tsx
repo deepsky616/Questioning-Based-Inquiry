@@ -13,6 +13,7 @@ import { buildSessionLabel, isSessionAvailable, sortSessionsAsc, sortSessionsDes
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import { EmptyState } from "@/components/shared/EmptyState";
 import {
   buildClassTargetValue,
   buildClassStudentTargetPayload,
@@ -368,9 +369,7 @@ export default function TeacherSessionsPage() {
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">로딩 중...</div>
       ) : sessions.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-input p-8 text-center text-sm text-muted-foreground">
-          등록된 세션이 없습니다. 위에서 새 세션을 추가해 보세요.
-        </div>
+        <EmptyState icon="📅" title="등록된 세션이 없습니다" description="위에서 새 세션을 추가해 보세요" />
       ) : (
         <Card>
           <CardHeader className="pb-3 space-y-3">
@@ -434,9 +433,7 @@ export default function TeacherSessionsPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             {activeSessions.length === 0 && pastSessions.length === 0 && (
-              <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-                조건에 맞는 세션이 없습니다.
-              </div>
+              <EmptyState icon="🔍" title="조건에 맞는 세션이 없습니다" description="필터를 바꿔 다시 찾아보세요" />
             )}
 
             {activeSessions.length > 0 && (
