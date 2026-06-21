@@ -11,6 +11,7 @@ import { buildSessionLabel, getSessionFilterOptions, filterSessions } from "@/li
 import { getSessionUser } from "@/lib/auth-helpers";
 import { COGNITIVE_LABEL } from "@/lib/question-labels";
 import { useToast } from "@/components/ui/use-toast";
+import { useTranslations } from "next-intl";
 
 interface SharedQuestion {
   type: string;
@@ -43,6 +44,9 @@ interface ClassificationResult {
 const TYPE_LABEL = COGNITIVE_LABEL;
 
 export default function AskPage() {
+  const t = useTranslations("ask");
+  const tCls = useTranslations("classification");
+  const tc = useTranslations("common");
   const router = useRouter();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { data: authSession } = useSession();
@@ -140,7 +144,7 @@ export default function AskPage() {
     // issue #3: handler 단에서도 세션 필수 검증
     if (!canAsk) return;
     if (content.trim().length === 0) {
-      toast({ variant: "destructive", description: "질문을 입력해 주세요" });
+      toast({ variant: "destructive", description: t("enterQuestion") });
       return;
     }
 
@@ -154,13 +158,13 @@ export default function AskPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || "분류 실패");
+        throw new Error(err.error || t("classifyFailed"));
       }
 
       const data = await res.json();
       setResult(data);
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : "분류 중 오류가 발생했습니다";
+      const msg = error instanceof Error ? error.message : t("classifyError");
       toast({ variant: "destructive", description: msg });
     } finally {
       setIsLoading(false);
@@ -188,33 +192,29 @@ export default function AskPage() {
         }),
       });
 
-      if (!res.ok) throw new Error("저장 실패");
+      if (!res.ok) throw new Error(t("saveFailed"));
       router.push("/student-questions");
     } catch {
-      toast({ variant: "destructive", description: "저장 중 오류가 발생했습니다" });
+      toast({ variant: "destructive", description: t("saveError") });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const getCognitiveLabel = (c: string) => {
-    const map: Record<string, string> = {
-      factual: "사실적 질문",
-      conceptual: "개념적 질문",
-      controversial: "논쟁적 질문",
-    };
-    return map[c] || c;
-  };
+  const getCognitiveLabel = (c: string) =>
+    (c === "factual" || c === "conceptual" || c === "controversial")
+      ? `${tCls(`${c}.label`)} ${tc("questionWord")}`
+      : c;
 
   // issue #1: 로딩 중에는 아무것도 표시하지 않음
   if (!sessionsLoaded) {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
+          <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         </div>
         <Card>
-          <CardContent className="p-6 text-center text-muted-foreground text-sm">수업 세션 확인 중...</CardContent>
+          <CardContent className="p-6 text-center text-muted-foreground text-sm">{t("checkingSession")}</CardContent>
         </Card>
       </div>
     );
@@ -225,11 +225,11 @@ export default function AskPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
+          <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         </div>
         <Card className="border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-950/40">
           <CardContent className="p-6 text-center text-red-700 text-sm">
-            수업 세션 정보를 불러오지 못했습니다. 페이지를 새로고침해 주세요.
+            {t("loadSessionError")}
           </CardContent>
         </Card>
       </div>
@@ -241,13 +241,13 @@ export default function AskPage() {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
+          <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         </div>
         <Card className="border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/40">
           <CardContent className="p-6 text-center text-yellow-800">
-            <p className="font-medium">아직 수업 세션이 없습니다</p>
+            <p className="font-medium">{t("noSession")}</p>
             <p className="text-sm mt-1 text-yellow-700">
-              담당 선생님이 수업 세션을 만들어야 질문할 수 있습니다.
+              {t("noSessionDesc")}
             </p>
           </CardContent>
         </Card>
@@ -258,15 +258,15 @@ export default function AskPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-foreground">질문하기</h2>
-        <p className="text-muted-foreground">질문을 입력하면 유형을 분석해 드립니다</p>
+        <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
+        <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 
       {aiConfigured === false && (
         <Card className="border-yellow-200 dark:border-yellow-500/30 bg-yellow-50 dark:bg-yellow-950/40">
           <CardContent className="p-4">
             <p className="text-yellow-800 text-sm">
-              교사가 AI 설정을 아직 등록하지 않았습니다. AI 분류 대신 키워드 기반 분류가 사용됩니다.
+              {t("aiNotConfigured")}
             </p>
           </CardContent>
         </Card>
@@ -275,52 +275,52 @@ export default function AskPage() {
       {aiConfigured === true && (
         <Card className="border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-950/40">
           <CardContent className="p-4">
-            <p className="text-green-800 text-sm">AI 분류가 활성화됐습니다.</p>
+            <p className="text-green-800 text-sm">{t("aiActive")}</p>
           </CardContent>
         </Card>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>질문 입력</CardTitle>
-          <CardDescription>수업 세션을 선택하고 탐구하고 싶은 질문을 적어보세요</CardDescription>
+          <CardTitle>{t("inputHeader")}</CardTitle>
+          <CardDescription>{t("inputDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 세션 선택 — 필수 */}
           <div className="space-y-2">
-            <Label htmlFor="session">수업 세션 선택 <span className="text-red-500">*</span></Label>
+            <Label htmlFor="session">{t("sessionSelectLabel")} <span className="text-red-500">*</span></Label>
 
             {/* 날짜·교과·주제로 좁혀서 찾기 (선택) */}
             <div className="grid grid-cols-3 gap-2">
               <select
-                aria-label="날짜로 거르기"
+                aria-label={t("filterByDate")}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={filterDate}
                 onChange={(e) => setFilterDate(e.target.value)}
               >
-                <option value="">전체 날짜</option>
+                <option value="">{t("allDates")}</option>
                 {filterOptions.dates.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
               <select
-                aria-label="교과로 거르기"
+                aria-label={t("filterBySubject")}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={filterSubject}
                 onChange={(e) => setFilterSubject(e.target.value)}
               >
-                <option value="">전체 교과</option>
+                <option value="">{t("allSubjects")}</option>
                 {filterOptions.subjects.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
               <select
-                aria-label="주제로 거르기"
+                aria-label={t("filterByTopic")}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={filterTopic}
                 onChange={(e) => setFilterTopic(e.target.value)}
               >
-                <option value="">전체 주제</option>
+                <option value="">{t("allTopics")}</option>
                 {filterOptions.topics.map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -335,7 +335,7 @@ export default function AskPage() {
               disabled={filteredSessions.length === 0}
             >
               {filteredSessions.length === 0 ? (
-                <option value="">조건에 맞는 수업 세션이 없습니다</option>
+                <option value="">{t("noMatchingSession")}</option>
               ) : (
                 filteredSessions.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -347,7 +347,7 @@ export default function AskPage() {
 
             {selectedSession && (
               <div className="rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-3 space-y-1">
-                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">현재 수업 세션</p>
+                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">{t("currentSession")}</p>
                 <p className="text-sm font-medium text-blue-900">
                   {selectedSession.subject}
                   {selectedSession.topic.trim() && (
@@ -355,15 +355,15 @@ export default function AskPage() {
                   )}
                 </p>
                 <p className="text-xs text-blue-600">
-                  {selectedSession.teacher.name} 선생님 &nbsp;·&nbsp; {selectedSession.date}
+                  {selectedSession.teacher.name} {t("teacherSuffix")} &nbsp;·&nbsp; {selectedSession.date}
                 </p>
                 {selectedSession.unitDesignId && (
                   <div className="mt-2 rounded-md border border-indigo-200 bg-white px-3 py-2 text-xs text-indigo-700">
-                    선생님이 만든 탐구 질문 수업입니다. 아래 탐구 질문을 참고해 나만의 질문을 만들어 보세요.
+                    {t("inquiryClassNotice")}
                   </div>
                 )}
                 <p className="text-xs text-blue-500">
-                  이 세션의 질문은 선생님 설정에 따라 {selectedSession.defaultQuestionPublic ? "공개" : "비공개"}로 저장됩니다.
+                  {t("visibilityNotice", { visibility: selectedSession.defaultQuestionPublic ? t("public") : t("private") })}
                 </p>
               </div>
             )}
@@ -375,10 +375,10 @@ export default function AskPage() {
             selectedSession.sharedQuestions.filter((q) => q.content?.trim()).length > 0 && (
               <div className="rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4 space-y-2">
                 <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
-                  선생님의 탐구 질문
+                  {t("teacherInquiryQuestions")}
                 </p>
                 <p className="text-xs text-indigo-500 mb-2">
-                  아래 질문을 참고해서 나만의 질문을 만들어보세요
+                  {t("inquiryHint")}
                 </p>
                 <ul className="space-y-1.5">
                   {selectedSession.sharedQuestions
@@ -398,18 +398,18 @@ export default function AskPage() {
           {/* 이미 제출한 질문 배너 */}
           {existingQuestion && !isCheckingExisting && (
             <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
-              이 세션에 이미 질문을 작성했습니다: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? '...' : ''}&rdquo;</strong>
+              {t("alreadyAsked")}: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? '...' : ''}&rdquo;</strong>
               <br />
-              <span className="text-xs text-amber-600">새 질문을 작성하면 기존 질문과 별도로 저장됩니다.</span>
+              <span className="text-xs text-amber-600">{t("separateSaveNotice")}</span>
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="content">질문</Label>
+            <Label htmlFor="content">{t("questionLabel")}</Label>
             <Textarea
               ref={textareaRef}
               id="content"
-              placeholder="예: 왜 밤에는 별이 보이지 않을까?"
+              placeholder={t("questionPlaceholder")}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={4}
@@ -422,7 +422,7 @@ export default function AskPage() {
             disabled={isLoading || !canAsk || content.trim().length === 0}
             className="w-full"
           >
-            {isLoading ? "분석 중..." : "질문 분석하기"}
+            {isLoading ? t("analyzing") : t("analyze")}
           </Button>
         </CardContent>
       </Card>
@@ -430,55 +430,55 @@ export default function AskPage() {
       {result && (
         <Card>
           <CardHeader>
-            <CardTitle>분석 결과</CardTitle>
+            <CardTitle>{t("resultHeader")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {result.inappropriate && (
               <div className="p-4 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/40">
-                <p className="text-sm font-bold text-red-700">⚠️ 부적절한 내용이 감지되었습니다</p>
+                <p className="text-sm font-bold text-red-700">{t("inappropriateDetected")}</p>
                 <p className="text-sm text-red-600 mt-1">
-                  {result.inappropriateReason || "학습에 적절하지 않은 표현이 포함되어 있어요."} 질문을 수정해 다시 분석하는 것을 권장합니다. 이대로 저장하면 선생님이 검토하게 됩니다.
+                  {result.inappropriateReason || t("inappropriateDefault")} {t("inappropriateAdvice")}
                 </p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
-                <div className="text-sm text-muted-foreground">폐쇄형/개방형</div>
+                <div className="text-sm text-muted-foreground">{t("closureLabel")}</div>
                 <div className="text-xl font-bold text-blue-700">
-                  {result.closure === "closed" ? "닫힌 질문" : "열린 질문"}
+                  {result.closure === "closed" ? t("closedResult") : t("openResult")}
                 </div>
                 <div className="text-sm text-blue-600 mt-0.5">
-                  {result.closure === "closed" ? "정해진 답이 있어요" : "다양한 답이 가능해요"}
+                  {result.closure === "closed" ? t("closedHint") : t("openHint")}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
-                  신뢰도: {Math.round(result.closureScore * 100)}%
+                  {t("confidence")}: {Math.round(result.closureScore * 100)}%
                 </div>
               </div>
               <div className="p-4 bg-purple-50 dark:bg-purple-950/40 rounded-lg">
-                <div className="text-sm text-muted-foreground">인지적 수준</div>
+                <div className="text-sm text-muted-foreground">{t("cognitiveLevel")}</div>
                 <div className="text-xl font-bold text-purple-700">
                   {COGNITIVE_LABEL[result.cognitive] ?? result.cognitive}
                 </div>
                 <div className="text-sm text-purple-600 mt-0.5">
-                  {result.cognitive === "factual" && "사실을 확인하는 질문이에요"}
-                  {result.cognitive === "conceptual" && "추론하고 분석하는 질문이에요"}
-                  {result.cognitive === "controversial" && "스스로 판단하는 질문이에요"}
+                  {result.cognitive === "factual" && t("factualHint")}
+                  {result.cognitive === "conceptual" && t("conceptualHint")}
+                  {result.cognitive === "controversial" && t("controversialHint")}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
-                  신뢰도: {Math.round(result.cognitiveScore * 100)}%
+                  {t("confidence")}: {Math.round(result.cognitiveScore * 100)}%
                 </div>
               </div>
             </div>
 
             <div className="p-4 bg-muted/40 rounded-lg">
-              <div className="text-sm font-medium text-foreground">분류 근거</div>
+              <div className="text-sm font-medium text-foreground">{t("reasoning")}</div>
               <p className="text-muted-foreground mt-1">{result.reasoning}</p>
             </div>
 
             {result.feedback && (
               <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg">
                 <div className="text-sm font-medium text-amber-800 mb-1">
-                  더 좋은 질문을 위한 제안
+                  {t("feedbackTitle")}
                 </div>
                 <p className="text-amber-700">{result.feedback}</p>
               </div>
@@ -487,15 +487,15 @@ export default function AskPage() {
             {result.improvedExample && result.improvedExample.trim() && (
               <div className="p-4 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-500/30 rounded-lg">
                 <div className="text-sm font-medium text-green-800 mb-2">
-                  이렇게 바꿔보면 어떨까요?
+                  {t("improvedTitle")}
                 </div>
                 <p className="text-green-900 font-medium">&ldquo;{result.improvedExample}&rdquo;</p>
-                <p className="text-xs text-green-600 mt-1">이 질문을 참고해서 더 깊이 생각할 수 있는 질문을 만들어보세요!</p>
+                <p className="text-xs text-green-600 mt-1">{t("improveHint")}</p>
               </div>
             )}
 
             <div className="p-4 border rounded-lg bg-muted/40 text-sm text-muted-foreground">
-              질문 공개 여부는 선생님이 수업 세션에서 설정합니다.
+              {t("visibilityByTeacher")}
             </div>
 
             <div className="flex gap-2">
@@ -508,10 +508,10 @@ export default function AskPage() {
                   setContent("");
                 }}
               >
-                ✏️ 질문 다시 작성하기
+                {t("rewriteQuestion")}
               </Button>
               <Button onClick={handleSave} disabled={isSaving} className="flex-1">
-                {isSaving ? "저장 중..." : "💾 질문 저장하기"}
+                {isSaving ? t("saving") : t("saveQuestion")}
               </Button>
             </div>
           </CardContent>
