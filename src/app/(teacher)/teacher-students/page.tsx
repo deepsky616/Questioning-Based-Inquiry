@@ -591,6 +591,23 @@ export default function StudentsPage() {
         className="max-w-xs"
       />
 
+      {/* 질문 유형 막대 범례 (목록의 미니 막대 색 설명) */}
+      <div className="hidden md:flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <span className="font-semibold text-foreground">질문 유형 막대</span>
+        <span className="flex items-center gap-1.5">
+          분류1
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#3b82f6" }} />폐쇄형
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#10b981" }} />개방형
+        </span>
+        <span className="flex items-center gap-1.5">
+          분류2
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#94a3b8" }} />사실
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#a855f7" }} />개념
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f97316" }} />논쟁
+        </span>
+        <span className="text-muted-foreground/80">막대에 마우스를 올리면 개수가 보여요</span>
+      </div>
+
       {isLoading ? (
         <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
       ) : students.length === 0 ? (
