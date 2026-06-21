@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -25,6 +26,7 @@ export function QuestionSequencePanel({
   initialQuestions?: SequencedQuestion[];
   editMode?: boolean;
 }) {
+  const t = useTranslations("sequencePanel");
   const [result, setResult] = useState<SequencedQuestion[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -57,19 +59,19 @@ export function QuestionSequencePanel({
         }),
       });
       if (!res.ok) throw new Error();
-      setMsg("학생에게 배포했습니다");
+      setMsg(t("published"));
       onDeployed?.();
     } catch {
-      setMsg("배포에 실패했습니다");
+      setMsg(t("publishFailed"));
     }
     setIsPublishing(false);
   }
 
   const toggles: [keyof DeploySettings, string, string][] = [
-    ["isActive", "학생 활성화", "켜면 학생이 배포된 질문에 좋아요·댓글을 남길 수 있어요."],
-    ["defaultQuestionPublic", "질문 공개", "켜면 학생이 작성한 질문을 서로 볼 수 있어요. 끄면 본인 질문만 보여요."],
-    ["likesVisibleToPeers", "좋아요 공개", "켜면 학생이 서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요."],
-    ["commentsVisibleToPeers", "댓글 공개", "켜면 학생이 서로의 댓글을 볼 수 있어요. 끄면 본인·선생님 댓글만 보여요."],
+    ["isActive", t("activeLabel"), t("activeDesc")],
+    ["defaultQuestionPublic", t("publicLabel"), t("publicDesc")],
+    ["likesVisibleToPeers", t("likesLabel"), t("likesDesc")],
+    ["commentsVisibleToPeers", t("commentsLabel"), t("commentsDesc")],
   ];
 
   return (
@@ -84,7 +86,7 @@ export function QuestionSequencePanel({
       />
       {/* ③ 배포 설정 토글 (2×2) */}
       <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-        <p className="text-sm font-semibold text-foreground">③ 배포 설정</p>
+        <p className="text-sm font-semibold text-foreground">{t("settingsTitle")}</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {toggles.map(([key, label, desc]) => (
             <div key={key} className="rounded-md border border-border bg-background p-2.5">
@@ -102,7 +104,7 @@ export function QuestionSequencePanel({
       </div>
       <div className="flex items-center gap-3">
         <Button onClick={publish} disabled={isPublishing || result.length === 0} className="gap-1.5 font-semibold">
-          <Send className="h-4 w-4" /> {isPublishing ? "배포 중..." : "⑤ 학생에게 배포"}
+          <Send className="h-4 w-4" /> {isPublishing ? t("publishing") : t("publishBtn")}
         </Button>
         {msg && <span className="text-sm text-muted-foreground">{msg}</span>}
       </div>

@@ -35,7 +35,6 @@ import {
   normalizeCognitiveType,
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
-import { formatBulkAiSummary, validatePreviewAnswers } from "@/lib/questions";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -122,6 +121,8 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 export default function QuestionsPage() {
   const tPages = useTranslations("pages");
   const tCls = useTranslations("classification");
+  const t = useTranslations("teacherQ");
+  const tc = useTranslations("common");
   const [questions, setQuestions] = useState<Question[]>([]);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -257,7 +258,7 @@ export default function QuestionsPage() {
   const confirm = useConfirm();
 
   const handleDeleteDeploy = async (sessionId: string) => {
-    if (!(await confirm({ description: "이 세션의 배포한 탐구설계를 삭제할까요? 학생이 남긴 좋아요·댓글도 함께 삭제됩니다.", confirmText: "삭제", destructive: true }))) return;
+    if (!(await confirm({ description: t("deleteDeployConfirm"), confirmText: tc("delete"), destructive: true }))) return;
     setDeletingDeployId(sessionId);
     try {
       const res = await fetch(`/api/sessions/${sessionId}/publish-questions`, {
@@ -269,7 +270,7 @@ export default function QuestionsPage() {
       if (editDeploySessionId === sessionId) setEditDeploySessionId(null);
       await reloadSessions();
     } catch {
-      toast({ variant: "destructive", description: "삭제에 실패했습니다" });
+      toast({ variant: "destructive", description: t("deleteFailed") });
     } finally {
       setDeletingDeployId(null);
     }
@@ -355,9 +356,9 @@ export default function QuestionsPage() {
           if (!res.ok) throw new Error(data.error);
           const q = questions.find((q) => q.id === id);
           const authorInfo = [
-            q?.author.grade && `${q.author.grade}학년`,
-            q?.author.className && `${q.author.className}반`,
-            q?.author.studentNumber && `${q.author.studentNumber}번`,
+            q?.author.grade && t("gradeLabel", { grade: q.author.grade }),
+            q?.author.className && t("classLabel", { className: q.author.className }),
+            q?.author.studentNumber && t("numberLabel", { studentNumber: q.author.studentNumber }),
           ].filter(Boolean).join(" ");
           return {
             questionId: id,
@@ -381,7 +382,7 @@ export default function QuestionsPage() {
         .map((r) => r.value);
 
       if (previews.length === 0) {
-        setBulkMsg({ type: "error", text: "AI 답변 생성에 실패했습니다. API 키를 확인해 주세요." });
+        setBulkMsg({ type: "error", text: t("aiAnswerFailedKey") });
       } else {
         const initial: Record<string, string> = {};
         previews.forEach((p) => { initial[p.questionId] = p.answer; });
@@ -390,12 +391,12 @@ export default function QuestionsPage() {
         if (previews.length < ids.length) {
           setBulkMsg({
             type: "error",
-            text: `${ids.length - previews.length}개 질문의 AI 답변 생성에 실패했습니다`,
+            text: t("aiAnswerPartialFail", { count: ids.length - previews.length }),
           });
         }
       }
     } catch (err) {
-      setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "AI 답변 생성에 실패했습니다" });
+      setBulkMsg({ type: "error", text: err instanceof Error ? err.message : t("aiAnswerFailed") });
     } finally {
       setIsGeneratingPreviews(false);
     }
@@ -404,11 +405,13 @@ export default function QuestionsPage() {
   // 2단계: 교사 확인 후 댓글로 전송
   const handleConfirmBulkAi = async () => {
     if (!bulkPreviews || bulkPreviews.length === 0) return;
-    const validationError = validatePreviewAnswers(
-      bulkPreviews.map((p) => ({ questionId: p.questionId, answer: editedAnswers[p.questionId] ?? p.answer }))
-    );
-    if (validationError) {
-      setBulkMsg({ type: "error", text: validationError });
+    const answerTexts = bulkPreviews.map((p) => editedAnswers[p.questionId] ?? p.answer);
+    if (answerTexts.length === 0) {
+      setBulkMsg({ type: "error", text: t("noAnswers") });
+      return;
+    }
+    if (answerTexts.some((a) => !a.trim())) {
+      setBulkMsg({ type: "error", text: t("emptyAnswers") });
       return;
     }
     setIsSendingPreviews(true);
@@ -422,13 +425,13 @@ export default function QuestionsPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ content: answer }),
           });
-          if (!res.ok) throw new Error("전송 실패");
+          if (!res.ok) throw new Error(t("sendFailed"));
         })
       );
       const success = results.filter((r) => r.status === "fulfilled").length;
       setBulkPreviews(null);
       setEditedAnswers({});
-      setBulkMsg({ type: "success", text: formatBulkAiSummary(success, bulkPreviews.length) });
+      setBulkMsg({ type: "success", text: bulkPreviews.length - success === 0 ? t("bulkSentAll", { count: success }) : t("bulkSentPartial", { success, failed: bulkPreviews.length - success }) });
       setShowBulkSuccess(true);
       window.setTimeout(() => {
         setSelectedIds(new Set());
@@ -437,7 +440,7 @@ export default function QuestionsPage() {
         fetchQuestions(selectedSessionId);
       }, 2000);
     } catch (err) {
-      setBulkMsg({ type: "error", text: err instanceof Error ? err.message : "전송에 실패했습니다" });
+      setBulkMsg({ type: "error", text: err instanceof Error ? err.message : t("sendFailedMsg") });
     } finally {
       setIsSendingPreviews(false);
     }
@@ -453,7 +456,7 @@ export default function QuestionsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ closure: correctionClosure, cognitive: correctionCognitive }),
       });
-      if (!patchRes.ok) throw new Error("분류 수정에 실패했습니다");
+      if (!patchRes.ok) throw new Error(t("classifyUpdateFailed"));
 
       if (comment.trim()) {
         const commentRes = await fetch(`/api/questions/${selectedQuestion.id}/comments`, {
@@ -461,14 +464,14 @@ export default function QuestionsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: comment.trim() }),
         });
-        if (!commentRes.ok) throw new Error("코멘트 저장에 실패했습니다");
+        if (!commentRes.ok) throw new Error(t("commentSaveFailed"));
       }
 
       setSelectedQuestion(null);
       setComment("");
       fetchQuestions(selectedSessionId);
     } catch (err) {
-      setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : "저장에 실패했습니다" });
+      setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : t("saveFailedMsg") });
     } finally {
       setIsSavingCorrection(false);
     }
@@ -485,7 +488,7 @@ export default function QuestionsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isPublic: nextPublic }),
       });
-      if (!res.ok) throw new Error("공개 여부 수정 실패");
+      if (!res.ok) throw new Error(t("publicUpdateFailed"));
     } catch {
       setQuestions((prev) =>
         prev.map((q) => (q.id === question.id ? { ...q, isPublic: question.isPublic } : q))
@@ -494,14 +497,14 @@ export default function QuestionsPage() {
   };
 
   const handleDeleteQuestion = async (question: Question) => {
-    if (!(await confirm({ description: `'${question.author.name}' 학생의 질문을 삭제하시겠습니까?\n연결된 댓글도 함께 삭제되며 되돌릴 수 없습니다.`, confirmText: "삭제", destructive: true }))) return;
+    if (!(await confirm({ description: t("deleteQuestionConfirm", { name: question.author.name }), confirmText: tc("delete"), destructive: true }))) return;
     try {
       const res = await fetch(`/api/questions/${question.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setQuestions((prev) => prev.filter((q) => q.id !== question.id));
       if (selectedQuestion?.id === question.id) setSelectedQuestion(null);
     } catch {
-      toast({ variant: "destructive", description: "삭제에 실패했습니다" });
+      toast({ variant: "destructive", description: t("deleteFailed") });
     }
   };
 
@@ -515,7 +518,7 @@ export default function QuestionsPage() {
       if (!res.ok) throw new Error();
       setQuestions((prev) => prev.map((q) => (q.id === question.id ? { ...q, flagged: false } : q)));
     } catch {
-      toast({ variant: "destructive", description: "처리에 실패했습니다" });
+      toast({ variant: "destructive", description: t("processFailed") });
     }
   };
 
@@ -531,11 +534,11 @@ export default function QuestionsPage() {
         body: JSON.stringify({}),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "AI 세션 분석에 실패했습니다");
+      if (!res.ok) throw new Error(data.error ?? t("sessionAnalysisFailed"));
       setSessionAnalysis(data as SessionAnalysis);
     } catch (err) {
       setSessionAnalysis(null);
-      setSessionAnalysisError(err instanceof Error ? err.message : "AI 세션 분석에 실패했습니다");
+      setSessionAnalysisError(err instanceof Error ? err.message : t("sessionAnalysisFailed"));
     } finally {
       setIsAnalyzingSession(false);
     }
@@ -547,7 +550,7 @@ export default function QuestionsPage() {
     try {
       const res = await fetch(`/api/sessions/${selectedSessionId}/participation`);
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "참여 현황 조회 실패");
+      if (!res.ok) throw new Error(data.error ?? t("participationFailed"));
       setParticipation(data as ParticipationData);
       setShowParticipation(true);
     } catch (err) {
@@ -593,7 +596,7 @@ export default function QuestionsPage() {
   const QuestionTable = ({ list }: { list: Question[] }) => {
     const allChecked = list.length > 0 && list.every((q) => selectedIds.has(q.id));
     return list.length === 0 ? (
-      <EmptyState icon="🔍" title="해당하는 질문이 없습니다" />
+      <EmptyState icon="🔍" title={t("noQuestions")} />
     ) : (
       <div className="overflow-x-auto"><Table>
         <TableHeader>
@@ -606,14 +609,14 @@ export default function QuestionsPage() {
                 className="h-4 w-4 rounded border-input accent-indigo-600"
               />
             </TableHead>
-            <TableHead>학생</TableHead>
-            <TableHead>질문 내용</TableHead>
-            <TableHead className="w-20">폐쇄/개방</TableHead>
-            <TableHead className="w-24">인지 수준</TableHead>
-            <TableHead className="w-16 text-center">좋아요</TableHead>
-            <TableHead className="w-16 text-center">댓글</TableHead>
-            <TableHead className="w-20">공개</TableHead>
-            <TableHead className="w-28">관리</TableHead>
+            <TableHead>{t("colStudent")}</TableHead>
+            <TableHead>{t("colContent")}</TableHead>
+            <TableHead className="w-20">{t("colClosure")}</TableHead>
+            <TableHead className="w-24">{t("colCognitive")}</TableHead>
+            <TableHead className="w-16 text-center">{t("colLikes")}</TableHead>
+            <TableHead className="w-16 text-center">{t("colComments")}</TableHead>
+            <TableHead className="w-20">{t("colPublic")}</TableHead>
+            <TableHead className="w-28">{t("colManage")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -632,8 +635,11 @@ export default function QuestionsPage() {
                 <div className="text-sm font-medium">{q.author.name}</div>
                 {q.author.className && (
                   <div className="text-xs text-muted-foreground">
-                    {q.author.grade && `${q.author.grade}학년 `}{q.author.className}반
-                    {q.author.studentNumber && ` ${q.author.studentNumber}번`}
+                    {[
+                      q.author.grade && t("gradeLabel", { grade: q.author.grade }),
+                      q.author.className && t("classLabel", { className: q.author.className }),
+                      q.author.studentNumber && t("numberLabel", { studentNumber: q.author.studentNumber }),
+                    ].filter(Boolean).join(" ")}
                   </div>
                 )}
               </TableCell>
@@ -641,14 +647,14 @@ export default function QuestionsPage() {
                 {q.flagged && (
                   <div className="mb-1.5 flex items-center gap-2 flex-wrap">
                     <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                      ⚠️ {q.flagReason || "부적절 의심"}
+                      ⚠️ {q.flagReason || t("flagSuspected")}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleClearFlag(q)}
                       className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800"
                     >
-                      ✓ 이상없음
+                      {t("clearFlag")}
                     </button>
                   </div>
                 )}
@@ -672,7 +678,7 @@ export default function QuestionsPage() {
                   </span>
                   {(q.likedBy?.length ?? 0) > 0 && (
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-36 shadow-lg">
-                      <p className="font-semibold mb-1">좋아요한 학생</p>
+                      <p className="font-semibold mb-1">{t("likedByStudents")}</p>
                       {q.likedBy!.map((u) => (
                         <p key={u.id} className="truncate">{u.name}</p>
                       ))}
@@ -685,7 +691,7 @@ export default function QuestionsPage() {
                   type="button"
                   onClick={() => setExpandedCommentId((prev) => (prev === q.id ? null : q.id))}
                   className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800"
-                  title="댓글 보기·작성"
+                  title={t("commentTooltip")}
                 >
                   💬 {commentCountOverride[q.id] ?? q.comments?.length ?? 0}
                 </button>
@@ -707,7 +713,7 @@ export default function QuestionsPage() {
                       setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
                     }}
                   >
-                    수정
+                    {tc("edit")}
                   </Button>
                   <Button
                     variant="outline"
@@ -715,7 +721,7 @@ export default function QuestionsPage() {
                     className="text-red-500 border-red-200 hover:bg-red-50"
                     onClick={() => handleDeleteQuestion(q)}
                   >
-                    삭제
+                    {tc("delete")}
                   </Button>
                 </div>
               </TableCell>
@@ -750,14 +756,14 @@ export default function QuestionsPage() {
           onClick={() => setTopTab("questions")}
           className={`px-4 py-2 text-sm font-medium transition-colors ${topTab === "questions" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
         >
-          📋 질문 조회
+          {t("tabQuestions")}
         </button>
         <button
           type="button"
           onClick={() => setTopTab("review")}
           className={`px-4 py-2 text-sm font-medium border-l transition-colors ${topTab === "review" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
         >
-          🎯 AI 추천 포인트
+          {t("tabReview")}
         </button>
       </div>
 
@@ -768,50 +774,50 @@ export default function QuestionsPage() {
       {/* 수업 세션 선택: 날짜·교과·주제로 좁혀서 단일 세션 선택 */}
       {sessions.length === 0 ? (
         <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          등록된 수업 세션이 없습니다. 수업 세션을 먼저 추가해 주세요.
+          {t("noSessions")}
         </div>
       ) : (
         <div className="rounded-lg border border-border bg-muted/40 p-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 w-36">
-              <label className="text-xs font-medium text-muted-foreground">날짜</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("date")}</label>
               <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 날짜</SelectItem>
+                  <SelectItem value="__all__">{t("allDates")}</SelectItem>
                   {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-32">
-              <label className="text-xs font-medium text-muted-foreground">교과</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("subject")}</label>
               <Select value={filterSubject || "__all__"} onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder={t("all")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 교과</SelectItem>
+                  <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
                   {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-52">
-              <label className="text-xs font-medium text-muted-foreground">주제</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("topic")}</label>
               <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder={t("all")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 주제</SelectItem>
+                  <SelectItem value="__all__">{t("allTopics")}</SelectItem>
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label className="text-xs font-medium text-muted-foreground">수업 세션</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("classSession")}</label>
               {filteredSessions.length === 0 ? (
-                <div className="h-8 flex items-center text-sm text-muted-foreground">조건에 맞는 수업 세션이 없습니다</div>
+                <div className="h-8 flex items-center text-sm text-muted-foreground">{t("noMatchingSession")}</div>
               ) : (
                 <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                  <SelectTrigger className="bg-card font-medium"><SelectValue placeholder="수업 세션 선택" /></SelectTrigger>
+                  <SelectTrigger className="bg-card font-medium"><SelectValue placeholder={t("selectSession")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">전체 수업 세션</SelectItem>
+                    <SelectItem value="all">{t("allSessions")}</SelectItem>
                     {filteredSessions.map((s) => (
                       <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
                     ))}
@@ -820,7 +826,7 @@ export default function QuestionsPage() {
               )}
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">💡 날짜·교과·주제로 좁혀도, 직접 수업 세션을 골라도 결과는 같습니다.</p>
+          <p className="text-xs text-muted-foreground mt-2">{t("filterHint")}</p>
         </div>
       )}
 
@@ -829,7 +835,7 @@ export default function QuestionsPage() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">학생 참여 현황</CardTitle>
+              <CardTitle className="text-base">{t("participationTitle")}</CardTitle>
               <Button
                 variant="outline"
                 size="sm"
@@ -837,7 +843,7 @@ export default function QuestionsPage() {
                 disabled={isLoadingParticipation}
                 className="text-xs"
               >
-                {isLoadingParticipation ? "조회 중..." : showParticipation ? "접기" : "참여 현황 조회"}
+                {isLoadingParticipation ? t("loadingShort") : showParticipation ? t("collapse") : t("loadParticipation")}
               </Button>
             </div>
           </CardHeader>
@@ -846,7 +852,7 @@ export default function QuestionsPage() {
               <div className="flex items-center gap-3 mb-4">
                 <span className="text-sm text-muted-foreground">
                   <span className="font-semibold text-green-700 dark:text-green-400">{participation.submittedCount}</span>
-                  /{participation.totalStudents}명 제출
+                  {t("submittedSuffix", { total: participation.totalStudents })}
                 </span>
                 <div className="flex rounded-md border border-border overflow-hidden ml-auto">
                   {(["all", "submitted", "not-submitted"] as const).map((f, i) => (
@@ -861,7 +867,7 @@ export default function QuestionsPage() {
                           : "bg-background text-muted-foreground hover:bg-muted"
                       }`}
                     >
-                      {f === "all" ? "전체" : f === "submitted" ? "제출" : "미제출"}
+                      {f === "all" ? t("all") : f === "submitted" ? t("submitted") : t("notSubmitted")}
                     </button>
                   ))}
                 </div>
@@ -870,12 +876,12 @@ export default function QuestionsPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground w-24">학년·반·번호</th>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">학생</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">질문 작성</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">댓글 작성</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">좋아요</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-14">제출</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground w-24">{t("colGradeClassNo")}</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">{t("colStudent")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">{t("colWroteQuestion")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">{t("colWroteComment")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">{t("colLikes")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-14">{t("colSubmit")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -891,9 +897,9 @@ export default function QuestionsPage() {
                         <tr key={s.id} className={s.hasQuestion ? "bg-background" : "bg-muted/40"}>
                           <td className="px-3 py-2 text-xs text-muted-foreground">
                             {[
-                              s.grade && `${s.grade}학년`,
-                              s.className && `${s.className}반`,
-                              s.studentNumber && `${s.studentNumber}번`,
+                              s.grade && t("gradeLabel", { grade: s.grade }),
+                              s.className && t("classLabel", { className: s.className }),
+                              s.studentNumber && t("numberLabel", { studentNumber: s.studentNumber }),
                             ]
                               .filter(Boolean)
                               .join(" ")}
@@ -924,7 +930,7 @@ export default function QuestionsPage() {
                     ? s.hasQuestion
                     : !s.hasQuestion
                 ).length === 0 && (
-                  <EmptyState icon="🧑‍🎓" title={participationFilter === "submitted" ? "제출한 학생이 없습니다" : "미제출 학생이 없습니다"} />
+                  <EmptyState icon="🧑‍🎓" title={participationFilter === "submitted" ? t("emptySubmitted") : t("emptyNotSubmitted")} />
                 )}
               </div>
             </CardContent>
@@ -937,7 +943,7 @@ export default function QuestionsPage() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">AI 세션 분석</CardTitle>
+              <CardTitle className="text-base">{t("sessionAnalysisTitle")}</CardTitle>
               <Button
                 type="button"
                 variant="outline"
@@ -946,7 +952,7 @@ export default function QuestionsPage() {
                 onClick={handleAnalyzeSession}
                 className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
               >
-                {isAnalyzingSession ? "분석 중..." : "✦ 분석하기"}
+                {isAnalyzingSession ? t("analyzing") : t("analyze")}
               </Button>
             </div>
           </CardHeader>
@@ -957,9 +963,9 @@ export default function QuestionsPage() {
               ) : sessionAnalysis ? (
                 <>
                   <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">질문 {sessionAnalysis.totalQuestions}개</span>
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">좋아요 {sessionAnalysis.totalLikes ?? 0}개</span>
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">댓글 {sessionAnalysis.totalComments ?? 0}개</span>
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: sessionAnalysis.totalQuestions })}</span>
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statLikes", { count: sessionAnalysis.totalLikes ?? 0 })}</span>
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statComments", { count: sessionAnalysis.totalComments ?? 0 })}</span>
                   </div>
                   <div className="rounded-lg bg-muted p-4 text-sm leading-6 text-foreground">{sessionAnalysis.summary}</div>
                   <div className="flex flex-wrap gap-2">
@@ -969,41 +975,41 @@ export default function QuestionsPage() {
                   </div>
                   {sessionAnalysis.balanceInsights && (
                     <div className="rounded-lg bg-violet-50 p-4 dark:bg-violet-950/30">
-                      <p className="text-xs font-semibold text-violet-800 dark:text-violet-300">⚖️ 질문 유형 균형 진단</p>
+                      <p className="text-xs font-semibold text-violet-800 dark:text-violet-300">{t("balanceTitle")}</p>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-violet-950 dark:text-violet-100">{sessionAnalysis.balanceInsights}</p>
                     </div>
                   )}
                   {sessionAnalysis.bestQuestion && (
                     <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950/30">
-                      <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-300">⭐ 베스트 질문</p>
+                      <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-300">{t("bestTitle")}</p>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-yellow-950 dark:text-yellow-100">{sessionAnalysis.bestQuestion}</p>
                     </div>
                   )}
                   <div className="rounded-lg bg-amber-50 p-4 dark:bg-amber-950/30">
-                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">교사 시사점</p>
+                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">{t("insightsTitle")}</p>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950 dark:text-amber-100">{sessionAnalysis.insights}</p>
                   </div>
                   {sessionAnalysis.nextQuestions && (
                     <div className="rounded-lg bg-indigo-50 p-4 dark:bg-indigo-950/30">
-                      <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-300">➡️ 다음 수업 발문 제안</p>
+                      <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-300">{t("nextTitle")}</p>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-indigo-950 dark:text-indigo-100">{sessionAnalysis.nextQuestions}</p>
                     </div>
                   )}
                   {sessionAnalysis.engagementInsights && (
                     <div className="rounded-lg bg-rose-50 p-4 dark:bg-rose-950/30">
-                      <p className="text-xs font-semibold text-rose-800 dark:text-rose-300">❤️ 좋아요·참여 분석</p>
+                      <p className="text-xs font-semibold text-rose-800 dark:text-rose-300">{t("engagementTitle")}</p>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-rose-950 dark:text-rose-100">{sessionAnalysis.engagementInsights}</p>
                     </div>
                   )}
                   {sessionAnalysis.commentInsights && (
                     <div className="rounded-lg bg-emerald-50 p-4 dark:bg-emerald-950/30">
-                      <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">댓글 대화 분석</p>
+                      <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">{t("commentInsightsTitle")}</p>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950 dark:text-emerald-100">{sessionAnalysis.commentInsights}</p>
                     </div>
                   )}
                   {sessionAnalysis.relevanceInsights && (
                     <div className="rounded-lg bg-sky-50 p-4 dark:bg-sky-950/30">
-                      <p className="text-xs font-semibold text-sky-800 dark:text-sky-300">🎯 주제 연관성·성의 분석</p>
+                      <p className="text-xs font-semibold text-sky-800 dark:text-sky-300">{t("relevanceTitle")}</p>
                       <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-sky-950 dark:text-sky-100">{sessionAnalysis.relevanceInsights}</p>
                     </div>
                   )}
@@ -1019,7 +1025,7 @@ export default function QuestionsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
-              📊 질문 분류 통계 현황 <span className="text-xs font-normal text-muted-foreground">· 총 {filtered.length}개</span>
+              {t("statsTitle")} <span className="text-xs font-normal text-muted-foreground">{t("statsCountSuffix", { count: filtered.length })}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1085,9 +1091,9 @@ export default function QuestionsPage() {
       {hasQuestionList && (
         <div className="flex items-center gap-3 flex-wrap justify-between">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-semibold text-foreground">📝 전체 질문 목록 <span className="font-normal text-muted-foreground">총 {filtered.length}개</span></span>
+            <span className="text-sm font-semibold text-foreground">{t("listTitle")} <span className="font-normal text-muted-foreground">{t("listCountSuffix", { count: filtered.length })}</span></span>
             <Input
-              placeholder="질문 또는 이름으로 검색..."
+              placeholder={t("searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 text-sm w-56 bg-card"
@@ -1098,9 +1104,9 @@ export default function QuestionsPage() {
               className={`h-8 rounded-md border px-3 text-xs font-medium transition-colors ${
                 showFlaggedOnly ? "border-red-400 bg-red-500 text-white" : "bg-white text-red-600 border-red-200 hover:bg-red-50"
               }`}
-              title="AI·사전이 부적절로 의심한 질문·댓글만 모아 봅니다"
+              title={t("flaggedTooltip")}
             >
-              ⚠️ 부적절 의심만 {flaggedCount > 0 && `(${flaggedCount})`}
+              {t("flaggedOnly")} {flaggedCount > 0 && `(${flaggedCount})`}
             </button>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -1118,28 +1124,28 @@ export default function QuestionsPage() {
       )}
 
       {isLoading ? (
-        <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
+        <div className="text-center py-16 text-muted-foreground">{tc("loading")}</div>
       ) : !hasQuestionList ? (
-        <div className="text-center py-16 text-muted-foreground text-sm">수업 세션을 선택해 주세요</div>
+        <div className="text-center py-16 text-muted-foreground text-sm">{t("selectSessionPrompt")}</div>
       ) : (
         /* ── 전체 질문 목록: 분류1/분류2 필터 ── */
         <Card>
           <CardContent className="pt-4">
             {/* 분류 필터 칩 (통계 막대 클릭과 연동) */}
             <div className="flex flex-wrap items-center gap-1.5 mb-3">
-              <span className="text-xs text-muted-foreground mr-0.5">분류1</span>
-              {([["all", "전체"], ["closed", "폐쇄형"], ["open", "개방형"]] as const).map(([v, label]) => (
+              <span className="text-xs text-muted-foreground mr-0.5">{tCls("category1")}</span>
+              {(["all", "closed", "open"] as const).map((v) => (
                 <button key={v} type="button" onClick={() => setFilterClosure(v)}
-                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterClosure === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{label}</button>
+                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterClosure === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{v === "all" ? t("all") : tCls(`${v}.label`)}</button>
               ))}
-              <span className="text-xs text-muted-foreground mx-1">분류2</span>
-              {([["all", "전체"], ["factual", "사실적"], ["conceptual", "개념적"], ["controversial", "논쟁적"]] as const).map(([v, label]) => (
+              <span className="text-xs text-muted-foreground mx-1">{tCls("category2")}</span>
+              {(["all", "factual", "conceptual", "controversial"] as const).map((v) => (
                 <button key={v} type="button" onClick={() => setFilterCognitive(v)}
-                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterCognitive === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{label}</button>
+                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterCognitive === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{v === "all" ? t("all") : tCls(`${v}.label`)}</button>
               ))}
               {(filterClosure !== "all" || filterCognitive !== "all") && (
                 <button type="button" onClick={() => { setFilterClosure("all"); setFilterCognitive("all"); }}
-                  className="ml-1 text-xs font-medium text-indigo-600">초기화</button>
+                  className="ml-1 text-xs font-medium text-indigo-600">{tc("reset")}</button>
               )}
             </div>
             <QuestionTable list={displayed} />
@@ -1156,7 +1162,7 @@ export default function QuestionsPage() {
             className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight text-indigo-700 hover:text-indigo-800 transition-colors"
           >
             <span className="text-xl">🧩</span>
-            질문 중심 탐구설계
+            {t("sequenceTitle")}
             <span className="text-base text-indigo-400">{showSequence ? "▾" : "▸"}</span>
           </button>
           {showSequence && (
@@ -1186,11 +1192,11 @@ export default function QuestionsPage() {
           <div className="rounded-xl border bg-card p-4">
             <div className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight text-emerald-700">
               <span className="text-xl">📋</span>
-              배포한 탐구설계
-              <span className="text-sm font-semibold text-emerald-500">총 {deployed.length}개</span>
+              {t("deployedTitle")}
+              <span className="text-sm font-semibold text-emerald-500">{t("listCountSuffix", { count: deployed.length })}</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              수업세션별로 학생에게 배포한 탐구 질문 목록입니다. 수정 후 재배포하거나 삭제할 수 있어요.
+              {t("deployedDesc")}
             </p>
             <div className="mt-3 space-y-2">
               {deployed.map((s) => {
@@ -1203,11 +1209,11 @@ export default function QuestionsPage() {
                           {buildSessionLabel(s.date, s.subject, s.topic)}
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                          질문 {s.sharedQuestions?.length ?? 0}개
+                          {t("statQuestions", { count: s.sharedQuestions?.length ?? 0 })}
                           {" · "}
-                          {s.isActive ? "학생 활동 켜짐" : "학생 활동 꺼짐"}
-                          {" · 좋아요 "}{s.likesVisibleToPeers ? "공개" : "비공개"}
-                          {" · 댓글 "}{s.commentsVisibleToPeers ? "공개" : "비공개"}
+                          {s.isActive ? t("activeOn") : t("activeOff")}
+                          {t("likesByline", { v: s.likesVisibleToPeers ? t("publicWord") : t("privateWord") })}
+                          {t("commentsByline", { v: s.commentsVisibleToPeers ? t("publicWord") : t("privateWord") })}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -1216,7 +1222,7 @@ export default function QuestionsPage() {
                           size="sm"
                           onClick={() => setEditDeploySessionId(isEditing ? null : s.id)}
                         >
-                          {isEditing ? "닫기" : "수정"}
+                          {isEditing ? tc("close") : tc("edit")}
                         </Button>
                         <Button
                           variant="outline"
@@ -1225,7 +1231,7 @@ export default function QuestionsPage() {
                           disabled={deletingDeployId === s.id}
                           onClick={() => handleDeleteDeploy(s.id)}
                         >
-                          {deletingDeployId === s.id ? "삭제 중..." : "삭제"}
+                          {deletingDeployId === s.id ? t("deleting") : tc("delete")}
                         </Button>
                       </div>
                     </div>
@@ -1236,7 +1242,7 @@ export default function QuestionsPage() {
                           <li key={i} className="line-clamp-1">{q.content}</li>
                         ))}
                         {(s.sharedQuestions?.length ?? 0) > 5 && (
-                          <li className="list-none text-xs">…외 {(s.sharedQuestions?.length ?? 0) - 5}개</li>
+                          <li className="list-none text-xs">{t("moreCount", { count: (s.sharedQuestions?.length ?? 0) - 5 })}</li>
                         )}
                       </ol>
                     )}
@@ -1253,9 +1259,9 @@ export default function QuestionsPage() {
                             type: q.type || "student",
                             content: q.content,
                             source: q.source === "teacher" ? "teacher" : "student",
-                            contentGroup: q.contentGroup || "수업 순서",
+                            contentGroup: q.contentGroup || t("groupDefault"),
                             priority: q.priority ?? i + 1,
-                            lessonPhase: "탐구",
+                            lessonPhase: t("phaseDefault"),
                             rationale: "",
                           }))}
                           initialSettings={{
@@ -1278,8 +1284,8 @@ export default function QuestionsPage() {
 
       {currentSession && currentSession.unitDesignId && (
         <InquiryFlowGraph
-          title="탐구 질문 관계도"
-          description="선생님의 탐구 질문이 학생 질문으로 어떻게 이어졌는지 한눈에 확인합니다"
+          title={t("flowTitle")}
+          description={t("flowDesc")}
           subject={currentSession.subject}
           topic={currentSession.topic}
           sharedQuestions={Array.isArray(currentSession.sharedQuestions) ? currentSession.sharedQuestions : []}
@@ -1298,49 +1304,49 @@ export default function QuestionsPage() {
       <Dialog open={!!selectedQuestion} onOpenChange={() => setSelectedQuestion(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>질문 분류 수정</DialogTitle>
+            <DialogTitle>{t("editDialogTitle")}</DialogTitle>
           </DialogHeader>
           {selectedQuestion && (
             <div className="space-y-4">
               <div className="p-4 bg-muted/40 rounded-lg">
-                <p className="font-medium">질문 내용</p>
+                <p className="font-medium">{t("questionContentLabel")}</p>
                 <p className="mt-1 text-foreground">{selectedQuestion.content}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  작성자: {selectedQuestion.author.name}
+                  {t("authorPrefix")}{selectedQuestion.author.name}
                   {selectedQuestion.author.className && ` (${selectedQuestion.author.className})`}
                 </p>
                 {selectedQuestion.session && (
                   <p className="text-xs text-indigo-600 mt-1">
-                    수업 세션: {buildSessionLabel(selectedQuestion.session.date, selectedQuestion.session.subject, selectedQuestion.session.topic)}
+                    {t("sessionPrefix")}{buildSessionLabel(selectedQuestion.session.date, selectedQuestion.session.subject, selectedQuestion.session.topic)}
                   </p>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>폐쇄형 / 개방형</Label>
+                  <Label>{tCls("closure")}</Label>
                   <Select value={correctionClosure} onValueChange={setCorrectionClosure}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="closed">폐쇄형 질문</SelectItem>
-                      <SelectItem value="open">개방형 질문</SelectItem>
+                      <SelectItem value="closed">{t("closedOption")}</SelectItem>
+                      <SelectItem value="open">{t("openOption")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>인지적 수준</Label>
+                  <Label>{t("cognitiveLevel")}</Label>
                   <Select value={correctionCognitive} onValueChange={setCorrectionCognitive}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="factual">사실적 질문</SelectItem>
-                      <SelectItem value="conceptual">개념적 질문</SelectItem>
-                      <SelectItem value="controversial">논쟁적 질문</SelectItem>
+                      <SelectItem value="factual">{t("factualOption")}</SelectItem>
+                      <SelectItem value="conceptual">{t("conceptualOption")}</SelectItem>
+                      <SelectItem value="controversial">{t("controversialOption")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>댓글 (선택)</Label>
+                  <Label>{t("commentOptional")}</Label>
                   <Button
                     variant="outline"
                     size="sm"
@@ -1355,18 +1361,18 @@ export default function QuestionsPage() {
                         if (!res.ok) throw new Error(data.error);
                         setComment(data.answer);
                       } catch (err) {
-                        setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : "AI 답변 생성 실패" });
+                        setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : t("aiAnswerFailedGen") });
                       } finally {
                         setIsGeneratingAi(false);
                       }
                     }}
                     className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 text-xs h-7"
                   >
-                    {isGeneratingAi ? "AI 생성 중..." : "✦ AI 답변 생성"}
+                    {isGeneratingAi ? t("aiGenerating") : t("aiGenerate")}
                   </Button>
                 </div>
                 <Textarea
-                  placeholder="학생에게 댓글을 남겨보세요... (AI 답변 생성 후 편집 가능)"
+                  placeholder={t("commentPlaceholder")}
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   rows={3}
@@ -1380,9 +1386,9 @@ export default function QuestionsPage() {
             </p>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setSelectedQuestion(null); setCorrectionMsg(null); }}>취소</Button>
+            <Button variant="outline" onClick={() => { setSelectedQuestion(null); setCorrectionMsg(null); }}>{tc("cancel")}</Button>
             <Button onClick={handleSaveCorrection} disabled={isSavingCorrection}>
-              {isSavingCorrection ? "저장 중..." : "저장"}
+              {isSavingCorrection ? t("saving") : tc("save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1392,20 +1398,20 @@ export default function QuestionsPage() {
       <Dialog open={!!bulkPreviews} onOpenChange={() => { if (!isSendingPreviews) { setBulkPreviews(null); setEditedAnswers({}); } }}>
         <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>AI 개별 답변 미리보기 및 확인</DialogTitle>
+            <DialogTitle>{t("previewDialogTitle")}</DialogTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              각 학생의 질문에 맞게 AI가 생성한 답변입니다. 내용을 검토하고 필요시 수정 후 전송하세요.
+              {t("previewDialogDesc")}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-                답변 준비 {bulkPreviewReady}/{bulkPreviewTotal}
+                {t("previewReady", { ready: bulkPreviewReady, total: bulkPreviewTotal })}
               </span>
               <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                전송 대기 {bulkPreviewTotal}개
+                {t("previewPending", { total: bulkPreviewTotal })}
               </span>
               {bulkPreviewOverLimit > 0 && (
                 <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
-                  150자 초과 {bulkPreviewOverLimit}개
+                  {t("previewOverLimit", { count: bulkPreviewOverLimit })}
                 </span>
               )}
             </div>
@@ -1434,13 +1440,13 @@ export default function QuestionsPage() {
                   </div>
                   <div className="px-4 py-3">
                     <div className="mb-1.5 flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold text-indigo-600">AI 생성 답변 (수정 가능)</p>
+                      <p className="text-xs font-semibold text-indigo-600">{t("aiGeneratedAnswer")}</p>
                       <span
                         className={`text-xs font-medium ${
                           answerLength > 150 ? "text-amber-700" : "text-muted-foreground"
                         }`}
                       >
-                        {answerLength}/150자
+                        {t("charCount", { n: answerLength })}
                       </span>
                     </div>
                     <Textarea
@@ -1466,7 +1472,7 @@ export default function QuestionsPage() {
               onClick={() => { setBulkPreviews(null); setEditedAnswers({}); setBulkMsg(null); }}
               disabled={isSendingPreviews}
             >
-              취소
+              {tc("cancel")}
             </Button>
             <Button
               onClick={handleConfirmBulkAi}
@@ -1474,8 +1480,8 @@ export default function QuestionsPage() {
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               {isSendingPreviews
-                ? "전송 중..."
-                : `${bulkPreviews?.length ?? 0}개 답변 전송`}
+                ? t("sending")
+                : t("sendCount", { count: bulkPreviews?.length ?? 0 })}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1491,8 +1497,8 @@ export default function QuestionsPage() {
                   {selectedIds.size}
                 </span>
                 <div>
-                  <p className="text-sm font-semibold text-white">AI 개별 맞춤 답변 전송</p>
-                  <p className="text-xs text-indigo-100">각 학생의 질문을 AI가 분석하여 개별 맞춤 답변을 동시에 생성하고 댓글로 전송합니다</p>
+                  <p className="text-sm font-semibold text-white">{t("bulkPanelTitle")}</p>
+                  <p className="text-xs text-indigo-100">{t("bulkPanelDesc")}</p>
                 </div>
               </div>
               <button
@@ -1500,7 +1506,7 @@ export default function QuestionsPage() {
                 disabled={isGeneratingPreviews || isSendingPreviews}
                 className="self-start rounded-md px-2 py-1 text-xs font-medium text-indigo-100 underline-offset-4 hover:bg-white/10 hover:text-white hover:underline disabled:opacity-40 sm:self-auto"
               >
-                선택 해제
+                {t("deselect")}
               </button>
             </div>
 
@@ -1516,7 +1522,7 @@ export default function QuestionsPage() {
               ))}
               {hiddenPreviewCount > 0 && (
                 <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
-                  +{hiddenPreviewCount}개
+                  {t("plusCount", { count: hiddenPreviewCount })}
                 </span>
               )}
             </div>
@@ -1532,10 +1538,10 @@ export default function QuestionsPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
                   </svg>
-                  AI 답변 생성 중... ({selectedIds.size}개 질문 분석 중)
+                  {t("aiGeneratingBulk", { count: selectedIds.size })}
                 </span>
               ) : (
-                `✦ AI 개별 답변 미리보기 (${selectedIds.size}개)`
+                t("aiPreviewBtn", { count: selectedIds.size })
               )}
             </Button>
 

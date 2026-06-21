@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ function bonusLabel(bt: string): { label: string; emoji: string; color: string }
 }
 
 export function PointReviewView() {
+  const t = useTranslations("pointReview");
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("all");
   const [pending, setPending] = useState<PendingLog[]>([]);
@@ -68,7 +70,7 @@ export function PointReviewView() {
 
   async function runAnalyze() {
     if (selectedSessionId === "all") {
-      setMessage("분석할 세션을 선택해주세요");
+      setMessage(t("selectSessionFirst"));
       return;
     }
     setBusy(true); setMessage(null);
@@ -80,12 +82,12 @@ export function PointReviewView() {
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage(`🤖 AI 분석 완료: ${data.createdPending}개 후보 생성 (질문 ${data.questionCount} · 답변 ${data.commentCount})`);
+        setMessage(t("analyzeDone", { created: data.createdPending, questions: data.questionCount, comments: data.commentCount }));
         loadPending();
       } else {
-        setMessage(data.error || "분석 실패");
+        setMessage(data.error || t("analyzeFailed"));
       }
-    } catch { setMessage("네트워크 오류"); }
+    } catch { setMessage(t("networkError")); }
     finally { setBusy(false); }
   }
 
@@ -99,7 +101,7 @@ export function PointReviewView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: targetIds, decision }),
       });
-      setMessage(`${targetIds.length}건 ${decision === "APPROVE" ? "승인" : "거부"}됨`);
+      setMessage(decision === "APPROVE" ? t("resultApproved", { count: targetIds.length }) : t("resultRejected", { count: targetIds.length }));
       loadPending();
     } catch {} finally { setBusy(false); }
   }
@@ -112,7 +114,7 @@ export function PointReviewView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [logId], decision: "APPROVE", overridePoints: points }),
       });
-      setMessage(`점수 ${points}점으로 수정 후 승인`);
+      setMessage(t("overrideApproved", { points }));
       loadPending();
     } catch {} finally { setBusy(false); }
   }
@@ -128,19 +130,19 @@ export function PointReviewView() {
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        학생의 질문·답변을 AI가 채점한 후보를 확인하고 승인하세요. 최종 결정은 선생님께 있어요.
+        {t("intro")}
       </p>
 
       {/* 세션 선택 + 분석 실행 */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">분석할 수업세션 선택</CardTitle>
-          <CardDescription>세션을 고르고 [AI 채점] 버튼을 누르면 학생 활동을 분석합니다.</CardDescription>
+          <CardTitle className="text-base">{t("selectTitle")}</CardTitle>
+          <CardDescription>{t("selectDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <select className="border rounded-md px-3 py-2 text-sm bg-card w-full"
             value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)}>
-            <option value="all">전체 (대기 중인 후보만 표시)</option>
+            <option value="all">{t("allPendingOnly")}</option>
             {sessions.map((s) => (
               <option key={s.id} value={s.id}>
                 {buildSessionLabel(s.date, s.subject, s.topic)}
@@ -152,9 +154,9 @@ export function PointReviewView() {
               onClick={runAnalyze}
               disabled={busy || selectedSessionId === "all"}
               className="flex-1">
-              {busy ? "AI 분석 중..." : "🤖 AI 채점 실행"}
+              {busy ? t("analyzing") : t("runAnalyze")}
             </Button>
-            <Button variant="outline" onClick={loadPending}>새로고침</Button>
+            <Button variant="outline" onClick={loadPending}>{t("refresh")}</Button>
           </div>
           {message && (
             <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl px-3 py-2 text-sm">
@@ -169,10 +171,10 @@ export function PointReviewView() {
         <Card className="border-red-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2 text-red-700">
-              ⚠️ 중복 가능성 ({duplicateRows.length})
+              {t("duplicateTitle", { count: duplicateRows.length })}
             </CardTitle>
             <CardDescription className="text-red-600 text-xs">
-              학생이 다른 작성물과 거의 동일한 내용을 작성했어요. 베끼기 또는 중복일 가능성을 검토하세요.
+              {t("duplicateDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -193,26 +195,26 @@ export function PointReviewView() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">추천 보너스 · 총 {normalRows.length}개</CardTitle>
+            <CardTitle className="text-base">{t("recommendedTitle", { count: normalRows.length })}</CardTitle>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={toggleAll} disabled={normalRows.length === 0}>
-                {selected.size === pending.length ? "선택 해제" : "전체 선택"}
+                {selected.size === pending.length ? t("deselectAll") : t("selectAll")}
               </Button>
               <Button size="sm" onClick={() => decide("APPROVE")}
                 disabled={selected.size === 0 || busy}>
-                ✅ 선택 승인 ({selected.size})
+                {t("approveSelected", { count: selected.size })}
               </Button>
               <Button size="sm" variant="outline" onClick={() => decide("REJECT")}
                 disabled={selected.size === 0 || busy}
                 className="text-red-500 border-red-200 hover:bg-red-50">
-                거부
+                {t("reject")}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {normalRows.length === 0 ? (
-            <EmptyState icon="✅" title="대기 중인 보너스가 없어요" />
+            <EmptyState icon="✅" title={t("noPending")} />
           ) : normalRows.map((p) => (
             <PendingRow key={p.id} p={p} selected={selected.has(p.id)}
               onToggle={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
@@ -238,10 +240,11 @@ function PendingRow({
   override: number | undefined;
   setOverride: (v: number) => void;
 }) {
+  const t = useTranslations("pointReview");
   const b = bonusLabel(p.bonusType);
   const isDup = p.bonusType.includes("DUPLICATE");
   const content = p.commentContent || p.questionContent;
-  const targetLabel = p.relatedQuestionId ? "질문" : "답변";
+  const targetLabel = p.relatedQuestionId ? t("targetQuestion") : t("targetAnswer");
   return (
     <div className={`rounded-xl border border-border p-3 space-y-2 ${selected ? "bg-indigo-50 dark:bg-indigo-950/40" : "bg-card"}`}>
       <div className="flex items-start gap-3">
@@ -249,11 +252,11 @@ function PendingRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-foreground text-sm">{p.studentName}</span>
-            <span className="text-xs text-muted-foreground">{p.grade}학년 {p.className}반</span>
+            <span className="text-xs text-muted-foreground">{t("gradeClass", { grade: p.grade ?? "", className: p.className ?? "" })}</span>
             <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
               style={{ background: b.color }}>
               {b.emoji} {b.label}
-              {!isDup && <span className="ml-1">+{p.points}점</span>}
+              {!isDup && <span className="ml-1">{t("pointsSuffix", { points: p.points })}</span>}
             </span>
             {p.relatedQuestionId && p.questionLikeCount != null && (
               <span className="text-xs font-medium text-rose-500">❤️ {p.questionLikeCount}</span>
@@ -261,18 +264,18 @@ function PendingRow({
             {/* 중복 지급 방지 안내: 같은 작성물/세션에서 이미 승인된 포인트 */}
             {p.alreadyForTarget > 0 && (
               <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                ⚠️ 이 {targetLabel}으로 이미 +{p.alreadyForTarget}점
+                {t("alreadyForTarget", { target: targetLabel, points: p.alreadyForTarget })}
               </span>
             )}
             {p.alreadyForTarget === 0 && p.alreadyInSession > 0 && (
               <span className="text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                이 수업세션 누적 +{p.alreadyInSession}점
+                {t("alreadyInSession", { points: p.alreadyInSession })}
               </span>
             )}
           </div>
           <div className="mt-1.5 text-xs">
             <span className="text-muted-foreground">{targetLabel}: </span>
-            <span className="text-foreground">{content || "(내용 없음)"}</span>
+            <span className="text-foreground">{content || t("noContent")}</span>
           </div>
           {p.reason && (
             <div className="mt-1 text-xs text-muted-foreground bg-muted/40 rounded px-2 py-1">
@@ -288,22 +291,22 @@ function PendingRow({
               type="number"
               value={override ?? ""}
               onChange={(e) => setOverride(parseInt(e.target.value) || 0)}
-              placeholder={`수정: ${p.points}`}
+              placeholder={t("overridePlaceholder", { points: p.points })}
               className="h-7 w-24 text-xs"
             />
             <Button size="sm" variant="outline" className="h-7 text-xs"
               disabled={!override}
               onClick={() => onOverride(override!)}>
-              수정 후 승인
+              {t("overrideApprove")}
             </Button>
           </>
         )}
         <Button size="sm" className="h-7 text-xs" onClick={() => onDecideOne("APPROVE")}>
-          승인
+          {t("approve")}
         </Button>
         <Button size="sm" variant="outline" className="h-7 text-xs text-red-500 border-red-200 hover:bg-red-50"
           onClick={() => onDecideOne("REJECT")}>
-          거부
+          {t("reject")}
         </Button>
       </div>
     </div>
