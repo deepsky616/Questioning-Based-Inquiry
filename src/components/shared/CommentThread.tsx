@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth-helpers";
@@ -38,6 +39,8 @@ export function CommentThread({
 }) {
   const { data: session } = useSession();
   const user = getSessionUser(session);
+  const t = useTranslations("comment");
+  const tc = useTranslations("common");
   const [comments, setComments] = useState<ThreadComment[]>(preloaded ?? []);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(!preloaded);
@@ -115,14 +118,14 @@ export function CommentThread({
       setEditingId(null);
       setEditText("");
     } catch {
-      toast({ variant: "destructive", description: "댓글 수정에 실패했습니다" });
+      toast({ variant: "destructive", description: t("editFailed") });
     }
   };
 
   const confirm = useConfirm();
 
   const deleteComment = async (commentId: string) => {
-    if (!(await confirm({ description: "이 댓글을 삭제하시겠습니까?", confirmText: "삭제", destructive: true }))) return;
+    if (!(await confirm({ description: t("deleteConfirm"), confirmText: tc("delete"), destructive: true }))) return;
     try {
       const res = await fetch(`/api/questions/${questionId}/comments/${commentId}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
@@ -132,18 +135,18 @@ export function CommentThread({
         return next;
       });
     } catch {
-      toast({ variant: "destructive", description: "댓글 삭제에 실패했습니다" });
+      toast({ variant: "destructive", description: t("deleteFailed") });
     }
   };
 
   if (isLoading) {
-    return <div className="text-sm text-muted-foreground">댓글 불러오는 중...</div>;
+    return <div className="text-sm text-muted-foreground">{t("loading")}</div>;
   }
 
   return (
     <div className="space-y-3">
       {comments.length === 0 ? (
-        <p className="text-sm text-muted-foreground">아직 댓글이 없습니다</p>
+        <p className="text-sm text-muted-foreground">{t("empty")}</p>
       ) : (
         <div className="space-y-2">
           {comments.map((c) => {
@@ -156,7 +159,7 @@ export function CommentThread({
                   <span className="text-sm font-medium text-foreground">{c.author.name}</span>
                   {c.flagged && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                      ⚠️ {c.flagReason || "부적절 의심"}
+                      ⚠️ {c.flagReason || t("flagSuspected")}
                     </span>
                   )}
                 </div>
@@ -176,8 +179,8 @@ export function CommentThread({
                     className="h-8 text-sm"
                     autoFocus
                   />
-                  <Button size="sm" onClick={() => saveEdit(c.id)} disabled={!editText.trim()} className="h-8 shrink-0">저장</Button>
-                  <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditText(""); }} className="h-8 shrink-0">취소</Button>
+                  <Button size="sm" onClick={() => saveEdit(c.id)} disabled={!editText.trim()} className="h-8 shrink-0">{tc("save")}</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditText(""); }} className="h-8 shrink-0">{tc("cancel")}</Button>
                 </div>
               ) : (
                 <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{c.content}</p>
@@ -186,17 +189,17 @@ export function CommentThread({
                 <div className="mt-1.5 flex items-center gap-3">
                   {isMine && (
                     <button type="button" onClick={() => { setEditingId(c.id); setEditText(c.content); }} className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800">
-                      ✏️ 수정
+                      {t("edit")}
                     </button>
                   )}
                   {canModerate && c.flagged && (
                     <button type="button" onClick={() => clearFlag(c.id)} className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800">
-                      ✓ 이상없음
+                      {t("clearFlag")}
                     </button>
                   )}
                   {(isMine || canModerate) && (
                     <button type="button" onClick={() => deleteComment(c.id)} className="text-[11px] font-medium text-red-500 hover:text-red-700">
-                      🗑 삭제
+                      {t("delete")}
                     </button>
                   )}
                 </div>
@@ -209,7 +212,7 @@ export function CommentThread({
       {user.id && (
         <div className="flex gap-2">
           <Input
-            placeholder="댓글을 입력하세요..."
+            placeholder={t("placeholder")}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
@@ -221,7 +224,7 @@ export function CommentThread({
             className="h-8 text-sm"
           />
           <Button size="sm" onClick={submit} disabled={isPosting || !text.trim()} className="h-8 shrink-0">
-            {isPosting ? "..." : "등록"}
+            {isPosting ? "..." : t("post")}
           </Button>
         </div>
       )}

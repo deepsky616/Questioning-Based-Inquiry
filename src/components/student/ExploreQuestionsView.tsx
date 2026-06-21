@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, compareByStudent, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
@@ -60,6 +61,7 @@ function LikeButton({
 }) {
   const { data: session } = useSession();
   const user = getSessionUser(session);
+  const t = useTranslations("explore");
   const [isPending, setIsPending] = useState(false);
 
   const isSelf = user.id === authorId;
@@ -84,7 +86,7 @@ function LikeButton({
     <button
       onClick={handleClick}
       disabled={isSelf || isPending || !user.id}
-      title={isSelf ? "자신의 질문에는 좋아요를 할 수 없습니다" : myLike ? "좋아요 취소" : "좋아요"}
+      title={isSelf ? t("likeSelfDisabled") : myLike ? t("unlike") : t("like")}
       className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
         myLike
           ? "bg-rose-100 text-rose-600 hover:bg-rose-200"
@@ -110,6 +112,7 @@ function QuestionCard({
   likesEnabled: boolean;
   commentsEnabled: boolean;
 }) {
+  const t = useTranslations("explore");
   const [showComments, setShowComments] = useState(false);
   const [commentCount, setCommentCount] = useState(q.commentCount ?? 0);
   const isTeacherShared = q.source === "TEACHER_SHARED";
@@ -134,11 +137,11 @@ function QuestionCard({
           <div className="flex gap-2 mb-2 flex-wrap items-center">
             {isTeacherShared ? (
               <span className="text-xs font-bold px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
-                📌 단원설계 질문
+                {t("unitDesignBadge")}
               </span>
             ) : (
               <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-500/30">
-                ✏️ 학생 질문
+                {t("studentBadge")}
               </span>
             )}
             {isTeacherShared && q.inquiryType && (
@@ -152,7 +155,7 @@ function QuestionCard({
           </p>
           {isTeacherShared && commentsEnabled && (
             <div className="mt-2 rounded-md bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
-              ✍️ 선생님의 탐구 질문이에요. 아래 <b>답변하기</b>를 눌러 내 생각을 댓글로 남겨보세요!
+              {t.rich("teacherInquiryNotice", { b: (chunks) => <b>{chunks}</b> })}
             </div>
           )}
           <div className="flex gap-2 mt-2 flex-wrap items-center">
@@ -176,13 +179,15 @@ function QuestionCard({
         <div className="flex flex-col items-end gap-2 shrink-0">
           <div className="text-right">
             <div className="text-sm text-muted-foreground">
-              {isTeacherShared ? `${q.author.name} 선생님` : q.author.name}
+              {isTeacherShared ? t("teacherName", { name: q.author.name }) : q.author.name}
             </div>
             {!isTeacherShared && (q.author.grade || q.author.className || q.author.studentNumber) && (
               <div className="text-xs text-muted-foreground">
-                {q.author.grade && `${q.author.grade}학년 `}
-                {q.author.className && `${q.author.className}반`}
-                {q.author.studentNumber && ` ${q.author.studentNumber}번`}
+                {[
+                  q.author.grade && t("gradeLabel", { grade: q.author.grade }),
+                  q.author.className && t("classLabel", { className: q.author.className }),
+                  q.author.studentNumber && t("numberLabel", { studentNumber: q.author.studentNumber }),
+                ].filter(Boolean).join(" ")}
               </div>
             )}
             <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(q.createdAt)}</div>
@@ -197,7 +202,7 @@ function QuestionCard({
               }`}
             >
               <span>💬 {commentCount}</span>
-              <span>{showComments ? "닫기" : isTeacherShared ? "답변하기" : "댓글"}</span>
+              <span>{showComments ? t("close") : isTeacherShared ? t("answer") : t("comment")}</span>
             </button>
           )}
         </div>
@@ -212,6 +217,7 @@ function QuestionCard({
 }
 
 export function ExploreQuestionsView() {
+  const t = useTranslations("explore");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("all");
@@ -302,7 +308,7 @@ export function ExploreQuestionsView() {
   const displayed = applyClassificationFilter(filtered, filterClosure, filterCognitive);
 
   const Empty = () => (
-    <EmptyState icon="🔍" title={search ? "검색 결과가 없습니다" : "해당하는 질문이 없습니다"} description="조건을 바꾸거나 검색어를 지워보세요" />
+    <EmptyState icon="🔍" title={search ? t("emptySearch") : t("emptyNone")} description={t("emptyDesc")} />
   );
 
   const QuestionList = ({ list }: { list: Question[] }) =>
@@ -318,58 +324,58 @@ export function ExploreQuestionsView() {
     );
 
   if (isLoading) {
-    return <div className="text-center py-16 text-muted-foreground">로딩 중...</div>;
+    return <div className="text-center py-16 text-muted-foreground">{t("loading")}</div>;
   }
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        다른 학생들의 질문을 살펴보고 좋아요·댓글을 남겨보세요 · 공개 {questions.length}개
+        {t("intro", { count: questions.length })}
       </p>
 
       {/* 조회 방법: 날짜·교과·주제로 좁혀 세션 선택 (교사 페이지와 동일) */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">조회 방법</CardTitle>
+          <CardTitle className="text-base">{t("filterHeader")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 w-36">
-              <label className="text-xs font-medium text-muted-foreground">날짜</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("date")}</label>
               <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 날짜</SelectItem>
+                  <SelectItem value="__all__">{t("allDates")}</SelectItem>
                   {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-32">
-              <label className="text-xs font-medium text-muted-foreground">교과</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("subject")}</label>
               <Select value={filterSubject || "__all__"} onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={t("all")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 교과</SelectItem>
+                  <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
                   {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-52">
-              <label className="text-xs font-medium text-muted-foreground">주제</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("topic")}</label>
               <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={t("all")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 주제</SelectItem>
+                  <SelectItem value="__all__">{t("allTopics")}</SelectItem>
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label className="text-xs font-medium text-muted-foreground">수업 세션</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("classSession")}</label>
               <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                <SelectTrigger className="bg-background font-medium"><SelectValue placeholder="수업 세션 선택" /></SelectTrigger>
+                <SelectTrigger className="bg-background font-medium"><SelectValue placeholder={t("selectSession")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">전체 수업 세션</SelectItem>
+                  <SelectItem value="all">{t("allSessions")}</SelectItem>
                   {filteredSessions.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
                   ))}
@@ -377,14 +383,14 @@ export function ExploreQuestionsView() {
               </Select>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">💡 날짜·교과·주제로 좁혀도, 직접 수업 세션을 골라도 결과는 같습니다.</p>
+          <p className="text-xs text-muted-foreground mt-2">{t("filterHint")}</p>
         </CardContent>
       </Card>
 
       {selectedSession?.unitDesignId && (
         <InquiryFlowGraph
-          title="탐구 질문 관계도"
-          description="선생님의 탐구 질문과 친구들의 공개 질문 흐름을 함께 봅니다"
+          title={t("flowTitle")}
+          description={t("flowDesc")}
           subject={selectedSession.subject}
           topic={selectedSession.topic}
           sharedQuestions={
@@ -410,11 +416,11 @@ export function ExploreQuestionsView() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 flex-wrap">
               <CardTitle className="text-base">
-                📝 전체 질문 목록{" "}
-                <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
+                {t("listTitle")}{" "}
+                <span className="text-sm font-normal text-muted-foreground">{t("countItems", { count: displayed.length })}</span>
               </CardTitle>
               <Input
-                placeholder="질문 또는 이름으로 검색..."
+                placeholder={t("searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 text-sm w-56 bg-background"

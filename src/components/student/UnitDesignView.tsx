@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
@@ -34,13 +35,6 @@ interface Published {
   commentCount: number;
   myLike: boolean;
 }
-
-const TYPE_LABEL: Record<string, string> = {
-  factual: "사실",
-  conceptual: "개념",
-  controversial: "논쟁",
-  student: "학생",
-};
 
 const TYPE_STYLE: Record<string, string> = {
   factual: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30",
@@ -83,6 +77,14 @@ function LikeButton({
 }
 
 export function UnitDesignView() {
+  const t = useTranslations("unitDesign");
+  const TYPE_KEY: Record<string, string> = {
+    factual: "typeFactual",
+    conceptual: "typeConceptual",
+    controversial: "typeControversial",
+    student: "typeStudent",
+  };
+  const typeLabel = (type: string) => (TYPE_KEY[type] ? t(TYPE_KEY[type]) : type);
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState("");
@@ -137,22 +139,22 @@ export function UnitDesignView() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">선생님이 배포한 탐구 질문에 좋아요·댓글로 참여해 보세요</p>
+      <p className="text-sm text-muted-foreground">{t("intro")}</p>
 
       {isLoading ? (
-        <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
+        <div className="text-center py-16 text-muted-foreground">{t("loading")}</div>
       ) : sessions.length === 0 ? (
         <Card>
           <CardContent className="p-0">
-            <EmptyState icon="📚" title="배포된 수업 탐구 질문이 없습니다" description="선생님이 수업 탐구 질문을 배포하면 여기에 표시됩니다" />
+            <EmptyState icon="📚" title={t("emptyTitle")} description={t("emptyDesc")} />
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">날짜 · 교과 · 단원/주제</CardTitle>
-              <CardDescription>확인할 단원설계를 선택하세요</CardDescription>
+              <CardTitle className="text-base">{t("listTitle")}</CardTitle>
+              <CardDescription>{t("listDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
               {sessions.map((session) => (
@@ -171,8 +173,8 @@ export function UnitDesignView() {
                         {buildSessionLabel(session.date, session.subject, session.topic)}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {session.sharedQuestions?.length ?? 0}개 질문
-                        {session.teacher?.name ? ` · ${session.teacher.name} 선생님` : ""}
+                        {t("questionCount", { count: session.sharedQuestions?.length ?? 0 })}
+                        {session.teacher?.name ? t("teacherByline", { name: session.teacher.name }) : ""}
                       </p>
                     </div>
                   </div>
@@ -187,9 +189,9 @@ export function UnitDesignView() {
                 <CardTitle className="text-base">
                   {selectedSession
                     ? buildSessionLabel(selectedSession.date, selectedSession.subject, selectedSession.topic)
-                    : "단원설계"}
+                    : t("fallbackTitle")}
                 </CardTitle>
-                <CardDescription>수업에서 다룰 질문 순서입니다. 질문에 좋아요·댓글로 참여해 보세요.</CardDescription>
+                <CardDescription>{t("detailDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -204,7 +206,7 @@ export function UnitDesignView() {
                           <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className={`rounded-full border px-2 py-0.5 text-xs ${TYPE_STYLE[question.type] ?? TYPE_STYLE.student}`}>
-                                {TYPE_LABEL[question.type] ?? question.type}
+                                {typeLabel(question.type)}
                               </span>
                               {question.contentGroup && (
                                 <span className="rounded-full border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-300">
@@ -235,7 +237,7 @@ export function UnitDesignView() {
                                   className="flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
                                 >
                                   <span>💬 {pub.commentCount}</span>
-                                  <span>{expandedId === pub.id ? "닫기" : "댓글"}</span>
+                                  <span>{expandedId === pub.id ? t("close") : t("comment")}</span>
                                 </button>
                               </div>
                             )}
@@ -256,8 +258,8 @@ export function UnitDesignView() {
             {grouped.length > 1 && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">내용별 묶음</CardTitle>
-                  <CardDescription>비슷한 질문끼리 정리된 결과입니다</CardDescription>
+                  <CardTitle className="text-base">{t("groupTitle")}</CardTitle>
+                  <CardDescription>{t("groupDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-3 md:grid-cols-2">
@@ -265,7 +267,7 @@ export function UnitDesignView() {
                       <div key={group} className="rounded-lg border bg-white p-3 dark:bg-card">
                         <div className="mb-2 flex items-center justify-between gap-2">
                           <h3 className="text-sm font-semibold text-foreground">{group}</h3>
-                          <span className="text-xs text-muted-foreground">총 {questions.length}개</span>
+                          <span className="text-xs text-muted-foreground">{t("groupCount", { count: questions.length })}</span>
                         </div>
                         <ul className="space-y-1 text-xs text-muted-foreground">
                           {questions.map((question, index) => (
