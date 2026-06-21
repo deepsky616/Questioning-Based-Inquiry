@@ -7,6 +7,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/shared/theme-provider";
+import { useTranslations } from "next-intl";
 import type { ReportRange, SeriesPoint, ReportTotals } from "@/lib/report-stats";
 import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -61,15 +62,15 @@ const RECEIVED: { key: keyof SeriesPoint; label: string; color: string }[] = [
   { key: "likesReceived", label: "받은 좋아요", color: "#f59e0b" },
   { key: "commentsReceived", label: "받은 댓글", color: "#8b5cf6" },
 ];
-// 분류 추세(누적 막대) — 분류1/분류2를 기간별로 쌓는다. 색은 분류 통계 카드와 동일.
-const CLOSURE_TREND: { key: keyof SeriesPoint; label: string; color: string }[] = [
-  { key: "closed", label: "폐쇄형", color: "#3b82f6" },
-  { key: "open", label: "개방형", color: "#10b981" },
+// 분류 추세(누적 막대) — 분류1/분류2를 기간별로 쌓는다. 라벨은 classification 카탈로그(key)로 해석.
+const CLOSURE_TREND: { key: keyof SeriesPoint; labelKey: string; color: string }[] = [
+  { key: "closed", labelKey: "closed", color: "#3b82f6" },
+  { key: "open", labelKey: "open", color: "#10b981" },
 ];
-const COGNITIVE_TREND: { key: keyof SeriesPoint; label: string; color: string }[] = [
-  { key: "factual", label: "사실적", color: "#94a3b8" },
-  { key: "conceptual", label: "개념적", color: "#a855f7" },
-  { key: "controversial", label: "논쟁적", color: "#f97316" },
+const COGNITIVE_TREND: { key: keyof SeriesPoint; labelKey: string; color: string }[] = [
+  { key: "factual", labelKey: "factual", color: "#94a3b8" },
+  { key: "conceptual", labelKey: "conceptual", color: "#a855f7" },
+  { key: "controversial", labelKey: "controversial", color: "#f97316" },
 ];
 
 function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
@@ -108,6 +109,7 @@ export function ReportView({
 }: ReportViewProps) {
   const [range, setRange] = useState<ReportRange>("week");
   const series = range === "week" ? weekly : monthly;
+  const tCls = useTranslations("classification");
 
   // 차트 색은 테마에 맞춰(다크 모드에서 그리드·축 라벨·툴팁 가독성 확보)
   const { theme } = useTheme();
@@ -126,11 +128,11 @@ export function ReportView({
   const tooltipText = dark ? "#e5e7eb" : "#111827";
 
   const classData = [
-    { name: "폐쇄형", value: classification.closure.closed, fill: "#3b82f6" },
-    { name: "개방형", value: classification.closure.open, fill: "#10b981" },
-    { name: "사실적", value: classification.cognitive.factual, fill: "#94a3b8" },
-    { name: "개념적", value: classification.cognitive.conceptual, fill: "#a855f7" },
-    { name: "논쟁적", value: classification.cognitive.controversial, fill: "#f97316" },
+    { name: tCls("closed.label"), value: classification.closure.closed, fill: "#3b82f6" },
+    { name: tCls("open.label"), value: classification.closure.open, fill: "#10b981" },
+    { name: tCls("factual.label"), value: classification.cognitive.factual, fill: "#94a3b8" },
+    { name: tCls("conceptual.label"), value: classification.cognitive.conceptual, fill: "#a855f7" },
+    { name: tCls("controversial.label"), value: classification.cognitive.controversial, fill: "#f97316" },
   ];
 
   // ── 수업세션별 AI 분석 (기간 필터 + 전체 분석) ──
@@ -264,35 +266,35 @@ export function ReportView({
 
       {/* 분류 안내 (분류 차트 공통 참조) — 색 점은 차트 색과 동일 */}
       <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">📚 질문 분류 안내</p>
+        <p className="mb-3 text-sm font-bold text-foreground">📚 {tCls("guideTitle")}</p>
         <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
           <div>
-            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">분류1 · 질문의 형태</p>
+            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{tCls("category1")} · {tCls("category1Sub")}</p>
             <ul className="space-y-1 text-xs text-foreground">
               <li className="flex items-start gap-2">
                 <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#3b82f6" }} />
-                <span><b className="font-semibold">폐쇄형</b> <span className="text-muted-foreground">정답이 하나로 정해진 질문</span></span>
+                <span><b className="font-semibold">{tCls("closed.label")}</b> <span className="text-muted-foreground">{tCls("closed.desc")}</span></span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#10b981" }} />
-                <span><b className="font-semibold">개방형</b> <span className="text-muted-foreground">여러 답이 나올 수 있는 질문</span></span>
+                <span><b className="font-semibold">{tCls("open.label")}</b> <span className="text-muted-foreground">{tCls("open.desc")}</span></span>
               </li>
             </ul>
           </div>
           <div>
-            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">분류2 · 생각의 깊이</p>
+            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{tCls("category2")} · {tCls("category2Sub")}</p>
             <ul className="space-y-1 text-xs text-foreground">
               <li className="flex items-start gap-2">
                 <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#94a3b8" }} />
-                <span><b className="font-semibold">사실적</b> <span className="text-muted-foreground">사실이나 정보를 확인하는 질문</span></span>
+                <span><b className="font-semibold">{tCls("factual.label")}</b> <span className="text-muted-foreground">{tCls("factual.desc")}</span></span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#a855f7" }} />
-                <span><b className="font-semibold">개념적</b> <span className="text-muted-foreground">원리와 이유를 생각하는 질문</span></span>
+                <span><b className="font-semibold">{tCls("conceptual.label")}</b> <span className="text-muted-foreground">{tCls("conceptual.desc")}</span></span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#f97316" }} />
-                <span><b className="font-semibold">논쟁적</b> <span className="text-muted-foreground">내 생각·판단이 필요한 질문</span></span>
+                <span><b className="font-semibold">{tCls("controversial.label")}</b> <span className="text-muted-foreground">{tCls("controversial.desc")}</span></span>
               </li>
             </ul>
           </div>
@@ -326,7 +328,7 @@ export function ReportView({
             <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {CLOSURE_TREND.map((m) => (
-              <Bar key={m.key} dataKey={m.key} name={m.label} stackId="closure" fill={m.color} />
+              <Bar key={m.key} dataKey={m.key} name={tCls(`${m.labelKey}.label`)} stackId="closure" fill={m.color} />
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -343,7 +345,7 @@ export function ReportView({
             <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {COGNITIVE_TREND.map((m) => (
-              <Bar key={m.key} dataKey={m.key} name={m.label} stackId="cognitive" fill={m.color} />
+              <Bar key={m.key} dataKey={m.key} name={tCls(`${m.labelKey}.label`)} stackId="cognitive" fill={m.color} />
             ))}
           </BarChart>
         </ResponsiveContainer>
