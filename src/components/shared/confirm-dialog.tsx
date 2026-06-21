@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +25,7 @@ export function useConfirm(): ConfirmFn {
 }
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [opts, setOpts] = useState<ConfirmOptions>({});
   const resolver = useRef<((v: boolean) => void) | null>(null);
@@ -48,20 +50,20 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       <Dialog open={open} onOpenChange={(o) => { if (!o) settle(false); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{opts.title ?? "확인"}</DialogTitle>
+            <DialogTitle>{opts.title ?? tc("confirm")}</DialogTitle>
             {opts.description && (
               <DialogDescription className="whitespace-pre-line">{opts.description}</DialogDescription>
             )}
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => settle(false)}>
-              {opts.cancelText ?? "취소"}
+              {opts.cancelText ?? tc("cancel")}
             </Button>
             <Button
               variant={opts.destructive ? "destructive" : "default"}
               onClick={() => settle(true)}
             >
-              {opts.confirmText ?? "확인"}
+              {opts.confirmText ?? tc("confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

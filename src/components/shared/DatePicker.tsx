@@ -1,21 +1,24 @@
 "use client";
 import { useState } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
-export default function DatePicker({ value, onChange, placeholder = "날짜 선택" }: {
+export default function DatePicker({ value, onChange, placeholder }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
+  const t = useTranslations("chrome");
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
 
   const selected = value ? new Date(value + "T00:00:00") : undefined;
 
   const displayLabel = selected
-    ? `${selected.getFullYear()}년 ${selected.getMonth() + 1}월 ${selected.getDate()}일`
-    : placeholder;
+    ? selected.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" })
+    : (placeholder ?? t("pickDate"));
 
   const handleSelect = (date: Date | undefined) => {
     if (!date) { onChange(""); setOpen(false); return; }
@@ -49,7 +52,7 @@ export default function DatePicker({ value, onChange, placeholder = "날짜 선�
               className="text-xs text-muted-foreground hover:text-muted-foreground"
               onClick={() => { onChange(""); setOpen(false); }}
             >
-              선택 초기화
+              {t("clearDate")}
             </button>
           </div>
         )}

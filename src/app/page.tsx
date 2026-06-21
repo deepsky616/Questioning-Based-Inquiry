@@ -2,9 +2,11 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 export default function Home() {
   const router = useRouter();
+  const t = useTranslations("appShell");
 
   useEffect(() => {
     router.push("/login");
@@ -22,7 +24,7 @@ export default function Home() {
         </div>
         <div className="text-center">
           <p className="text-lg font-bold text-foreground">Question Lab</p>
-          <p className="text-xs text-muted-foreground">질문기반 탐구수업</p>
+          <p className="text-xs text-muted-foreground">{t("tagline")}</p>
         </div>
         <span className="mt-1 h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-primary" />
       </div>

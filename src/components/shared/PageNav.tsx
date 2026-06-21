@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 
 interface PageNavProps {
@@ -9,6 +10,7 @@ interface PageNavProps {
 }
 
 export function PageNav({ pages }: PageNavProps) {
+  const t = useTranslations("chrome");
   const pathname = usePathname();
   const currentIndex = pages.findIndex((p) => p.href === pathname);
   const home = pages[0];
@@ -22,7 +24,7 @@ export function PageNav({ pages }: PageNavProps) {
         {!isHome && (
           <Link href={home.href}>
             <Button variant="outline" size="sm">
-              🏠 홈
+              {t("navHome")}
             </Button>
           </Link>
         )}

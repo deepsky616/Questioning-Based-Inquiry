@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { AI_BONUS_TYPES, GAME_LABEL, BASE_POINTS, pointBonusLabel } from "@/lib/points-policy";
 import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
@@ -23,16 +24,16 @@ interface PointLog {
 interface LeaderboardMe { rank: number | null; totalPoints: number }
 interface LeaderboardResp { scope: string; me?: LeaderboardMe }
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string): { key: "justNow" | "minutesAgo" | "hoursAgo" | "daysAgo"; v: Record<string, number> } {
   const t = new Date(iso).getTime();
   const diff = Date.now() - t;
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "방금";
-  if (m < 60) return `${m}분 전`;
+  if (m < 1) return { key: "justNow" as const, v: {} };
+  if (m < 60) return { key: "minutesAgo" as const, v: { m } };
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}시간 전`;
+  if (h < 24) return { key: "hoursAgo" as const, v: { h } };
   const d = Math.floor(h / 24);
-  return `${d}일 전`;
+  return { key: "daysAgo" as const, v: { d } };
 }
 
 const bonusLabel = pointBonusLabel;
@@ -59,6 +60,7 @@ async function fetchPointsCard() {
 }
 
 export default function PointsCard() {
+  const t = useTranslations("points");
   const [showGuide, setShowGuide] = useState(false);
 
   // 폴링을 react-query로: 백그라운드 탭에선 자동 일시정지, 창 포커스 시 갱신
@@ -73,7 +75,7 @@ export default function PointsCard() {
   const ranks = data?.ranks ?? { class: null, school: null, all: null };
   const loaded = isSuccess;
 
-  const rankText = (v: number | null) => (v != null ? `${v}등` : "-");
+  const rankText = (v: number | null) => (v != null ? t("rank", { v }) : "-");
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -82,27 +84,27 @@ export default function PointsCard() {
         style={{ background: "linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)" }}>
         <span className="absolute top-2 right-3 text-3xl opacity-20">⭐</span>
         <span className="absolute bottom-2 left-3 text-2xl opacity-20">✨</span>
-        <p className="text-white/80 text-xs font-medium relative">내 포인트</p>
+        <p className="text-white/80 text-xs font-medium relative">{t("myPoints")}</p>
         <p className="text-5xl font-black mt-1 relative">{loaded ? totalPoints : "..."}</p>
         <div className="mt-3 relative flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/90">
-          <span>🏫 우리반 <b className="font-black">{rankText(ranks.class)}</b></span>
-          <span>🏫 교내 <b className="font-black">{rankText(ranks.school)}</b></span>
-          <span>🌐 전체 <b className="font-black">{rankText(ranks.all)}</b></span>
+          <span>{t("ourClass")} <b className="font-black">{rankText(ranks.class)}</b></span>
+          <span>{t("school")} <b className="font-black">{rankText(ranks.school)}</b></span>
+          <span>{t("all")} <b className="font-black">{rankText(ranks.all)}</b></span>
         </div>
         <button
           type="button"
           onClick={() => setShowGuide(true)}
           className="mt-3 relative inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white hover:bg-white/30 transition-colors"
         >
-          ❓ 포인트 획득 방법
+          {t("howToEarn")}
         </button>
       </div>
 
       {/* 최근 받은 포인트 */}
       <div className="md:col-span-2 rounded-2xl p-5 bg-card border border-border shadow-sm">
-        <h3 className="font-black text-foreground text-sm mb-3">📜 최근 받은 포인트</h3>
+        <h3 className="font-black text-foreground text-sm mb-3">{t("recentTitle")}</h3>
         {recent.length === 0 ? (
-          <EmptyState icon="⭐" title="아직 받은 포인트가 없어요" description="질문·댓글을 작성하거나 질문놀이에 참여해 보세요!" />
+          <EmptyState icon="⭐" title={t("emptyTitle")} description={t("emptyDesc")} />
         ) : (
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {recent.slice(0, 8).map((log) => {
@@ -126,15 +128,15 @@ export default function PointsCard() {
                   <div className="flex items-center gap-2 shrink-0">
                     {isPending && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                        선생님 승인 대기
+                        {t("pendingApproval")}
                       </span>
                     )}
                     {isRejected && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                        거부됨
+                        {t("rejected")}
                       </span>
                     )}
-                    <span className="text-muted-foreground text-xs w-12 text-right">{relativeTime(log.createdAt)}</span>
+                    <span className="text-muted-foreground text-xs w-12 text-right">{(() => { const r = relativeTime(log.createdAt); return t(r.key, r.v); })()}</span>
                     <span className={`font-black w-10 text-right ${
                       isPending ? "text-amber-500" : isRejected ? "text-muted-foreground" : "text-indigo-600"
                     }`}>
@@ -152,34 +154,34 @@ export default function PointsCard() {
       <Dialog open={showGuide} onOpenChange={setShowGuide}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>❓ 포인트는 이렇게 모아요</DialogTitle>
+            <DialogTitle>{t("guideTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm">
             <div className="rounded-lg border bg-card p-3">
-              <p className="font-semibold text-foreground">✏️ 질문·댓글 쓰기</p>
+              <p className="font-semibold text-foreground">{t("writeSection")}</p>
               <ul className="mt-1 space-y-0.5 text-muted-foreground">
-                <li>수업세션 질문 작성 <b className="text-indigo-600">+{ACTIVITY_BASE_POINTS.QUESTION_WRITE}점</b></li>
-                <li>친구 질문에 답변(댓글) 작성 <b className="text-indigo-600">+{ACTIVITY_BASE_POINTS.COMMENT_WRITE}점</b></li>
+                <li>{t("writeQuestion")} <b className="text-indigo-600">{t("pointsSuffix", { n: ACTIVITY_BASE_POINTS.QUESTION_WRITE })}</b></li>
+                <li>{t("writeComment")} <b className="text-indigo-600">{t("pointsSuffix", { n: ACTIVITY_BASE_POINTS.COMMENT_WRITE })}</b></li>
               </ul>
             </div>
             <div className="rounded-lg border bg-card p-3">
-              <p className="font-semibold text-foreground">🎮 질문놀이 게임</p>
+              <p className="font-semibold text-foreground">{t("gameSection")}</p>
               <ul className="mt-1 space-y-0.5 text-muted-foreground">
-                <li>게임 참여 <b className="text-indigo-600">+{BASE_POINTS.PARTICIPATION}점</b></li>
-                <li>좋은 질문 1개당 <b className="text-indigo-600">+{BASE_POINTS.PER_VALID_QUESTION}점</b></li>
-                <li>끝까지 완료 <b className="text-indigo-600">+{BASE_POINTS.COMPLETION}점</b></li>
-                <li>1등 우승 <b className="text-indigo-600">+{BASE_POINTS.WINNER_BONUS}점</b></li>
+                <li>{t("gamePlay")} <b className="text-indigo-600">{t("pointsSuffix", { n: BASE_POINTS.PARTICIPATION })}</b></li>
+                <li>{t("perQuestion")} <b className="text-indigo-600">{t("pointsSuffix", { n: BASE_POINTS.PER_VALID_QUESTION })}</b></li>
+                <li>{t("completion")} <b className="text-indigo-600">{t("pointsSuffix", { n: BASE_POINTS.COMPLETION })}</b></li>
+                <li>{t("winner")} <b className="text-indigo-600">{t("pointsSuffix", { n: BASE_POINTS.WINNER_BONUS })}</b></li>
               </ul>
-              <p className="mt-1 text-xs text-muted-foreground">※ 혼자·AI 모드는 점수가 조금 더 낮아요.</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("soloNote")}</p>
             </div>
             <div className="rounded-lg border bg-card p-3">
-              <p className="font-semibold text-foreground">🏆 선생님이 주는 특별상</p>
+              <p className="font-semibold text-foreground">{t("specialSection")}</p>
               <ul className="mt-1 space-y-0.5 text-muted-foreground">
                 {Object.values(AI_BONUS_TYPES).map((b) => (
-                  <li key={b.key}>{b.emoji} {b.label} <b className="text-indigo-600">+{b.points}점</b></li>
+                  <li key={b.key}>{b.emoji} {b.label} <b className="text-indigo-600">{t("pointsSuffix", { n: b.points })}</b></li>
                 ))}
               </ul>
-              <p className="mt-1 text-xs text-muted-foreground">※ 좋은 질문을 AI가 추천하면 선생님이 확인 후 줍니다.</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("aiNote")}</p>
             </div>
           </div>
         </DialogContent>

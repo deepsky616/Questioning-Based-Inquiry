@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import {
   buildInquiryGraphSummary,
   type InquiryGraphQuestion,
@@ -35,6 +36,7 @@ export function InquiryFlowGraph({
   studentQuestions,
   audience,
 }: InquiryFlowGraphProps) {
+  const t = useTranslations("flow");
   const summary = buildInquiryGraphSummary(sharedQuestions, studentQuestions);
   const hasSharedQuestions = summary.sharedQuestionCount > 0;
   const hasStudentQuestions = summary.studentQuestionCount > 0;
@@ -60,9 +62,9 @@ export function InquiryFlowGraph({
       <div className="grid gap-4 p-4 lg:grid-cols-[1fr_auto_1fr]">
         <div className="rounded-lg border border-border bg-muted/40 p-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground">선생님의 탐구 질문</p>
+            <p className="text-xs font-semibold text-muted-foreground">{t("teacherQuestions")}</p>
             <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
-              {summary.sharedQuestionCount}개
+              {t("countItems", { count: summary.sharedQuestionCount })}
             </span>
           </div>
           <div className="mt-3 space-y-2">
@@ -80,7 +82,7 @@ export function InquiryFlowGraph({
                 ))
             ) : (
               <p className="rounded-md border border-dashed border-input bg-card px-3 py-4 text-center text-xs text-muted-foreground">
-                연결된 탐구 질문이 없습니다
+                {t("noLinked")}
               </p>
             )}
           </div>
@@ -88,19 +90,19 @@ export function InquiryFlowGraph({
 
         <div className="flex items-center justify-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full border border-indigo-200 bg-white text-center text-xs font-semibold text-indigo-700 shadow-sm">
-            질문
+            {t("flowWord1")}
             <br />
-            흐름
+            {t("flowWord2")}
           </div>
         </div>
 
         <div className="rounded-lg border border-border bg-muted/40 p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-muted-foreground">
-              {audience === "teacher" ? "학생 질문 반응" : "공개 질문 흐름"}
+              {audience === "teacher" ? t("studentReactions") : t("publicFlow")}
             </p>
             <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-              {summary.studentQuestionCount}개
+              {t("countItems", { count: summary.studentQuestionCount })}
             </span>
           </div>
 
@@ -126,15 +128,15 @@ export function InquiryFlowGraph({
 
           <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
             <div className="rounded-md bg-card p-2 shadow-sm">
-              <p className="text-muted-foreground">열린 질문</p>
+              <p className="text-muted-foreground">{t("openQ")}</p>
               <p className="text-base font-bold text-green-700">{summary.byClosure.open}</p>
             </div>
             <div className="rounded-md bg-card p-2 shadow-sm">
-              <p className="text-muted-foreground">닫힌 질문</p>
+              <p className="text-muted-foreground">{t("closedQ")}</p>
               <p className="text-base font-bold text-blue-700">{summary.byClosure.closed}</p>
             </div>
             <div className="rounded-md bg-card p-2 shadow-sm">
-              <p className="text-muted-foreground">공개 질문</p>
+              <p className="text-muted-foreground">{t("publicQ")}</p>
               <p className="text-base font-bold text-indigo-700">{summary.publicQuestionCount}</p>
             </div>
           </div>

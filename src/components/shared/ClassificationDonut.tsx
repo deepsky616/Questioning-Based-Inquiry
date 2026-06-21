@@ -1,6 +1,7 @@
 "use client";
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { useTranslations } from "next-intl";
 
 export interface DonutSlice {
   name: string;
@@ -15,6 +16,7 @@ function DonutTooltip({ active, payload, total }: {
   payload?: Array<{ payload: DonutSlice }>;
   total?: number;
 }) {
+  const t = useTranslations("chart");
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   const pct = total ? Math.round((d.value / total) * 100) : 0;
@@ -23,7 +25,7 @@ function DonutTooltip({ active, payload, total }: {
       <span className="inline-flex items-center gap-1.5">
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.fill }} />
         <span className="font-semibold text-foreground">{d.name}</span>
-        <span className="text-muted-foreground">{d.value}개 ({pct}%)</span>
+        <span className="text-muted-foreground">{t("countPct", { value: d.value, pct })}</span>
       </span>
     </div>
   );
@@ -41,11 +43,12 @@ export function ClassificationDonut({
   slices: DonutSlice[];
   size?: number;
 }) {
+  const t = useTranslations("chart");
   const total = slices.reduce((sum, s) => sum + s.value, 0);
   const hasData = total > 0;
 
   // 값이 모두 0이면 recharts가 빈 차트를 그리므로, 옅은 트랙용 더미 데이터를 쓴다.
-  const data = hasData ? slices : [{ name: "없음", value: 1, fill: "transparent" }];
+  const data = hasData ? slices : [{ name: t("none"), value: 1, fill: "transparent" }];
 
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
@@ -82,7 +85,7 @@ export function ClassificationDonut({
       {/* 가운데 총계 */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span className="text-xl font-bold text-foreground leading-none">{total}</span>
-        <span className="text-[11px] text-muted-foreground mt-0.5">총 질문</span>
+        <span className="text-[11px] text-muted-foreground mt-0.5">{t("totalQuestions")}</span>
       </div>
     </div>
   );

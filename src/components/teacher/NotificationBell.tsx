@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { useTranslations } from "next-intl";
 
 const POLL_MS = 25000;
 
@@ -28,6 +29,7 @@ async function fetchPendingCount(): Promise<number> {
  * 성격이 달라 합산 숫자가 아니라 항목별로 구분해 보여준다. (부적절 증가 시 토스트 알림)
  */
 export function NotificationBell() {
+  const t = useTranslations("notify");
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const prevRef = useRef<number | null>(null);
@@ -55,12 +57,12 @@ export function NotificationBell() {
     if (flagged === undefined) return;
     if (prevRef.current !== null && flagged.total > prevRef.current) {
       const added = flagged.total - prevRef.current;
-      setToast(`⚠️ 부적절 의심 질문·댓글 ${added}건이 새로 감지됐어요`);
+      setToast(t("newFlagged", { added }));
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setToast(null), 6000);
     }
     prevRef.current = flagged.total;
-  }, [flagged]);
+  }, [flagged, t]);
 
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
@@ -70,7 +72,7 @@ export function NotificationBell() {
         <PopoverTrigger asChild>
           <button
             type="button"
-            title="알림"
+            title={t("title")}
             className="relative inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-muted"
           >
             <span className="text-lg">🔔</span>
@@ -86,9 +88,9 @@ export function NotificationBell() {
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-72 p-0">
-          <div className="border-b border-border px-3 py-2 text-sm font-semibold text-foreground">알림</div>
+          <div className="border-b border-border px-3 py-2 text-sm font-semibold text-foreground">{t("title")}</div>
           {total === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">새 알림이 없어요</p>
+            <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("empty")}</p>
           ) : (
             <div className="py-1">
               {flaggedCount > 0 && (
@@ -99,7 +101,7 @@ export function NotificationBell() {
                 >
                   <span className="text-lg">🚩</span>
                   <span className="flex-1 text-sm text-foreground">
-                    <b className="font-semibold text-red-600">부적절 의심</b> 질문·댓글
+                    {t.rich("flaggedItem", { b: (c) => <b className="font-semibold text-red-600">{c}</b> })}
                   </span>
                   <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:bg-red-950/40 dark:text-red-300">
                     {flaggedCount}
@@ -114,7 +116,7 @@ export function NotificationBell() {
                 >
                   <span className="text-lg">📝</span>
                   <span className="flex-1 text-sm text-foreground">
-                    <b className="font-semibold text-amber-600">AI 추천 검토</b> 대기
+                    {t.rich("pendingItem", { b: (c) => <b className="font-semibold text-amber-600">{c}</b> })}
                   </span>
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                     {pendingCount}
@@ -133,7 +135,7 @@ export function NotificationBell() {
           className="fixed bottom-5 right-5 z-50 block max-w-xs rounded-xl border border-red-200 bg-card px-4 py-3 text-left text-sm shadow-lg dark:border-red-500/40"
         >
           <p className="font-semibold text-red-600">{toast}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">눌러서 확인하기 →</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t("tapToView")}</p>
         </Link>
       )}
     </>

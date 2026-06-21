@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ interface StudentRow {
 }
 
 export function StudentPasswordResetCard({ embedded = false }: { embedded?: boolean } = {}) {
+  const t = useTranslations("account");
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [classKey, setClassKey] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -80,7 +82,7 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
     setMsg(null);
     const ids = Array.from(checked);
     if (ids.length === 0) {
-      setMsg({ type: "error", text: "비밀번호를 재설정할 학생을 선택하세요" });
+      setMsg({ type: "error", text: t("selectStudent") });
       return;
     }
     const policyError = validatePasswordPolicy(newPassword);
@@ -96,12 +98,12 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
         body: JSON.stringify({ studentIds: ids, newPassword }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "재설정에 실패했습니다");
-      setMsg({ type: "success", text: `${data.count}명의 비밀번호를 재설정했어요. 학생들에게 새 비밀번호를 알려주세요.` });
+      if (!res.ok) throw new Error(data.error || t("resetFailed"));
+      setMsg({ type: "success", text: t("resetDone", { count: data.count }) });
       setChecked(new Set());
       setNewPassword("");
     } catch (e) {
-      setMsg({ type: "error", text: e instanceof Error ? e.message : "재설정에 실패했습니다" });
+      setMsg({ type: "error", text: e instanceof Error ? e.message : t("resetFailed") });
     } finally {
       setSaving(false);
     }
@@ -110,17 +112,17 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
   const body = (
     <div className="space-y-4">
         {students.length === 0 ? (
-          <EmptyState icon="🧑‍🏫" title="담당 학생이 없습니다" />
+          <EmptyState icon="🧑‍🏫" title={t("noStudents")} />
         ) : (
           <>
             {classOptions.length > 1 && (
               <div className="space-y-2">
-                <Label>학급 선택</Label>
+                <Label>{t("selectClass")}</Label>
                 <Select value={classKey} onValueChange={setClassKey}>
-                  <SelectTrigger className="bg-background"><SelectValue placeholder="학급 선택" /></SelectTrigger>
+                  <SelectTrigger className="bg-background"><SelectValue placeholder={t("selectClass")} /></SelectTrigger>
                   <SelectContent>
                     {classOptions.map((c) => (
-                      <SelectItem key={c.key} value={c.key}>{c.grade}학년 {c.className}반</SelectItem>
+                      <SelectItem key={c.key} value={c.key}>{t("gradeClass", { grade: c.grade, className: c.className })}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -131,15 +133,15 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
               <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <input type="checkbox" checked={allChecked} onChange={toggleAll} />
-                  전체 선택
+                  {t("selectAll")}
                 </label>
-                <span className="text-xs text-muted-foreground">{checked.size}명 선택</span>
+                <span className="text-xs text-muted-foreground">{t("selectedCount", { count: checked.size })}</span>
               </div>
               <div className="max-h-56 overflow-y-auto divide-y">
                 {classStudents.map((s) => (
                   <label key={s.id} className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/40 cursor-pointer">
                     <input type="checkbox" checked={checked.has(s.id)} onChange={() => toggleOne(s.id)} />
-                    <span className="w-10 text-muted-foreground">{s.studentNumber || "-"}번</span>
+                    <span className="w-10 text-muted-foreground">{s.studentNumber ? t("numberSuffix", { n: s.studentNumber }) : "-"}</span>
                     <span className="font-medium text-foreground">{s.name}</span>
                   </label>
                 ))}
@@ -147,12 +149,12 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="resetPw">새 비밀번호</Label>
-              <Input id="resetPw" type="text" value={newPassword} placeholder="예: Hanbit2026!"
+              <Label htmlFor="resetPw">{t("newPassword")}</Label>
+              <Input id="resetPw" type="text" value={newPassword} placeholder={t("resetPlaceholder")}
                 onChange={(e) => setNewPassword(e.target.value)} />
               <div className="rounded-md border bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground space-y-0.5">
-                <p>숫자 + 영문 대/소문자 + 특수문자, 3가지를 조합하여 8~16자 (사용 가능 특수문자: <span className="font-mono">! @ # $ % ^ &amp; * ( ) _ +</span>)</p>
-                <p className="text-amber-600">💡 선택한 학생 전원이 같은 비밀번호로 바뀌니, 학생들이 로그인 후 [설정]에서 각자 변경하도록 안내해 주세요.</p>
+                <p>{t("resetRulePrefix")}<span className="font-mono">! @ # $ % ^ &amp; * ( ) _ +</span>{t("resetRuleSuffix")}</p>
+                <p className="text-amber-600">{t("resetWarning")}</p>
               </div>
             </div>
 
@@ -160,7 +162,7 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
               <p className={`text-sm ${msg.type === "success" ? "text-green-600" : "text-red-600"}`}>{msg.text}</p>
             )}
             <Button onClick={handleReset} disabled={saving} className="font-semibold">
-              {saving ? "재설정 중..." : `${checked.size}명 비밀번호 재설정`}
+              {saving ? t("resetting") : t("resetBtn", { count: checked.size })}
             </Button>
           </>
         )}
@@ -170,7 +172,7 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
   if (embedded) {
     return (
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">비밀번호를 잊은 담당 학생을 골라(여러 명 가능) 새 비밀번호로 재설정해요</p>
+        <p className="text-sm text-muted-foreground">{t("resetCardDesc")}</p>
         {body}
       </div>
     );
@@ -179,8 +181,8 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
   return (
     <Card>
       <CardHeader>
-        <CardTitle>학생 비밀번호 재설정</CardTitle>
-        <CardDescription>비밀번호를 잊은 담당 학생을 골라(여러 명 가능) 새 비밀번호로 재설정해요</CardDescription>
+        <CardTitle>{t("resetCardTitle")}</CardTitle>
+        <CardDescription>{t("resetCardDesc")}</CardDescription>
       </CardHeader>
       <CardContent>{body}</CardContent>
     </Card>
