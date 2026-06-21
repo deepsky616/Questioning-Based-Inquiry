@@ -262,6 +262,43 @@ export function ReportView({
         </ResponsiveContainer>
       </div>
 
+      {/* 분류 안내 (분류 차트 공통 참조) — 색 점은 차트 색과 동일 */}
+      <div className="rounded-xl border bg-card p-4">
+        <p className="mb-3 text-sm font-bold text-foreground">📚 질문 분류 안내</p>
+        <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+          <div>
+            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">분류1 · 질문의 형태</p>
+            <ul className="space-y-1 text-xs text-foreground">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#3b82f6" }} />
+                <span><b className="font-semibold">폐쇄형</b> <span className="text-muted-foreground">정답이 하나로 정해진 질문</span></span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#10b981" }} />
+                <span><b className="font-semibold">개방형</b> <span className="text-muted-foreground">여러 답이 나올 수 있는 질문</span></span>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">분류2 · 생각의 깊이</p>
+            <ul className="space-y-1 text-xs text-foreground">
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#94a3b8" }} />
+                <span><b className="font-semibold">사실적</b> <span className="text-muted-foreground">사실이나 정보를 확인하는 질문</span></span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#a855f7" }} />
+                <span><b className="font-semibold">개념적</b> <span className="text-muted-foreground">원리와 이유를 생각하는 질문</span></span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#f97316" }} />
+                <span><b className="font-semibold">논쟁적</b> <span className="text-muted-foreground">내 생각·판단이 필요한 질문</span></span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {/* 질문 분류 분포 */}
       <div className="rounded-xl border bg-card p-4">
         <p className="mb-3 text-sm font-bold text-foreground">📊 질문 분류 분포 · 총 {classification.total}개</p>
