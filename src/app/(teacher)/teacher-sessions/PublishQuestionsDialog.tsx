@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -35,7 +35,7 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
   const [message, setMessage] = useState<string | null>(null);
 
   // 단원설계 + 현재 배포 상태 조회
-  function reload() {
+  const reload = useCallback(() => {
     Promise.all([
       fetch(`/api/unit-design/${unitDesignId}`).then((r) => r.json()),
       fetch(`/api/sessions/${sessionId}/publish-questions`).then((r) => r.json()),
@@ -43,9 +43,9 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
       setUnit(u);
       setPublished(p.published ?? []);
     }).catch(() => {});
-  }
+  }, [unitDesignId, sessionId]);
 
-  useEffect(() => { reload(); /* eslint-disable-next-line */ }, [unitDesignId, sessionId]);
+  useEffect(() => { reload(); }, [reload]);
 
   // 배포 상태 매핑 (content -> publishedQuestion)
   const publishedByContent = useMemo(() => {
