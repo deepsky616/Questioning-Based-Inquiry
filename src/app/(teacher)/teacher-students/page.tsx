@@ -17,20 +17,37 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 
-/** 분류1(폐쇄/개방) 미니 분포 막대 — 질문 유형을 한눈에 */
-function ClosureMiniBar({ dist }: { dist?: { closed: number; open: number } }) {
-  const closed = dist?.closed ?? 0;
-  const open = dist?.open ?? 0;
-  const total = closed + open;
+/** 한 줄 stacked 막대(전체 합 대비 비율) */
+function MiniBar({ segs }: { segs: { value: number; color: string }[] }) {
+  const total = segs.reduce((a, b) => a + b.value, 0);
+  if (total === 0) return <div className="h-1.5 w-16 rounded-full bg-muted" />;
+  return (
+    <div className="flex h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+      {segs.map((s, i) => (
+        <div key={i} style={{ width: `${(s.value / total) * 100}%`, background: s.color }} />
+      ))}
+    </div>
+  );
+}
+
+/** 분류1(폐쇄/개방) + 분류2(사실/개념/논쟁) 미니 분포 막대 2줄 */
+function TypeMiniBars({
+  closure, cognitive,
+}: {
+  closure?: { closed: number; open: number };
+  cognitive?: { factual: number; conceptual: number; controversial: number };
+}) {
+  const c = closure ?? { closed: 0, open: 0 };
+  const g = cognitive ?? { factual: 0, conceptual: 0, controversial: 0 };
+  const total = c.closed + c.open;
   if (total === 0) return <span className="text-xs text-muted-foreground">-</span>;
-  const cp = Math.round((closed / total) * 100);
   return (
     <div
-      className="mx-auto flex h-2.5 w-16 overflow-hidden rounded-full bg-muted"
-      title={`폐쇄형 ${closed} · 개방형 ${open}`}
+      className="mx-auto flex w-16 flex-col gap-1"
+      title={`분류1 — 폐쇄형 ${c.closed} · 개방형 ${c.open}\n분류2 — 사실적 ${g.factual} · 개념적 ${g.conceptual} · 논쟁적 ${g.controversial}`}
     >
-      <div style={{ width: `${cp}%`, background: "#3b82f6" }} />
-      <div style={{ width: `${100 - cp}%`, background: "#10b981" }} />
+      <MiniBar segs={[{ value: c.closed, color: "#3b82f6" }, { value: c.open, color: "#10b981" }]} />
+      <MiniBar segs={[{ value: g.factual, color: "#94a3b8" }, { value: g.conceptual, color: "#a855f7" }, { value: g.controversial, color: "#f97316" }]} />
     </div>
   );
 }
@@ -53,6 +70,7 @@ interface Student {
   questionCount: number; commentCount: number; pointLogCount: number; totalPoints: number;
   lastActivityAt?: string | null;
   closureDist?: { closed: number; open: number };
+  cognitiveDist?: { factual: number; conceptual: number; controversial: number };
 }
 interface TeacherClass { grade: string; className: string }
 
@@ -610,7 +628,7 @@ export default function StudentsPage() {
                       <TableHead className="w-14 text-center">번호</TableHead>
                       <TableHead>이름</TableHead>
                       <TableHead className="text-center w-20">질문</TableHead>
-                      <TableHead className="text-center w-24 hidden md:table-cell" title="폐쇄형(파랑) / 개방형(초록) 비율">질문 유형</TableHead>
+                      <TableHead className="text-center w-24 hidden md:table-cell" title="위: 분류1 폐쇄형(파랑)/개방형(초록) · 아래: 분류2 사실(회색)/개념(보라)/논쟁(주황)">질문 유형</TableHead>
                       <TableHead className="text-center w-20">답변</TableHead>
                       <TableHead className="text-center w-20">포인트</TableHead>
                       <TableHead className="text-center w-24 hidden sm:table-cell">마지막 활동</TableHead>
@@ -629,7 +647,7 @@ export default function StudentsPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-center hidden md:table-cell">
-                          <ClosureMiniBar dist={s.closureDist} />
+                          <TypeMiniBars closure={s.closureDist} cognitive={s.cognitiveDist} />
                         </TableCell>
                         <TableCell className="text-center">
                           <span className={`font-semibold ${s.commentCount > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
