@@ -20,9 +20,9 @@ import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 /** 한 줄 stacked 막대(전체 합 대비 비율) */
 function MiniBar({ segs }: { segs: { value: number; color: string }[] }) {
   const total = segs.reduce((a, b) => a + b.value, 0);
-  if (total === 0) return <div className="h-1.5 w-16 rounded-full bg-muted" />;
+  if (total === 0) return <div className="h-1.5 w-12 rounded-full bg-muted" />;
   return (
-    <div className="flex h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+    <div className="flex h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-muted">
       {segs.map((s, i) => (
         <div key={i} style={{ width: `${(s.value / total) * 100}%`, background: s.color }} />
       ))}
@@ -30,7 +30,7 @@ function MiniBar({ segs }: { segs: { value: number; color: string }[] }) {
   );
 }
 
-/** 분류1(폐쇄/개방) + 분류2(사실/개념/논쟁) 미니 분포 막대 2줄 */
+/** 분류1(폐쇄/개방) + 분류2(사실/개념/논쟁) 미니 분포 막대 2줄 + 핵심 비율 */
 function TypeMiniBars({
   closure, cognitive,
 }: {
@@ -41,13 +41,22 @@ function TypeMiniBars({
   const g = cognitive ?? { factual: 0, conceptual: 0, controversial: 0 };
   const total = c.closed + c.open;
   if (total === 0) return <span className="text-xs text-muted-foreground">-</span>;
+  const gTotal = g.factual + g.conceptual + g.controversial;
+  const openPct = Math.round((c.open / total) * 100);
+  const contrPct = gTotal ? Math.round((g.controversial / gTotal) * 100) : 0;
   return (
     <div
-      className="mx-auto flex w-16 flex-col gap-1"
+      className="mx-auto flex w-fit flex-col gap-1"
       title={`분류1 — 폐쇄형 ${c.closed} · 개방형 ${c.open}\n분류2 — 사실적 ${g.factual} · 개념적 ${g.conceptual} · 논쟁적 ${g.controversial}`}
     >
-      <MiniBar segs={[{ value: c.closed, color: "#3b82f6" }, { value: c.open, color: "#10b981" }]} />
-      <MiniBar segs={[{ value: g.factual, color: "#94a3b8" }, { value: g.conceptual, color: "#a855f7" }, { value: g.controversial, color: "#f97316" }]} />
+      <div className="flex items-center gap-1.5">
+        <MiniBar segs={[{ value: c.closed, color: "#3b82f6" }, { value: c.open, color: "#10b981" }]} />
+        <span className="text-[10px] tabular-nums text-muted-foreground whitespace-nowrap">개방 {openPct}%</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <MiniBar segs={[{ value: g.factual, color: "#94a3b8" }, { value: g.conceptual, color: "#a855f7" }, { value: g.controversial, color: "#f97316" }]} />
+        <span className="text-[10px] tabular-nums text-muted-foreground whitespace-nowrap">논쟁 {contrPct}%</span>
+      </div>
     </div>
   );
 }
@@ -645,7 +654,7 @@ export default function StudentsPage() {
                       <TableHead className="w-14 text-center">번호</TableHead>
                       <TableHead>이름</TableHead>
                       <TableHead className="text-center w-20">질문</TableHead>
-                      <TableHead className="text-center w-24 hidden md:table-cell" title="위: 분류1 폐쇄형(파랑)/개방형(초록) · 아래: 분류2 사실(회색)/개념(보라)/논쟁(주황)">질문 유형</TableHead>
+                      <TableHead className="text-center w-32 hidden md:table-cell" title="위: 분류1 폐쇄형(파랑)/개방형(초록) · 아래: 분류2 사실(회색)/개념(보라)/논쟁(주황)">질문 유형</TableHead>
                       <TableHead className="text-center w-20">답변</TableHead>
                       <TableHead className="text-center w-20">포인트</TableHead>
                       <TableHead className="text-center w-24 hidden sm:table-cell">마지막 활동</TableHead>
