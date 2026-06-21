@@ -1,0 +1,30 @@
+{
+  "nav": {
+    "dashboard": "대시보드",
+    "students": "학생관리",
+    "questionPlay": "질문놀이",
+    "sessions": "수업세션",
+    "questions": "질문조회",
+    "curriculum": "탐구질문",
+    "reports": "활동 리포트",
+    "settings": "설정",
+    "ask": "질문하기",
+    "explore": "질문탐구",
+    "logout": "로그아웃",
+    "teacherSuffix": "선생님",
+    "studentSuffix": "학생",
+    "openMenu": "메뉴 열기",
+    "closeMenu": "메뉴 닫기"
+  },
+  "common": {
+    "save": "저장",
+    "cancel": "취소",
+    "delete": "삭제",
+    "close": "닫기",
+    "confirm": "확인",
+    "edit": "수정",
+    "loading": "로딩 중...",
+    "search": "검색",
+    "language": "언어"
+  }
+}

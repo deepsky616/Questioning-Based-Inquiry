@@ -1,0 +1,30 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "students": "Students",
+    "questionPlay": "Question Games",
+    "sessions": "Class Sessions",
+    "questions": "Browse Questions",
+    "curriculum": "Inquiry Questions",
+    "reports": "Activity Report",
+    "settings": "Settings",
+    "ask": "Ask a Question",
+    "explore": "Explore Questions",
+    "logout": "Log out",
+    "teacherSuffix": "Teacher",
+    "studentSuffix": "Student",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "close": "Close",
+    "confirm": "Confirm",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "search": "Search",
+    "language": "Language"
+  }
+}

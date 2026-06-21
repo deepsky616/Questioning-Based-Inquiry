@@ -3,23 +3,26 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { PageNav } from "@/components/shared/PageNav";
 import { AppNav } from "@/components/shared/AppNav";
 import { getSessionUser } from "@/lib/auth-helpers";
 
 const STUDENT_PAGES = [
-  { href: "/student-dashboard", label: "대시보드" },
-  { href: "/student-question-play", label: "질문놀이" },
-  { href: "/student-ask", label: "질문하기" },
-  { href: "/student-questions", label: "질문탐구" },
-  { href: "/student-report", label: "활동 리포트" },
-  { href: "/student-settings", label: "설정" },
-];
+  { href: "/student-dashboard", key: "dashboard" },
+  { href: "/student-question-play", key: "questionPlay" },
+  { href: "/student-ask", key: "ask" },
+  { href: "/student-questions", key: "explore" },
+  { href: "/student-report", key: "reports" },
+  { href: "/student-settings", key: "settings" },
+] as const;
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const user = getSessionUser(session);
   const router = useRouter();
+  const t = useTranslations("nav");
+  const pages = STUDENT_PAGES.map((p) => ({ href: p.href, label: t(p.key) }));
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -42,13 +45,13 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   return (
     <div className="min-h-screen bg-background">
       <AppNav
-        pages={STUDENT_PAGES}
+        pages={pages}
         userName={user.name ?? ""}
-        roleSuffix="학생"
+        roleSuffix={t("studentSuffix")}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
-        <PageNav pages={STUDENT_PAGES} />
+        <PageNav pages={pages} />
       </main>
     </div>
   );

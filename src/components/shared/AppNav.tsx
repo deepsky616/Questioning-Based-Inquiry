@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { cn } from "@/lib/utils";
 
 export interface NavPage {
@@ -32,6 +34,7 @@ export function AppNav({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const t = useTranslations("nav");
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
@@ -62,6 +65,7 @@ export function AppNav({
 
           <div className="flex items-center gap-2 sm:gap-4">
             {extra}
+            <LanguageToggle />
             <ThemeToggle />
             <span className="hidden sm:inline text-sm text-muted-foreground truncate max-w-[8rem]">
               {userName} {roleSuffix}
@@ -72,12 +76,12 @@ export function AppNav({
               className="hidden md:inline-flex"
               onClick={() => signOut({ callbackUrl: "/login" })}
             >
-              로그아웃
+              {t("logout")}
             </Button>
             {/* 모바일 햄버거 */}
             <button
               type="button"
-              aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
+              aria-label={open ? t("closeMenu") : t("openMenu")}
               aria-expanded={open}
               onClick={() => setOpen((v) => !v)}
               className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted"
@@ -110,7 +114,7 @@ export function AppNav({
             <div className="flex items-center justify-between pt-2 mt-1 border-t">
               <span className="text-sm text-muted-foreground truncate">{userName} {roleSuffix}</span>
               <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
-                로그아웃
+                {t("logout")}
               </Button>
             </div>
           </nav>
