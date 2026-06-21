@@ -189,6 +189,7 @@ export default function TeacherDashboard() {
                       <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
                     </div>
                     <StatBar value={stats.byClosure.closed} total={stats.total} color="bg-blue-500" />
+                    <p className="text-xs text-muted-foreground">정답이 하나로 정해진 질문</p>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -199,6 +200,7 @@ export default function TeacherDashboard() {
                       <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
                     </div>
                     <StatBar value={stats.byClosure.open} total={stats.total} color="bg-green-500" />
+                    <p className="text-xs text-muted-foreground">여러 답이 나올 수 있는 질문</p>
                   </div>
                 </div>
               </div>
@@ -229,6 +231,7 @@ export default function TeacherDashboard() {
                       <span className="text-2xl font-bold text-foreground">{stats.byCognitive.factual}</span>
                     </div>
                     <StatBar value={stats.byCognitive.factual} total={stats.total} color="bg-gray-400" />
+                    <p className="text-xs text-muted-foreground">사실이나 정보를 확인하는 질문</p>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -239,6 +242,7 @@ export default function TeacherDashboard() {
                       <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.conceptual}</span>
                     </div>
                     <StatBar value={stats.byCognitive.conceptual} total={stats.total} color="bg-purple-500" />
+                    <p className="text-xs text-muted-foreground">원리와 이유를 생각하는 질문</p>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -249,6 +253,7 @@ export default function TeacherDashboard() {
                       <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.controversial}</span>
                     </div>
                     <StatBar value={stats.byCognitive.controversial} total={stats.total} color="bg-orange-500" />
+                    <p className="text-xs text-muted-foreground">내 생각·판단이 필요한 질문</p>
                   </div>
                 </div>
               </div>
