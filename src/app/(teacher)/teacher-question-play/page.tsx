@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -36,14 +37,16 @@ interface StudentPlay { id: string; name: string; studentNumber: string | null; 
 interface StudentLite { id: string; name: string; studentNumber: string | null }
 interface GameStat { participants: number; plays: number; completions: number; goodQuestions: number; lastPlayedAt: string | null; students: StudentPlay[]; nonParticipants: StudentLite[] }
 
-const VIS_LABEL: Record<VisType, { label: string; emoji: string; color: string }> = {
-  all:      { label: "전체공개", emoji: "🌍", color: "#10b981" },
-  classes:  { label: "학급공개", emoji: "🏫", color: "#3b82f6" },
-  students: { label: "학생공개", emoji: "👤", color: "#8b5cf6" },
-  hidden:   { label: "비공개",   emoji: "🔒", color: "#ef4444" },
+const VIS_LABEL: Record<VisType, { emoji: string; color: string }> = {
+  all:      { emoji: "🌍", color: "#10b981" },
+  classes:  { emoji: "🏫", color: "#3b82f6" },
+  students: { emoji: "👤", color: "#8b5cf6" },
+  hidden:   { emoji: "🔒", color: "#ef4444" },
 };
 
 export default function TeacherQuestionPlayPage() {
+  const t = useTranslations("qPlay");
+  const tc = useTranslations("common");
   const { toast } = useToast();
   const [games, setGames] = useState<AnyGame[]>([]);
   const [visibilityMap, setVisibilityMap] = useState<Record<string, GameVisibility>>({});
@@ -95,9 +98,9 @@ export default function TeacherQuestionPlayPage() {
       if (!res.ok) throw new Error();
       setVisibilityMap((prev) => ({ ...prev, [visDialogGame.id]: editVis }));
       setVisDialogGame(null);
-      toast({ variant: "success", description: "공개 설정을 저장했어요." });
+      toast({ variant: "success", description: t("visSaveSuccess") });
     } catch {
-      toast({ variant: "destructive", description: "공개 설정 저장에 실패했어요." });
+      toast({ variant: "destructive", description: t("visSaveFailed") });
     }
     setVisSaving(false);
   }
@@ -106,10 +109,10 @@ export default function TeacherQuestionPlayPage() {
   const confirm = useConfirm();
 
   async function deleteGame(game: AnyGame) {
-    if (!(await confirm({ description: `"${game.title}" 놀이를 삭제할까요?`, confirmText: "삭제", destructive: true }))) return;
+    if (!(await confirm({ description: t("deleteConfirm", { title: game.title }), confirmText: tc("delete"), destructive: true }))) return;
     const res = await fetch(`/api/teacher/question-games/${game.id}`, { method: "DELETE" }).catch(() => null);
     if (!res || !res.ok) {
-      toast({ variant: "destructive", description: "놀이 삭제에 실패했어요." });
+      toast({ variant: "destructive", description: t("deleteFailed") });
       return;
     }
     load();
@@ -154,22 +157,22 @@ export default function TeacherQuestionPlayPage() {
       {/* 페이지 헤더 */}
       <div>
         <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
-          🎮 질문놀이 관리
+          {t("title")}
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          학생들에게 질문놀이를 공개해보세요
+          {t("subtitle")}
         </p>
       </div>
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "전체 놀이", value: games.length, emoji: "🎮", color: "#7C3AED" },
-          { label: "공개 중",   value: publicCount,   emoji: "🌍", color: "#10b981" },
-          { label: "비공개",    value: hiddenCount,   emoji: "🔒", color: "#ef4444" },
+          { label: t("statAll"), value: games.length, emoji: "🎮", color: "#7C3AED" },
+          { label: t("statPublic"), value: publicCount, emoji: "🌍", color: "#10b981" },
+          { label: t("statHidden"), value: hiddenCount, emoji: "🔒", color: "#ef4444" },
         ].map((stat) => (
           <div
-            key={stat.label}
+            key={stat.emoji}
             className="rounded-2xl p-4 text-white text-center"
             style={{ background: stat.color }}
           >
@@ -183,9 +186,9 @@ export default function TeacherQuestionPlayPage() {
       {/* 필터 탭 */}
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="all">전체 ({games.length})</TabsTrigger>
-          <TabsTrigger value="public">공개 ({publicCount})</TabsTrigger>
-          <TabsTrigger value="hidden">비공개 ({hiddenCount})</TabsTrigger>
+          <TabsTrigger value="all">{t("tabAll", { count: games.length })}</TabsTrigger>
+          <TabsTrigger value="public">{t("tabPublic", { count: publicCount })}</TabsTrigger>
+          <TabsTrigger value="hidden">{t("tabHidden", { count: hiddenCount })}</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -198,7 +201,7 @@ export default function TeacherQuestionPlayPage() {
 
       {/* 게임 카드 그리드 */}
       {!isLoading && tab === "all" && (
-        <p className="text-xs text-muted-foreground mb-2">↕️ 카드를 드래그해 순서를 바꾸면 학생 질문놀이 목록에도 같은 순서로 표시돼요.</p>
+        <p className="text-xs text-muted-foreground mb-2">{t("dragHint")}</p>
       )}
       {!isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -229,9 +232,9 @@ export default function TeacherQuestionPlayPage() {
                     <div className="text-white">
                       <h3 className="font-black text-lg leading-tight">{game.title}</h3>
                       {game.isBuiltIn ? (
-                        <span className="text-white/70 text-xs">기본 제공</span>
+                        <span className="text-white/70 text-xs">{t("builtIn")}</span>
                       ) : (
-                        <span className="text-white/70 text-xs">커스텀</span>
+                        <span className="text-white/70 text-xs">{t("custom")}</span>
                       )}
                     </div>
                   </div>
@@ -239,7 +242,7 @@ export default function TeacherQuestionPlayPage() {
                   <span
                     className="bg-white/25 backdrop-blur-sm rounded-full px-3 py-1 text-white text-xs font-bold flex items-center gap-1"
                   >
-                    {visInfo.emoji} {visInfo.label}
+                    {visInfo.emoji} {t(`vis_${vis.type}`)}
                   </span>
                 </div>
 
@@ -264,9 +267,9 @@ export default function TeacherQuestionPlayPage() {
                     return (
                       <div className="mb-3 rounded-xl bg-indigo-50/60 px-3 py-2 text-xs text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
                         {st && st.plays > 0 ? (
-                          <span>참여 <b>{st.participants}</b>명 · 플레이 <b>{st.plays}</b>회 · 완료율 <b>{rate}%</b> · 좋은질문 <b>{st.goodQuestions}</b>개</span>
+                          <span>{t.rich("statLine", { participants: st.participants, plays: st.plays, rate, good: st.goodQuestions, b: (c) => <b>{c}</b> })}</span>
                         ) : (
-                          <span className="text-muted-foreground dark:text-muted-foreground">아직 참여 기록이 없어요</span>
+                          <span className="text-muted-foreground dark:text-muted-foreground">{t("noStats")}</span>
                         )}
                       </div>
                     );
@@ -275,7 +278,7 @@ export default function TeacherQuestionPlayPage() {
                   {/* 체험하기 (기본 제공 놀이만, 솔로 미리보기 · 점수 미적립) */}
                   {game.isBuiltIn && (
                     <Button asChild variant="gradient" size="sm" className="w-full text-xs rounded-xl mb-2">
-                      <Link href={`/teacher-question-play/${game.id}/preview`}>🎮 체험하기</Link>
+                      <Link href={`/teacher-question-play/${game.id}/preview`}>{t("experience")}</Link>
                     </Button>
                   )}
 
@@ -287,7 +290,7 @@ export default function TeacherQuestionPlayPage() {
                       className="flex-1 text-xs rounded-xl"
                       onClick={() => setStatsDialogGame(game)}
                     >
-                      📊 참여 현황
+                      {t("participation")}
                     </Button>
                     <Button
                       variant="outline"
@@ -298,7 +301,7 @@ export default function TeacherQuestionPlayPage() {
                         setEditVis(getVis(game.id));
                       }}
                     >
-                      ⚙️ 공개 설정
+                      {t("visSettings")}
                     </Button>
                     {!game.isBuiltIn && (
                       <Button
@@ -328,31 +331,31 @@ export default function TeacherQuestionPlayPage() {
               <>
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
-                    <span>{statsDialogGame.emoji}</span> {statsDialogGame.title} 참여 현황
+                    <span>{statsDialogGame.emoji}</span> {t("statsDialogTitle", { title: statsDialogGame.title })}
                   </DialogTitle>
                 </DialogHeader>
                 {!st || st.students.length === 0 ? (
-                  <EmptyState icon="🎮" title="아직 참여한 학생이 없어요" />
+                  <EmptyState icon="🎮" title={t("noParticipants")} />
                 ) : (
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">참여 {st.participants}명</span>
-                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">플레이 {st.plays}회</span>
-                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">완료율 {rate}%</span>
-                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">좋은 질문 {st.goodQuestions}개</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipParticipants", { n: st.participants })}</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipPlays", { n: st.plays })}</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipRate", { n: rate })}</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipGood", { n: st.goodQuestions })}</span>
                       {st.lastPlayedAt && (
-                        <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">최근 {new Date(st.lastPlayedAt).toLocaleDateString("ko-KR")}</span>
+                        <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipRecent", { date: new Date(st.lastPlayedAt).toLocaleDateString() })}</span>
                       )}
                     </div>
                     <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
                           <tr>
-                            <th className="px-3 py-2 text-left">학생</th>
-                            <th className="px-3 py-2 text-right">플레이</th>
-                            <th className="px-3 py-2 text-right">완료</th>
-                            <th className="px-3 py-2 text-right">좋은질문</th>
-                            <th className="px-3 py-2 text-right">포인트</th>
+                            <th className="px-3 py-2 text-left">{t("colStudent")}</th>
+                            <th className="px-3 py-2 text-right">{t("colPlay")}</th>
+                            <th className="px-3 py-2 text-right">{t("colComplete")}</th>
+                            <th className="px-3 py-2 text-right">{t("colGood")}</th>
+                            <th className="px-3 py-2 text-right">{t("colPoint")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -375,7 +378,7 @@ export default function TeacherQuestionPlayPage() {
                     {/* 미참여 학생 */}
                     {st.nonParticipants.length > 0 && (
                       <div className="rounded-lg border border-border p-3">
-                        <p className="text-xs font-semibold text-foreground mb-1.5">아직 참여하지 않은 학생 · {st.nonParticipants.length}명</p>
+                        <p className="text-xs font-semibold text-foreground mb-1.5">{t("notParticipated", { n: st.nonParticipants.length })}</p>
                         <div className="flex flex-wrap gap-1.5">
                           {st.nonParticipants.map((s) => (
                             <span key={s.id} className="text-xs rounded-full bg-muted text-muted-foreground px-2 py-0.5">
@@ -400,7 +403,7 @@ export default function TeacherQuestionPlayPage() {
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <span>{visDialogGame.emoji}</span> {visDialogGame.title} 공개 설정
+                  <span>{visDialogGame.emoji}</span> {t("visDialogTitle", { title: visDialogGame.title })}
                 </DialogTitle>
               </DialogHeader>
 
@@ -421,12 +424,12 @@ export default function TeacherQuestionPlayPage() {
                     >
                       <span className="text-2xl">{info.emoji}</span>
                       <div>
-                        <p className="font-bold text-foreground text-sm">{info.label}</p>
+                        <p className="font-bold text-foreground text-sm">{t(`vis_${type}`)}</p>
                         <p className="text-muted-foreground text-xs">
-                          {type === "all" && "모든 학생이 볼 수 있어요"}
-                          {type === "classes" && "특정 학급 학생만 볼 수 있어요"}
-                          {type === "students" && "특정 학생만 볼 수 있어요"}
-                          {type === "hidden" && "학생에게 표시되지 않아요"}
+                          {type === "all" && t("visDesc_all")}
+                          {type === "classes" && t("visDesc_classes")}
+                          {type === "students" && t("visDesc_students")}
+                          {type === "hidden" && t("visDesc_hidden")}
                         </p>
                       </div>
                     </button>
@@ -438,7 +441,7 @@ export default function TeacherQuestionPlayPage() {
               {editVis.type === "classes" && teacherClasses.length > 0 && (
                 <div className="mt-4">
                   <Label className="text-sm font-bold text-foreground mb-2 block">
-                    공개할 학급 선택
+                    {t("selectClasses")}
                   </Label>
                   <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                     {teacherClasses.map((tc) => {
@@ -463,7 +466,7 @@ export default function TeacherQuestionPlayPage() {
                             }}
                             className="accent-blue-500"
                           />
-                          {tc.grade}학년 {tc.className}반
+                          {t("gradeClass", { grade: tc.grade, className: tc.className })}
                         </label>
                       );
                     })}
@@ -475,7 +478,7 @@ export default function TeacherQuestionPlayPage() {
               {editVis.type === "students" && students.length > 0 && (
                 <div className="mt-4">
                   <Label className="text-sm font-bold text-foreground mb-2 block">
-                    공개할 학생 선택
+                    {t("selectStudents")}
                   </Label>
                   <div className="max-h-48 overflow-y-auto space-y-1">
                     {students.map((s) => {
@@ -501,7 +504,7 @@ export default function TeacherQuestionPlayPage() {
                           />
                           <span className="font-medium">{s.name}</span>
                           <span className="text-muted-foreground text-xs ml-auto">
-                            {s.grade}학년 {s.className}반
+                            {t("gradeClass", { grade: s.grade, className: s.className })}
                           </span>
                         </label>
                       );
@@ -512,10 +515,10 @@ export default function TeacherQuestionPlayPage() {
 
               <DialogFooter className="mt-6">
                 <Button variant="outline" onClick={() => setVisDialogGame(null)}>
-                  취소
+                  {tc("cancel")}
                 </Button>
                 <Button onClick={saveVisibility} disabled={visSaving} className="font-bold">
-                  {visSaving ? "저장 중..." : "저장"}
+                  {visSaving ? t("saving") : tc("save")}
                 </Button>
               </DialogFooter>
             </>
