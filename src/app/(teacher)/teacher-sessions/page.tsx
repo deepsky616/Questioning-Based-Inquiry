@@ -46,6 +46,9 @@ interface QuestionSession {
 
 export default function TeacherSessionsPage() {
   const tPages = useTranslations("pages");
+  const t = useTranslations("sessions");
+  const tc = useTranslations("common");
+  const tSeq = useTranslations("sequencePanel");
   const { toast } = useToast();
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [students, setStudents] = useState<SessionTargetStudent[]>([]);
@@ -116,11 +119,11 @@ export default function TeacherSessionsPage() {
 
   const handleCreate = async () => {
     if (!sessForm.date || !sessForm.subject.trim() || !sessForm.topic.trim()) {
-      toast({ variant: "destructive", description: "날짜, 교과, 주제는 필수입니다" });
+      toast({ variant: "destructive", description: t("dateRequired") });
       return;
     }
     if (sessForm.targetClassValue !== "all" && sessForm.selectedStudentIds.length === 0) {
-      toast({ variant: "destructive", description: "배포할 학생을 1명 이상 선택하세요" });
+      toast({ variant: "destructive", description: t("selectTargets") });
       return;
     }
     setIsSaving(true);
@@ -151,23 +154,23 @@ export default function TeacherSessionsPage() {
         commentsVisibleToPeers: true,
         isActive: true,
       }));
-      toast({ variant: "success", description: "세션이 추가됐습니다" });
+      toast({ variant: "success", description: t("sessionAdded") });
     } catch {
-      toast({ variant: "destructive", description: "세션 저장에 실패했습니다" });
+      toast({ variant: "destructive", description: t("saveFailed") });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const toggleFailed = () => toast({ variant: "destructive", description: "변경에 실패했어요. 잠시 후 다시 시도해 주세요." });
+  const toggleFailed = () => toast({ variant: "destructive", description: t("toggleFailed") });
 
   const confirm = useConfirm();
 
   const handleDelete = async (id: string) => {
-    if (!(await confirm({ description: "이 세션을 삭제하시겠습니까? 연결된 질문은 세션 없음 상태가 됩니다.", confirmText: "삭제", destructive: true }))) return;
+    if (!(await confirm({ description: t("deleteConfirm"), confirmText: tc("delete"), destructive: true }))) return;
     const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" }).catch(() => null);
     if (!res || !res.ok) {
-      toast({ variant: "destructive", description: "세션 삭제에 실패했어요." });
+      toast({ variant: "destructive", description: t("deleteFailed") });
       return;
     }
     setSessions((prev) => prev.filter((s) => s.id !== id));
@@ -275,27 +278,27 @@ export default function TeacherSessionsPage() {
       {/* 새 세션 만들기 */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">새 세션 만들기</CardTitle>
-          <CardDescription>날짜·교과·주제를 입력하면 학생 화면에서 선택 가능한 세션이 생성됩니다</CardDescription>
+          <CardTitle className="text-base">{t("newSession")}</CardTitle>
+          <CardDescription>{t("newSessionDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 날짜·교과·주제 (주제를 더 넓게) */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_2fr]">
             <div className="space-y-1">
-              <Label>날짜</Label>
+              <Label>{t("date")}</Label>
               <DatePicker
                 value={sessForm.date}
                 onChange={(v) => setSessForm((p) => ({ ...p, date: v }))}
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="sess-subject">교과</Label>
+              <Label htmlFor="sess-subject">{t("subject")}</Label>
               <Select
                 value={sessForm.subject}
                 onValueChange={(value) => setSessForm((p) => ({ ...p, subject: value }))}
               >
                 <SelectTrigger id="sess-subject">
-                  <SelectValue placeholder="교과 선택" />
+                  <SelectValue placeholder={t("selectSubject")} />
                 </SelectTrigger>
                 <SelectContent>
                   {subjectOptions.map((subject) => (
@@ -307,10 +310,10 @@ export default function TeacherSessionsPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="sess-topic">주제</Label>
+              <Label htmlFor="sess-topic">{t("topic")}</Label>
               <Input
                 id="sess-topic"
-                placeholder="예: 지구의 역사"
+                placeholder={t("topicPlaceholder")}
                 value={sessForm.topic}
                 onChange={(e) => setSessForm((p) => ({ ...p, topic: e.target.value }))}
               />
@@ -320,7 +323,7 @@ export default function TeacherSessionsPage() {
           {/* 대상 선택 + 공개 설정 (좌우 배치) */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-1">
-              <Label>대상 선택</Label>
+              <Label>{t("selectTargetsLabel")}</Label>
               <SessionTargetSelector
                 classes={targetClasses}
                 students={students}
@@ -336,13 +339,13 @@ export default function TeacherSessionsPage() {
             </div>
 
             <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 space-y-2">
-              <p className="text-sm font-semibold text-foreground">공개 설정</p>
+              <p className="text-sm font-semibold text-foreground">{t("visibilitySettings")}</p>
               <div className="space-y-2">
                 {([
-                  ["isActive", "학생 활성화", "학생이 이 세션에서 질문을 작성할 수 있어요.", sessForm.isActive],
-                  ["defaultQuestionPublic", "질문 공개", "학생이 작성한 질문을 서로 볼 수 있어요. (끄면 본인 질문만)", sessForm.defaultQuestionPublic],
-                  ["likesVisibleToPeers", "좋아요 공개", "서로의 좋아요를 누르고 좋아요 수를 볼 수 있어요.", sessForm.likesVisibleToPeers],
-                  ["commentsVisibleToPeers", "댓글 공개", "서로의 댓글을 볼 수 있어요. (끄면 본인·선생님 댓글만)", sessForm.commentsVisibleToPeers],
+                  ["isActive", tSeq("activeLabel"), t("activeDesc"), sessForm.isActive],
+                  ["defaultQuestionPublic", tSeq("publicLabel"), t("publicDesc"), sessForm.defaultQuestionPublic],
+                  ["likesVisibleToPeers", tSeq("likesLabel"), t("likesDesc"), sessForm.likesVisibleToPeers],
+                  ["commentsVisibleToPeers", tSeq("commentsLabel"), t("commentsDesc"), sessForm.commentsVisibleToPeers],
                 ] as const).map(([key, label, desc, value]) => (
                   <div key={key} className="rounded-md border border-border bg-background p-2.5">
                     <div className="flex items-center justify-between gap-3">
@@ -361,7 +364,7 @@ export default function TeacherSessionsPage() {
 
           <div className="flex items-center gap-3">
             <Button onClick={handleCreate} disabled={isSaving}>
-              {isSaving ? "저장 중..." : "세션 추가"}
+              {isSaving ? t("saving") : t("addSession")}
             </Button>
           </div>
         </CardContent>
@@ -369,36 +372,36 @@ export default function TeacherSessionsPage() {
 
       {/* 세션 목록 */}
       {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">로딩 중...</div>
+        <div className="text-center py-8 text-muted-foreground">{t("loading")}</div>
       ) : sessions.length === 0 ? (
-        <EmptyState icon="📅" title="등록된 세션이 없습니다" description="위에서 새 세션을 추가해 보세요" />
+        <EmptyState icon="📅" title={t("emptyTitle")} description={t("emptyDesc")} />
       ) : (
         <Card>
           <CardHeader className="pb-3 space-y-3">
-            <CardTitle className="text-base">수업 세션 목록</CardTitle>
+            <CardTitle className="text-base">{t("listTitle")}</CardTitle>
             {/* 조회(필터, 왼쪽) · 정렬(오른쪽) */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             {/* 필터 그룹 */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">조회</span>
+              <span className="text-xs font-medium text-muted-foreground">{t("filterLabel")}</span>
               <Select value={listFilterDate || "__all__"} onValueChange={(v) => setListFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 text-sm bg-background w-32"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm bg-background w-32"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 날짜</SelectItem>
+                  <SelectItem value="__all__">{t("allDates")}</SelectItem>
                   {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={listFilterSubject || "__all__"} onValueChange={(v) => setListFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 text-sm bg-background w-28"><SelectValue placeholder="전체 교과" /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm bg-background w-28"><SelectValue placeholder={t("allSubjects")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 교과</SelectItem>
+                  <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
                   {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={listFilterTopic || "__all__"} onValueChange={(v) => setListFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 text-sm bg-background w-36"><SelectValue placeholder="전체 주제" /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm bg-background w-36"><SelectValue placeholder={t("allTopics")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 주제</SelectItem>
+                  <SelectItem value="__all__">{t("allTopics")}</SelectItem>
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -408,16 +411,16 @@ export default function TeacherSessionsPage() {
                   onClick={() => { setListFilterDate(""); setListFilterSubject(""); setListFilterTopic(""); }}
                   className="h-9 px-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
                 >
-                  초기화
+                  {tc("reset")}
                 </button>
               )}
             </div>
 
             {/* 정렬 그룹 (오른쪽) */}
             <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">정렬</span>
+              <span className="text-xs font-medium text-muted-foreground">{t("sortLabel")}</span>
               <div className="flex rounded-md border overflow-hidden h-9">
-                {([["desc", "최신순"], ["asc", "오래된순"]] as const).map(([v, label], i) => (
+                {(["desc", "asc"] as const).map((v, i) => (
                   <button
                     key={v}
                     type="button"
@@ -426,7 +429,7 @@ export default function TeacherSessionsPage() {
                       listSort === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
                     }`}
                   >
-                    {label}
+                    {v === "desc" ? t("sortDesc") : t("sortAsc")}
                   </button>
                 ))}
               </div>
@@ -435,7 +438,7 @@ export default function TeacherSessionsPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             {activeSessions.length === 0 && pastSessions.length === 0 && (
-              <EmptyState icon="🔍" title="조건에 맞는 세션이 없습니다" description="필터를 바꿔 다시 찾아보세요" />
+              <EmptyState icon="🔍" title={t("noMatch")} description={t("noMatchDesc")} />
             )}
 
             {activeSessions.length > 0 && (
@@ -443,15 +446,15 @@ export default function TeacherSessionsPage() {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                    오늘·예정 수업
-                    <span className="text-xs font-normal text-muted-foreground">총 {activeSessions.length}개</span>
+                    {t("upcomingSessions")}
+                    <span className="text-xs font-normal text-muted-foreground">{t("countSuffix", { count: activeSessions.length })}</span>
                   </h3>
                   <div className="hidden sm:flex items-center gap-5 text-xs text-muted-foreground">
-                    <span className="w-16 text-center">학생 활성화</span>
-                    <span className="w-16 text-center">질문 공개</span>
-                    <span className="w-16 text-center">좋아요 공개</span>
-                    <span className="w-16 text-center">댓글 공개</span>
-                    <span className="w-24 text-center">관리</span>
+                    <span className="w-16 text-center">{tSeq("activeLabel")}</span>
+                    <span className="w-16 text-center">{tSeq("publicLabel")}</span>
+                    <span className="w-16 text-center">{tSeq("likesLabel")}</span>
+                    <span className="w-16 text-center">{tSeq("commentsLabel")}</span>
+                    <span className="w-24 text-center">{t("colManage")}</span>
                   </div>
                 </div>
                 <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
@@ -476,15 +479,15 @@ export default function TeacherSessionsPage() {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 inline-block" />
-                    지난 수업
-                    <span className="text-xs font-normal text-muted-foreground">총 {pastSessions.length}개</span>
+                    {t("pastSessions")}
+                    <span className="text-xs font-normal text-muted-foreground">{t("countSuffix", { count: pastSessions.length })}</span>
                   </h3>
                   <div className="hidden sm:flex items-center gap-5 text-xs text-muted-foreground">
-                    <span className="w-16 text-center">학생 활성화</span>
-                    <span className="w-16 text-center">질문 공개</span>
-                    <span className="w-16 text-center">좋아요 공개</span>
-                    <span className="w-16 text-center">댓글 공개</span>
-                    <span className="w-24 text-center">관리</span>
+                    <span className="w-16 text-center">{tSeq("activeLabel")}</span>
+                    <span className="w-16 text-center">{tSeq("publicLabel")}</span>
+                    <span className="w-16 text-center">{tSeq("likesLabel")}</span>
+                    <span className="w-16 text-center">{tSeq("commentsLabel")}</span>
+                    <span className="w-24 text-center">{t("colManage")}</span>
                   </div>
                 </div>
                 <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
@@ -527,6 +530,8 @@ function SessionRow({
   onToggleCommentsVisible: (id: string, current: boolean) => void;
   onEditSave: (id: string, patch: { date: string; subject?: string; topic: string }) => Promise<boolean>;
 }) {
+  const t = useTranslations("sessions");
+  const tc = useTranslations("common");
   const isDesignSession = !!session.unitDesignId;
   const [editing, setEditing] = useState(false);
   const [eDate, setEDate] = useState(session.date);
@@ -563,19 +568,19 @@ function SessionRow({
             </p>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {!session.isActive && (
-                <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">학생 비활성</span>
+                <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{t("badgeInactive")}</span>
               )}
               {!session.defaultQuestionPublic && (
-                <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded dark:bg-orange-950/40 dark:text-orange-300">질문 비공개</span>
+                <span className="text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded dark:bg-orange-950/40 dark:text-orange-300">{t("badgePrivateQ")}</span>
               )}
               {!session.likesVisibleToPeers && (
-                <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded dark:bg-amber-950/40 dark:text-amber-300">좋아요 비공개</span>
+                <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded dark:bg-amber-950/40 dark:text-amber-300">{t("badgePrivateLikes")}</span>
               )}
               {!session.commentsVisibleToPeers && (
-                <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded dark:bg-rose-950/40 dark:text-rose-300">댓글 서로 비공개</span>
+                <span className="text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded dark:bg-rose-950/40 dark:text-rose-300">{t("badgePrivateComments")}</span>
               )}
               {isDesignSession && (
-                <span className="text-xs font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">🧩 탐구질문 수업</span>
+                <span className="text-xs font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded inline-flex items-center gap-0.5">{t("badgeInquiry")}</span>
               )}
               <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded dark:bg-slate-800 dark:text-slate-300">
                 {buildTargetLabel({
@@ -595,10 +600,10 @@ function SessionRow({
           <div className="w-16 flex justify-center"><Switch checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} /></div>
           <div className="w-24 flex justify-end gap-1">
             <Button variant="ghost" size="sm" className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 h-7 px-2 text-xs" onClick={openEdit}>
-              수정
+              {tc("edit")}
             </Button>
             <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2 text-xs" onClick={() => onDelete(session.id)}>
-              삭제
+              {tc("delete")}
             </Button>
           </div>
         </div>
@@ -608,32 +613,32 @@ function SessionRow({
         <div className="border-t bg-indigo-50/40 dark:bg-indigo-950/30 px-4 py-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">날짜</Label>
-              <DatePicker value={eDate} onChange={setEDate} placeholder="날짜 선택" />
+              <Label className="text-xs">{t("date")}</Label>
+              <DatePicker value={eDate} onChange={setEDate} placeholder={t("pickDate")} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">교과</Label>
+              <Label className="text-xs">{t("subject")}</Label>
               <Input
                 className="h-9 w-32 bg-background"
                 value={isDesignSession ? session.subject : eSubject}
                 disabled={isDesignSession}
                 onChange={(e) => setESubject(e.target.value)}
-                placeholder="교과"
+                placeholder={t("subjectPlaceholder")}
               />
             </div>
             <div className="space-y-1 min-w-0 flex-1">
-              <Label className="text-xs">주제</Label>
-              <Input className="h-9 bg-background" value={eTopic} onChange={(e) => setETopic(e.target.value)} placeholder="주제" />
+              <Label className="text-xs">{t("topic")}</Label>
+              <Input className="h-9 bg-background" value={eTopic} onChange={(e) => setETopic(e.target.value)} placeholder={t("topicPlaceholderShort")} />
             </div>
             <div className="flex gap-2">
               <Button size="sm" disabled={savingEdit} onClick={saveEdit} className="font-semibold">
-                {savingEdit ? "저장 중..." : "저장"}
+                {savingEdit ? t("saving") : tc("save")}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setEditing(false)}>취소</Button>
+              <Button size="sm" variant="outline" onClick={() => setEditing(false)}>{tc("cancel")}</Button>
             </div>
           </div>
           {isDesignSession && (
-            <p className="mt-1 text-xs text-muted-foreground">🧩 탐구질문 수업은 날짜·주제만 수정할 수 있어요(교과 고정).</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("inquiryEditNote")}</p>
           )}
         </div>
       )}

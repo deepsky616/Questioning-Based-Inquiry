@@ -16,17 +16,17 @@ import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 /** ISO 날짜 → "오늘 / N일 전 / -" */
-function lastActiveLabel(iso?: string | null): string {
-  if (!iso) return "-";
+function lastActiveLabel(iso?: string | null): { key: "today" | "yesterday" | "daysAgo" | "monthsAgo" | "yearsAgo"; v: Record<string, number> } | null {
+  if (!iso) return null;
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (d <= 0) return "오늘";
-  if (d === 1) return "어제";
-  if (d < 30) return `${d}일 전`;
-  if (d < 365) return `${Math.floor(d / 30)}개월 전`;
-  return `${Math.floor(d / 365)}년 전`;
+  if (d <= 0) return { key: "today", v: {} };
+  if (d === 1) return { key: "yesterday", v: {} };
+  if (d < 30) return { key: "daysAgo", v: { d } };
+  if (d < 365) return { key: "monthsAgo", v: { m: Math.floor(d / 30) } };
+  return { key: "yearsAgo", v: { y: Math.floor(d / 365) } };
 }
 
 /* ─── 타입 ─── */
@@ -83,17 +83,23 @@ function bucketKey(date: Date, period: Period): string {
   return String(date.getDay()); // 0~6
 }
 
-const DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
-
-function bucketLabel(key: string, period: Period): string {
-  if (period === "dow") return DOW_LABELS[parseInt(key)] ?? key;
-  if (period === "month") return key.slice(5) + "월";
+function bucketLabel(key: string, period: Period, locale: string): string {
+  if (period === "dow") {
+    const idx = parseInt(key);
+    if (Number.isNaN(idx)) return key;
+    // 2024-01-07 = 일요일 기준
+    return new Date(2024, 0, 7 + idx).toLocaleDateString(locale, { weekday: "short" });
+  }
+  if (period === "month") {
+    const [y, m] = key.split("-");
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString(locale, { month: "short" });
+  }
   if (period === "week") return "W" + key.slice(-2);
   return key;
 }
 
 /* 결손 슬롯을 채워 정렬된 시리즈 반환 */
-function buildSeries(events: RawEvent[], period: Period): Array<{ key: string; label: string; question: number; comment: number; point: number }> {
+function buildSeries(events: RawEvent[], period: Period, locale: string): Array<{ key: string; label: string; question: number; comment: number; point: number }> {
   const map: Record<string, { question: number; comment: number; point: number }> = {};
   for (const ev of events) {
     const d = new Date(ev.createdAt);
@@ -129,7 +135,7 @@ function buildSeries(events: RawEvent[], period: Period): Array<{ key: string; l
 
   return keys.map((k) => ({
     key: k,
-    label: bucketLabel(k, period),
+    label: bucketLabel(k, period, locale),
     question: map[k]?.question ?? 0,
     comment: map[k]?.comment ?? 0,
     point: map[k]?.point ?? 0,
@@ -141,11 +147,6 @@ const METRIC_COLOR: Record<Metric, string> = {
   question: "#6366f1",
   comment: "#10b981",
   point: "#f59e0b",
-};
-const METRIC_LABEL: Record<Metric, string> = {
-  question: "질문 수",
-  comment: "답변 수",
-  point: "포인트",
 };
 
 function BarChart({
@@ -191,6 +192,10 @@ function BarChart({
 function StudentDetailDialog({
   student, onClose, onChanged,
 }: { student: Student; onClose: () => void; onChanged: () => void }) {
+  const t = useTranslations("students");
+  const tc = useTranslations("common");
+  const tCls = useTranslations("classification");
+  const locale = useLocale();
   const [stats, setStats] = useState<StudentStats | null>(null);
   const [period, setPeriod] = useState<Period>("month");
   const [metric, setMetric] = useState<Metric>("question");
@@ -206,8 +211,8 @@ function StudentDetailDialog({
   }, [student.id]);
 
   const series = useMemo(
-    () => (stats ? buildSeries(stats.events, period) : []),
-    [stats, period]
+    () => (stats ? buildSeries(stats.events, period, locale) : []),
+    [stats, period, locale]
   );
 
   async function submitPoints() {
@@ -236,7 +241,7 @@ function StudentDetailDialog({
           <DialogTitle className="flex items-center gap-2">
             <span>{student.name}</span>
             <span className="text-sm font-normal text-muted-foreground">
-              {buildTeacherClassLabel(student.grade, student.className)} · {student.studentNumber}번
+              {buildTeacherClassLabel(student.grade, student.className)} · {t("numberSuffix", { n: student.studentNumber })}
             </span>
           </DialogTitle>
         </DialogHeader>
@@ -244,19 +249,19 @@ function StudentDetailDialog({
         {/* 누적 통계 */}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 p-3 text-center">
-            <p className="text-xs text-indigo-500 font-medium">총 질문</p>
+            <p className="text-xs text-indigo-500 font-medium">{t("totalQuestions")}</p>
             <p className="text-2xl font-black text-indigo-700">
               {stats?.student.questionCount ?? student.questionCount}
             </p>
           </div>
           <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-500/30 p-3 text-center">
-            <p className="text-xs text-emerald-500 font-medium">총 답변</p>
+            <p className="text-xs text-emerald-500 font-medium">{t("totalAnswers")}</p>
             <p className="text-2xl font-black text-emerald-700">
               {stats?.student.commentCount ?? student.commentCount}
             </p>
           </div>
           <div className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-500/30 p-3 text-center">
-            <p className="text-xs text-amber-500 font-medium">총 포인트</p>
+            <p className="text-xs text-amber-500 font-medium">{t("totalPoints")}</p>
             <p className="text-2xl font-black text-amber-700">
               {stats?.student.totalPoints ?? student.totalPoints}
             </p>
@@ -266,19 +271,19 @@ function StudentDetailDialog({
         {/* 받은 호응 + 좋은 질문 + 질문놀이 참여 */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-500/30 p-3 text-center">
-            <p className="text-xs text-rose-500 font-medium">받은 좋아요</p>
+            <p className="text-xs text-rose-500 font-medium">{t("receivedLikes")}</p>
             <p className="text-2xl font-black text-rose-600">{stats?.student.likesReceived ?? "-"}</p>
           </div>
           <div className="rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-500/30 p-3 text-center">
-            <p className="text-xs text-sky-500 font-medium">받은 답변</p>
+            <p className="text-xs text-sky-500 font-medium">{t("receivedAnswers")}</p>
             <p className="text-2xl font-black text-sky-600">{stats?.student.commentsReceived ?? "-"}</p>
           </div>
           <div className="rounded-xl bg-violet-50 dark:bg-violet-950/40 border border-violet-100 dark:border-violet-500/30 p-3 text-center">
-            <p className="text-xs text-violet-500 font-medium">좋은 질문</p>
+            <p className="text-xs text-violet-500 font-medium">{t("goodQuestions")}</p>
             <p className="text-2xl font-black text-violet-600">{stats?.student.goodQuestions ?? "-"}</p>
           </div>
           <div className="rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-500/30 p-3 text-center">
-            <p className="text-xs text-teal-500 font-medium">질문놀이 참여</p>
+            <p className="text-xs text-teal-500 font-medium">{t("gamePlays")}</p>
             <p className="text-2xl font-black text-teal-600">{stats?.student.gamePlays ?? "-"}</p>
           </div>
         </div>
@@ -286,36 +291,36 @@ function StudentDetailDialog({
         {/* 질문 분류 분포 */}
         {stats && stats.classification.total > 0 && (
           <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="text-sm font-bold text-foreground mb-3">📊 질문 분류 분포</p>
+            <p className="text-sm font-bold text-foreground mb-3">{t("distTitle")}</p>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="flex items-center gap-3">
                 <ClassificationDonut
                   size={104}
                   slices={[
-                    { name: "폐쇄형", value: stats.classification.closure.closed, fill: "#3b82f6" },
-                    { name: "개방형", value: stats.classification.closure.open, fill: "#10b981" },
+                    { name: tCls("closed.label"), value: stats.classification.closure.closed, fill: "#3b82f6" },
+                    { name: tCls("open.label"), value: stats.classification.closure.open, fill: "#10b981" },
                   ]}
                 />
                 <div className="text-xs space-y-1">
-                  <p className="font-semibold text-muted-foreground">분류1</p>
-                  <p><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />폐쇄형 {stats.classification.closure.closed}</p>
-                  <p><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />개방형 {stats.classification.closure.open}</p>
+                  <p className="font-semibold text-muted-foreground">{tCls("category1")}</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5" />{tCls("closed.label")} {stats.classification.closure.closed}</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />{tCls("open.label")} {stats.classification.closure.open}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <ClassificationDonut
                   size={104}
                   slices={[
-                    { name: "사실적", value: stats.classification.cognitive.factual, fill: "#94a3b8" },
-                    { name: "개념적", value: stats.classification.cognitive.conceptual, fill: "#a855f7" },
-                    { name: "논쟁적", value: stats.classification.cognitive.controversial, fill: "#f97316" },
+                    { name: tCls("factual.label"), value: stats.classification.cognitive.factual, fill: "#94a3b8" },
+                    { name: tCls("conceptual.label"), value: stats.classification.cognitive.conceptual, fill: "#a855f7" },
+                    { name: tCls("controversial.label"), value: stats.classification.cognitive.controversial, fill: "#f97316" },
                   ]}
                 />
                 <div className="text-xs space-y-1">
-                  <p className="font-semibold text-muted-foreground">분류2</p>
-                  <p><span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1.5" />사실적 {stats.classification.cognitive.factual}</p>
-                  <p><span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1.5" />개념적 {stats.classification.cognitive.conceptual}</p>
-                  <p><span className="inline-block w-2 h-2 rounded-full bg-orange-500 mr-1.5" />논쟁적 {stats.classification.cognitive.controversial}</p>
+                  <p className="font-semibold text-muted-foreground">{tCls("category2")}</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1.5" />{tCls("factual.label")} {stats.classification.cognitive.factual}</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1.5" />{tCls("conceptual.label")} {stats.classification.cognitive.conceptual}</p>
+                  <p><span className="inline-block w-2 h-2 rounded-full bg-orange-500 mr-1.5" />{tCls("controversial.label")} {stats.classification.cognitive.controversial}</p>
                 </div>
               </div>
             </div>
@@ -334,7 +339,7 @@ function StudentDetailDialog({
                     background: period === p ? "#4f46e5" : "#f3f4f6",
                     color: period === p ? "white" : "#374151",
                   }}>
-                  {p === "month" ? "월별" : p === "week" ? "주별" : "요일별"}
+                  {p === "month" ? t("periodMonth") : p === "week" ? t("periodWeek") : t("periodDow")}
                 </button>
               ))}
             </div>
@@ -347,14 +352,14 @@ function StudentDetailDialog({
                     background: metric === m ? METRIC_COLOR[m] : "#f3f4f6",
                     color: metric === m ? "white" : "#374151",
                   }}>
-                  {METRIC_LABEL[m]}
+                  {t(m === "question" ? "metricQuestion" : m === "comment" ? "metricComment" : "metricPoint")}
                 </button>
               ))}
             </div>
           </div>
 
           {!stats ? (
-            <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">로딩 중...</div>
+            <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">{t("loading")}</div>
           ) : (
             <BarChart data={series} metric={metric} />
           )}
@@ -364,30 +369,30 @@ function StudentDetailDialog({
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="bg-card border border-border rounded-xl p-3">
-              <h4 className="text-xs font-black text-indigo-600 mb-2">📝 최근 질문</h4>
+              <h4 className="text-xs font-black text-indigo-600 mb-2">{t("recentQuestions")}</h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {stats.recentQuestions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">없음</p>
+                  <p className="text-xs text-muted-foreground">{t("none")}</p>
                 ) : stats.recentQuestions.map((q) => (
                   <div key={q.id} className="text-xs text-foreground truncate">{q.content}</div>
                 ))}
               </div>
             </div>
             <div className="bg-card border border-border rounded-xl p-3">
-              <h4 className="text-xs font-black text-emerald-600 mb-2">💬 최근 답변</h4>
+              <h4 className="text-xs font-black text-emerald-600 mb-2">{t("recentAnswers")}</h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {stats.recentComments.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">없음</p>
+                  <p className="text-xs text-muted-foreground">{t("none")}</p>
                 ) : stats.recentComments.map((c) => (
                   <div key={c.id} className="text-xs text-foreground truncate">{c.content}</div>
                 ))}
               </div>
             </div>
             <div className="bg-card border border-border rounded-xl p-3">
-              <h4 className="text-xs font-black text-amber-600 mb-2">🏆 최근 포인트</h4>
+              <h4 className="text-xs font-black text-amber-600 mb-2">{t("recentPoints")}</h4>
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {stats.recentPoints.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">없음</p>
+                  <p className="text-xs text-muted-foreground">{t("none")}</p>
                 ) : stats.recentPoints.map((p) => {
                   const b = pointBonusLabel(p.bonusType);
                   const game = GAME_LABEL[p.gameId];
@@ -412,30 +417,30 @@ function StudentDetailDialog({
 
         {/* 포인트 수동 지급/회수 */}
         <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-xl p-4 space-y-3">
-          <h3 className="font-black text-amber-700 text-sm">🎁 포인트 수동 지급 / 회수</h3>
+          <h3 className="font-black text-amber-700 text-sm">{t("pointManual")}</h3>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs text-amber-700 font-bold">점수 (음수=회수)</Label>
+              <Label className="text-xs text-amber-700 font-bold">{t("scoreLabel")}</Label>
               <Input type="number" value={delta || ""}
                 onChange={(e) => setDelta(parseInt(e.target.value) || 0)}
-                placeholder="예: 10 또는 -5" className="mt-1" />
+                placeholder={t("scorePlaceholder")} className="mt-1" />
             </div>
             <div>
-              <Label className="text-xs text-amber-700 font-bold">사유 (선택)</Label>
+              <Label className="text-xs text-amber-700 font-bold">{t("reasonLabel")}</Label>
               <Input value={reason} onChange={(e) => setReason(e.target.value)}
-                placeholder="예: 수업 중 좋은 질문" className="mt-1" />
+                placeholder={t("reasonPlaceholder")} className="mt-1" />
             </div>
           </div>
           <Button
             className="w-full"
             disabled={delta === 0 || saving}
             onClick={submitPoints}>
-            {saving ? "처리 중..." : delta >= 0 ? `${delta}점 지급` : `${Math.abs(delta)}점 회수`}
+            {saving ? t("processing") : delta >= 0 ? t("give", { n: delta }) : t("take", { n: Math.abs(delta) })}
           </Button>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>닫기</Button>
+          <Button variant="outline" onClick={onClose}>{tc("close")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -445,6 +450,7 @@ function StudentDetailDialog({
 /* ─── 메인 페이지 ─── */
 export default function StudentsPage() {
   const tPages = useTranslations("pages");
+  const t = useTranslations("students");
   const [students, setStudents] = useState<Student[]>([]);
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -500,19 +506,19 @@ export default function StudentsPage() {
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-2xl bg-muted/40 border border-border p-4 text-center">
-          <p className="text-xs text-muted-foreground font-medium">전체 학생</p>
-          <p className="text-2xl font-black text-foreground mt-1">{students.length}명</p>
+          <p className="text-xs text-muted-foreground font-medium">{t("allStudents")}</p>
+          <p className="text-2xl font-black text-foreground mt-1">{t("studentCount", { n: students.length })}</p>
         </div>
         <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 p-4 text-center">
-          <p className="text-xs text-indigo-500 font-medium">총 질문</p>
+          <p className="text-xs text-indigo-500 font-medium">{t("totalQuestions")}</p>
           <p className="text-2xl font-black text-indigo-700 mt-1">{totalQ}</p>
         </div>
         <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-500/30 p-4 text-center">
-          <p className="text-xs text-emerald-500 font-medium">총 답변</p>
+          <p className="text-xs text-emerald-500 font-medium">{t("totalAnswers")}</p>
           <p className="text-2xl font-black text-emerald-700 mt-1">{totalC}</p>
         </div>
         <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-500/30 p-4 text-center">
-          <p className="text-xs text-amber-500 font-medium">총 포인트 / 평균</p>
+          <p className="text-xs text-amber-500 font-medium">{t("totalPointsAvg")}</p>
           <p className="text-2xl font-black text-amber-700 mt-1">
             {totalP}<span className="text-sm font-normal text-amber-500 ml-1">/ {avgP}</span>
           </p>
@@ -529,7 +535,7 @@ export default function StudentsPage() {
                 ? "bg-indigo-600 text-white border-indigo-600"
                 : "bg-card text-muted-foreground border-border hover:border-indigo-300"
             }`}>
-            전체
+            {t("filterAll")}
           </button>
           {teacherClasses.map((tc) => {
             const key = `${tc.grade}-${tc.className}`;
@@ -550,21 +556,21 @@ export default function StudentsPage() {
 
       {/* 검색 */}
       <Input
-        placeholder="이름, 학년, 반 검색..."
+        placeholder={t("searchPlaceholder")}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="max-w-xs"
       />
 
       {isLoading ? (
-        <div className="text-center py-16 text-muted-foreground">로딩 중...</div>
+        <div className="text-center py-16 text-muted-foreground">{t("loading")}</div>
       ) : students.length === 0 ? (
         <Card><CardContent className="p-0">
-          <EmptyState icon="🧑‍🏫" title="등록된 학생이 없습니다" description="같은 학교·학년·반 학생이 회원가입하면 표시됩니다" />
+          <EmptyState icon="🧑‍🏫" title={t("emptyTitle")} description={t("emptyDesc")} />
         </CardContent></Card>
       ) : filtered.length === 0 ? (
         <Card><CardContent className="p-0">
-          <EmptyState icon="🔍" title="검색 결과가 없습니다" description="다른 이름이나 학급으로 다시 찾아보세요" />
+          <EmptyState icon="🔍" title={t("noResultTitle")} description={t("noResultDesc")} />
         </CardContent></Card>
       ) : (
         Object.entries(grouped).map(([classLabel, classStudents]) => {
@@ -579,24 +585,24 @@ export default function StudentsPage() {
                     {classLabel}
                   </span>
                   <span className="text-sm font-normal text-muted-foreground">
-                    총 {classStudents.length}명
+                    {t("classTotal", { n: classStudents.length })}
                   </span>
                 </CardTitle>
                 <CardDescription>
-                  질문 {qSum} · 답변 {cSum} · 포인트 {pSum}
+                  {t("classSummary", { q: qSum, c: cSum, p: pSum })}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto"><Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-14 text-center">번호</TableHead>
-                      <TableHead>이름</TableHead>
-                      <TableHead className="text-center w-20">질문</TableHead>
-                      <TableHead className="text-center w-20">답변</TableHead>
-                      <TableHead className="text-center w-20">포인트</TableHead>
-                      <TableHead className="text-center w-24 hidden sm:table-cell">마지막 활동</TableHead>
-                      <TableHead className="text-center w-20">상세</TableHead>
+                      <TableHead className="w-14 text-center">{t("colNumber")}</TableHead>
+                      <TableHead>{t("colName")}</TableHead>
+                      <TableHead className="text-center w-20">{t("colQuestion")}</TableHead>
+                      <TableHead className="text-center w-20">{t("colAnswer")}</TableHead>
+                      <TableHead className="text-center w-20">{t("colPoint")}</TableHead>
+                      <TableHead className="text-center w-24 hidden sm:table-cell">{t("colLastActive")}</TableHead>
+                      <TableHead className="text-center w-20">{t("colDetail")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -621,12 +627,12 @@ export default function StudentsPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-center text-xs text-muted-foreground hidden sm:table-cell">
-                          {lastActiveLabel(s.lastActivityAt)}
+                          {(() => { const r = lastActiveLabel(s.lastActivityAt); return r ? t(r.key, r.v) : "-"; })()}
                         </TableCell>
                         <TableCell className="text-center">
                           <Button size="sm" variant="outline"
                             onClick={(e) => { e.stopPropagation(); setSelected(s); }}>
-                            상세
+                            {t("detailBtn")}
                           </Button>
                         </TableCell>
                       </TableRow>
