@@ -434,7 +434,13 @@
     "deselect": "선택 해제",
     "plusCount": "+{count}개",
     "aiGeneratingBulk": "AI 답변 생성 중... ({count}개 질문 분석 중)",
-    "aiPreviewBtn": "✦ AI 개별 답변 미리보기 ({count}개)"
+    "aiPreviewBtn": "✦ AI 개별 답변 미리보기 ({count}개)",
+    "bulkSelectedLabel": "선택한 질문",
+    "bulkDeleteBtn": "🗑 선택한 질문 삭제",
+    "bulkDeleteConfirm": "선택한 질문 {count}개를 정말 삭제할까요? 연결된 댓글도 함께 삭제되며 되돌릴 수 없습니다.",
+    "bulkDeleting": "삭제 중...",
+    "bulkDeleteDone": "{count}개 질문을 삭제했습니다",
+    "bulkDeletePartial": "{count}개 질문 삭제에 실패했습니다"
   },
   "sequencePanel": {
     "published": "학생에게 배포했습니다",

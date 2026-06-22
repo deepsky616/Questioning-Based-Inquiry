@@ -434,7 +434,13 @@
     "deselect": "Deselect",
     "plusCount": "+{count}",
     "aiGeneratingBulk": "Generating AI answers... (analyzing {count} questions)",
-    "aiPreviewBtn": "✦ Preview individual AI answers ({count})"
+    "aiPreviewBtn": "✦ Preview individual AI answers ({count})",
+    "bulkSelectedLabel": "selected",
+    "bulkDeleteBtn": "🗑 Delete selected",
+    "bulkDeleteConfirm": "Really delete the {count} selected questions? Linked comments will also be deleted and this cannot be undone.",
+    "bulkDeleting": "Deleting...",
+    "bulkDeleteDone": "Deleted {count} questions",
+    "bulkDeletePartial": "Failed to delete {count} questions"
   },
   "sequencePanel": {
     "published": "Shared with students",

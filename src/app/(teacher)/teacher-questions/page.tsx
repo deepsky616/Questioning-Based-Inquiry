@@ -344,6 +344,35 @@ export default function QuestionsPage() {
     setShowBulkSuccess(false);
   };
 
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  // 선택한 학생 질문 일괄 삭제 (단건 삭제 엔드포인트 재사용)
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || isBulkDeleting) return;
+    if (!(await confirm({ description: t("bulkDeleteConfirm", { count: ids.length }), confirmText: tc("delete"), destructive: true }))) return;
+    setIsBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => fetch(`/api/questions/${id}`, { method: "DELETE" })),
+      );
+      const failed = results.filter(
+        (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok),
+      ).length;
+      const removed = new Set(ids);
+      setQuestions((prev) => prev.filter((q) => !removed.has(q.id)));
+      clearSelection();
+      if (failed > 0) {
+        toast({ variant: "destructive", description: t("bulkDeletePartial", { count: failed }) });
+      } else {
+        toast({ variant: "success", description: t("bulkDeleteDone", { count: ids.length }) });
+      }
+      fetchQuestions(selectedSessionId);
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   // 1단계: AI 답변 미리보기 생성 (저장 없음)
   const handlePreviewBulkAi = async () => {
     const ids = Array.from(selectedIds);
@@ -1095,7 +1124,7 @@ export default function QuestionsPage() {
       {hasQuestionList && (
         <div className="flex items-center gap-3 flex-wrap justify-between">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-semibold text-foreground">{t("listTitle")} <span className="font-normal text-muted-foreground">{t("listCountSuffix", { count: filtered.length })}</span></span>
+            <h3 className="text-base font-semibold leading-none tracking-tight text-foreground">{t("listTitle")} <span className="text-xs font-normal text-muted-foreground">{t("listCountSuffix", { count: filtered.length })}</span></h3>
             <Input
               placeholder={t("searchPlaceholder")}
               value={search}
@@ -1163,11 +1192,11 @@ export default function QuestionsPage() {
           <button
             type="button"
             onClick={() => setShowSequence((v) => !v)}
-            className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight text-indigo-700 hover:text-indigo-800 transition-colors"
+            className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground hover:text-primary transition-colors"
           >
-            <span className="text-xl">🧩</span>
+            <span>🧩</span>
             {t("sequenceTitle")}
-            <span className="text-base text-indigo-400">{showSequence ? "▾" : "▸"}</span>
+            <span className="text-sm text-muted-foreground">{showSequence ? "▾" : "▸"}</span>
           </button>
           {showSequence && (
             <div className="mt-3">
@@ -1194,10 +1223,10 @@ export default function QuestionsPage() {
         if (deployed.length === 0) return null;
         return (
           <div className="rounded-xl border bg-card p-4">
-            <div className="flex items-center gap-1.5 text-lg font-extrabold tracking-tight text-emerald-700">
-              <span className="text-xl">📋</span>
+            <div className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground">
+              <span>📋</span>
               {t("deployedTitle")}
-              <span className="text-sm font-semibold text-emerald-500">{t("listCountSuffix", { count: deployed.length })}</span>
+              <span className="text-xs font-normal text-muted-foreground">{t("listCountSuffix", { count: deployed.length })}</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               {t("deployedDesc")}
@@ -1498,9 +1527,12 @@ export default function QuestionsPage() {
             <div className="space-y-2.5 p-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-indigo-700 shadow-sm">
-                    {selectedIds.size}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-center leading-none">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-indigo-700 shadow-sm">
+                      {selectedIds.size}
+                    </span>
+                    <span className="mt-1 text-[10px] font-medium text-indigo-100">{t("bulkSelectedLabel")}</span>
+                  </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-white">{t("bulkPanelTitle")}</p>
                     <p className="line-clamp-2 text-xs text-indigo-100">{t("bulkPanelDesc")}</p>
@@ -1508,7 +1540,7 @@ export default function QuestionsPage() {
                 </div>
                 <button
                   onClick={clearSelection}
-                  disabled={isGeneratingPreviews || isSendingPreviews}
+                  disabled={isGeneratingPreviews || isSendingPreviews || isBulkDeleting}
                   className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-indigo-100 underline-offset-4 hover:bg-white/10 hover:text-white hover:underline disabled:opacity-40"
                 >
                   {t("deselect")}
@@ -1532,23 +1564,32 @@ export default function QuestionsPage() {
                 )}
               </div>
 
-              <Button
-                onClick={handlePreviewBulkAi}
-                disabled={isGeneratingPreviews || isSendingPreviews}
-                className="h-10 w-full bg-white font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300"
-              >
-                {isGeneratingPreviews ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
-                    </svg>
-                    {t("aiGeneratingBulk", { count: selectedIds.size })}
-                  </span>
-                ) : (
-                  t("aiPreviewBtn", { count: selectedIds.size })
-                )}
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  onClick={handlePreviewBulkAi}
+                  disabled={isGeneratingPreviews || isSendingPreviews || isBulkDeleting}
+                  className="h-10 flex-1 bg-white font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300"
+                >
+                  {isGeneratingPreviews ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+                      </svg>
+                      {t("aiGeneratingBulk", { count: selectedIds.size })}
+                    </span>
+                  ) : (
+                    t("aiPreviewBtn", { count: selectedIds.size })
+                  )}
+                </Button>
+                <Button
+                  onClick={handleBulkDelete}
+                  disabled={isGeneratingPreviews || isSendingPreviews || isBulkDeleting}
+                  className="h-10 shrink-0 border border-white/30 bg-white/10 font-semibold text-white hover:bg-red-500 hover:border-red-500 disabled:opacity-40 sm:w-auto"
+                >
+                  {isBulkDeleting ? t("bulkDeleting") : t("bulkDeleteBtn")}
+                </Button>
+              </div>
 
               {bulkMsg && (
                 <div
