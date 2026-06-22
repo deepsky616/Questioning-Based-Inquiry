@@ -14,6 +14,7 @@ import {
 import { buildTeacherClassLabel } from "@/lib/teacher";
 import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { StudentManagementCard } from "@/components/teacher/StudentManagementCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { useTranslations, useLocale } from "next-intl";
@@ -644,6 +645,8 @@ export default function StudentsPage() {
           );
         })
       )}
+
+      <StudentManagementCard />
 
       {selected && (
         <StudentDetailDialog
