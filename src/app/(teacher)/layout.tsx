@@ -9,14 +9,15 @@ import { AppNav } from "@/components/shared/AppNav";
 import { NotificationBell } from "@/components/teacher/NotificationBell";
 import { getSessionUser } from "@/lib/auth-helpers";
 
+// 수업 사이클 순서: 홈 → 준비(탐구질문 설계 → 수업세션 배포) → 검토(질문조회) → 활동(질문놀이) → 분석(리포트) → 관리(학생) → 설정
 const TEACHER_PAGES = [
   { href: "/teacher-dashboard", key: "dashboard" },
-  { href: "/teacher-students", key: "students" },
-  { href: "/teacher-question-play", key: "questionPlay" },
+  { href: "/teacher-curriculum", key: "curriculum" },
   { href: "/teacher-sessions", key: "sessions" },
   { href: "/teacher-questions", key: "questions" },
-  { href: "/teacher-curriculum", key: "curriculum" },
+  { href: "/teacher-question-play", key: "questionPlay" },
   { href: "/teacher-reports", key: "reports" },
+  { href: "/teacher-students", key: "students" },
   { href: "/teacher-settings", key: "settings" },
 ] as const;
 
