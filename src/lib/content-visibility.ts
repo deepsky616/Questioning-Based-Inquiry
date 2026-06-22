@@ -1,0 +1,53 @@
+// 질문·댓글 열람 권한 판정 (순수 함수). API 라우트(목록·단건·번역)에서 공통 사용해
+// "다른 학급 교사", "댓글 비공개 세션 학생" 등의 권한 규칙을 한곳에서 일관되게 적용한다.
+
+export interface AuthorInfo {
+  role: string;
+  school: string | null;
+  grade: string | null;
+  className: string | null;
+}
+
+export interface Viewer {
+  id: string;
+  role: string;
+  school: string | null;
+  teacherClasses: { grade: string; className: string }[];
+}
+
+/** 교사가 해당 학생 작성자를 볼 수 있는가: 같은 학교 + (담당 학급 없으면 학교 전체 / 있으면 해당 학급) */
+export function teacherCanSeeAuthor(viewer: Viewer | null | undefined, author: AuthorInfo | null | undefined): boolean {
+  if (!viewer || viewer.role !== "TEACHER" || !author || author.role !== "STUDENT") return false;
+  if (!viewer.school || viewer.school !== author.school) return false;
+  if (viewer.teacherClasses.length === 0) return true;
+  return viewer.teacherClasses.some((tc) => tc.grade === author.grade && tc.className === author.className);
+}
+
+/** 질문 열람 가능: 공개 / 본인 작성 / 담당 학급 교사 */
+export function canViewQuestion(
+  viewer: Viewer | null | undefined,
+  q: { isPublic: boolean; authorId: string; author: AuthorInfo | null },
+): boolean {
+  if (!viewer) return false;
+  return q.isPublic || q.authorId === viewer.id || teacherCanSeeAuthor(viewer, q.author);
+}
+
+/**
+ * 댓글 1건이 뷰어에게 보이는가 (부모 질문은 이미 볼 수 있다고 가정).
+ * 교사 / 본인 댓글 / 교사가 쓴 댓글 / 내 질문의 댓글 / 세션이 댓글 공개면 노출.
+ */
+export function isCommentVisibleToViewer(args: {
+  viewerRole: string;
+  viewerId: string;
+  commentsVisibleToPeers: boolean;
+  commentAuthorId: string;
+  commentAuthorRole: string;
+  questionAuthorId: string;
+}): boolean {
+  const { viewerRole, viewerId, commentsVisibleToPeers, commentAuthorId, commentAuthorRole, questionAuthorId } = args;
+  if (viewerRole === "TEACHER") return true;
+  if (commentAuthorId === viewerId) return true;
+  if (commentAuthorRole === "TEACHER") return true;
+  if (questionAuthorId === viewerId) return true;
+  return commentsVisibleToPeers;
+}

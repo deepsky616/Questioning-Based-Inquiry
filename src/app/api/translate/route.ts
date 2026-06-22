@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { getRequestLocale, DEFAULT_LOCALE } from "@/lib/locale";
 import { contentHash, translateTexts } from "@/lib/translate";
+import { canViewQuestion, isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { logger } from "@/lib/logger";
 
 const bodySchema = z.object({
@@ -46,18 +47,53 @@ export async function POST(req: Request) {
   }
   const { items } = parsed.data;
 
-  // 원문 로드 (질문·댓글). 본문은 이미 목록 API의 공개 권한을 통해 노출된 것이므로
-  // id로 본문을 가져와 번역만 한다(추가 정보 노출 없음).
+  // 원문 로드 + 열람 권한 검사. id만 알면 번역되지 않도록, 그 사용자가 실제로 볼 수 있는
+  // 질문·댓글만 번역 대상에 포함한다(공개/본인/담당 학급 교사/댓글 공개 규칙).
   const qIds = items.filter((i) => i.type === "QUESTION").map((i) => i.id);
   const cIds = items.filter((i) => i.type === "COMMENT").map((i) => i.id);
-  const [questions, comments] = await Promise.all([
-    qIds.length ? prisma.question.findMany({ where: { id: { in: qIds } }, select: { id: true, content: true } }) : [],
-    cIds.length ? prisma.comment.findMany({ where: { id: { in: cIds } }, select: { id: true, content: true } }) : [],
+
+  const authorSelect = { role: true, school: true, grade: true, className: true } as const;
+  const [viewer, questions, comments] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, school: true, grade: true, className: true, teacherClasses: { select: { grade: true, className: true } } },
+    }),
+    qIds.length
+      ? prisma.question.findMany({
+          where: { id: { in: qIds } },
+          select: { id: true, content: true, isPublic: true, authorId: true, author: { select: authorSelect } },
+        })
+      : [],
+    cIds.length
+      ? prisma.comment.findMany({
+          where: { id: { in: cIds } },
+          select: {
+            id: true, content: true, authorId: true, author: { select: { role: true } },
+            question: {
+              select: { isPublic: true, authorId: true, author: { select: authorSelect }, session: { select: { commentsVisibleToPeers: true } } },
+            },
+          },
+        })
+      : [],
   ]);
 
   const originals = new Map<string, string>();
-  for (const q of questions) originals.set(keyOf("QUESTION", q.id), q.content);
-  for (const c of comments) originals.set(keyOf("COMMENT", c.id), c.content);
+  for (const q of questions) {
+    if (canViewQuestion(viewer, q)) originals.set(keyOf("QUESTION", q.id), q.content);
+  }
+  for (const c of comments) {
+    const canSee =
+      canViewQuestion(viewer, c.question) &&
+      isCommentVisibleToViewer({
+        viewerRole: viewer?.role ?? "",
+        viewerId: userId,
+        commentsVisibleToPeers: c.question.session?.commentsVisibleToPeers ?? false,
+        commentAuthorId: c.authorId,
+        commentAuthorRole: c.author.role,
+        questionAuthorId: c.question.authorId,
+      });
+    if (canSee) originals.set(keyOf("COMMENT", c.id), c.content);
+  }
 
   // 캐시 조회
   const cached = await prisma.translation.findMany({

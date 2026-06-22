@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter } from "@/lib/questions";
+import { isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { sendQuestionNotificationEmail } from "@/lib/email";
 import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { Prisma } from "@prisma/client";
@@ -122,11 +123,11 @@ export async function GET(req: Request) {
         select: { id: true, name: true, className: true, grade: true, studentNumber: true },
       },
       session: {
-        select: { id: true, date: true, subject: true, topic: true, likesVisibleToPeers: true },
+        select: { id: true, date: true, subject: true, topic: true, likesVisibleToPeers: true, commentsVisibleToPeers: true },
       },
       comments: {
         include: {
-          author: { select: { id: true, name: true } },
+          author: { select: { id: true, name: true, role: true } },
         },
       },
       likes: {
@@ -139,17 +140,32 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
   });
 
-  const enriched = questions.map((q) => ({
-    ...q,
-    likeCount: q.likes.length,
-    commentCount: q.comments.length,
-    likesVisibleToPeers: q.session?.likesVisibleToPeers ?? true,
-    myLike: q.likes.some((l) => l.userId === userId),
-    likedBy: role === "TEACHER"
-      ? q.likes.map((l) => ({ id: l.user.id, name: l.user.name }))
-      : undefined,
-    likes: undefined,
-  }));
+  const enriched = questions.map((q) => {
+    // 댓글 비공개 세션: 학생 뷰어에겐 본인·교사 댓글만 노출(토글 안내 "끄면 본인·선생님 댓글만"과 일치)
+    const commentsVisible = q.session?.commentsVisibleToPeers ?? true;
+    const visibleComments = q.comments.filter((c) =>
+      isCommentVisibleToViewer({
+        viewerRole: role ?? "",
+        viewerId: userId,
+        commentsVisibleToPeers: commentsVisible,
+        commentAuthorId: c.author.id,
+        commentAuthorRole: c.author.role,
+        questionAuthorId: q.authorId,
+      }),
+    );
+    return {
+      ...q,
+      comments: visibleComments.map(({ author, ...c }) => ({ ...c, author: { id: author.id, name: author.name } })),
+      likeCount: q.likes.length,
+      commentCount: visibleComments.length,
+      likesVisibleToPeers: q.session?.likesVisibleToPeers ?? true,
+      myLike: q.likes.some((l) => l.userId === userId),
+      likedBy: role === "TEACHER"
+        ? q.likes.map((l) => ({ id: l.user.id, name: l.user.name }))
+        : undefined,
+      likes: undefined,
+    };
+  });
 
   // 정렬 기준은 학생순·좋아요순·댓글순 중 하나만 적용한다(클라이언트가 단일 기준 전송).
   if (studentSortParam) {

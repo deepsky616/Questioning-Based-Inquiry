@@ -85,7 +85,12 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   const userRole = (session.user as { id: string; role?: string }).role;
   const userId = (session.user as { id: string; role?: string }).id;
 
-  if (!question.isPublic && question.authorId !== userId && userRole !== "TEACHER") {
+  // 비공개 질문은 작성자 본인 또는 담당 학급 교사만 열람 가능(아무 교사나 X)
+  if (
+    !question.isPublic &&
+    question.authorId !== userId &&
+    !(userRole === "TEACHER" && (await canTeacherManageQuestion(userId, params.id)))
+  ) {
     return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
   }
 
@@ -170,6 +175,11 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   }
 
   if (question.authorId !== userId && userRole !== "TEACHER") {
+    return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
+  }
+
+  // 교사는 담당 학급 질문만 삭제 가능(수정 권한 검사와 동일)
+  if (userRole === "TEACHER" && !(await canTeacherManageQuestion(userId, params.id))) {
     return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
   }
 

@@ -10,6 +10,7 @@ vi.mock("@/lib/translate", async (importActual) => {
 });
 vi.mock("@/lib/db", () => ({
   prisma: {
+    user: { findUnique: vi.fn() },
     question: { findMany: vi.fn() },
     comment: { findMany: vi.fn() },
     translation: { findMany: vi.fn(), upsert: vi.fn() },
@@ -25,6 +26,7 @@ import { translateTexts, contentHash } from "@/lib/translate";
 const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mResolve = resolveUserAiConfig as unknown as ReturnType<typeof vi.fn>;
 const mTranslate = translateTexts as unknown as ReturnType<typeof vi.fn>;
+const mUser = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 const q = prisma.question.findMany as unknown as ReturnType<typeof vi.fn>;
 const c = prisma.comment.findMany as unknown as ReturnType<typeof vi.fn>;
 const tFind = prisma.translation.findMany as unknown as ReturnType<typeof vi.fn>;
@@ -39,10 +41,17 @@ function req(locale: string, items: unknown) {
 }
 
 const ITEM = [{ type: "QUESTION", id: "q1" }];
+// 공개 질문(권한 통과)
+const pubQ = (content: string) => ({
+  id: "q1", content, isPublic: true, authorId: "other",
+  author: { role: "STUDENT", school: "s", grade: "5", className: "1" },
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "u1" } });
+  // 기본 뷰어: 담당 학급 없는 교사(같은 학교 전체 열람 가능)
+  mUser.mockResolvedValue({ id: "u1", role: "TEACHER", school: "s", grade: null, className: null, teacherClasses: [] });
   q.mockResolvedValue([]);
   c.mockResolvedValue([]);
   tFind.mockResolvedValue([]);
@@ -65,7 +74,7 @@ describe("POST /api/translate", () => {
   });
 
   it("캐시 hit(해시 일치) → 번역 호출 없이 캐시 반환", async () => {
-    q.mockResolvedValue([{ id: "q1", content: "왜?" }]);
+    q.mockResolvedValue([pubQ("왜?")]);
     tFind.mockResolvedValue([
       { sourceType: "QUESTION", sourceId: "q1", content: "Why?", sourceHash: contentHash("왜?") },
     ]);
@@ -76,7 +85,7 @@ describe("POST /api/translate", () => {
   });
 
   it("캐시 miss + AI 키 없음 → 503", async () => {
-    q.mockResolvedValue([{ id: "q1", content: "왜?" }]);
+    q.mockResolvedValue([pubQ("왜?")]);
     mResolve.mockResolvedValue({ apiKey: null, model: "m" });
     const res = await POST(req("en", ITEM));
     expect(res.status).toBe(503);
@@ -84,7 +93,7 @@ describe("POST /api/translate", () => {
   });
 
   it("캐시 miss + 키 있음 → 번역·업서트·반환", async () => {
-    q.mockResolvedValue([{ id: "q1", content: "왜?" }]);
+    q.mockResolvedValue([pubQ("왜?")]);
     mResolve.mockResolvedValue({ apiKey: "k", model: "m" });
     mTranslate.mockResolvedValue(["Why?"]);
     const res = await POST(req("en", ITEM));
@@ -95,7 +104,7 @@ describe("POST /api/translate", () => {
   });
 
   it("stale 캐시(해시 불일치) → 재번역", async () => {
-    q.mockResolvedValue([{ id: "q1", content: "수정된 원문" }]);
+    q.mockResolvedValue([{ ...pubQ("수정된 원문") }]);
     tFind.mockResolvedValue([
       { sourceType: "QUESTION", sourceId: "q1", content: "old", sourceHash: contentHash("이전 원문") },
     ]);
@@ -104,5 +113,16 @@ describe("POST /api/translate", () => {
     const res = await POST(req("en", ITEM));
     expect(await res.json()).toEqual({ translations: { "QUESTION:q1": "new" } });
     expect(mTranslate).toHaveBeenCalledWith(["수정된 원문"], "en", "k", "m");
+  });
+
+  it("권한 없음(학생이 남의 비공개 질문 id로 직접 호출) → 번역 안 됨", async () => {
+    // 뷰어를 학생으로, 질문은 비공개+타인 작성 → 열람 불가 → 응답에서 제외
+    mUser.mockResolvedValue({ id: "u1", role: "STUDENT", school: "s", grade: "5", className: "1", teacherClasses: [] });
+    q.mockResolvedValue([{ id: "q1", content: "비밀 질문", isPublic: false, authorId: "other", author: { role: "STUDENT", school: "s", grade: "5", className: "1" } }]);
+    mResolve.mockResolvedValue({ apiKey: "k", model: "m" });
+    const res = await POST(req("en", ITEM));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ translations: {} });
+    expect(mTranslate).not.toHaveBeenCalled();
   });
 });
