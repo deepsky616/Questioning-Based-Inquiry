@@ -30,7 +30,8 @@
     "reset": "Reset",
     "questionWord": "question",
     "home": "Home",
-    "retry": "Try again"
+    "retry": "Try again",
+    "redirecting": "Redirecting..."
   },
   "classification": {
     "category1": "Type 1",
@@ -1151,5 +1152,13 @@
     "start": "🎮 Start game!",
     "builtIn": "Built-in",
     "play": "Play →"
+  },
+  "gamePreview": {
+    "cantPlay": "This game can't be previewed",
+    "builtInOnly": "Only built-in games support preview.",
+    "backToManage": "← Back to management",
+    "previewMode": "🎮 Preview mode · scores and records aren't saved",
+    "backShort": "← Back",
+    "teacherPlayer": "Teacher"
   }
 }

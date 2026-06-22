@@ -30,7 +30,8 @@
     "reset": "초기화",
     "questionWord": "질문",
     "home": "처음으로",
-    "retry": "다시 시도"
+    "retry": "다시 시도",
+    "redirecting": "이동 중..."
   },
   "classification": {
     "category1": "분류1",
@@ -1151,5 +1152,13 @@
     "start": "🎮 게임 시작!",
     "builtIn": "기본 제공",
     "play": "놀이하기 →"
+  },
+  "gamePreview": {
+    "cantPlay": "체험할 수 없는 놀이예요",
+    "builtInOnly": "기본 제공 놀이만 미리보기를 지원해요.",
+    "backToManage": "← 관리로 돌아가기",
+    "previewMode": "🎮 미리보기 모드 · 점수·기록은 저장되지 않아요",
+    "backShort": "← 관리로",
+    "teacherPlayer": "선생님"
   }
 }
