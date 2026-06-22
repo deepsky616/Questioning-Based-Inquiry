@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { StudentReportView } from "@/components/reports/StudentReportView";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -29,12 +31,27 @@ interface Stats {
   byCognitive: { factual: number; conceptual: number; controversial: number };
 }
 
-export default function StudentDashboard() {
+export default function StudentDashboardPage() {
+  // useSearchParams(탭 쿼리)는 Suspense 경계가 필요하다
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <StudentDashboard />
+    </Suspense>
+  );
+}
+
+function StudentDashboard() {
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const tCls = useTranslations("classification");
   const tc = useTranslations("common");
   const t = useTranslations("studentDash");
+  const tDash = useTranslations("dashboard");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
+  const setTab = (v: "overview" | "reports") =>
+    router.replace(v === "reports" ? "/student-dashboard?tab=reports" : "/student-dashboard", { scroll: false });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({
@@ -76,6 +93,26 @@ export default function StudentDashboard() {
         <p className="text-muted-foreground">{t("greetingSub")}</p>
       </div>
 
+      {/* 개요 / 상세 리포트 탭 */}
+      <div className="flex w-fit rounded-md border overflow-hidden">
+        {(["overview", "reports"] as const).map((v, i) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setTab(v)}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+              tab === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {v === "overview" ? tDash("tabOverview") : tDash("tabReports")}
+          </button>
+        ))}
+      </div>
+
+      {tab === "reports" ? (
+        <StudentReportView />
+      ) : (
+      <>
       {/* 포인트 카드 */}
       <PointsCard />
 
@@ -225,6 +262,8 @@ export default function StudentDashboard() {
         <ClassRankingPanel highlightSelf defaultScope="school" />
       </div>
         </>
+      )}
+      </>
       )}
     </div>
   );

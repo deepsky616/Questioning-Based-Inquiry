@@ -1,60 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ReportView, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 
-interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
-  student: { name: string; grade?: string | null; className?: string | null; studentNumber?: string | null };
-  sessions?: SessionMeta[];
-}
-
-async function analyzeStudentSession(sessionId: string, failMsg: string): Promise<SessionAnalysisResult | null> {
-  const res = await fetch("/api/reports/student-session-analysis", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionId }),
-  });
-  const d = await res.json();
-  if (!res.ok) throw new Error(d.error || failMsg);
-  return { summary: d.summary, insights: d.insights, relevanceInsights: d.relevanceInsights, growthInsights: d.growthInsights, rewriteExample: d.rewriteExample };
-}
-
-export default function StudentReportPage() {
-  const t = useTranslations("reports");
-  const [data, setData] = useState<StudentReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+// 활동 리포트는 대시보드의 '상세 리포트' 탭으로 통합됨. 기존 경로/북마크는 그쪽으로 보낸다.
+export default function StudentReportRedirect() {
+  const router = useRouter();
+  const tc = useTranslations("common");
   useEffect(() => {
-    fetch("/api/reports/student")
-      .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json()).error || t("loadFailed"));
-        return r.json();
-      })
-      .then((d: StudentReport) => setData(d))
-      .catch((e) => setError(e instanceof Error ? e.message : t("loadFailed")))
-      .finally(() => setLoading(false));
-  }, [t]);
-
-  if (loading) return <div className="py-16 text-center text-muted-foreground">{t("loadingReport")}</div>;
-  if (error || !data) return <div className="py-16 text-center text-red-600">{error ?? t("loadError")}</div>;
-
-  const s = data.student;
-  const sub = [s.grade && t("gradeLabel", { grade: s.grade }), s.className && t("classLabel", { className: s.className }), s.studentNumber && t("numberLabel", { n: s.studentNumber })]
-    .filter(Boolean).join(" ");
+    router.replace("/student-dashboard?tab=reports");
+  }, [router]);
 
   return (
-    <ReportView
-      scope="student"
-      title={t("studentReportTitle", { name: s.name })}
-      subtitle={sub || undefined}
-      totals={data.totals}
-      weekly={data.weekly}
-      monthly={data.monthly}
-      classification={data.classification}
-      sessions={data.sessions}
-      analyzeSession={(id) => analyzeStudentSession(id, t("analysisFailed"))}
-    />
+    <div className="min-h-[40vh] flex items-center justify-center">
+      <p className="text-muted-foreground text-sm">{tc("redirecting")}</p>
+    </div>
   );
 }
