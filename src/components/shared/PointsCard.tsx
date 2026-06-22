@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { AI_BONUS_TYPES, GAME_LABEL, BASE_POINTS, pointBonusLabel } from "@/lib/points-policy";
+import { AI_BONUS_TYPES, BASE_POINTS } from "@/lib/points-policy";
+import { usePointBonusLabel } from "@/components/shared/use-point-label";
 import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -36,8 +37,6 @@ function relativeTime(iso: string): { key: "justNow" | "minutesAgo" | "hoursAgo"
   return { key: "daysAgo" as const, v: { d } };
 }
 
-const bonusLabel = pointBonusLabel;
-
 async function fetchPointsCard() {
   const [meRes, classLb, schoolLb, allLb]: [
     { totalPoints?: number; recent?: PointLog[] },
@@ -61,6 +60,8 @@ async function fetchPointsCard() {
 
 export default function PointsCard() {
   const t = useTranslations("points");
+  const tAward = useTranslations("pointLabel");
+  const { label: bonusLabel, gameLabel } = usePointBonusLabel();
   const [showGuide, setShowGuide] = useState(false);
 
   // 폴링을 react-query로: 백그라운드 탭에선 자동 일시정지, 창 포커스 시 갱신
@@ -109,7 +110,7 @@ export default function PointsCard() {
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {recent.slice(0, 8).map((log) => {
               const b = bonusLabel(log.bonusType);
-              const game = GAME_LABEL[log.gameId];
+              const game = gameLabel(log.gameId);
               const isPending = log.status === "PENDING";
               const isRejected = log.status === "REJECTED";
               // instance:<UUID>는 중복 지급 방지용 내부 키이므로 표시하지 않는다
@@ -178,7 +179,7 @@ export default function PointsCard() {
               <p className="font-semibold text-foreground">{t("specialSection")}</p>
               <ul className="mt-1 space-y-0.5 text-muted-foreground">
                 {Object.values(AI_BONUS_TYPES).map((b) => (
-                  <li key={b.key}>{b.emoji} {b.label} <b className="text-indigo-600">{t("pointsSuffix", { n: b.points })}</b></li>
+                  <li key={b.key}>{b.emoji} {tAward(`award_${b.key}`)} <b className="text-indigo-600">{t("pointsSuffix", { n: b.points })}</b></li>
                 ))}
               </ul>
               <p className="mt-1 text-xs text-muted-foreground">{t("aiNote")}</p>

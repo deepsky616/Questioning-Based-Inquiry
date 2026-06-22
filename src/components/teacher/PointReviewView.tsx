@@ -26,17 +26,19 @@ interface PendingLog {
   alreadyInSession: number;
 }
 
-function bonusLabel(bt: string): { label: string; emoji: string; color: string } {
+// 라벨은 번역키(labelKey)로 반환하고 표시 시점에 t로 해석. 미지정 타입은 raw 노출.
+function bonusLabel(bt: string): { labelKey: string | null; raw: string; emoji: string; color: string } {
   const stripped = bt.replace(/^AI_/, "");
   if (stripped in ACTIVITY_BONUS_TYPES) {
     const def = ACTIVITY_BONUS_TYPES[stripped as keyof typeof ACTIVITY_BONUS_TYPES];
     return {
-      label: def.label,
+      labelKey: `review_${stripped}`,
+      raw: bt,
       emoji: def.emoji,
       color: stripped === "DUPLICATE_FLAGGED" ? "#ef4444" : "#6366f1",
     };
   }
-  return { label: bt, emoji: "🎯", color: "#6366f1" };
+  return { labelKey: null, raw: bt, emoji: "🎯", color: "#6366f1" };
 }
 
 export function PointReviewView() {
@@ -241,6 +243,7 @@ function PendingRow({
   setOverride: (v: number) => void;
 }) {
   const t = useTranslations("pointReview");
+  const tL = useTranslations("pointLabel");
   const b = bonusLabel(p.bonusType);
   const isDup = p.bonusType.includes("DUPLICATE");
   const content = p.commentContent || p.questionContent;
@@ -255,7 +258,7 @@ function PendingRow({
             <span className="text-xs text-muted-foreground">{t("gradeClass", { grade: p.grade ?? "", className: p.className ?? "" })}</span>
             <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
               style={{ background: b.color }}>
-              {b.emoji} {b.label}
+              {b.emoji} {b.labelKey ? tL(b.labelKey) : b.raw}
               {!isDup && <span className="ml-1">{t("pointsSuffix", { points: p.points })}</span>}
             </span>
             {p.relatedQuestionId && p.questionLikeCount != null && (

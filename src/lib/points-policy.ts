@@ -100,6 +100,37 @@ export function pointBonusLabel(bonusType: string): { label: string; emoji: stri
   }
 }
 
+// 포인트 이력 라벨을 번역키로 매핑하기 위한 명세(표시 시점 i18n용, 순수 함수).
+// pointBonusLabel(한국어)은 게임 화면 등 비번역 영역에서 계속 사용한다.
+const ACTIVITY_EMOJI: Record<string, string> = {
+  QUESTION_WRITE: "✏️",
+  COMMENT_WRITE: "💬",
+  PARTICIPATION: "✋",
+  VALID_QUESTIONS: "❓",
+  COMPLETION: "✅",
+  WINNER: "👑",
+  TEACHER_GRANT: "🎁",
+  TEACHER_REVOKE: "↩️",
+};
+
+export type PointBonusSpec =
+  | { kind: "award"; code: string; emoji: string }
+  | { kind: "game"; mode: "solo" | "ai"; gameId: string; emoji: string }
+  | { kind: "activity"; code: string; emoji: string };
+
+export function pointBonusSpec(bonusType: string): PointBonusSpec {
+  if (bonusType in AI_BONUS_TYPES) {
+    return { kind: "award", code: bonusType, emoji: AI_BONUS_TYPES[bonusType as BonusKey].emoji };
+  }
+  if (bonusType.startsWith("ACTIVITY_SOLO_") || bonusType.startsWith("ACTIVITY_AI_")) {
+    const isSolo = bonusType.startsWith("ACTIVITY_SOLO_");
+    const gameId = bonusType.slice(isSolo ? "ACTIVITY_SOLO_".length : "ACTIVITY_AI_".length);
+    return { kind: "game", mode: isSolo ? "solo" : "ai", gameId, emoji: isSolo ? "🙋" : "🤖" };
+  }
+  const code = bonusType in ACTIVITY_EMOJI ? bonusType : "default";
+  return { kind: "activity", code, emoji: ACTIVITY_EMOJI[code] ?? "🎯" };
+}
+
 // ── 유효 질문 판정 (서버에서 재검증) ─────────────────────
 export function isValidQuestionForm(text: string): boolean {
   const t = text.trim();
