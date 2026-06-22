@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,9 @@ interface Comment {
 }
 
 export function MyQuestionsView() {
+  const t = useTranslations("myQuestions");
+  const tc = useTranslations("common");
+  const tEx = useTranslations("explore");
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -146,7 +150,7 @@ export function MyQuestionsView() {
   const confirm = useConfirm();
 
   const handleDelete = async (questionId: string) => {
-    if (!(await confirm({ description: "이 질문을 정말 삭제할까요? 작성한 댓글도 모두 함께 사라집니다.", confirmText: "삭제", destructive: true }))) return;
+    if (!(await confirm({ description: t("deleteConfirm"), confirmText: tc("delete"), destructive: true }))) return;
     setDeletingId(questionId);
     try {
       const res = await fetch(`/api/questions/${questionId}`, { method: "DELETE" });
@@ -155,10 +159,10 @@ export function MyQuestionsView() {
         setExpandedQuestionId((prev) => (prev === questionId ? null : prev));
       } else {
         const data = await res.json().catch(() => ({}));
-        toast({ variant: "destructive", description: data?.error ?? "삭제에 실패했습니다." });
+        toast({ variant: "destructive", description: data?.error ?? t("deleteFailed") });
       }
     } catch {
-      toast({ variant: "destructive", description: "네트워크 오류가 발생했습니다." });
+      toast({ variant: "destructive", description: t("networkError") });
     } finally {
       setDeletingId(null);
     }
@@ -166,21 +170,21 @@ export function MyQuestionsView() {
 
   const QuestionRows = ({ list }: { list: Question[] }) =>
     list.length === 0 ? (
-      <EmptyState icon="📝" title="해당하는 질문이 없습니다" description="다른 조건으로 조회해 보세요" />
+      <EmptyState icon="📝" title={t("empty")} description={t("emptyDesc")} />
     ) : (
       <div className="overflow-x-auto"><Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">#</TableHead>
-            <TableHead>질문 내용</TableHead>
-            <TableHead className="w-20">폐쇄/개방</TableHead>
-            <TableHead className="w-24">인지 수준</TableHead>
-            <TableHead className="w-24">공개</TableHead>
-            <TableHead className="w-32">수업 세션</TableHead>
-            <TableHead className="w-36">작성 일시</TableHead>
-            <TableHead className="w-16">좋아요</TableHead>
-            <TableHead className="w-24">댓글</TableHead>
-            <TableHead className="w-20">관리</TableHead>
+            <TableHead>{t("colContent")}</TableHead>
+            <TableHead className="w-20">{t("colClosure")}</TableHead>
+            <TableHead className="w-24">{t("colCognitive")}</TableHead>
+            <TableHead className="w-24">{t("colPublic")}</TableHead>
+            <TableHead className="w-32">{t("colSession")}</TableHead>
+            <TableHead className="w-36">{t("colCreated")}</TableHead>
+            <TableHead className="w-16">{t("colLikes")}</TableHead>
+            <TableHead className="w-24">{t("colComments")}</TableHead>
+            <TableHead className="w-20">{t("colManage")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -208,7 +212,7 @@ export function MyQuestionsView() {
                   </TableCell>
                   <TableCell>
                     <span className={`text-xs px-2 py-1 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>
-                      {q.isPublic ? "공개" : "비공개"}
+                      {q.isPublic ? t("public") : t("private")}
                     </span>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
@@ -232,7 +236,7 @@ export function MyQuestionsView() {
                       }
                       onClick={() => toggleComments(q.id)}
                     >
-                      댓글 {commentCount}개
+                      {t("commentCount", { count: commentCount })}
                     </Button>
                   </TableCell>
                   <TableCell>
@@ -244,7 +248,7 @@ export function MyQuestionsView() {
                       disabled={isDeleting}
                       onClick={() => handleDelete(q.id)}
                     >
-                      {isDeleting ? "삭제 중..." : "🗑 삭제"}
+                      {isDeleting ? t("deleting") : t("deleteBtn")}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -268,52 +272,52 @@ export function MyQuestionsView() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        작성한 질문을 조회하고, 분류·세션별로 확인하거나 삭제할 수 있어요 · 총 {questions.length}개
+        {t("intro", { count: questions.length })}
       </p>
 
       {/* 조회 방법: 날짜·교과·주제로 좁혀 세션 선택 (교사 페이지와 동일) */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">조회 방법</CardTitle>
+          <CardTitle className="text-base">{tEx("filterHeader")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 w-36">
-              <label className="text-xs font-medium text-muted-foreground">날짜</label>
+              <label className="text-xs font-medium text-muted-foreground">{tEx("date")}</label>
               <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="전체 날짜" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={tEx("allDates")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 날짜</SelectItem>
+                  <SelectItem value="__all__">{tEx("allDates")}</SelectItem>
                   {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-32">
-              <label className="text-xs font-medium text-muted-foreground">교과</label>
+              <label className="text-xs font-medium text-muted-foreground">{tEx("subject")}</label>
               <Select value={filterSubject || "__all__"} onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={tEx("all")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 교과</SelectItem>
+                  <SelectItem value="__all__">{tEx("allSubjects")}</SelectItem>
                   {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-52">
-              <label className="text-xs font-medium text-muted-foreground">주제</label>
+              <label className="text-xs font-medium text-muted-foreground">{tEx("topic")}</label>
               <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder="전체" /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={tEx("all")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">전체 주제</SelectItem>
+                  <SelectItem value="__all__">{tEx("allTopics")}</SelectItem>
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label className="text-xs font-medium text-muted-foreground">수업 세션</label>
+              <label className="text-xs font-medium text-muted-foreground">{tEx("classSession")}</label>
               <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                <SelectTrigger className="bg-background font-medium"><SelectValue placeholder="수업 세션 선택" /></SelectTrigger>
+                <SelectTrigger className="bg-background font-medium"><SelectValue placeholder={tEx("selectSession")} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">전체 수업 세션</SelectItem>
+                  <SelectItem value="all">{tEx("allSessions")}</SelectItem>
                   {filteredSessions.map((s) => (
                     <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
                   ))}
@@ -321,7 +325,7 @@ export function MyQuestionsView() {
               </Select>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">💡 날짜·교과·주제로 좁혀도, 직접 수업 세션을 골라도 결과는 같습니다.</p>
+          <p className="text-xs text-muted-foreground mt-2">{tEx("filterHint")}</p>
         </CardContent>
       </Card>
 
@@ -334,10 +338,10 @@ export function MyQuestionsView() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 flex-wrap">
               <CardTitle className="text-base">
-                📝 전체 질문 목록 <span className="text-sm font-normal text-muted-foreground">{displayed.length}개</span>
+                {tEx("listTitle")} <span className="text-sm font-normal text-muted-foreground">{tEx("countItems", { count: displayed.length })}</span>
               </CardTitle>
               <Input
-                placeholder="질문으로 검색..."
+                placeholder={t("searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 text-sm w-56 bg-background"

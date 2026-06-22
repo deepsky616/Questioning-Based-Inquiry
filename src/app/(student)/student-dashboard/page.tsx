@@ -34,6 +34,7 @@ export default function StudentDashboard() {
   const user = getSessionUser(session);
   const tCls = useTranslations("classification");
   const tc = useTranslations("common");
+  const t = useTranslations("studentDash");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<Stats>({
@@ -70,9 +71,9 @@ export default function StudentDashboard() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">
-          안녕하세요, {user.name} 학생!
+          {t("greeting", { name: user.name ?? "" })}
         </h2>
-        <p className="text-muted-foreground">오늘도 좋은 질문을 만들어 보세요</p>
+        <p className="text-muted-foreground">{t("greetingSub")}</p>
       </div>
 
       {/* 포인트 카드 */}
@@ -85,7 +86,7 @@ export default function StudentDashboard() {
       {/* 총 질문 수 */}
       <Card>
         <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">내가 작성한 총 질문 수</p>
+          <p className="text-sm text-muted-foreground">{t("totalQuestions")}</p>
           <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
         </CardContent>
       </Card>
@@ -187,12 +188,12 @@ export default function StudentDashboard() {
       {/* 최근 질문 */}
       <Card>
         <CardHeader>
-          <CardTitle>최근 질문</CardTitle>
-          <CardDescription>내가 작성한 최근 질문 목록입니다</CardDescription>
+          <CardTitle>{t("recentTitle")}</CardTitle>
+          <CardDescription>{t("recentDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {questions.length === 0 ? (
-            <EmptyState icon="✏️" title="아직 질문이 없어요" description="첫 질문을 작성해 보세요!" />
+            <EmptyState icon="✏️" title={t("empty")} description={t("emptyDesc")} />
           ) : (
             <div className="space-y-3">
               {questions.map((q) => (
@@ -212,7 +213,7 @@ export default function StudentDashboard() {
           )}
           <div className="mt-4">
             <Link href="/student-questions">
-              <Button variant="outline">전체 질문 보기</Button>
+              <Button variant="outline">{t("viewAll")}</Button>
             </Link>
           </div>
         </CardContent>

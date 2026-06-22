@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -32,6 +34,7 @@ export function SessionTargetSelector({
   onTargetClassChange,
   onSelectedStudentIdsChange,
 }: SessionTargetSelectorProps) {
+  const t = useTranslations("targetSelector");
   const selectedClassStudents = targetClassValue === "all"
     ? []
     : students.filter((student) => {
@@ -68,16 +71,16 @@ export function SessionTargetSelector({
 
   return (
     <div className="space-y-2">
-      <Label>배포 대상</Label>
+      <Label>{t("target")}</Label>
       <Select value={targetClassValue} onValueChange={handleClassChange}>
         <SelectTrigger>
-          <SelectValue placeholder="학급 선택" />
+          <SelectValue placeholder={t("selectClass")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">전체 담당 학급</SelectItem>
+          <SelectItem value="all">{t("allClasses")}</SelectItem>
           {classes.map((targetClass) => (
             <SelectItem key={buildClassTargetValue(targetClass)} value={buildClassTargetValue(targetClass)}>
-              {targetClass.grade}학년 {targetClass.className}반
+              {t("gradeClass", { grade: targetClass.grade, className: targetClass.className })}
             </SelectItem>
           ))}
         </SelectContent>
@@ -90,7 +93,7 @@ export function SessionTargetSelector({
         <div className="max-h-44 overflow-auto rounded-md border bg-card">
           <label className="flex cursor-pointer items-center gap-2 border-b px-3 py-2 text-sm font-medium text-foreground">
             <input type="checkbox" checked={isAllChecked} onChange={toggleAll} />
-            전체 선택
+            {t("selectAll")}
           </label>
           {selectedClassStudents.map((student) => (
             <label
@@ -103,12 +106,12 @@ export function SessionTargetSelector({
                 onChange={() => toggleStudent(student.id)}
               />
               <span className="min-w-0 truncate">
-                {student.studentNumber}번 {student.name}
+                {t("numberName", { n: student.studentNumber, name: student.name })}
               </span>
             </label>
           ))}
           {selectedClassStudents.length === 0 && (
-            <div className="px-3 py-4 text-center text-sm text-muted-foreground">학생이 없습니다</div>
+            <div className="px-3 py-4 text-center text-sm text-muted-foreground">{t("noStudents")}</div>
           )}
         </div>
       )}

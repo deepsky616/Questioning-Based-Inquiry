@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ReportView, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
@@ -8,18 +9,19 @@ interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subti
   sessions?: SessionMeta[];
 }
 
-async function analyzeStudentSession(sessionId: string): Promise<SessionAnalysisResult | null> {
+async function analyzeStudentSession(sessionId: string, failMsg: string): Promise<SessionAnalysisResult | null> {
   const res = await fetch("/api/reports/student-session-analysis", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sessionId }),
   });
   const d = await res.json();
-  if (!res.ok) throw new Error(d.error || "분석 실패");
+  if (!res.ok) throw new Error(d.error || failMsg);
   return { summary: d.summary, insights: d.insights, relevanceInsights: d.relevanceInsights, growthInsights: d.growthInsights, rewriteExample: d.rewriteExample };
 }
 
 export default function StudentReportPage() {
+  const t = useTranslations("reports");
   const [data, setData] = useState<StudentReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,32 +29,32 @@ export default function StudentReportPage() {
   useEffect(() => {
     fetch("/api/reports/student")
       .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json()).error || "불러오기 실패");
+        if (!r.ok) throw new Error((await r.json()).error || t("loadFailed"));
         return r.json();
       })
       .then((d: StudentReport) => setData(d))
-      .catch((e) => setError(e instanceof Error ? e.message : "불러오기 실패"))
+      .catch((e) => setError(e instanceof Error ? e.message : t("loadFailed")))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
-  if (loading) return <div className="py-16 text-center text-muted-foreground">리포트를 불러오는 중...</div>;
-  if (error || !data) return <div className="py-16 text-center text-red-600">{error ?? "리포트를 불러올 수 없습니다"}</div>;
+  if (loading) return <div className="py-16 text-center text-muted-foreground">{t("loadingReport")}</div>;
+  if (error || !data) return <div className="py-16 text-center text-red-600">{error ?? t("loadError")}</div>;
 
   const s = data.student;
-  const sub = [s.grade && `${s.grade}학년`, s.className && `${s.className}반`, s.studentNumber && `${s.studentNumber}번`]
+  const sub = [s.grade && t("gradeLabel", { grade: s.grade }), s.className && t("classLabel", { className: s.className }), s.studentNumber && t("numberLabel", { n: s.studentNumber })]
     .filter(Boolean).join(" ");
 
   return (
     <ReportView
       scope="student"
-      title={`${s.name} 학생 활동 리포트`}
+      title={t("studentReportTitle", { name: s.name })}
       subtitle={sub || undefined}
       totals={data.totals}
       weekly={data.weekly}
       monthly={data.monthly}
       classification={data.classification}
       sessions={data.sessions}
-      analyzeSession={analyzeStudentSession}
+      analyzeSession={(id) => analyzeStudentSession(id, t("analysisFailed"))}
     />
   );
 }

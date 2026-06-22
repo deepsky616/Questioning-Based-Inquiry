@@ -20,6 +20,8 @@ interface ExtendedUser {
 
 export default function SettingsPage() {
   const tPages = useTranslations("pages");
+  const tSet = useTranslations("settings");
+  const t = useTranslations("studentSettings");
   const { data: session } = useSession();
   const user = session?.user as ExtendedUser | undefined;
 
@@ -29,42 +31,42 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>계정 정보</CardTitle>
+          <CardTitle>{tSet("accountInfo")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>이름</Label>
+              <Label>{tSet("name")}</Label>
               <Input value={user?.name || ""} disabled />
             </div>
             <div className="space-y-2">
-              <Label>역할</Label>
-              <Input value="학생" disabled />
+              <Label>{t("role")}</Label>
+              <Input value={t("student")} disabled />
             </div>
           </div>
           {user?.school && (
             <div className="space-y-2">
-              <Label>소속 학교</Label>
+              <Label>{tSet("school")}</Label>
               <Input value={user.school} disabled />
             </div>
           )}
           <div className="grid grid-cols-3 gap-4">
             {user?.grade && (
               <div className="space-y-2">
-                <Label>학년</Label>
-                <Input value={`${user.grade}학년`} disabled />
+                <Label>{t("grade")}</Label>
+                <Input value={t("gradeValue", { grade: user.grade })} disabled />
               </div>
             )}
             {user?.className && (
               <div className="space-y-2">
-                <Label>반</Label>
-                <Input value={`${user.className}반`} disabled />
+                <Label>{t("className")}</Label>
+                <Input value={t("classValue", { className: user.className })} disabled />
               </div>
             )}
             {user?.studentNumber && (
               <div className="space-y-2">
-                <Label>번호</Label>
-                <Input value={`${user.studentNumber}번`} disabled />
+                <Label>{t("number")}</Label>
+                <Input value={t("numberValue", { n: user.studentNumber })} disabled />
               </div>
             )}
           </div>

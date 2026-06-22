@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useEffect, useRef, useState } from "react";
 import { EmptyState } from "@/components/shared/EmptyState";
 
@@ -93,6 +95,7 @@ export function RankingPanel({
   defaultScope?: IndivScope;
   showStudentNumber?: boolean;
 }) {
+  const t = useTranslations("ranking");
   const [scope, setScope] = useState<IndivScope>(defaultScope);
   const [data, setData] = useState<IndivData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,9 +128,9 @@ export function RankingPanel({
   const sub = (s: { school: string | null; grade: string | null; className: string | null; studentNumber: string | null }) =>
     [
       s.school,
-      s.grade && `${s.grade}학년`,
-      s.className && `${s.className}반`,
-      showStudentNumber && s.studentNumber ? `${s.studentNumber}번` : null,
+      s.grade && t("gradeLabel", { grade: s.grade }),
+      s.className && t("classLabel", { className: s.className }),
+      showStudentNumber && s.studentNumber ? t("numberLabel", { n: s.studentNumber }) : null,
     ]
       .filter(Boolean)
       .join(" ");
@@ -137,34 +140,34 @@ export function RankingPanel({
   return (
     <div className="rounded-xl border bg-card p-4 space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm font-bold text-foreground">🏆 학생 순위 <span className="text-xs font-normal text-muted-foreground">· 총 {data?.total ?? 0}명</span></p>
+        <p className="text-sm font-bold text-foreground">{t("title")} <span className="text-xs font-normal text-muted-foreground">{t("totalCount", { count: data?.total ?? 0 })}</span></p>
         <ScopeTabs
           value={scope}
           onChange={setScope}
           options={[
-            { value: "class", label: "우리반" },
-            { value: "school", label: "교내" },
-            { value: "all", label: "전체" },
+            { value: "class", label: t("scopeClass") },
+            { value: "school", label: t("scopeSchool") },
+            { value: "all", label: t("scopeAll") },
           ]}
         />
       </div>
       {highlightSelf && data?.me?.rank != null && (
         <p className="text-xs text-muted-foreground">
-          내 순위: <span className="font-bold text-indigo-600">{data.me.rank}위</span> · {data.me.totalPoints}점
+          {t("myRankLabel")}<span className="font-bold text-indigo-600">{t("rankValue", { rank: data.me.rank })}</span> · {t("pointValue", { points: data.me.totalPoints })}
         </p>
       )}
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">불러오는 중...</div>
+        <div className="py-8 text-center text-sm text-muted-foreground">{t("loading")}</div>
       ) : !data || data.students.length === 0 ? (
-        <EmptyState icon="🏆" title="표시할 순위가 없습니다" />
+        <EmptyState icon="🏆" title={t("noRanking")} />
       ) : (
         <div ref={containerRef} className="max-h-80 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card">
               <tr className="text-xs text-muted-foreground border-b">
-                <th className="w-12 py-1.5 text-center font-medium">순위</th>
-                <th className="py-1.5 text-left font-medium">이름</th>
-                <th className="py-1.5 text-right font-medium pr-1">포인트</th>
+                <th className="w-12 py-1.5 text-center font-medium">{t("colRank")}</th>
+                <th className="py-1.5 text-left font-medium">{t("colName")}</th>
+                <th className="py-1.5 text-right font-medium pr-1">{t("colPoints")}</th>
               </tr>
             </thead>
             <tbody>
@@ -179,7 +182,7 @@ export function RankingPanel({
                     <td className="py-1.5 text-center font-semibold">{medal(i + 1)}</td>
                     <td className="py-1.5">
                       <span className="font-medium text-foreground">{s.name}</span>
-                      {isMe && <span className="ml-1 text-xs text-indigo-600">(나)</span>}
+                      {isMe && <span className="ml-1 text-xs text-indigo-600">{t("me")}</span>}
                       {sub(s) && <span className="ml-1.5 text-xs text-muted-foreground">{sub(s)}</span>}
                     </td>
                     <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{s.totalPoints}</td>
@@ -191,7 +194,7 @@ export function RankingPanel({
                   <td className="py-1.5 text-center font-semibold">{data.me.rank}</td>
                   <td className="py-1.5">
                     <span className="font-medium text-foreground">{data.me.name}</span>
-                    <span className="ml-1 text-xs text-indigo-600">(나)</span>
+                    <span className="ml-1 text-xs text-indigo-600">{t("me")}</span>
                   </td>
                   <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{data.me.totalPoints}</td>
                 </tr>
@@ -233,6 +236,7 @@ export function StudentRankPanel({
   classNameParam?: string;
   highlightSelf?: boolean;
 }) {
+  const t = useTranslations("ranking");
   const [data, setData] = useState<ClassRankData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const selfRef = useRef<HTMLTableRowElement>(null);
@@ -259,30 +263,30 @@ export function StudentRankPanel({
     }
   }, [data, highlightSelf]);
 
-  const klassLabel = data?.klass ? `${data.klass.grade}학년 ${data.klass.className}반` : "";
+  const klassLabel = data?.klass ? t("klassLabelFull", { grade: data.klass.grade, className: data.klass.className }) : "";
 
   return (
     <div className="rounded-xl border bg-card p-4 space-y-3">
       <p className="text-sm font-bold text-foreground">
-        🏆 학생 순위
-        {klassLabel && <span className="text-xs font-normal text-muted-foreground"> · {klassLabel} · 총 {data?.total ?? 0}명</span>}
+        {t("title")}
+        {klassLabel && <span className="text-xs font-normal text-muted-foreground">{t("classByline", { klass: klassLabel, count: data?.total ?? 0 })}</span>}
       </p>
-      <p className="text-xs text-muted-foreground">출석번호순 · 이름·포인트·우리반/교내/전체 순위</p>
+      <p className="text-xs text-muted-foreground">{t("studentRankHint")}</p>
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">불러오는 중...</div>
+        <div className="py-8 text-center text-sm text-muted-foreground">{t("loading")}</div>
       ) : !data || data.students.length === 0 ? (
-        <EmptyState icon="🏆" title="표시할 순위가 없습니다" />
+        <EmptyState icon="🏆" title={t("noRanking")} />
       ) : (
         <div ref={containerRef} className="max-h-80 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card">
               <tr className="text-xs text-muted-foreground border-b">
-                <th className="w-12 py-1.5 text-center font-medium">번호</th>
-                <th className="py-1.5 text-left font-medium">이름</th>
-                <th className="py-1.5 text-right font-medium pr-1">포인트</th>
-                <th className="py-1.5 text-center font-medium">우리반</th>
-                <th className="py-1.5 text-center font-medium">교내</th>
-                <th className="py-1.5 text-center font-medium">전체</th>
+                <th className="w-12 py-1.5 text-center font-medium">{t("colNumber")}</th>
+                <th className="py-1.5 text-left font-medium">{t("colName")}</th>
+                <th className="py-1.5 text-right font-medium pr-1">{t("colPoints")}</th>
+                <th className="py-1.5 text-center font-medium">{t("colClass")}</th>
+                <th className="py-1.5 text-center font-medium">{t("colSchool")}</th>
+                <th className="py-1.5 text-center font-medium">{t("colAll")}</th>
               </tr>
             </thead>
             <tbody>
@@ -295,7 +299,7 @@ export function StudentRankPanel({
                   <td className="py-1.5 text-center font-semibold text-foreground">{s.studentNumber ?? "-"}</td>
                   <td className="py-1.5 text-left">
                     <span className="font-medium text-foreground">{s.name}</span>
-                    {s.isMe && <span className="ml-1 text-xs text-indigo-600">(나)</span>}
+                    {s.isMe && <span className="ml-1 text-xs text-indigo-600">{t("me")}</span>}
                   </td>
                   <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{s.totalPoints}</td>
                   <td className="py-1.5 text-center text-indigo-600 dark:text-indigo-400 font-bold">{s.classRank}</td>
@@ -323,6 +327,7 @@ export function ClassRankingPanel({
   highlightSelf?: boolean;
   defaultScope?: ClassScope;
 }) {
+  const t = useTranslations("ranking");
   const [scope, setScope] = useState<ClassScope>(defaultScope);
   const [data, setData] = useState<ClassData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -359,41 +364,41 @@ export function ClassRankingPanel({
     c.className === data.myClass.className;
 
   const classLabel = (c: RankedClass) =>
-    scope === "all" ? `${c.school} ${c.grade}학년 ${c.className}반` : `${c.grade}학년 ${c.className}반`;
+    scope === "all" ? t("classNameAll", { school: c.school, grade: c.grade, className: c.className }) : t("classNameShort", { grade: c.grade, className: c.className });
 
   const myClassInList = data?.classes.some((c) => isSameClass(c));
 
   return (
     <div className="rounded-xl border bg-card p-4 space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <p className="text-sm font-bold text-foreground">🏫 반 순위 <span className="text-xs font-normal text-muted-foreground">· 1인당 평균 · 총 {data?.total ?? 0}개 반</span></p>
+        <p className="text-sm font-bold text-foreground">{t("classRankTitle")} <span className="text-xs font-normal text-muted-foreground">{t("classRankSub", { count: data?.total ?? 0 })}</span></p>
         <ScopeTabs
           value={scope}
           onChange={setScope}
           options={[
-            { value: "school", label: "교내" },
-            { value: "all", label: "전체" },
+            { value: "school", label: t("scopeSchool") },
+            { value: "all", label: t("scopeAll") },
           ]}
         />
       </div>
       {data?.myClass && (
         <p className="text-xs text-muted-foreground">
-          우리 반: <span className="font-bold text-indigo-600">{data.myClass.rank}위</span> · 평균 {data.myClass.avgPoints}점
+          {t("myClassLabel")}<span className="font-bold text-indigo-600">{t("rankValue", { rank: data.myClass.rank })}</span> · {t("avgValue", { avg: data.myClass.avgPoints })}
         </p>
       )}
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">불러오는 중...</div>
+        <div className="py-8 text-center text-sm text-muted-foreground">{t("loading")}</div>
       ) : !data || data.classes.length === 0 ? (
-        <EmptyState icon="🏆" title="표시할 순위가 없습니다" />
+        <EmptyState icon="🏆" title={t("noRanking")} />
       ) : (
         <div ref={containerRef} className="max-h-80 overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-card">
               <tr className="text-xs text-muted-foreground border-b">
-                <th className="w-12 py-1.5 text-center font-medium">순위</th>
-                <th className="py-1.5 text-left font-medium">반</th>
-                <th className="w-12 py-1.5 text-right font-medium">인원</th>
-                <th className="py-1.5 text-right font-medium pr-1">평균</th>
+                <th className="w-12 py-1.5 text-center font-medium">{t("colRank")}</th>
+                <th className="py-1.5 text-left font-medium">{t("colClassName")}</th>
+                <th className="w-12 py-1.5 text-right font-medium">{t("colCount")}</th>
+                <th className="py-1.5 text-right font-medium pr-1">{t("colAvg")}</th>
               </tr>
             </thead>
             <tbody>
@@ -408,9 +413,9 @@ export function ClassRankingPanel({
                     <td className="py-1.5 text-center font-semibold">{medal(c.rank)}</td>
                     <td className="py-1.5">
                       <span className="font-medium text-foreground">{classLabel(c)}</span>
-                      {mine && <span className="ml-1 text-xs text-indigo-600">(우리 반)</span>}
+                      {mine && <span className="ml-1 text-xs text-indigo-600">{t("myClassTag")}</span>}
                     </td>
-                    <td className="py-1.5 text-right text-xs text-muted-foreground">{c.memberCount}명</td>
+                    <td className="py-1.5 text-right text-xs text-muted-foreground">{t("memberCount", { count: c.memberCount })}</td>
                     <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{c.avgPoints}</td>
                   </tr>
                 );
@@ -420,9 +425,9 @@ export function ClassRankingPanel({
                   <td className="py-1.5 text-center font-semibold">{data.myClass.rank}</td>
                   <td className="py-1.5">
                     <span className="font-medium text-foreground">{classLabel(data.myClass)}</span>
-                    <span className="ml-1 text-xs text-indigo-600">(우리 반)</span>
+                    <span className="ml-1 text-xs text-indigo-600">{t("myClassTag")}</span>
                   </td>
-                  <td className="py-1.5 text-right text-xs text-muted-foreground">{data.myClass.memberCount}명</td>
+                  <td className="py-1.5 text-right text-xs text-muted-foreground">{t("memberCount", { count: data.myClass.memberCount })}</td>
                   <td className="py-1.5 text-right font-bold text-rose-500 pr-1">{data.myClass.avgPoints}</td>
                 </tr>
               )}

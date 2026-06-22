@@ -42,6 +42,7 @@ export function QuestionSortControl({
   onChange: (field: SortField, dir: SortDir) => void;
   showStudent?: boolean;
 }) {
+  const tq = useTranslations("qstats");
   const seg = (active: boolean, label: string, onClick: () => void, first: boolean) => (
     <button
       type="button"
@@ -54,16 +55,16 @@ export function QuestionSortControl({
     </button>
   );
 
-  const ascLabel = field === "student" ? "번호 순 ↑" : "적은 순 ↑";
-  const descLabel = field === "student" ? "역순 ↓" : "많은 순 ↓";
+  const ascLabel = field === "student" ? tq("ascNumber") : tq("ascLess");
+  const descLabel = field === "student" ? tq("descReverse") : tq("descMore");
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-xs text-muted-foreground">정렬</span>
+      <span className="text-xs text-muted-foreground">{tq("sortLabel")}</span>
       <div className="flex rounded-md border overflow-hidden">
-        {showStudent && seg(field === "student", "학생순", () => onChange("student", field === "student" ? dir : "asc"), true)}
-        {seg(field === "like", "좋아요순", () => onChange("like", field === "like" ? dir : "desc"), !showStudent)}
-        {seg(field === "comment", "댓글순", () => onChange("comment", field === "comment" ? dir : "desc"), false)}
+        {showStudent && seg(field === "student", tq("sortStudent"), () => onChange("student", field === "student" ? dir : "asc"), true)}
+        {seg(field === "like", tq("sortLike"), () => onChange("like", field === "like" ? dir : "desc"), !showStudent)}
+        {seg(field === "comment", tq("sortComment"), () => onChange("comment", field === "comment" ? dir : "desc"), false)}
       </div>
       <div className="flex rounded-md border overflow-hidden">
         {seg(dir === "desc", descLabel, () => onChange(field, "desc"), true)}
@@ -96,6 +97,7 @@ export function QuestionClassificationStats({
   questions: { closure: string; cognitive: string }[];
 }) {
   const t = useTranslations("classification");
+  const tq = useTranslations("qstats");
   const s = summarizeQuestionTypes(questions);
   const pct = (n: number) => (s.total ? Math.round((n / s.total) * 100) : 0);
 
@@ -115,7 +117,7 @@ export function QuestionClassificationStats({
   return (
     <div className="rounded-xl border bg-card p-4 space-y-3">
       <p className="text-sm font-bold text-foreground">
-        📊 질문 분류 통계 현황 <span className="text-xs font-normal text-muted-foreground">· 총 {s.total}개</span>
+        {tq("statsTitle")} <span className="text-xs font-normal text-muted-foreground">{tq("countSuffix", { count: s.total })}</span>
       </p>
 
       {/* 도넛 + 비율 막대 + 분류 설명 (표시 전용, 학생 대시보드 설명과 통일) */}

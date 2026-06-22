@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { AnyGame } from "@/lib/question-games-data";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function StudentQuestionPlayPage() {
+  const t = useTranslations("playLanding");
   const [games, setGames] = useState<AnyGame[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState<AnyGame | null>(null);
@@ -42,12 +44,12 @@ export default function StudentQuestionPlayPage() {
         <div className="relative z-10">
           <div className="text-7xl mb-4 drop-shadow-lg">🎮</div>
           <h1 className="text-5xl font-black mb-3 tracking-tight" style={{ textShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-            질문놀이
+            {t("title")}
           </h1>
-          <p className="text-xl font-medium opacity-90">놀이로 배우는 신나는 질문의 세계! 🚀</p>
+          <p className="text-xl font-medium opacity-90">{t("subtitle")}</p>
           <div className="mt-4 flex justify-center gap-3">
             <span className="bg-white/20 backdrop-blur-sm rounded-full px-4 py-1 text-sm font-medium">
-              총 {games.length}가지 놀이
+              {t("gameCount", { count: games.length })}
             </span>
           </div>
         </div>
@@ -56,12 +58,12 @@ export default function StudentQuestionPlayPage() {
       {isLoading && (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <div className="text-5xl animate-bounce">🎲</div>
-          <p className="text-muted-foreground font-medium">놀이를 불러오는 중...</p>
+          <p className="text-muted-foreground font-medium">{t("loading")}</p>
         </div>
       )}
 
       {!isLoading && games.length === 0 && (
-        <EmptyState icon="😢" title="아직 공개된 놀이가 없어요" description="선생님께 질문놀이 공개를 요청해보세요!" className="py-24" />
+        <EmptyState icon="😢" title={t("emptyTitle")} description={t("emptyDesc")} className="py-24" />
       )}
 
       {!isLoading && games.length > 0 && (
@@ -100,7 +102,7 @@ export default function StudentQuestionPlayPage() {
                 <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-bold"
                     style={{ background: selectedGame.accentColor }}>!</span>
-                  게임 방법
+                  {t("howTo")}
                 </h3>
                 <ol className="space-y-3">
                   {selectedGame.instructions.map((step, idx) => (
@@ -117,14 +119,14 @@ export default function StudentQuestionPlayPage() {
 
               <div className="mt-6 flex gap-3">
                 <Button variant="outline" className="flex-1" onClick={() => setSelectedGame(null)}>
-                  닫기
+                  {t("close")}
                 </Button>
                 <Button
                   className="flex-1 font-bold text-white rounded-xl"
                   style={{ background: selectedGame.gradientCss }}
                   onClick={() => startGame(selectedGame)}
                 >
-                  🎮 게임 시작!
+                  {t("start")}
                 </Button>
               </div>
             </>
@@ -136,6 +138,7 @@ export default function StudentQuestionPlayPage() {
 }
 
 function GameCard({ game, index, onSelect }: { game: AnyGame; index: number; onSelect: () => void }) {
+  const t = useTranslations("playLanding");
   const [hovered, setHovered] = useState(false);
   return (
     <div
@@ -169,7 +172,7 @@ function GameCard({ game, index, onSelect }: { game: AnyGame; index: number; onS
         </span>
         {game.isBuiltIn && (
           <span className="absolute top-3 right-3 bg-white/25 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-medium">
-            기본 제공
+            {t("builtIn")}
           </span>
         )}
       </div>
@@ -189,7 +192,7 @@ function GameCard({ game, index, onSelect }: { game: AnyGame; index: number; onS
           style={{ background: game.gradientCss }}
           onClick={(e) => { e.stopPropagation(); onSelect(); }}
         >
-          놀이하기 →
+          {t("play")}
         </button>
       </div>
     </div>
