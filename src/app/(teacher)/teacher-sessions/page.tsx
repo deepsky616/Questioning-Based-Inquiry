@@ -362,8 +362,12 @@ export default function TeacherSessionsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button onClick={handleCreate} disabled={isSaving}>
+          <div className="flex justify-end border-t border-border pt-4">
+            <Button
+              onClick={handleCreate}
+              disabled={isSaving || !sessForm.date || !sessForm.subject.trim() || !sessForm.topic.trim()}
+              className="w-full sm:w-auto"
+            >
               {isSaving ? t("saving") : t("addSession")}
             </Button>
           </div>
