@@ -18,18 +18,20 @@ export interface GenerateOptions {
   /** localize=true + req 제공 시, 프롬프트 끝에 출력 언어 지시문(languageDirective)을 덧붙인다 */
   req?: Request;
   localize?: boolean;
+  /** 모델 system instruction (역할·규칙 고정용) */
+  systemInstruction?: string;
 }
 
 /**
  * 통합 AI 호출 계층. resolveUserAiConfig로 키·모델을 결정하고 Gemini를 호출한다.
  * 키가 없으면 AiKeyMissingError를 던진다(라우트에서 503 처리).
  */
-async function callGemini({ userId, prompt, req, localize }: GenerateOptions): Promise<string> {
+async function callGemini({ userId, prompt, req, localize, systemInstruction }: GenerateOptions): Promise<string> {
   const cfg = await resolveUserAiConfig(userId);
   if (!cfg.apiKey) throw new AiKeyMissingError();
 
   const genAI = new GoogleGenerativeAI(cfg.apiKey);
-  const model = genAI.getGenerativeModel({ model: cfg.model });
+  const model = genAI.getGenerativeModel(systemInstruction ? { model: cfg.model, systemInstruction } : { model: cfg.model });
   const fullPrompt = localize && req ? prompt + languageDirective(getRequestLocale(req)) : prompt;
   const result = await model.generateContent(fullPrompt);
   return result.response.text().trim();

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getRequestLocale, languageDirective } from "@/lib/locale";
+import { generateText, AiKeyMissingError } from "@/lib/ai";
+import { extractJsonObject } from "@/lib/json-extract";
 
 const SYSTEM_PROMPT = `당신은 초등학생과 중학생을 위한 질문놀이 파트너입니다.
 - 쉽고 친근한 말투로 대화하세요.
@@ -82,41 +81,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
   }
 
-  const aiCfg = await resolveUserAiConfig((session.user as { id: string }).id);
-  if (!aiCfg.apiKey) {
-    return NextResponse.json(
-      { error: "AI 모델이 설정되지 않았습니다. 선생님께 API 키 설정을 요청하세요." },
-      { status: 503 }
-    );
-  }
-
-  const model = aiCfg.model;
-  const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-  const gemini = genAI.getGenerativeModel({
-    model,
-    systemInstruction: SYSTEM_PROMPT,
-  });
-
   const userPrompt = promptFn(context);
 
+  let text: string;
   try {
-    const result = await gemini.generateContent(userPrompt + languageDirective(getRequestLocale(req)));
-    const text = result.response.text().trim();
-
-    // JSON 응답 파싱이 필요한 액션들
-    if (action === "mystery-box:setup" || action === "mystery-box:ai-turn" || action === "story-dice:words") {
-      try {
-        const match = text.match(/\{[\s\S]*\}/);
-        const parsed = JSON.parse(match ? match[0] : text);
-        return NextResponse.json({ text, parsed });
-      } catch {
-        // JSON 파싱 실패 시 텍스트만 반환
-      }
-    }
-
-    return NextResponse.json({ text });
+    text = await generateText({
+      userId: (session.user as { id: string }).id,
+      prompt: userPrompt,
+      req,
+      localize: true,
+      systemInstruction: SYSTEM_PROMPT,
+    });
   } catch (err: unknown) {
+    if (err instanceof AiKeyMissingError) {
+      return NextResponse.json(
+        { error: "AI 모델이 설정되지 않았습니다. 선생님께 API 키 설정을 요청하세요." },
+        { status: 503 }
+      );
+    }
     const msg = err instanceof Error ? err.message : "AI 응답 오류";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+
+  // JSON 응답 파싱이 필요한 액션들 — 실패 시 텍스트만 반환
+  if (action === "mystery-box:setup" || action === "mystery-box:ai-turn" || action === "story-dice:words") {
+    try {
+      const parsed = extractJsonObject(text);
+      return NextResponse.json({ text, parsed });
+    } catch {
+      // JSON 파싱 실패 시 텍스트만 반환
+    }
+  }
+
+  return NextResponse.json({ text });
 }

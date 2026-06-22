@@ -2,15 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
+import { generateJson } from "@/lib/ai";
 import {
   ACTIVITY_BONUS_TYPES, VALID_ACTIVITY_BONUS,
   MAX_ACTIVITY_BONUS_PER_STUDENT,
 } from "@/lib/activity-bonus-policy";
 import { normalizeContent } from "@/lib/content-normalize";
 import { Prisma } from "@prisma/client";
-import { getRequestLocale, languageDirective } from "@/lib/locale";
 
 const SYS = `당신은 초·중학생 질문기반 탐구 수업을 따뜻하게 평가하는 선생님입니다.
 - 모든 학생을 격려하되, 두드러진 사례만 보너스로 줍니다.
@@ -96,14 +94,8 @@ export async function POST(req: NextRequest) {
   });
 
   // AI 호출 (교사 본인 설정)
-  const aiCfg = await resolveUserAiConfig(teacherId);
-
   let aiResp: AIResp | null = null;
-  if (aiCfg.apiKey) {
-    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-    const model = aiCfg.model;
-    const gemini = genAI.getGenerativeModel({ model, systemInstruction: SYS });
-
+  {
     const qBlock = questions.map((q) =>
       `[Q:${q.id}] ${q.author.name}(${q.authorId}): ${q.content}`
     ).join("\n");
@@ -140,10 +132,8 @@ ${cBlock || "(없음)"}
 }`;
 
     try {
-      const result = await gemini.generateContent(prompt + languageDirective(getRequestLocale(req)));
-      const text = result.response.text();
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) aiResp = JSON.parse(match[0]);
+      // 키 없음·파싱 실패는 AI 결과 없이 진행(키워드 기반 후보만 사용)
+      aiResp = await generateJson<AIResp>({ userId: teacherId, prompt, req, localize: true, systemInstruction: SYS });
     } catch {}
   }
 
