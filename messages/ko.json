@@ -601,7 +601,8 @@
     "resetting": "재설정 중...",
     "resetBtn": "{count}명 비밀번호 재설정",
     "resetCardTitle": "학생 비밀번호 재설정",
-    "resetCardDesc": "비밀번호를 잊은 담당 학생을 골라(여러 명 가능) 새 비밀번호로 재설정해요"
+    "resetCardDesc": "비밀번호를 잊은 담당 학생을 골라(여러 명 가능) 새 비밀번호로 재설정해요",
+    "resetBtnEmpty": "학생을 선택하세요"
   },
   "curriculum": {
     "step1": "교육과정 탐색",
@@ -739,7 +740,8 @@
     "colLastActive": "마지막 활동",
     "colDetail": "상세",
     "detailBtn": "상세",
-    "loading": "로딩 중..."
+    "loading": "로딩 중...",
+    "tabList": "학생 현황"
   },
   "sessions": {
     "dateRequired": "날짜, 교과, 주제는 필수입니다",

@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { StudentPasswordResetCard } from "@/components/teacher/StudentPasswordResetCard";
 import { useToast } from "@/components/ui/use-toast";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import { buildTeacherClassLabel, resolveClassInputMode } from "@/lib/teacher";
@@ -23,8 +21,8 @@ interface TeacherClass {
   className: string;
 }
 
-/** 학생 일괄 등록 + 비밀번호 재설정 (교사 학생관리 페이지에서 사용). 자체적으로 담당 학급 정보를 로드한다. */
-export function StudentManagementCard() {
+/** 학생 일괄 등록 폼 (교사 학생관리 '일괄 등록' 탭). 자체적으로 담당 학급 정보를 로드한다. */
+export function StudentBulkRegisterCard() {
   const t = useTranslations("settings");
   const tAcc = useTranslations("account");
   const { toast } = useToast();
@@ -113,18 +111,7 @@ export function StudentManagementCard() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t("studentMgmt")}</CardTitle>
-        <CardDescription>{t("studentMgmtDesc")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="bulk">
-          <TabsList>
-            <TabsTrigger value="bulk">{t("tabBulk")}</TabsTrigger>
-            <TabsTrigger value="reset">{t("tabReset")}</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="bulk" className="space-y-4">
+      <CardContent className="space-y-4 pt-6">
             <p className="text-sm text-muted-foreground">{t("bulkDesc")}</p>
             {(() => {
               const mode = resolveClassInputMode(teacherClasses);
@@ -220,20 +207,20 @@ export function StudentManagementCard() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              <Button onClick={handleBulkRegister} disabled={isBulkSaving}>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+              {bulkText ? (
+                <span className="text-sm text-muted-foreground">{t("enteredCount", { count: parseBulkText().length })}</span>
+              ) : (
+                <span />
+              )}
+              <Button
+                onClick={handleBulkRegister}
+                disabled={isBulkSaving || parseBulkText().length === 0}
+                className="w-full sm:w-auto"
+              >
                 {isBulkSaving ? t("registering") : t("bulkRegisterBtn", { count: parseBulkText().length })}
               </Button>
-              {bulkText && (
-                <span className="text-sm text-muted-foreground">{t("enteredCount", { count: parseBulkText().length })}</span>
-              )}
             </div>
-          </TabsContent>
-
-          <TabsContent value="reset">
-            <StudentPasswordResetCard embedded />
-          </TabsContent>
-        </Tabs>
       </CardContent>
     </Card>
   );

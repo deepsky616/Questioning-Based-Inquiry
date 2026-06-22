@@ -601,7 +601,8 @@
     "resetting": "Resetting...",
     "resetBtn": "Reset password for {count} students",
     "resetCardTitle": "Reset student passwords",
-    "resetCardDesc": "Pick students who forgot their password (multiple allowed) and reset to a new one"
+    "resetCardDesc": "Pick students who forgot their password (multiple allowed) and reset to a new one",
+    "resetBtnEmpty": "Select students"
   },
   "curriculum": {
     "step1": "Explore curriculum",
@@ -739,7 +740,8 @@
     "colLastActive": "Last active",
     "colDetail": "Details",
     "detailBtn": "Details",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "tabList": "Students"
   },
   "sessions": {
     "dateRequired": "Date, subject, and topic are required",

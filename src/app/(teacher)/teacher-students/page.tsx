@@ -14,7 +14,8 @@ import {
 import { buildTeacherClassLabel } from "@/lib/teacher";
 import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { StudentManagementCard } from "@/components/teacher/StudentManagementCard";
+import { StudentBulkRegisterCard } from "@/components/teacher/StudentBulkRegisterCard";
+import { StudentPasswordResetCard } from "@/components/teacher/StudentPasswordResetCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { useTranslations, useLocale } from "next-intl";
@@ -452,6 +453,8 @@ function StudentDetailDialog({
 export default function StudentsPage() {
   const tPages = useTranslations("pages");
   const t = useTranslations("students");
+  const tSet = useTranslations("settings");
+  const [mgmtTab, setMgmtTab] = useState<"list" | "bulk" | "reset">("list");
   const [students, setStudents] = useState<Student[]>([]);
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -504,6 +507,37 @@ export default function StudentsPage() {
     <div className="space-y-6">
       <PageHeader title={tPages("teacherStudents.title")} description={tPages("teacherStudents.description")} />
 
+      {/* 학생 현황 / 일괄 등록 / 비밀번호 재설정 탭 */}
+      <div className="flex w-fit rounded-md border overflow-hidden">
+        {([
+          ["list", t("tabList")],
+          ["bulk", tSet("tabBulk")],
+          ["reset", tSet("tabReset")],
+        ] as const).map(([v, label], i) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setMgmtTab(v)}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+              mgmtTab === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mgmtTab === "bulk" && <StudentBulkRegisterCard />}
+      {mgmtTab === "reset" && (
+        <Card>
+          <CardContent className="pt-6">
+            <StudentPasswordResetCard embedded />
+          </CardContent>
+        </Card>
+      )}
+
+      {mgmtTab === "list" && (
+      <>
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-2xl bg-muted/40 border border-border p-4 text-center">
@@ -645,8 +679,8 @@ export default function StudentsPage() {
           );
         })
       )}
-
-      <StudentManagementCard />
+      </>
+      )}
 
       {selected && (
         <StudentDetailDialog
