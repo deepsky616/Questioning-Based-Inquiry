@@ -1,12 +1,10 @@
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
-import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
-import { getRequestLocale, languageDirective } from "@/lib/locale";
+import { generateJson, AiKeyMissingError } from "@/lib/ai";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -64,11 +62,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "세션 분석 권한이 없습니다" }, { status: 403 });
   }
 
-  const aiCfg = await resolveUserAiConfig(teacherId);
-  if (!aiCfg.apiKey) {
-    return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
-  }
-
   const questions = questionSession.questions
     // 학생이 직접 만든 질문 + 교사가 배포한 탐구설계 질문(TEACHER_SHARED)을 모두 분석 대상에 포함
     .filter((q) => q.author.role !== "TEACHER" || q.source === "TEACHER_SHARED")
@@ -90,17 +83,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const totalLikes = questions.reduce((count, question) => count + question.likeCount, 0);
 
   try {
-    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-    const model = genAI.getGenerativeModel({ model: aiCfg.model });
-
     const prompt = buildSessionAnalysisPrompt(questions, questionSession.subject, questionSession.topic);
-    const result = await model.generateContent(prompt + languageDirective(getRequestLocale(req)));
-    const text = result.response.text().trim();
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Invalid response format");
-
-    const parsed = JSON.parse(jsonMatch[0]) as {
+    const parsed = await generateJson<{
       summary: string;
       themes: string[];
       insights: string;
@@ -110,7 +94,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       balanceInsights?: string;
       bestQuestion?: string;
       nextQuestions?: string;
-    };
+    }>({ userId: teacherId, prompt, req, localize: true });
 
     return NextResponse.json({
       summary: parsed.summary ?? "",
@@ -127,6 +111,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       totalLikes,
     });
   } catch (error) {
+    if (error instanceof AiKeyMissingError) {
+      return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
+    }
     logger.error("Session analysis error:", error);
     return NextResponse.json({ error: "AI 분석에 실패했습니다" }, { status: 500 });
   }

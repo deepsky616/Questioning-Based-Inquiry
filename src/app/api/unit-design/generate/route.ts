@@ -1,13 +1,11 @@
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { buildPrompt, unitDesignGenerateSchema } from "@/lib/unit-design-prompt";
 import { extractJsonObject } from "@/lib/json-extract";
-import { getRequestLocale, languageDirective } from "@/lib/locale";
+import { generateText, AiKeyMissingError } from "@/lib/ai";
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -27,21 +25,15 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = unitDesignGenerateSchema.parse(body);
 
-    const aiCfg = await resolveUserAiConfig((session.user as { id: string }).id);
-    if (!aiCfg.apiKey) {
-      return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
-    }
-
-    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-    const model = genAI.getGenerativeModel({ model: aiCfg.model });
-
     const prompt = buildPrompt(data);
 
     let text: string;
     try {
-      const result = await model.generateContent(prompt + languageDirective(getRequestLocale(req)));
-      text = result.response.text();
+      text = await generateText({ userId: (session.user as { id: string }).id, prompt, req, localize: true });
     } catch (aiErr) {
+      if (aiErr instanceof AiKeyMissingError) {
+        return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
+      }
       const detail = aiErr instanceof Error ? aiErr.message : String(aiErr);
       logger.error("Gemini API call failed:", detail);
       return NextResponse.json({

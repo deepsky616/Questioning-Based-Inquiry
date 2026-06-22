@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
-import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { buildStudentSessionPrompt } from "@/lib/ai-prompts";
 import { logger } from "@/lib/logger";
-import { getRequestLocale, languageDirective } from "@/lib/locale";
+import { generateJson, AiKeyMissingError } from "@/lib/ai";
 
 // 한 수업 세션에서 '학생 본인'의 질문·좋아요·댓글 활동을 AI가 분석
 // POST body: { sessionId, studentId? }  studentId는 교사가 특정 학생을 볼 때만
@@ -61,14 +59,7 @@ export async function POST(req: NextRequest) {
     controversial: priorQuestions.filter((q) => q.cognitive === "controversial").length,
   };
 
-  const aiCfg = await resolveUserAiConfig(targetId);
-  if (!aiCfg.apiKey) {
-    return NextResponse.json({ error: "AI 설정이 필요합니다. 선생님께 API 키 설정을 요청하세요." }, { status: 400 });
-  }
-
   try {
-    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-    const model = genAI.getGenerativeModel({ model: aiCfg.model });
     const prompt = buildStudentSessionPrompt({
       studentName: student.name,
       subject: qSession.subject,
@@ -81,10 +72,9 @@ export async function POST(req: NextRequest) {
       likesGiven,
       prior,
     });
-    const result = await model.generateContent(prompt + languageDirective(getRequestLocale(req)));
-    const text = result.response.text().trim();
-    const match = text.match(/\{[\s\S]*\}/);
-    const parsed = match ? JSON.parse(match[0]) : null;
+    const parsed = await generateJson<{
+      summary?: string; insights?: string; relevanceInsights?: string; growthInsights?: string; rewriteExample?: string;
+    }>({ userId: targetId, prompt, req, localize: true });
 
     return NextResponse.json({
       summary: parsed?.summary ?? "",
@@ -95,6 +85,9 @@ export async function POST(req: NextRequest) {
       totals: { questions: questions.length, comments: myComments.length, likesGiven },
     });
   } catch (error) {
+    if (error instanceof AiKeyMissingError) {
+      return NextResponse.json({ error: "AI 설정이 필요합니다. 선생님께 API 키 설정을 요청하세요." }, { status: 400 });
+    }
     logger.error("student session analysis error:", error);
     return NextResponse.json({ error: "AI 분석에 실패했습니다" }, { status: 500 });
   }
