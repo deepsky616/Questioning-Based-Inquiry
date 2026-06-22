@@ -1491,80 +1491,82 @@ export default function QuestionsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* AI 일괄 답변 패널 */}
+      {/* AI 일괄 답변 패널 — 하단 가운데 떠 있는 컴팩트 액션 바(양옆 여백은 클릭 통과) */}
       {selectedIds.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-indigo-300 bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 px-4 py-4 shadow-2xl">
-          <div className="mx-auto max-w-5xl space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-lg font-bold text-indigo-700 shadow-sm">
-                  {selectedIds.size}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-white">{t("bulkPanelTitle")}</p>
-                  <p className="text-xs text-indigo-100">{t("bulkPanelDesc")}</p>
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 px-4">
+          <div className="pointer-events-auto mx-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 shadow-xl ring-1 ring-black/5">
+            <div className="space-y-2.5 p-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-indigo-700 shadow-sm">
+                    {selectedIds.size}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white">{t("bulkPanelTitle")}</p>
+                    <p className="line-clamp-2 text-xs text-indigo-100">{t("bulkPanelDesc")}</p>
+                  </div>
                 </div>
-              </div>
-              <button
-                onClick={clearSelection}
-                disabled={isGeneratingPreviews || isSendingPreviews}
-                className="self-start rounded-md px-2 py-1 text-xs font-medium text-indigo-100 underline-offset-4 hover:bg-white/10 hover:text-white hover:underline disabled:opacity-40 sm:self-auto"
-              >
-                {t("deselect")}
-              </button>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {previewQuestions.map((q) => (
-                <span
-                  key={q.id}
-                  className="max-w-full truncate rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white ring-1 ring-white/20"
-                  title={`${q.author.name}: ${q.content}`}
+                <button
+                  onClick={clearSelection}
+                  disabled={isGeneratingPreviews || isSendingPreviews}
+                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-indigo-100 underline-offset-4 hover:bg-white/10 hover:text-white hover:underline disabled:opacity-40"
                 >
-                  {q.author.name}: {q.content.length > 30 ? `${q.content.slice(0, 30)}...` : q.content}
-                </span>
-              ))}
-              {hiddenPreviewCount > 0 && (
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
-                  {t("plusCount", { count: hiddenPreviewCount })}
-                </span>
-              )}
-            </div>
+                  {t("deselect")}
+                </button>
+              </div>
 
-            <Button
-              onClick={handlePreviewBulkAi}
-              disabled={isGeneratingPreviews || isSendingPreviews}
-              className="h-11 w-full bg-white font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300"
-            >
-              {isGeneratingPreviews ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
-                  </svg>
-                  {t("aiGeneratingBulk", { count: selectedIds.size })}
-                </span>
-              ) : (
-                t("aiPreviewBtn", { count: selectedIds.size })
-              )}
-            </Button>
-
-            {bulkMsg && (
-              <div
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
-                  bulkMsg.type === "success"
-                    ? "bg-white text-indigo-700"
-                    : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
-                }`}
-              >
-                {bulkMsg.type === "success" && (
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
-                    ✓
+              <div className="flex flex-wrap gap-1.5">
+                {previewQuestions.map((q) => (
+                  <span
+                    key={q.id}
+                    className="max-w-full truncate rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white ring-1 ring-white/20"
+                    title={`${q.author.name}: ${q.content}`}
+                  >
+                    {q.author.name}: {q.content.length > 24 ? `${q.content.slice(0, 24)}...` : q.content}
+                  </span>
+                ))}
+                {hiddenPreviewCount > 0 && (
+                  <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+                    {t("plusCount", { count: hiddenPreviewCount })}
                   </span>
                 )}
-                <span className={showBulkSuccess ? "animate-pulse" : ""}>{bulkMsg.text}</span>
               </div>
-            )}
+
+              <Button
+                onClick={handlePreviewBulkAi}
+                disabled={isGeneratingPreviews || isSendingPreviews}
+                className="h-10 w-full bg-white font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300"
+              >
+                {isGeneratingPreviews ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+                    </svg>
+                    {t("aiGeneratingBulk", { count: selectedIds.size })}
+                  </span>
+                ) : (
+                  t("aiPreviewBtn", { count: selectedIds.size })
+                )}
+              </Button>
+
+              {bulkMsg && (
+                <div
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
+                    bulkMsg.type === "success"
+                      ? "bg-white text-indigo-700"
+                      : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
+                  }`}
+                >
+                  {bulkMsg.type === "success" && (
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
+                      ✓
+                    </span>
+                  )}
+                  <span className={showBulkSuccess ? "animate-pulse" : ""}>{bulkMsg.text}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
