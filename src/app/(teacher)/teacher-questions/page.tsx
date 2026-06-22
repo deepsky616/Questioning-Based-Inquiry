@@ -2,6 +2,8 @@
 
 import { Fragment, useEffect, useState, useCallback } from "react";
 import { CommentThread } from "@/components/shared/CommentThread";
+import { useContentTranslation } from "@/components/shared/use-content-translation";
+import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { formatDateTime } from "@/lib/datetime";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -123,6 +125,7 @@ export default function QuestionsPage() {
   const tCls = useTranslations("classification");
   const t = useTranslations("teacherQ");
   const tc = useTranslations("common");
+  const ct = useContentTranslation();
   const [questions, setQuestions] = useState<Question[]>([]);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -658,7 +661,8 @@ export default function QuestionsPage() {
                     </button>
                   </div>
                 )}
-                <p className="whitespace-pre-wrap break-words text-sm">{q.content}</p>
+                <p className="whitespace-pre-wrap break-words text-sm">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
+                {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                 <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(q.createdAt)}</p>
               </TableCell>
               <TableCell>

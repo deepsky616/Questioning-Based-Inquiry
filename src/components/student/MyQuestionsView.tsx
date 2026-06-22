@@ -2,6 +2,8 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useContentTranslation } from "@/components/shared/use-content-translation";
+import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,6 +66,7 @@ export function MyQuestionsView() {
   const t = useTranslations("myQuestions");
   const tc = useTranslations("common");
   const tEx = useTranslations("explore");
+  const ct = useContentTranslation();
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -198,7 +201,8 @@ export function MyQuestionsView() {
                 <TableRow>
                   <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                   <TableCell className="max-w-xs">
-                    <p className="truncate">{q.content}</p>
+                    <p className="truncate">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
+                    {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                   </TableCell>
                   <TableCell>
                     <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>

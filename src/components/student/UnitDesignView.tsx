@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useContentTranslation } from "@/components/shared/use-content-translation";
+import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
@@ -78,6 +80,7 @@ function LikeButton({
 
 export function UnitDesignView() {
   const t = useTranslations("unitDesign");
+  const ct = useContentTranslation();
   const TYPE_KEY: Record<string, string> = {
     factual: "typeFactual",
     conceptual: "typeConceptual",
@@ -219,7 +222,10 @@ export function UnitDesignView() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm font-medium text-foreground">{question.content}</p>
+                            <p className="text-sm font-medium text-foreground">
+                              {pub ? ct.text({ type: "QUESTION", id: pub.id }, question.content) : question.content}
+                            </p>
+                            {ct.canTranslate && pub && <TranslateToggle item={{ type: "QUESTION", id: pub.id }} ct={ct} />}
                             {question.rationale && <p className="text-xs text-muted-foreground">{question.rationale}</p>}
                             {pub && (
                               <div className="flex items-center gap-3 pt-1">
