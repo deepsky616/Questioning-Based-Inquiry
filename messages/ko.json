@@ -884,7 +884,9 @@
     "colTrendTitle": "선택한 기간을 절반으로 나눠, 전반 대비 후반의 질문 작성량 변화를 보여줍니다",
     "gradeLabel": "{grade}학년",
     "classLabel": "{className}반",
-    "numberLabel": "{n}번"
+    "numberLabel": "{n}번",
+    "tabOverview": "개요",
+    "tabReports": "상세 리포트"
   },
   "reports": {
     "analysisFailed": "분석 실패",

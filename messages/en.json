@@ -884,7 +884,9 @@
     "colTrendTitle": "Splits the selected period in half and shows the change in questions written, latter vs. first half",
     "gradeLabel": "Grade {grade}",
     "classLabel": "Class {className}",
-    "numberLabel": "No. {n}"
+    "numberLabel": "No. {n}",
+    "tabOverview": "Overview",
+    "tabReports": "Detailed report"
   },
   "reports": {
     "analysisFailed": "Analysis failed",

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TeacherReportsView } from "@/components/teacher/TeacherReportsView";
 import {
   Select,
   SelectContent,
@@ -48,11 +50,25 @@ function classKey(tc: TeacherClass) {
   return `${tc.grade}|${tc.className}`;
 }
 
-export default function TeacherDashboard() {
+export default function TeacherDashboardPage() {
+  // useSearchParams(탭 쿼리)는 Suspense 경계가 필요하다
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <TeacherDashboard />
+    </Suspense>
+  );
+}
+
+function TeacherDashboard() {
   const tPages = useTranslations("pages");
   const tCls = useTranslations("classification");
   const tc = useTranslations("common");
   const t = useTranslations("dashboard");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
+  const setTab = (v: "overview" | "reports") =>
+    router.replace(v === "reports" ? "/teacher-dashboard?tab=reports" : "/teacher-dashboard", { scroll: false });
   const [stats, setStats] = useState<Stats | null>(null);
   const [period, setPeriod] = useState("month");
   const [selectedClass, setSelectedClass] = useState("all");
@@ -112,6 +128,26 @@ export default function TeacherDashboard() {
     <div className="space-y-6">
       <PageHeader title={tPages("teacherDashboard.title")} description={tPages("teacherDashboard.description")} />
 
+      {/* 개요 / 상세 리포트 탭 */}
+      <div className="flex w-fit rounded-md border overflow-hidden">
+        {(["overview", "reports"] as const).map((v, i) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setTab(v)}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+              tab === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {v === "overview" ? t("tabOverview") : t("tabReports")}
+          </button>
+        ))}
+      </div>
+
+      {tab === "reports" ? (
+        <TeacherReportsView />
+      ) : (
+      <>
       {/* 필터 */}
       <div className="flex gap-3">
         <Select value={period} onValueChange={setPeriod}>
@@ -348,6 +384,8 @@ export default function TeacherDashboard() {
             );
           })()}
         </>
+      )}
+      </>
       )}
     </div>
   );
