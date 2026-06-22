@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
+import { useContentTranslation } from "@/components/shared/use-content-translation";
+import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/auth-helpers";
@@ -41,6 +43,7 @@ export function CommentThread({
   const user = getSessionUser(session);
   const t = useTranslations("comment");
   const tc = useTranslations("common");
+  const ct = useContentTranslation();
   const [comments, setComments] = useState<ThreadComment[]>(preloaded ?? []);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(!preloaded);
@@ -183,7 +186,16 @@ export function CommentThread({
                   <Button size="sm" variant="outline" onClick={() => { setEditingId(null); setEditText(""); }} className="h-8 shrink-0">{tc("cancel")}</Button>
                 </div>
               ) : (
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">{c.content}</p>
+                <>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                    {ct.text({ type: "COMMENT", id: c.id }, c.content)}
+                  </p>
+                  {ct.canTranslate && (
+                    <div className="mt-1">
+                      <TranslateToggle item={{ type: "COMMENT", id: c.id }} ct={ct} />
+                    </div>
+                  )}
+                </>
               )}
               {!isEditing && (isMine || canModerate) && (
                 <div className="mt-1.5 flex items-center gap-3">

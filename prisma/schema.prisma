@@ -237,3 +237,21 @@ model QuestionLike {
   @@index([questionId])
   @@map("question_likes")
 }
+
+// 사용자 콘텐츠(질문·댓글) 번역 캐시. 원문은 Question/Comment에 그대로 보존하고
+// 번역문만 여기에 (sourceType, sourceId, targetLocale)별로 저장해 모든 뷰어가 공유한다.
+// sourceHash는 원문의 해시로, 원문이 수정되면 stale 번역을 폐기·재생성하는 데 쓴다.
+model Translation {
+  id           String   @id @default(cuid())
+  sourceType   String   @map("source_type") // "QUESTION" | "COMMENT"
+  sourceId     String   @map("source_id")
+  targetLocale String   @map("target_locale") // "en" …
+  content      String   @db.Text @map("content")
+  sourceHash   String   @map("source_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([sourceType, sourceId, targetLocale])
+  @@index([sourceType, sourceId])
+  @@map("translations")
+}

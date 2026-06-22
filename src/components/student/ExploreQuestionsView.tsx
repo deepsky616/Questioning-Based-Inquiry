@@ -18,6 +18,8 @@ import { getSessionUser } from "@/lib/auth-helpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 import { CommentThread } from "@/components/shared/CommentThread";
+import { useContentTranslation } from "@/components/shared/use-content-translation";
+import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { formatDateTime } from "@/lib/datetime";
 
 interface QuestionSession {
@@ -106,11 +108,13 @@ function QuestionCard({
   onLikeChange,
   likesEnabled,
   commentsEnabled,
+  ct,
 }: {
   q: Question;
   onLikeChange: (questionId: string, newCount: number, myLike: boolean) => void;
   likesEnabled: boolean;
   commentsEnabled: boolean;
+  ct: ReturnType<typeof useContentTranslation>;
 }) {
   const t = useTranslations("explore");
   const [showComments, setShowComments] = useState(false);
@@ -151,8 +155,13 @@ function QuestionCard({
             )}
           </div>
           <p className={isTeacherShared ? "text-foreground font-medium" : "text-foreground"}>
-            {q.content}
+            {ct.text({ type: "QUESTION", id: q.id }, q.content)}
           </p>
+          {ct.canTranslate && (
+            <div className="mt-1">
+              <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} />
+            </div>
+          )}
           {isTeacherShared && commentsEnabled && (
             <div className="mt-2 rounded-md bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300">
               {t.rich("teacherInquiryNotice", { b: (chunks) => <b>{chunks}</b> })}
@@ -218,6 +227,8 @@ function QuestionCard({
 
 export function ExploreQuestionsView() {
   const t = useTranslations("explore");
+  const tT = useTranslations("translate");
+  const ct = useContentTranslation();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("all");
@@ -318,7 +329,7 @@ export function ExploreQuestionsView() {
       <div className="space-y-3 mt-3">
         {list.map((q) => (
           <QuestionCard key={q.id} q={q} onLikeChange={handleLikeChange}
-            likesEnabled={exploreCfg.likesEnabled} commentsEnabled={exploreCfg.commentsEnabled} />
+            likesEnabled={exploreCfg.likesEnabled} commentsEnabled={exploreCfg.commentsEnabled} ct={ct} />
         ))}
       </div>
     );
@@ -425,6 +436,19 @@ export function ExploreQuestionsView() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 text-sm w-56 bg-background"
               />
+              {ct.canTranslate && displayed.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    ct.anyShown
+                      ? ct.showAllOriginal()
+                      : ct.translateAll(displayed.map((q) => ({ type: "QUESTION", id: q.id })))
+                  }
+                  className="h-8 rounded-md border border-indigo-200 px-3 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                >
+                  {ct.anyShown ? tT("showAllOriginal") : tT("translateAll")}
+                </button>
+              )}
             </div>
             <QuestionSortControl
               field={sortField}

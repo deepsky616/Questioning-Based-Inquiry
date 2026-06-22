@@ -1160,5 +1160,13 @@
     "previewMode": "🎮 Preview mode · scores and records aren't saved",
     "backShort": "← Back",
     "teacherPlayer": "Teacher"
+  },
+  "translate": {
+    "translate": "Translate",
+    "showOriginal": "Show original",
+    "translating": "Translating...",
+    "translateAll": "Translate all",
+    "showAllOriginal": "Show all original",
+    "translateFailed": "Translation failed"
   }
 }

@@ -1160,5 +1160,13 @@
     "previewMode": "🎮 미리보기 모드 · 점수·기록은 저장되지 않아요",
     "backShort": "← 관리로",
     "teacherPlayer": "선생님"
+  },
+  "translate": {
+    "translate": "번역 보기",
+    "showOriginal": "원문 보기",
+    "translating": "번역 중...",
+    "translateAll": "모두 번역",
+    "showAllOriginal": "모두 원문",
+    "translateFailed": "번역에 실패했어요"
   }
 }
