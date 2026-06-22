@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -28,6 +29,8 @@ interface Props {
 }
 
 export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDesignId, onClose, onChanged }: Props) {
+  const t = useTranslations("publishDialog");
+  const tc = useTranslations("common");
   const [unit, setUnit] = useState<UnitDesign | null>(null);
   const [published, setPublished] = useState<PublishedQuestion[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -94,15 +97,15 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage(`${data.created}개 배포됨${data.skipped > 0 ? ` (${data.skipped}개는 이미 배포됨)` : ""}`);
+        setMessage(t("deployedCount", { created: data.created }) + (data.skipped > 0 ? t("skippedSuffix", { skipped: data.skipped }) : ""));
         setSelected(new Set());
         reload();
         onChanged?.();
       } else {
-        setMessage(data.error || "배포 실패");
+        setMessage(data.error || t("deployFailed"));
       }
     } catch {
-      setMessage("네트워크 오류");
+      setMessage(t("networkError"));
     } finally { setBusy(false); }
   }
 
@@ -110,7 +113,7 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
 
   async function revoke(qId: string, commentCount: number) {
     if (commentCount > 0) {
-      const ok = await confirm({ description: `이 질문에 ${commentCount}개의 답변이 있어요. 정말 배포 취소(삭제)할까요?`, confirmText: "배포 취소", destructive: true });
+      const ok = await confirm({ description: t("cancelConfirm", { count: commentCount }), confirmText: t("cancelDeploy"), destructive: true });
       if (!ok) return;
     }
     setBusy(true);
@@ -132,20 +135,20 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span>📤 단원설계 질문 배포</span>
+            <span>{t("title")}</span>
           </DialogTitle>
           <p className="text-sm text-muted-foreground mt-1">{sessionLabel}</p>
         </DialogHeader>
 
         {!unit ? (
-          <div className="py-12 text-center text-muted-foreground text-sm">단원설계를 불러오는 중...</div>
+          <div className="py-12 text-center text-muted-foreground text-sm">{t("loading")}</div>
         ) : (
           <>
             <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 rounded-xl p-3 text-sm text-indigo-700 dark:text-indigo-300">
               📚 <strong>{unit.title}</strong>
-              <span className="text-indigo-500 ml-2">· 총 {allInquiry.length}개 질문</span>
+              <span className="text-indigo-500 ml-2">{t("totalQuestions", { count: allInquiry.length })}</span>
               {newCount > 0 && (
-                <span className="text-indigo-500 ml-2">· {newCount}개 배포 가능</span>
+                <span className="text-indigo-500 ml-2">{t("deployableCount", { count: newCount })}</span>
               )}
             </div>
 
@@ -158,7 +161,7 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
             {/* 질문 목록 */}
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {allInquiry.length === 0 ? (
-                <EmptyState icon="📭" title="이 단원설계에 작성된 탐구 질문이 없어요" />
+                <EmptyState icon="📭" title={t("emptyTitle")} />
               ) : allInquiry.map((q, idx) => {
                 const key = q.content.trim();
                 const pub = publishedByContent.get(key);
@@ -184,15 +187,15 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
                         <p className="text-foreground text-sm mt-0.5">{q.content}</p>
                         {isPublished && (
                           <div className="flex items-center gap-3 mt-1.5">
-                            <span className="text-xs text-emerald-600 font-bold">✅ 배포됨</span>
+                            <span className="text-xs text-emerald-600 font-bold">{t("deployed")}</span>
                             <span className="text-xs text-muted-foreground">
-                              💬 답변 {pub.commentCount}개
+                              {t("answerCount", { count: pub.commentCount })}
                             </span>
                             <button
                               onClick={() => revoke(pub.id, pub.commentCount)}
                               disabled={busy}
                               className="text-xs text-red-500 hover:underline ml-auto">
-                              배포 취소
+                              {t("cancelDeploy")}
                             </button>
                           </div>
                         )}
@@ -209,19 +212,19 @@ export default function PublishQuestionsDialog({ sessionId, sessionLabel, unitDe
                 onClick={selectAllNew}
                 disabled={newCount === 0}
                 className="text-xs text-indigo-600 hover:underline disabled:text-muted-foreground disabled:no-underline">
-                미배포 전체 선택 ({newCount})
+                {t("selectAllUndeployed", { count: newCount })}
               </button>
               <span className="text-xs text-muted-foreground">
-                선택: {selected.size}개
+                {t("selected", { count: selected.size })}
               </span>
             </div>
           </>
         )}
 
         <DialogFooter className="mt-2">
-          <Button variant="outline" onClick={onClose}>닫기</Button>
+          <Button variant="outline" onClick={onClose}>{tc("close")}</Button>
           <Button onClick={publish} disabled={selected.size === 0 || busy}>
-            {busy ? "처리 중..." : `${selected.size}개 배포`}
+            {busy ? t("processing") : t("deployBtn", { count: selected.size })}
           </Button>
         </DialogFooter>
       </DialogContent>

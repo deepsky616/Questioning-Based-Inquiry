@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/shared/theme-provider";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import type { ReportRange, SeriesPoint, ReportTotals } from "@/lib/report-stats";
 import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -53,14 +53,14 @@ export interface ReportViewProps {
   receptionLabel?: string;
 }
 
-const METRICS: { key: keyof SeriesPoint; label: string; color: string }[] = [
-  { key: "questions", label: "질문 작성", color: "#6366f1" },
-  { key: "likesGiven", label: "좋아요 누름", color: "#f43f5e" },
-  { key: "comments", label: "댓글 작성", color: "#10b981" },
+const METRICS: { key: keyof SeriesPoint; color: string }[] = [
+  { key: "questions", color: "#6366f1" },
+  { key: "likesGiven", color: "#f43f5e" },
+  { key: "comments", color: "#10b981" },
 ];
-const RECEIVED: { key: keyof SeriesPoint; label: string; color: string }[] = [
-  { key: "likesReceived", label: "받은 좋아요", color: "#f59e0b" },
-  { key: "commentsReceived", label: "받은 댓글", color: "#8b5cf6" },
+const RECEIVED: { key: keyof SeriesPoint; color: string }[] = [
+  { key: "likesReceived", color: "#f59e0b" },
+  { key: "commentsReceived", color: "#8b5cf6" },
 ];
 // 분류 추세(누적 막대) — 분류1/분류2를 기간별로 쌓는다. 라벨은 classification 카탈로그(key)로 해석.
 const CLOSURE_TREND: { key: keyof SeriesPoint; labelKey: string; color: string }[] = [
@@ -89,27 +89,32 @@ function mondayOf(d: Date): Date {
   return x;
 }
 /** 세션 날짜를 주/월 기간 키·라벨로 변환 */
-function sessionPeriod(dateStr: string, mode: ReportRange): { key: string; label: string } {
+function sessionPeriod(dateStr: string, mode: ReportRange, locale: string, otherLabel: string, weekSuffix: string): { key: string; label: string } {
   const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return { key: "기타", label: "기타" };
+  if (Number.isNaN(d.getTime())) return { key: "기타", label: otherLabel };
   if (mode === "month") {
-    return { key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`, label: `${d.getFullYear()}년 ${d.getMonth() + 1}월` };
+    return { key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`, label: d.toLocaleDateString(locale, { year: "numeric", month: "long" }) };
   }
   const m = mondayOf(d);
   const end = new Date(m); end.setDate(end.getDate() + 6);
   return {
     key: `${m.getFullYear()}-${pad2(m.getMonth() + 1)}-${pad2(m.getDate())}`,
-    label: `${m.getMonth() + 1}/${m.getDate()}~${end.getMonth() + 1}/${end.getDate()} 주`,
+    label: `${m.getMonth() + 1}/${m.getDate()}~${end.getMonth() + 1}/${end.getDate()}${weekSuffix}`,
   };
 }
 
 export function ReportView({
   scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession,
-  participationLabel = "내가 만든 활동", receptionLabel = "내 질문이 받은 반응",
+  participationLabel, receptionLabel,
 }: ReportViewProps) {
   const [range, setRange] = useState<ReportRange>("week");
   const series = range === "week" ? weekly : monthly;
   const tCls = useTranslations("classification");
+  const t = useTranslations("report");
+  const locale = useLocale();
+  const pLabel = participationLabel ?? t("defaultParticipation");
+  const rLabel = receptionLabel ?? t("defaultReception");
+  const metricName = (k: string) => t(`metric_${k}`);
 
   // 차트 색은 테마에 맞춰(다크 모드에서 그리드·축 라벨·툴팁 가독성 확보)
   const { theme } = useTheme();
@@ -149,27 +154,27 @@ export function ReportView({
   const periods = useMemo(() => {
     const map = new Map<string, string>();
     for (const s of allSessions) {
-      const p = sessionPeriod(s.date, sessRange);
+      const p = sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix"));
       if (!map.has(p.key)) map.set(p.key, p.label);
     }
     return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [allSessions, sessRange]);
+  }, [allSessions, sessRange, locale, t]);
 
   // 주별/월별 전환 시 최신 기간을 기본 선택
   useEffect(() => {
     if (periods.length > 0 && !periods.some(([k]) => k === period)) setPeriod(periods[0][0]);
   }, [periods, period]);
 
-  const filteredSessions = allSessions.filter((s) => sessionPeriod(s.date, sessRange).key === period);
+  const filteredSessions = allSessions.filter((s) => sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix")).key === period);
 
   const analyzeOne = async (id: string) => {
     if (!analyzeSession || res[id] || busy[id]) return;
     setBusy((b) => ({ ...b, [id]: true })); setErrs((e) => ({ ...e, [id]: "" }));
     try {
       const r = await analyzeSession(id);
-      if (r) setRes((p) => ({ ...p, [id]: r })); else setErrs((e) => ({ ...e, [id]: "분석 결과가 없어요" }));
+      if (r) setRes((p) => ({ ...p, [id]: r })); else setErrs((e) => ({ ...e, [id]: t("noAnalysisResult") }));
     } catch (e) {
-      setErrs((x) => ({ ...x, [id]: e instanceof Error ? e.message : "분석 실패" }));
+      setErrs((x) => ({ ...x, [id]: e instanceof Error ? e.message : t("analysisFailed") }));
     } finally {
       setBusy((b) => ({ ...b, [id]: false }));
     }
@@ -189,7 +194,7 @@ export function ReportView({
         const r = await analyzeSession(s.id);
         if (r) setRes((p) => ({ ...p, [s.id]: r }));
       } catch (e) {
-        setErrs((x) => ({ ...x, [s.id]: e instanceof Error ? e.message : "분석 실패" }));
+        setErrs((x) => ({ ...x, [s.id]: e instanceof Error ? e.message : t("analysisFailed") }));
       } finally {
         setBusy((b) => ({ ...b, [s.id]: false }));
       }
@@ -204,35 +209,35 @@ export function ReportView({
         <div>
           <h2 className="text-2xl font-bold text-foreground">{title}</h2>
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-          <p className="mt-0.5 text-xs text-muted-foreground">기준: {new Date().toLocaleDateString("ko-KR")} · 주별 최근 12주 / 월별 최근 6개월</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{t("basisNote", { date: new Date().toLocaleDateString(locale) })}</p>
         </div>
         <div className="no-print flex items-center gap-2">
           <div className="flex rounded-md border overflow-hidden">
             <button
               onClick={() => setRange("week")}
               className={`px-3 py-1.5 text-xs font-medium ${range === "week" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-            >주별</button>
+            >{t("week")}</button>
             <button
               onClick={() => setRange("month")}
               className={`px-3 py-1.5 text-xs font-medium border-l ${range === "month" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-            >월별</button>
+            >{t("month")}</button>
           </div>
-          <Button size="sm" onClick={() => window.print()} className="font-semibold">🖨️ 인쇄 · PDF 저장</Button>
+          <Button size="sm" onClick={() => window.print()} className="font-semibold">{t("print")}</Button>
         </div>
       </div>
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <SummaryCard label="질문 작성" value={totals.questions} color="#6366f1" />
-        <SummaryCard label="좋아요 누름" value={totals.likesGiven} color="#f43f5e" />
-        <SummaryCard label="댓글 작성" value={totals.comments} color="#10b981" />
-        <SummaryCard label="받은 좋아요" value={totals.likesReceived} color="#f59e0b" />
-        <SummaryCard label="받은 댓글" value={totals.commentsReceived} color="#8b5cf6" />
+        <SummaryCard label={t("metric_questions")} value={totals.questions} color="#6366f1" />
+        <SummaryCard label={t("metric_likesGiven")} value={totals.likesGiven} color="#f43f5e" />
+        <SummaryCard label={t("metric_comments")} value={totals.comments} color="#10b981" />
+        <SummaryCard label={t("metric_likesReceived")} value={totals.likesReceived} color="#f59e0b" />
+        <SummaryCard label={t("metric_commentsReceived")} value={totals.commentsReceived} color="#8b5cf6" />
       </div>
 
       {/* 참여 추세 */}
       <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">📈 참여 추세 ({range === "week" ? "주별" : "월별"}) · {participationLabel}</p>
+        <p className="mb-3 text-sm font-bold text-foreground">{t("participationTrend", { period: range === "week" ? t("week") : t("month"), label: pLabel })}</p>
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
@@ -241,7 +246,7 @@ export function ReportView({
             <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {METRICS.map((m) => (
-              <Line key={m.key} type="monotone" dataKey={m.key} name={m.label} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
+              <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
             ))}
           </LineChart>
         </ResponsiveContainer>
@@ -249,7 +254,7 @@ export function ReportView({
 
       {/* 호응 추세 */}
       <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">💛 호응 추세 ({range === "week" ? "주별" : "월별"}) · {receptionLabel}</p>
+        <p className="mb-3 text-sm font-bold text-foreground">{t("receptionTrend", { period: range === "week" ? t("week") : t("month"), label: rLabel })}</p>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
@@ -258,7 +263,7 @@ export function ReportView({
             <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {RECEIVED.map((m) => (
-              <Line key={m.key} type="monotone" dataKey={m.key} name={m.label} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
+              <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
             ))}
           </LineChart>
         </ResponsiveContainer>
@@ -303,14 +308,14 @@ export function ReportView({
 
       {/* 질문 분류 분포 */}
       <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">📊 질문 분류 분포 · 총 {classification.total}개</p>
+        <p className="mb-3 text-sm font-bold text-foreground">{t("distTitle", { count: classification.total })}</p>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={classData} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
             <XAxis dataKey="name" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
             <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
             <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-            <Bar dataKey="value" name="질문 수" radius={[4, 4, 0, 0]}>
+            <Bar dataKey="value" name={t("questionCountName")} radius={[4, 4, 0, 0]}>
               {classData.map((d, i) => <Cell key={i} fill={d.fill} />)}
             </Bar>
           </BarChart>
@@ -319,7 +324,7 @@ export function ReportView({
 
       {/* 분류1 추세 (폐쇄형/개방형 누적 막대) */}
       <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">📊 분류1 추세 ({range === "week" ? "주별" : "월별"}) · 폐쇄형 / 개방형</p>
+        <p className="mb-3 text-sm font-bold text-foreground">{t("closureTrend", { cat: tCls("category1"), period: range === "week" ? t("week") : t("month"), kinds: tCls("closure") })}</p>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
@@ -336,7 +341,7 @@ export function ReportView({
 
       {/* 분류2 추세 (사실/개념/논쟁 누적 막대) */}
       <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">📊 분류2 추세 ({range === "week" ? "주별" : "월별"}) · 사실 / 개념 / 논쟁</p>
+        <p className="mb-3 text-sm font-bold text-foreground">{t("cognitiveTrend", { cat: tCls("category2"), period: range === "week" ? t("week") : t("month"), kinds: tCls("cognitive") })}</p>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
@@ -354,23 +359,23 @@ export function ReportView({
       {/* 수업세션별 AI 분석 (기간 필터 + 전체 분석) */}
       {allSessions.length > 0 && analyzeSession && (
         <div className="rounded-xl border bg-card p-4">
-          <p className="mb-1 text-sm font-bold text-foreground">🤖 수업세션별 AI 분석</p>
+          <p className="mb-1 text-sm font-bold text-foreground">{t("aiSessionTitle")}</p>
           <p className="mb-3 text-xs text-muted-foreground">
-            주별/월별 기간을 고르면 그 기간의 수업세션만 보여요. 세션을 펼치면 개별 분석, ‘전체 분석’은 그 기간 세션을 한꺼번에 분석해요
+            {t("aiSessionDesc")}
           </p>
 
           {/* 주별/월별 기간 선택 + 그 기간 일괄 분석 */}
           <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
-            <span className="text-xs font-semibold text-foreground">전체 분석</span>
+            <span className="text-xs font-semibold text-foreground">{t("analyzeAll")}</span>
             <div className="flex rounded-md border overflow-hidden">
               <button
                 onClick={() => setSessRange("week")}
                 className={`px-3 py-1.5 text-xs font-medium ${sessRange === "week" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-              >주별</button>
+              >{t("week")}</button>
               <button
                 onClick={() => setSessRange("month")}
                 className={`px-3 py-1.5 text-xs font-medium border-l ${sessRange === "month" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-              >월별</button>
+              >{t("month")}</button>
             </div>
             <select
               value={period}
@@ -380,29 +385,29 @@ export function ReportView({
               {periods.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
             <Button size="sm" disabled={analyzingAll || filteredSessions.length === 0} onClick={analyzeAll} className="font-semibold">
-              {analyzingAll ? "분석 중..." : `📋 전체 분석 (${filteredSessions.length}개)`}
+              {analyzingAll ? t("analyzing") : t("analyzeAllBtn", { count: filteredSessions.length })}
             </Button>
           </div>
 
           {/* 수업세션별 개별 분석 목록(선택한 주/월의 세션만 표시) */}
           {filteredSessions.length === 0 ? (
-            <EmptyState icon="🗓️" title="이 기간에 진행한 수업세션이 없어요" />
+            <EmptyState icon="🗓️" title={t("noSessionsInPeriod")} />
           ) : (
           <div className="space-y-2">
             {filteredSessions.map((s) => {
               const r = res[s.id];
               const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
               const blocks: [string, string | undefined][] = [
-                ["📌 요약", r?.summary],
-                ["⚖️ 질문 유형 균형", r?.balanceInsights],
-                ["⭐ 베스트 질문", r?.bestQuestion],
-                ["📈 지난 세션 대비 성장", r?.growthInsights],
-                ["✍️ 더 좋은 질문으로", r?.rewriteExample],
-                ["❤️ 좋아요·참여", r?.engagementInsights],
-                ["💬 댓글", r?.commentInsights],
-                ["🎯 주제 연관성·성의", r?.relevanceInsights],
-                ["➡️ 다음 수업 발문", r?.nextQuestions],
-                ["🧭 제안", r?.insights],
+                [t("secSummary"), r?.summary],
+                [t("secBalance"), r?.balanceInsights],
+                [t("secBest"), r?.bestQuestion],
+                [t("secGrowth"), r?.growthInsights],
+                [t("secRewrite"), r?.rewriteExample],
+                [t("secEngagement"), r?.engagementInsights],
+                [t("secComment"), r?.commentInsights],
+                [t("secRelevance"), r?.relevanceInsights],
+                [t("secNext"), r?.nextQuestions],
+                [t("secSuggest"), r?.insights],
               ];
               return (
                 <div key={s.id} className="rounded-lg border bg-background">
@@ -413,7 +418,7 @@ export function ReportView({
                   {open[s.id] && (
                     <div className="border-t px-3 py-2 text-sm">
                       {busy[s.id] ? (
-                        <p className="text-muted-foreground">🤖 분석하는 중...</p>
+                        <p className="text-muted-foreground">{t("analyzingNow")}</p>
                       ) : errs[s.id] ? (
                         <p className="text-red-600">{errs[s.id]}</p>
                       ) : r ? (
@@ -439,16 +444,16 @@ export function ReportView({
       {/* 학생별 표(교사용) */}
       {scope === "class" && perStudent && perStudent.length > 0 && (
         <div className="rounded-xl border bg-card p-4">
-          <p className="mb-3 text-sm font-bold text-foreground">👥 학생별 활동 · 총 {perStudent.length}명</p>
+          <p className="mb-3 text-sm font-bold text-foreground">{t("studentActivity", { count: perStudent.length })}</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b text-xs text-muted-foreground">
                 <tr>
-                  <th className="px-2 py-2 text-left">번호</th>
-                  <th className="px-2 py-2 text-left">이름</th>
-                  <th className="px-2 py-2 text-right">질문</th>
-                  <th className="px-2 py-2 text-right">좋아요</th>
-                  <th className="px-2 py-2 text-right">댓글</th>
+                  <th className="px-2 py-2 text-left">{t("colNo")}</th>
+                  <th className="px-2 py-2 text-left">{t("colName")}</th>
+                  <th className="px-2 py-2 text-right">{t("colQuestion")}</th>
+                  <th className="px-2 py-2 text-right">{t("colLikes")}</th>
+                  <th className="px-2 py-2 text-right">{t("colComment")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
