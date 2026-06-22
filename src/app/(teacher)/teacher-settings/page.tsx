@@ -36,6 +36,9 @@ interface TeacherClass {
 
 export default function TeacherSettingsPage() {
   const tPages = useTranslations("pages");
+  const t = useTranslations("settings");
+  const tc = useTranslations("common");
+  const tAcc = useTranslations("account");
   const { data: session } = useSession();
   const { toast } = useToast();
   const user = session?.user as { name?: string; email?: string; school?: string };
@@ -87,11 +90,11 @@ export default function TeacherSettingsPage() {
 
   const handleTest = async () => {
     if (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) {
-      toast({ variant: "destructive", description: "API 키를 입력해 주세요 (10자 이상)" });
+      toast({ variant: "destructive", description: t("apiKeyRequired") });
       return;
     }
     if (apiKey && apiKey.length < 10) {
-      toast({ variant: "destructive", description: "API 키는 10자 이상이어야 합니다" });
+      toast({ variant: "destructive", description: t("apiKeyMinLen") });
       return;
     }
 
@@ -105,18 +108,18 @@ export default function TeacherSettingsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        toast({ variant: "success", description: `연결 성공! 모델: ${selectedModel}` });
+        toast({ variant: "success", description: t("connectSuccess", { model: selectedModel }) });
       } else {
         // 콘솔에도 진단 정보 전체 출력
         console.error(`[gemini/test] HTTP ${res.status}`, data);
-        const parts = [data.error || "연결 실패"];
+        const parts = [data.error || t("connectFailed")];
         if (data.action) parts.push(`→ ${data.action}`);
-        if (data.detail) parts.push(`\n자세한 원인: ${data.detail}`);
+        if (data.detail) parts.push(`\n${t("detailReason")}${data.detail}`);
         toast({ variant: "destructive", description: parts.join("\n") });
       }
     } catch (e) {
       console.error("[gemini/test] network error", e);
-      toast({ variant: "destructive", description: "테스트 요청 자체가 실패했어요. 네트워크를 확인해주세요." });
+      toast({ variant: "destructive", description: t("testRequestFailed") });
     } finally {
       setIsTesting(false);
     }
@@ -124,11 +127,11 @@ export default function TeacherSettingsPage() {
 
   const handleSave = async () => {
     if (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) {
-      toast({ variant: "destructive", description: "API 키를 입력해 주세요 (10자 이상)" });
+      toast({ variant: "destructive", description: t("apiKeyRequired") });
       return;
     }
     if (apiKey && apiKey.length < 10) {
-      toast({ variant: "destructive", description: "API 키는 10자 이상이어야 합니다" });
+      toast({ variant: "destructive", description: t("apiKeyMinLen") });
       return;
     }
 
@@ -142,7 +145,7 @@ export default function TeacherSettingsPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "저장 실패");
+      if (!res.ok) throw new Error(data.error || t("saveFailed"));
 
       setCurrentConfig({
         configured: true,
@@ -150,9 +153,9 @@ export default function TeacherSettingsPage() {
         model: data.model ?? selectedModel,
       });
       setApiKey("");
-      toast({ variant: "success", description: "AI 설정이 저장됐습니다. 저장된 API 키는 유지되고 선택한 모델이 적용됩니다." });
+      toast({ variant: "success", description: t("aiSaved") });
     } catch (error) {
-      toast({ variant: "destructive", description: error instanceof Error ? error.message : "설정 저장에 실패했습니다" });
+      toast({ variant: "destructive", description: error instanceof Error ? error.message : t("saveConfigFailed") });
     } finally {
       setIsSaving(false);
     }
@@ -161,16 +164,16 @@ export default function TeacherSettingsPage() {
   const confirm = useConfirm();
 
   const handleDelete = async () => {
-    if (!(await confirm({ description: "AI 설정을 삭제하면 학생들이 AI 분류를 사용할 수 없습니다. 계속하시겠습니까?", confirmText: "삭제", destructive: true }))) return;
+    if (!(await confirm({ description: t("deleteConfirm"), confirmText: tc("delete"), destructive: true }))) return;
 
     setIsDeleting(true);
     try {
       await fetch("/api/config", { method: "DELETE" });
       setCurrentConfig({ configured: false, maskedApiKey: null, model: DEFAULT_GEMINI_MODEL });
       setSelectedModel(DEFAULT_GEMINI_MODEL);
-      toast({ variant: "success", description: "AI 설정이 삭제됐습니다" });
+      toast({ variant: "success", description: t("aiDeleted") });
     } catch {
-      toast({ variant: "destructive", description: "삭제에 실패했습니다" });
+      toast({ variant: "destructive", description: t("deleteFailed") });
     } finally {
       setIsDeleting(false);
     }
@@ -193,17 +196,17 @@ export default function TeacherSettingsPage() {
 
   const handleBulkRegister = async () => {
     if (!bulkSchool || !bulkGrade || !bulkClass) {
-      toast({ variant: "destructive", description: "학교, 학년, 반을 입력해 주세요" });
+      toast({ variant: "destructive", description: t("schoolGradeClassRequired") });
       return;
     }
     const passwordError = validatePasswordPolicy(bulkPassword);
     if (passwordError) {
-      toast({ variant: "destructive", description: `기본 비밀번호: ${passwordError}` });
+      toast({ variant: "destructive", description: t("defaultPwError", { error: passwordError }) });
       return;
     }
     const students = parseBulkText();
     if (students.length === 0) {
-      toast({ variant: "destructive", description: "학생 목록을 입력해 주세요 (번호 이름 형식)" });
+      toast({ variant: "destructive", description: t("studentListRequired") });
       return;
     }
 
@@ -223,13 +226,13 @@ export default function TeacherSettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ variant: "destructive", description: data.error || "등록 실패" });
+        toast({ variant: "destructive", description: data.error || t("registerFailed") });
       } else {
-        toast({ variant: "success", description: `등록 완료: ${data.created}명 신규, ${data.skipped}명 중복 건너뜀${data.errors?.length ? ` / 오류 ${data.errors.length}건` : ""}` });
+        toast({ variant: "success", description: t("registerDone", { created: data.created, skipped: data.skipped, errors: data.errors?.length ? t("errorsSuffix", { count: data.errors.length }) : "" }) });
         if (data.created > 0) setBulkText("");
       }
     } catch {
-      toast({ variant: "destructive", description: "서버 오류가 발생했습니다" });
+      toast({ variant: "destructive", description: t("serverError") });
     } finally {
       setIsBulkSaving(false);
     }
@@ -241,27 +244,27 @@ export default function TeacherSettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>계정 정보</CardTitle>
+          <CardTitle>{t("accountInfo")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>이름</Label>
+              <Label>{t("name")}</Label>
               <Input value={user?.name || ""} disabled />
             </div>
             <div className="space-y-2">
-              <Label>이메일</Label>
+              <Label>{t("email")}</Label>
               <Input value={user?.email || ""} disabled />
             </div>
           </div>
           {user?.school && (
             <div className="space-y-2">
-              <Label>소속 학교</Label>
+              <Label>{t("school")}</Label>
               <Input value={user.school} disabled />
             </div>
           )}
           <div className="space-y-2">
-            <Label>담당 학년·반</Label>
+            <Label>{t("classInCharge")}</Label>
             {teacherClasses.length > 0 ? (
               <div className="flex flex-wrap gap-2 pt-1">
                 {teacherClasses.map((c) => (
@@ -274,7 +277,7 @@ export default function TeacherSettingsPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground pt-1">등록된 담당 학급 정보가 없습니다.</p>
+              <p className="text-sm text-muted-foreground pt-1">{t("noClassInfo")}</p>
             )}
           </div>
         </CardContent>
@@ -285,28 +288,28 @@ export default function TeacherSettingsPage() {
       {/* 학생 관리 — 일괄 등록 / 비밀번호 재설정 탭 */}
       <Card>
         <CardHeader>
-          <CardTitle>학생 관리</CardTitle>
-          <CardDescription>담당 학급 학생을 일괄 등록하거나 비밀번호를 재설정합니다.</CardDescription>
+          <CardTitle>{t("studentMgmt")}</CardTitle>
+          <CardDescription>{t("studentMgmtDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="bulk">
             <TabsList>
-              <TabsTrigger value="bulk">일괄 등록</TabsTrigger>
-              <TabsTrigger value="reset">비밀번호 재설정</TabsTrigger>
+              <TabsTrigger value="bulk">{t("tabBulk")}</TabsTrigger>
+              <TabsTrigger value="reset">{t("tabReset")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="bulk" className="space-y-4">
-              <p className="text-sm text-muted-foreground">반 학생 전체를 한번에 등록합니다. 기본 비밀번호로 계정이 생성됩니다.</p>
+              <p className="text-sm text-muted-foreground">{t("bulkDesc")}</p>
           {(() => {
             const mode = resolveClassInputMode(teacherClasses);
             return (
               <div className="space-y-3">
                 {/* 학교 */}
                 <div className="space-y-2">
-                  <Label htmlFor="bulkSchool">학교</Label>
+                  <Label htmlFor="bulkSchool">{t("schoolLabel")}</Label>
                   <Input
                     id="bulkSchool"
-                    placeholder="한빛초등학교"
+                    placeholder={t("schoolPlaceholder")}
                     value={bulkSchool}
                     disabled={mode !== "manual"}
                     onChange={(e) => setBulkSchool(e.target.value)}
@@ -317,7 +320,7 @@ export default function TeacherSettingsPage() {
                 {mode === "manual" && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label htmlFor="bulkGrade">학년</Label>
+                      <Label htmlFor="bulkGrade">{t("gradeLabel")}</Label>
                       <Input
                         id="bulkGrade"
                         placeholder="3"
@@ -326,7 +329,7 @@ export default function TeacherSettingsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="bulkClass">반</Label>
+                      <Label htmlFor="bulkClass">{t("classLabel")}</Label>
                       <Input
                         id="bulkClass"
                         placeholder="2"
@@ -339,7 +342,7 @@ export default function TeacherSettingsPage() {
 
                 {mode === "auto" && (
                   <div className="space-y-2">
-                    <Label>학년·반</Label>
+                    <Label>{t("gradeClassLabel")}</Label>
                     <Input
                       value={buildTeacherClassLabel(bulkGrade, bulkClass)}
                       disabled
@@ -349,7 +352,7 @@ export default function TeacherSettingsPage() {
 
                 {mode === "select" && (
                   <div className="space-y-2">
-                    <Label htmlFor="bulkClassSelect">학년·반 선택</Label>
+                    <Label htmlFor="bulkClassSelect">{t("gradeClassSelect")}</Label>
                     <Select
                       value={bulkGrade && bulkClass ? `${bulkGrade}-${bulkClass}` : ""}
                       onValueChange={(val) => {
@@ -359,7 +362,7 @@ export default function TeacherSettingsPage() {
                       }}
                     >
                       <SelectTrigger id="bulkClassSelect">
-                        <SelectValue placeholder="담당 학급을 선택하세요" />
+                        <SelectValue placeholder={t("selectClassPlaceholder")} />
                       </SelectTrigger>
                       <SelectContent>
                         {teacherClasses.map((c) => (
@@ -376,40 +379,40 @@ export default function TeacherSettingsPage() {
           })()}
 
           <div className="space-y-2">
-            <Label htmlFor="bulkPassword">기본 비밀번호</Label>
+            <Label htmlFor="bulkPassword">{t("defaultPassword")}</Label>
             <Input
               id="bulkPassword"
-              placeholder="예: Hanbit2026!"
+              placeholder={t("pwPlaceholder")}
               value={bulkPassword}
               onChange={(e) => setBulkPassword(e.target.value)}
             />
             <div className="rounded-md border bg-muted/40 p-2.5 text-xs leading-5 text-muted-foreground space-y-0.5">
-              <p>학생들이 처음 로그인할 때 사용할 비밀번호예요. 비밀번호 규칙을 따라야 합니다.</p>
-              <p>숫자 + 영문 대/소문자 + 특수문자, 3가지를 조합하여 8~16자 (사용 가능 특수문자: <span className="font-mono">! @ # $ % ^ &amp; * ( ) _ +</span>)</p>
-              <p className="text-amber-600">💡 전원 같은 비밀번호로 만들어지니, 학생들이 로그인 후 [설정]에서 각자 바꾸도록 안내해 주세요.</p>
+              <p>{t("pwHint")}</p>
+              <p>{tAcc("resetRulePrefix")}<span className="font-mono">! @ # $ % ^ &amp; * ( ) _ +</span>{tAcc("resetRuleSuffix")}</p>
+              <p className="text-amber-600">{t("pwWarning")}</p>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="bulkText">학생 목록</Label>
+            <Label htmlFor="bulkText">{t("studentList")}</Label>
             <textarea
               id="bulkText"
               className="w-full min-h-[160px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder={"번호와 이름을 한 줄에 하나씩 입력하세요\n예:\n1 김민준\n2 이서연\n3 박지호"}
+              placeholder={t("bulkPlaceholder")}
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              형식: <code className="bg-muted px-1 rounded">번호 이름</code> (탭, 쉼표, 공백 모두 구분자로 사용 가능)
+              {t("formatLabel")}<code className="bg-muted px-1 rounded">{t("formatCode")}</code>{t("formatHint")}
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <Button onClick={handleBulkRegister} disabled={isBulkSaving}>
-              {isBulkSaving ? "등록 중..." : `${parseBulkText().length}명 일괄 등록`}
+              {isBulkSaving ? t("registering") : t("bulkRegisterBtn", { count: parseBulkText().length })}
             </Button>
             {bulkText && (
-              <span className="text-sm text-muted-foreground">{parseBulkText().length}명 입력됨</span>
+              <span className="text-sm text-muted-foreground">{t("enteredCount", { count: parseBulkText().length })}</span>
             )}
           </div>
             </TabsContent>
@@ -423,9 +426,9 @@ export default function TeacherSettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Gemini AI 설정</CardTitle>
+          <CardTitle>{t("geminiTitle")}</CardTitle>
           <CardDescription>
-            여기서 설정한 API 키는 서버에 안전하게 저장되며, <b>선생님이 담당하는 학급의 학생들</b>이 별도 설정 없이 이 키로 AI 기능을 사용합니다. (교사마다 자신의 API 키를 따로 설정합니다)
+            {t.rich("geminiDescRich", { b: (c) => <b>{c}</b> })}
             <br />
             <a
               href="https://aistudio.google.com/app/apikey"
@@ -433,7 +436,7 @@ export default function TeacherSettingsPage() {
               rel="noopener noreferrer"
               className="text-blue-600 hover:underline"
             >
-              Google AI Studio에서 API 키 발급
+              {t("getApiKey")}
             </a>
           </CardDescription>
         </CardHeader>
@@ -441,9 +444,9 @@ export default function TeacherSettingsPage() {
           {currentConfig?.configured && (
             <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-500/30 flex items-center justify-between">
               <div>
-            <p className="text-sm font-medium text-green-800">AI 분류가 활성화됐습니다</p>
+            <p className="text-sm font-medium text-green-800">{t("aiActive")}</p>
                 <p className="text-xs text-green-600 mt-0.5">
-                  현재 키: {currentConfig.maskedApiKey} · 모델: {currentConfig.model}
+                  {t("currentKeyModel", { key: currentConfig.maskedApiKey ?? "", model: currentConfig.model })}
                 </p>
               </div>
               <Button
@@ -453,20 +456,20 @@ export default function TeacherSettingsPage() {
                 disabled={isDeleting}
                 className="text-red-600 border-red-200 hover:bg-red-50"
               >
-                {isDeleting ? "삭제 중..." : "삭제"}
+                {isDeleting ? t("deleting") : tc("delete")}
               </Button>
             </div>
           )}
 
           {!currentConfig?.configured && (
             <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/40 border border-yellow-200 dark:border-yellow-500/30">
-              <p className="text-sm text-yellow-800">AI 설정이 없습니다. API 키를 입력해 학생들이 AI 분류를 사용할 수 있게 하세요.</p>
+              <p className="text-sm text-yellow-800">{t("noAiConfig")}</p>
             </div>
           )}
 
           <div className="space-y-2">
             <Label htmlFor="apiKey">
-              {currentConfig?.configured ? "새 API 키 (변경 시에만 입력)" : "API 키"}
+              {currentConfig?.configured ? t("newApiKey") : t("apiKey")}
             </Label>
             <Input
               id="apiKey"
@@ -479,13 +482,13 @@ export default function TeacherSettingsPage() {
             />
             {currentConfig?.configured && (
               <p className="text-xs text-muted-foreground">
-                비워두고 저장하면 기존 API 키는 그대로 유지되고 모델만 변경됩니다.
+                {t("keepKeyHint")}
               </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="model">사용 모델</Label>
+            <Label htmlFor="model">{t("modelLabel")}</Label>
             <Select value={selectedModel} onValueChange={(v) => {
               setSelectedModel(v);
             }}>
@@ -508,13 +511,13 @@ export default function TeacherSettingsPage() {
               onClick={handleTest}
               disabled={isTesting || (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) || (!!apiKey && apiKey.length < 10)}
             >
-              {isTesting ? "테스트 중..." : "연결 테스트"}
+              {isTesting ? t("testing") : t("connectionTest")}
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving || (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) || (!!apiKey && apiKey.length < 10)}
             >
-              {isSaving ? "저장 중..." : "저장"}
+              {isSaving ? t("saving") : tc("save")}
             </Button>
           </div>
         </CardContent>

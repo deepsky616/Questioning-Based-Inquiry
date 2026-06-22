@@ -17,10 +17,10 @@ interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subti
 }
 
 // 학급 세션 분석: 기존 세션 분석(전체 학생) 엔드포인트 재사용
-async function analyzeClassSession(sessionId: string): Promise<SessionAnalysisResult | null> {
+async function analyzeClassSession(sessionId: string, failMsg: string): Promise<SessionAnalysisResult | null> {
   const res = await fetch(`/api/sessions/${sessionId}/analysis`, { method: "POST" });
   const d = await res.json();
-  if (!res.ok) throw new Error(d.error || "분석 실패");
+  if (!res.ok) throw new Error(d.error || failMsg);
   return {
     summary: d.summary, insights: d.insights, commentInsights: d.commentInsights,
     engagementInsights: d.engagementInsights, relevanceInsights: d.relevanceInsights,
@@ -28,7 +28,7 @@ async function analyzeClassSession(sessionId: string): Promise<SessionAnalysisRe
   };
 }
 // 특정 학생 세션 분석(교사가 그 학생을 지정해서 봄)
-function analyzeStudentSessionFor(studentId: string) {
+function analyzeStudentSessionFor(studentId: string, failMsg: string) {
   return async (sessionId: string): Promise<SessionAnalysisResult | null> => {
     const res = await fetch("/api/reports/student-session-analysis", {
       method: "POST",
@@ -36,13 +36,14 @@ function analyzeStudentSessionFor(studentId: string) {
       body: JSON.stringify({ sessionId, studentId }),
     });
     const d = await res.json();
-    if (!res.ok) throw new Error(d.error || "분석 실패");
+    if (!res.ok) throw new Error(d.error || failMsg);
     return { summary: d.summary, insights: d.insights, relevanceInsights: d.relevanceInsights, growthInsights: d.growthInsights, rewriteExample: d.rewriteExample };
   };
 }
 
 export default function TeacherReportsPage() {
   const tPages = useTranslations("pages");
+  const t = useTranslations("reports");
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selected, setSelected] = useState<string>(""); // "grade|className"
   const [view, setView] = useState<"class" | "student">("class");
@@ -70,22 +71,22 @@ export default function TeacherReportsPage() {
     const [grade, className] = selected.split("|");
     setLoading(true); setError(null); setReport(null); setStudentId(""); setStudentReport(null);
     fetch(`/api/reports/class?grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}`)
-      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || "불러오기 실패"); return r.json(); })
+      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || t("loadFailed")); return r.json(); })
       .then((d: ClassReport) => setReport(d))
-      .catch((e) => setError(e instanceof Error ? e.message : "불러오기 실패"))
+      .catch((e) => setError(e instanceof Error ? e.message : t("loadFailed")))
       .finally(() => setLoading(false));
-  }, [selected]);
+  }, [selected, t]);
 
   // 학생별 보기: 선택된 학생 리포트
   useEffect(() => {
     if (view !== "student" || !studentId) return;
     setLoading(true); setError(null); setStudentReport(null);
     fetch(`/api/reports/student?studentId=${encodeURIComponent(studentId)}`)
-      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || "불러오기 실패"); return r.json(); })
+      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || t("loadFailed")); return r.json(); })
       .then((d: StudentReport) => setStudentReport(d))
-      .catch((e) => setError(e instanceof Error ? e.message : "불러오기 실패"))
+      .catch((e) => setError(e instanceof Error ? e.message : t("loadFailed")))
       .finally(() => setLoading(false));
-  }, [view, studentId]);
+  }, [view, studentId, t]);
 
   const students = report?.perStudent ?? [];
   const currentStudent = students.find((s) => s.id === studentId);
@@ -107,13 +108,13 @@ export default function TeacherReportsPage() {
                     selected === key ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
                   }`}
                 >
-                  {c.grade}학년 {c.className}반 <span className="text-xs opacity-80">({c.studentCount}명)</span>
+                  {t("gradeClass", { grade: c.grade, className: c.className })} <span className="text-xs opacity-80">{t("studentCount", { count: c.studentCount })}</span>
                 </button>
               );
             })}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-muted-foreground">담당 학급이 없습니다. 설정에서 담당 학급을 추가해 주세요.</p>
+          <p className="mt-3 text-sm text-muted-foreground">{t("noClasses")}</p>
         )}
 
         {/* 학급별 / 학생별 보기 전환 */}
@@ -123,11 +124,11 @@ export default function TeacherReportsPage() {
               <button
                 onClick={() => setView("class")}
                 className={`px-3 py-1.5 text-xs font-medium ${view === "class" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-              >학급 전체</button>
+              >{t("classAll")}</button>
               <button
                 onClick={() => { setView("student"); if (!studentId && students[0]) setStudentId(students[0].id); }}
                 className={`px-3 py-1.5 text-xs font-medium border-l ${view === "student" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-              >학생별</button>
+              >{t("byStudent")}</button>
             </div>
             {view === "student" && (
               <select
@@ -144,24 +145,24 @@ export default function TeacherReportsPage() {
         )}
       </div>
 
-      {loading && <div className="py-16 text-center text-muted-foreground">리포트를 불러오는 중...</div>}
+      {loading && <div className="py-16 text-center text-muted-foreground">{t("loadingReport")}</div>}
       {error && <div className="py-16 text-center text-red-600">{error}</div>}
 
       {/* 학급별 보기 */}
       {!loading && view === "class" && report && (
         <ReportView
           scope="class"
-          title={`${report.klass.grade}학년 ${report.klass.className}반 활동 리포트`}
-          subtitle={`학생 ${report.klass.studentCount}명`}
+          title={t("classReportTitle", { grade: report.klass.grade, className: report.klass.className })}
+          subtitle={t("classReportSubtitle", { count: report.klass.studentCount })}
           totals={report.totals}
           weekly={report.weekly}
           monthly={report.monthly}
           classification={report.classification}
           perStudent={report.perStudent}
           sessions={report.sessions}
-          analyzeSession={analyzeClassSession}
-          participationLabel="학급이 만든 활동"
-          receptionLabel="학급 질문이 받은 반응"
+          analyzeSession={(id) => analyzeClassSession(id, t("analysisFailed"))}
+          participationLabel={t("participationClass")}
+          receptionLabel={t("receptionClass")}
         />
       )}
 
@@ -169,16 +170,16 @@ export default function TeacherReportsPage() {
       {!loading && view === "student" && studentReport && (
         <ReportView
           scope="student"
-          title={`${studentReport.student.name} 학생 활동 리포트`}
-          subtitle={currentStudent?.studentNumber ? `${currentStudent.studentNumber}번` : undefined}
+          title={t("studentReportTitle", { name: studentReport.student.name })}
+          subtitle={currentStudent?.studentNumber ? t("studentReportSubtitle", { number: currentStudent.studentNumber }) : undefined}
           totals={studentReport.totals}
           weekly={studentReport.weekly}
           monthly={studentReport.monthly}
           classification={studentReport.classification}
           sessions={studentReport.sessions}
-          analyzeSession={analyzeStudentSessionFor(studentId)}
-          participationLabel="이 학생이 만든 활동"
-          receptionLabel="이 학생 질문이 받은 반응"
+          analyzeSession={analyzeStudentSessionFor(studentId, t("analysisFailed"))}
+          participationLabel={t("participationStudent")}
+          receptionLabel={t("receptionStudent")}
         />
       )}
     </div>
