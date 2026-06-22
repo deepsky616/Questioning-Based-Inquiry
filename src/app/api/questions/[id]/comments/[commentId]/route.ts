@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { cleanupCommentTranslations } from "@/lib/translation-cleanup";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -85,5 +86,6 @@ export async function DELETE(
   }
 
   await prisma.comment.delete({ where: { id: params.commentId } });
+  await cleanupCommentTranslations([params.commentId]);
   return NextResponse.json({ ok: true });
 }

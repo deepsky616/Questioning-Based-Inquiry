@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { cleanupQuestionTranslations } from "@/lib/translation-cleanup";
 import { Prisma } from "@prisma/client";
 import { normalizeSharedQuestions, type SharedQuestionItem } from "@/lib/shared-questions";
 
@@ -120,8 +121,10 @@ export async function POST(
         q._count.comments === 0,
     );
     if (removable.length > 0) {
+      const removableIds = removable.map((q) => q.id);
+      await cleanupQuestionTranslations(removableIds);
       await prisma.question.deleteMany({
-        where: { id: { in: removable.map((q) => q.id) }, source: "TEACHER_SHARED" },
+        where: { id: { in: removableIds }, source: "TEACHER_SHARED" },
       });
     }
 
@@ -214,6 +217,11 @@ export async function DELETE(
 
   // 배포 전체 삭제: TEACHER_SHARED 질문 모두 제거 + sharedQuestions 비우기
   if (deleteAll) {
+    const toRemove = await prisma.question.findMany({
+      where: { sessionId, source: "TEACHER_SHARED" },
+      select: { id: true },
+    });
+    await cleanupQuestionTranslations(toRemove.map((x) => x.id));
     const removed = await prisma.question.deleteMany({
       where: { sessionId, source: "TEACHER_SHARED" },
     });
@@ -225,6 +233,7 @@ export async function DELETE(
   }
 
   // TEACHER_SHARED 만 삭제 가능
+  await cleanupQuestionTranslations(questionIds);
   await prisma.question.deleteMany({
     where: { id: { in: questionIds }, sessionId, source: "TEACHER_SHARED" },
   });

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canPatchQuestion } from "@/lib/questions";
+import { cleanupQuestionTranslations } from "@/lib/translation-cleanup";
 import { z } from "zod";
 
 const patchQuestionSchema = z.object({
@@ -171,6 +172,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   if (question.authorId !== userId && userRole !== "TEACHER") {
     return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
   }
+
+  // 번역 캐시 정리(삭제 전 호출 — 댓글 id 확보)
+  await cleanupQuestionTranslations([params.id]);
 
   // 댓글(외래키 Restrict)·좋아요·관련 PointLog까지 함께 정리
   await prisma.$transaction([
