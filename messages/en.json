@@ -14,7 +14,8 @@
     "teacherSuffix": "Teacher",
     "studentSuffix": "Student",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "more": "More"
   },
   "common": {
     "save": "Save",

@@ -14,7 +14,8 @@
     "teacherSuffix": "선생님",
     "studentSuffix": "학생",
     "openMenu": "메뉴 열기",
-    "closeMenu": "메뉴 닫기"
+    "closeMenu": "메뉴 닫기",
+    "more": "더보기"
   },
   "common": {
     "save": "저장",
