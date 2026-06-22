@@ -320,11 +320,14 @@ export function ClassRankingPanel({
   gradeParam,
   classNameParam,
   highlightSelf = false,
+  highlightClasses,
   defaultScope = "school",
 }: {
   gradeParam?: string;
   classNameParam?: string;
   highlightSelf?: boolean;
+  /** 추가로 강조할 학급들(예: 교사의 담당 학급 전체). grade·className으로 매칭. */
+  highlightClasses?: { grade: string; className: string }[];
   defaultScope?: ClassScope;
 }) {
   const t = useTranslations("ranking");
@@ -358,10 +361,11 @@ export function ClassRankingPanel({
   }, [data, highlightSelf]);
 
   const isSameClass = (c: RankedClass) =>
-    data?.myClass != null &&
-    c.school === data.myClass.school &&
-    c.grade === data.myClass.grade &&
-    c.className === data.myClass.className;
+    (data?.myClass != null &&
+      c.school === data.myClass.school &&
+      c.grade === data.myClass.grade &&
+      c.className === data.myClass.className) ||
+    (highlightClasses?.some((h) => h.grade === c.grade && h.className === c.className) ?? false);
 
   const classLabel = (c: RankedClass) =>
     scope === "all" ? t("classNameAll", { school: c.school, grade: c.grade, className: c.className }) : t("classNameShort", { grade: c.grade, className: c.className });

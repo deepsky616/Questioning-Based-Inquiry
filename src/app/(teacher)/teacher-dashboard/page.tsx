@@ -316,20 +316,32 @@ export default function TeacherDashboard() {
             </CardContent>
           </Card>
 
-          {/* 순위 (개인: 우리반/교내/전체 · 반: 교내/전체) — 선택 학급 기준 */}
+          {/* 순위 (개인: 우리반/교내/전체 · 반: 교내/전체)
+              · 특정 학급: 해당 학급 학생 순위
+              · 전체 담당 학급: 담당 학급별 학생 순위를 쌓아 모두 표시 + 반 순위에 담당 반 강조 */}
           {(() => {
             const [selGrade, selClassName] =
               selectedClass !== "all" ? selectedClass.split("|") : [undefined, undefined];
             return (
               <div className="grid gap-4 lg:grid-cols-2">
-                <StudentRankPanel
-                  gradeParam={selGrade}
-                  classNameParam={selClassName}
-                />
+                <div className="space-y-4">
+                  {selectedClass !== "all" ? (
+                    <StudentRankPanel gradeParam={selGrade} classNameParam={selClassName} />
+                  ) : (
+                    teacherClasses.map((tc) => (
+                      <StudentRankPanel
+                        key={classKey(tc)}
+                        gradeParam={tc.grade}
+                        classNameParam={tc.className}
+                      />
+                    ))
+                  )}
+                </div>
                 <ClassRankingPanel
                   gradeParam={selGrade}
                   classNameParam={selClassName}
                   highlightSelf={selectedClass !== "all"}
+                  highlightClasses={selectedClass === "all" ? teacherClasses : undefined}
                   defaultScope="school"
                 />
               </div>
