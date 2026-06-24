@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
@@ -126,6 +127,7 @@ export default function QuestionsPage() {
   const t = useTranslations("teacherQ");
   const tc = useTranslations("common");
   const ct = useContentTranslation();
+  const queryClient = useQueryClient();
   const [questions, setQuestions] = useState<Question[]>([]);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -549,6 +551,7 @@ export default function QuestionsPage() {
       });
       if (!res.ok) throw new Error();
       setQuestions((prev) => prev.map((q) => (q.id === question.id ? { ...q, flagged: false } : q)));
+      queryClient.invalidateQueries({ queryKey: ["flagged-count"] });
     } catch {
       toast({ variant: "destructive", description: t("processFailed") });
     }

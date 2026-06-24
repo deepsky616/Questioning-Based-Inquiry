@@ -956,7 +956,8 @@
     "colName": "이름",
     "colQuestion": "질문",
     "colLikes": "좋아요",
-    "colComment": "댓글"
+    "colComment": "댓글",
+    "reanalyze": "🔄 다시 분석"
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",

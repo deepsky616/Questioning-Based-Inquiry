@@ -56,6 +56,7 @@ export function StudentReportView() {
       classification={data.classification}
       sessions={data.sessions}
       analyzeSession={(id) => analyzeStudentSession(id, t("analysisFailed"))}
+      analysisCacheKey="student-self"
     />
   );
 }

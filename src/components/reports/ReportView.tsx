@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -48,6 +49,8 @@ export interface ReportViewProps {
   perStudent?: PerStudentRow[];
   sessions?: SessionMeta[];
   analyzeSession?: (sessionId: string) => Promise<SessionAnalysisResult | null>;
+  /** 세션 AI 분석 결과를 컴포넌트 remount(탭/뷰 전환)에도 유지하기 위한 캐시 키(예: "class:5|1", "student:abc"). */
+  analysisCacheKey?: string;
   // 추세 차트 부제(관점에 따라 다르게). 기본은 학생 본인 관점.
   participationLabel?: string;
   receptionLabel?: string;
@@ -104,7 +107,7 @@ function sessionPeriod(dateStr: string, mode: ReportRange, locale: string, other
 }
 
 export function ReportView({
-  scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession,
+  scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
   participationLabel, receptionLabel,
 }: ReportViewProps) {
   const [range, setRange] = useState<ReportRange>("week");
@@ -112,6 +115,7 @@ export function ReportView({
   const tCls = useTranslations("classification");
   const t = useTranslations("report");
   const locale = useLocale();
+  const queryClient = useQueryClient();
   const pLabel = participationLabel ?? t("defaultParticipation");
   const rLabel = receptionLabel ?? t("defaultReception");
   const metricName = (k: string) => t(`metric_${k}`);
@@ -167,12 +171,31 @@ export function ReportView({
 
   const filteredSessions = allSessions.filter((s) => sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix")).key === period);
 
-  const analyzeOne = async (id: string) => {
-    if (!analyzeSession || res[id] || busy[id]) return;
+  // 분석 결과를 QueryClient에 캐시해 탭/뷰 전환(remount)에도 유지한다.
+  const analysisKey = (id: string) => ["session-analysis", analysisCacheKey ?? "default", id] as const;
+
+  // 마운트/세션 변경 시 캐시에서 기존 분석 결과를 복원(재분석 방지)
+  useEffect(() => {
+    const restored: Record<string, SessionAnalysisResult> = {};
+    for (const s of allSessions) {
+      const cached = queryClient.getQueryData<SessionAnalysisResult>(analysisKey(s.id));
+      if (cached) restored[s.id] = cached;
+    }
+    if (Object.keys(restored).length > 0) setRes((p) => ({ ...restored, ...p }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allSessions, analysisCacheKey]);
+
+  // force=true면 캐시를 무시하고 다시 분석한다.
+  const analyzeOne = async (id: string, force = false) => {
+    if (!analyzeSession || busy[id]) return;
+    if (!force && res[id]) return;
     setBusy((b) => ({ ...b, [id]: true })); setErrs((e) => ({ ...e, [id]: "" }));
     try {
       const r = await analyzeSession(id);
-      if (r) setRes((p) => ({ ...p, [id]: r })); else setErrs((e) => ({ ...e, [id]: t("noAnalysisResult") }));
+      if (r) {
+        setRes((p) => ({ ...p, [id]: r }));
+        queryClient.setQueryData(analysisKey(id), r);
+      } else setErrs((e) => ({ ...e, [id]: t("noAnalysisResult") }));
     } catch (e) {
       setErrs((x) => ({ ...x, [id]: e instanceof Error ? e.message : t("analysisFailed") }));
     } finally {
@@ -192,7 +215,10 @@ export function ReportView({
       setBusy((b) => ({ ...b, [s.id]: true })); setErrs((e) => ({ ...e, [s.id]: "" }));
       try {
         const r = await analyzeSession(s.id);
-        if (r) setRes((p) => ({ ...p, [s.id]: r }));
+        if (r) {
+          setRes((p) => ({ ...p, [s.id]: r }));
+          queryClient.setQueryData(analysisKey(s.id), r);
+        }
       } catch (e) {
         setErrs((x) => ({ ...x, [s.id]: e instanceof Error ? e.message : t("analysisFailed") }));
       } finally {
@@ -429,6 +455,12 @@ export function ReportView({
                               <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{v}</p>
                             </div>
                           ))}
+                          <button
+                            onClick={() => analyzeOne(s.id, true)}
+                            className="no-print mt-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                          >
+                            {t("reanalyze")}
+                          </button>
                         </div>
                       ) : null}
                     </div>

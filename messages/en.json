@@ -956,7 +956,8 @@
     "colName": "Name",
     "colQuestion": "Questions",
     "colLikes": "Likes",
-    "colComment": "Comments"
+    "colComment": "Comments",
+    "reanalyze": "🔄 Re-analyze"
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

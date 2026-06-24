@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ function bonusLabel(bt: string): { labelKey: string | null; raw: string; emoji: 
 
 export function PointReviewView() {
   const t = useTranslations("pointReview");
+  const queryClient = useQueryClient();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("all");
   const [pending, setPending] = useState<PendingLog[]>([]);
@@ -105,6 +107,8 @@ export function PointReviewView() {
       });
       setMessage(decision === "APPROVE" ? t("resultApproved", { count: targetIds.length }) : t("resultRejected", { count: targetIds.length }));
       loadPending();
+      queryClient.invalidateQueries({ queryKey: ["pending-review-count"] });
+      queryClient.invalidateQueries({ queryKey: ["flagged-count"] });
     } catch {} finally { setBusy(false); }
   }
 
@@ -118,6 +122,7 @@ export function PointReviewView() {
       });
       setMessage(t("overrideApproved", { points }));
       loadPending();
+      queryClient.invalidateQueries({ queryKey: ["pending-review-count"] });
     } catch {} finally { setBusy(false); }
   }
 

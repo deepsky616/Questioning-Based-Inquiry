@@ -158,6 +158,7 @@ export function TeacherReportsView() {
           perStudent={report.perStudent}
           sessions={report.sessions}
           analyzeSession={(id) => analyzeClassSession(id, t("analysisFailed"))}
+          analysisCacheKey={`class:${selected}`}
           participationLabel={t("participationClass")}
           receptionLabel={t("receptionClass")}
         />
@@ -175,6 +176,7 @@ export function TeacherReportsView() {
           classification={studentReport.classification}
           sessions={studentReport.sessions}
           analyzeSession={analyzeStudentSessionFor(studentId, t("analysisFailed"))}
+          analysisCacheKey={`teacher-student:${studentId}`}
           participationLabel={t("participationStudent")}
           receptionLabel={t("receptionStudent")}
         />

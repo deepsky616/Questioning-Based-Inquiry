@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ export function CommentThread({
   const t = useTranslations("comment");
   const tc = useTranslations("common");
   const ct = useContentTranslation();
+  const queryClient = useQueryClient();
   const [comments, setComments] = useState<ThreadComment[]>(preloaded ?? []);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(!preloaded);
@@ -102,6 +104,8 @@ export function CommentThread({
       });
       if (!res.ok) throw new Error();
       setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, flagged: false } : c)));
+      // 알림 벨의 부적절 의심 카운트 즉시 갱신
+      queryClient.invalidateQueries({ queryKey: ["flagged-count"] });
     } catch {
       // 무시
     }
