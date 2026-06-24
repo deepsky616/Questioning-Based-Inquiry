@@ -958,7 +958,8 @@
     "colLikes": "좋아요",
     "colComment": "댓글",
     "reanalyze": "🔄 다시 분석",
-    "analyzeSessionBtn": "✦ AI 분석하기"
+    "analyzeSessionBtn": "✦ AI 분석하기",
+    "notAnalyzedYet": "아직 분석하지 않았습니다. 오른쪽의 ‘AI 분석하기’ 버튼을 눌러 시작하세요."
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",

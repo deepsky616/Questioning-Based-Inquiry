@@ -958,7 +958,8 @@
     "colLikes": "Likes",
     "colComment": "Comments",
     "reanalyze": "🔄 Re-analyze",
-    "analyzeSessionBtn": "✦ Analyze with AI"
+    "analyzeSessionBtn": "✦ Analyze with AI",
+    "notAnalyzedYet": "Not analyzed yet. Tap the “Analyze with AI” button on the right to start."
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

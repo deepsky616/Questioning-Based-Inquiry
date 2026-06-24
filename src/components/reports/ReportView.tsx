@@ -206,6 +206,11 @@ export function ReportView({
   const toggleSession = (id: string) => {
     setOpen((o) => ({ ...o, [id]: !o[id] }));
   };
+  // 분석 버튼: 펼친 뒤 분석 실행(이미 결과가 있으면 강제 재분석).
+  const runAnalysis = (id: string) => {
+    setOpen((o) => ({ ...o, [id]: true }));
+    analyzeOne(id, !!res[id]);
+  };
   const analyzeAll = async () => {
     if (!analyzeSession) return;
     setAnalyzingAll(true);
@@ -437,10 +442,23 @@ export function ReportView({
               ];
               return (
                 <div key={s.id} className="rounded-lg border bg-background">
-                  <button onClick={() => toggleSession(s.id)} className="no-print flex w-full items-center justify-between gap-2 px-3 py-2 text-left">
-                    <span className="truncate text-sm font-medium text-foreground">{label}</span>
-                    <span className="shrink-0 text-xs font-semibold text-emerald-600">🤖 {open[s.id] ? "▾" : "▸"}</span>
-                  </button>
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    <button onClick={() => toggleSession(s.id)} className="no-print flex min-w-0 flex-1 items-center gap-2 text-left">
+                      <span className="truncate text-sm font-medium text-foreground">{label}</span>
+                      <span className="shrink-0 text-xs font-semibold text-emerald-600">{open[s.id] ? "▾" : "▸"}</span>
+                    </button>
+                    <button
+                      onClick={() => runAnalysis(s.id)}
+                      disabled={busy[s.id]}
+                      className={`no-print shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                        r
+                          ? "border-border text-muted-foreground hover:bg-muted"
+                          : "border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                      }`}
+                    >
+                      {busy[s.id] ? t("analyzing") : r ? t("reanalyze") : t("analyzeSessionBtn")}
+                    </button>
+                  </div>
                   {open[s.id] && (
                     <div className="border-t px-3 py-2 text-sm">
                       {busy[s.id] ? (
@@ -455,20 +473,9 @@ export function ReportView({
                               <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{v}</p>
                             </div>
                           ))}
-                          <button
-                            onClick={() => analyzeOne(s.id, true)}
-                            className="no-print mt-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
-                          >
-                            {t("reanalyze")}
-                          </button>
                         </div>
                       ) : (
-                        <button
-                          onClick={() => analyzeOne(s.id)}
-                          className="no-print rounded-md border border-indigo-300 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
-                        >
-                          {t("analyzeSessionBtn")}
-                        </button>
+                        <p className="text-muted-foreground">{t("notAnalyzedYet")}</p>
                       )}
                     </div>
                   )}
