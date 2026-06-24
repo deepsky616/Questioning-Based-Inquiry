@@ -1,33 +1,12 @@
-"use client";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { getRedirectPath } from "@/lib/route-access";
+import type { UserRole } from "@/types/user";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
-
-export default function Home() {
-  const router = useRouter();
-  const t = useTranslations("appShell");
-
-  useEffect(() => {
-    router.push("/login");
-  }, [router]);
-
-  // 로그인으로 넘어가기 전 짧게 보이는 브랜드 스플래시
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-4">
-        <div
-          className="flex h-20 w-20 items-center justify-center rounded-3xl text-4xl font-black text-white shadow-lg"
-          style={{ background: "linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)" }}
-        >
-          ?
-        </div>
-        <div className="text-center">
-          <p className="text-lg font-bold text-foreground">Question Lab</p>
-          <p className="text-xs text-muted-foreground">{t("tagline")}</p>
-        </div>
-        <span className="mt-1 h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-primary" />
-      </div>
-    </div>
-  );
+// 루트 진입은 서버에서 즉시 적절한 곳으로 보낸다(로그인 사용자는 대시보드, 아니면 로그인).
+// 클라이언트 스플래시 후 하이드레이션을 기다렸다 리다이렉트하던 홉·깜빡임을 제거한다.
+export default async function Home() {
+  const session = await auth();
+  const role = (session?.user as { role?: UserRole } | undefined)?.role;
+  redirect(getRedirectPath(role ?? null));
 }
