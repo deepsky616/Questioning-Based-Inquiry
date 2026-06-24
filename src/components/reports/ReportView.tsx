@@ -51,6 +51,8 @@ export interface ReportViewProps {
   analyzeSession?: (sessionId: string) => Promise<SessionAnalysisResult | null>;
   /** 세션 AI 분석 결과를 컴포넌트 remount(탭/뷰 전환)에도 유지하기 위한 캐시 키(예: "class:5|1", "student:abc"). */
   analysisCacheKey?: string;
+  /** 분석/재분석 버튼 노출 여부. false면 저장된 결과만 보여준다(학생 본인 뷰=읽기 전용). 기본 true. */
+  canAnalyze?: boolean;
   // 추세 차트 부제(관점에 따라 다르게). 기본은 학생 본인 관점.
   participationLabel?: string;
   receptionLabel?: string;
@@ -108,7 +110,7 @@ function sessionPeriod(dateStr: string, mode: ReportRange, locale: string, other
 
 export function ReportView({
   scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
-  participationLabel, receptionLabel,
+  participationLabel, receptionLabel, canAnalyze = true,
 }: ReportViewProps) {
   const [range, setRange] = useState<ReportRange>("week");
   const series = range === "week" ? weekly : monthly;
@@ -417,9 +419,11 @@ export function ReportView({
             >
               {periods.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
-            <Button size="sm" disabled={analyzingAll || filteredSessions.length === 0} onClick={analyzeAll} className="font-semibold">
-              {analyzingAll ? t("analyzing") : t("analyzeAllBtn", { count: filteredSessions.length })}
-            </Button>
+            {canAnalyze && (
+              <Button size="sm" disabled={analyzingAll || filteredSessions.length === 0} onClick={analyzeAll} className="font-semibold">
+                {analyzingAll ? t("analyzing") : t("analyzeAllBtn", { count: filteredSessions.length })}
+              </Button>
+            )}
           </div>
 
           {/* 수업세션별 개별 분석 목록(선택한 주/월의 세션만 표시) */}
@@ -449,17 +453,19 @@ export function ReportView({
                       <span className="truncate text-sm font-medium text-foreground">{label}</span>
                       <span className="shrink-0 text-xs font-semibold text-emerald-600">{open[s.id] ? "▾" : "▸"}</span>
                     </button>
-                    <button
-                      onClick={() => runAnalysis(s.id)}
-                      disabled={busy[s.id]}
-                      className={`no-print shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                        r
-                          ? "border-border text-muted-foreground hover:bg-muted"
-                          : "border-indigo-300 text-indigo-600 hover:bg-indigo-50"
-                      }`}
-                    >
-                      {busy[s.id] ? t("analyzing") : r ? t("reanalyze") : t("analyzeSessionBtn")}
-                    </button>
+                    {canAnalyze && (
+                      <button
+                        onClick={() => runAnalysis(s.id)}
+                        disabled={busy[s.id]}
+                        className={`no-print shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                          r
+                            ? "border-border text-muted-foreground hover:bg-muted"
+                            : "border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                        }`}
+                      >
+                        {busy[s.id] ? t("analyzing") : r ? t("reanalyze") : t("analyzeSessionBtn")}
+                      </button>
+                    )}
                   </div>
                   {open[s.id] && (
                     <div className="border-t px-3 py-2 text-sm">
@@ -477,7 +483,7 @@ export function ReportView({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-muted-foreground">{t("notAnalyzedYet")}</p>
+                        <p className="text-muted-foreground">{canAnalyze ? t("notAnalyzedYet") : t("notAnalyzedYetReadonly")}</p>
                       )}
                     </div>
                   )}

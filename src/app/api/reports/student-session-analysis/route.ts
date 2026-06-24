@@ -15,10 +15,15 @@ export async function POST(req: NextRequest) {
   const role = (session.user as { role?: string }).role;
   const userId = (session.user as { id: string }).id;
 
+  // 분석 생성은 교사만(학생은 저장된 결과를 보기만 함) — 키 사용량·결과 일관성 관리
+  if (role !== "TEACHER") {
+    return NextResponse.json({ error: "교사만 분석을 실행할 수 있습니다" }, { status: 403 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const sessionId = typeof body.sessionId === "string" ? body.sessionId : "";
   if (!sessionId) return NextResponse.json({ error: "sessionId 필요" }, { status: 400 });
-  const targetId = role === "TEACHER" && typeof body.studentId === "string" ? body.studentId : userId;
+  const targetId = typeof body.studentId === "string" && body.studentId ? body.studentId : userId;
 
   const limited = checkRateLimit(`student-session-analysis:${userId}`, 15);
   if (limited) return limited;
