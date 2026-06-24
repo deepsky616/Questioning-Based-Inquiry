@@ -960,7 +960,15 @@
     "reanalyze": "🔄 다시 분석",
     "analyzeSessionBtn": "✦ AI 분석하기",
     "notAnalyzedYet": "아직 분석하지 않았습니다. 오른쪽의 ‘AI 분석하기’ 버튼을 눌러 시작하세요.",
-    "notAnalyzedYetReadonly": "아직 선생님이 이 세션을 분석하지 않았어요."
+    "notAnalyzedYetReadonly": "아직 선생님이 이 세션을 분석하지 않았어요.",
+    "bulkAnalyzeBtn": "👥 전체 학생 일괄 분석",
+    "bulkAnalyzeHint": "현재 기간의 세션을 반 전체 학생 각자에 대해 분석합니다. 이미 분석된 건 건너뜁니다.",
+    "bulkRunning": "분석 중… {processed}/{total}",
+    "bulkStop": "중단",
+    "bulkDone": "일괄 분석 완료 — {count}건 분석됨",
+    "bulkStopped": "중단됨 — {count}건 분석됨",
+    "bulkSomeFailed": "일부 항목은 실패해 건너뛰었어요",
+    "bulkFailed": "일괄 분석에 실패했습니다"
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",

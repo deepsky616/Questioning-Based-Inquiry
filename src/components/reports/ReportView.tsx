@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell,
@@ -53,6 +53,8 @@ export interface ReportViewProps {
   analysisCacheKey?: string;
   /** 분석/재분석 버튼 노출 여부. false면 저장된 결과만 보여준다(학생 본인 뷰=읽기 전용). 기본 true. */
   canAnalyze?: boolean;
+  /** 학급 보기에서 '전체 학생 일괄 분석'을 위한 콜백. cursor로 나눠 호출하고 진행 상태를 돌려준다. */
+  bulkAnalyze?: (sessionIds: string[], cursor: number) => Promise<{ total: number; nextCursor: number; done: boolean; analyzedThisCall: number; error?: string }>;
   // 추세 차트 부제(관점에 따라 다르게). 기본은 학생 본인 관점.
   participationLabel?: string;
   receptionLabel?: string;
@@ -110,7 +112,7 @@ function sessionPeriod(dateStr: string, mode: ReportRange, locale: string, other
 
 export function ReportView({
   scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
-  participationLabel, receptionLabel, canAnalyze = true,
+  participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze,
 }: ReportViewProps) {
   const [range, setRange] = useState<ReportRange>("week");
   const series = range === "week" ? weekly : monthly;
@@ -155,6 +157,9 @@ export function ReportView({
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [analyzingAll, setAnalyzingAll] = useState(false);
+  // 전체 학생 일괄 분석(학급 보기)
+  const [bulk, setBulk] = useState<{ running: boolean; processed: number; total: number; analyzed: number; note?: string }>({ running: false, processed: 0, total: 0, analyzed: 0 });
+  const bulkStop = useRef(false);
 
   // 기간 목록(세션이 있는 주/월) — 최신순
   const periods = useMemo(() => {
@@ -235,6 +240,34 @@ export function ReportView({
       }
     }
     setAnalyzingAll(false);
+  };
+
+  // 전체 학생 일괄 분석: 현재 기간의 세션들 × 반 전체 학생을 나눠서 분석(서버가 cursor로 진행).
+  const runBulkAnalyze = async () => {
+    if (!bulkAnalyze) return;
+    const ids = filteredSessions.map((s) => s.id);
+    if (ids.length === 0) return;
+    bulkStop.current = false;
+    setBulk({ running: true, processed: 0, total: 0, analyzed: 0 });
+    let cursor = 0, total = 0, analyzed = 0, hadError = false;
+    try {
+      for (;;) {
+        const r = await bulkAnalyze(ids, cursor);
+        total = r.total; cursor = r.nextCursor; analyzed += r.analyzedThisCall;
+        if (r.error) hadError = true;
+        if (r.done) {
+          setBulk({ running: false, processed: total, total, analyzed, note: t("bulkDone", { count: analyzed }) + (hadError ? " · " + t("bulkSomeFailed") : "") });
+          return;
+        }
+        if (bulkStop.current) {
+          setBulk({ running: false, processed: cursor, total, analyzed, note: t("bulkStopped", { count: analyzed }) });
+          return;
+        }
+        setBulk({ running: true, processed: cursor, total, analyzed });
+      }
+    } catch (e) {
+      setBulk({ running: false, processed: cursor, total, analyzed, note: e instanceof Error ? e.message : t("bulkFailed") });
+    }
   };
 
   return (
@@ -424,7 +457,31 @@ export function ReportView({
                 {analyzingAll ? t("analyzing") : t("analyzeAllBtn", { count: filteredSessions.length })}
               </Button>
             )}
+            {canAnalyze && scope === "class" && bulkAnalyze && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={bulk.running || filteredSessions.length === 0}
+                  onClick={runBulkAnalyze}
+                  className="font-semibold"
+                  title={t("bulkAnalyzeHint")}
+                >
+                  {bulk.running
+                    ? t("bulkRunning", { processed: bulk.processed, total: bulk.total })
+                    : t("bulkAnalyzeBtn")}
+                </Button>
+                {bulk.running && (
+                  <button onClick={() => { bulkStop.current = true; }} className="text-xs font-medium text-red-600 hover:text-red-800">
+                    {t("bulkStop")}
+                  </button>
+                )}
+              </>
+            )}
           </div>
+          {scope === "class" && bulkAnalyze && bulk.note && !bulk.running && (
+            <p className="no-print -mt-1 text-xs text-muted-foreground">{bulk.note}</p>
+          )}
 
           {/* 수업세션별 개별 분석 목록(선택한 주/월의 세션만 표시) */}
           {filteredSessions.length === 0 ? (

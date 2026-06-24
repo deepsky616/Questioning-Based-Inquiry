@@ -960,7 +960,15 @@
     "reanalyze": "🔄 Re-analyze",
     "analyzeSessionBtn": "✦ Analyze with AI",
     "notAnalyzedYet": "Not analyzed yet. Tap the “Analyze with AI” button on the right to start.",
-    "notAnalyzedYetReadonly": "Your teacher hasn’t analyzed this session yet."
+    "notAnalyzedYetReadonly": "Your teacher hasn’t analyzed this session yet.",
+    "bulkAnalyzeBtn": "👥 Analyze all students",
+    "bulkAnalyzeHint": "Analyzes this period’s sessions for every student in the class. Already-analyzed ones are skipped.",
+    "bulkRunning": "Analyzing… {processed}/{total}",
+    "bulkStop": "Stop",
+    "bulkDone": "Bulk analysis complete — {count} analyzed",
+    "bulkStopped": "Stopped — {count} analyzed",
+    "bulkSomeFailed": "Some items failed and were skipped",
+    "bulkFailed": "Bulk analysis failed"
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

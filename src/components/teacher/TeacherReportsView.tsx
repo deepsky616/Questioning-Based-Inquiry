@@ -26,6 +26,20 @@ async function analyzeClassSession(sessionId: string, failMsg: string): Promise<
     balanceInsights: d.balanceInsights, bestQuestion: d.bestQuestion, nextQuestions: d.nextQuestions,
   };
 }
+// 전체 학생 일괄 분석: 현재 기간의 세션들 × 반 전체 학생을 cursor로 나눠 호출
+function bulkAnalyzeClass(grade: string, className: string, failMsg: string) {
+  return async (sessionIds: string[], cursor: number) => {
+    const res = await fetch("/api/reports/bulk-student-analysis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ grade, className, sessionIds, cursor }),
+    });
+    const d = await res.json();
+    if (!res.ok && res.status !== 200) throw new Error(d.error || failMsg);
+    return { total: d.total ?? 0, nextCursor: d.nextCursor ?? cursor, done: !!d.done, analyzedThisCall: d.analyzedThisCall ?? 0, error: d.error };
+  };
+}
+
 // 특정 학생 세션 분석(교사가 그 학생을 지정해서 봄)
 function analyzeStudentSessionFor(studentId: string, failMsg: string) {
   return async (sessionId: string): Promise<SessionAnalysisResult | null> => {
@@ -159,6 +173,7 @@ export function TeacherReportsView() {
           sessions={report.sessions}
           analyzeSession={(id) => analyzeClassSession(id, t("analysisFailed"))}
           analysisCacheKey={`class:${selected}`}
+          bulkAnalyze={bulkAnalyzeClass(report.klass.grade, report.klass.className, t("analysisFailed"))}
           participationLabel={t("participationClass")}
           receptionLabel={t("receptionClass")}
         />

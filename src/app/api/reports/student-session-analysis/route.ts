@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { prisma } from "@/lib/db";
-import { buildStudentSessionPrompt } from "@/lib/ai-prompts";
 import { logger } from "@/lib/logger";
-import { generateJson, AiKeyMissingError } from "@/lib/ai";
-import { getRequestLocale } from "@/lib/locale";
+import { AiKeyMissingError } from "@/lib/ai";
+import { runStudentSessionAnalysis } from "@/lib/student-session-analysis";
 
-// 한 수업 세션에서 '학생 본인'의 질문·좋아요·댓글 활동을 AI가 분석
-// POST body: { sessionId, studentId? }  studentId는 교사가 특정 학생을 볼 때만
+// 한 수업 세션에서 한 학생의 질문·좋아요·댓글 활동을 AI가 분석(저장 포함)
+// POST body: { sessionId, studentId? }  — 분석 생성은 교사만, 학생은 저장된 결과를 보기만 함
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   const userId = (session.user as { id: string }).id;
 
-  // 분석 생성은 교사만(학생은 저장된 결과를 보기만 함) — 키 사용량·결과 일관성 관리
+  // 분석 생성은 교사만 — 키 사용량·결과 일관성 관리
   if (role !== "TEACHER") {
     return NextResponse.json({ error: "교사만 분석을 실행할 수 있습니다" }, { status: 403 });
   }
@@ -28,83 +26,10 @@ export async function POST(req: NextRequest) {
   const limited = checkRateLimit(`student-session-analysis:${userId}`, 15);
   if (limited) return limited;
 
-  const [qSession, student] = await Promise.all([
-    prisma.questionSession.findUnique({ where: { id: sessionId }, select: { subject: true, topic: true } }),
-    prisma.user.findUnique({ where: { id: targetId }, select: { name: true, role: true } }),
-  ]);
-  if (!qSession) return NextResponse.json({ error: "세션 없음" }, { status: 404 });
-  if (!student || student.role !== "STUDENT") return NextResponse.json({ error: "학생 없음" }, { status: 404 });
-
-  const [questions, myComments, likesGiven] = await Promise.all([
-    prisma.question.findMany({
-      where: { sessionId, authorId: targetId },
-      select: { content: true, closure: true, cognitive: true, _count: { select: { likes: true, comments: true } } },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.comment.findMany({
-      where: { authorId: targetId, question: { sessionId } },
-      select: { content: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.questionLike.count({ where: { userId: targetId, question: { sessionId } } }),
-  ]);
-
-  if (questions.length === 0 && myComments.length === 0 && likesGiven === 0) {
-    return NextResponse.json({ error: "이 세션에서 한 활동이 없어요" }, { status: 400 });
-  }
-
-  // 지난 세션 대비 성장 비교용: 이 세션을 제외한 학생의 누적 질문 분포
-  const priorQuestions = await prisma.question.findMany({
-    where: { authorId: targetId, sessionId: { not: sessionId } },
-    select: { closure: true, cognitive: true },
-  });
-  const prior = {
-    totalQuestions: priorQuestions.length,
-    open: priorQuestions.filter((q) => q.closure === "open").length,
-    conceptual: priorQuestions.filter((q) => q.cognitive === "conceptual").length,
-    controversial: priorQuestions.filter((q) => q.cognitive === "controversial").length,
-  };
-
   try {
-    const prompt = buildStudentSessionPrompt({
-      studentName: student.name,
-      subject: qSession.subject,
-      topic: qSession.topic,
-      questions: questions.map((q) => ({
-        content: q.content, closure: q.closure, cognitive: q.cognitive,
-        likeCount: q._count.likes, commentCount: q._count.comments,
-      })),
-      myComments: myComments.map((c) => c.content),
-      likesGiven,
-      prior,
-    });
-    const parsed = await generateJson<{
-      summary?: string; insights?: string; relevanceInsights?: string; growthInsights?: string; rewriteExample?: string;
-    }>({ userId: targetId, prompt, req, localize: true });
-
-    const analysisResult = {
-      summary: parsed?.summary ?? "",
-      insights: parsed?.insights ?? "",
-      relevanceInsights: parsed?.relevanceInsights ?? "",
-      growthInsights: parsed?.growthInsights ?? "",
-      rewriteExample: parsed?.rewriteExample ?? "",
-    };
-
-    // DB 영속화(베스트 에포트) — 학생별 분석을 다른 브라우저·기기에서도 유지
-    try {
-      await prisma.sessionAnalysis.upsert({
-        where: { sessionId_scope_studentId: { sessionId, scope: "student", studentId: targetId } },
-        create: { sessionId, scope: "student", studentId: targetId, result: analysisResult, locale: getRequestLocale(req) },
-        update: { result: analysisResult, locale: getRequestLocale(req) },
-      });
-    } catch (e) {
-      logger.error("student session analysis persist error:", e);
-    }
-
-    return NextResponse.json({
-      ...analysisResult,
-      totals: { questions: questions.length, comments: myComments.length, likesGiven },
-    });
+    const res = await runStudentSessionAnalysis({ studentId: targetId, sessionId, req });
+    if (!res) return NextResponse.json({ error: "이 세션에서 한 활동이 없어요" }, { status: 400 });
+    return NextResponse.json({ ...res.result, totals: res.totals });
   } catch (error) {
     if (error instanceof AiKeyMissingError) {
       return NextResponse.json({ error: "AI 설정이 필요합니다. 선생님께 API 키 설정을 요청하세요." }, { status: 400 });
