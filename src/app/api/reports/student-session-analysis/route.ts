@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { buildStudentSessionPrompt } from "@/lib/ai-prompts";
 import { logger } from "@/lib/logger";
 import { generateJson, AiKeyMissingError } from "@/lib/ai";
+import { getRequestLocale } from "@/lib/locale";
 
 // 한 수업 세션에서 '학생 본인'의 질문·좋아요·댓글 활동을 AI가 분석
 // POST body: { sessionId, studentId? }  studentId는 교사가 특정 학생을 볼 때만
@@ -76,12 +77,27 @@ export async function POST(req: NextRequest) {
       summary?: string; insights?: string; relevanceInsights?: string; growthInsights?: string; rewriteExample?: string;
     }>({ userId: targetId, prompt, req, localize: true });
 
-    return NextResponse.json({
+    const analysisResult = {
       summary: parsed?.summary ?? "",
       insights: parsed?.insights ?? "",
       relevanceInsights: parsed?.relevanceInsights ?? "",
       growthInsights: parsed?.growthInsights ?? "",
       rewriteExample: parsed?.rewriteExample ?? "",
+    };
+
+    // DB 영속화(베스트 에포트) — 학생별 분석을 다른 브라우저·기기에서도 유지
+    try {
+      await prisma.sessionAnalysis.upsert({
+        where: { sessionId_scope_studentId: { sessionId, scope: "student", studentId: targetId } },
+        create: { sessionId, scope: "student", studentId: targetId, result: analysisResult, locale: getRequestLocale(req) },
+        update: { result: analysisResult, locale: getRequestLocale(req) },
+      });
+    } catch (e) {
+      logger.error("student session analysis persist error:", e);
+    }
+
+    return NextResponse.json({
+      ...analysisResult,
       totals: { questions: questions.length, comments: myComments.length, likesGiven },
     });
   } catch (error) {

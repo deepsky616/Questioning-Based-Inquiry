@@ -43,13 +43,21 @@ export async function GET(req: NextRequest) {
 
   const report = buildActivityReport({ questions, likesGiven, comments, likesReceived, commentsReceived });
 
+  // 저장된 세션 AI 분석(이 학생 관점)을 동봉 → 어느 브라우저·기기에서도 마지막 분석 표시
+  const analyses = await prisma.sessionAnalysis.findMany({
+    where: { sessionId: { in: sessions.map((s) => s.id) }, scope: "student", studentId: targetId },
+    select: { sessionId: true, result: true },
+  });
+  const analysisBySession = new Map(analyses.map((a) => [a.sessionId, a.result]));
+  const sessionsWithAnalysis = sessions.map((s) => ({ ...s, analysis: analysisBySession.get(s.id) ?? null }));
+
   return NextResponse.json({
     scope: "student",
     student: {
       id: student.id, name: student.name, grade: student.grade,
       className: student.className, studentNumber: student.studentNumber, school: student.school,
     },
-    sessions,
+    sessions: sessionsWithAnalysis,
     ...report,
   });
 }

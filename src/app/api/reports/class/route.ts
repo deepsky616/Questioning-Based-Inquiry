@@ -73,6 +73,14 @@ export async function GET(req: NextRequest) {
     orderBy: { date: "desc" },
   });
 
+  // 저장된 세션 AI 분석(학급 전체 관점)을 동봉 → 어느 브라우저·기기에서도 마지막 분석 표시
+  const analyses = await prisma.sessionAnalysis.findMany({
+    where: { sessionId: { in: sessions.map((s) => s.id) }, scope: "class", studentId: "" },
+    select: { sessionId: true, result: true },
+  });
+  const analysisBySession = new Map(analyses.map((a) => [a.sessionId, a.result]));
+  const sessionsWithAnalysis = sessions.map((s) => ({ ...s, analysis: analysisBySession.get(s.id) ?? null }));
+
   // 학생별 롤업(쓴 활동 기준)
   const perStudent = students.map((s) => ({
     id: s.id,
@@ -87,7 +95,7 @@ export async function GET(req: NextRequest) {
     scope: "class",
     klass: { grade, className, studentCount: students.length, school },
     perStudent,
-    sessions,
+    sessions: sessionsWithAnalysis,
     ...report,
   });
 }

@@ -22,7 +22,7 @@ export interface PerStudentRow {
   comments: number;
 }
 
-export interface SessionMeta { id: string; date: string; subject: string; topic: string }
+export interface SessionMeta { id: string; date: string; subject: string; topic: string; analysis?: SessionAnalysisResult | null }
 export interface SessionAnalysisResult {
   summary?: string;
   insights?: string;
@@ -174,10 +174,12 @@ export function ReportView({
   // 분석 결과를 QueryClient에 캐시해 탭/뷰 전환(remount)에도 유지한다.
   const analysisKey = (id: string) => ["session-analysis", analysisCacheKey ?? "default", id] as const;
 
-  // 마운트/세션 변경 시 캐시에서 기존 분석 결과를 복원(재분석 방지)
+  // 마운트/세션 변경 시 기존 분석 결과를 복원(재분석 방지).
+  // 우선순위: 서버 영속값(다른 기기/브라우저) → 메모리 캐시(같은 세션에서 방금 분석한 최신값) 순으로 덮어씀.
   useEffect(() => {
     const restored: Record<string, SessionAnalysisResult> = {};
     for (const s of allSessions) {
+      if (s.analysis) restored[s.id] = s.analysis;
       const cached = queryClient.getQueryData<SessionAnalysisResult>(analysisKey(s.id));
       if (cached) restored[s.id] = cached;
     }

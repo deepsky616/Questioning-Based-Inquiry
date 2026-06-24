@@ -5,6 +5,7 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
 import { generateJson, AiKeyMissingError } from "@/lib/ai";
+import { getRequestLocale } from "@/lib/locale";
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -96,9 +97,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       nextQuestions?: string;
     }>({ userId: teacherId, prompt, req, localize: true });
 
-    return NextResponse.json({
+    // 리포트에서 복원할 분석 결과(SessionAnalysisResult 형태)
+    const analysisResult = {
       summary: parsed.summary ?? "",
-      themes: Array.isArray(parsed.themes) ? parsed.themes : [],
       insights: parsed.insights ?? "",
       commentInsights: parsed.commentInsights ?? "",
       engagementInsights: parsed.engagementInsights ?? "",
@@ -106,6 +107,22 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       balanceInsights: parsed.balanceInsights ?? "",
       bestQuestion: parsed.bestQuestion ?? "",
       nextQuestions: parsed.nextQuestions ?? "",
+    };
+
+    // DB 영속화(베스트 에포트) — 다른 브라우저·기기에서도 마지막 분석 유지
+    try {
+      await prisma.sessionAnalysis.upsert({
+        where: { sessionId_scope_studentId: { sessionId: params.id, scope: "class", studentId: "" } },
+        create: { sessionId: params.id, scope: "class", studentId: "", result: analysisResult, locale: getRequestLocale(req) },
+        update: { result: analysisResult, locale: getRequestLocale(req) },
+      });
+    } catch (e) {
+      logger.error("session analysis persist error:", e);
+    }
+
+    return NextResponse.json({
+      ...analysisResult,
+      themes: Array.isArray(parsed.themes) ? parsed.themes : [],
       totalQuestions: questions.length,
       totalComments,
       totalLikes,

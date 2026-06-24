@@ -255,3 +255,20 @@ model Translation {
   @@index([sourceType, sourceId])
   @@map("translations")
 }
+
+// 수업 세션 AI 분석 결과 영속화 — 어느 브라우저·기기에서든 마지막 분석을 그대로 보여주기 위함.
+// scope="class"는 세션 전체 분석(studentId=""), scope="student"는 특정 학생 분석(studentId=학생 id).
+model SessionAnalysis {
+  id        String   @id @default(cuid())
+  sessionId String   @map("session_id")
+  scope     String   @map("scope") // "class" | "student"
+  studentId String   @default("") @map("student_id") // student scope에서만 사용, class는 ""
+  result    Json     @map("result") // SessionAnalysisResult 형태
+  locale    String   @default("") @map("locale") // 생성 시 언어(참고용)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([sessionId, scope, studentId])
+  @@index([sessionId])
+  @@map("session_analyses")
+}

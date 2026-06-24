@@ -68,6 +68,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (!existing || existing.teacherId !== teacherId) {
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
+    // 저장된 세션 AI 분석도 함께 정리(고아 행 방지)
+    await prisma.sessionAnalysis.deleteMany({ where: { sessionId: id } });
     await prisma.questionSession.delete({ where: { id } });
     return new NextResponse(null, { status: 204 });
   } catch {
