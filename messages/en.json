@@ -957,7 +957,8 @@
     "colQuestion": "Questions",
     "colLikes": "Likes",
     "colComment": "Comments",
-    "reanalyze": "🔄 Re-analyze"
+    "reanalyze": "🔄 Re-analyze",
+    "analyzeSessionBtn": "✦ Analyze with AI"
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

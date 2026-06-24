@@ -202,9 +202,9 @@ export function ReportView({
       setBusy((b) => ({ ...b, [id]: false }));
     }
   };
+  // 펼치기만 하고 자동 분석하지 않는다(첫 분석도 버튼으로 시작).
   const toggleSession = (id: string) => {
     setOpen((o) => ({ ...o, [id]: !o[id] }));
-    if (!res[id]) analyzeOne(id);
   };
   const analyzeAll = async () => {
     if (!analyzeSession) return;
@@ -462,7 +462,14 @@ export function ReportView({
                             {t("reanalyze")}
                           </button>
                         </div>
-                      ) : null}
+                      ) : (
+                        <button
+                          onClick={() => analyzeOne(s.id)}
+                          className="no-print rounded-md border border-indigo-300 px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50"
+                        >
+                          {t("analyzeSessionBtn")}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
