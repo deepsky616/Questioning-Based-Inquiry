@@ -892,6 +892,8 @@
   },
   "reports": {
     "analysisFailed": "분석 실패",
+    "printIndividual": "🖨️ 학생 개별 출력",
+    "printAll": "🖨️ 전체 출력",
     "loadFailed": "불러오기 실패",
     "gradeClass": "{grade}학년 {className}반",
     "studentCount": "({count}명)",
@@ -972,8 +974,6 @@
     "editAnalysis": "✏️ 분석 수정",
     "editSave": "저장",
     "editCancel": "취소",
-    "printIndividual": "🖨️ 학생 개별 출력",
-    "printAll": "🖨️ 전체 출력",
     "docTitle": "활동 리포트",
     "docGenerated": "생성일 {date}",
     "docSummary": "활동 요약",

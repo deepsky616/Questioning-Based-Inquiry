@@ -892,6 +892,8 @@
   },
   "reports": {
     "analysisFailed": "Analysis failed",
+    "printIndividual": "🖨️ Print student",
+    "printAll": "🖨️ Print all",
     "loadFailed": "Failed to load",
     "gradeClass": "Grade {grade} Class {className}",
     "studentCount": "({count})",
@@ -972,8 +974,6 @@
     "editAnalysis": "✏️ Edit analysis",
     "editSave": "Save",
     "editCancel": "Cancel",
-    "printIndividual": "🖨️ Print student",
-    "printAll": "🖨️ Print all",
     "docTitle": "Activity Report",
     "docGenerated": "Generated {date}",
     "docSummary": "Activity summary",
