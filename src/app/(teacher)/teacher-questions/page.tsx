@@ -697,13 +697,13 @@ export default function QuestionsPage() {
                 {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                 <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(q.createdAt)}</p>
               </TableCell>
-              <TableCell>
-                <span className={`text-xs px-2 py-1 rounded break-keep text-center ${CLOSURE_STYLE[q.closure]}`}>
+              <TableCell className="text-center">
+                <span className={`text-xs px-2 py-1 rounded break-keep text-center inline-block ${CLOSURE_STYLE[q.closure]}`}>
                   {CLOSURE_LABEL[q.closure]}
                 </span>
               </TableCell>
-              <TableCell>
-                <span className={`text-xs px-2 py-1 rounded break-keep text-center ${COGNITIVE_STYLE[q.cognitive]}`}>
+              <TableCell className="text-center">
+                <span className={`text-xs px-2 py-1 rounded break-keep text-center inline-block ${COGNITIVE_STYLE[q.cognitive]}`}>
                   {COGNITIVE_LABEL[q.cognitive]}
                 </span>
               </TableCell>
