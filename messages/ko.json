@@ -940,6 +940,7 @@
     "aiSessionTitle": "🤖 수업세션별 AI 분석",
     "aiSessionDesc": "주별/월별 기간을 고르면 그 기간의 수업세션만 보여요. 세션을 펼치면 개별 분석, ‘전체 분석’은 그 기간 세션을 한꺼번에 분석해요",
     "analyzeAll": "전체 분석",
+    "allPeriods": "전체 기간",
     "analyzing": "분석 중...",
     "analyzeAllBtn": "📋 전체 분석 ({count}개)",
     "analyzeAllStudentBtn": "📋 개별 학생 전체 분석 ({count}개)",

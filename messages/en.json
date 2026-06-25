@@ -940,6 +940,7 @@
     "aiSessionTitle": "🤖 AI analysis by class session",
     "aiSessionDesc": "Pick a weekly/monthly period to see only that period's sessions. Expand a session for individual analysis; 'Analyze all' analyzes that period's sessions together",
     "analyzeAll": "Analyze all",
+    "allPeriods": "All periods",
     "analyzing": "Analyzing...",
     "analyzeAllBtn": "📋 Analyze all ({count})",
     "analyzeAllStudentBtn": "📋 Analyze this student ({count})",

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -150,17 +150,10 @@ export function ReportView({
   } as const;
   const tooltipText = dark ? "#e5e7eb" : "#111827";
 
-  const classData = [
-    { name: tCls("closed.label"), value: classification.closure.closed, fill: "#3b82f6" },
-    { name: tCls("open.label"), value: classification.closure.open, fill: "#10b981" },
-    { name: tCls("factual.label"), value: classification.cognitive.factual, fill: "#94a3b8" },
-    { name: tCls("conceptual.label"), value: classification.cognitive.conceptual, fill: "#a855f7" },
-    { name: tCls("controversial.label"), value: classification.cognitive.controversial, fill: "#f97316" },
-  ];
-
   // ── 수업세션별 AI 분석 (기간 필터 + 전체 분석) ──
   const allSessions = useMemo(() => sessions ?? [], [sessions]);
-  const [period, setPeriod] = useState<string>("");
+  // period="ALL"이면 전체, 그 외엔 특정 주/월 키. 상단 토글(range)과 함께 상단에서 선택한다.
+  const [period, setPeriod] = useState<string>("ALL");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [res, setRes] = useState<Record<string, SessionAnalysisResult>>({});
   const [busy, setBusy] = useState<Record<string, boolean>>({});
@@ -210,24 +203,47 @@ export function ReportView({
     }
   };
 
-  // 기간 목록(세션이 있는 주/월) — 최신순
+  // 기간 목록(세션이 있는 주/월) — 최신순. 맨 앞에 '전체'(ALL)
   const periods = useMemo(() => {
     const map = new Map<string, string>();
     for (const s of allSessions) {
       const p = sessionPeriod(s.date, range, locale, t("other"), t("weekSuffix"));
       if (!map.has(p.key)) map.set(p.key, p.label);
     }
-    return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+    const sorted = Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+    return [["ALL", t("allPeriods")] as [string, string], ...sorted];
   }, [allSessions, range, locale, t]);
 
-  // 주별/월별 전환 시 최신 기간을 기본 선택
+  // 주별↔월별 전환 등으로 현재 선택 키가 사라지면 '전체'로 되돌린다(전체는 항상 유효).
   useEffect(() => {
-    if (periods.length > 0 && !periods.some(([k]) => k === period)) setPeriod(periods[0][0]);
+    if (period !== "ALL" && !periods.some(([k]) => k === period)) setPeriod("ALL");
   }, [periods, period]);
 
-  const filteredSessions = allSessions.filter((s) => sessionPeriod(s.date, range, locale, t("other"), t("weekSuffix")).key === period);
+  // 현재 선택이 '전체'면 모든 세션, 아니면 그 기간 세션만
+  const inPeriod = (date: string) => period === "ALL" || sessionPeriod(date, range, locale, t("other"), t("weekSuffix")).key === period;
+  const filteredSessions = allSessions.filter((s) => inPeriod(s.date));
   // 일괄 분석 대상(학급 전체 세션 풀이 있으면 그것을 현재 기간으로 추림) 수
-  const bulkPeriodCount = (bulkSessions ?? allSessions).filter((s) => sessionPeriod(s.date, range, locale, t("other"), t("weekSuffix")).key === period).length;
+  const bulkPeriodCount = (bulkSessions ?? allSessions).filter((s) => inPeriod(s.date)).length;
+
+  // 선택 기간에 맞춘 요약·분류(전체면 전체 집계, 특정 기간이면 그 기간의 추세 데이터로 산출)
+  const selectedPoint = period === "ALL" ? null : series.find((p) => p.key === period) ?? null;
+  const viewTotals: ReportTotals = selectedPoint
+    ? { questions: selectedPoint.questions, likesGiven: selectedPoint.likesGiven, comments: selectedPoint.comments, likesReceived: selectedPoint.likesReceived, commentsReceived: selectedPoint.commentsReceived }
+    : totals;
+  const viewClassification: QuestionTypeSummary = selectedPoint
+    ? {
+        total: selectedPoint.closed + selectedPoint.open,
+        closure: { closed: selectedPoint.closed, open: selectedPoint.open },
+        cognitive: { factual: selectedPoint.factual, conceptual: selectedPoint.conceptual, controversial: selectedPoint.controversial },
+      }
+    : classification;
+  const classData = [
+    { name: tCls("closed.label"), value: viewClassification.closure.closed, fill: "#3b82f6" },
+    { name: tCls("open.label"), value: viewClassification.closure.open, fill: "#10b981" },
+    { name: tCls("factual.label"), value: viewClassification.cognitive.factual, fill: "#94a3b8" },
+    { name: tCls("conceptual.label"), value: viewClassification.cognitive.conceptual, fill: "#a855f7" },
+    { name: tCls("controversial.label"), value: viewClassification.cognitive.controversial, fill: "#f97316" },
+  ];
 
   // 분석 결과를 QueryClient에 캐시해 탭/뷰 전환(remount)에도 유지한다.
   const analysisKey = (id: string) => ["session-analysis", analysisCacheKey ?? "default", id] as const;
@@ -305,9 +321,7 @@ export function ReportView({
   const runBulkAnalyze = async () => {
     if (!bulkAnalyze) return;
     const pool = bulkSessions ?? allSessions;
-    const ids = pool
-      .filter((s) => sessionPeriod(s.date, range, locale, t("other"), t("weekSuffix")).key === period)
-      .map((s) => s.id);
+    const ids = pool.filter((s) => inPeriod(s.date)).map((s) => s.id);
     if (ids.length === 0) return;
     bulkStop.current = false;
     setBulk({ running: true, processed: 0, total: 0, analyzed: 0 });
@@ -349,7 +363,7 @@ export function ReportView({
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
           <p className="mt-0.5 text-xs text-muted-foreground">{t("basisNote", { date: new Date().toLocaleDateString(locale) })}</p>
         </div>
-        <div className="no-print flex items-center gap-2">
+        <div className="no-print flex flex-wrap items-center gap-2">
           <div className="flex rounded-md border overflow-hidden">
             <button
               onClick={() => setRange("week")}
@@ -360,6 +374,14 @@ export function ReportView({
               className={`px-3 py-1.5 text-xs font-medium border-l ${range === "month" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
             >{t("month")}</button>
           </div>
+          {/* 특정 주/월 선택 — 차트·요약·세션이 이 선택을 함께 따른다 */}
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="rounded-md border bg-background px-2 py-1.5 text-xs text-foreground"
+          >
+            {periods.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
           {showPrintButton && (
             <Button size="sm" onClick={() => window.print()} className="font-semibold">{t("print")}</Button>
           )}
@@ -368,11 +390,11 @@ export function ReportView({
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <SummaryCard label={t("metric_questions")} value={totals.questions} color="#6366f1" />
-        <SummaryCard label={t("metric_likesGiven")} value={totals.likesGiven} color="#f43f5e" />
-        <SummaryCard label={t("metric_comments")} value={totals.comments} color="#10b981" />
-        <SummaryCard label={t("metric_likesReceived")} value={totals.likesReceived} color="#f59e0b" />
-        <SummaryCard label={t("metric_commentsReceived")} value={totals.commentsReceived} color="#8b5cf6" />
+        <SummaryCard label={t("metric_questions")} value={viewTotals.questions} color="#6366f1" />
+        <SummaryCard label={t("metric_likesGiven")} value={viewTotals.likesGiven} color="#f43f5e" />
+        <SummaryCard label={t("metric_comments")} value={viewTotals.comments} color="#10b981" />
+        <SummaryCard label={t("metric_likesReceived")} value={viewTotals.likesReceived} color="#f59e0b" />
+        <SummaryCard label={t("metric_commentsReceived")} value={viewTotals.commentsReceived} color="#8b5cf6" />
       </div>
 
       {/* 참여 추세 */}
@@ -388,6 +410,7 @@ export function ReportView({
             {METRICS.map((m) => (
               <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
             ))}
+            {selectedPoint && <ReferenceLine x={selectedPoint.label} stroke="#6366f1" strokeDasharray="4 3" />}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -405,6 +428,7 @@ export function ReportView({
             {RECEIVED.map((m) => (
               <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
             ))}
+            {selectedPoint && <ReferenceLine x={selectedPoint.label} stroke="#6366f1" strokeDasharray="4 3" />}
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -448,7 +472,7 @@ export function ReportView({
 
       {/* 질문 분류 분포 */}
       <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">{t("distTitle", { count: classification.total })}</p>
+        <p className="mb-3 text-sm font-bold text-foreground">{t("distTitle", { count: viewClassification.total })}</p>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={classData} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
@@ -504,16 +528,9 @@ export function ReportView({
             {t("aiSessionDesc")}
           </p>
 
-          {/* 기간(주별/월별) 선택은 상단 토글과 공유. 여기선 특정 주/월만 고른다 + 그 기간 일괄 분석 */}
+          {/* 기간 선택은 상단으로 통합됨. 여기선 상단에서 고른 기간에 대한 분석만 실행 */}
           <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
             <span className="text-xs font-semibold text-foreground">{t("analyzeAll")}</span>
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-md border bg-background px-2 py-1.5 text-xs text-foreground"
-            >
-              {periods.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-            </select>
             {canAnalyze && (
               <Button size="sm" disabled={analyzingAll || filteredSessions.length === 0} onClick={analyzeAll} className="font-semibold">
                 {analyzingAll ? t("analyzing") : t(scope === "student" ? "analyzeAllStudentBtn" : "analyzeAllBtn", { count: filteredSessions.length })}
