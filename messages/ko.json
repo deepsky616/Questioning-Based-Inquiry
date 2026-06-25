@@ -37,7 +37,7 @@
   "classification": {
     "category1": "분류1",
     "category2": "분류2",
-    "category1Sub": "질문의 형태",
+    "category1Sub": "답의 개방성",
     "category2Sub": "생각의 깊이",
     "closure": "닫힌 질문 / 열린 질문",
     "cognitive": "사실 / 개념 / 논쟁",
