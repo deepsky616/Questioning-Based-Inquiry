@@ -139,7 +139,7 @@ export default function QuestionsPage() {
   const [isSavingCorrection, setIsSavingCorrection] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isAnalyzingSession, setIsAnalyzingSession] = useState(false);
-  const [showSessionAnalysis, setShowSessionAnalysis] = useState(true);
+  const [showSessionAnalysis, setShowSessionAnalysis] = useState(false);
   const [sessionAnalysis, setSessionAnalysis] = useState<SessionAnalysis | null>(null);
   const [sessionAnalysisError, setSessionAnalysisError] = useState<string | null>(null);
 
