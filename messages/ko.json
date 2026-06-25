@@ -993,7 +993,10 @@
     "docColCount": "개수",
     "docColRatio": "비율",
     "docDomainClosure": "종결성",
-    "docDomainCognitive": "인지 수준"
+    "docDomainCognitive": "인지 수준",
+    "docGrade": "{grade}학년",
+    "docClass": "{className}반",
+    "docNumber": "{n}번"
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",

@@ -53,21 +53,23 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
   const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
   const showRoster = items.length > 1;
 
-  const eyebrowOf = (it: PrintReportItem) =>
-    [it.school, it.grade && t("gradeLabel", { grade: it.grade }), it.className && t("classLabel", { className: it.className })]
-      .filter(Boolean).join(" · ");
-  const corner = (it: PrintReportItem) =>
-    [it.school, [it.studentNumber, it.name].filter(Boolean).join(" ")].filter(Boolean).join("  |  ");
+  // 학교 · 학년 · 반 · 번호를 모두 표시(이름은 제목에 별도 표시)
+  const idLine = (it: PrintReportItem) =>
+    [
+      it.school,
+      it.grade != null && it.grade !== "" ? t("docGrade", { grade: it.grade }) : "",
+      it.className != null && it.className !== "" ? t("docClass", { className: it.className }) : "",
+      it.studentNumber != null && it.studentNumber !== "" ? t("docNumber", { n: it.studentNumber }) : "",
+    ].filter(Boolean).join(" · ");
 
   return (
     <div className="rdoc">
       {/* 전체 출력: 맨 앞 학급 요약 */}
       {showRoster && items[0] && (
         <section className="rdoc-page">
-          <div className="rdoc-corner">{[items[0].school, items[0].grade && t("gradeLabel", { grade: items[0].grade }), items[0].className && t("classLabel", { className: items[0].className })].filter(Boolean).join("  |  ")}</div>
           <div className="rdoc-bar" />
           <div className="rdoc-band">
-            <div className="rdoc-eyebrow">{eyebrowOf(items[0])}</div>
+            <div className="rdoc-eyebrow">{idLine(items[0])}</div>
             <h1 className="rdoc-title"><span className="rdoc-accent">{t("docRosterTitle")}</span></h1>
             <div className="rdoc-gen">{t("docGenerated", { date: today })}</div>
           </div>
@@ -101,10 +103,9 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
         const analyzed = analyzedSessions(it);
         return (
           <section key={idx} className="rdoc-page">
-            <div className="rdoc-corner">{corner(it)}</div>
             <div className="rdoc-bar" />
             <div className="rdoc-band">
-              <div className="rdoc-eyebrow">{eyebrowOf(it)}</div>
+              <div className="rdoc-eyebrow">{idLine(it)}</div>
               <h1 className="rdoc-title">{it.name} <span className="rdoc-accent">{t("docTitle")}</span></h1>
               <div className="rdoc-gen">{t("docGenerated", { date: today })}</div>
             </div>

@@ -993,7 +993,10 @@
     "docColCount": "Count",
     "docColRatio": "Ratio",
     "docDomainClosure": "Closure",
-    "docDomainCognitive": "Cognitive"
+    "docDomainCognitive": "Cognitive",
+    "docGrade": "Grade {grade}",
+    "docClass": "Class {className}",
+    "docNumber": "No. {n}"
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

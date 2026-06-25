@@ -12,7 +12,7 @@ interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitl
   sessions?: SessionMeta[];
 }
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession" | "perStudent"> {
-  student: { name: string; grade?: string | null; className?: string | null; studentNumber?: string | null };
+  student: { name: string; grade?: string | null; className?: string | null; studentNumber?: string | null; school?: string | null };
   sessions?: SessionMeta[];
 }
 
@@ -100,7 +100,7 @@ export function TeacherReportsView() {
 
   const toItem = (r: StudentReport): PrintReportItem => ({
     name: r.student.name, grade: r.student.grade, className: r.student.className,
-    studentNumber: r.student.studentNumber,
+    studentNumber: r.student.studentNumber, school: r.student.school ?? undefined,
     totals: r.totals, classification: r.classification,
     weekly: r.weekly, monthly: r.monthly,
     sessions: (r.sessions as PrintReportItem["sessions"]) ?? [],
