@@ -104,7 +104,7 @@ export function QuestionClassificationStats({
   const bar = (name: string, value: number, color: string, desc: string) => (
     <div key={name} className="mb-2 w-full px-1.5">
       <div className="flex items-center gap-2 py-0.5">
-        <span className="w-14 shrink-0 break-keep leading-tight text-xs text-muted-foreground">{name}</span>
+        <span className="w-14 shrink-0 break-keep text-center leading-tight text-xs text-muted-foreground">{name}</span>
         <div className="flex-1 h-3.5 rounded bg-muted overflow-hidden">
           <div style={{ width: `${pct(value)}%`, background: color, height: "100%" }} />
         </div>
@@ -181,7 +181,7 @@ export function ClassificationChips({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-2.5 py-0.5 text-xs break-keep transition-colors ${active ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+      className={`rounded-full border px-2.5 py-0.5 text-xs break-keep text-center transition-colors ${active ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
     >
       {label}
     </button>
