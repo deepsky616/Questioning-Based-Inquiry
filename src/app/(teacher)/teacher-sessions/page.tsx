@@ -453,7 +453,7 @@ export default function TeacherSessionsPage() {
                     {t("upcomingSessions")}
                     <span className="text-xs font-normal text-muted-foreground">{t("countSuffix", { count: activeSessions.length })}</span>
                   </h3>
-                  <div className="hidden sm:flex items-center gap-5 text-sm font-medium text-foreground">
+                  <div className="hidden sm:flex items-center gap-5 text-sm font-normal text-foreground">
                     <span className="w-16 text-center">{tSeq("activeLabel")}</span>
                     <span className="w-16 text-center">{tSeq("publicLabel")}</span>
                     <span className="w-16 text-center">{tSeq("likesLabel")}</span>
@@ -486,7 +486,7 @@ export default function TeacherSessionsPage() {
                     {t("pastSessions")}
                     <span className="text-xs font-normal text-muted-foreground">{t("countSuffix", { count: pastSessions.length })}</span>
                   </h3>
-                  <div className="hidden sm:flex items-center gap-5 text-sm font-medium text-foreground">
+                  <div className="hidden sm:flex items-center gap-5 text-sm font-normal text-foreground">
                     <span className="w-16 text-center">{tSeq("activeLabel")}</span>
                     <span className="w-16 text-center">{tSeq("publicLabel")}</span>
                     <span className="w-16 text-center">{tSeq("likesLabel")}</span>
