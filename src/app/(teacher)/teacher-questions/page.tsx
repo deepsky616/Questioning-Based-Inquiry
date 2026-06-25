@@ -646,8 +646,6 @@ export default function QuestionsPage() {
             </TableHead>
             <TableHead>{t("colStudent")}</TableHead>
             <TableHead>{t("colContent")}</TableHead>
-            <TableHead className="w-20 break-keep text-center">{t("colClosure")}</TableHead>
-            <TableHead className="w-24 break-keep text-center">{t("colCognitive")}</TableHead>
             <TableHead className="w-20 text-center break-keep">{t("colLikes")}</TableHead>
             <TableHead className="w-16 text-center">{t("colComments")}</TableHead>
             <TableHead className="w-20 text-center">{t("colPublic")}</TableHead>
@@ -695,17 +693,12 @@ export default function QuestionsPage() {
                 )}
                 <p className="whitespace-pre-wrap break-words text-sm">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                 {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
-                <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(q.createdAt)}</p>
-              </TableCell>
-              <TableCell className="text-center">
-                <span className={`text-xs px-2 py-1 rounded break-keep text-center inline-block ${CLOSURE_STYLE[q.closure]}`}>
-                  {CLOSURE_LABEL[q.closure]}
-                </span>
-              </TableCell>
-              <TableCell className="text-center">
-                <span className={`text-xs px-2 py-1 rounded break-keep text-center inline-block ${COGNITIVE_STYLE[q.cognitive]}`}>
-                  {COGNITIVE_LABEL[q.cognitive]}
-                </span>
+                {/* 분류 배지(답의 개방성·생각의 깊이)를 내용 아래에 */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
+                </div>
+                <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><span>🕒</span><span>{formatDateTime(q.createdAt)}</span></p>
               </TableCell>
               <TableCell className="text-center">
                 <div className="group relative inline-block">
@@ -766,7 +759,7 @@ export default function QuestionsPage() {
             </TableRow>
             {expandedCommentId === q.id && (
               <TableRow>
-                <TableCell colSpan={9} className="bg-muted/30 px-6 py-4">
+                <TableCell colSpan={7} className="bg-muted/30 px-6 py-4">
                   <CommentThread
                     questionId={q.id}
                     preloaded={q.comments ?? []}
