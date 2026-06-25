@@ -698,7 +698,16 @@ export default function QuestionsPage() {
                   <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
                   <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
                 </div>
-                <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><span>🕒</span><span>{formatDateTime(q.createdAt)}</span></p>
+                {/* 수업세션(📚) · 작성일시(🕒) — 수업세션은 전체 조회일 때만(특정 세션 선택 시엔 중복) */}
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                  {selectedSessionId === "all" && q.session && (
+                    <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
+                      <span>📚</span>
+                      <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1"><span>🕒</span><span>{formatDateTime(q.createdAt)}</span></span>
+                </div>
               </TableCell>
               <TableCell className="text-center">
                 <div className="group relative inline-block">
