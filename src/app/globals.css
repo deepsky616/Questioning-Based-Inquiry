@@ -358,46 +358,40 @@
   }
 }
 
-/* ── 인쇄 전용 리포트 문서(레터헤드 + KPI + 분류 막대 + 세션 분석) ── */
+/* ── 인쇄 전용 리포트 문서('채점 결과 리포트' 양식: 보라 타이틀 밴드 + 라벤더 표 + 피드백 박스) ── */
 /* 화면에선 숨기고, 'print-doc-mode'로 인쇄할 때만 이 문서만 보이게 한다(새 탭 없이 현재 페이지에서 인쇄). */
 .print-root { display: none; }
-.report-doc { color: #111; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.report-doc-head { border-bottom: 2px solid #1f2937; padding-bottom: 6px; margin-bottom: 12px; }
-.report-doc-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.report-doc-head h1 { font-size: 19px; font-weight: 800; color: #111; }
-.report-doc-date { font-size: 11px; color: #6b7280; }
-.report-doc-meta { font-size: 12.5px; color: #374151; margin-top: 3px; }
-.report-doc-h2 { font-size: 13px; font-weight: 700; color: #111; margin: 14px 0 6px; border-left: 3px solid #6366f1; padding-left: 6px; }
-.report-doc-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.report-doc-kpi { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 4px; text-align: center; }
-.report-doc-kpi-v { font-size: 22px; font-weight: 800; line-height: 1.1; }
-.report-doc-kpi-l { font-size: 10.5px; color: #6b7280; margin-top: 2px; }
-.report-doc-bars { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; }
-.report-doc-bar-row { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 11.5px; color: #111; }
-.report-doc-bar-label { width: 72px; flex: none; }
-.report-doc-bar-track { position: relative; flex: 1; height: 12px; background: #f3f4f6; border-radius: 6px; overflow: hidden; }
-.report-doc-bar-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 6px; }
-.report-doc-bar-val { width: 72px; flex: none; text-align: right; color: #374151; }
-.report-doc-bar-sep { height: 1px; background: #eee; margin: 6px 0; }
-.report-doc-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-.report-doc-table th, .report-doc-table td { border: 1px solid #d1d5db; padding: 3px 6px; text-align: center; font-size: 11.5px; color: #111; }
-.report-doc-table th { background: #f3f4f6; font-weight: 600; }
-.report-doc-td-l { text-align: left !important; }
-.report-doc-roster th, .report-doc-roster td { padding: 4px 6px; }
-.report-doc-session { border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; break-inside: avoid; page-break-inside: avoid; }
-.report-doc-session h3 { font-size: 12.5px; font-weight: 700; color: #111; margin-bottom: 4px; }
-.report-doc-block { margin-bottom: 5px; }
-.report-doc-block-h { font-size: 11.5px; font-weight: 600; color: #4338ca; }
-.report-doc-block-b { font-size: 12px; white-space: pre-wrap; line-height: 1.55; color: #222; }
-.report-doc-empty { font-size: 12px; color: #666; }
-.report-doc-break { break-after: page; page-break-after: always; }
+.rdoc { color: #1f2937; font-size: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.rdoc-corner { text-align: right; font-size: 10px; color: #9ca3af; margin-bottom: 4px; }
+.rdoc-bar { height: 6px; background: #6c5ce7; border-radius: 3px; }
+.rdoc-band { background: #efeefc; border-radius: 0 0 8px 8px; padding: 12px 16px 14px; margin-bottom: 16px; }
+.rdoc-eyebrow { font-size: 11px; color: #6b7280; }
+.rdoc-title { font-size: 22px; font-weight: 800; color: #1f2937; margin-top: 2px; }
+.rdoc-accent { color: #6c5ce7; }
+.rdoc-gen { font-size: 10.5px; color: #9ca3af; margin-top: 4px; }
+.rdoc-section-label { font-size: 12px; color: #6b7280; font-weight: 600; margin: 14px 0 6px; }
+.rdoc-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.rdoc-kpi { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 4px; text-align: center; background: #fbfbfe; }
+.rdoc-kpi-v { font-size: 23px; font-weight: 800; line-height: 1.1; }
+.rdoc-kpi-l { font-size: 10.5px; color: #6b7280; margin-top: 3px; }
+.rdoc-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+.rdoc-table thead th { background: #efeefc; color: #4c3fd6; font-weight: 700; font-size: 11.5px; padding: 7px 8px; text-align: center; border-bottom: 1px solid #d8d5f2; }
+.rdoc-table tbody td { padding: 7px 8px; text-align: center; font-size: 11.5px; color: #1f2937; border-bottom: 1px solid #ececf4; }
+.rdoc-l { text-align: left !important; }
+.rdoc-feedback { background: #f6f5fe; border: 1px solid #e7e4fb; border-radius: 8px; padding: 10px 12px; margin-bottom: 9px; break-inside: avoid; page-break-inside: avoid; }
+.rdoc-feedback-h { font-size: 12.5px; font-weight: 700; color: #4c3fd6; margin-bottom: 6px; }
+.rdoc-fb-block { margin-bottom: 6px; }
+.rdoc-fb-h { font-size: 11.5px; font-weight: 600; color: #374151; }
+.rdoc-fb-b { font-size: 12px; white-space: pre-wrap; line-height: 1.55; color: #374151; }
+.rdoc-empty { font-size: 12px; color: #9ca3af; }
+.rdoc-break { break-after: page; page-break-after: always; }
 @media print {
   /* 현재 페이지에서 이 문서만 인쇄(나머지는 가림) */
   body.print-doc-mode * { visibility: hidden !important; }
   body.print-doc-mode .print-root,
   body.print-doc-mode .print-root * { visibility: visible !important; }
   body.print-doc-mode .print-root { display: block !important; position: absolute; inset: 0; width: 100%; }
-  .report-doc { font-size: 12px; }
+  .rdoc { font-size: 12px; }
   @page { margin: 14mm; }
 }
 

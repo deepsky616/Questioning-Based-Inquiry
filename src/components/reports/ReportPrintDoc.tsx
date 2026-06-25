@@ -18,8 +18,8 @@ export interface PrintReportItem {
   sessions: { id: string; date: string; subject: string; topic: string; analysis?: SessionAnalysisResult | null }[];
 }
 
-// 인쇄 전용 리포트 문서: 레터헤드 + KPI 카드 + 질문 분류 막대 + 세션별 AI 분석.
-// 차트(recharts) 대신 CSS 막대를 써 인쇄 안정성을 확보하고, 라이트 색을 강제한다.
+// 인쇄 전용 리포트 문서 — '채점 결과 리포트' 양식(보라 타이틀 밴드 + 라벤더 표 + 피드백 박스)을
+// 활동 리포트 데이터에 적용. 차트 대신 표로 인쇄 안정성 확보, 라이트 색 강제.
 export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
   const t = useTranslations("report");
   const tCls = useTranslations("classification");
@@ -47,50 +47,34 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     [t("secSuggest"), a.insights],
   ];
 
-  const analyzedCount = (it: PrintReportItem) =>
-    it.sessions.filter((s) => s.analysis && blocksOf(s.analysis).some(([, v]) => v && v.trim())).length;
-
-  // 추세는 월별 우선, 없으면 주별
+  const analyzedSessions = (it: PrintReportItem) =>
+    it.sessions.filter((s) => s.analysis && blocksOf(s.analysis).some(([, v]) => v && v.trim()));
   const trendOf = (it: PrintReportItem): SeriesPoint[] => (it.monthly && it.monthly.length ? it.monthly : it.weekly ?? []);
-
+  const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
   const showRoster = items.length > 1;
 
-  const bar = (label: string, value: number, groupTotal: number, color: string) => {
-    const pct = groupTotal > 0 ? Math.round((value / groupTotal) * 100) : 0;
-    return (
-      <div className="report-doc-bar-row" key={label}>
-        <span className="report-doc-bar-label">{label}</span>
-        <span className="report-doc-bar-track">
-          <span className="report-doc-bar-fill" style={{ width: `${pct}%`, background: color }} />
-        </span>
-        <span className="report-doc-bar-val">{value} ({pct}%)</span>
-      </div>
-    );
-  };
-
-  const rosterHead = items[0];
-  const rosterSub = rosterHead ? [
-    rosterHead.grade && t("gradeLabel", { grade: rosterHead.grade }),
-    rosterHead.className && t("classLabel", { className: rosterHead.className }),
-    rosterHead.school,
-  ].filter(Boolean).join(" · ") : "";
+  const eyebrowOf = (it: PrintReportItem) =>
+    [it.school, it.grade && t("gradeLabel", { grade: it.grade }), it.className && t("classLabel", { className: it.className })]
+      .filter(Boolean).join(" · ");
+  const corner = (it: PrintReportItem) =>
+    [it.school, [it.studentNumber, it.name].filter(Boolean).join(" ")].filter(Boolean).join("  |  ");
 
   return (
-    <div className="report-doc">
-      {/* 전체 출력일 때 맨 앞 학급 요약 표 */}
-      {showRoster && (
-        <section className="report-doc-page">
-          <header className="report-doc-head">
-            <div className="report-doc-head-row">
-              <h1>{t("docRosterTitle")}</h1>
-              <span className="report-doc-date">{t("docGenerated", { date: today })}</span>
-            </div>
-            {rosterSub && <div className="report-doc-meta">{rosterSub}</div>}
-          </header>
-          <table className="report-doc-table report-doc-roster">
+    <div className="rdoc">
+      {/* 전체 출력: 맨 앞 학급 요약 */}
+      {showRoster && items[0] && (
+        <section className="rdoc-page">
+          <div className="rdoc-corner">{[items[0].school, items[0].grade && t("gradeLabel", { grade: items[0].grade }), items[0].className && t("classLabel", { className: items[0].className })].filter(Boolean).join("  |  ")}</div>
+          <div className="rdoc-bar" />
+          <div className="rdoc-band">
+            <div className="rdoc-eyebrow">{eyebrowOf(items[0])}</div>
+            <h1 className="rdoc-title"><span className="rdoc-accent">{t("docRosterTitle")}</span></h1>
+            <div className="rdoc-gen">{t("docGenerated", { date: today })}</div>
+          </div>
+          <table className="rdoc-table">
             <thead>
               <tr>
-                <th>{t("docColNo")}</th><th className="report-doc-td-l">{t("docColName")}</th>
+                <th>{t("docColNo")}</th><th className="rdoc-l">{t("docColName")}</th>
                 <th>{t("metric_questions")}</th><th>{t("metric_likesGiven")}</th><th>{t("metric_comments")}</th>
                 <th>{t("metric_likesReceived")}</th><th>{t("metric_commentsReceived")}</th><th>{t("docColAnalyzed")}</th>
               </tr>
@@ -98,80 +82,84 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
             <tbody>
               {items.map((it, i) => (
                 <tr key={i}>
-                  <td>{it.studentNumber ?? "-"}</td><td className="report-doc-td-l">{it.name}</td>
+                  <td>{it.studentNumber ?? "-"}</td><td className="rdoc-l">{it.name}</td>
                   <td>{it.totals.questions}</td><td>{it.totals.likesGiven}</td><td>{it.totals.comments}</td>
-                  <td>{it.totals.likesReceived}</td><td>{it.totals.commentsReceived}</td><td>{analyzedCount(it)}</td>
+                  <td>{it.totals.likesReceived}</td><td>{it.totals.commentsReceived}</td><td>{analyzedSessions(it).length}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="report-doc-break" />
+          <div className="rdoc-break" />
         </section>
       )}
 
       {items.map((it, idx) => {
-        const sub = [
-          it.grade && t("gradeLabel", { grade: it.grade }),
-          it.className && t("classLabel", { className: it.className }),
-          it.studentNumber && t("numberLabel", { n: it.studentNumber }),
-        ].filter(Boolean).join(" ");
         const cl = it.classification;
         const closureTotal = cl.closure.closed + cl.closure.open;
         const cogTotal = cl.cognitive.factual + cl.cognitive.conceptual + cl.cognitive.controversial;
-        const analyzed = it.sessions.filter((s) => s.analysis && blocksOf(s.analysis).some(([, v]) => v && v.trim()));
+        const trend = trendOf(it);
+        const analyzed = analyzedSessions(it);
         return (
-          <section key={idx} className="report-doc-page">
-            {/* 레터헤드 */}
-            <header className="report-doc-head">
-              <div className="report-doc-head-row">
-                <h1>{t("docTitle")}</h1>
-                <span className="report-doc-date">{t("docGenerated", { date: today })}</span>
-              </div>
-              <div className="report-doc-meta">
-                <strong>{it.name}</strong>
-                {sub && <span> · {sub}</span>}
-                {it.school && <span> · {it.school}</span>}
-              </div>
-            </header>
+          <section key={idx} className="rdoc-page">
+            <div className="rdoc-corner">{corner(it)}</div>
+            <div className="rdoc-bar" />
+            <div className="rdoc-band">
+              <div className="rdoc-eyebrow">{eyebrowOf(it)}</div>
+              <h1 className="rdoc-title">{it.name} <span className="rdoc-accent">{t("docTitle")}</span></h1>
+              <div className="rdoc-gen">{t("docGenerated", { date: today })}</div>
+            </div>
 
             {/* 활동 요약 KPI */}
-            <h2 className="report-doc-h2">{t("docSummary")}</h2>
-            <div className="report-doc-kpis">
+            <div className="rdoc-section-label">{t("docSummary")}</div>
+            <div className="rdoc-kpis">
               {kpis(it.totals).map((k) => (
-                <div className="report-doc-kpi" key={k.label}>
-                  <div className="report-doc-kpi-v" style={{ color: k.color }}>{k.v}</div>
-                  <div className="report-doc-kpi-l">{k.label}</div>
+                <div className="rdoc-kpi" key={k.label}>
+                  <div className="rdoc-kpi-v" style={{ color: k.color }}>{k.v}</div>
+                  <div className="rdoc-kpi-l">{k.label}</div>
                 </div>
               ))}
             </div>
 
-            {/* 질문 분류(막대) */}
-            <h2 className="report-doc-h2">{t("docClassification")}</h2>
-            <div className="report-doc-bars">
-              {bar(tCls("closed.label"), cl.closure.closed, closureTotal, "#3b82f6")}
-              {bar(tCls("open.label"), cl.closure.open, closureTotal, "#10b981")}
-              <div className="report-doc-bar-sep" />
-              {bar(tCls("factual.label"), cl.cognitive.factual, cogTotal, "#94a3b8")}
-              {bar(tCls("conceptual.label"), cl.cognitive.conceptual, cogTotal, "#a855f7")}
-              {bar(tCls("controversial.label"), cl.cognitive.controversial, cogTotal, "#f97316")}
-            </div>
+            {/* 질문 분류(영역·유형·개수·비율) */}
+            <div className="rdoc-section-label">{t("docClassification")}</div>
+            <table className="rdoc-table">
+              <thead>
+                <tr>
+                  <th className="rdoc-l">{t("docColDomain")}</th><th className="rdoc-l">{t("docColType")}</th>
+                  <th>{t("docColCount")}</th><th>{t("docColRatio")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="rdoc-l" rowSpan={2}>{t("docDomainClosure")}</td>
+                  <td className="rdoc-l">{tCls("closed.label")}</td><td>{cl.closure.closed}</td><td>{pct(cl.closure.closed, closureTotal)}%</td>
+                </tr>
+                <tr><td className="rdoc-l">{tCls("open.label")}</td><td>{cl.closure.open}</td><td>{pct(cl.closure.open, closureTotal)}%</td></tr>
+                <tr>
+                  <td className="rdoc-l" rowSpan={3}>{t("docDomainCognitive")}</td>
+                  <td className="rdoc-l">{tCls("factual.label")}</td><td>{cl.cognitive.factual}</td><td>{pct(cl.cognitive.factual, cogTotal)}%</td>
+                </tr>
+                <tr><td className="rdoc-l">{tCls("conceptual.label")}</td><td>{cl.cognitive.conceptual}</td><td>{pct(cl.cognitive.conceptual, cogTotal)}%</td></tr>
+                <tr><td className="rdoc-l">{tCls("controversial.label")}</td><td>{cl.cognitive.controversial}</td><td>{pct(cl.cognitive.controversial, cogTotal)}%</td></tr>
+              </tbody>
+            </table>
 
-            {/* 활동 추세 표 */}
-            {trendOf(it).length > 0 && (
+            {/* 추세 표 */}
+            {trend.length > 0 && (
               <>
-                <h2 className="report-doc-h2">{t("docTrendTitle")}</h2>
-                <table className="report-doc-table">
+                <div className="rdoc-section-label">{t("docTrendTitle")}</div>
+                <table className="rdoc-table">
                   <thead>
                     <tr>
-                      <th className="report-doc-td-l">{t("docTrendPeriod")}</th>
+                      <th className="rdoc-l">{t("docTrendPeriod")}</th>
                       <th>{t("metric_questions")}</th><th>{t("metric_likesGiven")}</th><th>{t("metric_comments")}</th>
                       <th>{t("metric_likesReceived")}</th><th>{t("metric_commentsReceived")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {trendOf(it).map((p) => (
+                    {trend.map((p) => (
                       <tr key={p.key}>
-                        <td className="report-doc-td-l">{p.label}</td>
+                        <td className="rdoc-l">{p.label}</td>
                         <td>{p.questions}</td><td>{p.likesGiven}</td><td>{p.comments}</td>
                         <td>{p.likesReceived}</td><td>{p.commentsReceived}</td>
                       </tr>
@@ -179,19 +167,19 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
                   </tbody>
                 </table>
 
-                <h2 className="report-doc-h2">{t("docClassTrendTitle")}</h2>
-                <table className="report-doc-table">
+                <div className="rdoc-section-label">{t("docClassTrendTitle")}</div>
+                <table className="rdoc-table">
                   <thead>
                     <tr>
-                      <th className="report-doc-td-l">{t("docTrendPeriod")}</th>
+                      <th className="rdoc-l">{t("docTrendPeriod")}</th>
                       <th>{tCls("closed.label")}</th><th>{tCls("open.label")}</th>
                       <th>{tCls("factual.label")}</th><th>{tCls("conceptual.label")}</th><th>{tCls("controversial.label")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {trendOf(it).map((p) => (
+                    {trend.map((p) => (
                       <tr key={p.key}>
-                        <td className="report-doc-td-l">{p.label}</td>
+                        <td className="rdoc-l">{p.label}</td>
                         <td>{p.closed}</td><td>{p.open}</td>
                         <td>{p.factual}</td><td>{p.conceptual}</td><td>{p.controversial}</td>
                       </tr>
@@ -201,24 +189,24 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
               </>
             )}
 
-            {/* 세션별 AI 분석(모두 포함) */}
-            <h2 className="report-doc-h2">{t("docSessions")}</h2>
+            {/* 세션별 AI 분석 — 피드백 박스 */}
+            <div className="rdoc-section-label">{t("docSessions")}</div>
             {analyzed.length === 0 ? (
-              <p className="report-doc-empty">{t("docNoAnalysis")}</p>
+              <p className="rdoc-empty">{t("docNoAnalysis")}</p>
             ) : (
               analyzed.map((s) => (
-                <div key={s.id} className="report-doc-session">
-                  <h3>{s.date} · {s.subject}{s.topic ? ` - ${s.topic}` : ""}</h3>
+                <div key={s.id} className="rdoc-feedback">
+                  <h3 className="rdoc-feedback-h">{s.date} · {s.subject}{s.topic ? ` - ${s.topic}` : ""}</h3>
                   {blocksOf(s.analysis as SessionAnalysisResult).filter(([, v]) => v && v.trim()).map(([h, v]) => (
-                    <div key={h} className="report-doc-block">
-                      <p className="report-doc-block-h">{h}</p>
-                      <p className="report-doc-block-b">{v}</p>
+                    <div key={h} className="rdoc-fb-block">
+                      <p className="rdoc-fb-h">{h}</p>
+                      <p className="rdoc-fb-b">{v}</p>
                     </div>
                   ))}
                 </div>
               ))
             )}
-            {idx < items.length - 1 && <div className="report-doc-break" />}
+            {idx < items.length - 1 && <div className="rdoc-break" />}
           </section>
         );
       })}

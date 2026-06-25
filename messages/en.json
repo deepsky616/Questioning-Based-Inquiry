@@ -986,7 +986,13 @@
     "docRosterTitle": "Class summary",
     "docColNo": "No.",
     "docColName": "Name",
-    "docColAnalyzed": "Analyzed"
+    "docColAnalyzed": "Analyzed",
+    "docColDomain": "Area",
+    "docColType": "Type",
+    "docColCount": "Count",
+    "docColRatio": "Ratio",
+    "docDomainClosure": "Closure",
+    "docDomainCognitive": "Cognitive"
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

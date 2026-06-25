@@ -986,7 +986,13 @@
     "docRosterTitle": "학급 요약",
     "docColNo": "번호",
     "docColName": "이름",
-    "docColAnalyzed": "분석 세션"
+    "docColAnalyzed": "분석 세션",
+    "docColDomain": "영역",
+    "docColType": "유형",
+    "docColCount": "개수",
+    "docColRatio": "비율",
+    "docDomainClosure": "종결성",
+    "docDomainCognitive": "인지 수준"
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",
