@@ -37,7 +37,8 @@ import {
   matchesCognitiveCategory,
   normalizeCognitiveType,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { SectionToggle } from "@/components/shared/SectionToggle";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -126,6 +127,7 @@ export default function QuestionsPage() {
   const tCls = useTranslations("classification");
   const t = useTranslations("teacherQ");
   const tc = useTranslations("common");
+  const tSess = useTranslations("sessions");
   const ct = useContentTranslation();
   const queryClient = useQueryClient();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -152,6 +154,11 @@ export default function QuestionsPage() {
   // 배포한 탐구설계 목록에서 "수정"을 누른 세션(인라인 패널 열림)
   const [editDeploySessionId, setEditDeploySessionId] = useState<string | null>(null);
   const [deletingDeployId, setDeletingDeployId] = useState<string | null>(null);
+  // 배포한 탐구설계 목록 조회(필터)·정렬 — 수업세션 목록과 동일한 방식
+  const [deployFilterDate, setDeployFilterDate] = useState("");
+  const [deployFilterSubject, setDeployFilterSubject] = useState("");
+  const [deployFilterTopic, setDeployFilterTopic] = useState("");
+  const [deploySort, setDeploySort] = useState<"desc" | "asc">("desc");
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
 
@@ -953,17 +960,13 @@ export default function QuestionsPage() {
       {currentSession && (
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{t("participationTitle")}</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={showParticipation ? () => setShowParticipation(false) : handleLoadParticipation}
-                disabled={isLoadingParticipation}
-                className="text-xs"
-              >
-                {isLoadingParticipation ? t("loadingShort") : showParticipation ? t("collapse") : t("loadParticipation")}
-              </Button>
+            <div className="flex items-center justify-between gap-2">
+              <SectionToggle
+                title={t("participationTitle")}
+                open={showParticipation}
+                onToggle={showParticipation ? () => setShowParticipation(false) : handleLoadParticipation}
+                suffix={isLoadingParticipation ? <span className="text-xs font-normal text-muted-foreground">{t("loadingShort")}</span> : undefined}
+              />
             </div>
           </CardHeader>
           {showParticipation && participation && (
@@ -1062,14 +1065,11 @@ export default function QuestionsPage() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setShowSessionAnalysis((v) => !v)}
-                className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground hover:text-primary transition-colors"
-              >
-                {t("sessionAnalysisTitle")}
-                <span className="text-sm text-muted-foreground">{showSessionAnalysis ? "▾" : "▸"}</span>
-              </button>
+              <SectionToggle
+                title={t("sessionAnalysisTitle")}
+                open={showSessionAnalysis}
+                onToggle={() => setShowSessionAnalysis((v) => !v)}
+              />
               {editingSession ? (
                 <div className="flex gap-2">
                   <Button type="button" size="sm" disabled={savingSessionEdit} onClick={saveSessionEdit} className="text-xs">{tc("save")}</Button>
@@ -1340,14 +1340,77 @@ export default function QuestionsPage() {
 
       {/* 배포한 탐구설계 목록 (수업세션별) */}
       {(() => {
-        const deployed = sessions.filter((s) => (s.sharedQuestions?.length ?? 0) > 0);
-        if (deployed.length === 0) return null;
+        const deployedAll = sessions.filter((s) => (s.sharedQuestions?.length ?? 0) > 0);
+        if (deployedAll.length === 0) return null;
+        const deployOptions = getSessionFilterOptions(deployedAll);
+        const deployFiltered = filterSessions(deployedAll, {
+          date: deployFilterDate || undefined,
+          subject: deployFilterSubject || undefined,
+          topic: deployFilterTopic || undefined,
+        });
+        const deployed = deploySort === "asc" ? sortSessionsAsc(deployFiltered) : sortSessionsDesc(deployFiltered);
+        const hasDeployFilter = Boolean(deployFilterDate || deployFilterSubject || deployFilterTopic);
         return (
           <div className="rounded-xl border bg-card p-4">
-            <div className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground">
-              <span>📋</span>
-              {t("deployedTitle")}
-              <span className="text-xs font-normal text-muted-foreground">{t("listCountSuffix", { count: deployed.length })}</span>
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+              <div className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground">
+                <span>📋</span>
+                {t("deployedTitle")}
+                <span className="text-xs font-normal text-muted-foreground">{t("listCountSuffix", { count: deployedAll.length })}</span>
+              </div>
+              {/* 조회(필터, 왼쪽) · 정렬(오른쪽) — 수업세션 목록과 동일 */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">{tSess("filterLabel")}</span>
+                  <Select value={deployFilterDate || "__all__"} onValueChange={(v) => setDeployFilterDate(v === "__all__" ? "" : v)}>
+                    <SelectTrigger className="h-9 text-sm bg-background w-32"><SelectValue placeholder={tSess("allDates")} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{tSess("allDates")}</SelectItem>
+                      {deployOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={deployFilterSubject || "__all__"} onValueChange={(v) => setDeployFilterSubject(v === "__all__" ? "" : v)}>
+                    <SelectTrigger className="h-9 text-sm bg-background w-28"><SelectValue placeholder={tSess("allSubjects")} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{tSess("allSubjects")}</SelectItem>
+                      {deployOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={deployFilterTopic || "__all__"} onValueChange={(v) => setDeployFilterTopic(v === "__all__" ? "" : v)}>
+                    <SelectTrigger className="h-9 text-sm bg-background w-36"><SelectValue placeholder={tSess("allTopics")} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{tSess("allTopics")}</SelectItem>
+                      {deployOptions.topics.map((tp) => <SelectItem key={tp} value={tp}>{tp}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {hasDeployFilter && (
+                    <button
+                      type="button"
+                      onClick={() => { setDeployFilterDate(""); setDeployFilterSubject(""); setDeployFilterTopic(""); }}
+                      className="h-9 px-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                    >
+                      {tc("reset")}
+                    </button>
+                  )}
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">{tSess("sortLabel")}</span>
+                  <div className="flex rounded-md border overflow-hidden h-9">
+                    {(["desc", "asc"] as const).map((v, i) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setDeploySort(v)}
+                        className={`px-3 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+                          deploySort === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {v === "desc" ? tSess("sortDesc") : tSess("sortAsc")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
               {t("deployedDesc")}
