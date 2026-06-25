@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
-import type { ReportTotals } from "@/lib/report-stats";
+import type { ReportTotals, SeriesPoint } from "@/lib/report-stats";
 import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import type { SessionAnalysisResult } from "@/components/reports/ReportView";
 
@@ -13,6 +13,8 @@ export interface PrintReportItem {
   school?: string | null;
   totals: ReportTotals;
   classification: QuestionTypeSummary;
+  weekly?: SeriesPoint[];
+  monthly?: SeriesPoint[];
   sessions: { id: string; date: string; subject: string; topic: string; analysis?: SessionAnalysisResult | null }[];
 }
 
@@ -45,6 +47,14 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     [t("secSuggest"), a.insights],
   ];
 
+  const analyzedCount = (it: PrintReportItem) =>
+    it.sessions.filter((s) => s.analysis && blocksOf(s.analysis).some(([, v]) => v && v.trim())).length;
+
+  // 추세는 월별 우선, 없으면 주별
+  const trendOf = (it: PrintReportItem): SeriesPoint[] => (it.monthly && it.monthly.length ? it.monthly : it.weekly ?? []);
+
+  const showRoster = items.length > 1;
+
   const bar = (label: string, value: number, groupTotal: number, color: string) => {
     const pct = groupTotal > 0 ? Math.round((value / groupTotal) * 100) : 0;
     return (
@@ -58,8 +68,47 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     );
   };
 
+  const rosterHead = items[0];
+  const rosterSub = rosterHead ? [
+    rosterHead.grade && t("gradeLabel", { grade: rosterHead.grade }),
+    rosterHead.className && t("classLabel", { className: rosterHead.className }),
+    rosterHead.school,
+  ].filter(Boolean).join(" · ") : "";
+
   return (
     <div className="report-doc">
+      {/* 전체 출력일 때 맨 앞 학급 요약 표 */}
+      {showRoster && (
+        <section className="report-doc-page">
+          <header className="report-doc-head">
+            <div className="report-doc-head-row">
+              <h1>{t("docRosterTitle")}</h1>
+              <span className="report-doc-date">{t("docGenerated", { date: today })}</span>
+            </div>
+            {rosterSub && <div className="report-doc-meta">{rosterSub}</div>}
+          </header>
+          <table className="report-doc-table report-doc-roster">
+            <thead>
+              <tr>
+                <th>{t("docColNo")}</th><th className="report-doc-td-l">{t("docColName")}</th>
+                <th>{t("metric_questions")}</th><th>{t("metric_likesGiven")}</th><th>{t("metric_comments")}</th>
+                <th>{t("metric_likesReceived")}</th><th>{t("metric_commentsReceived")}</th><th>{t("docColAnalyzed")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={i}>
+                  <td>{it.studentNumber ?? "-"}</td><td className="report-doc-td-l">{it.name}</td>
+                  <td>{it.totals.questions}</td><td>{it.totals.likesGiven}</td><td>{it.totals.comments}</td>
+                  <td>{it.totals.likesReceived}</td><td>{it.totals.commentsReceived}</td><td>{analyzedCount(it)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="report-doc-break" />
+        </section>
+      )}
+
       {items.map((it, idx) => {
         const sub = [
           it.grade && t("gradeLabel", { grade: it.grade }),
@@ -106,6 +155,51 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
               {bar(tCls("conceptual.label"), cl.cognitive.conceptual, cogTotal, "#a855f7")}
               {bar(tCls("controversial.label"), cl.cognitive.controversial, cogTotal, "#f97316")}
             </div>
+
+            {/* 활동 추세 표 */}
+            {trendOf(it).length > 0 && (
+              <>
+                <h2 className="report-doc-h2">{t("docTrendTitle")}</h2>
+                <table className="report-doc-table">
+                  <thead>
+                    <tr>
+                      <th className="report-doc-td-l">{t("docTrendPeriod")}</th>
+                      <th>{t("metric_questions")}</th><th>{t("metric_likesGiven")}</th><th>{t("metric_comments")}</th>
+                      <th>{t("metric_likesReceived")}</th><th>{t("metric_commentsReceived")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trendOf(it).map((p) => (
+                      <tr key={p.key}>
+                        <td className="report-doc-td-l">{p.label}</td>
+                        <td>{p.questions}</td><td>{p.likesGiven}</td><td>{p.comments}</td>
+                        <td>{p.likesReceived}</td><td>{p.commentsReceived}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <h2 className="report-doc-h2">{t("docClassTrendTitle")}</h2>
+                <table className="report-doc-table">
+                  <thead>
+                    <tr>
+                      <th className="report-doc-td-l">{t("docTrendPeriod")}</th>
+                      <th>{tCls("closed.label")}</th><th>{tCls("open.label")}</th>
+                      <th>{tCls("factual.label")}</th><th>{tCls("conceptual.label")}</th><th>{tCls("controversial.label")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trendOf(it).map((p) => (
+                      <tr key={p.key}>
+                        <td className="report-doc-td-l">{p.label}</td>
+                        <td>{p.closed}</td><td>{p.open}</td>
+                        <td>{p.factual}</td><td>{p.conceptual}</td><td>{p.controversial}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
 
             {/* 세션별 AI 분석(모두 포함) */}
             <h2 className="report-doc-h2">{t("docSessions")}</h2>

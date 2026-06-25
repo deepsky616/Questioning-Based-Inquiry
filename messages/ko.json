@@ -979,7 +979,14 @@
     "docSummary": "활동 요약",
     "docClassification": "질문 분류",
     "docSessions": "수업 세션별 AI 분석",
-    "docNoAnalysis": "분석된 세션이 없습니다."
+    "docNoAnalysis": "분석된 세션이 없습니다.",
+    "docTrendTitle": "활동 추세",
+    "docClassTrendTitle": "질문 분류 추세",
+    "docTrendPeriod": "기간",
+    "docRosterTitle": "학급 요약",
+    "docColNo": "번호",
+    "docColName": "이름",
+    "docColAnalyzed": "분석 세션"
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",

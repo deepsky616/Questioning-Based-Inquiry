@@ -101,7 +101,9 @@ export function TeacherReportsView() {
   const toItem = (r: StudentReport): PrintReportItem => ({
     name: r.student.name, grade: r.student.grade, className: r.student.className,
     studentNumber: r.student.studentNumber,
-    totals: r.totals, classification: r.classification, sessions: (r.sessions as PrintReportItem["sessions"]) ?? [],
+    totals: r.totals, classification: r.classification,
+    weekly: r.weekly, monthly: r.monthly,
+    sessions: (r.sessions as PrintReportItem["sessions"]) ?? [],
   });
   const doPrint = (items: PrintReportItem[]) => {
     if (items.length === 0) return;

@@ -979,7 +979,14 @@
     "docSummary": "Activity summary",
     "docClassification": "Question types",
     "docSessions": "AI analysis by session",
-    "docNoAnalysis": "No analyzed sessions."
+    "docNoAnalysis": "No analyzed sessions.",
+    "docTrendTitle": "Activity trend",
+    "docClassTrendTitle": "Question type trend",
+    "docTrendPeriod": "Period",
+    "docRosterTitle": "Class summary",
+    "docColNo": "No.",
+    "docColName": "Name",
+    "docColAnalyzed": "Analyzed"
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",
