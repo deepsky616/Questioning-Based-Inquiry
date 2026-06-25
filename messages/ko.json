@@ -1005,16 +1005,16 @@
     "docRanking": "포인트 · 순위",
     "docPoints": "획득 포인트",
     "docAvgPoints": "반 평균 포인트",
-    "docClassRank": "우리반 석차",
-    "docSchoolRank": "교내 석차",
-    "docAllRank": "전체 석차",
-    "docClassOrderSchool": "교내 반 순위",
+    "docClassRank": "우리반 순위",
+    "docSchoolRank": "학교 순위",
+    "docAllRank": "전체 순위",
+    "docClassOrderSchool": "학교 반 순위",
     "docClassOrderAll": "전체 반 순위",
     "rankValue": "{rank}위",
     "unitStudents": "{count}명",
     "unitClasses": "{count}개 반",
     "docColPoints": "포인트",
-    "docColRank": "석차"
+    "docColRank": "순위"
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",
