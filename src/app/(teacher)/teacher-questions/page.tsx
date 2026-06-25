@@ -650,8 +650,8 @@ export default function QuestionsPage() {
             <TableHead className="w-24 break-keep text-center">{t("colCognitive")}</TableHead>
             <TableHead className="w-20 text-center break-keep">{t("colLikes")}</TableHead>
             <TableHead className="w-16 text-center">{t("colComments")}</TableHead>
-            <TableHead className="w-20">{t("colPublic")}</TableHead>
-            <TableHead className="w-28">{t("colManage")}</TableHead>
+            <TableHead className="w-20 text-center">{t("colPublic")}</TableHead>
+            <TableHead className="w-28 text-center">{t("colManage")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -733,13 +733,15 @@ export default function QuestionsPage() {
                 </button>
               </TableCell>
               <TableCell>
-                <Switch
-                  checked={q.isPublic}
-                  onCheckedChange={() => handleToggleQuestionPublic(q)}
-                />
+                <div className="flex justify-center">
+                  <Switch
+                    checked={q.isPublic}
+                    onCheckedChange={() => handleToggleQuestionPublic(q)}
+                  />
+                </div>
               </TableCell>
               <TableCell>
-                <div className="flex gap-1">
+                <div className="flex gap-1 justify-center">
                   <Button
                     variant="outline"
                     size="sm"
