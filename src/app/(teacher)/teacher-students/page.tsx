@@ -631,13 +631,13 @@ export default function StudentsPage() {
                 <div className="overflow-x-auto"><Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-14 text-center">{t("colNumber")}</TableHead>
+                      <TableHead className="w-16 text-center whitespace-nowrap">{t("colNumber")}</TableHead>
                       <TableHead>{t("colName")}</TableHead>
-                      <TableHead className="text-center w-20">{t("colQuestion")}</TableHead>
-                      <TableHead className="text-center w-20">{t("colAnswer")}</TableHead>
-                      <TableHead className="text-center w-20">{t("colPoint")}</TableHead>
-                      <TableHead className="text-center w-24 hidden sm:table-cell">{t("colLastActive")}</TableHead>
-                      <TableHead className="text-center w-20">{t("colDetail")}</TableHead>
+                      <TableHead className="text-center w-20 whitespace-nowrap">{t("colQuestion")}</TableHead>
+                      <TableHead className="text-center w-20 whitespace-nowrap">{t("colAnswer")}</TableHead>
+                      <TableHead className="text-center w-20 whitespace-nowrap">{t("colPoint")}</TableHead>
+                      <TableHead className="text-center w-28 whitespace-nowrap hidden sm:table-cell">{t("colLastActive")}</TableHead>
+                      <TableHead className="text-center w-20 whitespace-nowrap">{t("colDetail")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -661,7 +661,7 @@ export default function StudentsPage() {
                             {s.totalPoints}
                           </span>
                         </TableCell>
-                        <TableCell className="text-center text-xs text-muted-foreground hidden sm:table-cell">
+                        <TableCell className="text-center text-xs text-muted-foreground whitespace-nowrap hidden sm:table-cell">
                           {(() => { const r = lastActiveLabel(s.lastActivityAt); return r ? t(r.key, r.v) : "-"; })()}
                         </TableCell>
                         <TableCell className="text-center">
