@@ -148,7 +148,6 @@ export default function QuestionsPage() {
   const [participationFilter, setParticipationFilter] = useState<"all" | "submitted" | "not-submitted">("all");
   const [showParticipation, setShowParticipation] = useState(false);
 
-  const [showDeployed, setShowDeployed] = useState(false);
   // 배포한 탐구설계 목록에서 "수정"을 누른 세션(인라인 패널 열림)
   const [editDeploySessionId, setEditDeploySessionId] = useState<string | null>(null);
   const [deletingDeployId, setDeletingDeployId] = useState<string | null>(null);
@@ -1336,17 +1335,11 @@ export default function QuestionsPage() {
         if (deployed.length === 0) return null;
         return (
           <div className="rounded-xl border bg-card p-4">
-            <button
-              type="button"
-              onClick={() => setShowDeployed((v) => !v)}
-              className="flex w-full items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground hover:text-primary transition-colors"
-            >
+            <div className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground">
               <span>📋</span>
               {t("deployedTitle")}
               <span className="text-xs font-normal text-muted-foreground">{t("listCountSuffix", { count: deployed.length })}</span>
-              <span className="ml-auto text-sm text-muted-foreground">{showDeployed ? "▾" : "▸"}</span>
-            </button>
-            {showDeployed && (<>
+            </div>
             <p className="mt-3 text-sm text-muted-foreground">
               {t("deployedDesc")}
             </p>
@@ -1430,7 +1423,6 @@ export default function QuestionsPage() {
                 );
               })}
             </div>
-            </>)}
           </div>
         );
       })()}
