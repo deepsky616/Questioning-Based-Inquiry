@@ -109,12 +109,14 @@ function QuestionCard({
   onLikeChange,
   likesEnabled,
   commentsEnabled,
+  showSession,
   ct,
 }: {
   q: Question;
   onLikeChange: (questionId: string, newCount: number, myLike: boolean) => void;
   likesEnabled: boolean;
   commentsEnabled: boolean;
+  showSession: boolean;
   ct: ReturnType<typeof useContentTranslation>;
 }) {
   const t = useTranslations("explore");
@@ -193,7 +195,7 @@ function QuestionCard({
             )}
             {/* 수업세션(📚 칩) · 작성일시(🕒) — 내 질문 탭과 동일 톤 */}
             <div className="mt-0.5 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              {q.session && (
+              {showSession && q.session && (
                 <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                   <span>📚</span>
                   <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
@@ -347,7 +349,8 @@ export function ExploreQuestionsView() {
       <div className="space-y-3 mt-3">
         {list.map((q) => (
           <QuestionCard key={q.id} q={q} onLikeChange={handleLikeChange}
-            likesEnabled={exploreCfg.likesEnabled} commentsEnabled={exploreCfg.commentsEnabled} ct={ct} />
+            likesEnabled={exploreCfg.likesEnabled} commentsEnabled={exploreCfg.commentsEnabled}
+            showSession={selectedSessionId === "all"} ct={ct} />
         ))}
       </div>
     );

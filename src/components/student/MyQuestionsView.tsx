@@ -177,7 +177,7 @@ export function MyQuestionsView() {
                     </div>
                     {/* 수업세션(📚 칩) · 작성일시(🕒) — 한눈에 구분 */}
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      {q.session && (
+                      {selectedSessionId === "all" && q.session && (
                         <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                           <span>📚</span>
                           <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
