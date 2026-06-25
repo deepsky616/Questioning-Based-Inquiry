@@ -74,7 +74,7 @@ export function QuestionSortControl({
   );
 }
 
-/** 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 필터를 적용한다 (학생/교사 공용) */
+/** 분류1(닫힌/열린)·분류2(사실/개념/논쟁) 필터를 적용한다 (학생/교사 공용) */
 export function applyClassificationFilter<T extends { closure: string; cognitive: string }>(
   questions: T[],
   closure: ClosureFilter,

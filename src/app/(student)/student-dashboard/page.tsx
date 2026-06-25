@@ -128,7 +128,7 @@ function StudentDashboard() {
         </CardContent>
       </Card>
 
-      {/* 분류 1 · 폐쇄형 / 개방형 */}
+      {/* 분류 1 · 닫힌 질문 / 열린 질문 */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">{tCls("card1")}</CardTitle>

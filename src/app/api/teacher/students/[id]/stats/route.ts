@@ -100,7 +100,7 @@ export async function GET(
       OR: [{ bonusType: "PARTICIPATION" }, { gameId: "ACTIVITY_SOLO" }, { gameId: "ACTIVITY_AI" }],
     },
   });
-  // 질문 분류 분포(분류1 폐쇄/개방, 분류2 사실/개념/논쟁)
+  // 질문 분류 분포(분류1 닫힌/열린, 분류2 사실/개념/논쟁)
   const classification = summarizeQuestionTypes(
     questions.map((q) => ({ closure: q.closure ?? "", cognitive: q.cognitive ?? "" })),
   );

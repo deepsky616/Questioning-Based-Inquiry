@@ -1,6 +1,6 @@
 export const CLOSURE_LABEL: Record<string, string> = {
-  closed: "폐쇄형",
-  open: "개방형",
+  closed: "닫힌 질문",
+  open: "열린 질문",
 };
 
 export const CLOSURE_STYLE: Record<string, string> = {

@@ -111,7 +111,7 @@ export interface QuestionTypeSummary {
   cognitive: { factual: number; conceptual: number; controversial: number };
 }
 
-/** 질문 목록의 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 개수를 집계한다. */
+/** 질문 목록의 분류1(닫힌/열린)·분류2(사실/개념/논쟁) 개수를 집계한다. */
 export function summarizeQuestionTypes(
   questions: Array<{ closure: string; cognitive: string }>,
 ): QuestionTypeSummary {

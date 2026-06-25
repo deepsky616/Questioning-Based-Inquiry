@@ -99,7 +99,7 @@ function countInto(buckets: Bucket[], dates: (string | Date)[]): number[] {
   return counts;
 }
 
-/** 기간별로 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 질문 수를 집계한다 */
+/** 기간별로 분류1(닫힌/열린)·분류2(사실/개념/논쟁) 질문 수를 집계한다 */
 function classifyInto(
   buckets: Bucket[],
   questions: ActivityInput["questions"],

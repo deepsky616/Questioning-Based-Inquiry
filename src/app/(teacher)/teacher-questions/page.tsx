@@ -606,7 +606,7 @@ export default function QuestionsPage() {
       )
     : visibleQuestions;
 
-  // 분류1(폐쇄/개방)·분류2(사실/개념/논쟁) 필터를 적용한 표시용 목록
+  // 분류1(닫힌/열린)·분류2(사실/개념/논쟁) 필터를 적용한 표시용 목록
   const displayed = filtered.filter((q) =>
     (filterClosure === "all" || q.closure === filterClosure) &&
     (filterCognitive === "all" || matchesCognitiveCategory(q.cognitive, filterCognitive)) &&

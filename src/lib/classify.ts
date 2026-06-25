@@ -47,7 +47,7 @@ export function parseClassificationResponse(text: string): ClassificationResult 
 }
 
 export function fallbackClassification(content: string): ClassificationResult {
-  // "무슨"/"어떤"은 폐쇄형("무슨 색이에요?")과 개방형("어떤 방법이 좋을까?") 모두에 나타나므로 제외
+  // "무슨"/"어떤"은 닫힌 질문("무슨 색이에요?")과 열린 질문("어떤 방법이 좋을까?") 모두에 나타나므로 제외
   const closedKeywords = ["무엇", "언제", "몇", "어디", "누구", "얼마"];
   const openKeywords = ["왜", "어떻게"];
 

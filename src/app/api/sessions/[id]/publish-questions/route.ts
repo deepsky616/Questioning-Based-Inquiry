@@ -159,7 +159,7 @@ export async function POST(
       prisma.question.create({
         data: {
           content: it.content.trim(),
-          closure: "open",         // 교사 배포 질문 기본값 (탐구는 보통 개방형)
+          closure: "open",         // 교사 배포 질문 기본값 (탐구는 보통 열린 질문)
           cognitive: "conceptual", // 기본값
           source: "TEACHER_SHARED",
           inquiryType: it.type ?? null,

@@ -486,7 +486,7 @@ export function ReportView({
         </ResponsiveContainer>
       </div>
 
-      {/* 분류1 추세 (폐쇄형/개방형 누적 막대) */}
+      {/* 분류1 추세 (닫힌 질문/열린 질문 누적 막대) */}
       <div className="rounded-xl border bg-card p-4">
         <p className="mb-3 text-sm font-bold text-foreground">{t("closureTrend", { cat: tCls("category1"), period: range === "week" ? t("week") : t("month"), kinds: tCls("closure") })}</p>
         <ResponsiveContainer width="100%" height={220}>
