@@ -45,6 +45,7 @@ interface Question {
   commentCount?: number;
   myLike: boolean;
   likesVisibleToPeers?: boolean;
+  session?: { date: string; subject: string; topic: string } | null;
 }
 
 
@@ -190,7 +191,19 @@ function QuestionCard({
                 ].filter(Boolean).join(" ")}
               </div>
             )}
-            <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(q.createdAt)}</div>
+            {/* 수업세션(📚 칩) · 작성일시(🕒) — 내 질문 탭과 동일 톤 */}
+            <div className="mt-0.5 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              {q.session && (
+                <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
+                  <span>📚</span>
+                  <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1">
+                <span>🕒</span>
+                <span>{formatDateTime(q.createdAt)}</span>
+              </span>
+            </div>
           </div>
           {(commentsEnabled || (likesEnabled && q.likesVisibleToPeers !== false)) && (
             <div className="flex items-center gap-2">
