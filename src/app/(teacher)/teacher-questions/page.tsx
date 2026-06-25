@@ -327,6 +327,25 @@ export default function QuestionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterDate, filterSubject, filterTopic]);
 
+  // 세션 선택 시 저장된 학급 AI 분석을 불러온다(대시보드와 공유). 전체 조회/미선택이면 비움.
+  useEffect(() => {
+    if (selectedSessionId === "all" || !selectedSessionId) {
+      setSessionAnalysis(null);
+      setSessionAnalysisError(null);
+      return;
+    }
+    let active = true;
+    fetch(`/api/sessions/${selectedSessionId}/analysis`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!active) return;
+        setSessionAnalysis(d?.analysis ? (d.analysis as SessionAnalysis) : null);
+        setSessionAnalysisError(null);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [selectedSessionId]);
+
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -1004,13 +1023,13 @@ export default function QuestionsPage() {
               ) : sessionAnalysis ? (
                 <>
                   <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: sessionAnalysis.totalQuestions })}</span>
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: sessionAnalysis.totalQuestions ?? 0 })}</span>
                     <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statLikes", { count: sessionAnalysis.totalLikes ?? 0 })}</span>
                     <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statComments", { count: sessionAnalysis.totalComments ?? 0 })}</span>
                   </div>
                   <div className="rounded-lg bg-muted p-4 text-sm leading-6 text-foreground">{sessionAnalysis.summary}</div>
                   <div className="flex flex-wrap gap-2">
-                    {sessionAnalysis.themes.map((theme) => (
+                    {(sessionAnalysis.themes ?? []).map((theme) => (
                       <span key={theme} className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">{theme}</span>
                     ))}
                   </div>

@@ -7,6 +7,23 @@ import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
 import { generateJson, AiKeyMissingError } from "@/lib/ai";
 import { getRequestLocale } from "@/lib/locale";
 
+// 저장된 학급 세션 분석 조회(AI 호출 없음) — 질문조회/대시보드가 공유한 결과를 불러온다.
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if ((session.user as { role?: string }).role !== "TEACHER") {
+    return NextResponse.json({ error: "교사만 가능합니다" }, { status: 403 });
+  }
+  const teacherId = (session.user as { id: string }).id;
+  const owned = await prisma.questionSession.findUnique({ where: { id: params.id }, select: { teacherId: true } });
+  if (!owned || owned.teacherId !== teacherId) return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  const row = await prisma.sessionAnalysis.findUnique({
+    where: { sessionId_scope_studentId: { sessionId: params.id, scope: "class", studentId: "" } },
+    select: { result: true },
+  });
+  return NextResponse.json({ analysis: row?.result ?? null });
+}
+
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
   if (!session?.user) {
@@ -97,8 +114,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       nextQuestions?: string;
     }>({ userId: teacherId, prompt, req, localize: true });
 
-    // 리포트에서 복원할 분석 결과(SessionAnalysisResult 형태)
-    const analysisResult = {
+    // 저장·반환 결과(테마·집계까지 포함해 질문조회/대시보드 어디서든 그대로 복원 가능)
+    const stored = {
       summary: parsed.summary ?? "",
       insights: parsed.insights ?? "",
       commentInsights: parsed.commentInsights ?? "",
@@ -107,26 +124,24 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       balanceInsights: parsed.balanceInsights ?? "",
       bestQuestion: parsed.bestQuestion ?? "",
       nextQuestions: parsed.nextQuestions ?? "",
+      themes: Array.isArray(parsed.themes) ? parsed.themes : [],
+      totalQuestions: questions.length,
+      totalComments,
+      totalLikes,
     };
 
-    // DB 영속화(베스트 에포트) — 다른 브라우저·기기에서도 마지막 분석 유지
+    // DB 영속화(베스트 에포트) — 질문조회·대시보드·다른 기기에서 마지막 분석 공유
     try {
       await prisma.sessionAnalysis.upsert({
         where: { sessionId_scope_studentId: { sessionId: params.id, scope: "class", studentId: "" } },
-        create: { sessionId: params.id, scope: "class", studentId: "", result: analysisResult, locale: getRequestLocale(req) },
-        update: { result: analysisResult, locale: getRequestLocale(req) },
+        create: { sessionId: params.id, scope: "class", studentId: "", result: stored, locale: getRequestLocale(req) },
+        update: { result: stored, locale: getRequestLocale(req) },
       });
     } catch (e) {
       logger.error("session analysis persist error:", e);
     }
 
-    return NextResponse.json({
-      ...analysisResult,
-      themes: Array.isArray(parsed.themes) ? parsed.themes : [],
-      totalQuestions: questions.length,
-      totalComments,
-      totalLikes,
-    });
+    return NextResponse.json(stored);
   } catch (error) {
     if (error instanceof AiKeyMissingError) {
       return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
