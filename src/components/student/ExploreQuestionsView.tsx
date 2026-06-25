@@ -174,15 +174,6 @@ function QuestionCard({
             <span className={`text-xs px-2 py-1 rounded break-keep text-center ${COGNITIVE_STYLE[q.cognitive]}`}>
               {COGNITIVE_LABEL[q.cognitive]}
             </span>
-            {likesEnabled && q.likesVisibleToPeers !== false && (
-              <LikeButton
-                questionId={q.id}
-                authorId={q.author.id}
-                likeCount={q.likeCount}
-                myLike={q.myLike}
-                onLikeChange={onLikeChange}
-              />
-            )}
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
@@ -201,18 +192,32 @@ function QuestionCard({
             )}
             <div className="text-xs text-muted-foreground mt-0.5">{formatDateTime(q.createdAt)}</div>
           </div>
-          {commentsEnabled && (
-            <button
-              onClick={() => setShowComments((v) => !v)}
-              className={`flex items-center gap-1 text-xs font-medium transition-colors ${
-                isTeacherShared && !showComments
-                  ? "rounded-full bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700"
-                  : "text-indigo-600 hover:text-indigo-800"
-              }`}
-            >
-              <span>💬 {commentCount}</span>
-              <span>{showComments ? t("close") : isTeacherShared ? t("answer") : t("comment")}</span>
-            </button>
+          {(commentsEnabled || (likesEnabled && q.likesVisibleToPeers !== false)) && (
+            <div className="flex items-center gap-2">
+              {/* 좋아요를 댓글 왼쪽에 함께 배치 */}
+              {likesEnabled && q.likesVisibleToPeers !== false && (
+                <LikeButton
+                  questionId={q.id}
+                  authorId={q.author.id}
+                  likeCount={q.likeCount}
+                  myLike={q.myLike}
+                  onLikeChange={onLikeChange}
+                />
+              )}
+              {commentsEnabled && (
+                <button
+                  onClick={() => setShowComments((v) => !v)}
+                  className={`flex items-center gap-1 text-xs font-medium transition-colors ${
+                    isTeacherShared && !showComments
+                      ? "rounded-full bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700"
+                      : "text-indigo-600 hover:text-indigo-800"
+                  }`}
+                >
+                  <span>💬 {commentCount}</span>
+                  <span>{showComments ? t("close") : isTeacherShared ? t("answer") : t("comment")}</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
