@@ -7,21 +7,21 @@ import {
 } from "@/lib/classify";
 
 describe("fallbackClassification", () => {
-  it("폐쇄형 키워드가 있으면 closed를 반환한다", () => {
+  it("닫힌 질문 키워드가 있으면 closed를 반환한다", () => {
     const result = fallbackClassification("광합성이 무엇인지 설명해주세요");
     expect(result.closure).toBe("closed");
     expect(result.closureScore).toBeGreaterThan(0.5);
   });
 
-  it("개방형 키워드가 있으면 open을 반환한다", () => {
+  it("열린 질문 키워드가 있으면 open을 반환한다", () => {
     const result = fallbackClassification("왜 식물은 광합성을 하나요");
     expect(result.closure).toBe("open");
     expect(result.closureScore).toBeLessThan(0.5);
   });
 
-  it("폐쇄형과 개방형 키워드가 모두 있으면 더 많은 키워드 쪽으로 결정한다", () => {
+  it("닫힌 질문과 열린 질문 키워드가 모두 있으면 더 많은 키워드 쪽으로 결정한다", () => {
     const result = fallbackClassification("무엇이 왜 어디서 어떻게 일어났나요");
-    // 폐쇄형 2개(무엇, 어디), 개방형 2개(왜, 어떻게) → 동률이면 open
+    // 닫힌 질문 2개(무엇, 어디), 열린 질문 2개(왜, 어떻게) → 동률이면 open
     expect(result.closure).toBeDefined();
     // closureScore와 closure가 일치해야 함
     if (result.closure === "closed") {
@@ -68,7 +68,7 @@ describe("fallbackClassification", () => {
     expect(result.feedback!.length).toBeGreaterThan(0);
   });
 
-  it("닫힌+사실적 질문이면 개방형으로 바꾸길 권장하는 피드백을 반환한다", () => {
+  it("닫힌+사실적 질문이면 열린 질문으로 바꾸길 권장하는 피드백을 반환한다", () => {
     const result = fallbackClassification("광합성이 무엇인지 설명해주세요");
     expect(result.closure).toBe("closed");
     expect(result.cognitive).toBe("factual");

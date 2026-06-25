@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
 
 describe("summarizeQuestionTypes", () => {
-  it("폐쇄/개방, 사실/개념/논쟁 개수를 집계한다", () => {
+  it("닫힌/열린, 사실/개념/논쟁 개수를 집계한다", () => {
     const r = summarizeQuestionTypes([
       { closure: "closed", cognitive: "factual" },
       { closure: "open", cognitive: "conceptual" },
