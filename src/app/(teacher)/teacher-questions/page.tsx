@@ -149,6 +149,7 @@ export default function QuestionsPage() {
   const [showParticipation, setShowParticipation] = useState(false);
 
   const [showSequence, setShowSequence] = useState(false);
+  const [showDeployed, setShowDeployed] = useState(false);
   // 배포한 탐구설계 목록에서 "수정"을 누른 세션(인라인 패널 열림)
   const [editDeploySessionId, setEditDeploySessionId] = useState<string | null>(null);
   const [deletingDeployId, setDeletingDeployId] = useState<string | null>(null);
@@ -918,10 +919,10 @@ export default function QuestionsPage() {
                     <tr>
                       <th className="text-left px-3 py-2 font-medium text-muted-foreground w-24">{t("colGradeClassNo")}</th>
                       <th className="text-left px-3 py-2 font-medium text-muted-foreground">{t("colStudent")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">{t("colWroteQuestion")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">{t("colWroteComment")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-20 break-keep">{t("colLikes")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-14">{t("colSubmit")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-20 whitespace-nowrap">{t("colWroteQuestion")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-20 whitespace-nowrap">{t("colWroteComment")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-20 whitespace-nowrap">{t("colLikes")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16 whitespace-nowrap">{t("colSubmit")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -1233,12 +1234,18 @@ export default function QuestionsPage() {
         if (deployed.length === 0) return null;
         return (
           <div className="rounded-xl border bg-card p-4">
-            <div className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground">
+            <button
+              type="button"
+              onClick={() => setShowDeployed((v) => !v)}
+              className="flex w-full items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground hover:text-primary transition-colors"
+            >
               <span>📋</span>
               {t("deployedTitle")}
               <span className="text-xs font-normal text-muted-foreground">{t("listCountSuffix", { count: deployed.length })}</span>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
+              <span className="ml-auto text-sm text-muted-foreground">{showDeployed ? "▾" : "▸"}</span>
+            </button>
+            {showDeployed && (<>
+            <p className="mt-3 text-sm text-muted-foreground">
               {t("deployedDesc")}
             </p>
             <div className="mt-3 space-y-2">
@@ -1321,6 +1328,7 @@ export default function QuestionsPage() {
                 );
               })}
             </div>
+            </>)}
           </div>
         );
       })()}
