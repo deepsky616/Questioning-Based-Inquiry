@@ -1010,7 +1010,9 @@
     "docAllRank": "전체 석차",
     "docClassOrderSchool": "교내 반 순위",
     "docClassOrderAll": "전체 반 순위",
-    "rankOf": "{rank}/총{total}",
+    "rankValue": "{rank}위",
+    "unitStudents": "{count}명",
+    "unitClasses": "{count}개 반",
     "docColPoints": "포인트",
     "docColRank": "석차"
   },

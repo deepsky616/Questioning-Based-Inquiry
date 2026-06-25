@@ -1010,7 +1010,9 @@
     "docAllRank": "Overall rank",
     "docClassOrderSchool": "Class ranking (school)",
     "docClassOrderAll": "Class ranking (all)",
-    "rankOf": "{rank}/{total}",
+    "rankValue": "#{rank}",
+    "unitStudents": "{count} students",
+    "unitClasses": "{count} classes",
     "docColPoints": "Points",
     "docColRank": "Rank"
   },

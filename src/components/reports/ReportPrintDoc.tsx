@@ -61,8 +61,17 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     it.sessions.filter((s) => s.analysis && blocksOf(s.analysis).some(([, v]) => v && v.trim()));
   const trendOf = (it: PrintReportItem): SeriesPoint[] => (it.monthly && it.monthly.length ? it.monthly : it.weekly ?? []);
   const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
-  // 순위 표시: "3/총4"처럼 전체 인원/반수를 함께. 총수가 없으면 순위만.
-  const rankOf = (rank: number, total?: number) => (total ? t("rankOf", { rank, total }) : String(rank));
+  // 순위 KPI 셀: 값은 '3위'처럼 크게, 전체 수는 라벨에 단위와 함께('우리반 석차 · 4명')
+  const rankCell = (rank: number | undefined, total: number | undefined, label: string, unit: "students" | "classes") => {
+    if (rank == null) return null;
+    const totalText = total != null ? ` · ${t(unit === "students" ? "unitStudents" : "unitClasses", { count: total })}` : "";
+    return (
+      <div className="rdoc-kpi">
+        <div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{t("rankValue", { rank })}</div>
+        <div className="rdoc-kpi-l">{label}{totalText}</div>
+      </div>
+    );
+  };
   const showRoster = items.length > 1;
 
   // 학교 · 학년 · 반 · 번호를 모두 표시(이름은 제목에 별도 표시)
@@ -146,21 +155,11 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
                   {it.ranking.avgPoints != null && (
                     <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#d97706" }}>{it.ranking.avgPoints}</div><div className="rdoc-kpi-l">{t("docAvgPoints")}</div></div>
                   )}
-                  {it.ranking.classRank != null && (
-                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.classRank, it.ranking.classTotal)}</div><div className="rdoc-kpi-l">{t("docClassRank")}</div></div>
-                  )}
-                  {it.ranking.schoolRank != null && (
-                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.schoolRank, it.ranking.schoolTotal)}</div><div className="rdoc-kpi-l">{t("docSchoolRank")}</div></div>
-                  )}
-                  {it.ranking.allRank != null && (
-                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.allRank, it.ranking.allTotal)}</div><div className="rdoc-kpi-l">{t("docAllRank")}</div></div>
-                  )}
-                  {it.ranking.classOrderSchool != null && (
-                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.classOrderSchool, it.ranking.classOrderSchoolTotal)}</div><div className="rdoc-kpi-l">{t("docClassOrderSchool")}</div></div>
-                  )}
-                  {it.ranking.classOrderAll != null && (
-                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.classOrderAll, it.ranking.classOrderAllTotal)}</div><div className="rdoc-kpi-l">{t("docClassOrderAll")}</div></div>
-                  )}
+                  {rankCell(it.ranking.classRank, it.ranking.classTotal, t("docClassRank"), "students")}
+                  {rankCell(it.ranking.schoolRank, it.ranking.schoolTotal, t("docSchoolRank"), "students")}
+                  {rankCell(it.ranking.allRank, it.ranking.allTotal, t("docAllRank"), "students")}
+                  {rankCell(it.ranking.classOrderSchool, it.ranking.classOrderSchoolTotal, t("docClassOrderSchool"), "classes")}
+                  {rankCell(it.ranking.classOrderAll, it.ranking.classOrderAllTotal, t("docClassOrderAll"), "classes")}
                 </div>
               </>
             )}
