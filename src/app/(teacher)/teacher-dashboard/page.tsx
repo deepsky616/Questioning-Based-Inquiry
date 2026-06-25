@@ -312,11 +312,11 @@ function TeacherDashboard() {
                     <TableRow>
                       <TableHead>{t("colStudent")}</TableHead>
                       <TableHead className="text-center w-12">{t("colTotal")}</TableHead>
-                      <TableHead className="text-center w-16 text-blue-600">{tCls("closed.label")}</TableHead>
-                      <TableHead className="text-center w-16 text-green-600">{tCls("open.label")}</TableHead>
-                      <TableHead className="text-center w-16 text-muted-foreground">{tCls("factual.label")}</TableHead>
-                      <TableHead className="text-center w-16 text-purple-600">{tCls("conceptual.label")}</TableHead>
-                      <TableHead className="text-center w-16 text-orange-600">{tCls("controversial.label")}</TableHead>
+                      <TableHead className="text-center whitespace-nowrap px-3 text-blue-600">{tCls("closed.label")}</TableHead>
+                      <TableHead className="text-center whitespace-nowrap px-3 text-green-600">{tCls("open.label")}</TableHead>
+                      <TableHead className="text-center whitespace-nowrap px-3 text-muted-foreground">{tCls("factual.label")}</TableHead>
+                      <TableHead className="text-center whitespace-nowrap px-3 text-purple-600">{tCls("conceptual.label")}</TableHead>
+                      <TableHead className="text-center whitespace-nowrap px-3 text-orange-600">{tCls("controversial.label")}</TableHead>
                       <TableHead className="text-center w-28 whitespace-nowrap" title={t("colTrendTitle")}>
                         {t("colTrend")}
                       </TableHead>
