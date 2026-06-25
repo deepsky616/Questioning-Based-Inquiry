@@ -1007,7 +1007,10 @@
     "docAvgPoints": "Class avg points",
     "docClassRank": "Class rank",
     "docSchoolRank": "School rank",
-    "docClassOrder": "Class ranking (school)",
+    "docAllRank": "Overall rank",
+    "docClassOrderSchool": "Class ranking (school)",
+    "docClassOrderAll": "Class ranking (all)",
+    "rankOf": "{rank}/{total}",
     "docColPoints": "Points",
     "docColRank": "Rank"
   },

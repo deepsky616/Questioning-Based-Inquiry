@@ -16,11 +16,15 @@ export interface PrintReportItem {
   weekly?: SeriesPoint[];
   monthly?: SeriesPoint[];
   sessions: { id: string; date: string; subject: string; topic: string; analysis?: SessionAnalysisResult | null }[];
-  // 포인트·순위(있을 때만 표시). 학생: points/classRank/schoolRank, 학급: avgPoints/sumPoints/classOrder
+  // 포인트·순위(있을 때만 표시). 학생: 포인트 + 우리반/교내/전체 석차(각 총원), 학급: 평균 + 교내/전체 반 순위(각 총반수)
   ranking?: {
     points?: number;
-    classRank?: number; classRankTotal?: number; schoolRank?: number;
-    avgPoints?: number; sumPoints?: number; classOrder?: number; classOrderTotal?: number;
+    classRank?: number; classTotal?: number;
+    schoolRank?: number; schoolTotal?: number;
+    allRank?: number; allTotal?: number;
+    avgPoints?: number; sumPoints?: number;
+    classOrderSchool?: number; classOrderSchoolTotal?: number;
+    classOrderAll?: number; classOrderAllTotal?: number;
   };
 }
 
@@ -57,6 +61,8 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     it.sessions.filter((s) => s.analysis && blocksOf(s.analysis).some(([, v]) => v && v.trim()));
   const trendOf = (it: PrintReportItem): SeriesPoint[] => (it.monthly && it.monthly.length ? it.monthly : it.weekly ?? []);
   const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
+  // 순위 표시: "3/총4"처럼 전체 인원/반수를 함께. 총수가 없으면 순위만.
+  const rankOf = (rank: number, total?: number) => (total ? t("rankOf", { rank, total }) : String(rank));
   const showRoster = items.length > 1;
 
   // 학교 · 학년 · 반 · 번호를 모두 표시(이름은 제목에 별도 표시)
@@ -141,13 +147,19 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
                     <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#d97706" }}>{it.ranking.avgPoints}</div><div className="rdoc-kpi-l">{t("docAvgPoints")}</div></div>
                   )}
                   {it.ranking.classRank != null && (
-                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{it.ranking.classRank}{it.ranking.classRankTotal ? ` / ${it.ranking.classRankTotal}` : ""}</div><div className="rdoc-kpi-l">{t("docClassRank")}</div></div>
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.classRank, it.ranking.classTotal)}</div><div className="rdoc-kpi-l">{t("docClassRank")}</div></div>
                   )}
                   {it.ranking.schoolRank != null && (
-                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{it.ranking.schoolRank}</div><div className="rdoc-kpi-l">{t("docSchoolRank")}</div></div>
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.schoolRank, it.ranking.schoolTotal)}</div><div className="rdoc-kpi-l">{t("docSchoolRank")}</div></div>
                   )}
-                  {it.ranking.classOrder != null && (
-                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{it.ranking.classOrder}{it.ranking.classOrderTotal ? ` / ${it.ranking.classOrderTotal}` : ""}</div><div className="rdoc-kpi-l">{t("docClassOrder")}</div></div>
+                  {it.ranking.allRank != null && (
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.allRank, it.ranking.allTotal)}</div><div className="rdoc-kpi-l">{t("docAllRank")}</div></div>
+                  )}
+                  {it.ranking.classOrderSchool != null && (
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.classOrderSchool, it.ranking.classOrderSchoolTotal)}</div><div className="rdoc-kpi-l">{t("docClassOrderSchool")}</div></div>
+                  )}
+                  {it.ranking.classOrderAll != null && (
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{rankOf(it.ranking.classOrderAll, it.ranking.classOrderAllTotal)}</div><div className="rdoc-kpi-l">{t("docClassOrderAll")}</div></div>
                   )}
                 </div>
               </>

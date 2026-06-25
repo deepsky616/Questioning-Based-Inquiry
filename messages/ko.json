@@ -1007,7 +1007,10 @@
     "docAvgPoints": "반 평균 포인트",
     "docClassRank": "우리반 석차",
     "docSchoolRank": "교내 석차",
-    "docClassOrder": "반 순위(교내)",
+    "docAllRank": "전체 석차",
+    "docClassOrderSchool": "교내 반 순위",
+    "docClassOrderAll": "전체 반 순위",
+    "rankOf": "{rank}/총{total}",
     "docColPoints": "포인트",
     "docColRank": "석차"
   },

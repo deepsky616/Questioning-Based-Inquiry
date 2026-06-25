@@ -110,26 +110,37 @@ export function TeacherReportsView() {
     setPrintItems(items);
     setPrintTick((n) => n + 1);
   };
-  // 포인트·순위: class-ranks(반 전원 포인트+석차) + class-leaderboard(반 순위) 한 번에
-  interface RankRow { id: string; totalPoints: number; classRank: number; schoolRank: number }
+  // 포인트·순위: class-ranks(반 전원 포인트+우리반/교내/전체 석차) + class-leaderboard(교내·전체 반 순위)
+  interface RankRow { id: string; totalPoints: number; classRank: number; schoolRank: number; allRank: number }
   const fetchRanking = async (grade: string, className: string) => {
-    const [rk, lb] = await Promise.all([
-      fetch(`/api/points/class-ranks?grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      fetch(`/api/points/class-leaderboard?scope=school&grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    const q = `grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}`;
+    const [rk, lbSchool, lbAll] = await Promise.all([
+      fetch(`/api/points/class-ranks?${q}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(`/api/points/class-leaderboard?scope=school&${q}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(`/api/points/class-leaderboard?scope=all&${q}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
     const students: RankRow[] = rk?.students ?? [];
     return {
       byId: new Map(students.map((s) => [s.id, s])),
       total: rk?.total ?? students.length,
+      schoolTotal: rk?.schoolTotal as number | undefined,
+      allTotal: rk?.allTotal as number | undefined,
       sumPoints: students.reduce((a, s) => a + (s.totalPoints || 0), 0),
-      avgPoints: lb?.myClass?.avgPoints as number | undefined,
-      classOrder: lb?.myClass?.rank as number | undefined,
-      classOrderTotal: lb?.total as number | undefined,
+      avgPoints: lbSchool?.myClass?.avgPoints as number | undefined,
+      classOrderSchool: lbSchool?.myClass?.rank as number | undefined,
+      classOrderSchoolTotal: lbSchool?.total as number | undefined,
+      classOrderAll: lbAll?.myClass?.rank as number | undefined,
+      classOrderAllTotal: lbAll?.total as number | undefined,
     };
   };
   const studentRanking = (rk: Awaited<ReturnType<typeof fetchRanking>>, id: string): PrintReportItem["ranking"] => {
     const s = rk.byId.get(id);
-    return s ? { points: s.totalPoints, classRank: s.classRank, classRankTotal: rk.total, schoolRank: s.schoolRank } : undefined;
+    return s ? {
+      points: s.totalPoints,
+      classRank: s.classRank, classTotal: rk.total,
+      schoolRank: s.schoolRank, schoolTotal: rk.schoolTotal,
+      allRank: s.allRank, allTotal: rk.allTotal,
+    } : undefined;
   };
 
   // 학급 전체 출력: 학급 집계(전체 학생 종합) 리포트 1부 — 세션 전체(scope=class) 분석 + 반 포인트·순위
@@ -147,7 +158,11 @@ export function TeacherReportsView() {
         weekly: report.weekly,
         monthly: report.monthly,
         sessions: (report.sessions as PrintReportItem["sessions"]) ?? [],
-        ranking: { avgPoints: rk.avgPoints, sumPoints: rk.sumPoints, points: rk.sumPoints, classOrder: rk.classOrder, classOrderTotal: rk.classOrderTotal },
+        ranking: {
+          avgPoints: rk.avgPoints, points: rk.sumPoints,
+          classOrderSchool: rk.classOrderSchool, classOrderSchoolTotal: rk.classOrderSchoolTotal,
+          classOrderAll: rk.classOrderAll, classOrderAllTotal: rk.classOrderAllTotal,
+        },
       }]);
     } finally {
       setPrintBusy(false);

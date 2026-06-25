@@ -66,5 +66,7 @@ export async function GET(req: NextRequest) {
     klass: { school, grade, className },
     students,
     total: students.length,
+    schoolTotal: schoolRows.length,
+    allTotal: allRows.length,
   });
 }
