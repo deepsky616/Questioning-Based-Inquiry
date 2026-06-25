@@ -157,10 +157,10 @@ export function MyQuestionsView() {
             <TableHead className="w-20 break-keep text-center">{t("colClosure")}</TableHead>
             <TableHead className="w-24 break-keep text-center">{t("colCognitive")}</TableHead>
             <TableHead className="w-24">{t("colPublic")}</TableHead>
-            <TableHead className="w-32">{t("colSession")}</TableHead>
-            <TableHead className="w-36">{t("colCreated")}</TableHead>
-            <TableHead className="w-20 break-keep">{t("colLikes")}</TableHead>
-            <TableHead className="w-24">{t("colComments")}</TableHead>
+            <TableHead className="w-32 text-center">{t("colSession")}</TableHead>
+            <TableHead className="w-36 text-center">{t("colCreated")}</TableHead>
+            <TableHead className="w-20 break-keep text-center">{t("colLikes")}</TableHead>
+            <TableHead className="w-24 text-center">{t("colComments")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -191,16 +191,16 @@ export function MyQuestionsView() {
                       {q.isPublic ? t("public") : t("private")}
                     </span>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate">
+                  <TableCell className="text-center text-xs text-muted-foreground max-w-xs truncate">
                     {q.session ? buildSessionLabel(q.session.date, q.session.subject, q.session.topic) : "—"}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                  <TableCell className="text-center text-xs text-muted-foreground whitespace-nowrap">
                     {formatDateTime(q.createdAt)}
                   </TableCell>
-                  <TableCell className="text-sm text-rose-500">
+                  <TableCell className="text-center text-sm text-rose-500">
                     ♥ {q.likeCount ?? 0}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
                     <Button
                       type="button"
                       variant="outline"
