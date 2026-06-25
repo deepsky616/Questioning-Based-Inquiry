@@ -175,10 +175,19 @@ export function MyQuestionsView() {
                       <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
                       <span className={`text-xs px-2 py-0.5 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{q.isPublic ? t("public") : t("private")}</span>
                     </div>
-                    {/* 수업세션 · 작성일시 (작은 회색) */}
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {q.session ? buildSessionLabel(q.session.date, q.session.subject, q.session.topic) : "—"} · {formatDateTime(q.createdAt)}
-                    </p>
+                    {/* 수업세션(📚 칩) · 작성일시(🕒) — 한눈에 구분 */}
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      {q.session && (
+                        <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
+                          <span>📚</span>
+                          <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1">
+                        <span>🕒</span>
+                        <span>{formatDateTime(q.createdAt)}</span>
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="text-center align-top">
                     {/* 받은 좋아요(읽기 전용) — 탐구 탭과 같은 알약 모양 */}
