@@ -233,10 +233,7 @@ export function MyQuestionsView() {
 
       {/* 조회 방법: 날짜·교과·주제로 좁혀 세션 선택 (교사 페이지와 동일) */}
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">{tEx("filterHeader")}</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 w-36">
               <label className="text-xs font-medium text-muted-foreground">{tEx("date")}</label>
