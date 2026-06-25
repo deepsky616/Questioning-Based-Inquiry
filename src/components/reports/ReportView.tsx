@@ -554,26 +554,47 @@ export function ReportView({
                       <span className="truncate text-sm font-medium text-foreground">{label}</span>
                       <span className="shrink-0 text-xs font-semibold text-emerald-600">{open[s.id] ? "▾" : "▸"}</span>
                     </button>
-                    {canAnalyze && onSaveAnalysis && r && editing !== s.id && !busy[s.id] && (
-                      <button
-                        onClick={() => startEdit(s.id)}
-                        className="no-print shrink-0 rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50"
-                      >
-                        {t("editAnalysis")}
-                      </button>
-                    )}
-                    {canAnalyze && (
-                      <button
-                        onClick={() => runAnalysis(s.id)}
-                        disabled={busy[s.id]}
-                        className={`no-print shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-60 ${
-                          r
-                            ? "border-border text-muted-foreground hover:bg-muted"
-                            : "border-indigo-300 text-indigo-600 hover:bg-indigo-50"
-                        }`}
-                      >
-                        {busy[s.id] ? t("analyzing") : r ? t("reanalyze") : t("analyzeSessionBtn")}
-                      </button>
+                    {editing === s.id ? (
+                      <>
+                        <button
+                          onClick={() => saveEdit(s.id)}
+                          disabled={savingEdit}
+                          className="no-print shrink-0 rounded-md border border-indigo-500 bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-60"
+                        >
+                          {t("editSave")}
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          disabled={savingEdit}
+                          className="no-print shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-60"
+                        >
+                          {t("editCancel")}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {canAnalyze && onSaveAnalysis && r && !busy[s.id] && (
+                          <button
+                            onClick={() => startEdit(s.id)}
+                            className="no-print shrink-0 rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50"
+                          >
+                            {t("editAnalysis")}
+                          </button>
+                        )}
+                        {canAnalyze && (
+                          <button
+                            onClick={() => runAnalysis(s.id)}
+                            disabled={busy[s.id]}
+                            className={`no-print shrink-0 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-60 ${
+                              r
+                                ? "border-border text-muted-foreground hover:bg-muted"
+                                : "border-indigo-300 text-indigo-600 hover:bg-indigo-50"
+                            }`}
+                          >
+                            {busy[s.id] ? t("analyzing") : r ? t("reanalyze") : t("analyzeSessionBtn")}
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                   {open[s.id] && (
@@ -595,10 +616,6 @@ export function ReportView({
                               />
                             </div>
                           ))}
-                          <div className="no-print flex items-center gap-2 pt-1">
-                            <Button size="sm" onClick={() => saveEdit(s.id)} disabled={savingEdit} className="h-7">{t("editSave")}</Button>
-                            <button onClick={cancelEdit} disabled={savingEdit} className="text-xs font-medium text-muted-foreground hover:text-foreground">{t("editCancel")}</button>
-                          </div>
                         </div>
                       ) : r ? (
                         <div className="space-y-2">
