@@ -55,6 +55,10 @@ export interface ReportViewProps {
   canAnalyze?: boolean;
   /** 학급 보기에서 '전체 학생 일괄 분석'을 위한 콜백. cursor로 나눠 호출하고 진행 상태를 돌려준다. */
   bulkAnalyze?: (sessionIds: string[], cursor: number) => Promise<{ total: number; nextCursor: number; done: boolean; analyzedThisCall: number; error?: string }>;
+  /** ReportView 자체 인쇄 버튼 노출 여부(교사 페이지는 별도 출력 버튼을 쓰므로 숨김). 기본 true. */
+  showPrintButton?: boolean;
+  /** 교사가 수정한 분석 결과를 저장하는 콜백. 주어지면 분석 블록에 '수정'이 나타난다. */
+  onSaveAnalysis?: (sessionId: string, result: SessionAnalysisResult) => Promise<void>;
   // 추세 차트 부제(관점에 따라 다르게). 기본은 학생 본인 관점.
   participationLabel?: string;
   receptionLabel?: string;
@@ -112,7 +116,7 @@ function sessionPeriod(dateStr: string, mode: ReportRange, locale: string, other
 
 export function ReportView({
   scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
-  participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze,
+  participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze, showPrintButton = true, onSaveAnalysis,
 }: ReportViewProps) {
   const [range, setRange] = useState<ReportRange>("week");
   const series = range === "week" ? weekly : monthly;
@@ -160,6 +164,44 @@ export function ReportView({
   // 전체 학생 일괄 분석(학급 보기)
   const [bulk, setBulk] = useState<{ running: boolean; processed: number; total: number; analyzed: number; note?: string }>({ running: false, processed: 0, total: 0, analyzed: 0 });
   const bulkStop = useRef(false);
+  // 교사 분석 수정
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<SessionAnalysisResult>({});
+  const [savingEdit, setSavingEdit] = useState(false);
+  const editFields: { key: keyof SessionAnalysisResult; label: string }[] = scope === "class"
+    ? [
+        { key: "summary", label: t("secSummary") },
+        { key: "balanceInsights", label: t("secBalance") },
+        { key: "bestQuestion", label: t("secBest") },
+        { key: "engagementInsights", label: t("secEngagement") },
+        { key: "commentInsights", label: t("secComment") },
+        { key: "relevanceInsights", label: t("secRelevance") },
+        { key: "nextQuestions", label: t("secNext") },
+        { key: "insights", label: t("secSuggest") },
+      ]
+    : [
+        { key: "summary", label: t("secSummary") },
+        { key: "growthInsights", label: t("secGrowth") },
+        { key: "rewriteExample", label: t("secRewrite") },
+        { key: "relevanceInsights", label: t("secRelevance") },
+        { key: "insights", label: t("secSuggest") },
+      ];
+  const startEdit = (id: string) => { setEditing(id); setEditDraft({ ...res[id] }); };
+  const cancelEdit = () => { setEditing(null); setEditDraft({}); };
+  const saveEdit = async (id: string) => {
+    if (!onSaveAnalysis) return;
+    setSavingEdit(true);
+    try {
+      await onSaveAnalysis(id, editDraft);
+      setRes((p) => ({ ...p, [id]: editDraft }));
+      queryClient.setQueryData(analysisKey(id), editDraft);
+      setEditing(null); setEditDraft({});
+    } catch (e) {
+      setErrs((x) => ({ ...x, [id]: e instanceof Error ? e.message : t("analysisFailed") }));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   // 기간 목록(세션이 있는 주/월) — 최신순
   const periods = useMemo(() => {
@@ -290,7 +332,9 @@ export function ReportView({
               className={`px-3 py-1.5 text-xs font-medium border-l ${range === "month" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
             >{t("month")}</button>
           </div>
-          <Button size="sm" onClick={() => window.print()} className="font-semibold">{t("print")}</Button>
+          {showPrintButton && (
+            <Button size="sm" onClick={() => window.print()} className="font-semibold">{t("print")}</Button>
+          )}
         </div>
       </div>
 
@@ -530,6 +574,24 @@ export function ReportView({
                         <p className="text-muted-foreground">{t("analyzingNow")}</p>
                       ) : errs[s.id] ? (
                         <p className="text-red-600">{errs[s.id]}</p>
+                      ) : editing === s.id ? (
+                        <div className="space-y-2">
+                          {editFields.map(({ key, label }) => (
+                            <div key={key}>
+                              <label className="text-xs font-semibold text-foreground">{label}</label>
+                              <textarea
+                                value={editDraft[key] ?? ""}
+                                onChange={(e) => setEditDraft((d) => ({ ...d, [key]: e.target.value }))}
+                                rows={2}
+                                className="mt-0.5 w-full rounded-md border bg-background px-2 py-1 text-sm leading-6 text-foreground"
+                              />
+                            </div>
+                          ))}
+                          <div className="no-print flex items-center gap-2 pt-1">
+                            <Button size="sm" onClick={() => saveEdit(s.id)} disabled={savingEdit} className="h-7">{t("editSave")}</Button>
+                            <button onClick={cancelEdit} disabled={savingEdit} className="text-xs font-medium text-muted-foreground hover:text-foreground">{t("editCancel")}</button>
+                          </div>
+                        </div>
                       ) : r ? (
                         <div className="space-y-2">
                           {blocks.filter(([, v]) => v).map(([h, v]) => (
@@ -538,6 +600,11 @@ export function ReportView({
                               <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{v}</p>
                             </div>
                           ))}
+                          {canAnalyze && onSaveAnalysis && (
+                            <button onClick={() => startEdit(s.id)} className="no-print text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                              {t("editAnalysis")}
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <p className="text-muted-foreground">{canAnalyze ? t("notAnalyzedYet") : t("notAnalyzedYetReadonly")}</p>

@@ -26,6 +26,22 @@ async function analyzeClassSession(sessionId: string, failMsg: string): Promise<
     balanceInsights: d.balanceInsights, bestQuestion: d.bestQuestion, nextQuestions: d.nextQuestions,
   };
 }
+// 교사가 수정한 분석 결과 저장(학급/학생 공용)
+async function saveSessionAnalysis(
+  payload: { sessionId: string; scope: "class" | "student"; studentId?: string; result: SessionAnalysisResult },
+  failMsg: string,
+): Promise<void> {
+  const res = await fetch("/api/reports/session-analysis", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.error || failMsg);
+  }
+}
+
 // 전체 학생 일괄 분석: 현재 기간의 세션들 × 반 전체 학생을 cursor로 나눠 호출
 function bulkAnalyzeClass(grade: string, className: string, failMsg: string) {
   return async (sessionIds: string[], cursor: number) => {
@@ -152,6 +168,20 @@ export function TeacherReportsView() {
                 ))}
               </select>
             )}
+
+            {/* 출력(인쇄) — 학생 개별 / 전체 학생 */}
+            <div className="ml-auto flex items-center gap-2">
+              {view === "student" && studentId && (
+                <button
+                  onClick={() => window.open(`/teacher-reports/print?studentId=${encodeURIComponent(studentId)}`, "_blank")}
+                  className="rounded-md border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+                >{t("printIndividual")}</button>
+              )}
+              <button
+                onClick={() => window.open(`/teacher-reports/print?grade=${encodeURIComponent(report.klass.grade)}&className=${encodeURIComponent(report.klass.className)}`, "_blank")}
+                className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+              >{t("printAll")}</button>
+            </div>
           </div>
         )}
       </div>
@@ -174,6 +204,8 @@ export function TeacherReportsView() {
           analyzeSession={(id) => analyzeClassSession(id, t("analysisFailed"))}
           analysisCacheKey={`class:${selected}`}
           bulkAnalyze={bulkAnalyzeClass(report.klass.grade, report.klass.className, t("analysisFailed"))}
+          onSaveAnalysis={(id, result) => saveSessionAnalysis({ sessionId: id, scope: "class", result }, t("analysisFailed"))}
+          showPrintButton={false}
           participationLabel={t("participationClass")}
           receptionLabel={t("receptionClass")}
         />
@@ -192,6 +224,8 @@ export function TeacherReportsView() {
           sessions={studentReport.sessions}
           analyzeSession={analyzeStudentSessionFor(studentId, t("analysisFailed"))}
           analysisCacheKey={`teacher-student:${studentId}`}
+          onSaveAnalysis={(id, result) => saveSessionAnalysis({ sessionId: id, scope: "student", studentId, result }, t("analysisFailed"))}
+          showPrintButton={false}
           participationLabel={t("participationStudent")}
           receptionLabel={t("receptionStudent")}
         />

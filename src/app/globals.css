@@ -358,6 +358,27 @@
   }
 }
 
+/* ── 인쇄 전용 리포트 문서(압축 양식·라이트 강제) ── */
+.report-doc { color: #111; }
+.report-doc-head { border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 10px; }
+.report-doc-head h1 { font-size: 18px; font-weight: 800; color: #111; }
+.report-doc-meta { font-size: 12px; color: #333; margin-top: 2px; }
+.report-doc-h2 { font-size: 13px; font-weight: 700; color: #111; margin: 12px 0 4px; }
+.report-doc-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+.report-doc-table th, .report-doc-table td { border: 1px solid #ccc; padding: 4px 6px; text-align: center; font-size: 12px; color: #111; }
+.report-doc-table th { background: #f3f4f6; font-weight: 600; }
+.report-doc-session { border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; break-inside: avoid; page-break-inside: avoid; }
+.report-doc-session h3 { font-size: 12.5px; font-weight: 700; color: #111; margin-bottom: 4px; }
+.report-doc-block { margin-bottom: 5px; }
+.report-doc-block-h { font-size: 11.5px; font-weight: 600; color: #111; }
+.report-doc-block-b { font-size: 12px; white-space: pre-wrap; line-height: 1.55; color: #222; }
+.report-doc-empty { font-size: 12px; color: #666; }
+.report-doc-break { break-after: page; page-break-after: always; }
+@media print {
+  .report-doc { font-size: 12px; }
+  @page { margin: 14mm; }
+}
+
 /* 가로 스크롤 네비 등에서 스크롤바 숨김(스크롤은 가능) */
 .no-scrollbar {
   -ms-overflow-style: none;
