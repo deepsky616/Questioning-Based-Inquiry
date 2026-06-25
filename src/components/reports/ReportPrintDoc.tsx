@@ -16,21 +16,21 @@ export interface PrintReportItem {
   sessions: { id: string; date: string; subject: string; topic: string; analysis?: SessionAnalysisResult | null }[];
 }
 
-// 인쇄 전용 리포트 문서: 머리글 + 수치 표 + 질문 분류 표 + 모든 세션 AI 분석.
-// 차트 없이 압축 양식, 라이트 강제, 학생마다 새 페이지. 화면에선 .print-only로 숨김.
+// 인쇄 전용 리포트 문서: 레터헤드 + KPI 카드 + 질문 분류 막대 + 세션별 AI 분석.
+// 차트(recharts) 대신 CSS 막대를 써 인쇄 안정성을 확보하고, 라이트 색을 강제한다.
 export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
   const t = useTranslations("report");
   const tCls = useTranslations("classification");
   const locale = useLocale();
   const today = new Date().toLocaleDateString(locale);
 
-  const metrics = (totals: ReportTotals) => [
-    [t("metric_questions"), totals.questions],
-    [t("metric_likesGiven"), totals.likesGiven],
-    [t("metric_comments"), totals.comments],
-    [t("metric_likesReceived"), totals.likesReceived],
-    [t("metric_commentsReceived"), totals.commentsReceived],
-  ] as const;
+  const kpis = (totals: ReportTotals) => [
+    { label: t("metric_questions"), v: totals.questions, color: "#6366f1" },
+    { label: t("metric_likesGiven"), v: totals.likesGiven, color: "#f43f5e" },
+    { label: t("metric_comments"), v: totals.comments, color: "#10b981" },
+    { label: t("metric_likesReceived"), v: totals.likesReceived, color: "#f59e0b" },
+    { label: t("metric_commentsReceived"), v: totals.commentsReceived, color: "#8b5cf6" },
+  ];
 
   const blocksOf = (a: SessionAnalysisResult): [string, string | undefined][] => [
     [t("secSummary"), a.summary],
@@ -45,6 +45,19 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     [t("secSuggest"), a.insights],
   ];
 
+  const bar = (label: string, value: number, groupTotal: number, color: string) => {
+    const pct = groupTotal > 0 ? Math.round((value / groupTotal) * 100) : 0;
+    return (
+      <div className="report-doc-bar-row" key={label}>
+        <span className="report-doc-bar-label">{label}</span>
+        <span className="report-doc-bar-track">
+          <span className="report-doc-bar-fill" style={{ width: `${pct}%`, background: color }} />
+        </span>
+        <span className="report-doc-bar-val">{value} ({pct}%)</span>
+      </div>
+    );
+  };
+
   return (
     <div className="report-doc">
       {items.map((it, idx) => {
@@ -53,43 +66,46 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
           it.className && t("classLabel", { className: it.className }),
           it.studentNumber && t("numberLabel", { n: it.studentNumber }),
         ].filter(Boolean).join(" ");
+        const cl = it.classification;
+        const closureTotal = cl.closure.closed + cl.closure.open;
+        const cogTotal = cl.cognitive.factual + cl.cognitive.conceptual + cl.cognitive.controversial;
         const analyzed = it.sessions.filter((s) => s.analysis && blocksOf(s.analysis).some(([, v]) => v && v.trim()));
         return (
           <section key={idx} className="report-doc-page">
-            {/* 머리글 */}
+            {/* 레터헤드 */}
             <header className="report-doc-head">
-              <h1>{t("docTitle")}</h1>
+              <div className="report-doc-head-row">
+                <h1>{t("docTitle")}</h1>
+                <span className="report-doc-date">{t("docGenerated", { date: today })}</span>
+              </div>
               <div className="report-doc-meta">
                 <strong>{it.name}</strong>
                 {sub && <span> · {sub}</span>}
                 {it.school && <span> · {it.school}</span>}
-                <span> · {t("docGenerated", { date: today })}</span>
               </div>
             </header>
 
-            {/* 활동 요약 수치 */}
+            {/* 활동 요약 KPI */}
             <h2 className="report-doc-h2">{t("docSummary")}</h2>
-            <table className="report-doc-table">
-              <tbody>
-                <tr>{metrics(it.totals).map(([label]) => <th key={label}>{label}</th>)}</tr>
-                <tr>{metrics(it.totals).map(([label, v]) => <td key={label}>{v}</td>)}</tr>
-              </tbody>
-            </table>
+            <div className="report-doc-kpis">
+              {kpis(it.totals).map((k) => (
+                <div className="report-doc-kpi" key={k.label}>
+                  <div className="report-doc-kpi-v" style={{ color: k.color }}>{k.v}</div>
+                  <div className="report-doc-kpi-l">{k.label}</div>
+                </div>
+              ))}
+            </div>
 
-            {/* 질문 분류 */}
+            {/* 질문 분류(막대) */}
             <h2 className="report-doc-h2">{t("docClassification")}</h2>
-            <table className="report-doc-table">
-              <tbody>
-                <tr>
-                  <th>{tCls("closed.label")}</th><th>{tCls("open.label")}</th>
-                  <th>{tCls("factual.label")}</th><th>{tCls("conceptual.label")}</th><th>{tCls("controversial.label")}</th>
-                </tr>
-                <tr>
-                  <td>{it.classification.closure.closed}</td><td>{it.classification.closure.open}</td>
-                  <td>{it.classification.cognitive.factual}</td><td>{it.classification.cognitive.conceptual}</td><td>{it.classification.cognitive.controversial}</td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="report-doc-bars">
+              {bar(tCls("closed.label"), cl.closure.closed, closureTotal, "#3b82f6")}
+              {bar(tCls("open.label"), cl.closure.open, closureTotal, "#10b981")}
+              <div className="report-doc-bar-sep" />
+              {bar(tCls("factual.label"), cl.cognitive.factual, cogTotal, "#94a3b8")}
+              {bar(tCls("conceptual.label"), cl.cognitive.conceptual, cogTotal, "#a855f7")}
+              {bar(tCls("controversial.label"), cl.cognitive.controversial, cogTotal, "#f97316")}
+            </div>
 
             {/* 세션별 AI 분석(모두 포함) */}
             <h2 className="report-doc-h2">{t("docSessions")}</h2>

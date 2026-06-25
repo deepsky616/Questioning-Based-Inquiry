@@ -979,9 +979,7 @@
     "docSummary": "Activity summary",
     "docClassification": "Question types",
     "docSessions": "AI analysis by session",
-    "docNoAnalysis": "No analyzed sessions.",
-    "docNoStudents": "No students to print.",
-    "docReadyHint": "Report ready for {count} student(s). The print dialog will open automatically."
+    "docNoAnalysis": "No analyzed sessions."
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

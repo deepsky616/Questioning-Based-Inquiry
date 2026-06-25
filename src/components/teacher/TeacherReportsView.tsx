@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ReportView, type PerStudentRow, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
+import { ReportPrintDoc, type PrintReportItem } from "@/components/reports/ReportPrintDoc";
 import { useTranslations } from "next-intl";
 
 interface ClassItem { grade: string; className: string; studentCount: number }
@@ -82,6 +83,50 @@ export function TeacherReportsView() {
   const [studentReport, setStudentReport] = useState<StudentReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 인쇄(현재 페이지에서 print-root만 출력) — 새 탭 없이
+  const [printItems, setPrintItems] = useState<PrintReportItem[]>([]);
+  const [printTick, setPrintTick] = useState(0);
+  const [printBusy, setPrintBusy] = useState(false);
+
+  useEffect(() => {
+    if (printTick === 0 || printItems.length === 0) return;
+    document.body.classList.add("print-doc-mode");
+    const cleanup = () => document.body.classList.remove("print-doc-mode");
+    window.addEventListener("afterprint", cleanup, { once: true });
+    const id = setTimeout(() => window.print(), 150);
+    return () => { clearTimeout(id); window.removeEventListener("afterprint", cleanup); };
+  }, [printTick, printItems]);
+
+  const toItem = (r: StudentReport): PrintReportItem => ({
+    name: r.student.name, grade: r.student.grade, className: r.student.className,
+    studentNumber: r.student.studentNumber,
+    totals: r.totals, classification: r.classification, sessions: (r.sessions as PrintReportItem["sessions"]) ?? [],
+  });
+  const doPrint = (items: PrintReportItem[]) => {
+    if (items.length === 0) return;
+    setPrintItems(items);
+    setPrintTick((n) => n + 1);
+  };
+  // 전체 학생 출력: 학급 전원 리포트를 모아서 인쇄
+  const printAllStudents = async () => {
+    if (!report || printBusy) return;
+    setPrintBusy(true);
+    try {
+      const ids = (report.perStudent ?? []).map((s) => s.id);
+      const results = await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/reports/student?studentId=${encodeURIComponent(id)}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null),
+        ),
+      );
+      const items = results.filter(Boolean).map((d) => toItem(d as StudentReport));
+      doPrint(items);
+    } finally {
+      setPrintBusy(false);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/reports/class")
@@ -169,18 +214,20 @@ export function TeacherReportsView() {
               </select>
             )}
 
-            {/* 출력(인쇄) — 학생 개별 / 전체 학생 */}
+            {/* 출력(인쇄) — 학생 개별 / 전체 학생, 새 탭 없이 현재 페이지에서 인쇄 */}
             <div className="ml-auto flex items-center gap-2">
-              {view === "student" && studentId && (
+              {view === "student" && studentId && studentReport && (
                 <button
-                  onClick={() => window.open(`/teacher-reports/print?studentId=${encodeURIComponent(studentId)}`, "_blank")}
-                  className="rounded-md border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+                  onClick={() => doPrint([toItem(studentReport)])}
+                  disabled={printBusy}
+                  className="rounded-md border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-60"
                 >{t("printIndividual")}</button>
               )}
               <button
-                onClick={() => window.open(`/teacher-reports/print?grade=${encodeURIComponent(report.klass.grade)}&className=${encodeURIComponent(report.klass.className)}`, "_blank")}
-                className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
-              >{t("printAll")}</button>
+                onClick={printAllStudents}
+                disabled={printBusy}
+                className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
+              >{printBusy ? t("loadingReport") : t("printAll")}</button>
             </div>
           </div>
         )}
@@ -230,6 +277,11 @@ export function TeacherReportsView() {
           receptionLabel={t("receptionStudent")}
         />
       )}
+
+      {/* 인쇄 전용 문서(화면엔 숨김, print-doc-mode 인쇄 시에만 출력) */}
+      <div className="print-root" aria-hidden>
+        {printItems.length > 0 && <ReportPrintDoc items={printItems} />}
+      </div>
     </div>
   );
 }

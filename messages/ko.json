@@ -979,9 +979,7 @@
     "docSummary": "활동 요약",
     "docClassification": "질문 분류",
     "docSessions": "수업 세션별 AI 분석",
-    "docNoAnalysis": "분석된 세션이 없습니다.",
-    "docNoStudents": "출력할 학생이 없습니다.",
-    "docReadyHint": "{count}명분 리포트가 준비되었습니다. 인쇄 대화상자가 자동으로 열립니다."
+    "docNoAnalysis": "분석된 세션이 없습니다."
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",
