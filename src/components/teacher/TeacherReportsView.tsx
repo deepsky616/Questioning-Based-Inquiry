@@ -234,6 +234,15 @@ export function TeacherReportsView() {
       .finally(() => setLoading(false));
   }, [view, studentId, t]);
 
+  // 일괄 분석 완료 후 현재 학생 리포트를 다시 불러와 새 분석 결과를 화면에 반영
+  const refreshStudentReport = () => {
+    if (view !== "student" || !studentId) return;
+    fetch(`/api/reports/student?studentId=${encodeURIComponent(studentId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: StudentReport | null) => { if (d) setStudentReport(d); })
+      .catch(() => {});
+  };
+
   const students = report?.perStudent ?? [];
   const currentStudent = students.find((s) => s.id === studentId);
 
@@ -355,6 +364,7 @@ export function TeacherReportsView() {
           onSaveAnalysis={(id, result) => saveSessionAnalysis({ sessionId: id, scope: "student", studentId, result }, t("analysisFailed"))}
           bulkAnalyze={report ? bulkAnalyzeClass(report.klass.grade, report.klass.className, t("analysisFailed")) : undefined}
           bulkSessions={report?.sessions}
+          onBulkComplete={refreshStudentReport}
           showPrintButton={false}
           participationLabel={t("participationStudent")}
           receptionLabel={t("receptionStudent")}

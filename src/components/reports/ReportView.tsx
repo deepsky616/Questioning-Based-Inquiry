@@ -7,6 +7,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "@/components/shared/theme-provider";
 import { useTranslations, useLocale } from "next-intl";
 import type { ReportRange, SeriesPoint, ReportTotals } from "@/lib/report-stats";
@@ -61,6 +62,8 @@ export interface ReportViewProps {
   showPrintButton?: boolean;
   /** 교사가 수정한 분석 결과를 저장하는 콜백. 주어지면 분석 블록에 '수정'이 나타난다. */
   onSaveAnalysis?: (sessionId: string, result: SessionAnalysisResult) => Promise<void>;
+  /** 전체 학생 일괄 분석 완료 후 현재 화면을 갱신하기 위한 콜백(예: 선택 학생 리포트 재조회). */
+  onBulkComplete?: () => void;
   // 추세 차트 부제(관점에 따라 다르게). 기본은 학생 본인 관점.
   participationLabel?: string;
   receptionLabel?: string;
@@ -118,8 +121,9 @@ function sessionPeriod(dateStr: string, mode: ReportRange, locale: string, other
 
 export function ReportView({
   scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
-  participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze, bulkSessions, showPrintButton = true, onSaveAnalysis,
+  participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze, bulkSessions, showPrintButton = true, onSaveAnalysis, onBulkComplete,
 }: ReportViewProps) {
+  const { toast } = useToast();
   const [range, setRange] = useState<ReportRange>("week");
   const series = range === "week" ? weekly : monthly;
   const tCls = useTranslations("classification");
@@ -156,7 +160,6 @@ export function ReportView({
 
   // ── 수업세션별 AI 분석 (기간 필터 + 전체 분석) ──
   const allSessions = useMemo(() => sessions ?? [], [sessions]);
-  const [sessRange, setSessRange] = useState<ReportRange>("week");
   const [period, setPeriod] = useState<string>("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [res, setRes] = useState<Record<string, SessionAnalysisResult>>({});
@@ -198,8 +201,10 @@ export function ReportView({
       setRes((p) => ({ ...p, [id]: editDraft }));
       queryClient.setQueryData(analysisKey(id), editDraft);
       setEditing(null); setEditDraft({});
+      toast({ description: t("editSaved") });
     } catch (e) {
       setErrs((x) => ({ ...x, [id]: e instanceof Error ? e.message : t("analysisFailed") }));
+      toast({ variant: "destructive", description: t("analysisFailed") });
     } finally {
       setSavingEdit(false);
     }
@@ -209,20 +214,20 @@ export function ReportView({
   const periods = useMemo(() => {
     const map = new Map<string, string>();
     for (const s of allSessions) {
-      const p = sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix"));
+      const p = sessionPeriod(s.date, range, locale, t("other"), t("weekSuffix"));
       if (!map.has(p.key)) map.set(p.key, p.label);
     }
     return Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
-  }, [allSessions, sessRange, locale, t]);
+  }, [allSessions, range, locale, t]);
 
   // 주별/월별 전환 시 최신 기간을 기본 선택
   useEffect(() => {
     if (periods.length > 0 && !periods.some(([k]) => k === period)) setPeriod(periods[0][0]);
   }, [periods, period]);
 
-  const filteredSessions = allSessions.filter((s) => sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix")).key === period);
+  const filteredSessions = allSessions.filter((s) => sessionPeriod(s.date, range, locale, t("other"), t("weekSuffix")).key === period);
   // 일괄 분석 대상(학급 전체 세션 풀이 있으면 그것을 현재 기간으로 추림) 수
-  const bulkPeriodCount = (bulkSessions ?? allSessions).filter((s) => sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix")).key === period).length;
+  const bulkPeriodCount = (bulkSessions ?? allSessions).filter((s) => sessionPeriod(s.date, range, locale, t("other"), t("weekSuffix")).key === period).length;
 
   // 분석 결과를 QueryClient에 캐시해 탭/뷰 전환(remount)에도 유지한다.
   const analysisKey = (id: string) => ["session-analysis", analysisCacheKey ?? "default", id] as const;
@@ -250,9 +255,11 @@ export function ReportView({
       if (r) {
         setRes((p) => ({ ...p, [id]: r }));
         queryClient.setQueryData(analysisKey(id), r);
+        toast({ description: t("analysisDone") });
       } else setErrs((e) => ({ ...e, [id]: t("noAnalysisResult") }));
     } catch (e) {
       setErrs((x) => ({ ...x, [id]: e instanceof Error ? e.message : t("analysisFailed") }));
+      toast({ variant: "destructive", description: t("analysisFailed") });
     } finally {
       setBusy((b) => ({ ...b, [id]: false }));
     }
@@ -269,6 +276,7 @@ export function ReportView({
   const analyzeAll = async () => {
     if (!analyzeSession) return;
     setAnalyzingAll(true);
+    let analyzedCount = 0, failed = false;
     for (const s of filteredSessions) {
       setOpen((o) => ({ ...o, [s.id]: true }));
       if (res[s.id]) continue;
@@ -278,14 +286,18 @@ export function ReportView({
         if (r) {
           setRes((p) => ({ ...p, [s.id]: r }));
           queryClient.setQueryData(analysisKey(s.id), r);
+          analyzedCount++;
         }
       } catch (e) {
+        failed = true;
         setErrs((x) => ({ ...x, [s.id]: e instanceof Error ? e.message : t("analysisFailed") }));
       } finally {
         setBusy((b) => ({ ...b, [s.id]: false }));
       }
     }
     setAnalyzingAll(false);
+    if (failed) toast({ variant: "destructive", description: t("analysisFailed") });
+    else toast({ description: t("analysisAllDone", { count: analyzedCount }) });
   };
 
   // 전체 학생 일괄 분석: 현재 기간의 세션들 × 반 전체 학생을 나눠서 분석(서버가 cursor로 진행).
@@ -294,7 +306,7 @@ export function ReportView({
     if (!bulkAnalyze) return;
     const pool = bulkSessions ?? allSessions;
     const ids = pool
-      .filter((s) => sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix")).key === period)
+      .filter((s) => sessionPeriod(s.date, range, locale, t("other"), t("weekSuffix")).key === period)
       .map((s) => s.id);
     if (ids.length === 0) return;
     bulkStop.current = false;
@@ -306,17 +318,25 @@ export function ReportView({
         total = r.total; cursor = r.nextCursor; analyzed += r.analyzedThisCall;
         if (r.error) hadError = true;
         if (r.done) {
-          setBulk({ running: false, processed: total, total, analyzed, note: t("bulkDone", { count: analyzed }) + (hadError ? " · " + t("bulkSomeFailed") : "") });
+          const msg = t("bulkDone", { count: analyzed }) + (hadError ? " · " + t("bulkSomeFailed") : "");
+          setBulk({ running: false, processed: total, total, analyzed, note: msg });
+          toast({ variant: hadError ? "destructive" : undefined, description: msg });
+          onBulkComplete?.();
           return;
         }
         if (bulkStop.current) {
-          setBulk({ running: false, processed: cursor, total, analyzed, note: t("bulkStopped", { count: analyzed }) });
+          const msg = t("bulkStopped", { count: analyzed });
+          setBulk({ running: false, processed: cursor, total, analyzed, note: msg });
+          toast({ description: msg });
+          onBulkComplete?.();
           return;
         }
         setBulk({ running: true, processed: cursor, total, analyzed });
       }
     } catch (e) {
-      setBulk({ running: false, processed: cursor, total, analyzed, note: e instanceof Error ? e.message : t("bulkFailed") });
+      const msg = e instanceof Error ? e.message : t("bulkFailed");
+      setBulk({ running: false, processed: cursor, total, analyzed, note: msg });
+      toast({ variant: "destructive", description: msg });
     }
   };
 
@@ -484,19 +504,9 @@ export function ReportView({
             {t("aiSessionDesc")}
           </p>
 
-          {/* 주별/월별 기간 선택 + 그 기간 일괄 분석 */}
+          {/* 기간(주별/월별) 선택은 상단 토글과 공유. 여기선 특정 주/월만 고른다 + 그 기간 일괄 분석 */}
           <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
             <span className="text-xs font-semibold text-foreground">{t("analyzeAll")}</span>
-            <div className="flex rounded-md border overflow-hidden">
-              <button
-                onClick={() => setSessRange("week")}
-                className={`px-3 py-1.5 text-xs font-medium ${sessRange === "week" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-              >{t("week")}</button>
-              <button
-                onClick={() => setSessRange("month")}
-                className={`px-3 py-1.5 text-xs font-medium border-l ${sessRange === "month" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-              >{t("month")}</button>
-            </div>
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
