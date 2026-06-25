@@ -180,8 +180,8 @@ export function MyQuestionsView() {
           <TableRow>
             <TableHead className="w-10">#</TableHead>
             <TableHead>{t("colContent")}</TableHead>
-            <TableHead className="w-20">{t("colClosure")}</TableHead>
-            <TableHead className="w-24">{t("colCognitive")}</TableHead>
+            <TableHead className="w-20 break-keep text-center">{t("colClosure")}</TableHead>
+            <TableHead className="w-24 break-keep text-center">{t("colCognitive")}</TableHead>
             <TableHead className="w-24">{t("colPublic")}</TableHead>
             <TableHead className="w-32">{t("colSession")}</TableHead>
             <TableHead className="w-36">{t("colCreated")}</TableHead>

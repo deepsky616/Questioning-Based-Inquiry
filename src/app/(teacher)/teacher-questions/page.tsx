@@ -646,8 +646,8 @@ export default function QuestionsPage() {
             </TableHead>
             <TableHead>{t("colStudent")}</TableHead>
             <TableHead>{t("colContent")}</TableHead>
-            <TableHead className="w-20">{t("colClosure")}</TableHead>
-            <TableHead className="w-24">{t("colCognitive")}</TableHead>
+            <TableHead className="w-20 break-keep text-center">{t("colClosure")}</TableHead>
+            <TableHead className="w-24 break-keep text-center">{t("colCognitive")}</TableHead>
             <TableHead className="w-16 text-center">{t("colLikes")}</TableHead>
             <TableHead className="w-16 text-center">{t("colComments")}</TableHead>
             <TableHead className="w-20">{t("colPublic")}</TableHead>
