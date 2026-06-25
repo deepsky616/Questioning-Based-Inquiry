@@ -602,7 +602,7 @@ function SessionRow({
           <div className="w-16 flex justify-center"><Switch checked={session.defaultQuestionPublic} onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)} /></div>
           <div className="w-16 flex justify-center"><Switch checked={session.likesVisibleToPeers} onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)} /></div>
           <div className="w-16 flex justify-center"><Switch checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} /></div>
-          <div className="w-24 flex justify-end gap-1">
+          <div className="w-24 flex justify-center gap-1">
             <Button variant="ghost" size="sm" className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 h-7 px-2 text-xs" onClick={openEdit}>
               {tc("edit")}
             </Button>
