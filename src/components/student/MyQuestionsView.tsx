@@ -6,7 +6,6 @@ import { useContentTranslation } from "@/components/shared/use-content-translati
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { formatDateTime } from "@/lib/datetime";
@@ -181,23 +180,23 @@ export function MyQuestionsView() {
                       {q.session ? buildSessionLabel(q.session.date, q.session.subject, q.session.topic) : "—"} · {formatDateTime(q.createdAt)}
                     </p>
                   </TableCell>
-                  <TableCell className="text-center text-sm text-rose-500 align-top">
-                    ♥ {q.likeCount ?? 0}
+                  <TableCell className="text-center align-top">
+                    {/* 받은 좋아요(읽기 전용) — 탐구 탭과 같은 알약 모양 */}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs font-medium text-rose-500">
+                      <span>❤️</span>
+                      <span>{q.likeCount ?? 0}</span>
+                    </span>
                   </TableCell>
                   <TableCell className="text-center align-top">
-                    <Button
+                    {/* 댓글 토글 — 탐구 탭과 동일한 💬 개수 버튼 */}
+                    <button
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      className={
-                        commentCount === 0
-                          ? "h-8 border-border bg-muted/40 text-muted-foreground hover:bg-muted/40 hover:text-muted-foreground"
-                          : "h-8"
-                      }
                       onClick={() => toggleComments(q.id)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-800"
                     >
-                      {t("commentCount", { count: commentCount })}
-                    </Button>
+                      <span>💬 {commentCount}</span>
+                      <span>{isExpanded ? tEx("close") : tEx("comment")}</span>
+                    </button>
                   </TableCell>
                 </TableRow>
                 {isExpanded && (
