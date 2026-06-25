@@ -146,7 +146,7 @@ function StudentDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                    <span className="text-sm font-medium">{tCls("closed.label")}</span>
+                    <span className="text-sm font-medium break-keep">{tCls("closed.label")}</span>
                   </div>
                   <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
                 </div>
@@ -157,7 +157,7 @@ function StudentDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-                    <span className="text-sm font-medium">{tCls("open.label")}</span>
+                    <span className="text-sm font-medium break-keep">{tCls("open.label")}</span>
                   </div>
                   <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
                 </div>
@@ -188,7 +188,7 @@ function StudentDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
-                    <span className="text-sm font-medium">{tCls("factual.label")}</span>
+                    <span className="text-sm font-medium break-keep">{tCls("factual.label")}</span>
                   </div>
                   <span className="text-2xl font-bold text-foreground">{stats.byCognitive.factual}</span>
                 </div>
@@ -199,7 +199,7 @@ function StudentDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
-                    <span className="text-sm font-medium">{tCls("conceptual.label")}</span>
+                    <span className="text-sm font-medium break-keep">{tCls("conceptual.label")}</span>
                   </div>
                   <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.conceptual}</span>
                 </div>
@@ -210,7 +210,7 @@ function StudentDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
-                    <span className="text-sm font-medium">{tCls("controversial.label")}</span>
+                    <span className="text-sm font-medium break-keep">{tCls("controversial.label")}</span>
                   </div>
                   <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.controversial}</span>
                 </div>
@@ -237,10 +237,10 @@ function StudentDashboard() {
                 <div key={q.id} className="p-4 bg-muted/40 rounded-lg">
                   <p className="text-foreground line-clamp-1">{q.content}</p>
                   <div className="flex gap-2 mt-2">
-                    <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
+                    <span className={`text-xs px-2 py-1 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>
                       {CLOSURE_LABEL[q.closure]}
                     </span>
-                    <span className={`text-xs px-2 py-1 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>
+                    <span className={`text-xs px-2 py-1 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>
                       {COGNITIVE_LABEL[q.cognitive]}
                     </span>
                   </div>

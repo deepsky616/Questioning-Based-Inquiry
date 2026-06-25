@@ -205,12 +205,12 @@ export function MyQuestionsView() {
                     {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                   </TableCell>
                   <TableCell>
-                    <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
+                    <span className={`text-xs px-2 py-1 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>
                       {CLOSURE_LABEL[q.closure]}
                     </span>
                   </TableCell>
                   <TableCell>
-                    <span className={`text-xs px-2 py-1 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>
+                    <span className={`text-xs px-2 py-1 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>
                       {COGNITIVE_LABEL[q.cognitive]}
                     </span>
                   </TableCell>

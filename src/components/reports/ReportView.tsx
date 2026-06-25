@@ -354,6 +354,18 @@ export function ReportView({
     }
   };
 
+  // 분류 분포 막대그래프 X축: '사실적 질문'처럼 긴 라벨은 띄어쓰기에서 두 줄로 표시(SVG라 CSS 줄바꿈 불가)
+  const renderClassTick = ({ x, y, payload }: { x?: number; y?: number; payload?: { value?: string } }) => {
+    const parts = String(payload?.value ?? "").split(" ");
+    return (
+      <text x={x} y={y} dy={12} textAnchor="middle" fontSize={11} fill={chart.tick}>
+        {parts.length > 1
+          ? parts.map((p, i) => <tspan key={i} x={x} dy={i === 0 ? 0 : 12}>{p}</tspan>)
+          : parts[0]}
+      </text>
+    );
+  };
+
   return (
     <div className="report-print space-y-6">
       {/* 헤더 + 조작(인쇄 시 숨김) */}
@@ -473,10 +485,10 @@ export function ReportView({
       {/* 질문 분류 분포 */}
       <div className="rounded-xl border bg-card p-4">
         <p className="mb-3 text-sm font-bold text-foreground">{t("distTitle", { count: viewClassification.total })}</p>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={classData} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+        <ResponsiveContainer width="100%" height={240}>
+          <BarChart data={classData} margin={{ top: 5, right: 10, bottom: 16, left: -20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-            <XAxis dataKey="name" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
+            <XAxis dataKey="name" stroke={chart.grid} interval={0} tick={renderClassTick} />
             <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
             <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
             <Bar dataKey="value" name={t("questionCountName")} radius={[4, 4, 0, 0]}>

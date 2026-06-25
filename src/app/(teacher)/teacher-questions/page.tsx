@@ -698,12 +698,12 @@ export default function QuestionsPage() {
                 <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(q.createdAt)}</p>
               </TableCell>
               <TableCell>
-                <span className={`text-xs px-2 py-1 rounded ${CLOSURE_STYLE[q.closure]}`}>
+                <span className={`text-xs px-2 py-1 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>
                   {CLOSURE_LABEL[q.closure]}
                 </span>
               </TableCell>
               <TableCell>
-                <span className={`text-xs px-2 py-1 rounded ${COGNITIVE_STYLE[q.cognitive]}`}>
+                <span className={`text-xs px-2 py-1 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>
                   {COGNITIVE_LABEL[q.cognitive]}
                 </span>
               </TableCell>

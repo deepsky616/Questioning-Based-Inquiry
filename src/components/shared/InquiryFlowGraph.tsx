@@ -145,7 +145,7 @@ export function InquiryFlowGraph({
             <div className="mt-3 space-y-1.5">
               {summary.highlights.map((question, index) => (
                 <div key={question.id ?? index} className="rounded-md bg-card px-3 py-2 text-xs text-foreground shadow-sm">
-                  <span className={`mr-1 rounded px-1.5 py-0.5 ${COGNITIVE_STYLE[question.cognitive ?? "factual"]}`}>
+                  <span className={`mr-1 rounded px-1.5 py-0.5 break-keep ${COGNITIVE_STYLE[question.cognitive ?? "factual"]}`}>
                     {COGNITIVE_LABEL[question.cognitive ?? "factual"] ?? "사실적 질문"}
                   </span>
                   {question.content}
