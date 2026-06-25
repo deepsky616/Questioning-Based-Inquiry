@@ -186,7 +186,7 @@ export function ReportView({
         { key: "relevanceInsights", label: t("secRelevance") },
         { key: "insights", label: t("secSuggest") },
       ];
-  const startEdit = (id: string) => { setEditing(id); setEditDraft({ ...res[id] }); };
+  const startEdit = (id: string) => { setOpen((o) => ({ ...o, [id]: true })); setEditing(id); setEditDraft({ ...res[id] }); };
   const cancelEdit = () => { setEditing(null); setEditDraft({}); };
   const saveEdit = async (id: string) => {
     if (!onSaveAnalysis) return;
@@ -554,6 +554,14 @@ export function ReportView({
                       <span className="truncate text-sm font-medium text-foreground">{label}</span>
                       <span className="shrink-0 text-xs font-semibold text-emerald-600">{open[s.id] ? "▾" : "▸"}</span>
                     </button>
+                    {canAnalyze && onSaveAnalysis && r && editing !== s.id && !busy[s.id] && (
+                      <button
+                        onClick={() => startEdit(s.id)}
+                        className="no-print shrink-0 rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50"
+                      >
+                        {t("editAnalysis")}
+                      </button>
+                    )}
                     {canAnalyze && (
                       <button
                         onClick={() => runAnalysis(s.id)}
@@ -600,11 +608,6 @@ export function ReportView({
                               <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{v}</p>
                             </div>
                           ))}
-                          {canAnalyze && onSaveAnalysis && (
-                            <button onClick={() => startEdit(s.id)} className="no-print text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                              {t("editAnalysis")}
-                            </button>
-                          )}
                         </div>
                       ) : (
                         <p className="text-muted-foreground">{canAnalyze ? t("notAnalyzedYet") : t("notAnalyzedYetReadonly")}</p>
