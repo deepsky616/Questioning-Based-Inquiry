@@ -648,7 +648,7 @@ export default function QuestionsPage() {
             <TableHead>{t("colContent")}</TableHead>
             <TableHead className="w-20 break-keep text-center">{t("colClosure")}</TableHead>
             <TableHead className="w-24 break-keep text-center">{t("colCognitive")}</TableHead>
-            <TableHead className="w-16 text-center">{t("colLikes")}</TableHead>
+            <TableHead className="w-20 text-center break-keep">{t("colLikes")}</TableHead>
             <TableHead className="w-16 text-center">{t("colComments")}</TableHead>
             <TableHead className="w-20">{t("colPublic")}</TableHead>
             <TableHead className="w-28">{t("colManage")}</TableHead>
@@ -916,7 +916,7 @@ export default function QuestionsPage() {
                       <th className="text-left px-3 py-2 font-medium text-muted-foreground">{t("colStudent")}</th>
                       <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">{t("colWroteQuestion")}</th>
                       <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">{t("colWroteComment")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16">{t("colLikes")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-20 break-keep">{t("colLikes")}</th>
                       <th className="text-center px-3 py-2 font-medium text-muted-foreground w-14">{t("colSubmit")}</th>
                     </tr>
                   </thead>

@@ -21,8 +21,6 @@ import {
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
-import { useConfirm } from "@/components/shared/confirm-dialog";
-import { useToast } from "@/components/ui/use-toast";
 import {
   Table,
   TableBody,
@@ -64,13 +62,11 @@ interface Comment {
 
 export function MyQuestionsView() {
   const t = useTranslations("myQuestions");
-  const tc = useTranslations("common");
   const tEx = useTranslations("explore");
   const ct = useContentTranslation();
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const { toast } = useToast();
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
   const [sortField, setSortField] = useState<SortField>("like");
@@ -79,7 +75,6 @@ export function MyQuestionsView() {
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // 조회 모드
   const [selectedSessionId, setSelectedSessionId] = useState("all");
@@ -150,27 +145,6 @@ export function MyQuestionsView() {
     setExpandedQuestionId((prev) => (prev === questionId ? null : questionId));
   };
 
-  const confirm = useConfirm();
-
-  const handleDelete = async (questionId: string) => {
-    if (!(await confirm({ description: t("deleteConfirm"), confirmText: tc("delete"), destructive: true }))) return;
-    setDeletingId(questionId);
-    try {
-      const res = await fetch(`/api/questions/${questionId}`, { method: "DELETE" });
-      if (res.ok) {
-        setQuestions((prev) => prev.filter((q) => q.id !== questionId));
-        setExpandedQuestionId((prev) => (prev === questionId ? null : prev));
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast({ variant: "destructive", description: data?.error ?? t("deleteFailed") });
-      }
-    } catch {
-      toast({ variant: "destructive", description: t("networkError") });
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
   const QuestionRows = ({ list }: { list: Question[] }) =>
     list.length === 0 ? (
       <EmptyState icon="📝" title={t("empty")} description={t("emptyDesc")} />
@@ -185,16 +159,14 @@ export function MyQuestionsView() {
             <TableHead className="w-24">{t("colPublic")}</TableHead>
             <TableHead className="w-32">{t("colSession")}</TableHead>
             <TableHead className="w-36">{t("colCreated")}</TableHead>
-            <TableHead className="w-16">{t("colLikes")}</TableHead>
+            <TableHead className="w-20 break-keep">{t("colLikes")}</TableHead>
             <TableHead className="w-24">{t("colComments")}</TableHead>
-            <TableHead className="w-20">{t("colManage")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {list.map((q, i) => {
             const commentCount = commentCountOverride[q.id] ?? q.comments?.length ?? 0;
             const isExpanded = expandedQuestionId === q.id;
-            const isDeleting = deletingId === q.id;
 
             return (
               <Fragment key={q.id}>
@@ -243,22 +215,10 @@ export function MyQuestionsView() {
                       {t("commentCount", { count: commentCount })}
                     </Button>
                   </TableCell>
-                  <TableCell>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-red-500 border-red-200 hover:bg-red-50"
-                      disabled={isDeleting}
-                      onClick={() => handleDelete(q.id)}
-                    >
-                      {isDeleting ? t("deleting") : t("deleteBtn")}
-                    </Button>
-                  </TableCell>
                 </TableRow>
                 {isExpanded && (
                   <TableRow>
-                    <TableCell colSpan={10} className="bg-muted/30 px-6 py-4">
+                    <TableCell colSpan={9} className="bg-muted/30 px-6 py-4">
                       <CommentThread
                         questionId={q.id}
                         onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}
