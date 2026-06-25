@@ -104,13 +104,13 @@ export function QuestionClassificationStats({
   const bar = (name: string, value: number, color: string, desc: string) => (
     <div key={name} className="mb-2 w-full px-1.5">
       <div className="flex items-center gap-2 py-0.5">
-        <span className="w-14 shrink-0 break-keep text-center leading-tight text-xs text-muted-foreground">{name}</span>
+        <span className="w-20 shrink-0 whitespace-nowrap text-center text-xs text-muted-foreground">{name}</span>
         <div className="flex-1 h-3.5 rounded bg-muted overflow-hidden">
           <div style={{ width: `${pct(value)}%`, background: color, height: "100%" }} />
         </div>
         <span className="w-16 shrink-0 text-right text-xs font-semibold text-foreground">{value} ({pct(value)}%)</span>
       </div>
-      <p className="pl-14 text-[11px] leading-tight text-muted-foreground">{desc}</p>
+      <p className="pl-[5.5rem] text-[11px] leading-tight text-muted-foreground">{desc}</p>
     </div>
   );
 
