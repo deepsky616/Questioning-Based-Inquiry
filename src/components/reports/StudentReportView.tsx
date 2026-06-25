@@ -58,6 +58,7 @@ export function StudentReportView() {
       analyzeSession={(id) => analyzeStudentSession(id, t("analysisFailed"))}
       analysisCacheKey="student-self"
       canAnalyze={false}
+      showPrintButton={false}
     />
   );
 }
