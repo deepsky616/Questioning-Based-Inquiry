@@ -154,11 +154,6 @@ export function MyQuestionsView() {
           <TableRow>
             <TableHead className="w-10">#</TableHead>
             <TableHead>{t("colContent")}</TableHead>
-            <TableHead className="w-20 break-keep text-center">{t("colClosure")}</TableHead>
-            <TableHead className="w-24 break-keep text-center">{t("colCognitive")}</TableHead>
-            <TableHead className="w-24">{t("colPublic")}</TableHead>
-            <TableHead className="w-32 text-center">{t("colSession")}</TableHead>
-            <TableHead className="w-36 text-center">{t("colCreated")}</TableHead>
             <TableHead className="w-20 break-keep text-center">{t("colLikes")}</TableHead>
             <TableHead className="w-24 text-center">{t("colComments")}</TableHead>
           </TableRow>
@@ -171,36 +166,25 @@ export function MyQuestionsView() {
             return (
               <Fragment key={q.id}>
                 <TableRow>
-                  <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                  <TableCell className="max-w-xs">
+                  <TableCell className="text-muted-foreground align-top">{i + 1}</TableCell>
+                  <TableCell className="max-w-md align-top">
                     <p className="truncate">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                     {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
+                    {/* 분류·공개 배지를 내용 아래에(탐구 탭과 동일 톤) */}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{q.isPublic ? t("public") : t("private")}</span>
+                    </div>
+                    {/* 수업세션 · 작성일시 (작은 회색) */}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {q.session ? buildSessionLabel(q.session.date, q.session.subject, q.session.topic) : "—"} · {formatDateTime(q.createdAt)}
+                    </p>
                   </TableCell>
-                  <TableCell className="text-center">
-                    <span className={`text-xs px-2 py-1 rounded break-keep text-center inline-block ${CLOSURE_STYLE[q.closure]}`}>
-                      {CLOSURE_LABEL[q.closure]}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className={`text-xs px-2 py-1 rounded break-keep text-center inline-block ${COGNITIVE_STYLE[q.cognitive]}`}>
-                      {COGNITIVE_LABEL[q.cognitive]}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-xs px-2 py-1 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>
-                      {q.isPublic ? t("public") : t("private")}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center text-xs text-muted-foreground max-w-xs truncate">
-                    {q.session ? buildSessionLabel(q.session.date, q.session.subject, q.session.topic) : "—"}
-                  </TableCell>
-                  <TableCell className="text-center text-xs text-muted-foreground whitespace-nowrap">
-                    {formatDateTime(q.createdAt)}
-                  </TableCell>
-                  <TableCell className="text-center text-sm text-rose-500">
+                  <TableCell className="text-center text-sm text-rose-500 align-top">
                     ♥ {q.likeCount ?? 0}
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center align-top">
                     <Button
                       type="button"
                       variant="outline"
@@ -218,7 +202,7 @@ export function MyQuestionsView() {
                 </TableRow>
                 {isExpanded && (
                   <TableRow>
-                    <TableCell colSpan={9} className="bg-muted/30 px-6 py-4">
+                    <TableCell colSpan={4} className="bg-muted/30 px-6 py-4">
                       <CommentThread
                         questionId={q.id}
                         onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}
