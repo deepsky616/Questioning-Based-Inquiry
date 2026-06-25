@@ -39,7 +39,6 @@ import {
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -149,9 +148,7 @@ export default function QuestionsPage() {
   const [participationFilter, setParticipationFilter] = useState<"all" | "submitted" | "not-submitted">("all");
   const [showParticipation, setShowParticipation] = useState(false);
 
-  const [showSequence, setShowSequence] = useState(false);
   const [showDeployed, setShowDeployed] = useState(false);
-  const [mainTab, setMainTab] = useState<"review" | "design">("review");
   // 배포한 탐구설계 목록에서 "수정"을 누른 세션(인라인 패널 열림)
   const [editDeploySessionId, setEditDeploySessionId] = useState<string | null>(null);
   const [deletingDeployId, setDeletingDeployId] = useState<string | null>(null);
@@ -195,8 +192,8 @@ export default function QuestionsPage() {
   const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
   // 부적절 의심만 보기 필터
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
-  // 상단 탭: 질문 조회 / AI 추천 포인트
-  const [topTab, setTopTab] = useState<"questions" | "review">("questions");
+  // 상단 탭: 질문 조회 / 탐구 설계 / AI 추천 포인트
+  const [topTab, setTopTab] = useState<"questions" | "design" | "review">("questions");
 
   // 알림에서 들어온 쿼리 처리(마운트 시 1회 읽어 Suspense 회피)
   //  - ?flagged=1: 부적절 의심 필터 켜기
@@ -871,6 +868,13 @@ export default function QuestionsPage() {
         </button>
         <button
           type="button"
+          onClick={() => setTopTab("design")}
+          className={`px-4 py-2 text-sm font-medium border-l transition-colors ${topTab === "design" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+        >
+          {t("tabDesign")}
+        </button>
+        <button
+          type="button"
           onClick={() => setTopTab("review")}
           className={`px-4 py-2 text-sm font-medium border-l transition-colors ${topTab === "review" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
         >
@@ -941,13 +945,8 @@ export default function QuestionsPage() {
         </div>
       )}
 
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "review" | "design")} className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="review">{t("tabReview")}</TabsTrigger>
-          <TabsTrigger value="design">{t("tabDesign")}</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="review" className="space-y-6">
+      {topTab === "questions" && (
+        <div className="space-y-6">
 
       {/* 학생 참여 현황 */}
       {currentSession && (
@@ -1301,38 +1300,33 @@ export default function QuestionsPage() {
         </div>
       )}
 
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="design" className="space-y-6">
+      {topTab === "design" && (
+        <div className="space-y-6">
 
-      {/* 질문 중심 탐구설계 */}
+      {/* 질문 중심 탐구설계 (항상 열림) */}
       {currentSession && (
         <div className="rounded-xl border bg-card p-4">
-          <button
-            type="button"
-            onClick={() => setShowSequence((v) => !v)}
-            className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground hover:text-primary transition-colors"
-          >
+          <div className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground">
             <span>🧩</span>
             {t("sequenceTitle")}
-            <span className="text-sm text-muted-foreground">{showSequence ? "▾" : "▸"}</span>
-          </button>
-          {showSequence && (
-            <div className="mt-3">
-              <QuestionSequencePanel
-                sessionId={currentSession.id}
-                subject={currentSession.subject}
-                topic={currentSession.topic}
-                initialSettings={{
-                  isActive: currentSession.isActive,
-                  defaultQuestionPublic: currentSession.defaultQuestionPublic,
-                  likesVisibleToPeers: currentSession.likesVisibleToPeers,
-                  commentsVisibleToPeers: currentSession.commentsVisibleToPeers,
-                }}
-                onDeployed={reloadSessions}
-              />
-            </div>
-          )}
+          </div>
+          <div className="mt-3">
+            <QuestionSequencePanel
+              sessionId={currentSession.id}
+              subject={currentSession.subject}
+              topic={currentSession.topic}
+              initialSettings={{
+                isActive: currentSession.isActive,
+                defaultQuestionPublic: currentSession.defaultQuestionPublic,
+                likesVisibleToPeers: currentSession.likesVisibleToPeers,
+                commentsVisibleToPeers: currentSession.commentsVisibleToPeers,
+              }}
+              onDeployed={reloadSessions}
+            />
+          </div>
         </div>
       )}
 
@@ -1459,8 +1453,8 @@ export default function QuestionsPage() {
         />
       )}
 
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
 
       {/* 수정 다이얼로그 */}
       <Dialog open={!!selectedQuestion} onOpenChange={() => setSelectedQuestion(null)}>
