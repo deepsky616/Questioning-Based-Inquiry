@@ -892,8 +892,9 @@
   },
   "reports": {
     "analysisFailed": "Analysis failed",
+    "printClass": "🖨️ Print class",
     "printIndividual": "🖨️ Print student",
-    "printAll": "🖨️ Print all",
+    "printAll": "🖨️ Print all students",
     "loadFailed": "Failed to load",
     "gradeClass": "Grade {grade} Class {className}",
     "studentCount": "({count})",

@@ -110,6 +110,21 @@ export function TeacherReportsView() {
     setPrintItems(items);
     setPrintTick((n) => n + 1);
   };
+  // 학급 전체 출력: 학급 집계(전체 학생 종합) 리포트 1부 — 세션 전체(scope=class) 분석 포함
+  const printClassReport = () => {
+    if (!report) return;
+    const klass = report.klass as { grade: string; className: string; school?: string | null };
+    doPrint([{
+      name: t("gradeClass", { grade: klass.grade, className: klass.className }),
+      school: klass.school ?? undefined,
+      totals: report.totals,
+      classification: report.classification,
+      weekly: report.weekly,
+      monthly: report.monthly,
+      sessions: (report.sessions as PrintReportItem["sessions"]) ?? [],
+    }]);
+  };
+
   // 전체 학생 출력: 학급 전원 리포트를 모아서 인쇄
   const printAllStudents = async () => {
     if (!report || printBusy) return;
@@ -216,8 +231,16 @@ export function TeacherReportsView() {
               </select>
             )}
 
-            {/* 출력(인쇄) — 학생 개별 / 전체 학생, 새 탭 없이 현재 페이지에서 인쇄 */}
+            {/* 출력(인쇄) — 새 탭 없이 현재 페이지에서 인쇄.
+                학급 전체 탭: 학급 집계 분석 / 학생별 탭: 학생 개별·전체 학생 */}
             <div className="ml-auto flex items-center gap-2">
+              {view === "class" && (
+                <button
+                  onClick={printClassReport}
+                  disabled={printBusy}
+                  className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
+                >{t("printClass")}</button>
+              )}
               {view === "student" && studentId && studentReport && (
                 <button
                   onClick={() => doPrint([toItem(studentReport)])}
@@ -225,11 +248,13 @@ export function TeacherReportsView() {
                   className="rounded-md border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-60"
                 >{t("printIndividual")}</button>
               )}
-              <button
-                onClick={printAllStudents}
-                disabled={printBusy}
-                className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
-              >{printBusy ? t("loadingReport") : t("printAll")}</button>
+              {view === "student" && (
+                <button
+                  onClick={printAllStudents}
+                  disabled={printBusy}
+                  className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
+                >{printBusy ? t("loadingReport") : t("printAll")}</button>
+              )}
             </div>
           </div>
         )}

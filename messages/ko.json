@@ -892,8 +892,9 @@
   },
   "reports": {
     "analysisFailed": "분석 실패",
+    "printClass": "🖨️ 학급 전체 출력",
     "printIndividual": "🖨️ 학생 개별 출력",
-    "printAll": "🖨️ 전체 출력",
+    "printAll": "🖨️ 전체 학생 출력",
     "loadFailed": "불러오기 실패",
     "gradeClass": "{grade}학년 {className}반",
     "studentCount": "({count}명)",
