@@ -369,7 +369,7 @@
     "colSubmit": "제출",
     "emptySubmitted": "제출한 학생이 없습니다",
     "emptyNotSubmitted": "미제출 학생이 없습니다",
-    "sessionAnalysisTitle": "AI 세션 분석",
+    "sessionAnalysisTitle": "수업세션별 AI 분석",
     "analyzing": "분석 중...",
     "analyze": "✦ 분석하기",
     "statQuestions": "질문 {count}개",

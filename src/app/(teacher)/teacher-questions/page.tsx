@@ -139,6 +139,7 @@ export default function QuestionsPage() {
   const [isSavingCorrection, setIsSavingCorrection] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [isAnalyzingSession, setIsAnalyzingSession] = useState(false);
+  const [showSessionAnalysis, setShowSessionAnalysis] = useState(true);
   const [sessionAnalysis, setSessionAnalysis] = useState<SessionAnalysis | null>(null);
   const [sessionAnalysisError, setSessionAnalysisError] = useState<string | null>(null);
 
@@ -613,6 +614,7 @@ export default function QuestionsPage() {
       nextQuestions: sessionAnalysis.nextQuestions ?? "",
       insights: sessionAnalysis.insights ?? "",
     });
+    setShowSessionAnalysis(true);
     setEditingSession(true);
   };
   const cancelEditSession = () => { setEditingSession(false); setSessionEditDraft({}); };
@@ -1060,7 +1062,14 @@ export default function QuestionsPage() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base">{t("sessionAnalysisTitle")}</CardTitle>
+              <button
+                type="button"
+                onClick={() => setShowSessionAnalysis((v) => !v)}
+                className="flex items-center gap-1.5 text-base font-semibold leading-none tracking-tight text-foreground hover:text-primary transition-colors"
+              >
+                {t("sessionAnalysisTitle")}
+                <span className="text-sm text-muted-foreground">{showSessionAnalysis ? "▾" : "▸"}</span>
+              </button>
               {editingSession ? (
                 <div className="flex gap-2">
                   <Button type="button" size="sm" disabled={savingSessionEdit} onClick={saveSessionEdit} className="text-xs">{tc("save")}</Button>
@@ -1085,7 +1094,7 @@ export default function QuestionsPage() {
               )}
             </div>
           </CardHeader>
-          {(sessionAnalysis || sessionAnalysisError || editingSession) && (
+          {showSessionAnalysis && (sessionAnalysis || sessionAnalysisError || editingSession) && (
             <CardContent className="space-y-4">
               {editingSession ? (
                 <div className="space-y-3">

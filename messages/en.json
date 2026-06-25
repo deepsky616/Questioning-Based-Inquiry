@@ -369,7 +369,7 @@
     "colSubmit": "Submitted",
     "emptySubmitted": "No students have submitted",
     "emptyNotSubmitted": "No students are missing",
-    "sessionAnalysisTitle": "AI session analysis",
+    "sessionAnalysisTitle": "AI analysis by session",
     "analyzing": "Analyzing...",
     "analyze": "✦ Analyze",
     "statQuestions": "{count} questions",
