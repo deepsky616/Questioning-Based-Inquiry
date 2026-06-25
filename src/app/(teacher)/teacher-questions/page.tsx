@@ -1123,70 +1123,73 @@ export default function QuestionsPage() {
         </Card>
       )}
 
-      {/* 전체 질문 목록 — 정렬(좋아요순·댓글순) · 보기 방식(목록/질문·댓글) */}
-      {hasQuestionList && (
-        <div className="flex items-center gap-3 flex-wrap justify-between">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h3 className="text-base font-semibold leading-none tracking-tight text-foreground">{t("listTitle")} <span className="text-xs font-normal text-muted-foreground">{t("listCountSuffix", { count: filtered.length })}</span></h3>
-            <Input
-              placeholder={t("searchPlaceholder")}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 text-sm w-56 bg-card"
-            />
-            <button
-              type="button"
-              onClick={() => setShowFlaggedOnly((v) => !v)}
-              className={`h-8 rounded-md border px-3 text-xs font-medium transition-colors ${
-                showFlaggedOnly ? "border-red-400 bg-red-500 text-white" : "bg-white text-red-600 border-red-200 hover:bg-red-50"
-              }`}
-              title={t("flaggedTooltip")}
-            >
-              {t("flaggedOnly")} {flaggedCount > 0 && `(${flaggedCount})`}
-            </button>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <QuestionSortControl
-              field={sortField}
-              dir={sortDir}
-              onChange={(f, d) => {
-                setSortField(f);
-                setSortDir(d);
-                fetchQuestions(selectedSessionId, { sortField: f, sortDir: d });
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="text-center py-16 text-muted-foreground">{tc("loading")}</div>
-      ) : !hasQuestionList ? (
-        <div className="text-center py-16 text-muted-foreground text-sm">{t("selectSessionPrompt")}</div>
+      {/* 전체 질문 목록 — 제목·검색·필터·정렬·표를 한 패널에(다른 섹션과 톤 통일) */}
+      {!hasQuestionList ? (
+        isLoading ? (
+          <div className="text-center py-16 text-muted-foreground">{tc("loading")}</div>
+        ) : (
+          <div className="text-center py-16 text-muted-foreground text-sm">{t("selectSessionPrompt")}</div>
+        )
       ) : (
-        /* ── 전체 질문 목록: 분류1/분류2 필터 ── */
-        <Card>
-          <CardContent className="pt-4">
-            {/* 분류 필터 칩 (통계 막대 클릭과 연동) */}
-            <div className="flex flex-wrap items-center gap-1.5 mb-3">
-              <span className="text-xs text-muted-foreground mr-0.5">{tCls("category1")}</span>
-              {(["all", "closed", "open"] as const).map((v) => (
-                <button key={v} type="button" onClick={() => setFilterClosure(v)}
-                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterClosure === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{v === "all" ? t("all") : tCls(`${v}.label`)}</button>
-              ))}
-              <span className="text-xs text-muted-foreground mx-1">{tCls("category2")}</span>
-              {(["all", "factual", "conceptual", "controversial"] as const).map((v) => (
-                <button key={v} type="button" onClick={() => setFilterCognitive(v)}
-                  className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterCognitive === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{v === "all" ? t("all") : tCls(`${v}.label`)}</button>
-              ))}
-              {(filterClosure !== "all" || filterCognitive !== "all") && (
-                <button type="button" onClick={() => { setFilterClosure("all"); setFilterCognitive("all"); }}
-                  className="ml-1 text-xs font-medium text-indigo-600">{tc("reset")}</button>
-              )}
+        <div className="rounded-xl border bg-card p-4 space-y-3">
+          <div className="flex items-center gap-3 flex-wrap justify-between">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-base font-semibold leading-none tracking-tight text-foreground">{t("listTitle")} <span className="text-xs font-normal text-muted-foreground">{t("listCountSuffix", { count: filtered.length })}</span></h3>
+              <Input
+                placeholder={t("searchPlaceholder")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-8 text-sm w-56 bg-background"
+              />
+              <button
+                type="button"
+                onClick={() => setShowFlaggedOnly((v) => !v)}
+                className={`h-8 rounded-md border px-3 text-xs font-medium transition-colors ${
+                  showFlaggedOnly ? "border-red-400 bg-red-500 text-white" : "bg-white text-red-600 border-red-200 hover:bg-red-50"
+                }`}
+                title={t("flaggedTooltip")}
+              >
+                {t("flaggedOnly")} {flaggedCount > 0 && `(${flaggedCount})`}
+              </button>
             </div>
-            <QuestionTable list={displayed} />
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-3 flex-wrap">
+              <QuestionSortControl
+                field={sortField}
+                dir={sortDir}
+                onChange={(f, d) => {
+                  setSortField(f);
+                  setSortDir(d);
+                  fetchQuestions(selectedSessionId, { sortField: f, sortDir: d });
+                }}
+              />
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="text-center py-16 text-muted-foreground">{tc("loading")}</div>
+          ) : (
+            <>
+              {/* 분류 필터 칩 (통계 막대 클릭과 연동) */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-muted-foreground mr-0.5">{tCls("category1")}</span>
+                {(["all", "closed", "open"] as const).map((v) => (
+                  <button key={v} type="button" onClick={() => setFilterClosure(v)}
+                    className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterClosure === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{v === "all" ? t("all") : tCls(`${v}.label`)}</button>
+                ))}
+                <span className="text-xs text-muted-foreground mx-1">{tCls("category2")}</span>
+                {(["all", "factual", "conceptual", "controversial"] as const).map((v) => (
+                  <button key={v} type="button" onClick={() => setFilterCognitive(v)}
+                    className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${filterCognitive === v ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}>{v === "all" ? t("all") : tCls(`${v}.label`)}</button>
+                ))}
+                {(filterClosure !== "all" || filterCognitive !== "all") && (
+                  <button type="button" onClick={() => { setFilterClosure("all"); setFilterCognitive("all"); }}
+                    className="ml-1 text-xs font-medium text-indigo-600">{tc("reset")}</button>
+                )}
+              </div>
+              <QuestionTable list={displayed} />
+            </>
+          )}
+        </div>
       )}
 
       {/* 질문 중심 탐구설계 (질문 목록 아래) */}
