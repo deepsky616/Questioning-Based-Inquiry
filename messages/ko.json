@@ -382,6 +382,8 @@
     "engagementTitle": "❤️ 좋아요·참여 분석",
     "commentInsightsTitle": "댓글 대화 분석",
     "relevanceTitle": "🎯 주제 연관성·성의 분석",
+    "tabReview": "질문 조회",
+    "tabDesign": "탐구 설계",
     "statsTitle": "📊 질문 분류 통계 현황",
     "statsCountSuffix": "· 총 {count}개",
     "listTitle": "📝 전체 질문 목록",

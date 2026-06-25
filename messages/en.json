@@ -382,6 +382,8 @@
     "engagementTitle": "❤️ Likes & engagement",
     "commentInsightsTitle": "Comment conversation analysis",
     "relevanceTitle": "🎯 Topic relevance & effort",
+    "tabReview": "Browse questions",
+    "tabDesign": "Inquiry design",
     "statsTitle": "📊 Question classification stats",
     "statsCountSuffix": "· {count} total",
     "listTitle": "📝 All questions",

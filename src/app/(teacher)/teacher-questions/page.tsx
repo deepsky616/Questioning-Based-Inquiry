@@ -39,6 +39,7 @@ import {
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -150,6 +151,7 @@ export default function QuestionsPage() {
 
   const [showSequence, setShowSequence] = useState(false);
   const [showDeployed, setShowDeployed] = useState(false);
+  const [mainTab, setMainTab] = useState<"review" | "design">("review");
   // 배포한 탐구설계 목록에서 "수정"을 누른 세션(인라인 패널 열림)
   const [editDeploySessionId, setEditDeploySessionId] = useState<string | null>(null);
   const [deletingDeployId, setDeletingDeployId] = useState<string | null>(null);
@@ -890,6 +892,14 @@ export default function QuestionsPage() {
         </div>
       )}
 
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "review" | "design")} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="review">{t("tabReview")}</TabsTrigger>
+          <TabsTrigger value="design">{t("tabDesign")}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="review" className="space-y-6">
+
       {/* 학생 참여 현황 */}
       {currentSession && (
         <Card>
@@ -1216,7 +1226,11 @@ export default function QuestionsPage() {
         </div>
       )}
 
-      {/* 질문 중심 탐구설계 (질문 목록 아래) */}
+        </TabsContent>
+
+        <TabsContent value="design" className="space-y-6">
+
+      {/* 질문 중심 탐구설계 */}
       {currentSession && (
         <div className="rounded-xl border bg-card p-4">
           <button
@@ -1369,6 +1383,9 @@ export default function QuestionsPage() {
           audience="teacher"
         />
       )}
+
+        </TabsContent>
+      </Tabs>
 
       {/* 수정 다이얼로그 */}
       <Dialog open={!!selectedQuestion} onOpenChange={() => setSelectedQuestion(null)}>
