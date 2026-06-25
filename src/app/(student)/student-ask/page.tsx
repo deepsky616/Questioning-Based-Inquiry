@@ -203,7 +203,7 @@ export default function AskPage() {
 
   const getCognitiveLabel = (c: string) =>
     (c === "factual" || c === "conceptual" || c === "controversial")
-      ? `${tCls(`${c}.label`)} ${tc("questionWord")}`
+      ? `${tCls(`${c}.label`)}`
       : c;
 
   // issue #1: 로딩 중에는 아무것도 표시하지 않음

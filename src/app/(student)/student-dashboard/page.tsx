@@ -146,7 +146,7 @@ function StudentDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                    <span className="text-sm font-medium">{tCls("closed.label")} {tc("questionWord")}</span>
+                    <span className="text-sm font-medium">{tCls("closed.label")}</span>
                   </div>
                   <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
                 </div>
@@ -157,7 +157,7 @@ function StudentDashboard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-                    <span className="text-sm font-medium">{tCls("open.label")} {tc("questionWord")}</span>
+                    <span className="text-sm font-medium">{tCls("open.label")}</span>
                   </div>
                   <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
                 </div>

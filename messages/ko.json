@@ -40,9 +40,9 @@
     "category1Sub": "답의 개방성",
     "category2Sub": "생각의 깊이",
     "closure": "닫힌 질문 / 열린 질문",
-    "cognitive": "사실 / 개념 / 논쟁",
+    "cognitive": "사실적 질문 / 개념적 질문 / 논쟁적 질문",
     "card1": "분류 1 · 닫힌 질문 / 열린 질문",
-    "card2": "분류 2 · 사실적 / 개념적 / 논쟁적 질문",
+    "card2": "분류 2 · 사실적 질문 / 개념적 질문 / 논쟁적 질문",
     "guideTitle": "질문 분류 안내",
     "closed": {
       "label": "닫힌 질문",
@@ -53,15 +53,15 @@
       "desc": "여러 답이 나올 수 있는 질문"
     },
     "factual": {
-      "label": "사실적",
+      "label": "사실적 질문",
       "desc": "사실이나 정보를 확인하는 질문"
     },
     "conceptual": {
-      "label": "개념적",
+      "label": "개념적 질문",
       "desc": "원리와 이유를 생각하는 질문"
     },
     "controversial": {
-      "label": "논쟁적",
+      "label": "논쟁적 질문",
       "desc": "내 생각·판단이 필요한 질문"
     }
   },
@@ -345,8 +345,8 @@
     "noQuestions": "해당하는 질문이 없습니다",
     "colStudent": "학생",
     "colContent": "질문 내용",
-    "colClosure": "닫힌/열린",
-    "colCognitive": "인지 수준",
+    "colClosure": "답의 개방성",
+    "colCognitive": "생각의 깊이",
     "colLikes": "좋아요",
     "colComments": "댓글",
     "colPublic": "공개",
@@ -1110,8 +1110,8 @@
     "empty": "해당하는 질문이 없습니다",
     "emptyDesc": "다른 조건으로 조회해 보세요",
     "colContent": "질문 내용",
-    "colClosure": "닫힌/열린",
-    "colCognitive": "인지 수준",
+    "colClosure": "답의 개방성",
+    "colCognitive": "생각의 깊이",
     "colPublic": "공개",
     "colSession": "수업 세션",
     "colCreated": "작성 일시",

@@ -222,7 +222,7 @@ function TeacherDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
-                        <span className="text-sm font-medium">{tCls("closed.label")} {tc("questionWord")}</span>
+                        <span className="text-sm font-medium">{tCls("closed.label")}</span>
                       </div>
                       <span className="text-2xl font-bold text-blue-600">{stats.byClosure.closed}</span>
                     </div>
@@ -233,7 +233,7 @@ function TeacherDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
-                        <span className="text-sm font-medium">{tCls("open.label")} {tc("questionWord")}</span>
+                        <span className="text-sm font-medium">{tCls("open.label")}</span>
                       </div>
                       <span className="text-2xl font-bold text-green-600">{stats.byClosure.open}</span>
                     </div>
@@ -264,7 +264,7 @@ function TeacherDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-gray-400 inline-block" />
-                        <span className="text-sm font-medium">{tCls("factual.label")} {tc("questionWord")}</span>
+                        <span className="text-sm font-medium">{tCls("factual.label")}</span>
                       </div>
                       <span className="text-2xl font-bold text-foreground">{stats.byCognitive.factual}</span>
                     </div>
@@ -275,7 +275,7 @@ function TeacherDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />
-                        <span className="text-sm font-medium">{tCls("conceptual.label")} {tc("questionWord")}</span>
+                        <span className="text-sm font-medium">{tCls("conceptual.label")}</span>
                       </div>
                       <span className="text-2xl font-bold text-purple-600">{stats.byCognitive.conceptual}</span>
                     </div>
@@ -286,7 +286,7 @@ function TeacherDashboard() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
-                        <span className="text-sm font-medium">{tCls("controversial.label")} {tc("questionWord")}</span>
+                        <span className="text-sm font-medium">{tCls("controversial.label")}</span>
                       </div>
                       <span className="text-2xl font-bold text-orange-600">{stats.byCognitive.controversial}</span>
                     </div>

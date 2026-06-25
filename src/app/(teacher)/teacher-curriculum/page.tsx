@@ -143,7 +143,7 @@ export default function CurriculumPage() {
   const tCls = useTranslations("classification");
   const tSeq = useTranslations("sequencePanel");
   const stepLabel = (n: Step) => t(`step${n}`);
-  const typeLabel = (type: string) => `${tCls(`${type}.label`)} ${tc("questionWord")}`;
+  const typeLabel = (type: string) => `${tCls(`${type}.label`)}`;
   const typeDesc = (type: string) => tCls(`${type}.desc`);
   const [step, setStep] = useState<Step>(1);
   const { toast } = useToast();
