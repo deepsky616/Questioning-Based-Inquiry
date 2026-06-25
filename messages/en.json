@@ -996,7 +996,15 @@
     "docDomainCognitive": "Cognitive",
     "docGrade": "Grade {grade}",
     "docClass": "Class {className}",
-    "docNumber": "No. {n}"
+    "docNumber": "No. {n}",
+    "docRanking": "Points & rank",
+    "docPoints": "Points",
+    "docAvgPoints": "Class avg points",
+    "docClassRank": "Class rank",
+    "docSchoolRank": "School rank",
+    "docClassOrder": "Class ranking (school)",
+    "docColPoints": "Points",
+    "docColRank": "Rank"
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

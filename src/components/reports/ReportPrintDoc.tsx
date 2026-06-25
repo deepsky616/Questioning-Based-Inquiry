@@ -16,6 +16,12 @@ export interface PrintReportItem {
   weekly?: SeriesPoint[];
   monthly?: SeriesPoint[];
   sessions: { id: string; date: string; subject: string; topic: string; analysis?: SessionAnalysisResult | null }[];
+  // 포인트·순위(있을 때만 표시). 학생: points/classRank/schoolRank, 학급: avgPoints/sumPoints/classOrder
+  ranking?: {
+    points?: number;
+    classRank?: number; classRankTotal?: number; schoolRank?: number;
+    avgPoints?: number; sumPoints?: number; classOrder?: number; classOrderTotal?: number;
+  };
 }
 
 // 인쇄 전용 리포트 문서 — '채점 결과 리포트' 양식(보라 타이틀 밴드 + 라벤더 표 + 피드백 박스)을
@@ -79,6 +85,7 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
                 <th>{t("docColNo")}</th><th className="rdoc-l">{t("docColName")}</th>
                 <th>{t("metric_questions")}</th><th>{t("metric_likesGiven")}</th><th>{t("metric_comments")}</th>
                 <th>{t("metric_likesReceived")}</th><th>{t("metric_commentsReceived")}</th><th>{t("docColAnalyzed")}</th>
+                <th>{t("docColPoints")}</th><th>{t("docColRank")}</th>
               </tr>
             </thead>
             <tbody>
@@ -87,6 +94,7 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
                   <td>{it.studentNumber ?? "-"}</td><td className="rdoc-l">{it.name}</td>
                   <td>{it.totals.questions}</td><td>{it.totals.likesGiven}</td><td>{it.totals.comments}</td>
                   <td>{it.totals.likesReceived}</td><td>{it.totals.commentsReceived}</td><td>{analyzedSessions(it).length}</td>
+                  <td>{it.ranking?.points ?? "-"}</td><td>{it.ranking?.classRank ?? "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -120,6 +128,30 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
                 </div>
               ))}
             </div>
+
+            {/* 포인트 · 순위 */}
+            {it.ranking && (
+              <>
+                <div className="rdoc-section-label">{t("docRanking")}</div>
+                <div className="rdoc-kpis">
+                  {it.ranking.points != null && (
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#d97706" }}>{it.ranking.points}</div><div className="rdoc-kpi-l">{t("docPoints")}</div></div>
+                  )}
+                  {it.ranking.avgPoints != null && (
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#d97706" }}>{it.ranking.avgPoints}</div><div className="rdoc-kpi-l">{t("docAvgPoints")}</div></div>
+                  )}
+                  {it.ranking.classRank != null && (
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{it.ranking.classRank}{it.ranking.classRankTotal ? ` / ${it.ranking.classRankTotal}` : ""}</div><div className="rdoc-kpi-l">{t("docClassRank")}</div></div>
+                  )}
+                  {it.ranking.schoolRank != null && (
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{it.ranking.schoolRank}</div><div className="rdoc-kpi-l">{t("docSchoolRank")}</div></div>
+                  )}
+                  {it.ranking.classOrder != null && (
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#6c5ce7" }}>{it.ranking.classOrder}{it.ranking.classOrderTotal ? ` / ${it.ranking.classOrderTotal}` : ""}</div><div className="rdoc-kpi-l">{t("docClassOrder")}</div></div>
+                  )}
+                </div>
+              </>
+            )}
 
             {/* 질문 분류(영역·유형·개수·비율) */}
             <div className="rdoc-section-label">{t("docClassification")}</div>

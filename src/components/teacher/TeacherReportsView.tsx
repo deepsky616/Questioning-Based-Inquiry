@@ -110,35 +110,90 @@ export function TeacherReportsView() {
     setPrintItems(items);
     setPrintTick((n) => n + 1);
   };
-  // 학급 전체 출력: 학급 집계(전체 학생 종합) 리포트 1부 — 세션 전체(scope=class) 분석 포함
-  const printClassReport = () => {
-    if (!report) return;
-    const klass = report.klass as { grade: string; className: string; school?: string | null };
-    doPrint([{
-      name: t("gradeClass", { grade: klass.grade, className: klass.className }),
-      school: klass.school ?? undefined,
-      totals: report.totals,
-      classification: report.classification,
-      weekly: report.weekly,
-      monthly: report.monthly,
-      sessions: (report.sessions as PrintReportItem["sessions"]) ?? [],
-    }]);
+  // 포인트·순위: class-ranks(반 전원 포인트+석차) + class-leaderboard(반 순위) 한 번에
+  interface RankRow { id: string; totalPoints: number; classRank: number; schoolRank: number }
+  const fetchRanking = async (grade: string, className: string) => {
+    const [rk, lb] = await Promise.all([
+      fetch(`/api/points/class-ranks?grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(`/api/points/class-leaderboard?scope=school&grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+    const students: RankRow[] = rk?.students ?? [];
+    return {
+      byId: new Map(students.map((s) => [s.id, s])),
+      total: rk?.total ?? students.length,
+      sumPoints: students.reduce((a, s) => a + (s.totalPoints || 0), 0),
+      avgPoints: lb?.myClass?.avgPoints as number | undefined,
+      classOrder: lb?.myClass?.rank as number | undefined,
+      classOrderTotal: lb?.total as number | undefined,
+    };
+  };
+  const studentRanking = (rk: Awaited<ReturnType<typeof fetchRanking>>, id: string): PrintReportItem["ranking"] => {
+    const s = rk.byId.get(id);
+    return s ? { points: s.totalPoints, classRank: s.classRank, classRankTotal: rk.total, schoolRank: s.schoolRank } : undefined;
   };
 
-  // 전체 학생 출력: 학급 전원 리포트를 모아서 인쇄
+  // 학급 전체 출력: 학급 집계(전체 학생 종합) 리포트 1부 — 세션 전체(scope=class) 분석 + 반 포인트·순위
+  const printClassReport = async () => {
+    if (!report || printBusy) return;
+    setPrintBusy(true);
+    try {
+      const klass = report.klass as { grade: string; className: string; school?: string | null };
+      const rk = await fetchRanking(klass.grade, klass.className);
+      doPrint([{
+        name: t("gradeClass", { grade: klass.grade, className: klass.className }),
+        school: klass.school ?? undefined,
+        totals: report.totals,
+        classification: report.classification,
+        weekly: report.weekly,
+        monthly: report.monthly,
+        sessions: (report.sessions as PrintReportItem["sessions"]) ?? [],
+        ranking: { avgPoints: rk.avgPoints, sumPoints: rk.sumPoints, points: rk.sumPoints, classOrder: rk.classOrder, classOrderTotal: rk.classOrderTotal },
+      }]);
+    } finally {
+      setPrintBusy(false);
+    }
+  };
+
+  // 학생 개별 출력: 현재 선택 학생 + 포인트·순위
+  const printOneStudent = async () => {
+    if (!studentReport || !studentId || printBusy) return;
+    setPrintBusy(true);
+    try {
+      const grade = studentReport.student.grade ?? "";
+      const className = studentReport.student.className ?? "";
+      const rk = grade && className ? await fetchRanking(grade, className) : null;
+      const item = toItem(studentReport);
+      if (rk) item.ranking = studentRanking(rk, studentId);
+      doPrint([item]);
+    } finally {
+      setPrintBusy(false);
+    }
+  };
+
+  // 전체 학생 출력: 학급 전원 리포트를 모아서 인쇄(+ 포인트·순위)
   const printAllStudents = async () => {
     if (!report || printBusy) return;
     setPrintBusy(true);
     try {
+      const klass = report.klass as { grade: string; className: string };
       const ids = (report.perStudent ?? []).map((s) => s.id);
-      const results = await Promise.all(
-        ids.map((id) =>
-          fetch(`/api/reports/student?studentId=${encodeURIComponent(id)}`)
-            .then((r) => (r.ok ? r.json() : null))
-            .catch(() => null),
+      const [results, rk] = await Promise.all([
+        Promise.all(
+          ids.map((id) =>
+            fetch(`/api/reports/student?studentId=${encodeURIComponent(id)}`)
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null),
+          ),
         ),
-      );
-      const items = results.filter(Boolean).map((d) => toItem(d as StudentReport));
+        fetchRanking(klass.grade, klass.className),
+      ]);
+      const items: PrintReportItem[] = [];
+      results.forEach((d, i) => {
+        if (!d) return;
+        const item = toItem(d as StudentReport);
+        item.ranking = studentRanking(rk, ids[i]);
+        items.push(item);
+      });
       doPrint(items);
     } finally {
       setPrintBusy(false);
@@ -243,10 +298,10 @@ export function TeacherReportsView() {
               )}
               {view === "student" && studentId && studentReport && (
                 <button
-                  onClick={() => doPrint([toItem(studentReport)])}
+                  onClick={printOneStudent}
                   disabled={printBusy}
                   className="rounded-md border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-60"
-                >{t("printIndividual")}</button>
+                >{printBusy ? t("loadingReport") : t("printIndividual")}</button>
               )}
               {view === "student" && (
                 <button
