@@ -601,6 +601,55 @@ export default function QuestionsPage() {
     }
   };
 
+  // 세션 분석 교사 수정(대시보드 상세 리포트와 동일하게)
+  const [editingSession, setEditingSession] = useState(false);
+  const [sessionEditDraft, setSessionEditDraft] = useState<Record<string, string>>({});
+  const [savingSessionEdit, setSavingSessionEdit] = useState(false);
+  const startEditSession = () => {
+    if (!sessionAnalysis) return;
+    setSessionEditDraft({
+      summary: sessionAnalysis.summary ?? "",
+      balanceInsights: sessionAnalysis.balanceInsights ?? "",
+      bestQuestion: sessionAnalysis.bestQuestion ?? "",
+      engagementInsights: sessionAnalysis.engagementInsights ?? "",
+      commentInsights: sessionAnalysis.commentInsights ?? "",
+      relevanceInsights: sessionAnalysis.relevanceInsights ?? "",
+      nextQuestions: sessionAnalysis.nextQuestions ?? "",
+      insights: sessionAnalysis.insights ?? "",
+    });
+    setEditingSession(true);
+  };
+  const cancelEditSession = () => { setEditingSession(false); setSessionEditDraft({}); };
+  const saveSessionEdit = async () => {
+    if (!currentSession) return;
+    setSavingSessionEdit(true);
+    try {
+      const res = await fetch("/api/reports/session-analysis", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: selectedSessionId, scope: "class", result: { ...(sessionAnalysis ?? {}), ...sessionEditDraft } }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? t("sessionAnalysisFailed"));
+      setSessionAnalysis((prev) => (prev ? { ...prev, ...sessionEditDraft } : prev));
+      setEditingSession(false);
+      setSessionEditDraft({});
+    } catch (err) {
+      setSessionAnalysisError(err instanceof Error ? err.message : t("sessionAnalysisFailed"));
+    } finally {
+      setSavingSessionEdit(false);
+    }
+  };
+  const sessionEditFields: [string, string][] = [
+    ["summary", t("summaryTitle")],
+    ["balanceInsights", t("balanceTitle")],
+    ["bestQuestion", t("bestTitle")],
+    ["engagementInsights", t("engagementTitle")],
+    ["commentInsights", t("commentInsightsTitle")],
+    ["relevanceInsights", t("relevanceTitle")],
+    ["nextQuestions", t("nextTitle")],
+    ["insights", t("insightsTitle")],
+  ];
+
   const handleLoadParticipation = async () => {
     if (!selectedSessionId) return;
     setIsLoadingParticipation(true);
@@ -1014,21 +1063,47 @@ export default function QuestionsPage() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">{t("sessionAnalysisTitle")}</CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isAnalyzingSession}
-                onClick={handleAnalyzeSession}
-                className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-              >
-                {isAnalyzingSession ? t("analyzing") : t("analyze")}
-              </Button>
+              {editingSession ? (
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" disabled={savingSessionEdit} onClick={saveSessionEdit} className="text-xs">{tc("save")}</Button>
+                  <Button type="button" size="sm" variant="outline" disabled={savingSessionEdit} onClick={cancelEditSession} className="text-xs">{tc("cancel")}</Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  {sessionAnalysis && !isAnalyzingSession && (
+                    <Button type="button" size="sm" variant="outline" onClick={startEditSession} className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50">{t("editAnalysisBtn")}</Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isAnalyzingSession}
+                    onClick={handleAnalyzeSession}
+                    className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                  >
+                    {isAnalyzingSession ? t("analyzing") : sessionAnalysis ? t("reanalyzeBtn") : t("analyze")}
+                  </Button>
+                </div>
+              )}
             </div>
           </CardHeader>
-          {(sessionAnalysis || sessionAnalysisError) && (
+          {(sessionAnalysis || sessionAnalysisError || editingSession) && (
             <CardContent className="space-y-4">
-              {sessionAnalysisError ? (
+              {editingSession ? (
+                <div className="space-y-3">
+                  {sessionEditFields.map(([key, label]) => (
+                    <div key={key}>
+                      <label className="text-xs font-semibold text-foreground">{label}</label>
+                      <textarea
+                        value={sessionEditDraft[key] ?? ""}
+                        onChange={(e) => setSessionEditDraft((d) => ({ ...d, [key]: e.target.value }))}
+                        rows={2}
+                        className="mt-0.5 w-full rounded-md border bg-background px-2 py-1 text-sm leading-6 text-foreground"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : sessionAnalysisError ? (
                 <p className="text-sm text-red-600 dark:text-red-400">{sessionAnalysisError}</p>
               ) : sessionAnalysis ? (
                 <>
