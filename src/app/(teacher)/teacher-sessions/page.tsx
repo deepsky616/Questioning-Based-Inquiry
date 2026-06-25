@@ -454,10 +454,10 @@ export default function TeacherSessionsPage() {
                     <span className="text-xs font-normal text-muted-foreground">{t("countSuffix", { count: activeSessions.length })}</span>
                   </h3>
                   <div className="hidden sm:flex items-center gap-5 text-xs font-normal text-foreground whitespace-nowrap">
-                    <span className="w-16 text-center">{tSeq("activeLabel")}</span>
-                    <span className="w-16 text-center">{tSeq("publicLabel")}</span>
-                    <span className="w-16 text-center">{tSeq("likesLabel")}</span>
-                    <span className="w-16 text-center">{tSeq("commentsLabel")}</span>
+                    <span className="w-20 text-center">{tSeq("activeLabel")}</span>
+                    <span className="w-20 text-center">{tSeq("publicLabel")}</span>
+                    <span className="w-20 text-center">{tSeq("likesLabel")}</span>
+                    <span className="w-20 text-center">{tSeq("commentsLabel")}</span>
                     <span className="w-24 text-center">{t("colManage")}</span>
                   </div>
                 </div>
@@ -487,10 +487,10 @@ export default function TeacherSessionsPage() {
                     <span className="text-xs font-normal text-muted-foreground">{t("countSuffix", { count: pastSessions.length })}</span>
                   </h3>
                   <div className="hidden sm:flex items-center gap-5 text-xs font-normal text-foreground whitespace-nowrap">
-                    <span className="w-16 text-center">{tSeq("activeLabel")}</span>
-                    <span className="w-16 text-center">{tSeq("publicLabel")}</span>
-                    <span className="w-16 text-center">{tSeq("likesLabel")}</span>
-                    <span className="w-16 text-center">{tSeq("commentsLabel")}</span>
+                    <span className="w-20 text-center">{tSeq("activeLabel")}</span>
+                    <span className="w-20 text-center">{tSeq("publicLabel")}</span>
+                    <span className="w-20 text-center">{tSeq("likesLabel")}</span>
+                    <span className="w-20 text-center">{tSeq("commentsLabel")}</span>
                     <span className="w-24 text-center">{t("colManage")}</span>
                   </div>
                 </div>
@@ -598,10 +598,10 @@ function SessionRow({
           </div>
         </div>
         <div className="flex items-center gap-5 shrink-0">
-          <div className="w-16 flex justify-center"><Switch checked={session.isActive} onCheckedChange={() => onToggleActive(session.id, session.isActive)} /></div>
-          <div className="w-16 flex justify-center"><Switch checked={session.defaultQuestionPublic} onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)} /></div>
-          <div className="w-16 flex justify-center"><Switch checked={session.likesVisibleToPeers} onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)} /></div>
-          <div className="w-16 flex justify-center"><Switch checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} /></div>
+          <div className="w-20 flex justify-center"><Switch checked={session.isActive} onCheckedChange={() => onToggleActive(session.id, session.isActive)} /></div>
+          <div className="w-20 flex justify-center"><Switch checked={session.defaultQuestionPublic} onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)} /></div>
+          <div className="w-20 flex justify-center"><Switch checked={session.likesVisibleToPeers} onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)} /></div>
+          <div className="w-20 flex justify-center"><Switch checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} /></div>
           <div className="w-24 flex justify-center gap-1">
             <Button variant="ghost" size="sm" className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 h-7 px-2 text-xs" onClick={openEdit}>
               {tc("edit")}
