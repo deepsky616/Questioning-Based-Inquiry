@@ -942,6 +942,7 @@
     "analyzeAll": "Analyze all",
     "analyzing": "Analyzing...",
     "analyzeAllBtn": "📋 Analyze all ({count})",
+    "analyzeAllStudentBtn": "📋 Analyze this student ({count})",
     "noSessionsInPeriod": "No class sessions in this period",
     "secSummary": "📌 Summary",
     "secBalance": "⚖️ Question type balance",

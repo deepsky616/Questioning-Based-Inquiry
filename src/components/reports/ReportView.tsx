@@ -53,8 +53,10 @@ export interface ReportViewProps {
   analysisCacheKey?: string;
   /** 분석/재분석 버튼 노출 여부. false면 저장된 결과만 보여준다(학생 본인 뷰=읽기 전용). 기본 true. */
   canAnalyze?: boolean;
-  /** 학급 보기에서 '전체 학생 일괄 분석'을 위한 콜백. cursor로 나눠 호출하고 진행 상태를 돌려준다. */
+  /** '전체 학생 일괄 분석'을 위한 콜백. cursor로 나눠 호출하고 진행 상태를 돌려준다. */
   bulkAnalyze?: (sessionIds: string[], cursor: number) => Promise<{ total: number; nextCursor: number; done: boolean; analyzedThisCall: number; error?: string }>;
+  /** 일괄 분석 대상 세션 풀(학급 전체 세션). 주면 현재 기간 필터로 추려 일괄 분석에 사용(학생별 탭에서 학급 전체 세션 기준). 없으면 화면의 세션을 사용. */
+  bulkSessions?: SessionMeta[];
   /** ReportView 자체 인쇄 버튼 노출 여부(교사 페이지는 별도 출력 버튼을 쓰므로 숨김). 기본 true. */
   showPrintButton?: boolean;
   /** 교사가 수정한 분석 결과를 저장하는 콜백. 주어지면 분석 블록에 '수정'이 나타난다. */
@@ -116,7 +118,7 @@ function sessionPeriod(dateStr: string, mode: ReportRange, locale: string, other
 
 export function ReportView({
   scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
-  participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze, showPrintButton = true, onSaveAnalysis,
+  participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze, bulkSessions, showPrintButton = true, onSaveAnalysis,
 }: ReportViewProps) {
   const [range, setRange] = useState<ReportRange>("week");
   const series = range === "week" ? weekly : monthly;
@@ -219,6 +221,8 @@ export function ReportView({
   }, [periods, period]);
 
   const filteredSessions = allSessions.filter((s) => sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix")).key === period);
+  // 일괄 분석 대상(학급 전체 세션 풀이 있으면 그것을 현재 기간으로 추림) 수
+  const bulkPeriodCount = (bulkSessions ?? allSessions).filter((s) => sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix")).key === period).length;
 
   // 분석 결과를 QueryClient에 캐시해 탭/뷰 전환(remount)에도 유지한다.
   const analysisKey = (id: string) => ["session-analysis", analysisCacheKey ?? "default", id] as const;
@@ -285,9 +289,13 @@ export function ReportView({
   };
 
   // 전체 학생 일괄 분석: 현재 기간의 세션들 × 반 전체 학생을 나눠서 분석(서버가 cursor로 진행).
+  // 대상 세션은 bulkSessions(학급 전체)가 있으면 그것을 현재 기간으로 추려 쓰고, 없으면 화면의 세션을 쓴다.
   const runBulkAnalyze = async () => {
     if (!bulkAnalyze) return;
-    const ids = filteredSessions.map((s) => s.id);
+    const pool = bulkSessions ?? allSessions;
+    const ids = pool
+      .filter((s) => sessionPeriod(s.date, sessRange, locale, t("other"), t("weekSuffix")).key === period)
+      .map((s) => s.id);
     if (ids.length === 0) return;
     bulkStop.current = false;
     setBulk({ running: true, processed: 0, total: 0, analyzed: 0 });
@@ -498,15 +506,15 @@ export function ReportView({
             </select>
             {canAnalyze && (
               <Button size="sm" disabled={analyzingAll || filteredSessions.length === 0} onClick={analyzeAll} className="font-semibold">
-                {analyzingAll ? t("analyzing") : t("analyzeAllBtn", { count: filteredSessions.length })}
+                {analyzingAll ? t("analyzing") : t(scope === "student" ? "analyzeAllStudentBtn" : "analyzeAllBtn", { count: filteredSessions.length })}
               </Button>
             )}
-            {canAnalyze && scope === "class" && bulkAnalyze && (
+            {canAnalyze && bulkAnalyze && (
               <>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={bulk.running || filteredSessions.length === 0}
+                  disabled={bulk.running || bulkPeriodCount === 0}
                   onClick={runBulkAnalyze}
                   className="font-semibold"
                   title={t("bulkAnalyzeHint")}
@@ -523,7 +531,7 @@ export function ReportView({
               </>
             )}
           </div>
-          {scope === "class" && bulkAnalyze && bulk.note && !bulk.running && (
+          {canAnalyze && bulkAnalyze && bulk.note && !bulk.running && (
             <p className="no-print -mt-1 text-xs text-muted-foreground">{bulk.note}</p>
           )}
 

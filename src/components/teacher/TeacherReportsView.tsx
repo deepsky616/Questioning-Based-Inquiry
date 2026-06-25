@@ -332,7 +332,6 @@ export function TeacherReportsView() {
           sessions={report.sessions}
           analyzeSession={(id) => analyzeClassSession(id, t("analysisFailed"))}
           analysisCacheKey={`class:${selected}`}
-          bulkAnalyze={bulkAnalyzeClass(report.klass.grade, report.klass.className, t("analysisFailed"))}
           onSaveAnalysis={(id, result) => saveSessionAnalysis({ sessionId: id, scope: "class", result }, t("analysisFailed"))}
           showPrintButton={false}
           participationLabel={t("participationClass")}
@@ -354,6 +353,8 @@ export function TeacherReportsView() {
           analyzeSession={analyzeStudentSessionFor(studentId, t("analysisFailed"))}
           analysisCacheKey={`teacher-student:${studentId}`}
           onSaveAnalysis={(id, result) => saveSessionAnalysis({ sessionId: id, scope: "student", studentId, result }, t("analysisFailed"))}
+          bulkAnalyze={report ? bulkAnalyzeClass(report.klass.grade, report.klass.className, t("analysisFailed")) : undefined}
+          bulkSessions={report?.sessions}
           showPrintButton={false}
           participationLabel={t("participationStudent")}
           receptionLabel={t("receptionStudent")}
