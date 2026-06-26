@@ -128,15 +128,20 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 /** 참여 현황 셀: 활동 개수 + 그 아래 가장 최근 시각, 호버 시 전체 시각 목록 툴팁. */
 function ActivityCell({ count, times, color, refDate }: { count: number; times: string[]; color: string; refDate?: string }) {
   if (count === 0) {
-    return <td className="px-3 py-2 text-center text-sm font-semibold text-muted-foreground">-</td>;
+    return <td className="px-3 py-2 text-center align-top text-sm font-semibold text-muted-foreground">-</td>;
   }
   const latest = times[times.length - 1];
   const latestLabel = latest ? (isSameDay(latest, refDate) ? formatClock(latest) : formatShortDateTime(latest)) : "";
   const tooltip = times.map((tm) => formatDateTime(tm)).join("\n");
   return (
-    <td className="px-3 py-2 text-center whitespace-nowrap" title={tooltip || undefined}>
-      <span className={`text-sm font-semibold ${color}`}>{count}</span>
-      {latestLabel && <span className="ml-1.5 text-xs text-muted-foreground">{latestLabel}</span>}
+    <td className="px-3 py-2 text-center align-top whitespace-nowrap" title={tooltip || undefined}>
+      <div className={`text-sm font-semibold ${color}`}>{count}</div>
+      {latestLabel && (
+        <div className="mt-0.5 inline-flex items-center gap-0.5 text-[11px] leading-tight text-muted-foreground">
+          <span aria-hidden>🕒</span>
+          <span>{latestLabel}</span>
+        </div>
+      )}
     </td>
   );
 }
@@ -1036,7 +1041,7 @@ export default function QuestionsPage() {
                       )
                       .map((s) => (
                         <tr key={s.id} className={s.hasQuestion ? "bg-background" : "bg-muted/40"}>
-                          <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                          <td className="px-3 py-2 align-top text-xs text-muted-foreground whitespace-nowrap">
                             {[
                               s.grade && t("gradeLabel", { grade: s.grade }),
                               s.className && t("classLabel", { className: s.className }),
@@ -1045,11 +1050,11 @@ export default function QuestionsPage() {
                               .filter(Boolean)
                               .join(" ")}
                           </td>
-                          <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{s.name}</td>
+                          <td className="px-3 py-2 align-top font-medium text-foreground whitespace-nowrap">{s.name}</td>
                           <ActivityCell count={s.questionCount} times={s.questionTimes} color="text-foreground" refDate={currentSession?.date} />
                           <ActivityCell count={s.commentCount} times={s.commentTimes} color="text-indigo-600 dark:text-indigo-400" refDate={currentSession?.date} />
                           <ActivityCell count={s.likeCount} times={s.likeTimes} color="text-rose-500 dark:text-rose-400" refDate={currentSession?.date} />
-                          <td className="px-3 py-2 text-center">
+                          <td className="px-3 py-2 text-center align-top">
                             {s.hasQuestion ? (
                               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold dark:bg-green-950/50 dark:text-green-400">
                                 ✓
