@@ -80,6 +80,7 @@ function LikeButton({
 
 export function UnitDesignView() {
   const t = useTranslations("unitDesign");
+  const tEx = useTranslations("explore");
   const ct = useContentTranslation();
   const TYPE_KEY: Record<string, string> = {
     factual: "typeFactual",
@@ -245,6 +246,15 @@ export function UnitDesignView() {
                                   <span>💬 {pub.commentCount}</span>
                                   <span>{expandedId === pub.id ? t("close") : t("comment")}</span>
                                 </button>
+                                {/* 교사가 댓글을 비공개로 설정한 경우(친구 댓글 비노출) 안내 배지 */}
+                                {!commentsVisible && (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+                                    title={tEx("commentsHiddenHint")}
+                                  >
+                                    🔒 {tEx("commentsHidden")}
+                                  </span>
+                                )}
                               </div>
                             )}
                             {pub && expandedId === pub.id && (
