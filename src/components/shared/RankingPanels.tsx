@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 type IndivScope = "class" | "school" | "all";
@@ -97,22 +98,23 @@ export function RankingPanel({
 }) {
   const t = useTranslations("ranking");
   const [scope, setScope] = useState<IndivScope>(defaultScope);
-  const [data, setData] = useState<IndivData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const selfRef = useRef<HTMLTableRowElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setIsLoading(true);
-    const params = new URLSearchParams({ scope });
-    if (gradeParam) params.set("grade", gradeParam);
-    if (classNameParam) params.set("className", classNameParam);
-    fetch(`/api/points/leaderboard?${params}`)
-      .then((r) => r.json())
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, [scope, gradeParam, classNameParam]);
+  // 랭킹은 react-query로 주기 폴링(12초)+포커스 재조회.
+  const { data, isLoading } = useQuery<IndivData>({
+    queryKey: ["leaderboard", scope, gradeParam, classNameParam],
+    queryFn: async () => {
+      const params = new URLSearchParams({ scope });
+      if (gradeParam) params.set("grade", gradeParam);
+      if (classNameParam) params.set("className", classNameParam);
+      const r = await fetch(`/api/points/leaderboard?${params}`);
+      if (!r.ok) throw new Error("failed to load leaderboard");
+      return r.json();
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   useEffect(() => {
     // 페이지 전체가 아니라 순위 목록 컨테이너 안에서만 본인 행이 보이도록 스크롤한다
@@ -237,22 +239,23 @@ export function StudentRankPanel({
   highlightSelf?: boolean;
 }) {
   const t = useTranslations("ranking");
-  const [data, setData] = useState<ClassRankData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const selfRef = useRef<HTMLTableRowElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setIsLoading(true);
-    const params = new URLSearchParams();
-    if (gradeParam) params.set("grade", gradeParam);
-    if (classNameParam) params.set("className", classNameParam);
-    fetch(`/api/points/class-ranks?${params}`)
-      .then((r) => r.json())
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, [gradeParam, classNameParam]);
+  // 우리반 순위는 react-query로 주기 폴링(12초)+포커스 재조회.
+  const { data, isLoading } = useQuery<ClassRankData>({
+    queryKey: ["class-ranks", gradeParam, classNameParam],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (gradeParam) params.set("grade", gradeParam);
+      if (classNameParam) params.set("className", classNameParam);
+      const r = await fetch(`/api/points/class-ranks?${params}`);
+      if (!r.ok) throw new Error("failed to load class ranks");
+      return r.json();
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   useEffect(() => {
     if (highlightSelf && selfRef.current && containerRef.current) {
@@ -332,22 +335,23 @@ export function ClassRankingPanel({
 }) {
   const t = useTranslations("ranking");
   const [scope, setScope] = useState<ClassScope>(defaultScope);
-  const [data, setData] = useState<ClassData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const selfRef = useRef<HTMLTableRowElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setIsLoading(true);
-    const params = new URLSearchParams({ scope });
-    if (gradeParam) params.set("grade", gradeParam);
-    if (classNameParam) params.set("className", classNameParam);
-    fetch(`/api/points/class-leaderboard?${params}`)
-      .then((r) => r.json())
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, [scope, gradeParam, classNameParam]);
+  // 반별 랭킹은 react-query로 주기 폴링(12초)+포커스 재조회.
+  const { data, isLoading } = useQuery<ClassData>({
+    queryKey: ["class-leaderboard", scope, gradeParam, classNameParam],
+    queryFn: async () => {
+      const params = new URLSearchParams({ scope });
+      if (gradeParam) params.set("grade", gradeParam);
+      if (classNameParam) params.set("className", classNameParam);
+      const r = await fetch(`/api/points/class-leaderboard?${params}`);
+      if (!r.ok) throw new Error("failed to load class leaderboard");
+      return r.json();
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   useEffect(() => {
     // 페이지 전체가 아니라 순위 목록 컨테이너 안에서만 본인 행이 보이도록 스크롤한다

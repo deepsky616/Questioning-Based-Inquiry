@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
@@ -89,40 +90,54 @@ export function UnitDesignView() {
     student: "typeStudent",
   };
   const typeLabel = (type: string) => (TYPE_KEY[type] ? t(TYPE_KEY[type]) : type);
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
-  const [published, setPublished] = useState<Published[]>([]);
-  const [likesVisible, setLikesVisible] = useState(true);
-  const [commentsVisible, setCommentsVisible] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch("/api/sessions")
-      .then((res) => res.json())
-      .then((data: QuestionSession[]) => {
-        const unitDesignSessions = sortSessionsAsc(Array.isArray(data) ? data : [])
-          .filter((session) => (session.sharedQuestions?.length ?? 0) > 0);
-        setSessions(unitDesignSessions);
-        if (unitDesignSessions.length > 0) setSelectedId(unitDesignSessions[0].id);
-      })
-      .catch(() => setSessions([]))
-      .finally(() => setIsLoading(false));
-  }, []);
+  // 배포된 탐구 세션 목록은 react-query로 주기 폴링(12초)+포커스 재조회.
+  const { data: sessions = [], isLoading } = useQuery<QuestionSession[]>({
+    queryKey: ["unit-design-sessions"],
+    queryFn: async () => {
+      const r = await fetch("/api/sessions");
+      if (!r.ok) throw new Error("failed to load sessions");
+      const data = await r.json();
+      return sortSessionsAsc(Array.isArray(data) ? data : []).filter(
+        (session) => (session.sharedQuestions?.length ?? 0) > 0,
+      );
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
-  // 선택한 세션의 배포 질문(좋아요·댓글 대상)과 공개 설정을 불러온다
+  // 첫 세션 자동 선택
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId && sessions.length > 0) setSelectedId(sessions[0].id);
+  }, [sessions, selectedId]);
+
+  // 세션 변경 시 펼침 상태 초기화
+  useEffect(() => {
     setExpandedId(null);
-    fetch(`/api/sessions/${selectedId}/publish-questions`)
-      .then((r) => r.json())
-      .then((d) => {
-        setPublished(Array.isArray(d.published) ? d.published : []);
-        setLikesVisible(d.likesVisible ?? true);
-        setCommentsVisible(d.commentsVisible ?? true);
-      })
-      .catch(() => setPublished([]));
   }, [selectedId]);
+
+  // 선택 세션의 배포 질문(좋아요·댓글수)과 공개 설정도 주기 폴링(12초)+포커스 재조회.
+  const publishedKey = ["unit-design-published", selectedId] as const;
+  const { data: pubData } = useQuery<{ published: Published[]; likesVisible: boolean; commentsVisible: boolean }>({
+    queryKey: publishedKey,
+    queryFn: async () => {
+      const r = await fetch(`/api/sessions/${selectedId}/publish-questions`);
+      if (!r.ok) throw new Error("failed to load published questions");
+      return r.json();
+    },
+    enabled: Boolean(selectedId),
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
+  const published: Published[] = useMemo(
+    () => (Array.isArray(pubData?.published) ? pubData!.published : []),
+    [pubData],
+  );
+  const likesVisible = pubData?.likesVisible ?? true;
+  const commentsVisible = pubData?.commentsVisible ?? true;
 
   const selectedSession = sessions.find((session) => session.id === selectedId) ?? sessions[0] ?? null;
   const grouped = useMemo(
@@ -136,10 +151,15 @@ export function UnitDesignView() {
     [published],
   );
 
+  // 좋아요·댓글수는 캐시에 즉시 반영(다음 폴링에서 서버 값으로 확정)
   const updateLike = (id: string, count: number, my: boolean) =>
-    setPublished((prev) => prev.map((p) => (p.id === id ? { ...p, likeCount: count, myLike: my } : p)));
+    queryClient.setQueryData<{ published: Published[]; likesVisible: boolean; commentsVisible: boolean }>(publishedKey, (prev) =>
+      prev ? { ...prev, published: prev.published.map((p) => (p.id === id ? { ...p, likeCount: count, myLike: my } : p)) } : prev,
+    );
   const setCommentCount = (id: string, n: number) =>
-    setPublished((prev) => prev.map((p) => (p.id === id ? { ...p, commentCount: n } : p)));
+    queryClient.setQueryData<{ published: Published[]; likesVisible: boolean; commentsVisible: boolean }>(publishedKey, (prev) =>
+      prev ? { ...prev, published: prev.published.map((p) => (p.id === id ? { ...p, commentCount: n } : p)) } : prev,
+    );
 
   return (
     <div className="space-y-6">

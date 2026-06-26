@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -198,19 +199,24 @@ function StudentDetailDialog({
   const tc = useTranslations("common");
   const tCls = useTranslations("classification");
   const locale = useLocale();
-  const [stats, setStats] = useState<StudentStats | null>(null);
+  const queryClient = useQueryClient();
   const [period, setPeriod] = useState<Period>("month");
   const [metric, setMetric] = useState<Metric>("question");
   const [delta, setDelta] = useState(0);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    fetch(`/api/teacher/students/${student.id}/stats`)
-      .then((r) => r.json())
-      .then((d) => setStats(d))
-      .catch(() => {});
-  }, [student.id]);
+  // 학생 상세 통계(질문·댓글·포인트)는 react-query로 주기 폴링(12초)+포커스 재조회.
+  const { data: stats = null } = useQuery<StudentStats>({
+    queryKey: ["student-stats", student.id],
+    queryFn: async () => {
+      const r = await fetch(`/api/teacher/students/${student.id}/stats`);
+      if (!r.ok) throw new Error("failed to load student stats");
+      return r.json();
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   const series = useMemo(
     () => (stats ? buildSeries(stats.events, period, locale) : []),
@@ -228,9 +234,8 @@ function StudentDetailDialog({
       });
       if (res.ok) {
         setDelta(0); setReason("");
-        // stats 재조회
-        const refreshed = await fetch(`/api/teacher/students/${student.id}/stats`).then((r) => r.json());
-        setStats(refreshed);
+        // 포인트 부여 후 상세 통계·목록 캐시 무효화(폴링과 무관하게 즉시 최신화)
+        await queryClient.invalidateQueries({ queryKey: ["student-stats", student.id] });
         onChanged();
       }
     } catch {} finally { setSaving(false); }
@@ -454,27 +459,26 @@ export default function StudentsPage() {
   const tPages = useTranslations("pages");
   const t = useTranslations("students");
   const tSet = useTranslations("settings");
+  const queryClient = useQueryClient();
   const [mgmtTab, setMgmtTab] = useState<"list" | "bulk" | "reset">("list");
-  const [students, setStudents] = useState<Student[]>([]);
-  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterClass, setFilterClass] = useState<string>("all");
   const [selected, setSelected] = useState<Student | null>(null);
 
-  const load = useCallback(() => {
-    setIsLoading(true);
-    fetch("/api/teacher/students")
-      .then((r) => r.json())
-      .then((data) => {
-        setStudents(data.students ?? []);
-        setTeacherClasses(data.teacherClasses ?? []);
-      })
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  // 학생 목록(질문수·댓글수·포인트 집계)은 react-query로 주기 폴링(12초)+포커스 재조회.
+  const { data, isLoading } = useQuery<{ students: Student[]; teacherClasses: TeacherClass[] }>({
+    queryKey: ["teacher-student-list"],
+    queryFn: async () => {
+      const r = await fetch("/api/teacher/students");
+      if (!r.ok) throw new Error("failed to load students");
+      return r.json();
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
+  const students = data?.students ?? [];
+  const teacherClasses = data?.teacherClasses ?? [];
+  const refetchList = () => queryClient.invalidateQueries({ queryKey: ["teacher-student-list"] });
 
   const normalizedSearch = search.trim().replace(/학년|반/g, "").trim();
 
@@ -686,7 +690,7 @@ export default function StudentsPage() {
         <StudentDetailDialog
           student={selected}
           onClose={() => setSelected(null)}
-          onChanged={load}
+          onChanged={refetchList}
         />
       )}
     </div>

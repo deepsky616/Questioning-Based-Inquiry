@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { StudentReportView } from "@/components/reports/StudentReportView";
@@ -52,37 +53,32 @@ function StudentDashboard() {
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
   const setTab = (v: "overview" | "reports") =>
     router.replace(v === "reports" ? "/student-dashboard?tab=reports" : "/student-dashboard", { scroll: false });
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState<Stats>({
-    total: 0,
-    byClosure: { closed: 0, open: 0 },
-    byCognitive: { factual: 0, conceptual: 0, controversial: 0 },
+  // 내 질문/통계는 react-query로 주기 폴링(12초)+포커스 재조회.
+  const { data: allQuestions = [], isLoading } = useQuery<Question[]>({
+    queryKey: ["student-dashboard-questions", user.id],
+    queryFn: async () => {
+      const r = await fetch(`/api/questions?authorId=${user.id}`);
+      if (!r.ok) throw new Error("failed to load questions");
+      return r.json();
+    },
+    enabled: Boolean(user.id),
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
   });
 
-  useEffect(() => {
-    if (!user.id) return;
-    setIsLoading(true);
-    fetch(`/api/questions?authorId=${user.id}`)
-      .then((r) => r.json())
-      .then((data: Question[]) => {
-        setQuestions(data.slice(0, 5));
-        setStats({
-          total: data.length,
-          byClosure: {
-            closed: data.filter((q) => q.closure === "closed").length,
-            open: data.filter((q) => q.closure === "open").length,
-          },
-          byCognitive: {
-            factual: data.filter((q) => matchesCognitiveCategory(q.cognitive, "factual")).length,
-            conceptual: data.filter((q) => matchesCognitiveCategory(q.cognitive, "conceptual")).length,
-            controversial: data.filter((q) => matchesCognitiveCategory(q.cognitive, "controversial")).length,
-          },
-        });
-      })
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, [user.id]);
+  const questions = allQuestions.slice(0, 5);
+  const stats: Stats = {
+    total: allQuestions.length,
+    byClosure: {
+      closed: allQuestions.filter((q) => q.closure === "closed").length,
+      open: allQuestions.filter((q) => q.closure === "open").length,
+    },
+    byCognitive: {
+      factual: allQuestions.filter((q) => matchesCognitiveCategory(q.cognitive, "factual")).length,
+      conceptual: allQuestions.filter((q) => matchesCognitiveCategory(q.cognitive, "conceptual")).length,
+      controversial: allQuestions.filter((q) => matchesCognitiveCategory(q.cognitive, "controversial")).length,
+    },
+  };
 
   return (
     <div className="space-y-6">

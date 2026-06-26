@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TeacherReportsView } from "@/components/teacher/TeacherReportsView";
@@ -69,25 +70,26 @@ function TeacherDashboard() {
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
   const setTab = (v: "overview" | "reports") =>
     router.replace(v === "reports" ? "/teacher-dashboard?tab=reports" : "/teacher-dashboard", { scroll: false });
-  const [stats, setStats] = useState<Stats | null>(null);
   const [period, setPeriod] = useState("month");
   const [selectedClass, setSelectedClass] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    setIsLoading(true);
-    const params = new URLSearchParams({ period });
-    if (selectedClass !== "all") {
-      const [grade, className] = selectedClass.split("|");
-      params.append("grade", grade);
-      params.append("className", className);
-    }
-    fetch(`/api/stats?${params}`)
-      .then((r) => r.json())
-      .then(setStats)
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, [period, selectedClass]);
+  // 학급 통계(질문수·댓글수·좋아요수 등)는 react-query로 주기 폴링(12초)+포커스 재조회.
+  const { data: stats, isLoading } = useQuery<Stats>({
+    queryKey: ["teacher-stats", period, selectedClass],
+    queryFn: async () => {
+      const params = new URLSearchParams({ period });
+      if (selectedClass !== "all") {
+        const [grade, className] = selectedClass.split("|");
+        params.append("grade", grade);
+        params.append("className", className);
+      }
+      const r = await fetch(`/api/stats?${params}`);
+      if (!r.ok) throw new Error("failed to load stats");
+      return r.json();
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   // 학급 변경 시 선택값이 새 목록에 없으면 "전체"로 초기화
   useEffect(() => {
