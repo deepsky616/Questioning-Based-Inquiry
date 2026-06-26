@@ -77,7 +77,7 @@ export async function GET(
     // 7. 해당 세션의 모든 질문 조회
     const questions = await prisma.question.findMany({
       where: { sessionId: id },
-      select: { id: true, authorId: true, content: true },
+      select: { id: true, authorId: true, content: true, createdAt: true },
     });
 
     // 8. 질문을 제출한 학생 ID Set 생성
@@ -88,15 +88,19 @@ export async function GET(
     const comments = sessionQuestionIds.length
       ? await prisma.comment.findMany({
           where: { questionId: { in: sessionQuestionIds } },
-          select: { authorId: true },
+          select: { authorId: true, createdAt: true },
         })
       : [];
     const likes = sessionQuestionIds.length
       ? await prisma.questionLike.findMany({
           where: { questionId: { in: sessionQuestionIds } },
-          select: { userId: true },
+          select: { userId: true, createdAt: true },
         })
       : [];
+
+    // 오름차순 시각 배열로 정리(인라인=마지막, 툴팁=전체)
+    const sortedTimes = (arr: { createdAt: Date }[]) =>
+      arr.map((x) => x.createdAt.toISOString()).sort((a, b) => a.localeCompare(b));
 
     // 9. 학생별 활동 집계
     const studentList = students.map((s) => ({
@@ -108,6 +112,9 @@ export async function GET(
       questionCount: questions.filter((q) => q.authorId === s.id).length,
       commentCount: comments.filter((c) => c.authorId === s.id).length,
       likeCount: likes.filter((l) => l.userId === s.id).length,
+      questionTimes: sortedTimes(questions.filter((q) => q.authorId === s.id)),
+      commentTimes: sortedTimes(comments.filter((c) => c.authorId === s.id)),
+      likeTimes: sortedTimes(likes.filter((l) => l.userId === s.id)),
     }));
 
     // 10. 응답 반환
