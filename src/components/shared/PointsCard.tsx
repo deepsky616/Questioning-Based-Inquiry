@@ -9,7 +9,8 @@ import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 
-const POLL_MS = 5000;
+// 폴링 표준 12초로 통일(획득 직후 즉시성은 refetchOnWindowFocus가 담당)
+const POLL_MS = 12000;
 
 interface PointLog {
   id: string;
