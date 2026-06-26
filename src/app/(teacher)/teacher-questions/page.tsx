@@ -128,15 +128,15 @@ function StatBadge({ label, value, color }: { label: string; value: number; colo
 /** 참여 현황 셀: 활동 개수 + 그 아래 가장 최근 시각, 호버 시 전체 시각 목록 툴팁. */
 function ActivityCell({ count, times, color, refDate }: { count: number; times: string[]; color: string; refDate?: string }) {
   if (count === 0) {
-    return <td className="px-3 py-2 text-center align-top text-sm font-semibold text-muted-foreground">-</td>;
+    return <td className="px-3 py-2 text-center text-sm font-semibold text-muted-foreground">-</td>;
   }
   const latest = times[times.length - 1];
   const latestLabel = latest ? (isSameDay(latest, refDate) ? formatClock(latest) : formatShortDateTime(latest)) : "";
   const tooltip = times.map((tm) => formatDateTime(tm)).join("\n");
   return (
-    <td className="px-3 py-2 text-center align-top" title={tooltip || undefined}>
-      <div className={`text-sm font-semibold ${color}`}>{count}</div>
-      {latestLabel && <div className="mt-0.5 text-[11px] leading-tight text-muted-foreground">{latestLabel}</div>}
+    <td className="px-3 py-2 text-center whitespace-nowrap" title={tooltip || undefined}>
+      <span className={`text-sm font-semibold ${color}`}>{count}</span>
+      {latestLabel && <span className="ml-1.5 text-xs text-muted-foreground">{latestLabel}</span>}
     </td>
   );
 }
@@ -1017,12 +1017,12 @@ export default function QuestionsPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted">
                     <tr>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground w-24">{t("colGradeClassNo")}</th>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">{t("colStudent")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-20 whitespace-nowrap">{t("colWroteQuestion")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-20 whitespace-nowrap">{t("colWroteComment")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-20 whitespace-nowrap">{t("colLikes")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground w-16 whitespace-nowrap">{t("colSubmit")}</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground w-24 whitespace-nowrap">{t("colGradeClassNo")}</th>
+                      <th className="text-left px-3 py-2 font-medium text-muted-foreground w-32 whitespace-nowrap">{t("colStudent")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{t("colWroteQuestion")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{t("colWroteComment")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{t("colLikes")}</th>
+                      <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{t("colSubmit")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -1036,7 +1036,7 @@ export default function QuestionsPage() {
                       )
                       .map((s) => (
                         <tr key={s.id} className={s.hasQuestion ? "bg-background" : "bg-muted/40"}>
-                          <td className="px-3 py-2 align-top text-xs text-muted-foreground">
+                          <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
                             {[
                               s.grade && t("gradeLabel", { grade: s.grade }),
                               s.className && t("classLabel", { className: s.className }),
@@ -1045,11 +1045,11 @@ export default function QuestionsPage() {
                               .filter(Boolean)
                               .join(" ")}
                           </td>
-                          <td className="px-3 py-2 align-top font-medium text-foreground">{s.name}</td>
+                          <td className="px-3 py-2 font-medium text-foreground whitespace-nowrap">{s.name}</td>
                           <ActivityCell count={s.questionCount} times={s.questionTimes} color="text-foreground" refDate={currentSession?.date} />
                           <ActivityCell count={s.commentCount} times={s.commentTimes} color="text-indigo-600 dark:text-indigo-400" refDate={currentSession?.date} />
                           <ActivityCell count={s.likeCount} times={s.likeTimes} color="text-rose-500 dark:text-rose-400" refDate={currentSession?.date} />
-                          <td className="px-3 py-2 text-center align-top">
+                          <td className="px-3 py-2 text-center">
                             {s.hasQuestion ? (
                               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold dark:bg-green-950/50 dark:text-green-400">
                                 ✓
