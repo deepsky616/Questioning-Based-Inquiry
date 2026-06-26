@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
@@ -65,7 +66,6 @@ export function MyQuestionsView() {
   const ct = useContentTranslation();
   const { data: session } = useSession();
   const user = getSessionUser(session);
-  const [questions, setQuestions] = useState<Question[]>([]);
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
   const [sortField, setSortField] = useState<SortField>("like");
@@ -81,34 +81,32 @@ export function MyQuestionsView() {
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
 
-  const fetchQuestions = useCallback(
-    (opts?: { sessionId?: string; date?: string; subject?: string; topic?: string }) => {
-      if (!user.id) return;
+  // 내 질문 목록은 react-query로 주기 폴링(12초) + 창 포커스 시 재조회한다.
+  // 교사가 질문조회에서 공개/비공개를 바꾸면 새로고침 없이 자동 반영된다.
+  const { data: questions = [] } = useQuery<Question[]>({
+    queryKey: ["my-questions", user.id, selectedSessionId],
+    queryFn: async () => {
       const params = new URLSearchParams({ authorId: user.id });
-      if (opts?.sessionId && opts.sessionId !== "all") params.set("sessionId", opts.sessionId);
-      if (opts?.date) params.set("date", opts.date);
-      if (opts?.subject) params.set("subject", opts.subject);
-      if (opts?.topic) params.set("topic", opts.topic);
-      fetch(`/api/questions?${params}`)
-        .then((r) => r.json())
-        .then(setQuestions)
-        .catch(() => {});
+      if (selectedSessionId !== "all") params.set("sessionId", selectedSessionId);
+      const res = await fetch(`/api/questions?${params}`);
+      if (!res.ok) throw new Error("failed to load questions");
+      return res.json();
     },
-    [user.id]
-  );
+    enabled: Boolean(user.id),
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   useEffect(() => {
     if (!user.id) return;
-    fetchQuestions();
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
       .catch(() => {});
-  }, [user.id, fetchQuestions]);
+  }, [user.id]);
 
   const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);
-    fetchQuestions({ sessionId: val });
   };
 
   // 날짜·교과·주제로 세션 목록을 좁힌다(세션을 고르는 보조 필터, 교사 페이지와 동일)

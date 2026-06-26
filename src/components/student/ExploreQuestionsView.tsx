@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -251,11 +252,10 @@ export function ExploreQuestionsView() {
   const t = useTranslations("explore");
   const tT = useTranslations("translate");
   const ct = useContentTranslation();
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const queryClient = useQueryClient();
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState("all");
   const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
@@ -266,40 +266,38 @@ export function ExploreQuestionsView() {
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
   const [filterCognitive, setFilterCognitive] = useState<CognitiveFilter>("all");
 
-  const fetchQuestions = useCallback(
-    (sessionId: string, opts?: { date?: string; subject?: string; topic?: string }) => {
-      setIsLoading(true);
+  // 전체 질문 목록은 react-query로 주기 폴링(12초) + 창 포커스 시 재조회한다.
+  // 교사가 질문조회에서 공개/비공개를 바꾸면 새로고침 없이 목록에서 자동으로 나타나거나 사라진다.
+  const questionsKey = ["explore-questions", selectedSessionId] as const;
+  const { data: questions = [], isLoading } = useQuery<Question[]>({
+    queryKey: questionsKey,
+    queryFn: async () => {
       const params = new URLSearchParams({ isPublic: "true" });
-      if (sessionId !== "all") params.set("sessionId", sessionId);
-      if (opts?.date) params.set("date", opts.date);
-      if (opts?.subject) params.set("subject", opts.subject);
-      if (opts?.topic) params.set("topic", opts.topic);
-      fetch(`/api/questions?${params}`)
-        .then((r) => r.json())
-        .then(setQuestions)
-        .catch(() => {})
-        .finally(() => setIsLoading(false));
+      if (selectedSessionId !== "all") params.set("sessionId", selectedSessionId);
+      const res = await fetch(`/api/questions?${params}`);
+      if (!res.ok) throw new Error("failed to load questions");
+      return res.json();
     },
-    []
-  );
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   useEffect(() => {
-    fetchQuestions("all");
     fetch("/api/sessions")
       .then((r) => r.json())
       .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
       .catch(() => {});
-  }, [fetchQuestions]);
+  }, []);
 
   const handleLikeChange = (questionId: string, newCount: number, myLike: boolean) => {
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === questionId ? { ...q, likeCount: newCount, myLike } : q))
+    // 좋아요는 즉시 캐시에 반영(다음 폴링에서 서버 값으로 확정)
+    queryClient.setQueryData<Question[]>(questionsKey, (prev) =>
+      prev?.map((q) => (q.id === questionId ? { ...q, likeCount: newCount, myLike } : q)) ?? prev
     );
   };
 
   const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);
-    fetchQuestions(val);
   };
 
   // 날짜·교과·주제로 세션 목록을 좁힌다(세션을 고르는 보조 필터, 교사 페이지와 동일)
