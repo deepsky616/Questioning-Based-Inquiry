@@ -1,9 +1,19 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, PieChart, Pie, Cell } from "recharts";
 import type { ReportTotals, SeriesPoint } from "@/lib/report-stats";
 import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import type { SessionAnalysisResult } from "@/components/reports/ReportView";
+
+// 인쇄 추세 꺾은선 시리즈(화면 리포트와 동일 색)
+const TREND_SERIES: { key: keyof SeriesPoint; color: string }[] = [
+  { key: "questions", color: "#6366f1" },
+  { key: "likesGiven", color: "#f43f5e" },
+  { key: "comments", color: "#10b981" },
+  { key: "likesReceived", color: "#f59e0b" },
+  { key: "commentsReceived", color: "#8b5cf6" },
+];
 
 export interface PrintReportItem {
   name: string;
@@ -73,6 +83,42 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     );
   };
   const showRoster = items.length > 1;
+
+  // 추세 꺾은선 라벨(시리즈명)
+  const trendName: Record<string, string> = {
+    questions: t("metric_questions"),
+    likesGiven: t("metric_likesGiven"),
+    comments: t("metric_comments"),
+    likesReceived: t("metric_likesReceived"),
+    commentsReceived: t("metric_commentsReceived"),
+  };
+  // 인쇄용 추세 꺾은선 — ResponsiveContainer 대신 고정 크기, 애니메이션 끔(숨김 상태 인쇄 안정성)
+  const renderTrendChart = (data: SeriesPoint[]) => (
+    <div className="rdoc-chart">
+      <LineChart width={680} height={210} data={data} margin={{ top: 8, right: 14, bottom: 0, left: -16 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+        <XAxis dataKey="label" stroke="#9ca3af" tick={{ fontSize: 10, fill: "#6b7280" }} />
+        <YAxis allowDecimals={false} stroke="#9ca3af" tick={{ fontSize: 10, fill: "#6b7280" }} />
+        <Legend wrapperStyle={{ fontSize: 10 }} />
+        {TREND_SERIES.map((m) => (
+          <Line key={m.key} type="monotone" dataKey={m.key} name={trendName[m.key]} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} />
+        ))}
+      </LineChart>
+    </div>
+  );
+  // 인쇄용 분류 도넛 — 고정 크기, 애니메이션 끔
+  const renderDonut = (slices: { name: string; value: number; fill: string }[]) => {
+    const has = slices.some((s) => s.value > 0);
+    const data = has ? slices : [{ name: "", value: 1, fill: "#e5e7eb" }];
+    return (
+      <PieChart width={220} height={170}>
+        <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={66} stroke="none" isAnimationActive={false}>
+          {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
+        </Pie>
+        <Legend wrapperStyle={{ fontSize: 10 }} />
+      </PieChart>
+    );
+  };
 
   // 학교 · 학년 · 반 · 번호를 모두 표시(이름은 제목에 별도 표시)
   const idLine = (it: PrintReportItem) =>
@@ -166,6 +212,17 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
 
             {/* 질문 분류(영역·유형·개수·비율) */}
             <div className="rdoc-section-label">{t("docClassification")}</div>
+            <div className="rdoc-charts-row">
+              {renderDonut([
+                { name: tCls("closed.label"), value: cl.closure.closed, fill: "#3b82f6" },
+                { name: tCls("open.label"), value: cl.closure.open, fill: "#10b981" },
+              ])}
+              {renderDonut([
+                { name: tCls("factual.label"), value: cl.cognitive.factual, fill: "#94a3b8" },
+                { name: tCls("conceptual.label"), value: cl.cognitive.conceptual, fill: "#a855f7" },
+                { name: tCls("controversial.label"), value: cl.cognitive.controversial, fill: "#f97316" },
+              ])}
+            </div>
             <table className="rdoc-table">
               <thead>
                 <tr>
@@ -192,6 +249,7 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
             {trend.length > 0 && (
               <>
                 <div className="rdoc-section-label">{t("docTrendTitle")}</div>
+                {renderTrendChart(trend)}
                 <table className="rdoc-table">
                   <thead>
                     <tr>
