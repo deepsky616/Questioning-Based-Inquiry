@@ -178,6 +178,15 @@ export default function QuestionsPage() {
   // 배포한 탐구설계 목록에서 "수정"을 누른 세션(인라인 패널 열림)
   const [editDeploySessionId, setEditDeploySessionId] = useState<string | null>(null);
   const [deletingDeployId, setDeletingDeployId] = useState<string | null>(null);
+  // 배포 항목별 접기 토글(기본 닫힘)
+  const [openDeploy, setOpenDeploy] = useState<Set<string>>(new Set());
+  const toggleDeploy = (id: string) =>
+    setOpenDeploy((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   // 배포한 탐구설계 목록 조회(필터)·정렬 — 수업세션 목록과 동일한 방식
   const [deployFilterDate, setDeployFilterDate] = useState("");
   const [deployFilterSubject, setDeployFilterSubject] = useState("");
@@ -1446,9 +1455,10 @@ export default function QuestionsPage() {
                 return (
                   <div key={s.id} className="rounded-lg border bg-background">
                     <div className="flex flex-wrap items-center justify-between gap-2 p-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">
-                          {buildSessionLabel(s.date, s.subject, s.topic)}
+                      <button type="button" onClick={() => toggleDeploy(s.id)} className="min-w-0 flex-1 text-left">
+                        <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+                          <span className="text-xs text-muted-foreground">{openDeploy.has(s.id) ? "▾" : "▸"}</span>
+                          <span className="truncate">{buildSessionLabel(s.date, s.subject, s.topic)}</span>
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {t("statQuestions", { count: s.sharedQuestions?.length ?? 0 })}
@@ -1457,7 +1467,7 @@ export default function QuestionsPage() {
                           {t("likesByline", { v: s.likesVisibleToPeers ? t("publicWord") : t("privateWord") })}
                           {t("commentsByline", { v: s.commentsVisibleToPeers ? t("publicWord") : t("privateWord") })}
                         </p>
-                      </div>
+                      </button>
                       <div className="flex shrink-0 items-center gap-2">
                         <Button
                           variant={isEditing ? "secondary" : "outline"}
@@ -1477,8 +1487,8 @@ export default function QuestionsPage() {
                         </Button>
                       </div>
                     </div>
-                    {/* 배포된 질문 미리보기 */}
-                    {!isEditing && (
+                    {/* 배포된 질문 미리보기 (접기 토글 — 기본 닫힘) */}
+                    {!isEditing && openDeploy.has(s.id) && (
                       <ol className="list-decimal space-y-1 border-t px-7 py-2 text-sm text-muted-foreground">
                         {(s.sharedQuestions ?? []).slice(0, 5).map((q, i) => (
                           <li key={i} className="line-clamp-1">{q.content}</li>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { GripVertical } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
@@ -157,6 +158,7 @@ export default function CurriculumPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editQuestions, setEditQuestions] = useState<InquiryQuestion[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [mainTab, setMainTab] = useState<"create" | "saved">("create");
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
   const [sessionDate, setSessionDate] = useState("");
@@ -591,6 +593,17 @@ export default function CurriculumPage() {
   const addEditQuestion = () => {
     setEditQuestions((prev) => [...prev, { type: "factual", content: "" }]);
   };
+  // 드래그앤드롭 순서 변경
+  const handleEditDrop = (targetIndex: number) => {
+    setEditQuestions((prev) => {
+      if (dragIndex === null || dragIndex === targetIndex || dragIndex < 0 || dragIndex >= prev.length) return prev;
+      const copy = [...prev];
+      const [moved] = copy.splice(dragIndex, 1);
+      copy.splice(targetIndex, 0, moved);
+      return copy;
+    });
+    setDragIndex(null);
+  };
   const saveEditDesign = async (id: string) => {
     if (!editTitle.trim() || savingEdit) return;
     const cleaned = editQuestions
@@ -661,7 +674,10 @@ export default function CurriculumPage() {
                         onClick={() => handleSelectSavedDesign(d)}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <span className="block truncate font-medium text-sm text-foreground">{d.title}</span>
+                        <span className="flex items-center gap-1.5 font-medium text-sm text-foreground">
+                          <span className="text-xs text-muted-foreground">{selectedSavedId === d.id ? "▾" : "▸"}</span>
+                          <span className="truncate">{d.title}</span>
+                        </span>
                         <span className="text-xs text-muted-foreground">
                           {d.sessionDate ? `${d.sessionDate} · ` : ""}{d.subject} · {d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange })} · {d.area} · {t("inquiryCount", { count: d.inquiryQuestions.length })}
                         </span>
@@ -694,7 +710,15 @@ export default function CurriculumPage() {
                         </div>
                         <div className="space-y-2">
                           {editQuestions.map((q, i) => (
-                            <div key={i} className="flex items-start gap-2">
+                            <div
+                              key={i}
+                              draggable
+                              onDragStart={() => setDragIndex(i)}
+                              onDragOver={(e) => e.preventDefault()}
+                              onDrop={() => handleEditDrop(i)}
+                              className="flex items-start gap-2"
+                            >
+                              <GripVertical className="mt-2 h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
                               <select
                                 value={q.type}
                                 onChange={(e) => updateEditQuestion(i, { type: e.target.value as InquiryQuestion["type"] })}
