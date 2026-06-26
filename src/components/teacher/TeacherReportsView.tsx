@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ReportView, type PerStudentRow, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 import { ReportPrintDoc, type PrintReportItem } from "@/components/reports/ReportPrintDoc";
 import { useTranslations } from "next-intl";
@@ -74,15 +75,61 @@ function analyzeStudentSessionFor(studentId: string, failMsg: string) {
 /** 학급/학생 활동 리포트 본문 (대시보드 '상세 리포트' 탭에서 사용). 페이지 헤더는 호출부에서 제공. */
 export function TeacherReportsView() {
   const t = useTranslations("reports");
-  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string>(""); // "grade|className"
   const [view, setView] = useState<"class" | "student">("class");
   const [studentId, setStudentId] = useState<string>("");
 
-  const [report, setReport] = useState<ClassReport | null>(null);
-  const [studentReport, setStudentReport] = useState<StudentReport | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 학급 목록(가벼움): 포커스 재조회만
+  const { data: classes = [] } = useQuery<ClassItem[]>({
+    queryKey: ["report-classes"],
+    queryFn: async () => {
+      const r = await fetch("/api/reports/class");
+      if (!r.ok) throw new Error("failed to load classes");
+      const d = await r.json();
+      return Array.isArray(d.classes) ? d.classes : [];
+    },
+    refetchOnWindowFocus: true,
+  });
+  // 첫 학급 자동 선택
+  useEffect(() => {
+    if (!selected && classes.length > 0) setSelected(`${classes[0].grade}|${classes[0].className}`);
+  }, [classes, selected]);
+  // 학급 변경 시 학생 선택 초기화
+  useEffect(() => { setStudentId(""); }, [selected]);
+
+  // 학급 리포트(무거운 집계): 긴 폴링(60초)+포커스 재조회
+  const classReportQuery = useQuery<ClassReport>({
+    queryKey: ["class-report", selected],
+    queryFn: async () => {
+      const [grade, className] = selected.split("|");
+      const r = await fetch(`/api/reports/class?grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}`);
+      if (!r.ok) throw new Error((await r.json()).error || t("loadFailed"));
+      return r.json();
+    },
+    enabled: Boolean(selected),
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
+  });
+  const report = classReportQuery.data ?? null;
+
+  // 학생별 리포트: 학생 선택 시 긴 폴링(60초)+포커스 재조회
+  const studentReportQuery = useQuery<StudentReport>({
+    queryKey: ["teacher-student-report", studentId],
+    queryFn: async () => {
+      const r = await fetch(`/api/reports/student?studentId=${encodeURIComponent(studentId)}`);
+      if (!r.ok) throw new Error((await r.json()).error || t("loadFailed"));
+      return r.json();
+    },
+    enabled: view === "student" && Boolean(studentId),
+    refetchInterval: 60000,
+    refetchOnWindowFocus: true,
+  });
+  const studentReport = studentReportQuery.data ?? null;
+
+  const loading = classReportQuery.isLoading || (view === "student" && studentReportQuery.isLoading);
+  const reportError = classReportQuery.error || studentReportQuery.error;
+  const error = reportError instanceof Error ? reportError.message : null;
 
   // 인쇄(현재 페이지에서 print-root만 출력) — 새 탭 없이
   const [printItems, setPrintItems] = useState<PrintReportItem[]>([]);
@@ -215,47 +262,10 @@ export function TeacherReportsView() {
     }
   };
 
-  useEffect(() => {
-    fetch("/api/reports/class")
-      .then((r) => r.json())
-      .then((d) => {
-        const list: ClassItem[] = Array.isArray(d.classes) ? d.classes : [];
-        setClasses(list);
-        if (list.length > 0) setSelected(`${list[0].grade}|${list[0].className}`);
-      })
-      .catch(() => setClasses([]));
-  }, []);
-
-  // 학급 리포트(학급별 보기 + 학생 선택 목록 제공)
-  useEffect(() => {
-    if (!selected) return;
-    const [grade, className] = selected.split("|");
-    setLoading(true); setError(null); setReport(null); setStudentId(""); setStudentReport(null);
-    fetch(`/api/reports/class?grade=${encodeURIComponent(grade)}&className=${encodeURIComponent(className)}`)
-      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || t("loadFailed")); return r.json(); })
-      .then((d: ClassReport) => setReport(d))
-      .catch((e) => setError(e instanceof Error ? e.message : t("loadFailed")))
-      .finally(() => setLoading(false));
-  }, [selected, t]);
-
-  // 학생별 보기: 선택된 학생 리포트
-  useEffect(() => {
-    if (view !== "student" || !studentId) return;
-    setLoading(true); setError(null); setStudentReport(null);
-    fetch(`/api/reports/student?studentId=${encodeURIComponent(studentId)}`)
-      .then(async (r) => { if (!r.ok) throw new Error((await r.json()).error || t("loadFailed")); return r.json(); })
-      .then((d: StudentReport) => setStudentReport(d))
-      .catch((e) => setError(e instanceof Error ? e.message : t("loadFailed")))
-      .finally(() => setLoading(false));
-  }, [view, studentId, t]);
-
   // 일괄 분석 완료 후 현재 학생 리포트를 다시 불러와 새 분석 결과를 화면에 반영
   const refreshStudentReport = () => {
     if (view !== "student" || !studentId) return;
-    fetch(`/api/reports/student?studentId=${encodeURIComponent(studentId)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: StudentReport | null) => { if (d) setStudentReport(d); })
-      .catch(() => {});
+    queryClient.invalidateQueries({ queryKey: ["teacher-student-report", studentId] });
   };
 
   const students = report?.perStudent ?? [];
