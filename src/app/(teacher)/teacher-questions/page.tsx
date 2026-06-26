@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState, useCallback } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
@@ -202,8 +202,19 @@ export default function QuestionsPage() {
   const [bulkMsg, setBulkMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showBulkSuccess, setShowBulkSuccess] = useState(false);
 
-  // 세션 관련 상태
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  // 세션 관련 상태 — 수업세션 목록은 react-query로 주기 폴링(12초)+창 포커스 재조회.
+  // teacher-sessions와 같은 쿼리 키를 공유해 토글·삭제·재배포가 양쪽에 자동 반영된다.
+  const { data: sessions = [] } = useQuery<QuestionSession[]>({
+    queryKey: ["teacher-sessions"],
+    queryFn: async () => {
+      const r = await fetch("/api/sessions");
+      if (!r.ok) throw new Error("failed to load sessions");
+      const data = await r.json();
+      return sortSessionsAsc(Array.isArray(data) ? data : []);
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
   const [selectedSessionId, setSelectedSessionId] = useState("");
 
 
@@ -266,28 +277,18 @@ export default function QuestionsPage() {
   }, [sortField, sortDir]);
 
   useEffect(() => {
-    fetch("/api/sessions")
-      .then((r) => r.json())
-      .then((data: QuestionSession[]) => {
-        setSessions(sortSessionsAsc(data));
-        // 기본값: 날짜·교과·주제·세션 모두 전체
-        setSelectedSessionId("all");
-        fetchQuestions("all");
-      })
-      .catch(() => setIsLoading(false));
-    // 세션 목록은 최초 1회만 로드한다. (fetchQuestions가 정렬 상태로 재생성돼도
-    // 재실행되어 선택 세션이 초기화되지 않도록 deps를 비운다)
+    // 세션 목록은 useQuery가 담당. 여기선 기본 선택(전체)과 질문 목록만 초기화한다.
+    setSelectedSessionId("all");
+    fetchQuestions("all");
+    // 최초 1회만 실행. (fetchQuestions가 정렬 상태로 재생성돼도 선택 세션이 초기화되지 않도록 deps 비움)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 배포 삭제·재배포 후 세션 목록(sharedQuestions)을 최신화한다(선택/조회 상태는 유지)
+  // 배포 삭제·재배포 후 세션 목록(sharedQuestions)을 최신화한다(선택/조회 상태는 유지).
+  // 공유 쿼리를 무효화하면 teacher-sessions에도 반영된다.
   const reloadSessions = useCallback(
-    () =>
-      fetch("/api/sessions")
-        .then((r) => r.json())
-        .then((data: QuestionSession[]) => setSessions(sortSessionsAsc(data)))
-        .catch(() => {}),
-    [],
+    () => queryClient.invalidateQueries({ queryKey: ["teacher-sessions"] }),
+    [queryClient],
   );
 
   // 배포한 탐구설계 전체 삭제
