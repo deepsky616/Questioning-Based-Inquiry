@@ -281,7 +281,9 @@
     "listTitle": "📝 전체 질문 목록",
     "countItems": "{count}개",
     "searchPlaceholder": "질문 또는 이름으로 검색...",
-    "loading": "로딩 중..."
+    "loading": "로딩 중...",
+    "commentsHidden": "댓글 비공개",
+    "commentsHiddenHint": "선생님이 친구 댓글을 비공개로 설정했어요. 내 댓글과 선생님 댓글만 보여요."
   },
   "unitDesign": {
     "intro": "선생님이 배포한 탐구 질문에 좋아요·댓글로 참여해 보세요",

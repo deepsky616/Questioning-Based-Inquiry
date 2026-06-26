@@ -159,6 +159,7 @@ export async function GET(req: Request) {
       likeCount: q.likes.length,
       commentCount: visibleComments.length,
       likesVisibleToPeers: q.session?.likesVisibleToPeers ?? true,
+      commentsVisibleToPeers: commentsVisible,
       myLike: q.likes.some((l) => l.userId === userId),
       likedBy: role === "TEACHER"
         ? q.likes.map((l) => ({ id: l.user.id, name: l.user.name }))

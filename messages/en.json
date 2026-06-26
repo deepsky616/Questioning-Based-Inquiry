@@ -281,7 +281,9 @@
     "listTitle": "📝 All questions",
     "countItems": "{count}",
     "searchPlaceholder": "Search by question or name...",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "commentsHidden": "Comments hidden",
+    "commentsHiddenHint": "Your teacher set peer comments to private. You only see your own and the teacher comments."
   },
   "unitDesign": {
     "intro": "Join the inquiry questions your teacher shared with likes and comments",

@@ -46,6 +46,7 @@ interface Question {
   commentCount?: number;
   myLike: boolean;
   likesVisibleToPeers?: boolean;
+  commentsVisibleToPeers?: boolean;
   session?: { date: string; subject: string; topic: string } | null;
 }
 
@@ -234,6 +235,15 @@ function QuestionCard({
                   <span>💬 {commentCount}</span>
                   <span>{showComments ? t("close") : isTeacherShared ? t("answer") : t("comment")}</span>
                 </button>
+              )}
+              {/* 교사가 수업세션 단위로 댓글을 비공개로 설정한 경우(친구 댓글 비노출) 안내 배지 */}
+              {q.commentsVisibleToPeers === false && (
+                <span
+                  className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+                  title={t("commentsHiddenHint")}
+                >
+                  🔒 {t("commentsHidden")}
+                </span>
               )}
             </div>
           )}
