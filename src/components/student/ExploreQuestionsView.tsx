@@ -181,16 +181,18 @@ function QuestionCard({
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <div className="text-right">
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm font-semibold text-foreground">
               {isTeacherShared ? t("teacherName", { name: q.author.name }) : q.author.name}
             </div>
             {!isTeacherShared && (q.author.grade || q.author.className || q.author.studentNumber) && (
-              <div className="text-xs text-muted-foreground">
-                {[
-                  q.author.grade && t("gradeLabel", { grade: q.author.grade }),
-                  q.author.className && t("classLabel", { className: q.author.className }),
-                  q.author.studentNumber && t("numberLabel", { studentNumber: q.author.studentNumber }),
-                ].filter(Boolean).join(" ")}
+              <div className="mt-0.5">
+                <span className="inline-block rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                  {[
+                    q.author.grade && t("gradeLabel", { grade: q.author.grade }),
+                    q.author.className && t("classLabel", { className: q.author.className }),
+                    q.author.studentNumber && t("numberLabel", { studentNumber: q.author.studentNumber }),
+                  ].filter(Boolean).join(" ")}
+                </span>
               </div>
             )}
             {/* 수업세션(📚 칩) · 작성일시(🕒) — 내 질문 탭과 동일 톤 */}
