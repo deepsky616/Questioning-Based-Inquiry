@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, PieChart, Pie, Cell } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import type { ReportTotals, SeriesPoint } from "@/lib/report-stats";
 import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import type { SessionAnalysisResult } from "@/components/reports/ReportView";
@@ -92,31 +92,50 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     likesReceived: t("metric_likesReceived"),
     commentsReceived: t("metric_commentsReceived"),
   };
-  // 인쇄용 추세 꺾은선 — ResponsiveContainer 대신 고정 크기, 애니메이션 끔(숨김 상태 인쇄 안정성)
+  // 인쇄용 추세 꺾은선 — 고정 크기·애니메이션 끔(숨김 상태 인쇄 안정성).
+  // 범례는 recharts Legend 대신 정렬이 보장되는 커스텀 HTML로 그린다.
   const renderTrendChart = (data: SeriesPoint[]) => (
     <div className="rdoc-chart">
-      <LineChart width={680} height={210} data={data} margin={{ top: 8, right: 14, bottom: 0, left: -16 }}>
+      <div className="rdoc-legend">
+        {TREND_SERIES.map((m) => (
+          <span key={m.key} className="rdoc-legend-item">
+            <span className="rdoc-legend-dot" style={{ background: m.color }} />
+            {trendName[m.key]}
+          </span>
+        ))}
+      </div>
+      <LineChart width={660} height={200} data={data} margin={{ top: 8, right: 16, bottom: 0, left: -14 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
         <XAxis dataKey="label" stroke="#9ca3af" tick={{ fontSize: 10, fill: "#6b7280" }} />
-        <YAxis allowDecimals={false} stroke="#9ca3af" tick={{ fontSize: 10, fill: "#6b7280" }} />
-        <Legend wrapperStyle={{ fontSize: 10 }} />
+        <YAxis allowDecimals={false} stroke="#9ca3af" tick={{ fontSize: 10, fill: "#6b7280" }} width={34} />
         {TREND_SERIES.map((m) => (
           <Line key={m.key} type="monotone" dataKey={m.key} name={trendName[m.key]} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} />
         ))}
       </LineChart>
     </div>
   );
-  // 인쇄용 분류 도넛 — 고정 크기, 애니메이션 끔
-  const renderDonut = (slices: { name: string; value: number; fill: string }[]) => {
+  // 인쇄용 분류 도넛 — 제목 + 도넛 + 정렬된 커스텀 범례(라벨·개수)
+  const renderDonut = (caption: string, slices: { name: string; value: number; fill: string }[]) => {
     const has = slices.some((s) => s.value > 0);
     const data = has ? slices : [{ name: "", value: 1, fill: "#e5e7eb" }];
     return (
-      <PieChart width={220} height={170}>
-        <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={66} stroke="none" isAnimationActive={false}>
-          {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
-        </Pie>
-        <Legend wrapperStyle={{ fontSize: 10 }} />
-      </PieChart>
+      <div className="rdoc-donut">
+        <div className="rdoc-donut-cap">{caption}</div>
+        <PieChart width={150} height={150}>
+          <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={42} outerRadius={66} stroke="none" isAnimationActive={false}>
+            {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
+          </Pie>
+        </PieChart>
+        <div className="rdoc-legend rdoc-legend-col">
+          {slices.map((s) => (
+            <span key={s.name} className="rdoc-legend-item">
+              <span className="rdoc-legend-dot" style={{ background: s.fill }} />
+              <span className="rdoc-legend-label">{s.name}</span>
+              <b>{s.value}</b>
+            </span>
+          ))}
+        </div>
+      </div>
     );
   };
 
@@ -213,11 +232,11 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
             {/* 질문 분류(영역·유형·개수·비율) */}
             <div className="rdoc-section-label">{t("docClassification")}</div>
             <div className="rdoc-charts-row">
-              {renderDonut([
+              {renderDonut(t("docDomainClosure"), [
                 { name: tCls("closed.label"), value: cl.closure.closed, fill: "#3b82f6" },
                 { name: tCls("open.label"), value: cl.closure.open, fill: "#10b981" },
               ])}
-              {renderDonut([
+              {renderDonut(t("docDomainCognitive"), [
                 { name: tCls("factual.label"), value: cl.cognitive.factual, fill: "#94a3b8" },
                 { name: tCls("conceptual.label"), value: cl.cognitive.conceptual, fill: "#a855f7" },
                 { name: tCls("controversial.label"), value: cl.cognitive.controversial, fill: "#f97316" },
