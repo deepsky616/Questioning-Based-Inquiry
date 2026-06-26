@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import DatePicker from "@/components/shared/DatePicker";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -141,7 +142,6 @@ export default function CurriculumPage() {
   const t = useTranslations("curriculum");
   const tc = useTranslations("common");
   const tCls = useTranslations("classification");
-  const tSeq = useTranslations("sequencePanel");
   const stepLabel = (n: Step) => t(`step${n}`);
   const typeLabel = (type: string) => `${tCls(`${type}.label`)}`;
   const typeDesc = (type: string) => tCls(`${type}.desc`);
@@ -151,7 +151,12 @@ export default function CurriculumPage() {
   const [saveTitle, setSaveTitle] = useState("");
   const [saveGrade, setSaveGrade] = useState("");
   const [saveDate, setSaveDate] = useState(todayStr);
-  const [savedList, setSavedList] = useState<SavedInquiryDesign[]>([]);
+  const queryClient = useQueryClient();
+  // 편집 상태(저장 설계 제목·질문 인라인 수정)
+  const [editingDesignId, setEditingDesignId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editQuestions, setEditQuestions] = useState<InquiryQuestion[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [mainTab, setMainTab] = useState<"create" | "saved">("create");
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
   const [sessionDate, setSessionDate] = useState("");
@@ -202,14 +207,22 @@ export default function CurriculumPage() {
   const [selectedInquiryQuestionIndices, setSelectedInquiryQuestionIndices] = useState<number[]>([]);
   const [loadingInquiry, setLoadingInquiry] = useState(false);
 
-  useEffect(() => { fetchSaved(); }, []);
-
-  const fetchSaved = () => {
-    fetch("/api/unit-design")
-      .then((r) => r.json())
-      .then((d) => setSavedList(Array.isArray(d) ? d : []))
-      .catch(() => {});
-  };
+  // 저장된 탐구설계 목록 — react-query 폴링(12초)+포커스 재조회
+  const { data: savedList = [] } = useQuery<SavedInquiryDesign[]>({
+    queryKey: ["unit-designs"],
+    queryFn: async () => {
+      const r = await fetch("/api/unit-design");
+      if (!r.ok) throw new Error("failed to load saved designs");
+      const d = await r.json();
+      return Array.isArray(d) ? d : [];
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
+  const fetchSaved = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ["unit-designs"] }),
+    [queryClient],
+  );
 
   const getQuestionKey = (question: InquiryQuestion) => `${question.type}|${question.content.trim()}`;
 
@@ -473,9 +486,10 @@ export default function CurriculumPage() {
         setSaveDate(todayStr());
         fetchSaved();
         if (savedDesign?.id) {
-          setSavedList((prev) => [
+          // 새 설계를 캐시에 즉시 반영(다음 폴링/invalidate에서 서버 값으로 확정)
+          queryClient.setQueryData<SavedInquiryDesign[]>(["unit-designs"], (prev) => [
             { ...savedDesign, createdAt: new Date().toISOString() },
-            ...prev.filter((design) => design.id !== savedDesign.id),
+            ...(prev ?? []).filter((design) => design.id !== savedDesign.id),
           ]);
           setMainTab("saved");
           setSelectedSavedId(savedDesign.id);
@@ -557,6 +571,53 @@ export default function CurriculumPage() {
     fetchSaved();
   };
 
+  // ── 저장 설계 인라인 편집(제목·질문 수정/추가/삭제) ──────────────────
+  const startEditDesign = (design: SavedInquiryDesign) => {
+    setEditingDesignId(design.id);
+    setEditTitle(design.title);
+    setEditQuestions(design.inquiryQuestions.map((q) => ({ ...q })));
+  };
+  const cancelEditDesign = () => {
+    setEditingDesignId(null);
+    setEditTitle("");
+    setEditQuestions([]);
+  };
+  const updateEditQuestion = (index: number, patch: Partial<InquiryQuestion>) => {
+    setEditQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)));
+  };
+  const removeEditQuestion = (index: number) => {
+    setEditQuestions((prev) => prev.filter((_, i) => i !== index));
+  };
+  const addEditQuestion = () => {
+    setEditQuestions((prev) => [...prev, { type: "factual", content: "" }]);
+  };
+  const saveEditDesign = async (id: string) => {
+    if (!editTitle.trim() || savingEdit) return;
+    const cleaned = editQuestions
+      .map((q) => ({ type: q.type, content: q.content.trim() }))
+      .filter((q) => q.content);
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/unit-design/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle.trim(), inquiryQuestions: cleaned }),
+      });
+      if (!res.ok) throw new Error();
+      // 편집 중이던 설계가 선택/세션생성 대상이면 선택 질문 키도 갱신
+      if (selectedSavedId === id) {
+        setSelectedSavedQuestionKeys(new Set(cleaned.map(getQuestionKey)));
+      }
+      cancelEditDesign();
+      fetchSaved();
+      toast({ variant: "success", description: t("designUpdated") });
+    } catch {
+      toast({ variant: "destructive", description: t("designUpdateFailed") });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   // ── 렌더 ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -605,8 +666,73 @@ export default function CurriculumPage() {
                           {d.sessionDate ? `${d.sessionDate} · ` : ""}{d.subject} · {d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange })} · {d.area} · {t("inquiryCount", { count: d.inquiryQuestions.length })}
                         </span>
                       </button>
-                      <button onClick={() => handleDelete(d.id)} className="text-xs text-red-400 hover:text-red-600">{tc("delete")}</button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          variant={editingDesignId === d.id ? "secondary" : "outline"}
+                          size="sm"
+                          onClick={() => (editingDesignId === d.id ? cancelEditDesign() : startEditDesign(d))}
+                        >
+                          {editingDesignId === d.id ? tc("cancel") : tc("edit")}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => handleDelete(d.id)}
+                        >
+                          {tc("delete")}
+                        </Button>
+                      </div>
                     </div>
+
+                    {/* 인라인 편집: 제목 + 질문 수정/추가/삭제 */}
+                    {editingDesignId === d.id && (
+                      <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
+                        <div className="space-y-1">
+                          <Label>{t("designTitle")}</Label>
+                          <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          {editQuestions.map((q, i) => (
+                            <div key={i} className="flex items-start gap-2">
+                              <select
+                                value={q.type}
+                                onChange={(e) => updateEditQuestion(i, { type: e.target.value as InquiryQuestion["type"] })}
+                                className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                              >
+                                <option value="factual">{typeLabel("factual")}</option>
+                                <option value="conceptual">{typeLabel("conceptual")}</option>
+                                <option value="controversial">{typeLabel("controversial")}</option>
+                              </select>
+                              <textarea
+                                value={q.content}
+                                onChange={(e) => updateEditQuestion(i, { content: e.target.value })}
+                                rows={2}
+                                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                                placeholder={t("topicPlaceholder")}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeEditQuestion(i)}
+                                className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700"
+                                aria-label={tc("delete")}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                          <Button variant="outline" size="sm" onClick={addEditQuestion}>＋ {t("addQuestion")}</Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" onClick={() => saveEditDesign(d.id)} disabled={savingEdit || !editTitle.trim()}>
+                            {savingEdit ? tc("loading") : tc("save")}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={cancelEditDesign} disabled={savingEdit}>
+                            {tc("cancel")}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     {selectedSavedId === d.id && (
                       <div className="mt-3 space-y-3 rounded-md bg-muted/40 p-3">
@@ -662,28 +788,21 @@ export default function CurriculumPage() {
                           </div>
                         </div>
 
-                        <div className="rounded-lg border border-border bg-card px-4 py-3 space-y-2">
-                          {([
-                            ["isActive", tSeq("activeLabel"), tSeq("activeDesc"), sessionIsActive, setSessionIsActive],
-                            ["defaultQuestionPublic", tSeq("publicLabel"), tSeq("publicDesc"), defaultQuestionPublic, setDefaultQuestionPublic],
-                            ["likesVisibleToPeers", tSeq("likesLabel"), tSeq("likesDesc"), sessionLikesVisible, setSessionLikesVisible],
-                            ["commentsVisibleToPeers", tSeq("commentsLabel"), tSeq("commentsDesc"), sessionCommentsVisible, setSessionCommentsVisible],
-                          ] as const).map(([key, label, desc, value, setter]) => (
-                            <div key={key} className="flex items-center justify-between gap-4">
-                              <div>
-                                <p className="text-sm font-medium text-foreground">{label}</p>
-                                <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
-                              </div>
-                              <Switch
-                                checked={value}
-                                onCheckedChange={(checked) => {
-                                  setter(checked);
-                                  setCreatedSessionMessage("");
-                                }}
-                              />
-                            </div>
-                          ))}
-                        </div>
+                        <SessionVisibilitySettings
+                          value={{
+                            isActive: sessionIsActive,
+                            defaultQuestionPublic,
+                            likesVisibleToPeers: sessionLikesVisible,
+                            commentsVisibleToPeers: sessionCommentsVisible,
+                          }}
+                          onChange={(next) => {
+                            setSessionIsActive(next.isActive);
+                            setDefaultQuestionPublic(next.defaultQuestionPublic);
+                            setSessionLikesVisible(next.likesVisibleToPeers);
+                            setSessionCommentsVisible(next.commentsVisibleToPeers);
+                            setCreatedSessionMessage("");
+                          }}
+                        />
 
                         <div className="flex items-center gap-3">
                           <Button

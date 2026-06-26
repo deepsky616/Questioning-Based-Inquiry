@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
+import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
 import { QuestionSequenceEditor } from "@/components/teacher/QuestionSequenceEditor";
 import type { SequencedQuestion } from "@/lib/unit-sequence";
 
@@ -67,13 +67,6 @@ export function QuestionSequencePanel({
     setIsPublishing(false);
   }
 
-  const toggles: [keyof DeploySettings, string, string][] = [
-    ["isActive", t("activeLabel"), t("activeDesc")],
-    ["defaultQuestionPublic", t("publicLabel"), t("publicDesc")],
-    ["likesVisibleToPeers", t("likesLabel"), t("likesDesc")],
-    ["commentsVisibleToPeers", t("commentsLabel"), t("commentsDesc")],
-  ];
-
   return (
     <div className="space-y-4">
       <QuestionSequenceEditor
@@ -84,23 +77,10 @@ export function QuestionSequencePanel({
         initialQuestions={initialQuestions}
         editMode={editMode}
       />
-      {/* ③ 배포 설정 토글 (2×2) */}
+      {/* ③ 배포 설정 토글 (2×2) — 공통 컴포넌트 */}
       <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
         <p className="text-sm font-semibold text-foreground">{t("settingsTitle")}</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {toggles.map(([key, label, desc]) => (
-            <div key={key} className="rounded-md border border-border bg-background p-2.5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-foreground">{label}</p>
-                <Switch
-                  checked={settings[key]}
-                  onCheckedChange={(v) => setSettings((s) => ({ ...s, [key]: v }))}
-                />
-              </div>
-              <p className="mt-0.5 text-xs text-muted-foreground leading-snug">{desc}</p>
-            </div>
-          ))}
-        </div>
+        <SessionVisibilitySettings value={settings} onChange={(v) => setSettings(v)} />
       </div>
       <div className="flex items-center gap-3">
         <Button onClick={publish} disabled={isPublishing || result.length === 0} className="gap-1.5 font-semibold">

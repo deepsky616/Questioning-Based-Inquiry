@@ -14,16 +14,17 @@ const inquiryQuestionSchema = z.object({
   rationale: z.string().optional(),
 }).passthrough();
 
+// 부분 업데이트: 보낸 필드만 갱신(나머지 필드 보존). 호출자가 전체 객체를 갖고 있지 않아도 안전.
 const updateSchema = z.object({
-  title: z.string().min(1),
-  subject: z.string(),
-  gradeRange: z.string(),
-  area: z.string(),
-  coreIdea: z.string(),
-  selectedKeywords: z.array(z.string()),
-  coreSentences: z.array(z.string()),
-  essentialQuestions: z.array(z.string()),
-  inquiryQuestions: z.array(inquiryQuestionSchema),
+  title: z.string().min(1).optional(),
+  subject: z.string().optional(),
+  gradeRange: z.string().optional(),
+  area: z.string().optional(),
+  coreIdea: z.string().optional(),
+  selectedKeywords: z.array(z.string()).optional(),
+  coreSentences: z.array(z.string()).optional(),
+  essentialQuestions: z.array(z.string()).optional(),
+  inquiryQuestions: z.array(inquiryQuestionSchema).optional(),
 });
 
 async function assertOwner(id: string, teacherId: string) {
@@ -48,23 +49,27 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
 
     const data = updateSchema.parse(await req.json());
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    const add = (col: string, val: unknown, cast = "") => {
+      vals.push(val);
+      sets.push(`${col} = $${vals.length}${cast}`);
+    };
+    if (data.title !== undefined) add("title", data.title);
+    if (data.subject !== undefined) add("subject", data.subject);
+    if (data.gradeRange !== undefined) add("grade_range", data.gradeRange);
+    if (data.area !== undefined) add("area", data.area);
+    if (data.coreIdea !== undefined) add("core_idea", data.coreIdea);
+    if (data.selectedKeywords !== undefined) add("selected_keywords", JSON.stringify(data.selectedKeywords), "::jsonb");
+    if (data.coreSentences !== undefined) add("core_sentences", JSON.stringify(data.coreSentences), "::jsonb");
+    if (data.essentialQuestions !== undefined) add("essential_questions", JSON.stringify(data.essentialQuestions), "::jsonb");
+    if (data.inquiryQuestions !== undefined) add("inquiry_questions", JSON.stringify(data.inquiryQuestions), "::jsonb");
+    if (sets.length === 0) return NextResponse.json({ ok: true, designId: id });
+    sets.push("updated_at = now()");
+    vals.push(id);
     await prisma.$executeRawUnsafe(
-      `UPDATE unit_designs
-       SET title = $1, subject = $2, grade_range = $3, area = $4, core_idea = $5,
-           selected_keywords = $6::jsonb, core_sentences = $7::jsonb,
-           essential_questions = $8::jsonb, inquiry_questions = $9::jsonb,
-           updated_at = now()
-       WHERE id = $10`,
-      data.title,
-      data.subject,
-      data.gradeRange,
-      data.area,
-      data.coreIdea,
-      JSON.stringify(data.selectedKeywords),
-      JSON.stringify(data.coreSentences),
-      JSON.stringify(data.essentialQuestions),
-      JSON.stringify(data.inquiryQuestions),
-      id,
+      `UPDATE unit_designs SET ${sets.join(", ")} WHERE id = $${vals.length}`,
+      ...vals,
     );
     return NextResponse.json({ ok: true, designId: id });
   } catch (error) {

@@ -631,7 +631,7 @@
     "topic": "Topic",
     "topicPlaceholder": "Class topic (e.g., Photosynthesis and energy)",
     "creatingSession": "Creating session...",
-    "createSessionBtn": "Create a class session with the selected questions",
+    "createSessionBtn": "Deploy inquiry design with selected questions",
     "sessionCreated": "Presented inquiry questions to the {date} {subject} class session.",
     "sessionCreateFailed": "Failed to create class session",
     "step1Title": "Step 1 · Explore curriculum",
@@ -692,7 +692,11 @@
     "saveFailed": "Save failed",
     "aiGenError": "AI generation error",
     "detailLabel": "Details:",
-    "rawLabel": "Part of AI response:"
+    "rawLabel": "Part of AI response:",
+    "designTitle": "Title",
+    "addQuestion": "Add question",
+    "designUpdated": "Inquiry design updated.",
+    "designUpdateFailed": "Update failed. Please try again."
   },
   "students": {
     "today": "Today",
