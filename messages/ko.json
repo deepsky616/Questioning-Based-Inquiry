@@ -1046,7 +1046,9 @@
     "editTitle": "내용 수정",
     "deleteTitle": "삭제",
     "emptyHasQuestions": "‘③ 추가’로 질문을 넣거나 위 버튼으로 정렬해 보세요",
-    "emptyNoQuestions": "‘① 비슷한 질문 묶기’를 눌러 이 세션의 학생 질문을 묶어보세요"
+    "emptyNoQuestions": "‘① 비슷한 질문 묶기’를 눌러 이 세션의 학생 질문을 묶어보세요",
+    "moveUp": "위로 이동",
+    "moveDown": "아래로 이동"
   },
   "publishDialog": {
     "deployedCount": "{created}개 배포됨",

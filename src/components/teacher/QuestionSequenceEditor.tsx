@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { Check, GripVertical, Layers, ListOrdered, Pencil, Plus, RotateCw, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, GripVertical, Layers, ListOrdered, Pencil, Plus, RotateCw, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -133,6 +133,13 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
     update(sequenced.filter((_, i) => i !== index).map((q, i) => ({ ...q, priority: i + 1 })));
   }
 
+  // 위/아래 이동(터치·키보드 등 모든 기기 지원). dir: -1 위, +1 아래
+  function moveAt(index: number, dir: -1 | 1) {
+    const to = index + dir;
+    if (to < 0 || to >= sequenced.length) return;
+    update(reorder(sequenced, index, to).map((q, i) => ({ ...q, priority: i + 1 })));
+  }
+
   return (
     <div className="space-y-4">
       {/* ① 묶기 + ② 흐름 정렬 (편집 모드에서는 묶기 없이 흐름 정렬만) */}
@@ -209,7 +216,29 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
             onDrop={() => handleDrop(index)}
             className="flex items-center gap-3 rounded-lg border bg-card p-3"
           >
-            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+            <div className="flex shrink-0 items-center">
+              <GripVertical className="hidden h-4 w-4 cursor-grab text-muted-foreground sm:block" />
+              <div className="flex sm:flex-col">
+                <button
+                  type="button"
+                  onClick={() => moveAt(index, -1)}
+                  disabled={index === 0 || isEditing}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                  title={t("moveUp")}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveAt(index, 1)}
+                  disabled={index === sequenced.length - 1 || isEditing}
+                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                  title={t("moveDown")}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-xs text-background">{index + 1}</span>
             {isEditing ? (
               <div className="flex min-w-0 flex-1 items-center gap-2">

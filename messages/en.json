@@ -1046,7 +1046,9 @@
     "editTitle": "Edit content",
     "deleteTitle": "Delete",
     "emptyHasQuestions": "Add questions with '③ Add' or sort with the buttons above",
-    "emptyNoQuestions": "Press '① Group similar questions' to group this session's student questions"
+    "emptyNoQuestions": "Press '① Group similar questions' to group this session's student questions",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "publishDialog": {
     "deployedCount": "{created} deployed",
