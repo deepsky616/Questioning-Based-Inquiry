@@ -619,7 +619,7 @@
     "tabCreate": "✏️ 탐구질문 만들기",
     "tabSaved": "📁 저장된 탐구질문",
     "savedTitle": "저장된 탐구 질문",
-    "savedDesc": "저장된 질문을 확인하고 원하는 날짜의 수업 세션에 제시할 질문을 선택하세요",
+    "savedDesc": "저장된 질문을 확인하고 원하는 날짜의 수업 세션에 제시할 질문을 선택해 탐구 설계하세요",
     "savedEmpty": "저장된 탐구 질문이 없습니다",
     "gradeLabel": "{grade}학년",
     "gradeRangeLabel": "{range}학년군",
@@ -696,7 +696,9 @@
     "designTitle": "제목",
     "addQuestion": "질문 추가",
     "designUpdated": "탐구설계를 수정했어요.",
-    "designUpdateFailed": "수정에 실패했어요. 다시 시도해 주세요."
+    "designUpdateFailed": "수정에 실패했어요. 다시 시도해 주세요.",
+    "moveUp": "위로 이동",
+    "moveDown": "아래로 이동"
   },
   "students": {
     "today": "오늘",

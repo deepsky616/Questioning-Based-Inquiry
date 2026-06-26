@@ -619,7 +619,7 @@
     "tabCreate": "✏️ Create inquiry questions",
     "tabSaved": "📁 Saved inquiry questions",
     "savedTitle": "Saved inquiry questions",
-    "savedDesc": "Review saved questions and pick which ones to present in a class session on the date you want",
+    "savedDesc": "Review saved questions and pick which ones to present in a class session on the date you want to design your inquiry",
     "savedEmpty": "No saved inquiry questions",
     "gradeLabel": "Grade {grade}",
     "gradeRangeLabel": "Grades {range}",
@@ -696,7 +696,9 @@
     "designTitle": "Title",
     "addQuestion": "Add question",
     "designUpdated": "Inquiry design updated.",
-    "designUpdateFailed": "Update failed. Please try again."
+    "designUpdateFailed": "Update failed. Please try again.",
+    "moveUp": "Move up",
+    "moveDown": "Move down"
   },
   "students": {
     "today": "Today",

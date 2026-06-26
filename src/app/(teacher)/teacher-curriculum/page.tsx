@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { GripVertical } from "lucide-react";
+import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
@@ -593,6 +593,16 @@ export default function CurriculumPage() {
   const addEditQuestion = () => {
     setEditQuestions((prev) => [...prev, { type: "factual", content: "" }]);
   };
+  // 위/아래 이동(터치·키보드 등 모든 기기 지원). dir: -1 위, +1 아래
+  const moveEditQuestion = (index: number, dir: -1 | 1) => {
+    setEditQuestions((prev) => {
+      const to = index + dir;
+      if (to < 0 || to >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[index], copy[to]] = [copy[to], copy[index]];
+      return copy;
+    });
+  };
   // 드래그앤드롭 순서 변경
   const handleEditDrop = (targetIndex: number) => {
     setEditQuestions((prev) => {
@@ -718,7 +728,29 @@ export default function CurriculumPage() {
                               onDrop={() => handleEditDrop(i)}
                               className="flex items-start gap-2"
                             >
-                              <GripVertical className="mt-2 h-4 w-4 shrink-0 cursor-grab text-muted-foreground" />
+                              <div className="mt-1 flex shrink-0 flex-col items-center">
+                                <GripVertical className="hidden h-4 w-4 cursor-grab text-muted-foreground sm:block" />
+                                <div className="flex sm:flex-col">
+                                  <button
+                                    type="button"
+                                    onClick={() => moveEditQuestion(i, -1)}
+                                    disabled={i === 0}
+                                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                    aria-label={t("moveUp")}
+                                  >
+                                    <ChevronUp className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => moveEditQuestion(i, 1)}
+                                    disabled={i === editQuestions.length - 1}
+                                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                    aria-label={t("moveDown")}
+                                  >
+                                    <ChevronDown className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
                               <select
                                 value={q.type}
                                 onChange={(e) => updateEditQuestion(i, { type: e.target.value as InquiryQuestion["type"] })}
