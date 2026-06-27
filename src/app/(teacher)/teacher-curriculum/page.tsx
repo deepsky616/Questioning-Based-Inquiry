@@ -159,6 +159,7 @@ export default function CurriculumPage() {
   const [editQuestions, setEditQuestions] = useState<InquiryQuestion[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [addType, setAddType] = useState<InquiryQuestion["type"]>("factual");
   const [mainTab, setMainTab] = useState<"create" | "saved">("create");
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
   const [sessionDate, setSessionDate] = useState("");
@@ -590,8 +591,8 @@ export default function CurriculumPage() {
   const removeEditQuestion = (index: number) => {
     setEditQuestions((prev) => prev.filter((_, i) => i !== index));
   };
-  const addEditQuestion = () => {
-    setEditQuestions((prev) => [...prev, { type: "factual", content: "" }]);
+  const addEditQuestion = (type: InquiryQuestion["type"]) => {
+    setEditQuestions((prev) => [...prev, { type, content: "" }]);
   };
   // 위/아래 이동(터치·키보드 등 모든 기기 지원). dir: -1 위, +1 아래
   const moveEditQuestion = (index: number, dir: -1 | 1) => {
@@ -777,7 +778,19 @@ export default function CurriculumPage() {
                               </button>
                             </div>
                           ))}
-                          <Button variant="outline" size="sm" onClick={addEditQuestion}>＋ {t("addQuestion")}</Button>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={addType}
+                              onChange={(e) => setAddType(e.target.value as InquiryQuestion["type"])}
+                              className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                              aria-label={t("addQuestionType")}
+                            >
+                              <option value="factual">{typeLabel("factual")}</option>
+                              <option value="conceptual">{typeLabel("conceptual")}</option>
+                              <option value="controversial">{typeLabel("controversial")}</option>
+                            </select>
+                            <Button variant="outline" size="sm" onClick={() => addEditQuestion(addType)}>＋ {t("addQuestion")}</Button>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button size="sm" onClick={() => saveEditDesign(d.id)} disabled={savingEdit || !editTitle.trim()}>

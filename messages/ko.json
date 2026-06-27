@@ -698,7 +698,8 @@
     "designUpdated": "탐구설계를 수정했어요.",
     "designUpdateFailed": "수정에 실패했어요. 다시 시도해 주세요.",
     "moveUp": "위로 이동",
-    "moveDown": "아래로 이동"
+    "moveDown": "아래로 이동",
+    "addQuestionType": "추가할 질문 유형"
   },
   "students": {
     "today": "오늘",

@@ -698,7 +698,8 @@
     "designUpdated": "Inquiry design updated.",
     "designUpdateFailed": "Update failed. Please try again.",
     "moveUp": "Move up",
-    "moveDown": "Move down"
+    "moveDown": "Move down",
+    "addQuestionType": "Type of question to add"
   },
   "students": {
     "today": "Today",
