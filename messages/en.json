@@ -833,8 +833,7 @@
     "subjectPlaceholder": "Subject",
     "topicPlaceholderShort": "Topic",
     "pickDate": "Pick a date",
-    "inquiryEditNote": "🧩 Inquiry lessons let you edit only the date·topic (subject is fixed).",
-    "badgeInquiryClass": "Inquiry-question class"
+    "inquiryEditNote": "🧩 Inquiry lessons let you edit only the date·topic (subject is fixed)."
   },
   "settings": {
     "apiKeyRequired": "Please enter an API key (10+ characters)",
