@@ -709,7 +709,10 @@
     "addQuestionType": "추가할 질문 유형",
     "createInquirySessionBtn": "탐구질문 수업 세션 만들기",
     "createInquirySessionHint": "질문을 배포하지 않고, 학생이 이 탐구설계 내용을 참고해 직접 질문을 작성하는 수업 세션을 만듭니다.",
-    "inquirySessionCreated": "{date} {subject} 탐구질문 수업 세션을 만들었어요. 학생 질문하기에서 참고 자료와 함께 보여요."
+    "inquirySessionCreated": "{date} {subject} 탐구질문 수업 세션을 만들었어요. 학생 질문하기에서 참고 자료와 함께 보여요.",
+    "unitNamePlaceholder": "단원명을 입력하면 해당 단원 성취기준을 추천해요",
+    "recommendByUnit": "이 단원 성취기준 추천",
+    "unitNameNoMatch": "일치하는 단원이 없어요. 단원 칩에서 직접 선택하세요."
   },
   "students": {
     "today": "오늘",

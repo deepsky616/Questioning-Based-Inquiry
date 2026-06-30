@@ -709,7 +709,10 @@
     "addQuestionType": "Type of question to add",
     "createInquirySessionBtn": "Create inquiry-question class session",
     "createInquirySessionHint": "Create a session where students write their own questions referencing this design, without deploying the questions.",
-    "inquirySessionCreated": "Created an inquiry-question class session for {date} {subject}. It appears with reference material in student Ask."
+    "inquirySessionCreated": "Created an inquiry-question class session for {date} {subject}. It appears with reference material in student Ask.",
+    "unitNamePlaceholder": "Type a unit name to recommend its achievement standards",
+    "recommendByUnit": "Recommend this unit standards",
+    "unitNameNoMatch": "No matching unit. Pick one from the chips below."
   },
   "students": {
     "today": "Today",
