@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { splitCoreIdeaLines } from "@/lib/content-selection";
 
 export interface DesignReference {
   title?: string;
@@ -30,6 +31,7 @@ export function DesignReferenceView({ data, className }: { data: DesignReference
   const meta = [data.grade ? `${data.grade}${t("gradeSuffix")}` : data.gradeRange, data.subject, data.area]
     .filter(Boolean)
     .join(" · ");
+  const coreIdeaLines = splitCoreIdeaLines(data.coreIdea ?? "");
   const sentences = (data.coreSentences ?? []).filter((s) => s.trim());
   const essential = (data.essentialQuestions ?? []).filter((s) => s.trim());
   const inquiry = (data.inquiryQuestions ?? []).filter((q) => q.content.trim());
@@ -40,10 +42,12 @@ export function DesignReferenceView({ data, className }: { data: DesignReference
       {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}
 
       <div className="mt-2 space-y-3 text-sm">
-        {data.coreIdea?.trim() && (
+        {coreIdeaLines.length > 0 && (
           <section>
             <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("coreIdea")}</p>
-            <p className="mt-0.5 whitespace-pre-wrap text-foreground">{data.coreIdea}</p>
+            <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-foreground">
+              {coreIdeaLines.map((line, i) => <li key={i}>{line}</li>)}
+            </ul>
           </section>
         )}
         {sentences.length > 0 && (
