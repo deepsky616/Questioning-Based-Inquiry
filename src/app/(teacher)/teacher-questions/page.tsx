@@ -37,7 +37,7 @@ import {
   matchesCognitiveCategory,
   normalizeCognitiveType,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { SectionToggle } from "@/components/shared/SectionToggle";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -342,8 +342,11 @@ export default function QuestionsPage() {
 
   // 날짜·교과·주제 필터로 세션 목록을 좁힌다(질문 직접 조회가 아니라 세션을 고르는 보조 필터)
   const filterOptions = getSessionFilterOptions(sessions);
-  // 탐구질문에서 생성한 수업세션(unitDesignId)은 질문 조회에서 제외한다(학생 '수업 탐구 질문'에서만 다룸)
-  const curriculumSessionIds = new Set(sessions.filter((s) => s.unitDesignId).map((s) => s.id));
+  // 질문 배포 세션(unitDesignId + 배포 질문 있음)만 질문 조회에서 제외한다(학생 '수업 탐구 질문'에서 다룸).
+  // 탐구질문 수업 세션(unitDesignId + 배포 질문 없음)은 학생이 직접 질문을 작성하므로 질문 조회에 노출한다.
+  const curriculumSessionIds = new Set(
+    sessions.filter((s) => s.unitDesignId && !isInquiryDesignSession(s)).map((s) => s.id),
+  );
   const filteredSessions = filterSessions(sessions, {
     date: filterDate || undefined,
     subject: filterSubject || undefined,
