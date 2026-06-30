@@ -728,7 +728,12 @@
     "recommendFailed": "Recommendation failed. Please try again.",
     "exactUnitMatch": "Matches a curriculum unit:",
     "addSessionBtn": "Add session",
-    "addSessionHint": "Saves and creates an inquiry-question class session (students write their own questions using the reference). Deploy sessions can be created from the saved tab."
+    "addSessionHint": "Saves and creates an inquiry-question class session (students write their own questions using the reference). Deploy sessions can be created from the saved tab.",
+    "coreSentencesLabel": "Core sentences",
+    "essentialQuestionsLabel": "Essential questions",
+    "inquiryQuestionsLabel": "Inquiry questions",
+    "addItem": "Add item",
+    "referencePreview": "Reference material students see"
   },
   "students": {
     "today": "Today",
@@ -1315,5 +1320,12 @@
     "review_APT_ANSWER": "Apt answer",
     "review_INSIGHTFUL_ANSWER": "Insightful answer",
     "review_DUPLICATE_FLAGGED": "Possible duplicate"
+  },
+  "designRef": {
+    "gradeSuffix": "",
+    "coreIdea": "Core idea",
+    "coreSentences": "Core sentences",
+    "essentialQuestions": "Essential questions",
+    "inquiryQuestions": "Inquiry questions"
   }
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { buildSessionLabel, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { COGNITIVE_LABEL } from "@/lib/question-labels";
 import { useToast } from "@/components/ui/use-toast";
@@ -106,11 +107,6 @@ export default function AskPage() {
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
   const isInquirySession = selectedSession ? isInquiryDesignSession(selectedSession) : false;
-  const inquiryTypeLabel = (ty: string) =>
-    ty === "factual" ? tCls("factual.label")
-      : ty === "conceptual" ? tCls("conceptual.label")
-      : ty === "controversial" ? tCls("controversial.label")
-      : ty;
 
   // 탐구질문 수업 세션이면 참고 자료(탐구설계 맥락)를 불러온다
   useEffect(() => {
@@ -418,48 +414,7 @@ export default function AskPage() {
                 </span>
                 <span className="shrink-0 text-xs font-normal text-indigo-500">{t("referenceHint")}</span>
               </button>
-              {showRef && (
-                <div className="mt-3 space-y-3 text-sm">
-                  <p className="text-xs text-indigo-600 dark:text-indigo-400">
-                    {[designContext.gradeRange, designContext.subject, designContext.area].filter(Boolean).join(" · ")}
-                  </p>
-                  {designContext.coreIdea.trim() && (
-                    <div>
-                      <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">{t("refCoreIdea")}</p>
-                      <p className="whitespace-pre-wrap text-foreground">{designContext.coreIdea}</p>
-                    </div>
-                  )}
-                  {designContext.coreSentences.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">{t("refCoreSentences")}</p>
-                      <ul className="list-disc space-y-0.5 pl-5 text-foreground">
-                        {designContext.coreSentences.map((s, i) => <li key={i}>{s}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  {designContext.essentialQuestions.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">{t("refEssentialQuestions")}</p>
-                      <ul className="list-disc space-y-0.5 pl-5 text-foreground">
-                        {designContext.essentialQuestions.map((s, i) => <li key={i}>{s}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  {designContext.inquiryQuestions.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">{t("refInquiryQuestions")}</p>
-                      <ul className="space-y-1 text-foreground">
-                        {designContext.inquiryQuestions.map((q, i) => (
-                          <li key={i}>
-                            <span className="mr-1 font-medium text-indigo-600 dark:text-indigo-400">[{inquiryTypeLabel(q.type)}]</span>
-                            {q.content}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
+              {showRef && <DesignReferenceView data={designContext} className="mt-3" />}
             </div>
           )}
 

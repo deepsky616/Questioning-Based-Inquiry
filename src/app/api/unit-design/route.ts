@@ -44,21 +44,29 @@ export async function GET(req: Request) {
       grade: string | null;
       session_date: string | null;
       area: string;
+      core_idea: string;
+      core_sentences: unknown;
+      essential_questions: unknown;
       inquiry_questions: unknown;
       created_at: Date;
     }[]
   >`
-    SELECT id, title, subject, grade_range, grade, session_date, area, inquiry_questions, created_at
+    SELECT id, title, subject, grade_range, grade, session_date, area,
+           core_idea, core_sentences, essential_questions, inquiry_questions, created_at
     FROM unit_designs
     WHERE teacher_id = ${teacherId}
     ORDER BY created_at DESC
   `;
 
+  const asArray = (v: unknown) => (Array.isArray(v) ? v : []);
   return NextResponse.json(
     designs.map((d) => ({
       id: d.id, title: d.title, subject: d.subject,
       gradeRange: d.grade_range, grade: d.grade, sessionDate: d.session_date, area: d.area,
-      inquiryQuestions: Array.isArray(d.inquiry_questions) ? d.inquiry_questions : [],
+      coreIdea: d.core_idea ?? "",
+      coreSentences: asArray(d.core_sentences) as string[],
+      essentialQuestions: asArray(d.essential_questions) as string[],
+      inquiryQuestions: asArray(d.inquiry_questions),
       createdAt: d.created_at,
     }))
   );

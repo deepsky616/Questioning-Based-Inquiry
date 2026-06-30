@@ -728,7 +728,12 @@
     "recommendFailed": "추천에 실패했어요. 잠시 후 다시 시도해 주세요.",
     "exactUnitMatch": "교육과정 단원과 일치:",
     "addSessionBtn": "세션 추가",
-    "addSessionHint": "저장과 동시에 탐구질문 수업 세션을 만들어요(학생이 참고 자료를 보고 직접 질문 작성). 질문 배포 세션은 저장 탭에서 만들 수 있어요."
+    "addSessionHint": "저장과 동시에 탐구질문 수업 세션을 만들어요(학생이 참고 자료를 보고 직접 질문 작성). 질문 배포 세션은 저장 탭에서 만들 수 있어요.",
+    "coreSentencesLabel": "핵심 문장",
+    "essentialQuestionsLabel": "핵심 질문",
+    "inquiryQuestionsLabel": "탐구 질문",
+    "addItem": "항목 추가",
+    "referencePreview": "학생에게 보이는 참고자료"
   },
   "students": {
     "today": "오늘",
@@ -1315,5 +1320,12 @@
     "review_APT_ANSWER": "적절한 답변",
     "review_INSIGHTFUL_ANSWER": "통찰 있는 답변",
     "review_DUPLICATE_FLAGGED": "중복 가능성"
+  },
+  "designRef": {
+    "gradeSuffix": "학년",
+    "coreIdea": "핵심 아이디어",
+    "coreSentences": "핵심 문장",
+    "essentialQuestions": "핵심 질문",
+    "inquiryQuestions": "탐구 질문"
   }
 }

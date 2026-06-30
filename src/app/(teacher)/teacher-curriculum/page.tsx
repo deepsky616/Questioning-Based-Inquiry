@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
+import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import {
   buildClassStudentTargetPayload,
   type SessionTargetClass,
@@ -83,6 +84,9 @@ interface SavedInquiryDesign {
   grade?: string | null;
   sessionDate?: string | null;
   area: string;
+  coreIdea?: string;
+  coreSentences?: string[];
+  essentialQuestions?: string[];
   inquiryQuestions: InquiryQuestion[];
   createdAt?: string;
 }
@@ -161,6 +165,9 @@ export default function CurriculumPage() {
   // 편집 상태(저장 설계 제목·질문 인라인 수정)
   const [editingDesignId, setEditingDesignId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [editCoreIdea, setEditCoreIdea] = useState("");
+  const [editCoreSentences, setEditCoreSentences] = useState<string[]>([]);
+  const [editEssentialQuestions, setEditEssentialQuestions] = useState<string[]>([]);
   const [editQuestions, setEditQuestions] = useState<InquiryQuestion[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -803,13 +810,31 @@ export default function CurriculumPage() {
   const startEditDesign = (design: SavedInquiryDesign) => {
     setEditingDesignId(design.id);
     setEditTitle(design.title);
+    setEditCoreIdea(design.coreIdea ?? "");
+    setEditCoreSentences([...(design.coreSentences ?? [])]);
+    setEditEssentialQuestions([...(design.essentialQuestions ?? [])]);
     setEditQuestions(design.inquiryQuestions.map((q) => ({ ...q })));
   };
   const cancelEditDesign = () => {
     setEditingDesignId(null);
     setEditTitle("");
+    setEditCoreIdea("");
+    setEditCoreSentences([]);
+    setEditEssentialQuestions([]);
     setEditQuestions([]);
   };
+  // 핵심문장·핵심질문(문자열 리스트) 공통 편집 헬퍼
+  const updateTextItem = (
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    index: number,
+    value: string,
+  ) => setter((prev) => prev.map((v, i) => (i === index ? value : v)));
+  const removeTextItem = (
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    index: number,
+  ) => setter((prev) => prev.filter((_, i) => i !== index));
+  const addTextItem = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
+    setter((prev) => [...prev, ""]);
   const updateEditQuestion = (index: number, patch: Partial<InquiryQuestion>) => {
     setEditQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)));
   };
@@ -845,12 +870,20 @@ export default function CurriculumPage() {
     const cleaned = editQuestions
       .map((q) => ({ type: q.type, content: q.content.trim() }))
       .filter((q) => q.content);
+    const cleanedSentences = editCoreSentences.map((s) => s.trim()).filter(Boolean);
+    const cleanedEssential = editEssentialQuestions.map((s) => s.trim()).filter(Boolean);
     setSavingEdit(true);
     try {
       const res = await fetch(`/api/unit-design/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: editTitle.trim(), inquiryQuestions: cleaned }),
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          coreIdea: editCoreIdea.trim(),
+          coreSentences: cleanedSentences,
+          essentialQuestions: cleanedEssential,
+          inquiryQuestions: cleaned,
+        }),
       });
       if (!res.ok) throw new Error();
       // 편집 중이던 설계가 선택/세션생성 대상이면 선택 질문 키도 갱신
@@ -940,10 +973,62 @@ export default function CurriculumPage() {
                     {/* 인라인 편집: 제목 + 질문 수정/추가/삭제 */}
                     {editingDesignId === d.id && (
                       <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
+                        {/* 학년·교과·영역 (읽기 전용 메타) */}
+                        <p className="text-xs text-muted-foreground">
+                          {[d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange }), d.subject, d.area].filter(Boolean).join(" · ")}
+                        </p>
                         <div className="space-y-1">
                           <Label>{t("designTitle")}</Label>
                           <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
                         </div>
+
+                        {/* 핵심 아이디어 */}
+                        <div className="space-y-1">
+                          <Label>{t("coreIdea")}</Label>
+                          <textarea
+                            value={editCoreIdea}
+                            onChange={(e) => setEditCoreIdea(e.target.value)}
+                            rows={3}
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                          />
+                        </div>
+
+                        {/* 핵심 문장 */}
+                        <div className="space-y-1.5">
+                          <Label>{t("coreSentencesLabel")}</Label>
+                          {editCoreSentences.map((s, i) => (
+                            <div key={i} className="flex items-start gap-2">
+                              <textarea
+                                value={s}
+                                onChange={(e) => updateTextItem(setEditCoreSentences, i, e.target.value)}
+                                rows={2}
+                                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                              />
+                              <button type="button" onClick={() => removeTextItem(setEditCoreSentences, i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>✕</button>
+                            </div>
+                          ))}
+                          <Button variant="outline" size="sm" onClick={() => addTextItem(setEditCoreSentences)}>＋ {t("addItem")}</Button>
+                        </div>
+
+                        {/* 핵심 질문 */}
+                        <div className="space-y-1.5">
+                          <Label>{t("essentialQuestionsLabel")}</Label>
+                          {editEssentialQuestions.map((s, i) => (
+                            <div key={i} className="flex items-start gap-2">
+                              <textarea
+                                value={s}
+                                onChange={(e) => updateTextItem(setEditEssentialQuestions, i, e.target.value)}
+                                rows={2}
+                                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                              />
+                              <button type="button" onClick={() => removeTextItem(setEditEssentialQuestions, i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>✕</button>
+                            </div>
+                          ))}
+                          <Button variant="outline" size="sm" onClick={() => addTextItem(setEditEssentialQuestions)}>＋ {t("addItem")}</Button>
+                        </div>
+
+                        {/* 탐구 질문 */}
+                        <Label>{t("inquiryQuestionsLabel")}</Label>
                         <div className="space-y-2">
                           {editQuestions.map((q, i) => (
                             <div
@@ -1030,6 +1115,22 @@ export default function CurriculumPage() {
 
                     {selectedSavedId === d.id && (
                       <div className="mt-3 space-y-3 rounded-md bg-muted/40 p-3">
+                        {/* 학생에게 전달되는 참고자료 미리보기(읽기 전용, 수정은 위 '수정' 버튼) */}
+                        <div className="rounded-md border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/60 dark:bg-indigo-950/30 p-3">
+                          <p className="mb-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">📚 {t("referencePreview")}</p>
+                          <DesignReferenceView
+                            data={{
+                              gradeRange: d.gradeRange,
+                              grade: d.grade,
+                              subject: d.subject,
+                              area: d.area,
+                              coreIdea: d.coreIdea,
+                              coreSentences: d.coreSentences,
+                              essentialQuestions: d.essentialQuestions,
+                              inquiryQuestions: d.inquiryQuestions,
+                            }}
+                          />
+                        </div>
                         <div className="space-y-2">
                           {d.inquiryQuestions.length === 0 ? (
                             <p className="text-sm text-muted-foreground">{t("noSavedInquiry")}</p>
