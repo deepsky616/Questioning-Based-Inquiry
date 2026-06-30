@@ -20,7 +20,7 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import {
   Table,
   TableBody,
@@ -36,6 +36,7 @@ interface QuestionSession {
   subject: string;
   topic: string;
   unitDesignId?: string | null;
+  sharedQuestions?: Array<{ type: string; content: string }>;
 }
 
 interface Question {
@@ -110,8 +111,9 @@ export function MyQuestionsView() {
   };
 
   // 날짜·교과·주제로 세션 목록을 좁힌다(세션을 고르는 보조 필터, 교사 페이지와 동일)
-  // 탐구질문에서 생성한 수업세션(unitDesignId)은 내 질문 조회에서 제외(수업 탐구 질문 탭에서만 다룸)
-  const browsableSessions = sessions.filter((s) => !s.unitDesignId);
+  // 질문 배포 세션(unitDesignId + 배포 질문)만 제외. 탐구질문 수업 세션(배포 질문 없음)은
+  // 학생이 직접 질문을 작성하므로 내 질문 조회에 노출한다.
+  const browsableSessions = sessions.filter((s) => !s.unitDesignId || isInquiryDesignSession(s));
   const filterOptions = getSessionFilterOptions(browsableSessions);
   const filteredSessions = filterSessions(browsableSessions, {
     date: filterDate || undefined,

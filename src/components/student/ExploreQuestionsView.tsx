@@ -14,7 +14,7 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
@@ -312,12 +312,13 @@ export function ExploreQuestionsView() {
 
   // 날짜·교과·주제로 세션 목록을 좁힌다(세션을 고르는 보조 필터, 교사 페이지와 동일)
   const filterOptions = getSessionFilterOptions(sessions);
-  // 탐구질문에서 생성한 수업세션(unitDesignId)은 전체 질문탐구에서 제외(수업 탐구 질문 탭에서만 다룸)
+  // 질문 배포 세션(unitDesignId + 배포 질문)만 제외. 탐구질문 수업 세션(배포 질문 없음)은
+  // 학생이 직접 질문을 작성하므로 전체 질문탐구에 노출한다.
   const filteredSessions = filterSessions(sessions, {
     date: filterDate || undefined,
     subject: filterSubject || undefined,
     topic: filterTopic || undefined,
-  }).filter((s) => !s.unitDesignId);
+  }).filter((s) => !s.unitDesignId || isInquiryDesignSession(s));
 
   // 필터로 선택 세션이 목록 밖이 되면 전체로 보정
   useEffect(() => {
