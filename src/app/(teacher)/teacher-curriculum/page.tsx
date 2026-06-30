@@ -176,6 +176,8 @@ export default function CurriculumPage() {
     likesVisibleToPeers: true,
     commentsVisibleToPeers: true,
   });
+  const [editTargetClassValue, setEditTargetClassValue] = useState("all");
+  const [editSelectedStudentIds, setEditSelectedStudentIds] = useState<string[]>([]);
   const [editCoreIdea, setEditCoreIdea] = useState("");
   const [editCoreSentences, setEditCoreSentences] = useState<string[]>([]);
   const [editEssentialQuestions, setEditEssentialQuestions] = useState<string[]>([]);
@@ -650,6 +652,8 @@ export default function CurriculumPage() {
   // 교과서 단원명(자유 입력) → AI가 영역 데이터에서 관련 성취기준·지식·과정·가치를 추천(선택)
   const recommendByUnitName = async () => {
     if (!curriculumData || !unitNameInput.trim() || isRecommending) return;
+    // 입력한 단원명을 주제(저장 제목)에 반영 — 비어있을 때만(교사가 입력한 주제는 보존)
+    if (!saveTitle.trim()) setSaveTitle(unitNameInput.trim());
     setIsRecommending(true);
     setRecommendMessage("");
     try {
@@ -756,6 +760,8 @@ export default function CurriculumPage() {
       likesVisibleToPeers: design.likesVisibleToPeers ?? true,
       commentsVisibleToPeers: design.commentsVisibleToPeers ?? true,
     });
+    setEditTargetClassValue("all");
+    setEditSelectedStudentIds([]);
     setEditCoreIdea(design.coreIdea ?? "");
     setEditCoreSentences([...(design.coreSentences ?? [])]);
     setEditEssentialQuestions([...(design.essentialQuestions ?? [])]);
@@ -862,6 +868,11 @@ export default function CurriculumPage() {
     try {
       const { ok } = await patchEditDesign(id);
       if (!ok) throw new Error();
+      const target = buildClassStudentTargetPayload({
+        targetClassValue: editTargetClassValue,
+        selectedStudentIds: editSelectedStudentIds,
+        students,
+      });
       const res = await fetch(`/api/unit-design/${id}/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -872,6 +883,7 @@ export default function CurriculumPage() {
           isActive: editVisibility.isActive,
           likesVisibleToPeers: editVisibility.likesVisibleToPeers,
           commentsVisibleToPeers: editVisibility.commentsVisibleToPeers,
+          ...target,
           // sharedQuestions 생략 → 탐구질문 수업 세션
         }),
       });
@@ -963,9 +975,14 @@ export default function CurriculumPage() {
                     {/* 인라인 편집: 제목 + 질문 수정/추가/삭제 */}
                     {editingDesignId === d.id && (
                       <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
-                        {/* 학년·교과·영역 (읽기 전용 메타) */}
+                        {/* 학년·교과·영역·단원명 (읽기 전용 메타) */}
                         <p className="text-xs text-muted-foreground">
-                          {[d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange }), d.subject, d.area].filter(Boolean).join(" · ")}
+                          {[
+                            d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange }),
+                            d.subject,
+                            d.area,
+                            d.title && t("unitNameMeta", { name: d.title }),
+                          ].filter(Boolean).join(" · ")}
                         </p>
                         {/* 수업날짜·교과·주제 (탐구질문 만들기에서 설정한 값이 기본값) */}
                         <div className="grid gap-3 sm:grid-cols-[1fr_1fr_2fr]">
@@ -983,10 +1000,23 @@ export default function CurriculumPage() {
                           </div>
                         </div>
 
-                        {/* 공개 설정 4종 */}
-                        <div className="space-y-1">
-                          <Label>{t("visibilitySettingsLabel")}</Label>
-                          <SessionVisibilitySettings value={editVisibility} onChange={setEditVisibility} />
+                        {/* 배포 대상 + 공개 설정 4종 */}
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label>{t("selectTargetsLabel")}</Label>
+                            <SessionTargetSelector
+                              classes={targetClasses}
+                              students={students}
+                              targetClassValue={editTargetClassValue}
+                              selectedStudentIds={editSelectedStudentIds}
+                              onTargetClassChange={(v, ids) => { setEditTargetClassValue(v); setEditSelectedStudentIds(ids); }}
+                              onSelectedStudentIdsChange={setEditSelectedStudentIds}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>{t("visibilitySettingsLabel")}</Label>
+                            <SessionVisibilitySettings value={editVisibility} onChange={setEditVisibility} />
+                          </div>
                         </div>
 
                         {/* 핵심 아이디어 */}
