@@ -35,7 +35,6 @@ import {
   toggleContentItem,
 } from "@/lib/content-selection";
 import {
-  filterSelectedInquiryQuestions,
   filterSelectedTexts,
   selectAllIndices,
   toggleSelectedIndex,
@@ -152,7 +151,6 @@ export default function CurriculumPage() {
   const tCls = useTranslations("classification");
   const stepLabel = (n: Step) => t(`step${n}`);
   const typeLabel = (type: string) => `${tCls(`${type}.label`)}`;
-  const typeDesc = (type: string) => tCls(`${type}.desc`);
   const [step, setStep] = useState<Step>(1);
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -222,7 +220,8 @@ export default function CurriculumPage() {
 
   // Step 5 — 탐구 질문
   const [inquiryQuestions, setInquiryQuestions] = useState<InquiryQuestion[]>([]);
-  const [selectedInquiryQuestionIndices, setSelectedInquiryQuestionIndices] = useState<number[]>([]);
+  const [dragInquiryIndex, setDragInquiryIndex] = useState<number | null>(null);
+  const [inquiryAddType, setInquiryAddType] = useState<InquiryQuestion["type"]>("factual");
   const [loadingInquiry, setLoadingInquiry] = useState(false);
 
   // 저장된 탐구설계 목록 — react-query 폴링(12초)+포커스 재조회
@@ -357,10 +356,10 @@ export default function CurriculumPage() {
     essentialQuestions,
     selectedEssentialQuestionIndices
   );
-  const selectedInquiryQuestions = filterSelectedInquiryQuestions(
-    inquiryQuestions,
-    selectedInquiryQuestionIndices
-  );
+  // 5단계 탐구질문은 리스트 자체가 저장/세션 대상(내용이 빈 것은 제외)
+  const selectedInquiryQuestions = inquiryQuestions
+    .map((q) => ({ type: q.type, content: q.content.trim() }))
+    .filter((q) => q.content);
 
   const getFilteredAchievementGroups = () => {
     const groups = curriculumData?.achievementGroups ?? [];
@@ -438,7 +437,6 @@ export default function CurriculumPage() {
         setEssentialQuestions([]);
         setSelectedEssentialQuestionIndices([]);
         setInquiryQuestions([]);
-        setSelectedInquiryQuestionIndices([]);
         setStep(3);
       }
     } finally {
@@ -454,7 +452,6 @@ export default function CurriculumPage() {
         setEssentialQuestions(data.questions);
         setSelectedEssentialQuestionIndices(selectAllIndices(data.questions));
         setInquiryQuestions([]);
-        setSelectedInquiryQuestionIndices([]);
         setStep(4);
       }
     } finally {
@@ -471,7 +468,6 @@ export default function CurriculumPage() {
       });
       if (data?.inquiryQuestions) {
         setInquiryQuestions(data.inquiryQuestions);
-        setSelectedInquiryQuestionIndices(selectAllIndices(data.inquiryQuestions));
         setStep(5);
       }
     } finally {
@@ -761,6 +757,32 @@ export default function CurriculumPage() {
     } finally {
       setIsRecommending(false);
     }
+  };
+
+  // 5단계 탐구질문 편집(저장 탭 편집과 동일: 드래그·↑↓·유형·내용·삭제·추가)
+  const updateInquiry = (index: number, patch: Partial<InquiryQuestion>) =>
+    setInquiryQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)));
+  const removeInquiry = (index: number) =>
+    setInquiryQuestions((prev) => prev.filter((_, i) => i !== index));
+  const addInquiry = (type: InquiryQuestion["type"]) =>
+    setInquiryQuestions((prev) => [...prev, { type, content: "" }]);
+  const moveInquiry = (index: number, dir: -1 | 1) =>
+    setInquiryQuestions((prev) => {
+      const to = index + dir;
+      if (to < 0 || to >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[index], copy[to]] = [copy[to], copy[index]];
+      return copy;
+    });
+  const handleInquiryDrop = (targetIndex: number) => {
+    setInquiryQuestions((prev) => {
+      if (dragInquiryIndex === null || dragInquiryIndex === targetIndex || dragInquiryIndex < 0 || dragInquiryIndex >= prev.length) return prev;
+      const copy = [...prev];
+      const [moved] = copy.splice(dragInquiryIndex, 1);
+      copy.splice(targetIndex, 0, moved);
+      return copy;
+    });
+    setDragInquiryIndex(null);
   };
 
   const confirm = useConfirm();
@@ -1801,64 +1823,63 @@ export default function CurriculumPage() {
             <CardDescription>{t("step5Desc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{t("selectedCount", { count: selectedInquiryQuestions.length })}</span>
-              <span className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedInquiryQuestionIndices(selectAllIndices(inquiryQuestions))}
-                  className="text-indigo-600 hover:text-indigo-800 underline"
+            <p className="text-xs text-muted-foreground">{t("selectedCount", { count: selectedInquiryQuestions.length })}</p>
+            {/* 평면 편집 리스트 — 드래그·↑↓ 순서 변경, 유형 변경, 내용 수정, 삭제, 추가 */}
+            <div className="space-y-2">
+              {inquiryQuestions.map((q, i) => (
+                <div
+                  key={i}
+                  draggable
+                  onDragStart={() => setDragInquiryIndex(i)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => handleInquiryDrop(i)}
+                  className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 ${TYPE_COLOR[q.type] ?? "bg-card"}`}
                 >
-                  {t("selectAll")}
-                </button>
-                <span className="text-muted-foreground">|</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedInquiryQuestionIndices([])}
-                  className="text-indigo-600 hover:text-indigo-800 underline"
-                >
-                  {t("deselectAll")}
-                </button>
-              </span>
-            </div>
-            {(["factual", "conceptual", "controversial"] as const).map((type) => (
-              <div key={type}>
-                <p className="text-xs font-semibold text-muted-foreground mb-2">
-                  {typeLabel(type)}
-                  <span className="ml-1.5 font-normal text-muted-foreground/80">· {typeDesc(type)}</span>
-                </p>
-                <div className="space-y-2">
-                  {inquiryQuestions
-                    .map((q, i) => ({ ...q, idx: i }))
-                    .filter((q) => q.type === type)
-                    .map(({ content, idx }) => (
-                      <div key={idx} className={`flex gap-2 rounded-lg border px-4 py-3 ${TYPE_COLOR[type]}`}>
-                        <input
-                          type="checkbox"
-                          className="mt-1 h-4 w-4 shrink-0 accent-indigo-600"
-                          checked={selectedInquiryQuestionIndices.includes(idx)}
-                          onChange={() =>
-                            setSelectedInquiryQuestionIndices((prev) =>
-                              toggleSelectedIndex(prev, idx)
-                            )
-                          }
-                          aria-label={t("selectType", { type: typeLabel(type) })}
-                        />
-                        <textarea
-                          className="w-full bg-transparent text-sm resize-none outline-none"
-                          rows={2}
-                          value={content}
-                          onChange={(e) => {
-                            const next = [...inquiryQuestions];
-                            next[idx] = { ...next[idx], content: e.target.value };
-                            setInquiryQuestions(next);
-                          }}
-                        />
-                      </div>
-                    ))}
+                  <div className="mt-1 flex shrink-0 flex-col items-center">
+                    <GripVertical className="hidden h-4 w-4 cursor-grab text-muted-foreground sm:block" />
+                    <div className="flex sm:flex-col">
+                      <button type="button" onClick={() => moveInquiry(i, -1)} disabled={i === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30" aria-label={t("moveUp")}>
+                        <ChevronUp className="h-4 w-4" />
+                      </button>
+                      <button type="button" onClick={() => moveInquiry(i, 1)} disabled={i === inquiryQuestions.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30" aria-label={t("moveDown")}>
+                        <ChevronDown className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <select
+                    value={q.type}
+                    onChange={(e) => updateInquiry(i, { type: e.target.value as InquiryQuestion["type"] })}
+                    className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                  >
+                    <option value="factual">{typeLabel("factual")}</option>
+                    <option value="conceptual">{typeLabel("conceptual")}</option>
+                    <option value="controversial">{typeLabel("controversial")}</option>
+                  </select>
+                  <textarea
+                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                    rows={2}
+                    value={q.content}
+                    onChange={(e) => updateInquiry(i, { content: e.target.value })}
+                  />
+                  <button type="button" onClick={() => removeInquiry(i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>
+                    ✕
+                  </button>
                 </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <select
+                  value={inquiryAddType}
+                  onChange={(e) => setInquiryAddType(e.target.value as InquiryQuestion["type"])}
+                  className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                  aria-label={t("addQuestionType")}
+                >
+                  <option value="factual">{typeLabel("factual")}</option>
+                  <option value="conceptual">{typeLabel("conceptual")}</option>
+                  <option value="controversial">{typeLabel("controversial")}</option>
+                </select>
+                <Button variant="outline" size="sm" onClick={() => addInquiry(inquiryAddType)}>＋ {t("addQuestion")}</Button>
               </div>
-            ))}
+            </div>
 
             {/* 저장 — 날짜·학년·교과·주제 결정 후 저장 */}
             <div className="border-t pt-4 space-y-3">
@@ -1927,19 +1948,16 @@ export default function CurriculumPage() {
                 </div>
               </div>
 
-              {/* 저장 / 저장하고 바로 수업 세션 만들기 */}
+              {/* 세션 추가(탐구질문 수업) / 저장된 탐구질문 탭에 저장 */}
               <div className="flex flex-wrap items-center gap-2 border-t pt-4">
                 <Button onClick={() => handleSaveAndCreateSession("inquiry")} disabled={isSaving || !canSaveDesign}>
-                  ✍️ {t("saveAndStartInquiry")}
-                </Button>
-                <Button variant="secondary" onClick={() => handleSaveAndCreateSession("deploy")} disabled={isSaving || !canSaveDesign}>
-                  📋 {t("saveAndStartDeploy")}
+                  ➕ {t("addSessionBtn")}
                 </Button>
                 <Button variant="outline" onClick={handleSave} disabled={isSaving || !canSaveDesign}>
                   💾 {t("saveOnly")}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">{t("saveAndStartHint")}</p>
+              <p className="text-xs text-muted-foreground">{t("addSessionHint")}</p>
             </div>
           </CardContent>
         </Card>

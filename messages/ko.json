@@ -726,7 +726,9 @@
     "recommendDone": "{count}개 항목을 추천했어요. 확인하고 가감하세요.",
     "recommendEmpty": "관련 항목을 찾지 못했어요. 아래에서 직접 선택하세요.",
     "recommendFailed": "추천에 실패했어요. 잠시 후 다시 시도해 주세요.",
-    "exactUnitMatch": "교육과정 단원과 일치:"
+    "exactUnitMatch": "교육과정 단원과 일치:",
+    "addSessionBtn": "세션 추가",
+    "addSessionHint": "저장과 동시에 탐구질문 수업 세션을 만들어요(학생이 참고 자료를 보고 직접 질문 작성). 질문 배포 세션은 저장 탭에서 만들 수 있어요."
   },
   "students": {
     "today": "오늘",

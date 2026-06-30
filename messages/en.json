@@ -726,7 +726,9 @@
     "recommendDone": "Recommended {count} items. Review and adjust.",
     "recommendEmpty": "No related items found. Please select manually below.",
     "recommendFailed": "Recommendation failed. Please try again.",
-    "exactUnitMatch": "Matches a curriculum unit:"
+    "exactUnitMatch": "Matches a curriculum unit:",
+    "addSessionBtn": "Add session",
+    "addSessionHint": "Saves and creates an inquiry-question class session (students write their own questions using the reference). Deploy sessions can be created from the saved tab."
   },
   "students": {
     "today": "Today",
