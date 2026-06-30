@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -109,17 +109,31 @@ export default function AskPage() {
   const isInquirySession = selectedSession ? isInquiryDesignSession(selectedSession) : false;
 
   // 탐구질문 수업 세션이면 참고 자료(탐구설계 맥락)를 불러온다
+  const fetchDesignContext = useCallback((sessionId: string) => {
+    fetch(`/api/sessions/${sessionId}/design-context`)
+      .then((r) => r.json())
+      .then((d) => setDesignContext(d?.context ?? null))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     setDesignContext(null);
     const sel = sessions.find((s) => s.id === selectedSessionId);
     if (selectedSessionId && sel && isInquiryDesignSession(sel)) {
       setShowRef(true);
-      fetch(`/api/sessions/${selectedSessionId}/design-context`)
-        .then((r) => r.json())
-        .then((d) => setDesignContext(d?.context ?? null))
-        .catch(() => {});
+      fetchDesignContext(selectedSessionId);
     }
-  }, [selectedSessionId, sessions]);
+  }, [selectedSessionId, sessions, fetchDesignContext]);
+
+  // 교사가 저장 설계를 수정하면 라이브로 반영된다. 창 포커스 시 참고자료를 다시 불러와 최신화한다.
+  useEffect(() => {
+    const onFocus = () => {
+      const sel = sessions.find((s) => s.id === selectedSessionId);
+      if (selectedSessionId && sel && isInquiryDesignSession(sel)) fetchDesignContext(selectedSessionId);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [selectedSessionId, sessions, fetchDesignContext]);
 
   // 날짜/교과/주제 필터로 좁힌 세션 목록
   const filterOptions = getSessionFilterOptions(sessions);

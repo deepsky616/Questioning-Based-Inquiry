@@ -733,7 +733,10 @@
     "essentialQuestionsLabel": "Essential questions",
     "inquiryQuestionsLabel": "Inquiry questions",
     "addItem": "Add item",
-    "referencePreview": "Reference material students see"
+    "referencePreview": "Reference material students see",
+    "saveAndRedeploy": "Save and apply to students",
+    "saveAndRedeployHint": "Saving immediately updates the student reference material of inquiry-question class sessions made from this design.",
+    "designRedeployed": "Saved and applied the changes to the student reference material."
   },
   "students": {
     "today": "Today",

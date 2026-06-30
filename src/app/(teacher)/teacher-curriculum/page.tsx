@@ -892,7 +892,7 @@ export default function CurriculumPage() {
       }
       cancelEditDesign();
       fetchSaved();
-      toast({ variant: "success", description: t("designUpdated") });
+      toast({ variant: "success", description: t("designRedeployed") });
     } catch {
       toast({ variant: "destructive", description: t("designUpdateFailed") });
     } finally {
@@ -1102,14 +1102,15 @@ export default function CurriculumPage() {
                             <Button variant="outline" size="sm" onClick={() => addEditQuestion(addType)}>＋ {t("addQuestion")}</Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Button size="sm" onClick={() => saveEditDesign(d.id)} disabled={savingEdit || !editTitle.trim()}>
-                            {savingEdit ? tc("loading") : tc("save")}
+                            {savingEdit ? tc("loading") : `📤 ${t("saveAndRedeploy")}`}
                           </Button>
                           <Button size="sm" variant="outline" onClick={cancelEditDesign} disabled={savingEdit}>
                             {tc("cancel")}
                           </Button>
                         </div>
+                        <p className="text-xs text-muted-foreground">{t("saveAndRedeployHint")}</p>
                       </div>
                     )}
 

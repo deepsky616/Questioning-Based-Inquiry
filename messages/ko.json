@@ -733,7 +733,10 @@
     "essentialQuestionsLabel": "핵심 질문",
     "inquiryQuestionsLabel": "탐구 질문",
     "addItem": "항목 추가",
-    "referencePreview": "학생에게 보이는 참고자료"
+    "referencePreview": "학생에게 보이는 참고자료",
+    "saveAndRedeploy": "저장 후 학생에게 반영",
+    "saveAndRedeployHint": "저장하면 이 설계로 만든 탐구질문 수업 세션의 학생 참고자료에 곧바로 반영돼요.",
+    "designRedeployed": "수정 내용을 저장하고 학생 참고자료에 반영했어요."
   },
   "students": {
     "today": "오늘",
