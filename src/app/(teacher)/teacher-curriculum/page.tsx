@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
+import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
+import {
+  buildClassStudentTargetPayload,
+  type SessionTargetClass,
+  type SessionTargetStudent,
+} from "@/lib/session-targeting";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import DatePicker from "@/components/shared/DatePicker";
@@ -182,6 +188,11 @@ export default function CurriculumPage() {
   const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>([]);
   const [selectedAchievementCodes, setSelectedAchievementCodes] = useState<string[]>([]);
   const [unitNameInput, setUnitNameInput] = useState("");
+  // 마지막 단계에서 바로 세션을 만들기 위한 대상 선택 데이터(수업세션 페이지와 동일 UI)
+  const [students, setStudents] = useState<SessionTargetStudent[]>([]);
+  const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
+  const [targetClassValue, setTargetClassValue] = useState("all");
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   // 내용요소 선택 (새 기능: 핵심아이디어·지식이해·과정기능·가치태도 체크박스)
   const [selectedCoreIdeaLines, setSelectedCoreIdeaLines] = useState<string[]>([]);
@@ -227,6 +238,26 @@ export default function CurriculumPage() {
     () => queryClient.invalidateQueries({ queryKey: ["unit-designs"] }),
     [queryClient],
   );
+
+  // 대상 선택용 학생/학급 로드(마지막 단계 세션 만들기)
+  useEffect(() => {
+    fetch("/api/teacher/students")
+      .then((r) => r.json())
+      .then((d) => {
+        setStudents(d.students ?? []);
+        setTeacherClasses(d.teacherClasses ?? []);
+      })
+      .catch(() => {});
+  }, []);
+
+  const targetClasses = useMemo(() => {
+    if (teacherClasses.length > 0) return teacherClasses;
+    const map = new Map<string, SessionTargetClass>();
+    students.forEach((s) => {
+      if (s.grade && s.className) map.set(`${s.grade}-${s.className}`, { grade: s.grade, className: s.className });
+    });
+    return Array.from(map.values());
+  }, [students, teacherClasses]);
 
   const getQuestionKey = (question: InquiryQuestion) => `${question.type}|${question.content.trim()}`;
 
@@ -459,48 +490,109 @@ export default function CurriculumPage() {
     setCustomKeyword("");
   };
 
+  const canSaveDesign = Boolean(
+    curriculumData && saveTitle.trim() && saveGrade && saveDate && selectedInquiryQuestions.length > 0,
+  );
+
+  // 설계 저장만 수행하고 생성된 설계를 반환(이동/폼 리셋은 호출자가 처리)
+  const saveDesign = async (): Promise<SavedInquiryDesign | null> => {
+    if (!curriculumData) return null;
+    const res = await fetch("/api/unit-design", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: saveTitle.trim(),
+        curriculumAreaId: curriculumData.id,
+        subject: curriculumData.subject,
+        gradeRange: curriculumData.gradeRange,
+        grade: saveGrade,
+        sessionDate: saveDate,
+        area: curriculumData.area,
+        coreIdea: curriculumData.coreIdea,
+        selectedKeywords,
+        coreSentences: selectedCoreSentences,
+        essentialQuestions: selectedEssentialQuestions,
+        inquiryQuestions: selectedInquiryQuestions,
+      }),
+    });
+    if (!res.ok) {
+      toast({ variant: "destructive", description: t("saveFailed") });
+      return null;
+    }
+    const data = await res.json();
+    const savedDesign: SavedInquiryDesign | null = data.design ?? null;
+    if (savedDesign?.id) {
+      queryClient.setQueryData<SavedInquiryDesign[]>(["unit-designs"], (prev) => [
+        { ...savedDesign, createdAt: new Date().toISOString() },
+        ...(prev ?? []).filter((design) => design.id !== savedDesign.id),
+      ]);
+    }
+    fetchSaved();
+    return savedDesign;
+  };
+
+  const resetSaveForm = () => {
+    setSaveTitle("");
+    setSaveGrade("");
+    setSaveDate(todayStr());
+  };
+
+  // 저장만
   const handleSave = async () => {
-    if (!curriculumData || !saveTitle.trim() || !saveGrade || !saveDate || selectedInquiryQuestions.length === 0) return;
+    if (!canSaveDesign) return;
     setIsSaving(true);
     setCreatedSessionMessage("");
     try {
-      const res = await fetch("/api/unit-design", {
+      const d = await saveDesign();
+      if (d?.id) {
+        resetSaveForm();
+        setMainTab("saved");
+        setSelectedSavedId(d.id);
+        setSelectedSavedQuestionKeys(new Set(d.inquiryQuestions.map(getQuestionKey)));
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 저장하고 바로 수업 세션 만들기 — mode: "inquiry"(학생이 직접 작성) / "deploy"(질문 배포)
+  const handleSaveAndCreateSession = async (mode: "inquiry" | "deploy") => {
+    if (!canSaveDesign || !curriculumData) return;
+    setIsSaving(true);
+    setCreatedSessionMessage("");
+    try {
+      const d = await saveDesign();
+      if (!d?.id) return;
+      const target = buildClassStudentTargetPayload({ targetClassValue, selectedStudentIds, students });
+      const res = await fetch(`/api/unit-design/${d.id}/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: saveTitle.trim(),
-          curriculumAreaId: curriculumData.id,
-          subject: curriculumData.subject,
-          gradeRange: curriculumData.gradeRange,
-          grade: saveGrade,
-          sessionDate: saveDate,
-          area: curriculumData.area,
-          coreIdea: curriculumData.coreIdea,
-          selectedKeywords,
-          coreSentences: selectedCoreSentences,
-          essentialQuestions: selectedEssentialQuestions,
-          inquiryQuestions: selectedInquiryQuestions,
+          date: saveDate,
+          topic: saveTitle.trim(),
+          defaultQuestionPublic,
+          isActive: sessionIsActive,
+          likesVisibleToPeers: sessionLikesVisible,
+          commentsVisibleToPeers: sessionCommentsVisible,
+          ...target,
+          ...(mode === "deploy" ? { sharedQuestions: selectedInquiryQuestions } : {}),
         }),
       });
       if (res.ok) {
-        const data = await res.json();
-        const savedDesign: SavedInquiryDesign | null = data.design ?? null;
-        setSaveTitle("");
-        setSaveGrade("");
-        setSaveDate(todayStr());
-        fetchSaved();
-        if (savedDesign?.id) {
-          // 새 설계를 캐시에 즉시 반영(다음 폴링/invalidate에서 서버 값으로 확정)
-          queryClient.setQueryData<SavedInquiryDesign[]>(["unit-designs"], (prev) => [
-            { ...savedDesign, createdAt: new Date().toISOString() },
-            ...(prev ?? []).filter((design) => design.id !== savedDesign.id),
-          ]);
-          setMainTab("saved");
-          setSelectedSavedId(savedDesign.id);
-          setSelectedSavedQuestionKeys(new Set(savedDesign.inquiryQuestions.map(getQuestionKey)));
-        }
+        toast({
+          variant: "success",
+          description: t(mode === "deploy" ? "sessionCreated" : "inquirySessionCreated", {
+            date: saveDate,
+            subject: curriculumData.subject,
+          }),
+        });
+        resetSaveForm();
+        setMainTab("saved");
+        setSelectedSavedId(d.id);
+        setSelectedSavedQuestionKeys(new Set(d.inquiryQuestions.map(getQuestionKey)));
       } else {
-        toast({ variant: "destructive", description: t("saveFailed") });
+        const data = await res.json().catch(() => ({}));
+        toast({ variant: "destructive", description: data.error || t("sessionCreateFailed") });
       }
     } finally {
       setIsSaving(false);
@@ -1734,12 +1826,52 @@ export default function CurriculumPage() {
                   />
                 </div>
               </div>
-              <Button
-                onClick={handleSave}
-                disabled={isSaving || !saveTitle.trim() || !saveGrade || !saveDate || selectedInquiryQuestions.length === 0}
-              >
-                {isSaving ? t("saving") : tc("save")}
-              </Button>
+
+              {/* 대상 선택 + 공개 설정 (수업세션 페이지와 동일 구성) */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>{t("selectTargetsLabel")}</Label>
+                  <SessionTargetSelector
+                    classes={targetClasses}
+                    students={students}
+                    targetClassValue={targetClassValue}
+                    selectedStudentIds={selectedStudentIds}
+                    onTargetClassChange={(v, ids) => { setTargetClassValue(v); setSelectedStudentIds(ids); }}
+                    onSelectedStudentIdsChange={setSelectedStudentIds}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>{t("visibilitySettingsLabel")}</Label>
+                  <SessionVisibilitySettings
+                    value={{
+                      isActive: sessionIsActive,
+                      defaultQuestionPublic,
+                      likesVisibleToPeers: sessionLikesVisible,
+                      commentsVisibleToPeers: sessionCommentsVisible,
+                    }}
+                    onChange={(next) => {
+                      setSessionIsActive(next.isActive);
+                      setDefaultQuestionPublic(next.defaultQuestionPublic);
+                      setSessionLikesVisible(next.likesVisibleToPeers);
+                      setSessionCommentsVisible(next.commentsVisibleToPeers);
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* 저장 / 저장하고 바로 수업 세션 만들기 */}
+              <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+                <Button onClick={() => handleSaveAndCreateSession("inquiry")} disabled={isSaving || !canSaveDesign}>
+                  ✍️ {t("saveAndStartInquiry")}
+                </Button>
+                <Button variant="secondary" onClick={() => handleSaveAndCreateSession("deploy")} disabled={isSaving || !canSaveDesign}>
+                  📋 {t("saveAndStartDeploy")}
+                </Button>
+                <Button variant="outline" onClick={handleSave} disabled={isSaving || !canSaveDesign}>
+                  💾 {t("saveOnly")}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{t("saveAndStartHint")}</p>
             </div>
           </CardContent>
         </Card>

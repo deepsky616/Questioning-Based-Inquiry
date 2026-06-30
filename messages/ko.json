@@ -712,7 +712,13 @@
     "inquirySessionCreated": "{date} {subject} 탐구질문 수업 세션을 만들었어요. 학생 질문하기에서 참고 자료와 함께 보여요.",
     "unitNamePlaceholder": "단원명을 입력하면 해당 단원 성취기준을 추천해요",
     "recommendByUnit": "이 단원 성취기준 추천",
-    "unitNameNoMatch": "일치하는 단원이 없어요. 단원 칩에서 직접 선택하세요."
+    "unitNameNoMatch": "일치하는 단원이 없어요. 단원 칩에서 직접 선택하세요.",
+    "selectTargetsLabel": "대상 선택",
+    "visibilitySettingsLabel": "공개 설정",
+    "saveAndStartInquiry": "탐구질문 수업으로 시작",
+    "saveAndStartDeploy": "질문 배포로 시작",
+    "saveOnly": "저장만 하기",
+    "saveAndStartHint": "저장과 동시에 바로 수업 세션을 만들 수 있어요. ‘저장만 하기’를 누르면 저장 목록에서 나중에 만들 수 있어요."
   },
   "students": {
     "today": "오늘",

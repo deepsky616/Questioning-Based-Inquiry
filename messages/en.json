@@ -712,7 +712,13 @@
     "inquirySessionCreated": "Created an inquiry-question class session for {date} {subject}. It appears with reference material in student Ask.",
     "unitNamePlaceholder": "Type a unit name to recommend its achievement standards",
     "recommendByUnit": "Recommend this unit standards",
-    "unitNameNoMatch": "No matching unit. Pick one from the chips below."
+    "unitNameNoMatch": "No matching unit. Pick one from the chips below.",
+    "selectTargetsLabel": "Target",
+    "visibilitySettingsLabel": "Visibility",
+    "saveAndStartInquiry": "Start as inquiry-question class",
+    "saveAndStartDeploy": "Start by deploying questions",
+    "saveOnly": "Save only",
+    "saveAndStartHint": "Create a class session right after saving. Choose Save only to create it later from the saved list."
   },
   "students": {
     "today": "Today",
