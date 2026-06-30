@@ -21,6 +21,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useTranslations } from "next-intl";
 import {
+  extractUnitCode,
   filterAchievementsByUnitCodes,
   getSelectedAchievementsForAnalysis,
   pickAchievementExplanations,
@@ -734,10 +735,18 @@ export default function CurriculumPage() {
       const kIdx: number[] = Array.isArray(data.knowledgeIdx) ? data.knowledgeIdx : [];
       const pIdx: number[] = Array.isArray(data.processIdx) ? data.processIdx : [];
       const vIdx: number[] = Array.isArray(data.valueIdx) ? data.valueIdx : [];
-      // 성취기준: 단원 필터를 전체로 풀고 추천 코드만 선택(추천 안 된 것도 화면에 보여 교사가 가감)
-      setSelectedUnitCodes(curriculumData.units.map((u) => u.unitCode));
-      const areaCodes = new Set(curriculumData.achievements.map((a) => a.code));
-      const codes = recCodes.filter((c) => areaCodes.has(c));
+      // 핵심아이디어: 영역 단일값이라 단원으로 좁히지 않고 전체 줄을 선택(버튼 한 번으로 5종 모두 채움)
+      setSelectedCoreIdeaLines(splitCoreIdeaLines(curriculumData.coreIdea));
+      // 성취기준: AI가 돌려준 코드를 정규화 비교로 영역의 정규(canonical) 코드에 되매핑
+      // (대괄호·공백 등 형식 차이로 추천이 조용히 0개가 되는 것을 방지)
+      const normCode = (s: string) => s.replace(/[\s[\]]/g, "");
+      const areaByNorm = new Map(curriculumData.achievements.map((a) => [normCode(a.code), a.code] as const));
+      const codes = Array.from(
+        new Set(recCodes.map((c) => areaByNorm.get(normCode(c))).filter((c): c is string => Boolean(c))),
+      );
+      // 단원 필터가 추천 성취기준을 가리지 않도록 전체 단원 + 추천 코드의 단원을 포함
+      const recUnits = codes.map((c) => extractUnitCode(c)).filter(Boolean);
+      setSelectedUnitCodes(Array.from(new Set([...curriculumData.units.map((u) => u.unitCode), ...recUnits])));
       setSelectedAchievementCodes(codes);
       const pick = (items: string[], idx: number[]) =>
         idx.filter((i) => Number.isInteger(i) && i >= 0 && i < items.length).map((i) => items[i]);
