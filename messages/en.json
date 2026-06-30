@@ -710,7 +710,7 @@
     "createInquirySessionBtn": "Create inquiry-question class session",
     "createInquirySessionHint": "Create a session where students write their own questions referencing this design, without deploying the questions.",
     "inquirySessionCreated": "Created an inquiry-question class session for {date} {subject}. It appears with reference material in student Ask.",
-    "unitNamePlaceholder": "Type a unit name to recommend its achievement standards",
+    "unitNamePlaceholder": "e.g., Plant life cycle",
     "recommendByUnit": "Recommend this unit standards",
     "unitNameNoMatch": "No matching unit. Pick one from the chips below.",
     "selectTargetsLabel": "Target",
@@ -718,7 +718,15 @@
     "saveAndStartInquiry": "Start as inquiry-question class",
     "saveAndStartDeploy": "Start by deploying questions",
     "saveOnly": "Save only",
-    "saveAndStartHint": "Create a class session right after saving. Choose Save only to create it later from the saved list."
+    "saveAndStartHint": "Create a class session right after saving. Choose Save only to create it later from the saved list.",
+    "unitNameTitle": "Auto-recommend by unit name",
+    "unitNameDesc": "Type a textbook unit name and AI recommends matching standards and content elements. Adjust freely after.",
+    "recommendByUnitNameBtn": "Recommend for this unit",
+    "recommending": "Recommending...",
+    "recommendDone": "Recommended {count} items. Review and adjust.",
+    "recommendEmpty": "No related items found. Please select manually below.",
+    "recommendFailed": "Recommendation failed. Please try again.",
+    "exactUnitMatch": "Matches a curriculum unit:"
   },
   "students": {
     "today": "Today",

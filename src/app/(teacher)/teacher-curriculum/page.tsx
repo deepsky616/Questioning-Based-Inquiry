@@ -188,6 +188,8 @@ export default function CurriculumPage() {
   const [selectedUnitCodes, setSelectedUnitCodes] = useState<string[]>([]);
   const [selectedAchievementCodes, setSelectedAchievementCodes] = useState<string[]>([]);
   const [unitNameInput, setUnitNameInput] = useState("");
+  const [isRecommending, setIsRecommending] = useState(false);
+  const [recommendMessage, setRecommendMessage] = useState("");
   // 마지막 단계에서 바로 세션을 만들기 위한 대상 선택 데이터(수업세션 페이지와 동일 UI)
   const [students, setStudents] = useState<SessionTargetStudent[]>([]);
   const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
@@ -702,6 +704,56 @@ export default function CurriculumPage() {
     setUnitNameInput("");
   };
 
+  // 교과서 단원명(자유 입력) → AI가 영역 데이터에서 관련 성취기준·지식·과정·가치를 추천(선택)
+  const recommendByUnitName = async () => {
+    if (!curriculumData || !unitNameInput.trim() || isRecommending) return;
+    setIsRecommending(true);
+    setRecommendMessage("");
+    try {
+      const res = await fetch("/api/unit-design/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: "recommend_by_unit",
+          subject: curriculumData.subject,
+          gradeRange: curriculumData.gradeRange,
+          area: curriculumData.area,
+          unitName: unitNameInput.trim(),
+          achievements: curriculumData.achievements,
+          knowledgeItems: curriculumData.knowledgeItems,
+          processItems: curriculumData.processItems,
+          valueItems: curriculumData.valueItems,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ variant: "destructive", description: data.error || t("recommendFailed") });
+        return;
+      }
+      const recCodes: string[] = Array.isArray(data.recommendedCodes) ? data.recommendedCodes : [];
+      const kIdx: number[] = Array.isArray(data.knowledgeIdx) ? data.knowledgeIdx : [];
+      const pIdx: number[] = Array.isArray(data.processIdx) ? data.processIdx : [];
+      const vIdx: number[] = Array.isArray(data.valueIdx) ? data.valueIdx : [];
+      // 성취기준: 단원 필터를 전체로 풀고 추천 코드만 선택(추천 안 된 것도 화면에 보여 교사가 가감)
+      setSelectedUnitCodes(curriculumData.units.map((u) => u.unitCode));
+      const areaCodes = new Set(curriculumData.achievements.map((a) => a.code));
+      const codes = recCodes.filter((c) => areaCodes.has(c));
+      setSelectedAchievementCodes(codes);
+      const pick = (items: string[], idx: number[]) =>
+        idx.filter((i) => Number.isInteger(i) && i >= 0 && i < items.length).map((i) => items[i]);
+      setSelectedKnowledge(pick(curriculumData.knowledgeItems, kIdx));
+      setSelectedProcess(pick(curriculumData.processItems, pIdx));
+      setSelectedValue(pick(curriculumData.valueItems, vIdx));
+      const total = codes.length + pick(curriculumData.knowledgeItems, kIdx).length
+        + pick(curriculumData.processItems, pIdx).length + pick(curriculumData.valueItems, vIdx).length;
+      setRecommendMessage(total > 0 ? t("recommendDone", { count: total }) : t("recommendEmpty"));
+    } catch {
+      toast({ variant: "destructive", description: t("recommendFailed") });
+    } finally {
+      setIsRecommending(false);
+    }
+  };
+
   const confirm = useConfirm();
 
   const handleDelete = async (id: string) => {
@@ -1126,6 +1178,43 @@ export default function CurriculumPage() {
 
           {curriculumData && (
             <div className="space-y-3 mt-2">
+              {/* 단원명 자유 입력 → AI 자동 추천(교과서 단원명 기반) */}
+              <div className="rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-4 space-y-2">
+                <div>
+                  <p className="text-xs font-semibold text-blue-700">{t("unitNameTitle")}</p>
+                  <p className="text-xs text-blue-500">{t("unitNameDesc")}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={unitNameInput}
+                    onChange={(e) => setUnitNameInput(e.target.value)}
+                    placeholder={t("unitNamePlaceholder")}
+                    className="h-9 min-w-[200px] flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                  />
+                  <Button size="sm" onClick={recommendByUnitName} disabled={isRecommending || !unitNameInput.trim()}>
+                    {isRecommending ? t("recommending") : t("recommendByUnitNameBtn")}
+                  </Button>
+                </div>
+                {/* 교육과정 단원명과 정확히 일치하면 데이터 기반 정확 추천도 제공 */}
+                {unitNameInput.trim() && unitMatches.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs text-blue-500">{t("exactUnitMatch")}</span>
+                    {unitMatches.map((u) => (
+                      <button
+                        key={u.unitCode}
+                        type="button"
+                        onClick={() => recommendUnit(u.unitCode)}
+                        className="rounded-full border border-blue-400 bg-white px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-200"
+                      >
+                        {u.unitName} · {t("recommendByUnit")}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {recommendMessage && <p className="text-xs font-medium text-blue-700">{recommendMessage}</p>}
+              </div>
+
               {/* 핵심아이디어 (선택 가능) */}
               <div className="rounded-lg border border-indigo-100 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -1382,36 +1471,6 @@ export default function CurriculumPage() {
                     </div>
                   </div>
                   <p className="text-xs text-blue-500">{t("unitSelectHint")}</p>
-
-                  {/* 단원명 입력 → 매칭 단원 클릭 시 그 단원 성취기준 자동 추천 */}
-                  <div className="space-y-1.5">
-                    <input
-                      type="text"
-                      value={unitNameInput}
-                      onChange={(e) => setUnitNameInput(e.target.value)}
-                      placeholder={t("unitNamePlaceholder")}
-                      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    />
-                    {unitNameInput.trim() && (
-                      unitMatches.length > 0 ? (
-                        <div className="flex flex-wrap gap-1.5">
-                          {unitMatches.map((u) => (
-                            <button
-                              key={u.unitCode}
-                              type="button"
-                              onClick={() => recommendUnit(u.unitCode)}
-                              className="rounded-full border border-blue-400 bg-white px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-200"
-                            >
-                              {u.unitName} · {t("recommendByUnit")}
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">{t("unitNameNoMatch")}</p>
-                      )
-                    )}
-                  </div>
-
                   <div className="flex flex-wrap gap-2">
                     {curriculumData.units.map((u) => {
                       const selected = selectedUnitCodes.includes(u.unitCode);

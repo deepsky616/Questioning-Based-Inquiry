@@ -550,4 +550,23 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     expect(inquiryPrompt).toContain("conceptual (개념적): 추론·비교·분석·해석 → 3~4개");
     expect(inquiryPrompt).toContain("controversial (논쟁적): 판단·의견·가치·적용 → 정확히 2개");
   });
+
+  it("recommend_by_unit 단계는 단원명과 제공 목록(번호)만 포함하고 선택 규칙을 명시한다", () => {
+    const prompt = buildPrompt({
+      ...PROMPT_BASE,
+      step: "recommend_by_unit",
+      unitName: "식물의 한살이",
+      achievements: [{ code: "[4과03-01]", content: "광합성 과정을 설명한다" }],
+      knowledgeItems: ["광합성", "증산 작용"],
+      processItems: ["관찰하기"],
+      valueItems: ["생명 존중"],
+    });
+    expect(prompt).toContain("식물의 한살이");
+    expect(prompt).toContain("[4과03-01]");
+    expect(prompt).toContain("0. 광합성");
+    expect(prompt).toContain("recommendedCodes");
+    expect(prompt).toContain("knowledgeIdx");
+    // 새로 만들지 말고 제공 목록에서만 선택하도록 지시
+    expect(prompt).toContain("새로 만들어내지 마세요");
+  });
 });

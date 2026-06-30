@@ -1,10 +1,11 @@
 import { z } from "zod";
 
 export const unitDesignGenerateSchema = z.object({
-  step: z.enum(["keywords", "sentences", "questions", "inquiry", "recommend_achievements"]),
+  step: z.enum(["keywords", "sentences", "questions", "inquiry", "recommend_achievements", "recommend_by_unit"]),
   subject: z.string(),
   gradeRange: z.string(),
   area: z.string(),
+  unitName: z.string().optional(),
   coreIdea: z.string().optional().default(""),
   knowledgeItems: z.array(z.string()).optional().default([]),
   processItems: z.array(z.string()).optional().default([]),
@@ -37,6 +38,37 @@ export function buildPrompt(data: z.infer<typeof unitDesignGenerateSchema>): str
   const achievementSupportContext = `${achievementsSummary ? `[선택 성취기준]\n${achievementsSummary}` : ""}
 ${explanationContext ? `[선택 성취기준 해설]\n${explanationContext}` : ""}
 ${considerationContext ? `[성취기준 적용 시 고려 사항]\n${considerationContext}` : ""}`.trim();
+
+  if (data.step === "recommend_by_unit") {
+    const allAchs = data.achievements.map((a) => `${a.code}: ${a.content}`).join("\n");
+    const numbered = (items: string[]) => items.map((it, i) => `${i}. ${it}`).join("\n");
+    return `당신은 2022 개정 교육과정 전문가입니다.
+교사가 교과서 단원명을 입력했습니다. 이 단원과 관련성이 높은 항목만 아래 목록에서 골라 추천하세요.
+반드시 아래 제공된 목록 안에서만 선택하고, 새로 만들어내지 마세요.
+
+[교과] ${data.subject}  [영역] ${data.area}  [학년군] ${gradeLabel}
+[교과서 단원명] ${data.unitName ?? ""}
+
+[해당 영역의 성취기준]
+${allAchs || "(없음)"}
+
+[지식·이해 항목]
+${numbered(data.knowledgeItems) || "(없음)"}
+
+[과정·기능 항목]
+${numbered(data.processItems) || "(없음)"}
+
+[가치·태도 항목]
+${numbered(data.valueItems) || "(없음)"}
+
+규칙:
+- 성취기준은 위 목록의 코드만 사용. 단원과 직접 관련된 것만, 최소 1개(없으면 빈 배열).
+- 지식·이해/과정·기능/가치·태도는 위 번호(인덱스)로만 선택. 관련성 높은 것만.
+- 관련 항목이 없으면 해당 배열은 비웁니다.
+
+아래 JSON만 출력 (다른 텍스트 없이):
+{"recommendedCodes": ["[예시코드-01]"], "knowledgeIdx": [0], "processIdx": [], "valueIdx": [0]}`;
+  }
 
   if (data.step === "recommend_achievements") {
     const allAchs = data.achievements
