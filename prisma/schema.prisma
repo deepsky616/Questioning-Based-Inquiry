@@ -219,6 +219,12 @@ model UnitDesign {
   essentialQuestions Json            @map("essential_questions") // string[]
   inquiryQuestions   Json            @map("inquiry_questions")   // [{type, content}][]
 
+  // 수업세션 기본 공개 설정(저장 탭 수정 시 기본값으로 반영)
+  isActive               Boolean     @default(true) @map("is_active")
+  defaultQuestionPublic  Boolean     @default(true) @map("default_question_public")
+  likesVisibleToPeers    Boolean     @default(true) @map("likes_visible_to_peers")
+  commentsVisibleToPeers Boolean     @default(true) @map("comments_visible_to_peers")
+
   createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt          DateTime        @updatedAt @map("updated_at")
 

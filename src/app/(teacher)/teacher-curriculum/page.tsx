@@ -88,6 +88,10 @@ interface SavedInquiryDesign {
   coreSentences?: string[];
   essentialQuestions?: string[];
   inquiryQuestions: InquiryQuestion[];
+  isActive?: boolean;
+  defaultQuestionPublic?: boolean;
+  likesVisibleToPeers?: boolean;
+  commentsVisibleToPeers?: boolean;
   createdAt?: string;
 }
 
@@ -165,6 +169,13 @@ export default function CurriculumPage() {
   // 편집 상태(저장 설계 제목·질문 인라인 수정)
   const [editingDesignId, setEditingDesignId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editVisibility, setEditVisibility] = useState({
+    isActive: true,
+    defaultQuestionPublic: true,
+    likesVisibleToPeers: true,
+    commentsVisibleToPeers: true,
+  });
   const [editCoreIdea, setEditCoreIdea] = useState("");
   const [editCoreSentences, setEditCoreSentences] = useState<string[]>([]);
   const [editEssentialQuestions, setEditEssentialQuestions] = useState<string[]>([]);
@@ -519,6 +530,10 @@ export default function CurriculumPage() {
         coreSentences: selectedCoreSentences,
         essentialQuestions: selectedEssentialQuestions,
         inquiryQuestions: selectedInquiryQuestions,
+        isActive: sessionIsActive,
+        defaultQuestionPublic,
+        likesVisibleToPeers: sessionLikesVisible,
+        commentsVisibleToPeers: sessionCommentsVisible,
       }),
     });
     if (!res.ok) {
@@ -605,88 +620,12 @@ export default function CurriculumPage() {
     }
   };
 
-  const toggleSavedQuestion = (question: InquiryQuestion) => {
-    setCreatedSessionMessage("");
-    const key = getQuestionKey(question);
-    setSelectedSavedQuestionKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
   const handleSelectSavedDesign = (design: SavedInquiryDesign) => {
     setSelectedSavedId((prev) => (prev === design.id ? null : design.id));
     setCreatedSessionMessage("");
     setSessionTopic("");
     if (design.sessionDate) setSessionDate(design.sessionDate);
     setSelectedSavedQuestionKeys(new Set(design.inquiryQuestions.map(getQuestionKey)));
-  };
-
-  const handleCreateSessionFromSaved = async () => {
-    if (!selectedSavedDesign || !sessionDate || !sessionTopic.trim() || isCreatingSession) return;
-    const selectedQuestions = selectedSavedDesign.inquiryQuestions
-      .filter((question) => question.content.trim() && selectedSavedQuestionKeys.has(getQuestionKey(question)))
-      .map((question) => ({ type: question.type, content: question.content.trim() }));
-
-    if (selectedQuestions.length === 0) return;
-
-    setIsCreatingSession(true);
-    setCreatedSessionMessage("");
-    try {
-      const res = await fetch(`/api/unit-design/${selectedSavedDesign.id}/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: sessionDate,
-          topic: sessionTopic.trim(),
-          defaultQuestionPublic,
-          isActive: sessionIsActive,
-          likesVisibleToPeers: sessionLikesVisible,
-          commentsVisibleToPeers: sessionCommentsVisible,
-          sharedQuestions: selectedQuestions,
-        }),
-      });
-      if (res.ok) {
-        setCreatedSessionMessage(t("sessionCreated", { date: sessionDate, subject: selectedSavedDesign.subject }));
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast({ variant: "destructive", description: data.error || t("sessionCreateFailed") });
-      }
-    } finally {
-      setIsCreatingSession(false);
-    }
-  };
-
-  // 탐구질문 수업 세션 생성(질문 배포 없이) — 학생이 참고 자료를 보고 직접 질문 작성
-  const handleCreateInquirySession = async () => {
-    if (!selectedSavedDesign || !sessionDate || !sessionTopic.trim() || isCreatingSession) return;
-    setIsCreatingSession(true);
-    setCreatedSessionMessage("");
-    try {
-      const res = await fetch(`/api/unit-design/${selectedSavedDesign.id}/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: sessionDate,
-          topic: sessionTopic.trim(),
-          defaultQuestionPublic,
-          isActive: sessionIsActive,
-          likesVisibleToPeers: sessionLikesVisible,
-          commentsVisibleToPeers: sessionCommentsVisible,
-          // sharedQuestions 생략 → "탐구질문 수업"
-        }),
-      });
-      if (res.ok) {
-        setCreatedSessionMessage(t("inquirySessionCreated", { date: sessionDate, subject: selectedSavedDesign.subject }));
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast({ variant: "destructive", description: data.error || t("sessionCreateFailed") });
-      }
-    } finally {
-      setIsCreatingSession(false);
-    }
   };
 
   // 단원명 입력 → 교육과정 단원 매칭(성취기준 자동 추천용)
@@ -810,6 +749,13 @@ export default function CurriculumPage() {
   const startEditDesign = (design: SavedInquiryDesign) => {
     setEditingDesignId(design.id);
     setEditTitle(design.title);
+    setEditDate(design.sessionDate || todayStr());
+    setEditVisibility({
+      isActive: design.isActive ?? true,
+      defaultQuestionPublic: design.defaultQuestionPublic ?? true,
+      likesVisibleToPeers: design.likesVisibleToPeers ?? true,
+      commentsVisibleToPeers: design.commentsVisibleToPeers ?? true,
+    });
     setEditCoreIdea(design.coreIdea ?? "");
     setEditCoreSentences([...(design.coreSentences ?? [])]);
     setEditEssentialQuestions([...(design.essentialQuestions ?? [])]);
@@ -865,34 +811,78 @@ export default function CurriculumPage() {
     });
     setDragIndex(null);
   };
-  const saveEditDesign = async (id: string) => {
-    if (!editTitle.trim() || savingEdit) return;
+  // 편집 내용을 설계에 PATCH(제목·수업날짜·공개설정·참고자료 전부)
+  const patchEditDesign = async (id: string) => {
     const cleaned = editQuestions
       .map((q) => ({ type: q.type, content: q.content.trim() }))
       .filter((q) => q.content);
     const cleanedSentences = editCoreSentences.map((s) => s.trim()).filter(Boolean);
     const cleanedEssential = editEssentialQuestions.map((s) => s.trim()).filter(Boolean);
+    const res = await fetch(`/api/unit-design/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: editTitle.trim(),
+        sessionDate: editDate || null,
+        isActive: editVisibility.isActive,
+        defaultQuestionPublic: editVisibility.defaultQuestionPublic,
+        likesVisibleToPeers: editVisibility.likesVisibleToPeers,
+        commentsVisibleToPeers: editVisibility.commentsVisibleToPeers,
+        coreIdea: editCoreIdea.trim(),
+        coreSentences: cleanedSentences,
+        essentialQuestions: cleanedEssential,
+        inquiryQuestions: cleaned,
+      }),
+    });
+    return { ok: res.ok, cleaned };
+  };
+
+  // 저장만(설계 업데이트 — 라이브 참고자료에 즉시 반영)
+  const saveEditDesign = async (id: string) => {
+    if (!editTitle.trim() || savingEdit) return;
     setSavingEdit(true);
     try {
-      const res = await fetch(`/api/unit-design/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: editTitle.trim(),
-          coreIdea: editCoreIdea.trim(),
-          coreSentences: cleanedSentences,
-          essentialQuestions: cleanedEssential,
-          inquiryQuestions: cleaned,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      // 편집 중이던 설계가 선택/세션생성 대상이면 선택 질문 키도 갱신
-      if (selectedSavedId === id) {
-        setSelectedSavedQuestionKeys(new Set(cleaned.map(getQuestionKey)));
-      }
+      const { ok, cleaned } = await patchEditDesign(id);
+      if (!ok) throw new Error();
+      if (selectedSavedId === id) setSelectedSavedQuestionKeys(new Set(cleaned.map(getQuestionKey)));
       cancelEditDesign();
       fetchSaved();
       toast({ variant: "success", description: t("designRedeployed") });
+    } catch {
+      toast({ variant: "destructive", description: t("designUpdateFailed") });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // 저장하고 수업세션에 재배포(탐구질문 수업 세션 생성)
+  const redeployEditDesign = async (id: string) => {
+    if (!editTitle.trim() || !editDate || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const { ok } = await patchEditDesign(id);
+      if (!ok) throw new Error();
+      const res = await fetch(`/api/unit-design/${id}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: editDate,
+          topic: editTitle.trim(),
+          defaultQuestionPublic: editVisibility.defaultQuestionPublic,
+          isActive: editVisibility.isActive,
+          likesVisibleToPeers: editVisibility.likesVisibleToPeers,
+          commentsVisibleToPeers: editVisibility.commentsVisibleToPeers,
+          // sharedQuestions 생략 → 탐구질문 수업 세션
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        toast({ variant: "destructive", description: d.error || t("sessionCreateFailed") });
+        return;
+      }
+      cancelEditDesign();
+      fetchSaved();
+      toast({ variant: "success", description: t("inquirySessionCreated", { date: editDate, subject: editTitle.trim() }) });
     } catch {
       toast({ variant: "destructive", description: t("designUpdateFailed") });
     } finally {
@@ -977,9 +967,26 @@ export default function CurriculumPage() {
                         <p className="text-xs text-muted-foreground">
                           {[d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange }), d.subject, d.area].filter(Boolean).join(" · ")}
                         </p>
+                        {/* 수업날짜·교과·주제 (탐구질문 만들기에서 설정한 값이 기본값) */}
+                        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_2fr]">
+                          <div className="space-y-1">
+                            <Label>{t("sessionDate")}</Label>
+                            <DatePicker value={editDate} onChange={setEditDate} placeholder={t("pickSessionDate")} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>{t("subject")}</Label>
+                            <Input value={d.subject} disabled className="bg-muted" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>{t("designTitle")}</Label>
+                            <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                          </div>
+                        </div>
+
+                        {/* 공개 설정 4종 */}
                         <div className="space-y-1">
-                          <Label>{t("designTitle")}</Label>
-                          <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                          <Label>{t("visibilitySettingsLabel")}</Label>
+                          <SessionVisibilitySettings value={editVisibility} onChange={setEditVisibility} />
                         </div>
 
                         {/* 핵심 아이디어 */}
@@ -1104,130 +1111,35 @@ export default function CurriculumPage() {
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <Button size="sm" onClick={() => saveEditDesign(d.id)} disabled={savingEdit || !editTitle.trim()}>
-                            {savingEdit ? tc("loading") : `📤 ${t("saveAndRedeploy")}`}
+                            💾 {savingEdit ? tc("loading") : tc("save")}
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => redeployEditDesign(d.id)} disabled={savingEdit || !editTitle.trim() || !editDate}>
+                            📤 {t("redeployToSession")}
                           </Button>
                           <Button size="sm" variant="outline" onClick={cancelEditDesign} disabled={savingEdit}>
                             {tc("cancel")}
                           </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground">{t("saveAndRedeployHint")}</p>
+                        <p className="text-xs text-muted-foreground">{t("redeployHint")}</p>
                       </div>
                     )}
 
                     {selectedSavedId === d.id && (
-                      <div className="mt-3 space-y-3 rounded-md bg-muted/40 p-3">
-                        {/* 학생에게 전달되는 참고자료 미리보기(읽기 전용, 수정은 위 '수정' 버튼) */}
-                        <div className="rounded-md border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/60 dark:bg-indigo-950/30 p-3">
-                          <p className="mb-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">📚 {t("referencePreview")}</p>
-                          <DesignReferenceView
-                            data={{
-                              gradeRange: d.gradeRange,
-                              grade: d.grade,
-                              subject: d.subject,
-                              area: d.area,
-                              coreIdea: d.coreIdea,
-                              coreSentences: d.coreSentences,
-                              essentialQuestions: d.essentialQuestions,
-                              inquiryQuestions: d.inquiryQuestions,
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          {d.inquiryQuestions.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">{t("noSavedInquiry")}</p>
-                          ) : (
-                            d.inquiryQuestions.map((question, i) => (
-                              <label key={`${question.type}-${i}`} className="flex items-start gap-2">
-                                <input
-                                  type="checkbox"
-                                  className="mt-1 shrink-0 accent-indigo-600"
-                                  checked={selectedSavedQuestionKeys.has(getQuestionKey(question))}
-                                  onChange={() => toggleSavedQuestion(question)}
-                                />
-                                <span className="text-sm text-foreground">
-                                  <span className="font-medium text-indigo-600 mr-1">
-                                    [{typeLabel(question.type)}]
-                                  </span>
-                                  {question.content}
-                                </span>
-                              </label>
-                            ))
-                          )}
-                        </div>
-
-                        <div className="grid gap-3 border-t pt-3 sm:grid-cols-[1fr_1fr_2fr]">
-                          <div className="space-y-1">
-                            <Label>{t("sessionDate")}</Label>
-                            <DatePicker
-                              value={sessionDate}
-                              onChange={(v) => {
-                                setSessionDate(v);
-                                setCreatedSessionMessage("");
-                              }}
-                              placeholder={t("pickSessionDate")}
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label>{t("subject")}</Label>
-                            <Input value={d.subject} disabled className="bg-muted" />
-                          </div>
-                          <div className="space-y-1">
-                            <Label>{t("topic")}</Label>
-                            <Input
-                              value={sessionTopic}
-                              onChange={(e) => {
-                                setSessionTopic(e.target.value);
-                                setCreatedSessionMessage("");
-                              }}
-                              placeholder={t("topicPlaceholder")}
-                            />
-                          </div>
-                        </div>
-
-                        <SessionVisibilitySettings
-                          value={{
-                            isActive: sessionIsActive,
-                            defaultQuestionPublic,
-                            likesVisibleToPeers: sessionLikesVisible,
-                            commentsVisibleToPeers: sessionCommentsVisible,
-                          }}
-                          onChange={(next) => {
-                            setSessionIsActive(next.isActive);
-                            setDefaultQuestionPublic(next.defaultQuestionPublic);
-                            setSessionLikesVisible(next.likesVisibleToPeers);
-                            setSessionCommentsVisible(next.commentsVisibleToPeers);
-                            setCreatedSessionMessage("");
+                      <div className="mt-3 rounded-md border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/60 dark:bg-indigo-950/30 p-3">
+                        {/* 학생에게 전달되는 참고자료 미리보기(수정·재배포는 위 '수정' 버튼) */}
+                        <p className="mb-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">📚 {t("referencePreview")}</p>
+                        <DesignReferenceView
+                          data={{
+                            gradeRange: d.gradeRange,
+                            grade: d.grade,
+                            subject: d.subject,
+                            area: d.area,
+                            coreIdea: d.coreIdea,
+                            coreSentences: d.coreSentences,
+                            essentialQuestions: d.essentialQuestions,
+                            inquiryQuestions: d.inquiryQuestions,
                           }}
                         />
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button
-                            onClick={handleCreateSessionFromSaved}
-                            disabled={
-                              isCreatingSession ||
-                              !sessionDate ||
-                              !sessionTopic.trim() ||
-                              d.inquiryQuestions.length === 0 ||
-                              selectedSavedQuestionKeys.size === 0
-                            }
-                          >
-                            {isCreatingSession ? t("creatingSession") : t("createSessionBtn")}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={handleCreateInquirySession}
-                            disabled={isCreatingSession || !sessionDate || !sessionTopic.trim()}
-                          >
-                            {isCreatingSession ? t("creatingSession") : t("createInquirySessionBtn")}
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">{t("createInquirySessionHint")}</p>
-
-                        {createdSessionMessage && (
-                          <div className="rounded-md border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm text-green-800 dark:text-green-300">
-                            {createdSessionMessage}
-                          </div>
-                        )}
                       </div>
                     )}
                   </li>

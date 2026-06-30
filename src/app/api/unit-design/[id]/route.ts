@@ -25,6 +25,12 @@ const updateSchema = z.object({
   coreSentences: z.array(z.string()).optional(),
   essentialQuestions: z.array(z.string()).optional(),
   inquiryQuestions: z.array(inquiryQuestionSchema).optional(),
+  grade: z.string().nullable().optional(),
+  sessionDate: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+  defaultQuestionPublic: z.boolean().optional(),
+  likesVisibleToPeers: z.boolean().optional(),
+  commentsVisibleToPeers: z.boolean().optional(),
 });
 
 async function assertOwner(id: string, teacherId: string) {
@@ -64,6 +70,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (data.coreSentences !== undefined) add("core_sentences", JSON.stringify(data.coreSentences), "::jsonb");
     if (data.essentialQuestions !== undefined) add("essential_questions", JSON.stringify(data.essentialQuestions), "::jsonb");
     if (data.inquiryQuestions !== undefined) add("inquiry_questions", JSON.stringify(data.inquiryQuestions), "::jsonb");
+    if (data.grade !== undefined) add("grade", data.grade);
+    if (data.sessionDate !== undefined) add("session_date", data.sessionDate);
+    if (data.isActive !== undefined) add("is_active", data.isActive);
+    if (data.defaultQuestionPublic !== undefined) add("default_question_public", data.defaultQuestionPublic);
+    if (data.likesVisibleToPeers !== undefined) add("likes_visible_to_peers", data.likesVisibleToPeers);
+    if (data.commentsVisibleToPeers !== undefined) add("comments_visible_to_peers", data.commentsVisibleToPeers);
     if (sets.length === 0) return NextResponse.json({ ok: true, designId: id });
     sets.push("updated_at = now()");
     vals.push(id);

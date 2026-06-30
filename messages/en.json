@@ -736,7 +736,9 @@
     "referencePreview": "Reference material students see",
     "saveAndRedeploy": "Save and apply to students",
     "saveAndRedeployHint": "Saving immediately updates the student reference material of inquiry-question class sessions made from this design.",
-    "designRedeployed": "Saved and applied the changes to the student reference material."
+    "designRedeployed": "Saved and applied the changes to the student reference material.",
+    "redeployToSession": "Redeploy to class session",
+    "redeployHint": "Save updates the content (reflected live in linked reference); Redeploy creates a new inquiry-question class session with these settings."
   },
   "students": {
     "today": "Today",

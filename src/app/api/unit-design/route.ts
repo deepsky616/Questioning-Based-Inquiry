@@ -28,6 +28,10 @@ const saveSchema = z.object({
   coreSentences: z.array(z.string()),
   essentialQuestions: z.array(z.string()),
   inquiryQuestions: z.array(inquiryQuestionSchema),
+  isActive: z.boolean().optional().default(true),
+  defaultQuestionPublic: z.boolean().optional().default(true),
+  likesVisibleToPeers: z.boolean().optional().default(true),
+  commentsVisibleToPeers: z.boolean().optional().default(true),
 });
 
 export async function GET(req: Request) {
@@ -48,11 +52,16 @@ export async function GET(req: Request) {
       core_sentences: unknown;
       essential_questions: unknown;
       inquiry_questions: unknown;
+      is_active: boolean;
+      default_question_public: boolean;
+      likes_visible_to_peers: boolean;
+      comments_visible_to_peers: boolean;
       created_at: Date;
     }[]
   >`
     SELECT id, title, subject, grade_range, grade, session_date, area,
-           core_idea, core_sentences, essential_questions, inquiry_questions, created_at
+           core_idea, core_sentences, essential_questions, inquiry_questions,
+           is_active, default_question_public, likes_visible_to_peers, comments_visible_to_peers, created_at
     FROM unit_designs
     WHERE teacher_id = ${teacherId}
     ORDER BY created_at DESC
@@ -67,6 +76,10 @@ export async function GET(req: Request) {
       coreSentences: asArray(d.core_sentences) as string[],
       essentialQuestions: asArray(d.essential_questions) as string[],
       inquiryQuestions: asArray(d.inquiry_questions),
+      isActive: d.is_active,
+      defaultQuestionPublic: d.default_question_public,
+      likesVisibleToPeers: d.likes_visible_to_peers,
+      commentsVisibleToPeers: d.comments_visible_to_peers,
       createdAt: d.created_at,
     }))
   );
@@ -88,11 +101,12 @@ export async function POST(req: Request) {
       `INSERT INTO unit_designs
          (id, teacher_id, curriculum_area_id, title, subject, grade_range, area,
           core_idea, selected_keywords, core_sentences, essential_questions, inquiry_questions,
-          grade, session_date, created_at, updated_at)
+          grade, session_date, is_active, default_question_public, likes_visible_to_peers,
+          comments_visible_to_peers, created_at, updated_at)
        VALUES
          (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
           $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb,
-          $12, $13, now(), now())
+          $12, $13, $14, $15, $16, $17, now(), now())
        RETURNING id`,
       teacherId,
       data.curriculumAreaId ?? null,
@@ -106,7 +120,11 @@ export async function POST(req: Request) {
       JSON.stringify(data.essentialQuestions),
       JSON.stringify(data.inquiryQuestions),
       data.grade ?? null,
-      data.sessionDate ?? null
+      data.sessionDate ?? null,
+      data.isActive,
+      data.defaultQuestionPublic,
+      data.likesVisibleToPeers,
+      data.commentsVisibleToPeers
     );
 
     const designId = inserted[0]?.id ?? null;
