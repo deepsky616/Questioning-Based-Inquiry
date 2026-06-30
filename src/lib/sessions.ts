@@ -4,6 +4,18 @@ function formatDateKr(dateStr: string): string {
   return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
 }
 
+/**
+ * "탐구질문 수업" 세션 여부.
+ * 탐구설계(unitDesignId)에 연결됐지만 배포 질문(sharedQuestions)이 없으면,
+ * 학생이 참고 자료를 보고 직접 질문을 작성하는 탐구질문 수업이다.
+ */
+export function isInquiryDesignSession(s: {
+  unitDesignId?: string | null;
+  sharedQuestions?: unknown[] | null;
+}): boolean {
+  return Boolean(s.unitDesignId) && (s.sharedQuestions?.length ?? 0) === 0;
+}
+
 export function buildSessionLabel(date: string, subject: string, topic: string): string {
   const parts = [formatDateKr(date), subject];
   if (topic.trim()) parts.push(topic.trim());

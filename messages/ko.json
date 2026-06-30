@@ -231,7 +231,14 @@
     "feedbackTitle": "더 좋은 질문을 위한 제안",
     "improvedTitle": "이렇게 바꿔보면 어떨까요?",
     "visibilityByTeacher": "질문 공개 여부는 선생님이 수업 세션에서 설정합니다.",
-    "rewriteQuestion": "✏️ 질문 다시 작성하기"
+    "rewriteQuestion": "✏️ 질문 다시 작성하기",
+    "inquiryClassTag": "탐구질문 수업",
+    "referenceTitle": "참고 자료",
+    "referenceHint": "이 내용을 참고해 나만의 질문을 만들어요",
+    "refCoreIdea": "핵심 아이디어",
+    "refCoreSentences": "핵심 문장",
+    "refEssentialQuestions": "핵심 질문",
+    "refInquiryQuestions": "탐구 질문"
   },
   "comment": {
     "loading": "댓글 불러오는 중...",
@@ -699,7 +706,10 @@
     "designUpdateFailed": "수정에 실패했어요. 다시 시도해 주세요.",
     "moveUp": "위로 이동",
     "moveDown": "아래로 이동",
-    "addQuestionType": "추가할 질문 유형"
+    "addQuestionType": "추가할 질문 유형",
+    "createInquirySessionBtn": "탐구질문 수업 세션 만들기",
+    "createInquirySessionHint": "질문을 배포하지 않고, 학생이 이 탐구설계 내용을 참고해 직접 질문을 작성하는 수업 세션을 만듭니다.",
+    "inquirySessionCreated": "{date} {subject} 탐구질문 수업 세션을 만들었어요. 학생 질문하기에서 참고 자료와 함께 보여요."
   },
   "students": {
     "today": "오늘",
@@ -804,7 +814,8 @@
     "subjectPlaceholder": "교과",
     "topicPlaceholderShort": "주제",
     "pickDate": "날짜 선택",
-    "inquiryEditNote": "🧩 탐구질문 수업은 날짜·주제만 수정할 수 있어요(교과 고정)."
+    "inquiryEditNote": "🧩 탐구질문 수업은 날짜·주제만 수정할 수 있어요(교과 고정).",
+    "badgeInquiryClass": "탐구질문 수업"
   },
   "settings": {
     "apiKeyRequired": "API 키를 입력해 주세요 (10자 이상)",

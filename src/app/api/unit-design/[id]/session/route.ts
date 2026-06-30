@@ -21,7 +21,8 @@ const createSessionSchema = z.object({
   isActive: z.boolean().optional().default(true),
   likesVisibleToPeers: z.boolean().optional().default(true),
   commentsVisibleToPeers: z.boolean().optional().default(true),
-  sharedQuestions: z.array(inquiryQuestionSchema).min(1),
+  // 비우면 "탐구질문 수업"(학생이 참고 자료를 보고 직접 질문 작성). 채우면 기존 배포.
+  sharedQuestions: z.array(inquiryQuestionSchema).optional().default([]),
 });
 
 function questionKey(question: { type: string; content: string }) {

@@ -231,7 +231,14 @@
     "feedbackTitle": "Suggestions for a better question",
     "improvedTitle": "How about trying it this way?",
     "visibilityByTeacher": "Your teacher sets whether questions are public in the class session.",
-    "rewriteQuestion": "✏️ Rewrite question"
+    "rewriteQuestion": "✏️ Rewrite question",
+    "inquiryClassTag": "Inquiry-question class",
+    "referenceTitle": "Reference material",
+    "referenceHint": "Use this to make your own question",
+    "refCoreIdea": "Core idea",
+    "refCoreSentences": "Core sentences",
+    "refEssentialQuestions": "Essential questions",
+    "refInquiryQuestions": "Inquiry questions"
   },
   "comment": {
     "loading": "Loading comments...",
@@ -699,7 +706,10 @@
     "designUpdateFailed": "Update failed. Please try again.",
     "moveUp": "Move up",
     "moveDown": "Move down",
-    "addQuestionType": "Type of question to add"
+    "addQuestionType": "Type of question to add",
+    "createInquirySessionBtn": "Create inquiry-question class session",
+    "createInquirySessionHint": "Create a session where students write their own questions referencing this design, without deploying the questions.",
+    "inquirySessionCreated": "Created an inquiry-question class session for {date} {subject}. It appears with reference material in student Ask."
   },
   "students": {
     "today": "Today",
@@ -804,7 +814,8 @@
     "subjectPlaceholder": "Subject",
     "topicPlaceholderShort": "Topic",
     "pickDate": "Pick a date",
-    "inquiryEditNote": "🧩 Inquiry lessons let you edit only the date·topic (subject is fixed)."
+    "inquiryEditNote": "🧩 Inquiry lessons let you edit only the date·topic (subject is fixed).",
+    "badgeInquiryClass": "Inquiry-question class"
   },
   "settings": {
     "apiKeyRequired": "Please enter an API key (10+ characters)",

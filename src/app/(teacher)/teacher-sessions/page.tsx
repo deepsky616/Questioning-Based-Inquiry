@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DatePicker from "@/components/shared/DatePicker";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
-import { buildSessionLabel, isSessionAvailable, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { buildSessionLabel, isSessionAvailable, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -33,6 +33,7 @@ interface QuestionSession {
   topic: string;
   teacher: { name: string };
   unitDesignId?: string | null;
+  sharedQuestions?: { type: string; content: string }[];
   defaultQuestionPublic: boolean;
   likesVisibleToPeers: boolean;
   commentsVisibleToPeers: boolean;
@@ -584,6 +585,9 @@ function SessionRow({
               {buildSessionLabel(session.date, session.subject, session.topic)}
             </p>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {isInquiryDesignSession(session) && (
+                <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded dark:bg-indigo-950/40 dark:text-indigo-300">{t("badgeInquiryClass")}</span>
+              )}
               {!session.isActive && (
                 <span className="text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded">{t("badgeInactive")}</span>
               )}

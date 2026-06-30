@@ -341,16 +341,22 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
     expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
-  it("선택한 탐구질문이 없으면 400을 반환한다", async () => {
+  it("질문 없이 만들면 탐구질문 수업 세션(빈 sharedQuestions)이 생성된다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockQueryRaw.mockResolvedValue([SAVED_DESIGN]);
     const [req, ctx] = makeDesignSessionRequest("ud-1", {
       date: "2026-05-10",
+      topic: "탐구질문 수업",
       sharedQuestions: [],
     });
 
     const res = await createSessionFromDesign(req, ctx);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
+    expect(mockSessionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ sharedQuestions: [], unitDesignId: "ud-1" }),
+      }),
+    );
   });
 });
 

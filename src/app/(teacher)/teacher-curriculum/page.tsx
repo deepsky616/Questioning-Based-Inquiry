@@ -560,6 +560,36 @@ export default function CurriculumPage() {
     }
   };
 
+  // 탐구질문 수업 세션 생성(질문 배포 없이) — 학생이 참고 자료를 보고 직접 질문 작성
+  const handleCreateInquirySession = async () => {
+    if (!selectedSavedDesign || !sessionDate || !sessionTopic.trim() || isCreatingSession) return;
+    setIsCreatingSession(true);
+    setCreatedSessionMessage("");
+    try {
+      const res = await fetch(`/api/unit-design/${selectedSavedDesign.id}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: sessionDate,
+          topic: sessionTopic.trim(),
+          defaultQuestionPublic,
+          isActive: sessionIsActive,
+          likesVisibleToPeers: sessionLikesVisible,
+          commentsVisibleToPeers: sessionCommentsVisible,
+          // sharedQuestions 생략 → "탐구질문 수업"
+        }),
+      });
+      if (res.ok) {
+        setCreatedSessionMessage(t("inquirySessionCreated", { date: sessionDate, subject: selectedSavedDesign.subject }));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ variant: "destructive", description: data.error || t("sessionCreateFailed") });
+      }
+    } finally {
+      setIsCreatingSession(false);
+    }
+  };
+
   const confirm = useConfirm();
 
   const handleDelete = async (id: string) => {
@@ -873,7 +903,7 @@ export default function CurriculumPage() {
                           }}
                         />
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
                           <Button
                             onClick={handleCreateSessionFromSaved}
                             disabled={
@@ -886,7 +916,15 @@ export default function CurriculumPage() {
                           >
                             {isCreatingSession ? t("creatingSession") : t("createSessionBtn")}
                           </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleCreateInquirySession}
+                            disabled={isCreatingSession || !sessionDate || !sessionTopic.trim()}
+                          >
+                            {isCreatingSession ? t("creatingSession") : t("createInquirySessionBtn")}
+                          </Button>
                         </div>
+                        <p className="text-xs text-muted-foreground">{t("createInquirySessionHint")}</p>
 
                         {createdSessionMessage && (
                           <div className="rounded-md border border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-950/40 px-3 py-2 text-sm text-green-800 dark:text-green-300">
