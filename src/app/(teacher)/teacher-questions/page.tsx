@@ -993,9 +993,6 @@ export default function QuestionsPage() {
       {topTab === "questions" && (
         <div className="space-y-6">
 
-      {/* 탐구질문에서 생성한 수업세션이면 학생 배포 참고자료 표시(접기) */}
-      {currentSession && <SessionReferencePanel sessionId={currentSession.id} />}
-
       {/* 학생 참여 현황 */}
       {currentSession && (
         <Card>
@@ -1211,6 +1208,9 @@ export default function QuestionsPage() {
           )}
         </Card>
       )}
+
+      {/* 탐구질문 수업 세션이면 학생 배포 참고자료 표시(접기) — 질문 분류 통계 위 */}
+      {currentSession && <SessionReferencePanel sessionId={currentSession.id} />}
 
       {/* 질문 분류 통계 현황 (비율 막대, 표시 전용) */}
       {hasQuestionList && (
