@@ -169,6 +169,7 @@ export default function CurriculumPage() {
   // 편집 상태(저장 설계 제목·질문 인라인 수정)
   const [editingDesignId, setEditingDesignId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [editSessionTopic, setEditSessionTopic] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editVisibility, setEditVisibility] = useState({
     isActive: true,
@@ -753,6 +754,7 @@ export default function CurriculumPage() {
   const startEditDesign = (design: SavedInquiryDesign) => {
     setEditingDesignId(design.id);
     setEditTitle(design.title);
+    setEditSessionTopic(design.title);
     setEditDate(design.sessionDate || todayStr());
     setEditVisibility({
       isActive: design.isActive ?? true,
@@ -770,6 +772,7 @@ export default function CurriculumPage() {
   const cancelEditDesign = () => {
     setEditingDesignId(null);
     setEditTitle("");
+    setEditSessionTopic("");
     setEditCoreIdea("");
     setEditCoreSentences([]);
     setEditEssentialQuestions([]);
@@ -878,7 +881,7 @@ export default function CurriculumPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: editDate,
-          topic: editTitle.trim(),
+          topic: (editSessionTopic.trim() || editTitle.trim()),
           defaultQuestionPublic: editVisibility.defaultQuestionPublic,
           isActive: editVisibility.isActive,
           likesVisibleToPeers: editVisibility.likesVisibleToPeers,
@@ -975,17 +978,12 @@ export default function CurriculumPage() {
                     {/* 인라인 편집: 제목 + 질문 수정/추가/삭제 */}
                     {editingDesignId === d.id && (
                       <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
-                        {/* 학년·교과·영역·단원명 (읽기 전용 메타) */}
+                        {/* 학년 (읽기 전용) */}
                         <p className="text-xs text-muted-foreground">
-                          {[
-                            d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange }),
-                            d.subject,
-                            d.area,
-                            d.title && t("unitNameMeta", { name: d.title }),
-                          ].filter(Boolean).join(" · ")}
+                          {d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange })}
                         </p>
-                        {/* 수업날짜·교과·주제 (탐구질문 만들기에서 설정한 값이 기본값) */}
-                        <div className="grid gap-3 sm:grid-cols-[1fr_1fr_2fr]">
+                        {/* 수업날짜 · 교과 · 영역 · 단원 순 (교과·영역은 읽기 전용) */}
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                           <div className="space-y-1">
                             <Label>{t("sessionDate")}</Label>
                             <DatePicker value={editDate} onChange={setEditDate} placeholder={t("pickSessionDate")} />
@@ -995,9 +993,22 @@ export default function CurriculumPage() {
                             <Input value={d.subject} disabled className="bg-muted" />
                           </div>
                           <div className="space-y-1">
-                            <Label>{t("designTitle")}</Label>
+                            <Label>{t("area")}</Label>
+                            <Input value={d.area} disabled className="bg-muted" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>{t("unitFieldLabel")}</Label>
                             <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
                           </div>
+                        </div>
+                        {/* 주제 = 수업세션 제목 (재배포 시 세션 제목으로 사용) */}
+                        <div className="space-y-1">
+                          <Label>{t("sessionTopicLabel")}</Label>
+                          <Input
+                            value={editSessionTopic}
+                            onChange={(e) => setEditSessionTopic(e.target.value)}
+                            placeholder={t("topicPlaceholder")}
+                          />
                         </div>
 
                         {/* 배포 대상 + 공개 설정 4종 */}

@@ -739,7 +739,9 @@
     "designRedeployed": "Saved and applied the changes to the student reference material.",
     "redeployToSession": "Redeploy to class session",
     "redeployHint": "Save updates the content (reflected live in linked reference); Redeploy creates a new inquiry-question class session with these settings.",
-    "unitNameMeta": "Unit: {name}"
+    "unitNameMeta": "Unit: {name}",
+    "unitFieldLabel": "Unit",
+    "sessionTopicLabel": "Topic (class session title)"
   },
   "students": {
     "today": "Today",
