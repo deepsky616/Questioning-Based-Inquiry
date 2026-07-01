@@ -169,7 +169,6 @@ export default function CurriculumPage() {
   // 편집 상태(저장 설계 제목·질문 인라인 수정)
   const [editingDesignId, setEditingDesignId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editSessionTopic, setEditSessionTopic] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editVisibility, setEditVisibility] = useState({
     isActive: true,
@@ -754,7 +753,6 @@ export default function CurriculumPage() {
   const startEditDesign = (design: SavedInquiryDesign) => {
     setEditingDesignId(design.id);
     setEditTitle(design.title);
-    setEditSessionTopic(design.title);
     setEditDate(design.sessionDate || todayStr());
     setEditVisibility({
       isActive: design.isActive ?? true,
@@ -772,7 +770,6 @@ export default function CurriculumPage() {
   const cancelEditDesign = () => {
     setEditingDesignId(null);
     setEditTitle("");
-    setEditSessionTopic("");
     setEditCoreIdea("");
     setEditCoreSentences([]);
     setEditEssentialQuestions([]);
@@ -881,7 +878,7 @@ export default function CurriculumPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: editDate,
-          topic: (editSessionTopic.trim() || editTitle.trim()),
+          topic: editTitle.trim(),
           defaultQuestionPublic: editVisibility.defaultQuestionPublic,
           isActive: editVisibility.isActive,
           likesVisibleToPeers: editVisibility.likesVisibleToPeers,
@@ -953,7 +950,7 @@ export default function CurriculumPage() {
                           <span className="truncate">{d.title}</span>
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {d.sessionDate ? `${d.sessionDate} · ` : ""}{d.subject} · {d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange })} · {d.area} · {t("inquiryCount", { count: d.inquiryQuestions.length })}
+                          {[d.sessionDate, d.subject, d.area].filter(Boolean).join(" · ")}
                         </span>
                       </button>
                       <div className="flex shrink-0 items-center gap-2">
@@ -1000,15 +997,6 @@ export default function CurriculumPage() {
                             <Label>{t("unitFieldLabel")}</Label>
                             <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
                           </div>
-                        </div>
-                        {/* 주제 = 수업세션 제목 (재배포 시 세션 제목으로 사용) */}
-                        <div className="space-y-1">
-                          <Label>{t("sessionTopicLabel")}</Label>
-                          <Input
-                            value={editSessionTopic}
-                            onChange={(e) => setEditSessionTopic(e.target.value)}
-                            placeholder={t("topicPlaceholder")}
-                          />
                         </div>
 
                         {/* 배포 대상 + 공개 설정 4종 */}
@@ -1171,6 +1159,8 @@ export default function CurriculumPage() {
                         <p className="mb-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">📚 {t("referencePreview")}</p>
                         <DesignReferenceView
                           data={{
+                            title: d.title,
+                            sessionDate: d.sessionDate,
                             gradeRange: d.gradeRange,
                             grade: d.grade,
                             subject: d.subject,
@@ -1962,9 +1952,9 @@ export default function CurriculumPage() {
                   <Input value={curriculumData?.subject ?? ""} disabled className="bg-muted" />
                 </div>
                 <div className="space-y-1">
-                  <Label>{t("topic")}</Label>
+                  <Label>{t("unitFieldLabel")}</Label>
                   <Input
-                    placeholder={t("saveTopicPlaceholder")}
+                    placeholder={t("unitNamePlaceholder")}
                     value={saveTitle}
                     onChange={(e) => setSaveTitle(e.target.value)}
                   />

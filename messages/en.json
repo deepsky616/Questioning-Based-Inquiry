@@ -1342,6 +1342,7 @@
     "coreIdeaDesc": "The biggest idea you should understand in this unit.",
     "coreSentencesDesc": "The core idea written out as sentences.",
     "essentialQuestionsDesc": "A big question that runs through the whole unit.",
-    "inquiryQuestionsDesc": "Concrete questions you can investigate. Use them to make your own question."
+    "inquiryQuestionsDesc": "Concrete questions you can investigate. Use them to make your own question.",
+    "labelDate": "Date"
   }
 }

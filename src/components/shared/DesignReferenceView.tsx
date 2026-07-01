@@ -5,6 +5,7 @@ import { splitCoreIdeaLines } from "@/lib/content-selection";
 
 export interface DesignReference {
   title?: string;
+  sessionDate?: string | null;
   gradeRange?: string;
   grade?: string | null;
   subject?: string;
@@ -28,9 +29,9 @@ export function DesignReferenceView({ data, className }: { data: DesignReference
       : ty === "controversial" ? tCls("controversial.label")
       : ty;
 
-  // 라벨 통일: 학년(숫자/학년군)·교과·영역
+  // 라벨 통일: 수업날짜·교과·영역 (단원은 제목으로 별도 표시)
   const metaParts = [
-    (data.grade || data.gradeRange) && `${t("labelGrade")} ${data.grade || data.gradeRange}`,
+    data.sessionDate && `${t("labelDate")} ${data.sessionDate}`,
     data.subject && `${t("labelSubject")} ${data.subject}`,
     data.area && `${t("labelArea")} ${data.area}`,
   ].filter(Boolean);

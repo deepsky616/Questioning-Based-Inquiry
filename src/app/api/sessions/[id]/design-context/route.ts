@@ -10,7 +10,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const qs = await prisma.questionSession.findUnique({
     where: { id: params.id },
-    select: { unitDesignId: true },
+    select: { unitDesignId: true, date: true },
   });
   if (!qs?.unitDesignId) return NextResponse.json({ context: null });
 
@@ -38,6 +38,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return NextResponse.json({
     context: {
       title: d.title,
+      sessionDate: qs.date,
       subject: d.subject,
       gradeRange: d.grade_range,
       grade: d.grade,
