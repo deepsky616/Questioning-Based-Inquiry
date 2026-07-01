@@ -715,7 +715,13 @@
     "designRedeployed": "수정 내용을 저장하고 학생 참고자료에 반영했어요.",
     "redeployToSession": "수업세션에 재배포",
     "redeployHint": "‘저장’은 내용만 갱신(연결된 참고자료에 즉시 반영), ‘수업세션에 재배포’는 이 설정으로 새 탐구질문 수업 세션을 만들어요.",
-    "unitFieldLabel": "단원"
+    "unitFieldLabel": "단원",
+    "savedFilterAllDates": "전체 날짜",
+    "savedFilterAllGrades": "전체 학년",
+    "savedFilterAllSubjects": "전체 교과",
+    "savedFilterAllAreas": "전체 영역",
+    "savedFilterAllUnits": "전체 단원",
+    "savedFilterEmpty": "조건에 맞는 탐구질문이 없어요."
   },
   "students": {
     "today": "오늘",

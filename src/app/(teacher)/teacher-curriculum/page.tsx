@@ -159,6 +159,7 @@ export default function CurriculumPage() {
   const t = useTranslations("curriculum");
   const tc = useTranslations("common");
   const tCls = useTranslations("classification");
+  const tSess = useTranslations("sessions");
   const stepLabel = (n: Step) => t(`step${n}`);
   const typeLabel = (type: string) => `${tCls(`${type}.label`)}`;
   const [step, setStep] = useState<Step>(1);
@@ -189,6 +190,13 @@ export default function CurriculumPage() {
   const [addType, setAddType] = useState<InquiryQuestion["type"]>("factual");
   const [mainTab, setMainTab] = useState<"create" | "saved">("create");
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
+  // 저장 목록 조회(필터)·정렬
+  const [savedFilterDate, setSavedFilterDate] = useState("");
+  const [savedFilterGrade, setSavedFilterGrade] = useState("");
+  const [savedFilterSubject, setSavedFilterSubject] = useState("");
+  const [savedFilterArea, setSavedFilterArea] = useState("");
+  const [savedFilterUnit, setSavedFilterUnit] = useState("");
+  const [savedSort, setSavedSort] = useState<"desc" | "asc">("desc");
   const [sessionDate, setSessionDate] = useState("");
   const [sessionTopic, setSessionTopic] = useState("");
   const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(true);
@@ -286,6 +294,31 @@ export default function CurriculumPage() {
   const getQuestionKey = (question: InquiryQuestion) => `${question.type}|${question.content.trim()}`;
 
   const selectedSavedDesign = savedList.find((design) => design.id === selectedSavedId) ?? null;
+
+  // 저장 목록 조회(필터) 옵션 + 필터/정렬 적용
+  const uniq = (vals: (string | null | undefined)[]) =>
+    Array.from(new Set(vals.filter((v): v is string => Boolean(v)))).sort((a, b) => a.localeCompare(b, "ko"));
+  const savedFilterOptions = {
+    dates: uniq(savedList.map((d) => d.sessionDate)),
+    grades: uniq(savedList.map((d) => d.grade)),
+    subjects: uniq(savedList.map((d) => d.subject)),
+    areas: uniq(savedList.map((d) => d.area)),
+    units: uniq(savedList.map((d) => d.title)),
+  };
+  const hasSavedFilter = Boolean(savedFilterDate || savedFilterGrade || savedFilterSubject || savedFilterArea || savedFilterUnit);
+  const visibleSaved = savedList
+    .filter((d) =>
+      (!savedFilterDate || d.sessionDate === savedFilterDate) &&
+      (!savedFilterGrade || d.grade === savedFilterGrade) &&
+      (!savedFilterSubject || d.subject === savedFilterSubject) &&
+      (!savedFilterArea || d.area === savedFilterArea) &&
+      (!savedFilterUnit || d.title === savedFilterUnit),
+    )
+    .sort((a, b) => {
+      const av = a.sessionDate || (typeof a.createdAt === "string" ? a.createdAt : "");
+      const bv = b.sessionDate || (typeof b.createdAt === "string" ? b.createdAt : "");
+      return savedSort === "desc" ? bv.localeCompare(av) : av.localeCompare(bv);
+    });
 
   // 학년군 변경 → 교과·영역·커리큘럼 초기화
   useEffect(() => {
@@ -574,8 +607,7 @@ export default function CurriculumPage() {
       if (d?.id) {
         resetSaveForm();
         setMainTab("saved");
-        setSelectedSavedId(d.id);
-        setSelectedSavedQuestionKeys(new Set(d.inquiryQuestions.map(getQuestionKey)));
+        setSelectedSavedId(null); // 목록은 접힌 상태가 기본
       }
     } finally {
       setIsSaving(false);
@@ -615,8 +647,7 @@ export default function CurriculumPage() {
         });
         resetSaveForm();
         setMainTab("saved");
-        setSelectedSavedId(d.id);
-        setSelectedSavedQuestionKeys(new Set(d.inquiryQuestions.map(getQuestionKey)));
+        setSelectedSavedId(null); // 목록은 접힌 상태가 기본
       } else {
         const data = await res.json().catch(() => ({}));
         toast({ variant: "destructive", description: data.error || t("sessionCreateFailed") });
@@ -934,16 +965,70 @@ export default function CurriculumPage() {
       {/* 저장 목록 */}
       {mainTab === "saved" && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("savedTitle")}</CardTitle>
-            <CardDescription>{t("savedDesc")}</CardDescription>
+          <CardHeader className="space-y-3">
+            <div>
+              <CardTitle className="text-base">{t("savedTitle")}</CardTitle>
+              <CardDescription>{t("savedDesc")}</CardDescription>
+            </div>
+            {savedList.length > 0 && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                {/* 조회(필터) */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">{tSess("filterLabel")}</span>
+                  {([
+                    [savedFilterDate, setSavedFilterDate, savedFilterOptions.dates, t("savedFilterAllDates")],
+                    [savedFilterGrade, setSavedFilterGrade, savedFilterOptions.grades, t("savedFilterAllGrades")],
+                    [savedFilterSubject, setSavedFilterSubject, savedFilterOptions.subjects, t("savedFilterAllSubjects")],
+                    [savedFilterArea, setSavedFilterArea, savedFilterOptions.areas, t("savedFilterAllAreas")],
+                    [savedFilterUnit, setSavedFilterUnit, savedFilterOptions.units, t("savedFilterAllUnits")],
+                  ] as const).map(([value, setter, options, allLabel], i) => (
+                    <select
+                      key={i}
+                      value={value}
+                      onChange={(e) => setter(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                    >
+                      <option value="">{allLabel}</option>
+                      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ))}
+                  {hasSavedFilter && (
+                    <button
+                      type="button"
+                      onClick={() => { setSavedFilterDate(""); setSavedFilterGrade(""); setSavedFilterSubject(""); setSavedFilterArea(""); setSavedFilterUnit(""); }}
+                      className="h-8 px-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                    >
+                      {tc("reset")}
+                    </button>
+                  )}
+                </div>
+                {/* 정렬 */}
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">{tSess("sortLabel")}</span>
+                  <div className="flex rounded-md border overflow-hidden h-8">
+                    {(["desc", "asc"] as const).map((v, i) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setSavedSort(v)}
+                        className={`px-3 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${savedSort === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                      >
+                        {v === "desc" ? tSess("sortDesc") : tSess("sortAsc")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             {savedList.length === 0 ? (
               <EmptyState icon="📭" title={t("savedEmpty")} />
+            ) : visibleSaved.length === 0 ? (
+              <EmptyState icon="🔍" title={t("savedFilterEmpty")} />
             ) : (
               <ul className="divide-y rounded-md border">
-                {savedList.map((d) => (
+                {visibleSaved.map((d) => (
                   <li key={d.id} className="p-3">
                     <div className="flex items-center justify-between gap-3">
                       <button

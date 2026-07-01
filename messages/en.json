@@ -715,7 +715,13 @@
     "designRedeployed": "Saved and applied the changes to the student reference material.",
     "redeployToSession": "Redeploy to class session",
     "redeployHint": "Save updates the content (reflected live in linked reference); Redeploy creates a new inquiry-question class session with these settings.",
-    "unitFieldLabel": "Unit"
+    "unitFieldLabel": "Unit",
+    "savedFilterAllDates": "All dates",
+    "savedFilterAllGrades": "All grades",
+    "savedFilterAllSubjects": "All subjects",
+    "savedFilterAllAreas": "All areas",
+    "savedFilterAllUnits": "All units",
+    "savedFilterEmpty": "No saved inquiry designs match the filters."
   },
   "students": {
     "today": "Today",
