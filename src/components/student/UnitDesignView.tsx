@@ -7,7 +7,8 @@ import { useContentTranslation } from "@/components/shared/use-content-translati
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
+import { Input } from "@/components/ui/input";
+import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions, isSessionAvailable } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { groupSharedQuestions } from "@/lib/shared-questions";
 import { CommentThread } from "@/components/shared/CommentThread";
@@ -83,6 +84,8 @@ function LikeButton({
 export function UnitDesignView() {
   const t = useTranslations("unitDesign");
   const tEx = useTranslations("explore");
+  const tc = useTranslations("common");
+  const tSess = useTranslations("sessions");
   const ct = useContentTranslation();
   const TYPE_KEY: Record<string, string> = {
     factual: "typeFactual",
@@ -94,6 +97,12 @@ export function UnitDesignView() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // 조회(필터)·검색·정렬 — 목록이 쌓일 때 대비
+  const [filterDate, setFilterDate] = useState("");
+  const [filterSubject, setFilterSubject] = useState("");
+  const [filterTopic, setFilterTopic] = useState("");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"desc" | "asc">("desc");
 
   // 배포된 탐구 세션 목록은 react-query로 주기 폴링(12초)+포커스 재조회.
   const { data: sessions = [], isLoading } = useQuery<QuestionSession[]>({
@@ -141,6 +150,19 @@ export function UnitDesignView() {
   const commentsVisible = pubData?.commentsVisible ?? true;
 
   const selectedSession = sessions.find((session) => session.id === selectedId) ?? sessions[0] ?? null;
+
+  // 조회(필터)·검색·정렬 적용 + 진행 중/지난 수업 구분
+  const filterOptions = getSessionFilterOptions(sessions);
+  const searchLc = search.trim().toLowerCase();
+  const filteredSessions = filterSessions(sessions, {
+    date: filterDate || undefined,
+    subject: filterSubject || undefined,
+    topic: filterTopic || undefined,
+  }).filter((s) => !searchLc || buildSessionLabel(s.date, s.subject, s.topic).toLowerCase().includes(searchLc));
+  const sortedSessions = sort === "asc" ? sortSessionsAsc(filteredSessions) : sortSessionsDesc(filteredSessions);
+  const activeSessions = sortedSessions.filter((s) => isSessionAvailable(s.date));
+  const pastSessions = sortedSessions.filter((s) => !isSessionAvailable(s.date));
+  const hasFilter = Boolean(filterDate || filterSubject || filterTopic || search.trim());
   const grouped = useMemo(
     () => groupSharedQuestions(selectedSession?.sharedQuestions ?? []).map(
       (g) => [g.group, g.questions] as [string, typeof g.questions],
@@ -177,34 +199,95 @@ export function UnitDesignView() {
       ) : (
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t("listTitle")}</CardTitle>
-              <CardDescription>{t("listDesc")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {sessions.map((session) => (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => setSelectedId(session.id)}
-                  className={`w-full rounded-md border p-3 text-left transition-colors ${
-                    selectedSession?.id === session.id ? "border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40" : "bg-card hover:bg-muted/40"
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {buildSessionLabel(session.date, session.subject, session.topic)}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t("questionCount", { count: session.sharedQuestions?.length ?? 0 })}
-                        {session.teacher?.name ? t("teacherByline", { name: session.teacher.name }) : ""}
-                      </p>
-                    </div>
+            <CardHeader className="pb-3 space-y-3">
+              <div>
+                <CardTitle className="text-base">{t("listTitle")}</CardTitle>
+                <CardDescription>{t("listDesc")}</CardDescription>
+              </div>
+              {/* 조회(날짜·교과·단원) + 검색 + 정렬(최신순/오래된순) */}
+              <div className="space-y-2">
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t("searchPlaceholder")}
+                  className="h-8 text-sm"
+                />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {([
+                    [filterDate, setFilterDate, filterOptions.dates, tSess("allDates")],
+                    [filterSubject, setFilterSubject, filterOptions.subjects, tSess("allSubjects")],
+                    [filterTopic, setFilterTopic, filterOptions.topics, tSess("allTopics")],
+                  ] as const).map(([value, setter, options, allLabel], i) => (
+                    <select
+                      key={i}
+                      value={value}
+                      onChange={(e) => setter(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                    >
+                      <option value="">{allLabel}</option>
+                      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  ))}
+                  {hasFilter && (
+                    <button
+                      type="button"
+                      onClick={() => { setFilterDate(""); setFilterSubject(""); setFilterTopic(""); setSearch(""); }}
+                      className="h-8 px-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                    >
+                      {tc("reset")}
+                    </button>
+                  )}
+                  <div className="ml-auto flex rounded-md border overflow-hidden h-8">
+                    {(["desc", "asc"] as const).map((v, i) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setSort(v)}
+                        className={`px-2.5 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${sort === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                      >
+                        {v === "desc" ? tSess("sortDesc") : tSess("sortAsc")}
+                      </button>
+                    ))}
                   </div>
-                </button>
-              ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 max-h-[70vh] overflow-y-auto">
+              {sortedSessions.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">{t("listNoMatch")}</p>
+              ) : (
+                ([
+                  [t("sectionActive"), activeSessions],
+                  [t("sectionPast"), pastSessions],
+                ] as const).map(([label, group]) => group.length === 0 ? null : (
+                  <section key={label} className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground">{label} <span className="font-normal">({group.length})</span></p>
+                    {group.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => setSelectedId(session.id)}
+                        className={`w-full rounded-md border p-3 text-left transition-colors ${
+                          selectedSession?.id === session.id ? "border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40" : "bg-card hover:bg-muted/40"
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground">
+                              {buildSessionLabel(session.date, session.subject, session.topic)}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {t("questionCount", { count: session.sharedQuestions?.length ?? 0 })}
+                              {session.teacher?.name ? t("teacherByline", { name: session.teacher.name }) : ""}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </section>
+                ))
+              )}
             </CardContent>
           </Card>
 

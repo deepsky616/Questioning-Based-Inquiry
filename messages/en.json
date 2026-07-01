@@ -308,7 +308,11 @@
     "typeFactual": "Factual",
     "typeConceptual": "Conceptual",
     "typeControversial": "Debatable",
-    "typeStudent": "Student"
+    "typeStudent": "Student",
+    "searchPlaceholder": "Search unit/topic",
+    "listNoMatch": "No classes match the filters.",
+    "sectionActive": "Ongoing",
+    "sectionPast": "Past"
   },
   "teacherQ": {
     "deleteDeployConfirm": "Delete the shared inquiry design for this session? Students' likes and comments will also be deleted.",
