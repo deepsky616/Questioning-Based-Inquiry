@@ -555,6 +555,7 @@ function SessionRow({
   const [eDate, setEDate] = useState(session.date);
   const [eSubject, setESubject] = useState(session.subject);
   const [eTopic, setETopic] = useState(session.topic);
+  const [eArea, setEArea] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
   const openEdit = () => {
@@ -562,6 +563,13 @@ function SessionRow({
     setESubject(session.subject);
     setETopic(session.topic);
     setEditing(true);
+    // 탐구질문 수업: 연결된 설계의 영역을 읽어와 표시(읽기 전용)
+    if (isDesignSession) {
+      fetch(`/api/sessions/${session.id}/design-context`)
+        .then((r) => r.json())
+        .then((d) => setEArea(d?.context?.area ?? ""))
+        .catch(() => {});
+    }
   };
   const saveEdit = async () => {
     if (!eDate || !eTopic.trim() || (!isDesignSession && !eSubject.trim())) return;
@@ -637,15 +645,21 @@ function SessionRow({
             <div className="space-y-1">
               <Label className="text-xs">{t("subject")}</Label>
               <Input
-                className="h-9 w-32 bg-background"
+                className="h-9 w-24 bg-background"
                 value={isDesignSession ? session.subject : eSubject}
                 disabled={isDesignSession}
                 onChange={(e) => setESubject(e.target.value)}
                 placeholder={t("subjectPlaceholder")}
               />
             </div>
+            {isDesignSession && (
+              <div className="space-y-1">
+                <Label className="text-xs">{t("areaLabel")}</Label>
+                <Input className="h-9 w-24 bg-muted" value={eArea} disabled />
+              </div>
+            )}
             <div className="space-y-1 min-w-0 flex-1">
-              <Label className="text-xs">{t("topic")}</Label>
+              <Label className="text-xs">{isDesignSession ? t("unitLabel") : t("topic")}</Label>
               <Input className="h-9 bg-background" value={eTopic} onChange={(e) => setETopic(e.target.value)} placeholder={t("topicPlaceholderShort")} />
             </div>
             <div className="flex gap-2">

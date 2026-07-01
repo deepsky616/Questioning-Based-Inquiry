@@ -92,6 +92,8 @@ interface SavedInquiryDesign {
   defaultQuestionPublic?: boolean;
   likesVisibleToPeers?: boolean;
   commentsVisibleToPeers?: boolean;
+  targetClassValue?: string;
+  targetStudentIds?: string[];
   createdAt?: string;
 }
 
@@ -536,6 +538,8 @@ export default function CurriculumPage() {
         defaultQuestionPublic,
         likesVisibleToPeers: sessionLikesVisible,
         commentsVisibleToPeers: sessionCommentsVisible,
+        targetClassValue,
+        targetStudentIds: selectedStudentIds,
       }),
     });
     if (!res.ok) {
@@ -760,8 +764,8 @@ export default function CurriculumPage() {
       likesVisibleToPeers: design.likesVisibleToPeers ?? true,
       commentsVisibleToPeers: design.commentsVisibleToPeers ?? true,
     });
-    setEditTargetClassValue("all");
-    setEditSelectedStudentIds([]);
+    setEditTargetClassValue(design.targetClassValue ?? "all");
+    setEditSelectedStudentIds([...(design.targetStudentIds ?? [])]);
     setEditCoreIdea(design.coreIdea ?? "");
     setEditCoreSentences([...(design.coreSentences ?? [])]);
     setEditEssentialQuestions([...(design.essentialQuestions ?? [])]);
@@ -834,6 +838,8 @@ export default function CurriculumPage() {
         defaultQuestionPublic: editVisibility.defaultQuestionPublic,
         likesVisibleToPeers: editVisibility.likesVisibleToPeers,
         commentsVisibleToPeers: editVisibility.commentsVisibleToPeers,
+        targetClassValue: editTargetClassValue,
+        targetStudentIds: editSelectedStudentIds,
         coreIdea: editCoreIdea.trim(),
         coreSentences: cleanedSentences,
         essentialQuestions: cleanedEssential,

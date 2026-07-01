@@ -31,6 +31,8 @@ const updateSchema = z.object({
   defaultQuestionPublic: z.boolean().optional(),
   likesVisibleToPeers: z.boolean().optional(),
   commentsVisibleToPeers: z.boolean().optional(),
+  targetClassValue: z.string().optional(),
+  targetStudentIds: z.array(z.string()).optional(),
 });
 
 async function assertOwner(id: string, teacherId: string) {
@@ -76,6 +78,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (data.defaultQuestionPublic !== undefined) add("default_question_public", data.defaultQuestionPublic);
     if (data.likesVisibleToPeers !== undefined) add("likes_visible_to_peers", data.likesVisibleToPeers);
     if (data.commentsVisibleToPeers !== undefined) add("comments_visible_to_peers", data.commentsVisibleToPeers);
+    if (data.targetClassValue !== undefined) add("target_class_value", data.targetClassValue);
+    if (data.targetStudentIds !== undefined) add("target_student_ids", JSON.stringify(data.targetStudentIds), "::jsonb");
     if (sets.length === 0) return NextResponse.json({ ok: true, designId: id });
     sets.push("updated_at = now()");
     vals.push(id);

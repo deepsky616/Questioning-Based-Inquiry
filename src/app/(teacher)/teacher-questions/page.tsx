@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
+import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import { PointReviewView } from "@/components/teacher/PointReviewView";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
@@ -993,6 +993,9 @@ export default function QuestionsPage() {
       {topTab === "questions" && (
         <div className="space-y-6">
 
+      {/* 탐구질문에서 생성한 수업세션이면 학생 배포 참고자료 표시(접기) */}
+      {currentSession && <SessionReferencePanel sessionId={currentSession.id} />}
+
       {/* 학생 참여 현황 */}
       {currentSession && (
         <Card>
@@ -1537,23 +1540,8 @@ export default function QuestionsPage() {
         );
       })()}
 
-      {currentSession && currentSession.unitDesignId && (
-        <InquiryFlowGraph
-          title={t("flowTitle")}
-          description={t("flowDesc")}
-          subject={currentSession.subject}
-          topic={currentSession.topic}
-          sharedQuestions={Array.isArray(currentSession.sharedQuestions) ? currentSession.sharedQuestions : []}
-          studentQuestions={filtered.map((question) => ({
-            id: question.id,
-            content: question.content,
-            cognitive: question.cognitive,
-            closure: question.closure,
-            isPublic: question.isPublic,
-          }))}
-          audience="teacher"
-        />
-      )}
+      {/* 탐구질문에서 생성한 수업세션으로 배포한 경우에만 참고자료 표시(접기) */}
+      {currentSession && <SessionReferencePanel sessionId={currentSession.id} />}
 
         </div>
       )}

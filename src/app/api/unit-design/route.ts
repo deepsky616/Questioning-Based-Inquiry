@@ -32,6 +32,8 @@ const saveSchema = z.object({
   defaultQuestionPublic: z.boolean().optional().default(true),
   likesVisibleToPeers: z.boolean().optional().default(true),
   commentsVisibleToPeers: z.boolean().optional().default(true),
+  targetClassValue: z.string().optional().default("all"),
+  targetStudentIds: z.array(z.string()).optional().default([]),
 });
 
 export async function GET(req: Request) {
@@ -56,12 +58,15 @@ export async function GET(req: Request) {
       default_question_public: boolean;
       likes_visible_to_peers: boolean;
       comments_visible_to_peers: boolean;
+      target_class_value: string;
+      target_student_ids: unknown;
       created_at: Date;
     }[]
   >`
     SELECT id, title, subject, grade_range, grade, session_date, area,
            core_idea, core_sentences, essential_questions, inquiry_questions,
-           is_active, default_question_public, likes_visible_to_peers, comments_visible_to_peers, created_at
+           is_active, default_question_public, likes_visible_to_peers, comments_visible_to_peers,
+           target_class_value, target_student_ids, created_at
     FROM unit_designs
     WHERE teacher_id = ${teacherId}
     ORDER BY created_at DESC
@@ -80,6 +85,8 @@ export async function GET(req: Request) {
       defaultQuestionPublic: d.default_question_public,
       likesVisibleToPeers: d.likes_visible_to_peers,
       commentsVisibleToPeers: d.comments_visible_to_peers,
+      targetClassValue: d.target_class_value ?? "all",
+      targetStudentIds: asArray(d.target_student_ids) as string[],
       createdAt: d.created_at,
     }))
   );
@@ -102,11 +109,11 @@ export async function POST(req: Request) {
          (id, teacher_id, curriculum_area_id, title, subject, grade_range, area,
           core_idea, selected_keywords, core_sentences, essential_questions, inquiry_questions,
           grade, session_date, is_active, default_question_public, likes_visible_to_peers,
-          comments_visible_to_peers, created_at, updated_at)
+          comments_visible_to_peers, target_class_value, target_student_ids, created_at, updated_at)
        VALUES
          (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
           $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb,
-          $12, $13, $14, $15, $16, $17, now(), now())
+          $12, $13, $14, $15, $16, $17, $18, $19::jsonb, now(), now())
        RETURNING id`,
       teacherId,
       data.curriculumAreaId ?? null,
@@ -124,7 +131,9 @@ export async function POST(req: Request) {
       data.isActive,
       data.defaultQuestionPublic,
       data.likesVisibleToPeers,
-      data.commentsVisibleToPeers
+      data.commentsVisibleToPeers,
+      data.targetClassValue,
+      JSON.stringify(data.targetStudentIds)
     );
 
     const designId = inserted[0]?.id ?? null;

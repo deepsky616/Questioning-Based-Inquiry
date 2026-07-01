@@ -410,8 +410,6 @@
     "moreCount": "…and {count} more",
     "groupDefault": "Lesson order",
     "phaseDefault": "Inquiry",
-    "flowTitle": "Inquiry question map",
-    "flowDesc": "See at a glance how your inquiry questions led to student questions",
     "editDialogTitle": "Edit question classification",
     "questionContentLabel": "Question",
     "authorPrefix": "Author: ",
@@ -822,7 +820,9 @@
     "subjectPlaceholder": "Subject",
     "topicPlaceholderShort": "Topic",
     "pickDate": "Pick a date",
-    "inquiryEditNote": "🧩 Inquiry lessons let you edit only the date·topic (subject is fixed)."
+    "inquiryEditNote": "🧩 Inquiry lessons let you edit only the date·topic (subject is fixed).",
+    "areaLabel": "Area",
+    "unitLabel": "Unit"
   },
   "settings": {
     "apiKeyRequired": "Please enter an API key (10+ characters)",

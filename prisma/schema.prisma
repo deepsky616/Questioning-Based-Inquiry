@@ -224,6 +224,9 @@ model UnitDesign {
   defaultQuestionPublic  Boolean     @default(true) @map("default_question_public")
   likesVisibleToPeers    Boolean     @default(true) @map("likes_visible_to_peers")
   commentsVisibleToPeers Boolean     @default(true) @map("comments_visible_to_peers")
+  // 배포 대상(SessionTargetSelector 선택값 그대로 저장 → 수정 시 복원)
+  targetClassValue       String      @default("all") @map("target_class_value")
+  targetStudentIds       Json        @default("[]") @map("target_student_ids")
 
   createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt          DateTime        @updatedAt @map("updated_at")

@@ -410,8 +410,6 @@
     "moreCount": "…외 {count}개",
     "groupDefault": "수업 순서",
     "phaseDefault": "탐구",
-    "flowTitle": "탐구 질문 관계도",
-    "flowDesc": "선생님의 탐구 질문이 학생 질문으로 어떻게 이어졌는지 한눈에 확인합니다",
     "editDialogTitle": "질문 분류 수정",
     "questionContentLabel": "질문 내용",
     "authorPrefix": "작성자: ",
@@ -822,7 +820,9 @@
     "subjectPlaceholder": "교과",
     "topicPlaceholderShort": "주제",
     "pickDate": "날짜 선택",
-    "inquiryEditNote": "🧩 탐구질문 수업은 날짜·주제만 수정할 수 있어요(교과 고정)."
+    "inquiryEditNote": "🧩 탐구질문 수업은 날짜·주제만 수정할 수 있어요(교과 고정).",
+    "areaLabel": "영역",
+    "unitLabel": "단원"
   },
   "settings": {
     "apiKeyRequired": "API 키를 입력해 주세요 (10자 이상)",
