@@ -1210,7 +1210,6 @@
     "classNameShort": "Grade {grade} Class {className}"
   },
   "targetSelector": {
-    "target": "Target",
     "selectClass": "Select class",
     "allClasses": "All classes",
     "gradeClass": "Grade {grade} Class {className}",

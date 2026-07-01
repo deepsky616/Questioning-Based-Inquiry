@@ -1210,7 +1210,6 @@
     "classNameShort": "{grade}학년 {className}반"
   },
   "targetSelector": {
-    "target": "배포 대상",
     "selectClass": "학급 선택",
     "allClasses": "전체 담당 학급",
     "gradeClass": "{grade}학년 {className}반",

@@ -2,7 +2,6 @@
 
 import { useTranslations } from "next-intl";
 
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -71,7 +70,6 @@ export function SessionTargetSelector({
 
   return (
     <div className="space-y-2">
-      <Label>{t("target")}</Label>
       <Select value={targetClassValue} onValueChange={handleClassChange}>
         <SelectTrigger>
           <SelectValue placeholder={t("selectClass")} />
