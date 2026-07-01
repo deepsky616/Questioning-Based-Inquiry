@@ -38,6 +38,7 @@ export function SessionReferencePanel({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className="flex w-full items-center gap-1.5 text-left text-sm font-semibold text-indigo-700 dark:text-indigo-300"
       >
         <span>📚</span>

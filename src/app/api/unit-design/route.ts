@@ -60,13 +60,16 @@ export async function GET(req: Request) {
       comments_visible_to_peers: boolean;
       target_class_value: string;
       target_student_ids: unknown;
+      session_count: bigint | number;
       created_at: Date;
     }[]
   >`
     SELECT id, title, subject, grade_range, grade, session_date, area,
            core_idea, core_sentences, essential_questions, inquiry_questions,
            is_active, default_question_public, likes_visible_to_peers, comments_visible_to_peers,
-           target_class_value, target_student_ids, created_at
+           target_class_value, target_student_ids,
+           (SELECT count(*) FROM question_sessions qs WHERE qs.unit_design_id = unit_designs.id) AS session_count,
+           created_at
     FROM unit_designs
     WHERE teacher_id = ${teacherId}
     ORDER BY created_at DESC
@@ -87,6 +90,7 @@ export async function GET(req: Request) {
       commentsVisibleToPeers: d.comments_visible_to_peers,
       targetClassValue: d.target_class_value ?? "all",
       targetStudentIds: asArray(d.target_student_ids) as string[],
+      sessionCount: Number(d.session_count ?? 0),
       createdAt: d.created_at,
     }))
   );

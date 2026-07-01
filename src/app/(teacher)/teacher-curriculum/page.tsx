@@ -95,6 +95,7 @@ interface SavedInquiryDesign {
   commentsVisibleToPeers?: boolean;
   targetClassValue?: string;
   targetStudentIds?: string[];
+  sessionCount?: number;
   createdAt?: string;
 }
 
@@ -766,7 +767,10 @@ export default function CurriculumPage() {
   const confirm = useConfirm();
 
   const handleDelete = async (id: string) => {
-    if (!(await confirm({ description: t("deleteConfirm"), confirmText: tc("delete"), destructive: true }))) return;
+    const linked = savedList.find((x) => x.id === id)?.sessionCount ?? 0;
+    // 연결된 수업세션이 있으면 참고자료가 사라짐을 경고
+    const description = linked > 0 ? t("deleteConfirmLinked", { count: linked }) : t("deleteConfirm");
+    if (!(await confirm({ description, confirmText: tc("delete"), destructive: true }))) return;
     await fetch(`/api/unit-design/${id}`, { method: "DELETE" });
     if (selectedSavedId === id) {
       setSelectedSavedId(null);

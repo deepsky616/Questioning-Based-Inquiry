@@ -721,7 +721,8 @@
     "savedFilterAllSubjects": "전체 교과",
     "savedFilterAllAreas": "전체 영역",
     "savedFilterAllUnits": "전체 단원",
-    "savedFilterEmpty": "조건에 맞는 탐구질문이 없어요."
+    "savedFilterEmpty": "조건에 맞는 탐구질문이 없어요.",
+    "deleteConfirmLinked": "이 설계로 만든 수업세션 {count}개의 학생 참고자료가 사라집니다. 정말 삭제할까요?"
   },
   "students": {
     "today": "오늘",

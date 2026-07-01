@@ -721,7 +721,8 @@
     "savedFilterAllSubjects": "All subjects",
     "savedFilterAllAreas": "All areas",
     "savedFilterAllUnits": "All units",
-    "savedFilterEmpty": "No saved inquiry designs match the filters."
+    "savedFilterEmpty": "No saved inquiry designs match the filters.",
+    "deleteConfirmLinked": "This will remove the student reference material of {count} class session(s) created from this design. Delete anyway?"
   },
   "students": {
     "today": "Today",
