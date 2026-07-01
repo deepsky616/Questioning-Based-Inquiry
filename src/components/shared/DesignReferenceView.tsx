@@ -28,9 +28,12 @@ export function DesignReferenceView({ data, className }: { data: DesignReference
       : ty === "controversial" ? tCls("controversial.label")
       : ty;
 
-  const meta = [data.grade ? `${data.grade}${t("gradeSuffix")}` : data.gradeRange, data.subject, data.area]
-    .filter(Boolean)
-    .join(" · ");
+  // 라벨 통일: 학년(숫자/학년군)·교과·영역
+  const metaParts = [
+    (data.grade || data.gradeRange) && `${t("labelGrade")} ${data.grade || data.gradeRange}`,
+    data.subject && `${t("labelSubject")} ${data.subject}`,
+    data.area && `${t("labelArea")} ${data.area}`,
+  ].filter(Boolean);
   const coreIdeaLines = splitCoreIdeaLines(data.coreIdea ?? "");
   const sentences = (data.coreSentences ?? []).filter((s) => s.trim());
   const essential = (data.essentialQuestions ?? []).filter((s) => s.trim());
@@ -38,13 +41,19 @@ export function DesignReferenceView({ data, className }: { data: DesignReference
 
   return (
     <div className={className}>
-      {data.title && <p className="text-sm font-semibold text-foreground">{data.title}</p>}
-      {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}
+      {data.title && (
+        <p className="text-sm font-semibold text-foreground">
+          <span className="mr-1 text-xs font-medium text-muted-foreground">{t("labelUnit")}</span>
+          {data.title}
+        </p>
+      )}
+      {metaParts.length > 0 && <p className="mt-0.5 text-xs text-muted-foreground">{metaParts.join(" · ")}</p>}
 
       <div className="mt-2 space-y-3 text-sm">
         {coreIdeaLines.length > 0 && (
           <section>
             <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("coreIdea")}</p>
+            <p className="text-[11px] leading-snug text-muted-foreground">{t("coreIdeaDesc")}</p>
             <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-foreground">
               {coreIdeaLines.map((line, i) => <li key={i}>{line}</li>)}
             </ul>
@@ -53,6 +62,7 @@ export function DesignReferenceView({ data, className }: { data: DesignReference
         {sentences.length > 0 && (
           <section>
             <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("coreSentences")}</p>
+            <p className="text-[11px] leading-snug text-muted-foreground">{t("coreSentencesDesc")}</p>
             <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-foreground">
               {sentences.map((s, i) => <li key={i}>{s}</li>)}
             </ul>
@@ -61,6 +71,7 @@ export function DesignReferenceView({ data, className }: { data: DesignReference
         {essential.length > 0 && (
           <section>
             <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("essentialQuestions")}</p>
+            <p className="text-[11px] leading-snug text-muted-foreground">{t("essentialQuestionsDesc")}</p>
             <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-foreground">
               {essential.map((s, i) => <li key={i}>{s}</li>)}
             </ul>
@@ -69,6 +80,7 @@ export function DesignReferenceView({ data, className }: { data: DesignReference
         {inquiry.length > 0 && (
           <section>
             <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("inquiryQuestions")}</p>
+            <p className="text-[11px] leading-snug text-muted-foreground">{t("inquiryQuestionsDesc")}</p>
             <ul className="mt-0.5 space-y-1 text-foreground">
               {inquiry.map((q, i) => (
                 <li key={i}>
