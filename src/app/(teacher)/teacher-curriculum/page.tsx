@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
+import { filterSortSavedDesigns } from "@/lib/saved-designs";
 import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import {
   buildClassStudentTargetPayload,
@@ -306,19 +307,11 @@ export default function CurriculumPage() {
     units: uniq(savedList.map((d) => d.title)),
   };
   const hasSavedFilter = Boolean(savedFilterDate || savedFilterGrade || savedFilterSubject || savedFilterArea || savedFilterUnit);
-  const visibleSaved = savedList
-    .filter((d) =>
-      (!savedFilterDate || d.sessionDate === savedFilterDate) &&
-      (!savedFilterGrade || d.grade === savedFilterGrade) &&
-      (!savedFilterSubject || d.subject === savedFilterSubject) &&
-      (!savedFilterArea || d.area === savedFilterArea) &&
-      (!savedFilterUnit || d.title === savedFilterUnit),
-    )
-    .sort((a, b) => {
-      const av = a.sessionDate || (typeof a.createdAt === "string" ? a.createdAt : "");
-      const bv = b.sessionDate || (typeof b.createdAt === "string" ? b.createdAt : "");
-      return savedSort === "desc" ? bv.localeCompare(av) : av.localeCompare(bv);
-    });
+  const visibleSaved = filterSortSavedDesigns(
+    savedList,
+    { date: savedFilterDate, grade: savedFilterGrade, subject: savedFilterSubject, area: savedFilterArea, unit: savedFilterUnit },
+    savedSort,
+  );
 
   // 학년군 변경 → 교과·영역·커리큘럼 초기화
   useEffect(() => {

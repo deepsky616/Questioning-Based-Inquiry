@@ -1,5 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { buildSessionLabel, buildSessionContextHint, isSessionAvailable, sortSessionsDesc } from "@/lib/sessions";
+import { buildSessionLabel, buildSessionContextHint, isSessionAvailable, sortSessionsDesc, isInquiryDesignSession } from "@/lib/sessions";
+
+describe("isInquiryDesignSession", () => {
+  it("unitDesignId가 있고 배포 질문이 없으면 탐구질문 수업이다", () => {
+    expect(isInquiryDesignSession({ unitDesignId: "ud-1", sharedQuestions: [] })).toBe(true);
+    expect(isInquiryDesignSession({ unitDesignId: "ud-1" })).toBe(true);
+    expect(isInquiryDesignSession({ unitDesignId: "ud-1", sharedQuestions: null })).toBe(true);
+  });
+
+  it("배포 질문이 있으면(배포 세션) 탐구질문 수업이 아니다", () => {
+    expect(isInquiryDesignSession({ unitDesignId: "ud-1", sharedQuestions: [{ type: "factual", content: "q" }] })).toBe(false);
+  });
+
+  it("unitDesignId가 없으면(일반 세션) 탐구질문 수업이 아니다", () => {
+    expect(isInquiryDesignSession({ unitDesignId: null, sharedQuestions: [] })).toBe(false);
+    expect(isInquiryDesignSession({})).toBe(false);
+  });
+});
 
 describe("buildSessionLabel", () => {
   it("날짜·교과·주제를 합쳐 레이블을 반환한다", () => {
