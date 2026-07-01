@@ -1504,6 +1504,12 @@ export default function QuestionsPage() {
                         )}
                       </ol>
                     )}
+                    {/* 배포한 수업의 참고자료(탐구설계 연결 시에만 표시) */}
+                    {!isEditing && openDeploy.has(s.id) && (
+                      <div className="border-t px-3 pb-3 pt-2">
+                        <SessionReferencePanel sessionId={s.id} />
+                      </div>
+                    )}
                     {/* 수정: 탐구설계 패널을 다시 열어 수정 후 재배포 */}
                     {isEditing && (
                       <div className="border-t p-3">
@@ -1539,9 +1545,6 @@ export default function QuestionsPage() {
           </div>
         );
       })()}
-
-      {/* 탐구질문에서 생성한 수업세션으로 배포한 경우에만 참고자료 표시(접기) */}
-      {currentSession && <SessionReferencePanel sessionId={currentSession.id} />}
 
         </div>
       )}
