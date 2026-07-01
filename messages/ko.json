@@ -286,7 +286,8 @@
     "searchPlaceholder": "질문 또는 이름으로 검색...",
     "loading": "로딩 중...",
     "commentsHidden": "댓글 비공개",
-    "commentsHiddenHint": "선생님이 친구 댓글을 비공개로 설정했어요. 내 댓글과 선생님 댓글만 보여요."
+    "commentsHiddenHint": "선생님이 친구 댓글을 비공개로 설정했어요. 내 댓글과 선생님 댓글만 보여요.",
+    "topicFilterLabel": "주제(단원)"
   },
   "unitDesign": {
     "intro": "선생님이 배포한 탐구 질문에 좋아요·댓글로 참여해 보세요",
@@ -445,7 +446,8 @@
     "bulkDeleteConfirm": "선택한 질문 {count}개를 정말 삭제할까요? 연결된 댓글도 함께 삭제되며 되돌릴 수 없습니다.",
     "bulkDeleting": "삭제 중...",
     "bulkDeleteDone": "{count}개 질문을 삭제했습니다",
-    "bulkDeletePartial": "{count}개 질문 삭제에 실패했습니다"
+    "bulkDeletePartial": "{count}개 질문 삭제에 실패했습니다",
+    "topicFilterLabel": "주제(단원)"
   },
   "sequencePanel": {
     "published": "학생에게 배포했습니다",

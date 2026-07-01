@@ -286,7 +286,8 @@
     "searchPlaceholder": "Search by question or name...",
     "loading": "Loading...",
     "commentsHidden": "Comments hidden",
-    "commentsHiddenHint": "Your teacher set peer comments to private. You only see your own and the teacher comments."
+    "commentsHiddenHint": "Your teacher set peer comments to private. You only see your own and the teacher comments.",
+    "topicFilterLabel": "Topic (unit)"
   },
   "unitDesign": {
     "intro": "Join the inquiry questions your teacher shared with likes and comments",
@@ -445,7 +446,8 @@
     "bulkDeleteConfirm": "Really delete the {count} selected questions? Linked comments will also be deleted and this cannot be undone.",
     "bulkDeleting": "Deleting...",
     "bulkDeleteDone": "Deleted {count} questions",
-    "bulkDeletePartial": "Failed to delete {count} questions"
+    "bulkDeletePartial": "Failed to delete {count} questions",
+    "topicFilterLabel": "Topic (unit)"
   },
   "sequencePanel": {
     "published": "Shared with students",

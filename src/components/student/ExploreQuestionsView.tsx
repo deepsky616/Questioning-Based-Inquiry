@@ -400,7 +400,7 @@ export function ExploreQuestionsView() {
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-52">
-              <label className="text-xs font-medium text-muted-foreground">{t("topic")}</label>
+              <label className="text-xs font-medium text-muted-foreground">{t("topicFilterLabel")}</label>
               <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={t("all")} /></SelectTrigger>
                 <SelectContent>

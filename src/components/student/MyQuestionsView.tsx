@@ -257,7 +257,7 @@ export function MyQuestionsView() {
               </Select>
             </div>
             <div className="flex flex-col gap-1 w-52">
-              <label className="text-xs font-medium text-muted-foreground">{tEx("topic")}</label>
+              <label className="text-xs font-medium text-muted-foreground">{tEx("topicFilterLabel")}</label>
               <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
                 <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={tEx("all")} /></SelectTrigger>
                 <SelectContent>
