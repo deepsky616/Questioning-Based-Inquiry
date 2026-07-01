@@ -8,6 +8,7 @@ import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { buildSessionLabel, sortSessionsAsc } from "@/lib/sessions";
+import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { groupSharedQuestions } from "@/lib/shared-questions";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -208,6 +209,8 @@ export function UnitDesignView() {
           </Card>
 
           <div className="space-y-6">
+            {/* 참고자료(접기, 기본 닫힘) */}
+            {selectedId && <SessionReferencePanel sessionId={selectedId} />}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">

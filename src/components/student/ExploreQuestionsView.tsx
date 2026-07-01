@@ -15,6 +15,7 @@ import {
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
@@ -426,6 +427,9 @@ export function ExploreQuestionsView() {
           <p className="text-xs text-muted-foreground mt-2">{t("filterHint")}</p>
         </CardContent>
       </Card>
+
+      {/* 탐구질문 수업 세션 선택 시 참고자료(접기, 기본 닫힘) */}
+      {selectedSessionId !== "all" && <SessionReferencePanel sessionId={selectedSessionId} />}
 
       {selectedSession?.unitDesignId && (
         <InquiryFlowGraph

@@ -21,6 +21,7 @@ import {
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
 import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import {
   Table,
   TableBody,
@@ -281,6 +282,9 @@ export function MyQuestionsView() {
           <p className="text-xs text-muted-foreground mt-2">{tEx("filterHint")}</p>
         </CardContent>
       </Card>
+
+      {/* 탐구질문 수업 세션 선택 시 참고자료(접기, 기본 닫힘) */}
+      {selectedSessionId !== "all" && <SessionReferencePanel sessionId={selectedSessionId} />}
 
       {/* 질문 분류 통계 현황 (비율 막대, 표시 전용) */}
       <QuestionClassificationStats questions={filtered} />
