@@ -451,7 +451,10 @@
     "bulkDeleting": "Deleting...",
     "bulkDeleteDone": "Deleted {count} questions",
     "bulkDeletePartial": "Failed to delete {count} questions",
-    "topicFilterLabel": "Topic (unit)"
+    "topicFilterLabel": "Topic (unit)",
+    "groupTitle": "Grouped by content",
+    "groupDesc": "Similar questions organized together",
+    "groupCount": "{count} total"
   },
   "sequencePanel": {
     "published": "Shared with students",

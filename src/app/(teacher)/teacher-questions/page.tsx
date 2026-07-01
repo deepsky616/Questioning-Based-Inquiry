@@ -24,6 +24,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
+import { groupSharedQuestions } from "@/lib/shared-questions";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import { PointReviewView } from "@/components/teacher/PointReviewView";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
@@ -1504,6 +1505,36 @@ export default function QuestionsPage() {
                         )}
                       </ol>
                     )}
+                    {/* 내용별 묶음 (contentGroup별, 그룹 2개 이상일 때만) */}
+                    {!isEditing && openDeploy.has(s.id) && (() => {
+                      const grouped = groupSharedQuestions(s.sharedQuestions ?? []);
+                      if (grouped.length <= 1) return null;
+                      return (
+                        <div className="border-t px-3 pb-3 pt-2">
+                          <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
+                            <p className="text-sm font-semibold text-foreground">{t("groupTitle")}</p>
+                            <span className="text-xs text-muted-foreground">{t("groupDesc")}</span>
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            {grouped.map(({ group, questions }) => (
+                              <div key={group} className="rounded-lg border bg-white p-3 dark:bg-card">
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                  <h3 className="text-sm font-semibold text-foreground">{group}</h3>
+                                  <span className="text-xs text-muted-foreground">{t("groupCount", { count: questions.length })}</span>
+                                </div>
+                                <ul className="space-y-1 text-xs text-muted-foreground">
+                                  {questions.map((question, index) => (
+                                    <li key={`${question.content}-${index}`} className="line-clamp-2">
+                                      {question.priority}. {question.content}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {/* 배포한 수업의 참고자료(탐구설계 연결 시에만 표시) */}
                     {!isEditing && openDeploy.has(s.id) && (
                       <div className="border-t px-3 pb-3 pt-2">

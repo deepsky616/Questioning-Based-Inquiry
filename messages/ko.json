@@ -451,7 +451,10 @@
     "bulkDeleting": "삭제 중...",
     "bulkDeleteDone": "{count}개 질문을 삭제했습니다",
     "bulkDeletePartial": "{count}개 질문 삭제에 실패했습니다",
-    "topicFilterLabel": "주제(단원)"
+    "topicFilterLabel": "주제(단원)",
+    "groupTitle": "내용별 묶음",
+    "groupDesc": "비슷한 질문끼리 정리된 결과입니다",
+    "groupCount": "총 {count}개"
   },
   "sequencePanel": {
     "published": "학생에게 배포했습니다",
