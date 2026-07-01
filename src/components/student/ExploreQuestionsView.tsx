@@ -18,7 +18,6 @@ import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSes
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { InquiryFlowGraph } from "@/components/shared/InquiryFlowGraph";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
@@ -346,7 +345,6 @@ export function ExploreQuestionsView() {
       }
       return sortDir === "desc" ? sortKey(b) - sortKey(a) : sortKey(a) - sortKey(b);
     });
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId);
 
   const displayed = applyClassificationFilter(filtered, filterClosure, filterCognitive);
 
@@ -430,26 +428,6 @@ export function ExploreQuestionsView() {
 
       {/* 탐구질문 수업 세션 선택 시 참고자료(접기, 기본 닫힘) */}
       {selectedSessionId !== "all" && <SessionReferencePanel sessionId={selectedSessionId} />}
-
-      {selectedSession?.unitDesignId && (
-        <InquiryFlowGraph
-          title={t("flowTitle")}
-          description={t("flowDesc")}
-          subject={selectedSession.subject}
-          topic={selectedSession.topic}
-          sharedQuestions={
-            Array.isArray(selectedSession.sharedQuestions) ? selectedSession.sharedQuestions : []
-          }
-          studentQuestions={filtered.map((question) => ({
-            id: question.id,
-            content: question.content,
-            cognitive: question.cognitive,
-            closure: question.closure,
-            isPublic: true,
-          }))}
-          audience="student"
-        />
-      )}
 
       {/* 질문 분류 통계 현황 (비율 막대, 표시 전용) */}
       <QuestionClassificationStats questions={filtered} />
