@@ -7,12 +7,31 @@ import { prisma } from "@/lib/db";
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = session.user as { id: string; role?: string; grade?: string; className?: string };
 
   const qs = await prisma.questionSession.findUnique({
     where: { id: params.id },
-    select: { unitDesignId: true, date: true },
+    select: {
+      unitDesignId: true, date: true, teacherId: true,
+      targetType: true, targetGrade: true, targetClassName: true, targetStudentId: true, targetStudentIds: true,
+    },
   });
-  if (!qs?.unitDesignId) return NextResponse.json({ context: null });
+  if (!qs) return NextResponse.json({ context: null });
+
+  // 권한: 교사는 본인 소유 세션, 학생은 세션 대상일 때만 참고자료를 볼 수 있다.
+  const targetIds = Array.isArray(qs.targetStudentIds) ? (qs.targetStudentIds as string[]) : [];
+  const isOwnerTeacher = user.role === "TEACHER" && qs.teacherId === user.id;
+  const isTargetStudent = user.role !== "TEACHER" && (
+    qs.targetType === "ALL" ||
+    (qs.targetType === "CLASS" && qs.targetGrade === user.grade && qs.targetClassName === user.className) ||
+    (qs.targetType === "STUDENT" && qs.targetStudentId === user.id) ||
+    (qs.targetType === "CUSTOM" && targetIds.includes(user.id))
+  );
+  if (!isOwnerTeacher && !isTargetStudent) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
+
+  if (!qs.unitDesignId) return NextResponse.json({ context: null });
 
   const rows = await prisma.$queryRaw<
     {
