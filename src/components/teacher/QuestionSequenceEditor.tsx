@@ -97,30 +97,25 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
     setIsRunning(false);
   }
 
-  // ③ 교사 질문 추가
+  // ③ 교사 질문 추가 — 입력한 문장을 그대로 목록 맨 뒤에 추가(AI 재정리 없음).
+  // AI 묶기·정렬은 아래 버튼으로만 실행한다(추가 시 자동으로 다른 질문이 생성되던 문제 수정).
   function handleAddTeacher() {
     const content = teacherInput.trim();
     if (!content) return;
     setTeacherInput("");
-    if (editMode) {
-      // 편집 모드: 묶기 없이 현재 목록 맨 뒤에 그대로 추가
-      const newQuestion: SequencedQuestion = {
-        id: `added-${Date.now()}`,
-        type: "student",
-        content,
-        source: "teacher",
-        contentGroup: t("addedGroup"),
-        priority: sequenced.length + 1,
-        lessonPhase: "탐구",
-        rationale: t("addedRationale"),
-      };
-      update([...sequenced, newQuestion]);
-      return;
-    }
-    // 생성 모드: additionalQuestions에 넣고 즉시 재정리(학생+교사 질문 함께 묶음)
-    const next = [...additionalQuestions, content];
-    setAdditionalQuestions(next);
-    runSequence(next, "merge");
+    const newQuestion: SequencedQuestion = {
+      id: `added-${Date.now()}`,
+      type: "student",
+      content,
+      source: "teacher",
+      contentGroup: t("addedGroup"),
+      priority: sequenced.length + 1,
+      lessonPhase: "탐구",
+      rationale: t("addedRationale"),
+    };
+    update([...sequenced, newQuestion]);
+    // 생성 모드: 나중에 '묶기/정렬'을 누르면 AI 재정리에 포함되도록 추가 질문 목록에도 보관
+    if (!editMode) setAdditionalQuestions((prev) => [...prev, content]);
   }
 
   function handleDrop(targetIndex: number) {
