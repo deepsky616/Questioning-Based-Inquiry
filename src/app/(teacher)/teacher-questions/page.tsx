@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
-import { formatDateTime, formatClock, formatShortDateTime, isSameDay } from "@/lib/datetime";
+import { formatDateTime } from "@/lib/datetime";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import {
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import { DeployedDesignList } from "./DeployedDesignList";
+import { ParticipationSection } from "./ParticipationSection";
 import type { QuestionSession } from "./types";
 import { PointReviewView } from "@/components/teacher/PointReviewView";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
@@ -81,59 +82,6 @@ interface SessionAnalysis {
   totalLikes?: number;
 }
 
-interface ParticipantStudent {
-  id: string;
-  name: string;
-  grade: string | null;
-  className: string | null;
-  studentNumber: string | null;
-  hasQuestion: boolean;
-  questionContent: string | null;
-  questionCount: number;
-  commentCount: number;
-  likeCount: number;
-  questionTimes: string[];
-  commentTimes: string[];
-  likeTimes: string[];
-}
-
-interface ParticipationData {
-  sessionId: string;
-  totalStudents: number;
-  submittedCount: number;
-  students: ParticipantStudent[];
-}
-
-function StatBadge({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className={`flex flex-col items-center px-4 py-2 rounded-lg ${color}`}>
-      <span className="text-lg font-bold">{value}</span>
-      <span className="text-xs mt-0.5">{label}</span>
-    </div>
-  );
-}
-
-/** 참여 현황 셀: 활동 개수 + 그 아래 가장 최근 시각, 호버 시 전체 시각 목록 툴팁. */
-function ActivityCell({ count, times, color, refDate }: { count: number; times: string[]; color: string; refDate?: string }) {
-  if (count === 0) {
-    return <td className="px-3 py-2 text-center align-top text-sm font-semibold text-muted-foreground">-</td>;
-  }
-  const latest = times[times.length - 1];
-  const latestLabel = latest ? (isSameDay(latest, refDate) ? formatClock(latest) : formatShortDateTime(latest)) : "";
-  const tooltip = times.map((tm) => formatDateTime(tm)).join("\n");
-  return (
-    <td className="px-3 py-2 text-center align-top whitespace-nowrap" title={tooltip || undefined}>
-      <div className={`text-sm font-semibold ${color}`}>{count}</div>
-      {latestLabel && (
-        <div className="mt-0.5 inline-flex items-center gap-0.5 text-[11px] leading-tight text-muted-foreground">
-          <span aria-hidden>🕒</span>
-          <span>{latestLabel}</span>
-        </div>
-      )}
-    </td>
-  );
-}
-
 export default function QuestionsPage() {
   const tPages = useTranslations("pages");
   const tCls = useTranslations("classification");
@@ -158,10 +106,6 @@ export default function QuestionsPage() {
   const [sessionAnalysisError, setSessionAnalysisError] = useState<string | null>(null);
 
   // 참여 현황
-  const [participation, setParticipation] = useState<ParticipationData | null>(null);
-  const [isLoadingParticipation, setIsLoadingParticipation] = useState(false);
-  const [participationFilter, setParticipationFilter] = useState<"all" | "submitted" | "not-submitted">("all");
-  const [showParticipation, setShowParticipation] = useState(false);
 
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
@@ -277,8 +221,7 @@ export default function QuestionsPage() {
     setSelectedSessionId(val);
     setSessionAnalysis(null);
     setSessionAnalysisError(null);
-    setParticipation(null);
-    setShowParticipation(false);
+    // 참여 현황은 ParticipationSection이 key=세션id로 리마운트되며 초기화된다
     resetBulkState();
     if (val === "all") {
       fetchQuestions("all", {
@@ -643,22 +586,6 @@ export default function QuestionsPage() {
     ["insights", t("insightsTitle")],
   ];
 
-  const handleLoadParticipation = async () => {
-    if (!selectedSessionId) return;
-    setIsLoadingParticipation(true);
-    try {
-      const res = await fetch(`/api/sessions/${selectedSessionId}/participation`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? t("participationFailed"));
-      setParticipation(data as ParticipationData);
-      setShowParticipation(true);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsLoadingParticipation(false);
-    }
-  };
-
   const searchKeyword = search.trim().toLowerCase();
   // 탐구질문 생성 세션의 질문은 조회 대상에서 제외
   const visibleQuestions = questions.filter((q) => !curriculumSessionIds.has(q.session?.id ?? q.sessionId ?? ""));
@@ -944,108 +871,9 @@ export default function QuestionsPage() {
       {topTab === "questions" && (
         <div className="space-y-6">
 
-      {/* 학생 참여 현황 */}
+      {/* 학생 참여 현황 — 세션 변경 시 key로 상태 초기화 */}
       {currentSession && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <SectionToggle
-                title={t("participationTitle")}
-                open={showParticipation}
-                onToggle={showParticipation ? () => setShowParticipation(false) : handleLoadParticipation}
-                suffix={isLoadingParticipation ? <span className="text-xs font-normal text-muted-foreground">{t("loadingShort")}</span> : undefined}
-              />
-            </div>
-          </CardHeader>
-          {showParticipation && participation && (
-            <CardContent>
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-green-700 dark:text-green-400">{participation.submittedCount}</span>
-                  {t("submittedSuffix", { total: participation.totalStudents })}
-                </span>
-                <div className="flex rounded-md border border-border overflow-hidden ml-auto">
-                  {(["all", "submitted", "not-submitted"] as const).map((f, i) => (
-                    <button
-                      key={f}
-                      onClick={() => setParticipationFilter(f)}
-                      className={`px-3 py-1 text-xs font-medium transition-colors ${
-                        i > 0 ? "border-l border-border" : ""
-                      } ${
-                        participationFilter === f
-                          ? "bg-indigo-600 text-white"
-                          : "bg-background text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      {f === "all" ? t("all") : f === "submitted" ? t("submitted") : t("notSubmitted")}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="rounded-lg border border-border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground w-24 whitespace-nowrap">{t("colGradeClassNo")}</th>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground w-32 whitespace-nowrap">{t("colStudent")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{t("colWroteQuestion")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{t("colWroteComment")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{t("colLikes")}</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground whitespace-nowrap">{t("colSubmit")}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {participation.students
-                      .filter((s) =>
-                        participationFilter === "all"
-                          ? true
-                          : participationFilter === "submitted"
-                          ? s.hasQuestion
-                          : !s.hasQuestion
-                      )
-                      .map((s) => (
-                        <tr key={s.id} className={s.hasQuestion ? "bg-background" : "bg-muted/40"}>
-                          <td className="px-3 py-2 align-top text-xs text-muted-foreground whitespace-nowrap">
-                            {[
-                              s.grade && t("gradeLabel", { grade: s.grade }),
-                              s.className && t("classLabel", { className: s.className }),
-                              s.studentNumber && t("numberLabel", { studentNumber: s.studentNumber }),
-                            ]
-                              .filter(Boolean)
-                              .join(" ")}
-                          </td>
-                          <td className="px-3 py-2 align-top font-medium text-foreground whitespace-nowrap">{s.name}</td>
-                          <ActivityCell count={s.questionCount} times={s.questionTimes} color="text-foreground" refDate={currentSession?.date} />
-                          <ActivityCell count={s.commentCount} times={s.commentTimes} color="text-indigo-600 dark:text-indigo-400" refDate={currentSession?.date} />
-                          <ActivityCell count={s.likeCount} times={s.likeTimes} color="text-rose-500 dark:text-rose-400" refDate={currentSession?.date} />
-                          <td className="px-3 py-2 text-center align-top">
-                            {s.hasQuestion ? (
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold dark:bg-green-950/50 dark:text-green-400">
-                                ✓
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs">
-                                -
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-                {participation.students.filter((s) =>
-                  participationFilter === "all"
-                    ? true
-                    : participationFilter === "submitted"
-                    ? s.hasQuestion
-                    : !s.hasQuestion
-                ).length === 0 && (
-                  <EmptyState icon="🧑‍🎓" title={participationFilter === "submitted" ? t("emptySubmitted") : t("emptyNotSubmitted")} />
-                )}
-              </div>
-            </CardContent>
-          )}
-        </Card>
+        <ParticipationSection key={currentSession.id} sessionId={currentSession.id} sessionDate={currentSession.date} />
       )}
 
       {/* AI 세션 분석 */}
