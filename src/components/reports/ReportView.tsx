@@ -166,6 +166,52 @@ export function ReportView({
   const [editing, setEditing] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<SessionAnalysisResult>({});
   const [savingEdit, setSavingEdit] = useState(false);
+  // 분석 결과 번역(ko 외 로케일에서 세션별 원문/번역 전환)
+  const tT = useTranslations("translate");
+  const canTranslate = locale !== "ko" && canAnalyze;
+  const [trFields, setTrFields] = useState<Record<string, SessionAnalysisResult>>({});
+  const [trShown, setTrShown] = useState<Record<string, boolean>>({});
+  const [trBusy, setTrBusy] = useState<Record<string, boolean>>({});
+  // 재분석·수정으로 원문이 바뀌면 이전 번역을 버린다(서버 캐시는 해시로 자동 무효화)
+  const dropTranslation = (id: string) => {
+    setTrFields((p) => { const n = { ...p }; delete n[id]; return n; });
+    setTrShown((p) => ({ ...p, [id]: false }));
+  };
+  const toggleTranslate = async (id: string) => {
+    if (trShown[id]) {
+      setTrShown((p) => ({ ...p, [id]: false }));
+      return;
+    }
+    if (trFields[id]) {
+      setTrShown((p) => ({ ...p, [id]: true }));
+      return;
+    }
+    const r = res[id];
+    if (!r || trBusy[id]) return;
+    setTrBusy((p) => ({ ...p, [id]: true }));
+    try {
+      const body = {
+        sessionId: id,
+        cacheKey: analysisCacheKey ?? "class",
+        fields: Object.fromEntries(
+          Object.entries(r).filter(([, v]) => typeof v === "string" && v.trim()),
+        ),
+      };
+      const resp = await fetch("/api/reports/session-analysis/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(typeof data?.error === "string" ? data.error : tT("translateFailed"));
+      setTrFields((p) => ({ ...p, [id]: data.fields ?? {} }));
+      setTrShown((p) => ({ ...p, [id]: true }));
+    } catch (e) {
+      toast({ variant: "destructive", description: e instanceof Error ? e.message : tT("translateFailed") });
+    } finally {
+      setTrBusy((p) => ({ ...p, [id]: false }));
+    }
+  };
   const editFields: { key: keyof SessionAnalysisResult; label: string }[] = scope === "class"
     ? [
         { key: "summary", label: t("secSummary") },
@@ -193,6 +239,7 @@ export function ReportView({
       await onSaveAnalysis(id, editDraft);
       setRes((p) => ({ ...p, [id]: editDraft }));
       queryClient.setQueryData(analysisKey(id), editDraft);
+      dropTranslation(id); // 원문이 바뀌었으니 이전 번역 폐기
       setEditing(null); setEditDraft({});
       toast({ description: t("editSaved") });
     } catch (e) {
@@ -271,6 +318,7 @@ export function ReportView({
       if (r) {
         setRes((p) => ({ ...p, [id]: r }));
         queryClient.setQueryData(analysisKey(id), r);
+        dropTranslation(id); // 원문이 바뀌었으니 이전 번역 폐기
         toast({ description: t("analysisDone") });
       } else setErrs((e) => ({ ...e, [id]: t("noAnalysisResult") }));
     } catch (e) {
@@ -581,18 +629,20 @@ export function ReportView({
           <div className="space-y-2">
             {filteredSessions.map((s) => {
               const r = res[s.id];
+              // 번역 보기가 켜져 있으면 번역된 필드로 표시(없는 필드는 원문 유지)
+              const rv = r && trShown[s.id] ? { ...r, ...trFields[s.id] } : r;
               const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
               const blocks: [string, string | undefined][] = [
-                [t("secSummary"), r?.summary],
-                [t("secBalance"), r?.balanceInsights],
-                [t("secBest"), r?.bestQuestion],
-                [t("secGrowth"), r?.growthInsights],
-                [t("secRewrite"), r?.rewriteExample],
-                [t("secEngagement"), r?.engagementInsights],
-                [t("secComment"), r?.commentInsights],
-                [t("secRelevance"), r?.relevanceInsights],
-                [t("secNext"), r?.nextQuestions],
-                [t("secSuggest"), r?.insights],
+                [t("secSummary"), rv?.summary],
+                [t("secBalance"), rv?.balanceInsights],
+                [t("secBest"), rv?.bestQuestion],
+                [t("secGrowth"), rv?.growthInsights],
+                [t("secRewrite"), rv?.rewriteExample],
+                [t("secEngagement"), rv?.engagementInsights],
+                [t("secComment"), rv?.commentInsights],
+                [t("secRelevance"), rv?.relevanceInsights],
+                [t("secNext"), rv?.nextQuestions],
+                [t("secSuggest"), rv?.insights],
               ];
               return (
                 <div key={s.id} className="rounded-lg border bg-background">
@@ -620,6 +670,15 @@ export function ReportView({
                       </>
                     ) : (
                       <>
+                        {canTranslate && r && !busy[s.id] && (
+                          <button
+                            onClick={() => toggleTranslate(s.id)}
+                            disabled={trBusy[s.id]}
+                            className="no-print shrink-0 rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-60"
+                          >
+                            {trBusy[s.id] ? tT("translating") : trShown[s.id] ? tT("showOriginal") : `🌐 ${tT("translate")}`}
+                          </button>
+                        )}
                         {canAnalyze && onSaveAnalysis && r && !busy[s.id] && (
                           <button
                             onClick={() => startEdit(s.id)}
