@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { SectionToggle } from "@/components/shared/SectionToggle";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useToast } from "@/components/ui/use-toast";
 import { formatDateTime, formatClock, formatShortDateTime, isSameDay } from "@/lib/datetime";
 
 interface ParticipantStudent {
@@ -65,6 +66,7 @@ interface ParticipationSectionProps {
  */
 export function ParticipationSection({ sessionId, sessionDate }: ParticipationSectionProps) {
   const t = useTranslations("teacherQ");
+  const { toast } = useToast();
   const [participation, setParticipation] = useState<ParticipationData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState<"all" | "submitted" | "not-submitted">("all");
@@ -80,7 +82,11 @@ export function ParticipationSection({ sessionId, sessionDate }: ParticipationSe
       setParticipation(data as ParticipationData);
       setShow(true);
     } catch (err) {
-      console.error(err);
+      // 조용히 실패하면 토글이 무반응으로 보인다 — 사용자에게 알린다
+      toast({
+        variant: "destructive",
+        description: err instanceof Error ? err.message : t("participationFailed"),
+      });
     } finally {
       setIsLoading(false);
     }
@@ -129,8 +135,8 @@ export function ParticipationSection({ sessionId, sessionDate }: ParticipationSe
               ))}
             </div>
           </div>
-          <div className="rounded-lg border border-border overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="rounded-lg border border-border overflow-hidden overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
               <thead className="bg-muted">
                 <tr>
                   <th className="text-left px-3 py-2 font-medium text-muted-foreground w-24 whitespace-nowrap">{t("colGradeClassNo")}</th>
