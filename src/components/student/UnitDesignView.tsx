@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
+import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -296,11 +297,20 @@ export function UnitDesignView() {
             {selectedId && <SessionReferencePanel sessionId={selectedId} />}
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">
-                  {selectedSession
-                    ? buildSessionLabel(selectedSession.date, selectedSession.subject, selectedSession.topic)
-                    : t("fallbackTitle")}
-                </CardTitle>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-base">
+                    {selectedSession
+                      ? buildSessionLabel(selectedSession.date, selectedSession.subject, selectedSession.topic)
+                      : t("fallbackTitle")}
+                  </CardTitle>
+                  <TranslateAllButton
+                    items={(selectedSession?.sharedQuestions ?? [])
+                      .map((q) => pubByContent.get(q.content.trim()))
+                      .filter((p): p is NonNullable<typeof p> => Boolean(p))
+                      .map((p) => ({ type: "QUESTION" as const, id: p.id }))}
+                    ct={ct}
+                  />
+                </div>
                 <CardDescription>{t("detailDesc")}</CardDescription>
               </CardHeader>
               <CardContent>

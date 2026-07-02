@@ -36,11 +36,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ translations: {} });
   }
 
-  const { success } = rateLimit(`translate:${userId}`, { limit: 30, windowMs: 60_000 });
-  if (!success) {
-    return NextResponse.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
-  }
-
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "잘못된 요청입니다" }, { status: 400 });
@@ -125,6 +120,13 @@ export async function POST(req: Request) {
 
   if (misses.length === 0) {
     return NextResponse.json({ translations: out });
+  }
+
+  // 레이트 리밋은 실제 Gemini 호출(캐시 미스)이 있을 때만 차감한다.
+  // 캐시 히트만 있는 재방문 요청이 한도를 소모하지 않도록.
+  const { success } = rateLimit(`translate:${userId}`, { limit: 30, windowMs: 60_000 });
+  if (!success) {
+    return NextResponse.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
   // 캐시 미스 → 한 번의 Gemini 호출로 일괄 번역

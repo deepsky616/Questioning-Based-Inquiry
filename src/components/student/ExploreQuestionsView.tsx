@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
+import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { formatDateTime } from "@/lib/datetime";
 
 interface QuestionSession {
@@ -260,7 +261,6 @@ function QuestionCard({
 
 export function ExploreQuestionsView() {
   const t = useTranslations("explore");
-  const tT = useTranslations("translate");
   const ct = useContentTranslation();
   const queryClient = useQueryClient();
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
@@ -447,19 +447,7 @@ export function ExploreQuestionsView() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 text-sm w-56 bg-background"
               />
-              {ct.canTranslate && displayed.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    ct.anyShown
-                      ? ct.showAllOriginal()
-                      : ct.translateAll(displayed.map((q) => ({ type: "QUESTION", id: q.id })))
-                  }
-                  className="h-8 rounded-md border border-indigo-200 px-3 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-                >
-                  {ct.anyShown ? tT("showAllOriginal") : tT("translateAll")}
-                </button>
-              )}
+              <TranslateAllButton items={displayed.map((q) => ({ type: "QUESTION" as const, id: q.id }))} ct={ct} />
             </div>
             <QuestionSortControl
               field={sortField}

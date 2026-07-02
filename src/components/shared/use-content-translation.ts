@@ -142,5 +142,16 @@ export function useContentTranslation() {
   const isShown = useCallback((item: TranslatableItem) => shown.has(keyOf(item.type, item.id)), [shown]);
   const isLoading = useCallback((item: TranslatableItem) => loading.has(keyOf(item.type, item.id)), [loading]);
 
-  return { canTranslate, toggle, translateAll, showAllOriginal, text, isShown, isLoading, anyShown: shown.size > 0 };
+  return {
+    canTranslate,
+    toggle,
+    translateAll,
+    showAllOriginal,
+    text,
+    isShown,
+    isLoading,
+    anyShown: shown.size > 0,
+    /** 하나라도 번역 요청이 진행 중인가 — '모두 번역' 버튼 로딩 표시용 */
+    busy: loading.size > 0,
+  };
 }

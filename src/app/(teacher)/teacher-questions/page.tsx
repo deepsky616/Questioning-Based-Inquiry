@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
+import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { formatDateTime } from "@/lib/datetime";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -863,6 +864,7 @@ export default function QuestionsPage() {
               >
                 {t("flaggedOnly")} {flaggedCount > 0 && `(${flaggedCount})`}
               </button>
+              <TranslateAllButton items={filtered.map((q) => ({ type: "QUESTION" as const, id: q.id }))} ct={ct} />
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <QuestionSortControl

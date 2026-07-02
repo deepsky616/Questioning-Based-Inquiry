@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
+import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -303,6 +304,7 @@ export function MyQuestionsView() {
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 text-sm w-56 bg-background"
               />
+              <TranslateAllButton items={displayed.map((q) => ({ type: "QUESTION" as const, id: q.id }))} ct={ct} />
             </div>
             <QuestionSortControl
               field={sortField}

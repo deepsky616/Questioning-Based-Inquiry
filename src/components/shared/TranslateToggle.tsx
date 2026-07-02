@@ -24,7 +24,7 @@ export function TranslateToggle({
       disabled={loading}
       className={`text-[11px] font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-50 ${className}`}
     >
-      {loading ? t("translating") : shown ? t("showOriginal") : t("translate")}
+      {loading ? t("translating") : shown ? t("showOriginal") : `🌐 ${t("translate")}`}
     </button>
   );
 }
