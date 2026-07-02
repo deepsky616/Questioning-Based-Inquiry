@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { sendTeacherWelcomeEmail } from "@/lib/email";
 import { validatePasswordPolicy } from "@/lib/password-policy";
+import { checkRateLimit, getClientIp } from "@/lib/api-rate-limit";
 
 const studentSchema = z.object({
   role: z.literal("STUDENT"),
@@ -33,6 +34,11 @@ const teacherSchema = z.object({
 const registerSchema = z.discriminatedUnion("role", [studentSchema, teacherSchema]);
 
 export async function POST(req: Request) {
+  // 레이트 리밋: IP당 분당 30회 (봇 대량 가입 방지. 학교 NAT 뒤에서 한 학급이
+  // 동시에 가입하는 경우를 막지 않도록 여유 있게 설정)
+  const limited = checkRateLimit(`register:ip:${getClientIp(req)}`, 30);
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const data = registerSchema.parse(body);

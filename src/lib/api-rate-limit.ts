@@ -20,3 +20,16 @@ export function checkRateLimit(
     { status: 429 }
   );
 }
+
+/**
+ * 비로그인 엔드포인트(회원가입·비밀번호 재설정 등)용 클라이언트 IP 추출.
+ * 프록시 뒤에서는 x-forwarded-for의 첫 값을 사용한다.
+ */
+export function getClientIp(req: Request): string {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return req.headers.get("x-real-ip")?.trim() || "unknown";
+}

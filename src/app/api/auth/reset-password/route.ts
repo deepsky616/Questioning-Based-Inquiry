@@ -2,6 +2,7 @@ import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashPasswordResetToken } from "@/lib/password-reset";
+import { checkRateLimit, getClientIp } from "@/lib/api-rate-limit";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -11,6 +12,10 @@ const resetPasswordSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  // 레이트 리밋: IP당 분당 10회 (토큰 무차별 대입 방지)
+  const limited = checkRateLimit(`reset-password:ip:${getClientIp(req)}`, 10);
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const { token, password } = resetPasswordSchema.parse(body);
