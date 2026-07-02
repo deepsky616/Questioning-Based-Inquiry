@@ -27,6 +27,7 @@ import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import { DeployedDesignList } from "./DeployedDesignList";
 import { ParticipationSection } from "./ParticipationSection";
+import { SessionAnalysisCard } from "./SessionAnalysisCard";
 import type { QuestionSession } from "./types";
 import { PointReviewView } from "@/components/teacher/PointReviewView";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
@@ -67,21 +68,6 @@ interface Question {
   likedBy?: Array<{ id: string; name: string }>;
 }
 
-interface SessionAnalysis {
-  summary: string;
-  themes: string[];
-  insights: string;
-  commentInsights?: string;
-  engagementInsights?: string;
-  relevanceInsights?: string;
-  balanceInsights?: string;
-  bestQuestion?: string;
-  nextQuestions?: string;
-  totalQuestions: number;
-  totalComments?: number;
-  totalLikes?: number;
-}
-
 export default function QuestionsPage() {
   const tPages = useTranslations("pages");
   const tCls = useTranslations("classification");
@@ -100,13 +86,6 @@ export default function QuestionsPage() {
   const [correctionMsg, setCorrectionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [isSavingCorrection, setIsSavingCorrection] = useState(false);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-  const [isAnalyzingSession, setIsAnalyzingSession] = useState(false);
-  const [showSessionAnalysis, setShowSessionAnalysis] = useState(false);
-  const [sessionAnalysis, setSessionAnalysis] = useState<SessionAnalysis | null>(null);
-  const [sessionAnalysisError, setSessionAnalysisError] = useState<string | null>(null);
-
-  // 참여 현황
-
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
 
@@ -219,9 +198,7 @@ export default function QuestionsPage() {
 
   const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);
-    setSessionAnalysis(null);
-    setSessionAnalysisError(null);
-    // 참여 현황은 ParticipationSection이 key=세션id로 리마운트되며 초기화된다
+    // 참여 현황·AI 분석은 각 섹션 컴포넌트가 key=세션id로 리마운트되며 초기화된다
     resetBulkState();
     if (val === "all") {
       fetchQuestions("all", {
@@ -263,25 +240,6 @@ export default function QuestionsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterDate, filterSubject, filterTopic]);
-
-  // 세션 선택 시 저장된 학급 AI 분석을 불러온다(대시보드와 공유). 전체 조회/미선택이면 비움.
-  useEffect(() => {
-    if (selectedSessionId === "all" || !selectedSessionId) {
-      setSessionAnalysis(null);
-      setSessionAnalysisError(null);
-      return;
-    }
-    let active = true;
-    fetch(`/api/sessions/${selectedSessionId}/analysis`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!active) return;
-        setSessionAnalysis(d?.analysis ? (d.analysis as SessionAnalysis) : null);
-        setSessionAnalysisError(null);
-      })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [selectedSessionId]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -513,78 +471,6 @@ export default function QuestionsPage() {
       toast({ variant: "destructive", description: t("processFailed") });
     }
   };
-
-  const handleAnalyzeSession = async () => {
-    if (!currentSession) return;
-
-    setIsAnalyzingSession(true);
-    setSessionAnalysisError(null);
-    try {
-      const res = await fetch(`/api/sessions/${selectedSessionId}/analysis`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? t("sessionAnalysisFailed"));
-      setSessionAnalysis(data as SessionAnalysis);
-    } catch (err) {
-      setSessionAnalysis(null);
-      setSessionAnalysisError(err instanceof Error ? err.message : t("sessionAnalysisFailed"));
-    } finally {
-      setIsAnalyzingSession(false);
-    }
-  };
-
-  // 세션 분석 교사 수정(대시보드 상세 리포트와 동일하게)
-  const [editingSession, setEditingSession] = useState(false);
-  const [sessionEditDraft, setSessionEditDraft] = useState<Record<string, string>>({});
-  const [savingSessionEdit, setSavingSessionEdit] = useState(false);
-  const startEditSession = () => {
-    if (!sessionAnalysis) return;
-    setSessionEditDraft({
-      summary: sessionAnalysis.summary ?? "",
-      balanceInsights: sessionAnalysis.balanceInsights ?? "",
-      bestQuestion: sessionAnalysis.bestQuestion ?? "",
-      engagementInsights: sessionAnalysis.engagementInsights ?? "",
-      commentInsights: sessionAnalysis.commentInsights ?? "",
-      relevanceInsights: sessionAnalysis.relevanceInsights ?? "",
-      nextQuestions: sessionAnalysis.nextQuestions ?? "",
-      insights: sessionAnalysis.insights ?? "",
-    });
-    setShowSessionAnalysis(true);
-    setEditingSession(true);
-  };
-  const cancelEditSession = () => { setEditingSession(false); setSessionEditDraft({}); };
-  const saveSessionEdit = async () => {
-    if (!currentSession) return;
-    setSavingSessionEdit(true);
-    try {
-      const res = await fetch("/api/reports/session-analysis", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: selectedSessionId, scope: "class", result: { ...(sessionAnalysis ?? {}), ...sessionEditDraft } }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? t("sessionAnalysisFailed"));
-      setSessionAnalysis((prev) => (prev ? { ...prev, ...sessionEditDraft } : prev));
-      setEditingSession(false);
-      setSessionEditDraft({});
-    } catch (err) {
-      setSessionAnalysisError(err instanceof Error ? err.message : t("sessionAnalysisFailed"));
-    } finally {
-      setSavingSessionEdit(false);
-    }
-  };
-  const sessionEditFields: [string, string][] = [
-    ["summary", t("summaryTitle")],
-    ["balanceInsights", t("balanceTitle")],
-    ["bestQuestion", t("bestTitle")],
-    ["engagementInsights", t("engagementTitle")],
-    ["commentInsights", t("commentInsightsTitle")],
-    ["relevanceInsights", t("relevanceTitle")],
-    ["nextQuestions", t("nextTitle")],
-    ["insights", t("insightsTitle")],
-  ];
 
   const searchKeyword = search.trim().toLowerCase();
   // 탐구질문 생성 세션의 질문은 조회 대상에서 제외
@@ -876,117 +762,8 @@ export default function QuestionsPage() {
         <ParticipationSection key={currentSession.id} sessionId={currentSession.id} sessionDate={currentSession.date} />
       )}
 
-      {/* AI 세션 분석 */}
-      {currentSession && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <SectionToggle
-                title={t("sessionAnalysisTitle")}
-                open={showSessionAnalysis}
-                onToggle={() => setShowSessionAnalysis((v) => !v)}
-              />
-              {editingSession ? (
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" disabled={savingSessionEdit} onClick={saveSessionEdit} className="text-xs">{tc("save")}</Button>
-                  <Button type="button" size="sm" variant="outline" disabled={savingSessionEdit} onClick={cancelEditSession} className="text-xs">{tc("cancel")}</Button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  {sessionAnalysis && !isAnalyzingSession && (
-                    <Button type="button" size="sm" variant="outline" onClick={startEditSession} className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50">{t("editAnalysisBtn")}</Button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isAnalyzingSession}
-                    onClick={handleAnalyzeSession}
-                    className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                  >
-                    {isAnalyzingSession ? t("analyzing") : sessionAnalysis ? t("reanalyzeBtn") : t("analyze")}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          {showSessionAnalysis && (sessionAnalysis || sessionAnalysisError || editingSession) && (
-            <CardContent className="space-y-4">
-              {editingSession ? (
-                <div className="space-y-3">
-                  {sessionEditFields.map(([key, label]) => (
-                    <div key={key}>
-                      <label className="text-xs font-semibold text-foreground">{label}</label>
-                      <textarea
-                        value={sessionEditDraft[key] ?? ""}
-                        onChange={(e) => setSessionEditDraft((d) => ({ ...d, [key]: e.target.value }))}
-                        rows={2}
-                        className="mt-0.5 w-full rounded-md border bg-background px-2 py-1 text-sm leading-6 text-foreground"
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : sessionAnalysisError ? (
-                <p className="text-sm text-red-600 dark:text-red-400">{sessionAnalysisError}</p>
-              ) : sessionAnalysis ? (
-                <>
-                  <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: sessionAnalysis.totalQuestions ?? 0 })}</span>
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statLikes", { count: sessionAnalysis.totalLikes ?? 0 })}</span>
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statComments", { count: sessionAnalysis.totalComments ?? 0 })}</span>
-                  </div>
-                  <div className="rounded-lg bg-muted p-4 text-sm leading-6 text-foreground">{sessionAnalysis.summary}</div>
-                  <div className="flex flex-wrap gap-2">
-                    {(sessionAnalysis.themes ?? []).map((theme) => (
-                      <span key={theme} className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">{theme}</span>
-                    ))}
-                  </div>
-                  {sessionAnalysis.balanceInsights && (
-                    <div className="rounded-lg bg-violet-50 p-4 dark:bg-violet-950/30">
-                      <p className="text-xs font-semibold text-violet-800 dark:text-violet-300">{t("balanceTitle")}</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-violet-950 dark:text-violet-100">{sessionAnalysis.balanceInsights}</p>
-                    </div>
-                  )}
-                  {sessionAnalysis.bestQuestion && (
-                    <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950/30">
-                      <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-300">{t("bestTitle")}</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-yellow-950 dark:text-yellow-100">{sessionAnalysis.bestQuestion}</p>
-                    </div>
-                  )}
-                  <div className="rounded-lg bg-amber-50 p-4 dark:bg-amber-950/30">
-                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">{t("insightsTitle")}</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-amber-950 dark:text-amber-100">{sessionAnalysis.insights}</p>
-                  </div>
-                  {sessionAnalysis.nextQuestions && (
-                    <div className="rounded-lg bg-indigo-50 p-4 dark:bg-indigo-950/30">
-                      <p className="text-xs font-semibold text-indigo-800 dark:text-indigo-300">{t("nextTitle")}</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-indigo-950 dark:text-indigo-100">{sessionAnalysis.nextQuestions}</p>
-                    </div>
-                  )}
-                  {sessionAnalysis.engagementInsights && (
-                    <div className="rounded-lg bg-rose-50 p-4 dark:bg-rose-950/30">
-                      <p className="text-xs font-semibold text-rose-800 dark:text-rose-300">{t("engagementTitle")}</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-rose-950 dark:text-rose-100">{sessionAnalysis.engagementInsights}</p>
-                    </div>
-                  )}
-                  {sessionAnalysis.commentInsights && (
-                    <div className="rounded-lg bg-emerald-50 p-4 dark:bg-emerald-950/30">
-                      <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">{t("commentInsightsTitle")}</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-emerald-950 dark:text-emerald-100">{sessionAnalysis.commentInsights}</p>
-                    </div>
-                  )}
-                  {sessionAnalysis.relevanceInsights && (
-                    <div className="rounded-lg bg-sky-50 p-4 dark:bg-sky-950/30">
-                      <p className="text-xs font-semibold text-sky-800 dark:text-sky-300">{t("relevanceTitle")}</p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-sky-950 dark:text-sky-100">{sessionAnalysis.relevanceInsights}</p>
-                    </div>
-                  )}
-                </>
-              ) : null}
-            </CardContent>
-          )}
-        </Card>
-      )}
+      {/* AI 세션 분석 — 세션 변경 시 key로 상태 초기화, 저장된 분석은 마운트 시 로드 */}
+      {currentSession && <SessionAnalysisCard key={currentSession.id} sessionId={currentSession.id} />}
 
       {/* 탐구질문 수업 세션이면 학생 배포 참고자료 표시(접기) — 질문 분류 통계 위 */}
       {currentSession && <SessionReferencePanel sessionId={currentSession.id} />}
