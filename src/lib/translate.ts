@@ -22,7 +22,11 @@ export async function translateTexts(
   const target = languageName(targetLocale);
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const gemini = genAI.getGenerativeModel({ model });
+  // JSON 출력 강제 — 마크다운·설명이 섞여 파싱에 실패하는 것을 방지
+  const gemini = genAI.getGenerativeModel({
+    model,
+    generationConfig: { responseMimeType: "application/json" },
+  });
 
   const numbered = texts.map((t, i) => `${i + 1}. ${t}`).join("\n");
   const prompt = `Translate the following numbered Korean texts (questions or comments written by K-12 students) into ${target}.
