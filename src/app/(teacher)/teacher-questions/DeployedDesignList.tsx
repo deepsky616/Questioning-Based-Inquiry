@@ -223,10 +223,20 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                             <h3 className="text-sm font-semibold text-foreground">{group}</h3>
                             <span className="text-xs text-muted-foreground">{t("groupCount", { count: questions.length })}</span>
                           </div>
-                          <ul className="space-y-1 text-xs text-muted-foreground">
+                          <ul className="space-y-1.5 text-xs text-muted-foreground">
                             {questions.map((question, index) => (
-                              <li key={`${question.content}-${index}`} className="line-clamp-2">
-                                {question.priority}. {question.content}
+                              <li key={`${question.content}-${index}`}>
+                                <p className="line-clamp-2 font-medium text-foreground/80">
+                                  {question.priority}. {question.content}
+                                </p>
+                                {/* 이 대표 질문에 묶인 학생 원본 질문들 */}
+                                {(question.mergedFrom?.length ?? 0) > 1 && (
+                                  <ul className="mt-0.5 space-y-0.5 border-l-2 border-emerald-200 pl-2 dark:border-emerald-500/30">
+                                    {question.mergedFrom!.map((original, i) => (
+                                      <li key={`${original}-${i}`} className="break-words">· {original}</li>
+                                    ))}
+                                  </ul>
+                                )}
                               </li>
                             ))}
                           </ul>
@@ -259,12 +269,20 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                       priority: q.priority ?? i + 1,
                       lessonPhase: t("phaseDefault"),
                       rationale: "",
+                      ...(q.mergedFrom && q.mergedFrom.length > 0 ? { mergedFrom: q.mergedFrom } : {}),
                     }))}
                     initialSettings={{
                       isActive: s.isActive,
                       defaultQuestionPublic: s.defaultQuestionPublic,
                       likesVisibleToPeers: s.likesVisibleToPeers,
                       commentsVisibleToPeers: s.commentsVisibleToPeers,
+                    }}
+                    initialTarget={{
+                      targetType: s.targetType,
+                      targetGrade: s.targetGrade,
+                      targetClassName: s.targetClassName,
+                      targetStudentId: s.targetStudentId,
+                      targetStudentIds: s.targetStudentIds,
                     }}
                     onDeployed={onChanged}
                   />

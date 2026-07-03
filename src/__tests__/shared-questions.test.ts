@@ -36,3 +36,26 @@ describe("groupSharedQuestions", () => {
     expect(groups[0].group).toBe("수업 순서");
   });
 });
+
+describe("mergedFrom 관통", () => {
+  it("normalize가 유효한 원본 질문 목록을 보존한다", () => {
+    const [q] = normalizeSharedQuestions([
+      { content: "대표 질문", mergedFrom: ["원본1", "원본2", "", 3 as unknown as string] },
+    ]);
+    expect(q.mergedFrom).toEqual(["원본1", "원본2"]);
+  });
+
+  it("mergedFrom이 없으면 필드를 만들지 않는다", () => {
+    const [q] = normalizeSharedQuestions([{ content: "질문" }]);
+    expect(q.mergedFrom).toBeUndefined();
+  });
+
+  it("그룹 결과에도 mergedFrom이 유지된다", () => {
+    const groups = groupSharedQuestions([
+      { content: "대표", contentGroup: "A", mergedFrom: ["원본1", "원본2"] },
+      { content: "단독", contentGroup: "A" },
+    ]);
+    expect(groups[0].questions[0].mergedFrom).toEqual(["원본1", "원본2"]);
+    expect(groups[0].questions[1].mergedFrom).toBeUndefined();
+  });
+});

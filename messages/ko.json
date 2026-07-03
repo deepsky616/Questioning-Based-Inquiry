@@ -471,7 +471,8 @@
     "commentsLabel": "댓글 공개",
     "commentsDesc": "켜면 학생이 서로의 댓글을 볼 수 있어요. 끄면 본인·선생님 댓글만 보여요.",
     "publishing": "배포 중...",
-    "publishBtn": "⑤ 학생에게 배포"
+    "publishBtn": "⑤ 학생에게 배포",
+    "targetTitle": "배포 대상"
   },
   "pointReview": {
     "selectSessionFirst": "분석할 세션을 선택해주세요",

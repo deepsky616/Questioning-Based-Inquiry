@@ -10,5 +10,11 @@ export interface QuestionSession {
   likesVisibleToPeers?: boolean;
   commentsVisibleToPeers?: boolean;
   isActive?: boolean;
-  sharedQuestions?: Array<{ type: string; content: string; contentGroup?: string; source?: "student" | "teacher"; priority?: number }>;
+  // 배포 대상(수업세션과 동일 구조) — 질문 중심 탐구설계 배포 시 초기값으로 사용
+  targetType?: string | null;
+  targetGrade?: string | null;
+  targetClassName?: string | null;
+  targetStudentId?: string | null;
+  targetStudentIds?: string[] | null;
+  sharedQuestions?: Array<{ type: string; content: string; contentGroup?: string; source?: "student" | "teacher"; priority?: number; mergedFrom?: string[] }>;
 }

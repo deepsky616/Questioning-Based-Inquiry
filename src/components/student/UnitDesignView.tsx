@@ -22,6 +22,8 @@ interface SharedQuestion {
   lessonPhase?: string;
   rationale?: string;
   priority?: number;
+  /** 비슷한 질문 묶기로 이 대표 질문에 합쳐진 학생 원본 질문들 */
+  mergedFrom?: string[];
 }
 
 interface QuestionSession {
@@ -401,10 +403,20 @@ export function UnitDesignView() {
                           <h3 className="text-sm font-semibold text-foreground">{group}</h3>
                           <span className="text-xs text-muted-foreground">{t("groupCount", { count: questions.length })}</span>
                         </div>
-                        <ul className="space-y-1 text-xs text-muted-foreground">
+                        <ul className="space-y-1.5 text-xs text-muted-foreground">
                           {questions.map((question, index) => (
-                            <li key={`${question.content}-${index}`} className="line-clamp-2">
-                              {question.priority}. {question.content}
+                            <li key={`${question.content}-${index}`}>
+                              <p className="line-clamp-2 font-medium text-foreground/80">
+                                {question.priority}. {question.content}
+                              </p>
+                              {/* 이 대표 질문에 묶인 우리(학생들)의 원본 질문 */}
+                              {(question.mergedFrom?.length ?? 0) > 1 && (
+                                <ul className="mt-0.5 space-y-0.5 border-l-2 border-emerald-200 pl-2 dark:border-emerald-500/30">
+                                  {question.mergedFrom!.map((original, i) => (
+                                    <li key={`${original}-${i}`} className="break-words">· {original}</li>
+                                  ))}
+                                </ul>
+                              )}
                             </li>
                           ))}
                         </ul>

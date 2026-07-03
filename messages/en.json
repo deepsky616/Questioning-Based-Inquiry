@@ -471,7 +471,8 @@
     "commentsLabel": "Comments visibility",
     "commentsDesc": "When on, students can see each other's comments. When off, only their own and the teacher's.",
     "publishing": "Sharing...",
-    "publishBtn": "⑤ Share with students"
+    "publishBtn": "⑤ Share with students",
+    "targetTitle": "Deploy target"
   },
   "pointReview": {
     "selectSessionFirst": "Please select a session to analyze",
