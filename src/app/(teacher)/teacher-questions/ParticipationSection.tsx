@@ -98,14 +98,23 @@ export function ParticipationSection({ sessionId, sessionDate }: ParticipationSe
       )
     : [];
 
+  const toggleSection = () => (show ? setShow(false) : handleLoad());
+
   return (
     <Card>
-      <CardHeader className="pb-2">
+      {/* 헤더 여백 어디를 눌러도 접기/펼치기 (내부 버튼 클릭은 제외) */}
+      <CardHeader
+        className="cursor-pointer select-none pb-2"
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("button")) return;
+          toggleSection();
+        }}
+      >
         <div className="flex items-center justify-between gap-2">
           <SectionToggle
             title={t("participationTitle")}
             open={show}
-            onToggle={show ? () => setShow(false) : handleLoad}
+            onToggle={toggleSection}
             suffix={isLoading ? <span className="text-xs font-normal text-muted-foreground">{t("loadingShort")}</span> : undefined}
           />
         </div>
