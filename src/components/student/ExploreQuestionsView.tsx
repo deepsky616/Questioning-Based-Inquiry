@@ -269,8 +269,9 @@ export function ExploreQuestionsView() {
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
-  const [sortField, setSortField] = useState<SortField>("like");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // 기본 정렬: 학생(학년·반·번호)순 — 교사 질문 목록과 동일. 좋아요/댓글순은 토글로 선택.
+  const [sortField, setSortField] = useState<SortField>("student");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   // 좋아요·댓글 사용 여부는 수업세션/질문 단위 공개 설정으로 제어한다(전역 explore 설정 폐지)
   const exploreCfg = { likesEnabled: true, commentsEnabled: true };
   const [filterClosure, setFilterClosure] = useState<ClosureFilter>("all");
