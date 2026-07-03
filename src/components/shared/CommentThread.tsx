@@ -230,6 +230,7 @@ export function CommentThread({
           <Input
             placeholder={t("placeholder")}
             value={text}
+            maxLength={300}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {

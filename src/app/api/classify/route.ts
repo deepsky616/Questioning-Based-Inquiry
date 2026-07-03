@@ -12,7 +12,7 @@ import { getRequestLocale, languageDirective } from "@/lib/locale";
 const classifySchema = z.object({
   apiKey: z.string().optional(),
   model: z.string().refine(isAllowedGeminiModel, "지원하지 않는 Gemini 모델입니다").optional(),
-  content: z.string().min(1).max(500),
+  content: z.string().min(1).max(200),
 });
 
 const CLASSIFICATION_PROMPT = `당신은 초·중·고 수업에서 학생 질문을 분류하고 더 좋은 질문을 만들도록 돕는 선생님입니다.

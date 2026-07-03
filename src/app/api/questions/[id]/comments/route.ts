@@ -93,6 +93,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   try {
     const { content } = await req.json();
+    if (typeof content === "string" && content.trim().length > 300) {
+      return NextResponse.json({ error: "댓글은 300자 이내로 작성해 주세요" }, { status: 400 });
+    }
     if (!content?.trim()) {
       return NextResponse.json({ error: "댓글 내용을 입력해 주세요" }, { status: 400 });
     }

@@ -1167,8 +1167,8 @@
     "saving": "Saving..."
   },
   "myQuestions": {
-    "deleteConfirm": "Really delete this question? All comments you wrote will also disappear.",
-    "deleteFailed": "Failed to delete.",
+    "deleteConfirm": "Delete this question? This cannot be undone.",
+    "deleteFailed": "Failed to delete question",
     "networkError": "A network error occurred.",
     "empty": "No matching questions",
     "emptyDesc": "Try different filters",
@@ -1185,9 +1185,16 @@
     "private": "Private",
     "commentCount": "{count} comments",
     "deleting": "Deleting...",
-    "deleteBtn": "🗑 Delete",
+    "deleteBtn": "Delete",
     "intro": "Review your questions, check them by type/session, or delete them · {count} total",
-    "searchPlaceholder": "Search questions..."
+    "searchPlaceholder": "Search questions...",
+    "editBtn": "Edit",
+    "saveEdit": "Save",
+    "savingEdit": "Saving...",
+    "reclassifyNote": "Saving re-classifies your question automatically",
+    "editDone": "Question updated",
+    "editFailed": "Failed to update question",
+    "deleteDone": "Question deleted"
   },
   "ranking": {
     "gradeLabel": "Grade {grade}",

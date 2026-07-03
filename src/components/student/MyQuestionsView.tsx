@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
@@ -9,6 +9,11 @@ import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { useConfirm } from "@/components/shared/confirm-dialog";
+import { Pencil, Trash2 } from "lucide-react";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { formatDateTime } from "@/lib/datetime";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
@@ -77,6 +82,66 @@ export function MyQuestionsView() {
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
+  // 내 질문 수정(반응이 달리기 전까지만) — 저장 시 자동 재분류
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const confirm = useConfirm();
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  const refreshMyQuestions = () => queryClient.invalidateQueries({ queryKey: ["my-questions"] });
+
+  const saveQuestionEdit = async (questionId: string) => {
+    const content = editContent.trim();
+    if (!content || isSavingEdit) return;
+    setIsSavingEdit(true);
+    try {
+      // 내용이 바뀌었으니 자동 재분류 후 함께 저장한다
+      const clsRes = await fetch("/api/classify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const cls = await clsRes.json().catch(() => ({}));
+      const res = await fetch(`/api/questions/${questionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content,
+          ...(clsRes.ok && cls.closure ? {
+            closure: cls.closure,
+            cognitive: cls.cognitive,
+            closureScore: cls.closureScore,
+            cognitiveScore: cls.cognitiveScore,
+          } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data?.error === "string" ? data.error : t("editFailed"));
+      setEditingQuestionId(null);
+      setEditContent("");
+      refreshMyQuestions();
+      toast({ variant: "success", description: t("editDone") });
+    } catch (err) {
+      toast({ variant: "destructive", description: err instanceof Error ? err.message : t("editFailed") });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const deleteQuestion = async (questionId: string) => {
+    if (!(await confirm({ description: t("deleteConfirm"), confirmText: t("deleteBtn"), destructive: true }))) return;
+    try {
+      const res = await fetch(`/api/questions/${questionId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof data?.error === "string" ? data.error : t("deleteFailed"));
+      refreshMyQuestions();
+      toast({ variant: "success", description: t("deleteDone") });
+    } catch (err) {
+      toast({ variant: "destructive", description: err instanceof Error ? err.message : t("deleteFailed") });
+    }
+  };
 
   // 조회 모드
   const [selectedSessionId, setSelectedSessionId] = useState("all");
@@ -169,13 +234,58 @@ export function MyQuestionsView() {
                 <TableRow>
                   <TableCell className="text-muted-foreground align-top">{i + 1}</TableCell>
                   <TableCell className="max-w-md align-top">
-                    <p className="truncate">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
-                    {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
+                    {editingQuestionId === q.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editContent}
+                          maxLength={200}
+                          rows={3}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="text-sm"
+                          autoFocus
+                        />
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-muted-foreground">{editContent.length}/200 · {t("reclassifyNote")}</span>
+                          <div className="flex gap-1.5">
+                            <Button size="sm" onClick={() => saveQuestionEdit(q.id)} disabled={isSavingEdit || !editContent.trim()}>
+                              {isSavingEdit ? t("savingEdit") : t("saveEdit")}
+                            </Button>
+                            <Button size="sm" variant="outline" disabled={isSavingEdit} onClick={() => { setEditingQuestionId(null); setEditContent(""); }}>
+                              {tEx("close")}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="truncate">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
+                    )}
+                    {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                     {/* 분류·공개 배지를 내용 아래에(탐구 탭과 동일 톤) */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
                       <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
                       <span className={`text-xs px-2 py-0.5 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{q.isPublic ? t("public") : t("private")}</span>
+                      {/* 반응(좋아요·댓글)이 달리기 전까지만 수정·삭제 가능 */}
+                      {(q.likeCount ?? 0) === 0 && commentCount === 0 && editingQuestionId !== q.id && (
+                        <span className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => { setEditingQuestionId(q.id); setEditContent(q.content); }}
+                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                            title={t("editBtn")}
+                          >
+                            <Pencil className="h-3 w-3" /> {t("editBtn")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteQuestion(q.id)}
+                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium text-red-500 hover:bg-red-50"
+                            title={t("deleteBtn")}
+                          >
+                            <Trash2 className="h-3 w-3" /> {t("deleteBtn")}
+                          </button>
+                        </span>
+                      )}
                     </div>
                     {/* 수업세션(📚 칩) · 작성일시(🕒) — 한눈에 구분 */}
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">

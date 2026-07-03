@@ -104,6 +104,9 @@ export function canCreateComment(role: string | null | undefined, isPublic: bool
   return false;
 }
 
+/** 학생 본인이 질문 내용을 다듬을 때 수정할 수 있는 필드(재분류 결과 포함) */
+const STUDENT_EDITABLE_FIELDS = ["content", "closure", "cognitive", "closureScore", "cognitiveScore"];
+
 export function canPatchQuestion(
   role: string | null | undefined,
   userId: string,
@@ -111,7 +114,10 @@ export function canPatchQuestion(
   fields: string[]
 ): boolean {
   if (role === "TEACHER") return true;
-  if (role === "STUDENT" && userId === authorId) return fields.length === 0;
+  if (role === "STUDENT" && userId === authorId) {
+    // 본인 질문: 내용·분류(재분류 결과)만 수정 가능(공개 여부·플래그는 교사 전용)
+    return fields.every((f) => STUDENT_EDITABLE_FIELDS.includes(f));
+  }
   return false;
 }
 

@@ -150,12 +150,18 @@ describe("canPatchQuestion", () => {
     expect(canPatchQuestion("STUDENT", "s1", "s1", ["isPublic"])).toBe(false);
   });
 
-  it("학생은 본인 질문이라도 closure는 수정할 수 없다", () => {
-    expect(canPatchQuestion("STUDENT", "s1", "s1", ["closure"])).toBe(false);
+  it("학생은 본인 질문의 내용·재분류 필드는 수정할 수 있다(반응 전 수정 흐름)", () => {
+    expect(canPatchQuestion("STUDENT", "s1", "s1", ["content"])).toBe(true);
+    expect(canPatchQuestion("STUDENT", "s1", "s1", ["content", "closure", "cognitive", "closureScore", "cognitiveScore"])).toBe(true);
   });
 
-  it("학생은 본인 질문이라도 cognitive는 수정할 수 없다", () => {
-    expect(canPatchQuestion("STUDENT", "s1", "s1", ["cognitive"])).toBe(false);
+  it("학생은 내용 수정과 함께라도 isPublic·flagged는 수정할 수 없다", () => {
+    expect(canPatchQuestion("STUDENT", "s1", "s1", ["content", "isPublic"])).toBe(false);
+    expect(canPatchQuestion("STUDENT", "s1", "s1", ["flagged"])).toBe(false);
+  });
+
+  it("학생은 다른 학생 질문의 내용을 수정할 수 없다", () => {
+    expect(canPatchQuestion("STUDENT", "s1", "s2", ["content"])).toBe(false);
   });
 
   it("학생은 다른 학생의 질문 isPublic을 수정할 수 없다", () => {

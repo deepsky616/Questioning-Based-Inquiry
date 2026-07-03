@@ -3,12 +3,17 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canPatchQuestion } from "@/lib/questions";
+import { normalizeContent } from "@/lib/content-normalize";
+import { checkProfanity } from "@/lib/profanity";
 import { cleanupQuestionTranslations } from "@/lib/translation-cleanup";
 import { z } from "zod";
 
 const patchQuestionSchema = z.object({
+  content: z.string().min(1).max(200).optional(),
   closure: z.enum(["closed", "open"]).optional(),
   cognitive: z.enum(["factual", "conceptual", "controversial"]).optional(),
+  closureScore: z.number().min(0).max(1).optional(),
+  cognitiveScore: z.number().min(0).max(1).optional(),
   isPublic: z.boolean().optional(),
   flagged: z.boolean().optional(),
 });
@@ -112,10 +117,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const { closure, cognitive, isPublic } = data;
 
     const patchedFields = Object.keys(data).filter((k) =>
-      ["closure", "cognitive", "isPublic", "flagged"].includes(k)
+      ["content", "closure", "cognitive", "closureScore", "cognitiveScore", "isPublic", "flagged"].includes(k)
     );
 
-    const existing = await prisma.question.findUnique({ where: { id: params.id } });
+    const existing = await prisma.question.findUnique({
+      where: { id: params.id },
+      include: { _count: { select: { likes: true, comments: true } } },
+    });
     if (!existing) {
       return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
     }
@@ -128,13 +136,42 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: "수정 권한이 없습니다" }, { status: 403 });
     }
 
+    // 학생 본인 내용 수정: 반응(좋아요·댓글)이나 포인트가 붙기 전까지만 허용
+    if (data.content !== undefined && userRole === "STUDENT") {
+      if (existing._count.likes > 0 || existing._count.comments > 0) {
+        return NextResponse.json(
+          { error: "좋아요나 댓글이 달린 질문은 수정할 수 없어요. 선생님께 요청해 주세요." },
+          { status: 403 },
+        );
+      }
+      const pointCount = await prisma.pointLog.count({ where: { relatedQuestionId: params.id } });
+      if (pointCount > 0) {
+        return NextResponse.json(
+          { error: "포인트가 지급된 질문은 수정할 수 없어요. 선생님께 요청해 주세요." },
+          { status: 403 },
+        );
+      }
+    }
+
+    // 내용이 바뀌면 정규화 키와 부적절 표현 플래그도 함께 갱신한다
+    const nextContent = data.content?.trim();
+    const profanity = nextContent ? checkProfanity(nextContent) : null;
+
     const question = await prisma.question.update({
       where: { id: params.id },
       data: {
+        ...(nextContent && {
+          content: nextContent,
+          normalizedContent: normalizeContent(nextContent),
+          flagged: profanity?.flagged ?? false,
+          flagReason: profanity?.flagged ? profanity.reason : null,
+        }),
         ...(closure !== undefined && { closure }),
         ...(cognitive !== undefined && { cognitive }),
+        ...(data.closureScore !== undefined && { closureScore: data.closureScore }),
+        ...(data.cognitiveScore !== undefined && { cognitiveScore: data.cognitiveScore }),
         ...(isPublic !== undefined && { isPublic }),
-        ...(data.flagged !== undefined && { flagged: data.flagged }),
+        ...(data.flagged !== undefined && !nextContent && { flagged: data.flagged }),
       },
       include: {
         author: {
@@ -176,6 +213,21 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
   if (question.authorId !== userId && userRole !== "TEACHER") {
     return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
+  }
+
+  // 학생 본인 삭제: 반응(좋아요·댓글)이나 포인트가 붙기 전까지만 허용(교사는 제한 없음)
+  if (userRole === "STUDENT") {
+    const [likeCount, commentCount, pointCount] = await Promise.all([
+      prisma.questionLike.count({ where: { questionId: params.id } }),
+      prisma.comment.count({ where: { questionId: params.id } }),
+      prisma.pointLog.count({ where: { relatedQuestionId: params.id } }),
+    ]);
+    if (likeCount > 0 || commentCount > 0 || pointCount > 0) {
+      return NextResponse.json(
+        { error: "좋아요·댓글·포인트가 달린 질문은 삭제할 수 없어요. 선생님께 요청해 주세요." },
+        { status: 403 },
+      );
+    }
   }
 
   // 교사는 담당 학급 질문만 삭제 가능(수정 권한 검사와 동일)

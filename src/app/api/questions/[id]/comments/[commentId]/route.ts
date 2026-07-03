@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const patchSchema = z.object({
   flagged: z.boolean().optional(),
-  content: z.string().min(1).max(1000).optional(),
+  content: z.string().min(1).max(300).optional(),
 });
 
 /**

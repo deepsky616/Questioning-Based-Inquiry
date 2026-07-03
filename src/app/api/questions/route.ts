@@ -13,7 +13,7 @@ const closureSchema = z.enum(["closed", "open"]);
 const cognitiveSchema = z.enum(["factual", "conceptual", "controversial"]);
 
 const createQuestionSchema = z.object({
-  content: z.string().min(1).max(500),
+  content: z.string().min(1).max(200),
   context: z.string().optional(),
   isPublic: z.boolean().optional(),
   closure: closureSchema.optional(),

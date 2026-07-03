@@ -1167,8 +1167,8 @@
     "saving": "저장 중..."
   },
   "myQuestions": {
-    "deleteConfirm": "이 질문을 정말 삭제할까요? 작성한 댓글도 모두 함께 사라집니다.",
-    "deleteFailed": "삭제에 실패했습니다.",
+    "deleteConfirm": "이 질문을 삭제할까요? 삭제하면 되돌릴 수 없어요.",
+    "deleteFailed": "질문 삭제에 실패했어요",
     "networkError": "네트워크 오류가 발생했습니다.",
     "empty": "해당하는 질문이 없습니다",
     "emptyDesc": "다른 조건으로 조회해 보세요",
@@ -1185,9 +1185,16 @@
     "private": "비공개",
     "commentCount": "댓글 {count}개",
     "deleting": "삭제 중...",
-    "deleteBtn": "🗑 삭제",
+    "deleteBtn": "삭제",
     "intro": "작성한 질문을 조회하고, 분류·세션별로 확인하거나 삭제할 수 있어요 · 총 {count}개",
-    "searchPlaceholder": "질문으로 검색..."
+    "searchPlaceholder": "질문으로 검색...",
+    "editBtn": "수정",
+    "saveEdit": "저장",
+    "savingEdit": "저장 중...",
+    "reclassifyNote": "저장하면 자동으로 다시 분류돼요",
+    "editDone": "질문을 수정했어요",
+    "editFailed": "질문 수정에 실패했어요",
+    "deleteDone": "질문을 삭제했어요"
   },
   "ranking": {
     "gradeLabel": "{grade}학년",

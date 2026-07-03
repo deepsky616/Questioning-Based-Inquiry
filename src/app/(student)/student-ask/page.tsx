@@ -475,10 +475,11 @@ export default function AskPage() {
               id="content"
               placeholder={t("questionPlaceholder")}
               value={content}
+              maxLength={200}
               onChange={(e) => setContent(e.target.value)}
               rows={4}
             />
-            <p className="text-sm text-muted-foreground text-right">{content.length}/500</p>
+            <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
           </div>
 
           <Button
