@@ -77,7 +77,7 @@ export async function runStudentSessionAnalysis(opts: {
   });
   const parsed = await generateJson<{
     summary?: string; insights?: string; relevanceInsights?: string; growthInsights?: string; rewriteExample?: string;
-  }>({ userId: studentId, prompt, req, localize: true });
+  }>({ userId: studentId, prompt, req, localize: true, quality: true });
 
   const result: StudentSessionAnalysisResult = {
     summary: parsed?.summary ?? "",

@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     let text: string;
     try {
-      text = await generateText({ userId: (session.user as { id: string }).id, prompt, req, localize: true });
+      text = await generateText({ userId: (session.user as { id: string }).id, prompt, req, localize: true, quality: true });
     } catch (aiErr) {
       if (aiErr instanceof AiKeyMissingError) {
         return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });

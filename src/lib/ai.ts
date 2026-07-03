@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
-import { alternateModel, chooseModelAuto } from "@/lib/api-config";
+import { alternateModel, chooseModelAuto, chooseQualityModel } from "@/lib/api-config";
 import { AiBusyError, AiKeyMissingError, isTransientAiError } from "@/lib/ai-errors";
 
 // 기존 import 경로 호환을 위해 재노출 (라우트들은 @/lib/ai에서 가져온다)
@@ -19,6 +19,8 @@ export interface GenerateOptions {
   localize?: boolean;
   /** 모델 system instruction (역할·규칙 고정용) */
   systemInstruction?: string;
+  /** true면 크기와 무관하게 품질 우선 모델(flash 이상)을 사용 — 분석·수업자료 생성 등 */
+  quality?: boolean;
 }
 
 /**
@@ -27,12 +29,12 @@ export interface GenerateOptions {
  * - 모델 혼잡(503/429)은 백오프 재시도 후 대체 모델(lite↔flash)로 자동 전환
  * - 키가 없으면 AiKeyMissingError, 대체 모델까지 혼잡하면 AiBusyError를 던진다
  */
-async function callGemini({ userId, prompt, req, localize, systemInstruction }: GenerateOptions): Promise<string> {
+async function callGemini({ userId, prompt, req, localize, systemInstruction, quality }: GenerateOptions): Promise<string> {
   const cfg = await resolveUserAiConfig(userId);
   if (!cfg.apiKey) throw new AiKeyMissingError();
 
   const fullPrompt = localize && req ? prompt + languageDirective(getRequestLocale(req)) : prompt;
-  const primary = chooseModelAuto(cfg.model, fullPrompt.length);
+  const primary = quality ? chooseQualityModel(cfg.model) : chooseModelAuto(cfg.model, fullPrompt.length);
 
   const genAI = new GoogleGenerativeAI(cfg.apiKey);
   const runWith = async (modelName: string, attempts: number): Promise<string> => {

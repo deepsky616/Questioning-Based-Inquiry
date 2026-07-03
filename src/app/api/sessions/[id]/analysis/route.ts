@@ -112,7 +112,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       balanceInsights?: string;
       bestQuestion?: string;
       nextQuestions?: string;
-    }>({ userId: teacherId, prompt, req, localize: true });
+    }>({ userId: teacherId, prompt, req, localize: true, quality: true });
 
     // 저장·반환 결과(테마·집계까지 포함해 질문조회/대시보드 어디서든 그대로 복원 가능)
     const stored = {
