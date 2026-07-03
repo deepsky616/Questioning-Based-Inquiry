@@ -2,6 +2,7 @@
 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/shared/PasswordInput";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -177,8 +178,8 @@ function StudentLoginForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="s-password">{t("password")}</Label>
-        <Input
-          id="s-password" name="password" type="password" placeholder="••••"
+        <PasswordInput
+          id="s-password" name="password" placeholder="••••"
           value={form.password} onChange={handleChange}
           autoComplete={STUDENT_LOGIN_AUTOCOMPLETE.password}
         />
@@ -271,8 +272,8 @@ function TeacherLoginForm() {
       </div>
       <div className="space-y-2">
         <Label htmlFor="t-password">{t("password")}</Label>
-        <Input
-          id="t-password" name="password" type="password" placeholder="••••••"
+        <PasswordInput
+          id="t-password" name="password" placeholder="••••••"
           value={form.password} onChange={handleChange}
           autoComplete={TEACHER_LOGIN_AUTOCOMPLETE.password}
         />

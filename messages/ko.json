@@ -132,7 +132,9 @@
     "min6": "6자 이상",
     "changing": "변경 중...",
     "changePassword": "비밀번호 변경",
-    "backToLogin": "로그인으로 돌아가기"
+    "backToLogin": "로그인으로 돌아가기",
+    "showPassword": "비밀번호 보기",
+    "hidePassword": "비밀번호 숨기기"
   },
   "pages": {
     "teacherDashboard": {

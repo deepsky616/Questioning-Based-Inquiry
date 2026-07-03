@@ -133,7 +133,7 @@ ${cBlock || "(없음)"}
 
     try {
       // 키 없음·파싱 실패는 AI 결과 없이 진행(키워드 기반 후보만 사용)
-      aiResp = await generateJson<AIResp>({ userId: teacherId, prompt, req, localize: true, systemInstruction: SYS });
+      aiResp = await generateJson<AIResp>({ userId: teacherId, prompt, req, localize: true, systemInstruction: SYS, quality: true });
     } catch {}
   }
 

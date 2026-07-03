@@ -132,7 +132,9 @@
     "min6": "At least 6 characters",
     "changing": "Changing...",
     "changePassword": "Change password",
-    "backToLogin": "Back to login"
+    "backToLogin": "Back to login",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "pages": {
     "teacherDashboard": {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { compareByClassAndNumber } from "@/lib/student-sort";
 
 export async function GET() {
   const session = await auth();
@@ -55,8 +56,9 @@ export async function GET() {
       totalPoints: true,
       _count: { select: { questions: true, comments: true, pointLogs: true } },
     },
-    orderBy: [{ grade: "asc" }, { className: "asc" }, { studentNumber: "asc" }],
   });
+  // 학급(학년·반) → 번호순 정렬(번호는 숫자 해석 — 문자열 사전순 "10"<"2" 방지)
+  students.sort(compareByClassAndNumber);
 
   // 마지막 활동일(질문·댓글 중 최신) — 학생별 max createdAt
   const ids = students.map((s) => s.id);
