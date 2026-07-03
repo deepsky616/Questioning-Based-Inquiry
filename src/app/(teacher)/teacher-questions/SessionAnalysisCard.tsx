@@ -58,6 +58,7 @@ export function SessionAnalysisCard({ sessionId }: SessionAnalysisCardProps) {
 
   const handleAnalyze = async () => {
     if (!sessionId) return;
+    setShow(true); // 분석 시작과 함께 펼쳐서 진행·결과가 바로 보이게(대시보드와 동일)
     setIsAnalyzing(true);
     setError(null);
     try {
@@ -167,7 +168,12 @@ export function SessionAnalysisCard({ sessionId }: SessionAnalysisCardProps) {
           )}
         </div>
       </CardHeader>
-      {show && (analysis || error || editing) && (
+      {show && isAnalyzing && !editing && (
+        <CardContent>
+          <p className="text-sm text-muted-foreground">{t("analyzing")}</p>
+        </CardContent>
+      )}
+      {show && !isAnalyzing && (analysis || error || editing) && (
         <CardContent className="space-y-4">
           {editing ? (
             <div className="space-y-3">

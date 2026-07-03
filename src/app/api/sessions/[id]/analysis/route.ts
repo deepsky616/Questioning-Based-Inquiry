@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
-import { generateJson, AiKeyMissingError } from "@/lib/ai";
+import { generateJson, AiKeyMissingError, AiBusyError } from "@/lib/ai";
 import { getRequestLocale } from "@/lib/locale";
 
 // 저장된 학급 세션 분석 조회(AI 호출 없음) — 질문조회/대시보드가 공유한 결과를 불러온다.
@@ -145,6 +145,10 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   } catch (error) {
     if (error instanceof AiKeyMissingError) {
       return NextResponse.json({ error: "AI 설정이 필요합니다. 설정 페이지에서 API 키를 등록해 주세요." }, { status: 400 });
+    }
+    if (error instanceof AiBusyError) {
+      // 재시도까지 실패한 일시적 모델 혼잡 — 원인을 정확히 안내
+      return NextResponse.json({ error: "AI 모델이 혼잡합니다. 잠시 후 다시 시도해 주세요." }, { status: 503 });
     }
     logger.error("Session analysis error:", error);
     return NextResponse.json({ error: "AI 분석에 실패했습니다" }, { status: 500 });
