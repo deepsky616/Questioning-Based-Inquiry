@@ -324,7 +324,15 @@ export function MyQuestionsView() {
                         </button>
                       </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground" title={t("lockedHint")}>🔒</span>
+                      <button
+                        type="button"
+                        onClick={() => toast({ description: t("lockedHint") })}
+                        className="text-sm text-muted-foreground"
+                        title={t("lockedHint")}
+                        aria-label={t("lockedHint")}
+                      >
+                        🔒
+                      </button>
                     )}
                   </TableCell>
                 </TableRow>

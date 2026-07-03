@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState, useCallback } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
@@ -648,25 +649,29 @@ export default function QuestionsPage() {
               </TableCell>
               <TableCell>
                 <div className="flex gap-1 justify-center">
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  {/* 아이콘 버튼(학생 내 질문 관리 열과 동일 패턴) — 툴팁·aria로 의미 유지 */}
+                  <button
+                    type="button"
                     onClick={() => {
                       setSelectedQuestion(q);
                       setCorrectionClosure(q.closure);
                       setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
                     }}
+                    className="rounded-md border border-indigo-200 p-1.5 text-indigo-600 hover:bg-indigo-50"
+                    title={tc("edit")}
+                    aria-label={tc("edit")}
                   >
-                    {tc("edit")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-red-500 border-red-200 hover:bg-red-50"
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleDeleteQuestion(q)}
+                    className="rounded-md border border-red-200 p-1.5 text-red-500 hover:bg-red-50"
+                    title={tc("delete")}
+                    aria-label={tc("delete")}
                   >
-                    {tc("delete")}
-                  </Button>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </TableCell>
             </TableRow>
