@@ -135,11 +135,16 @@ export function QuestionSequencePanel({
         <p className="text-sm font-semibold text-foreground">{t("settingsTitle")}</p>
         <SessionVisibilitySettings value={settings} onChange={(v) => setSettings(v)} />
       </div>
-      <div className="flex items-center gap-3">
-        <Button onClick={publish} disabled={isPublishing || result.length === 0} className="gap-1.5 font-semibold">
-          <Send className="h-4 w-4" /> {isPublishing ? t("publishing") : t("publishBtn")}
+      <div className="space-y-2">
+        <Button
+          onClick={publish}
+          disabled={isPublishing || result.length === 0}
+          variant="gradient"
+          className="h-11 w-full gap-1.5 text-base font-semibold"
+        >
+          <Send className="h-5 w-5" /> {isPublishing ? t("publishing") : t("publishBtn")}
         </Button>
-        {msg && <span className="text-sm text-muted-foreground">{msg}</span>}
+        {msg && <p className="text-center text-sm text-muted-foreground">{msg}</p>}
       </div>
     </div>
   );

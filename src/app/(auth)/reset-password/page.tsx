@@ -99,7 +99,7 @@ function ResetPasswordContent() {
               }}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={isSubmitting || Boolean(message)}>
+          <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting || Boolean(message)}>
             {isSubmitting ? t("changing") : t("changePassword")}
           </Button>
         </form>

@@ -73,7 +73,7 @@ export default function ForgotPasswordPage() {
                 }}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? t("sending") : t("getResetLink")}
             </Button>
           </form>

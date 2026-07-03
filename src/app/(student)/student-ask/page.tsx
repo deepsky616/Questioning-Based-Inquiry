@@ -484,7 +484,8 @@ export default function AskPage() {
           <Button
             onClick={handleClassify}
             disabled={isLoading || !canAsk || content.trim().length === 0}
-            className="w-full"
+            variant="gradient"
+            className="h-11 w-full text-base font-semibold"
           >
             {isLoading ? t("analyzing") : t("analyze")}
           </Button>
@@ -565,7 +566,7 @@ export default function AskPage() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="h-11 flex-1"
                 disabled={isSaving}
                 onClick={() => {
                   setResult(null);
@@ -574,7 +575,7 @@ export default function AskPage() {
               >
                 {t("rewriteQuestion")}
               </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="flex-1">
+              <Button onClick={handleSave} disabled={isSaving} variant="gradient" className="h-11 flex-1 text-base font-semibold">
                 {isSaving ? t("saving") : t("saveQuestion")}
               </Button>
             </div>

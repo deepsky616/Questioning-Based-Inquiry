@@ -1516,10 +1516,20 @@ export default function CurriculumPage() {
 
               {/* 세션 추가(탐구질문 수업) / 저장된 탐구질문 탭에 저장 */}
               <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-                <Button onClick={() => handleSaveAndCreateSession("inquiry")} disabled={isSaving || !canSaveDesign}>
+                <Button
+                  onClick={() => handleSaveAndCreateSession("inquiry")}
+                  disabled={isSaving || !canSaveDesign}
+                  variant="gradient"
+                  className="h-11 flex-1 text-base font-semibold"
+                >
                   ➕ {t("addSessionBtn")}
                 </Button>
-                <Button variant="outline" onClick={handleSave} disabled={isSaving || !canSaveDesign}>
+                <Button
+                  variant="outline"
+                  onClick={handleSave}
+                  disabled={isSaving || !canSaveDesign}
+                  className="h-11 flex-1 text-base"
+                >
                   💾 {t("saveOnly")}
                 </Button>
               </div>

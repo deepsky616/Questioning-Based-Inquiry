@@ -98,6 +98,14 @@ function TeacherDashboard() {
     if (!keys.includes(selectedClass)) setSelectedClass("all");
   }, [stats, selectedClass]);
 
+  // 기본값: 담당 학급이 1개뿐이면 그 학급을 자동 선택(최초 1회, 이후 교사 선택 존중)
+  const [classDefaulted, setClassDefaulted] = useState(false);
+  useEffect(() => {
+    if (classDefaulted || !stats) return;
+    if (stats.teacherClasses.length === 1) setSelectedClass(classKey(stats.teacherClasses[0]));
+    setClassDefaulted(true);
+  }, [stats, classDefaulted]);
+
   const getTrendLabel = (trend: number | null) => {
     if (trend === null)
       return (
