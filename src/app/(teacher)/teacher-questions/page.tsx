@@ -166,9 +166,9 @@ export default function QuestionsPage() {
 
   const fetchQuestions = useCallback((
     sessionId: string,
-    opts?: { date?: string; subject?: string; topic?: string; sortField?: SortField; sortDir?: SortDir }
+    opts?: { date?: string; subject?: string; topic?: string; sortField?: SortField; sortDir?: SortDir; silent?: boolean }
   ) => {
-    setIsLoading(true);
+    if (!opts?.silent) setIsLoading(true);
     const params = new URLSearchParams();
     if (sessionId && sessionId !== "all") params.append("sessionId", sessionId);
     if (opts?.date) params.append("date", opts.date);
@@ -192,6 +192,27 @@ export default function QuestionsPage() {
     // 최초 1회만 실행. (fetchQuestions가 정렬 상태로 재생성돼도 선택 세션이 초기화되지 않도록 deps 비움)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 질문 목록도 주기 폴링(12초)+창 포커스 재조회 — 학생의 질문 작성·수정·삭제가
+  // 교사가 조작하지 않아도 자동 반영되도록(세션 목록 폴링과 동일 정책)
+  useEffect(() => {
+    const refetch = () => {
+      if (document.visibilityState !== "visible") return;
+      fetchQuestions(selectedSessionId || "all", {
+        date: filterDate || undefined,
+        subject: filterSubject || undefined,
+        topic: filterTopic || undefined,
+        silent: true, // 백그라운드 재조회 — 로딩 표시로 화면이 깜빡이지 않게
+      });
+    };
+    const timer = window.setInterval(refetch, 12000);
+    window.addEventListener("focus", refetch);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refetch);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSessionId, filterDate, filterSubject, filterTopic, sortField, sortDir]);
 
   // 배포 삭제·재배포 후 세션 목록(sharedQuestions)을 최신화한다(선택/조회 상태는 유지).
   // 공유 쿼리를 무효화하면 teacher-sessions에도 반영된다.

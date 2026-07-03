@@ -90,7 +90,11 @@ export function MyQuestionsView() {
   const [editContent, setEditContent] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  const refreshMyQuestions = () => queryClient.invalidateQueries({ queryKey: ["my-questions"] });
+  const refreshMyQuestions = () => {
+    queryClient.invalidateQueries({ queryKey: ["my-questions"] });
+    // 같은 기기에서 전체 질문 탐구로 이동해도 바로 반영되도록 함께 무효화
+    queryClient.invalidateQueries({ queryKey: ["explore-questions"] });
+  };
 
   const saveQuestionEdit = async (questionId: string) => {
     const content = editContent.trim();
