@@ -93,7 +93,12 @@ async function callAI(req: AwardRequest, userId: string): Promise<AIVerdictRespo
   const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
   const prompt = buildPrompt(req);
   // 프롬프트 크기에 따라 모델 자동 선택
-  const gemini = genAI.getGenerativeModel({ model: chooseModelAuto(aiCfg.model, prompt.length), systemInstruction: AI_SYSTEM });
+  // 같은 활동 → 같은 판정이 나오도록 온도 0
+  const gemini = genAI.getGenerativeModel({
+    model: chooseModelAuto(aiCfg.model, prompt.length),
+    systemInstruction: AI_SYSTEM,
+    generationConfig: { temperature: 0 },
+  });
   try {
     const result = await gemini.generateContent(prompt);
     return tryParseAI(result.response.text());

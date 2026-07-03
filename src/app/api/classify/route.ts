@@ -84,7 +84,11 @@ export async function POST(req: Request) {
     const fullPrompt = `${CLASSIFICATION_PROMPT}\n\n[분석할 질문]\n${content}${languageDirective(getRequestLocale(req))}`;
 
     // 프롬프트 크기에 따라 모델 자동 선택(요청에서 모델을 명시하면 그대로 사용)
-    const genModel = genAI.getGenerativeModel({ model: requestModel ? model : chooseModelAuto(model, fullPrompt.length) });
+    // 같은 질문 → 같은 분류가 나오도록 온도 0
+    const genModel = genAI.getGenerativeModel({
+      model: requestModel ? model : chooseModelAuto(model, fullPrompt.length),
+      generationConfig: { temperature: 0 },
+    });
 
     const result = await genModel.generateContent(fullPrompt);
     const text = result.response.text();

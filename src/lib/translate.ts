@@ -38,7 +38,7 @@ ${numbered}`;
     // JSON 출력 강제 — 마크다운·설명이 섞여 파싱에 실패하는 것을 방지
     const gemini = genAI.getGenerativeModel({
       model: modelName,
-      generationConfig: { responseMimeType: "application/json" },
+      generationConfig: { responseMimeType: "application/json", temperature: 0 },
     });
     return gemini.generateContent(prompt);
   };

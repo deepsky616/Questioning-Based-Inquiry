@@ -157,8 +157,11 @@ export async function POST(req: Request) {
         }) + languageDirective(getRequestLocale(req));
         const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
         // 묶기(merge)·흐름 정렬(sort) 모두 수업 순서를 결정하는 교육적 추론 작업이라
-        // 크기와 무관하게 품질 우선 모델(flash 이상)을 사용한다
-        const model = genAI.getGenerativeModel({ model: chooseQualityModel(aiCfg.model) });
+        // 크기와 무관하게 품질 우선 모델(flash 이상) + 낮은 온도(같은 질문 → 같은 묶음·순서 유지)
+        const model = genAI.getGenerativeModel({
+          model: chooseQualityModel(aiCfg.model),
+          generationConfig: { temperature: 0.1 },
+        });
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);

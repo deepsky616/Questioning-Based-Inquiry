@@ -21,26 +21,38 @@ export interface GenerateOptions {
   systemInstruction?: string;
   /** true면 크기와 무관하게 품질 우선 모델(flash 이상)을 사용 — 분석·수업자료 생성 등 */
   quality?: boolean;
+  /**
+   * 샘플링 온도(0~2). 미지정 시 quality 작업은 0.1(같은 입력 → 최대한 일관된 결과),
+   * 그 외에는 모델 기본값을 쓴다. 다양성이 필요한 작업(질문 게임 등)은 명시적으로 높인다.
+   */
+  temperature?: number;
 }
+
+/** 분석·수업자료 생성 등 일관성이 중요한 작업의 기본 온도 */
+export const CONSISTENT_TEMPERATURE = 0.1;
 
 /**
  * 통합 AI 호출 계층. resolveUserAiConfig로 키를 결정하고 Gemini를 호출한다.
  * - 모델은 프롬프트 크기에 따라 자동 선택(짧은 작업 flash-lite / 긴 작업 flash, pro 설정은 존중)
+ * - quality 작업은 낮은 온도로 호출해 같은 입력에 최대한 같은 분석이 나오게 한다
  * - 모델 혼잡(503/429)은 백오프 재시도 후 대체 모델(lite↔flash)로 자동 전환
  * - 키가 없으면 AiKeyMissingError, 대체 모델까지 혼잡하면 AiBusyError를 던진다
  */
-async function callGemini({ userId, prompt, req, localize, systemInstruction, quality }: GenerateOptions): Promise<string> {
+async function callGemini({ userId, prompt, req, localize, systemInstruction, quality, temperature }: GenerateOptions): Promise<string> {
   const cfg = await resolveUserAiConfig(userId);
   if (!cfg.apiKey) throw new AiKeyMissingError();
 
   const fullPrompt = localize && req ? prompt + languageDirective(getRequestLocale(req)) : prompt;
   const primary = quality ? chooseQualityModel(cfg.model) : chooseModelAuto(cfg.model, fullPrompt.length);
+  const temp = temperature ?? (quality ? CONSISTENT_TEMPERATURE : undefined);
 
   const genAI = new GoogleGenerativeAI(cfg.apiKey);
   const runWith = async (modelName: string, attempts: number): Promise<string> => {
-    const model = genAI.getGenerativeModel(
-      systemInstruction ? { model: modelName, systemInstruction } : { model: modelName },
-    );
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      ...(systemInstruction ? { systemInstruction } : {}),
+      ...(temp != null ? { generationConfig: { temperature: temp } } : {}),
+    });
     for (let attempt = 1; ; attempt++) {
       try {
         const result = await model.generateContent(fullPrompt);
