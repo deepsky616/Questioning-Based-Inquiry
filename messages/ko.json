@@ -951,7 +951,8 @@
     "classLabel": "{className}반",
     "numberLabel": "{n}번",
     "tabOverview": "개요",
-    "tabReports": "상세 리포트"
+    "tabReports": "상세 리포트",
+    "trendSortTitle": "누르면 활동이 줄어든 학생부터 정렬해요"
   },
   "reports": {
     "analysisFailed": "분석 실패",

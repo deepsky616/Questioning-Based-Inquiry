@@ -40,6 +40,7 @@ interface Stats {
     distribution: { closed: number; open: number };
     cognitiveDistribution: { factual: number; conceptual: number; controversial: number };
     trend: number | null;
+    sparkline?: number[];
   }>;
   timeline: Array<{ date: string; count: number }>;
   school?: string | null;
@@ -106,31 +107,53 @@ function TeacherDashboard() {
     setClassDefaulted(true);
   }, [stats, classDefaulted]);
 
-  const getTrendLabel = (trend: number | null) => {
+  // 추세 배지 — 방향만 압축 표시, 정확한 수치·설명은 툴팁으로
+  const getTrendBadge = (trend: number | null) => {
     if (trend === null)
       return (
-        <span className="text-blue-500 text-xs font-medium" title={t("trendNewTitle")}>
-          {t("trendNew")}
+        <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-600 dark:bg-blue-950/40" title={t("trendNewTitle")}>
+          🆕
         </span>
       );
     if (trend > 0)
       return (
-        <span className="text-green-600 text-xs font-medium" title={t("trendUpTitle")}>
-          {t("trendUp", { trend })}
+        <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-xs font-bold text-green-600 dark:bg-green-950/40" title={`${t("trendUpTitle")} (+${trend}%)`}>
+          ▲
         </span>
       );
     if (trend < 0)
       return (
-        <span className="text-red-500 text-xs font-medium" title={t("trendDownTitle")}>
-          {t("trendDown", { trend: Math.abs(trend) })}
+        <span className="rounded-full bg-orange-50 px-1.5 py-0.5 text-xs font-bold text-orange-600 dark:bg-orange-950/40" title={`${t("trendDownTitle")} (-${Math.abs(trend)}%)`}>
+          ▼
         </span>
       );
     return (
-      <span className="text-muted-foreground text-xs" title={t("trendFlatTitle")}>
-        {t("trendFlat")}
+      <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground" title={t("trendFlatTitle")}>
+        —
       </span>
     );
   };
+
+  // 미니 스파크라인 — 기간 6버킷의 질문 수를 작은 막대로(활동 리듬을 한눈에)
+  const Sparkline = ({ data }: { data?: number[] }) => {
+    if (!data || data.length === 0) return null;
+    const max = Math.max(...data, 1);
+    return (
+      <span className="inline-flex h-5 items-end gap-[2px]" aria-hidden>
+        {data.map((v, i) => (
+          <span
+            key={i}
+            className={`w-[7px] rounded-sm ${v > 0 ? "bg-indigo-400" : "bg-muted"}`}
+            style={{ height: v > 0 ? `${Math.max(20, (v / max) * 100)}%` : "3px" }}
+          />
+        ))}
+      </span>
+    );
+  };
+
+  // 추세 열 정렬: 기본(번호순) ↔ 감소 학생 우선(지도가 필요한 학생 찾기)
+  const [trendSortOn, setTrendSortOn] = useState(false);
+  const trendRank = (trend: number | null) => (trend === null ? 3 : trend < 0 ? 0 : trend === 0 ? 1 : 2);
 
   const teacherClasses = stats?.teacherClasses ?? [];
 
@@ -327,13 +350,23 @@ function TeacherDashboard() {
                       <TableHead className="text-center whitespace-nowrap px-3 text-muted-foreground">{tCls("factual.label")}</TableHead>
                       <TableHead className="text-center whitespace-nowrap px-3 text-purple-600">{tCls("conceptual.label")}</TableHead>
                       <TableHead className="text-center whitespace-nowrap px-3 text-orange-600">{tCls("controversial.label")}</TableHead>
-                      <TableHead className="text-center w-28 whitespace-nowrap" title={t("colTrendTitle")}>
-                        {t("colTrend")}
+                      <TableHead className="text-center w-32 whitespace-nowrap" title={t("colTrendTitle")}>
+                        <button
+                          type="button"
+                          onClick={() => setTrendSortOn((v) => !v)}
+                          className={`inline-flex items-center gap-1 hover:text-foreground ${trendSortOn ? "text-orange-600 font-bold" : ""}`}
+                          title={t("trendSortTitle")}
+                        >
+                          {t("colTrend")} {trendSortOn ? "▼" : "⇅"}
+                        </button>
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stats.byStudent.map((s) => (
+                    {(trendSortOn
+                      ? [...stats.byStudent].sort((a, b) => trendRank(a.trend) - trendRank(b.trend) || (a.trend ?? 0) - (b.trend ?? 0))
+                      : stats.byStudent
+                    ).map((s) => (
                       <TableRow key={s.studentId}>
                         <TableCell>
                           <div className="font-medium">{s.name}</div>
@@ -353,7 +386,12 @@ function TeacherDashboard() {
                         <TableCell className="text-center text-muted-foreground">{s.cognitiveDistribution.factual}</TableCell>
                         <TableCell className="text-center text-purple-600">{s.cognitiveDistribution.conceptual}</TableCell>
                         <TableCell className="text-center text-orange-600">{s.cognitiveDistribution.controversial}</TableCell>
-                        <TableCell className="text-center whitespace-nowrap">{getTrendLabel(s.trend)}</TableCell>
+                        <TableCell className="text-center whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Sparkline data={s.sparkline} />
+                            {getTrendBadge(s.trend)}
+                          </span>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

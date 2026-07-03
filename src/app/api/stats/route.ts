@@ -120,11 +120,21 @@ export async function GET(req: Request) {
     }))
   );
 
+  // 스파크라인: 기간을 6버킷으로 나눠 학생별 질문 수 배열 생성(추세 리듬 시각화)
+  const BUCKETS = 6;
+  const spanMs = Math.max(1, now.getTime() - startDate.getTime());
+  const bucketOf = (d: Date) =>
+    Math.min(BUCKETS - 1, Math.floor(((d.getTime() - startDate.getTime()) / spanMs) * BUCKETS));
+
   const byStudent = byStudentBase
     .map((student) => {
       const s1 = firstHalf.filter((q) => q.author.id === student.studentId).length;
       const s2 = secondHalf.filter((q) => q.author.id === student.studentId).length;
-      return { ...student, trend: calcTrend(s1, s2) };
+      const sparkline = Array.from({ length: BUCKETS }, () => 0);
+      for (const q of questions) {
+        if (q.author.id === student.studentId) sparkline[bucketOf(q.createdAt)] += 1;
+      }
+      return { ...student, trend: calcTrend(s1, s2), sparkline };
     })
     // 학급(학년·반) → 번호순 정렬(번호는 숫자 해석 — 문자열 사전순 방지)
     .sort(compareByClassAndNumber);

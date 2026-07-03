@@ -951,7 +951,8 @@
     "classLabel": "Class {className}",
     "numberLabel": "No. {n}",
     "tabOverview": "Overview",
-    "tabReports": "Detailed report"
+    "tabReports": "Detailed report",
+    "trendSortTitle": "Click to sort students with declining activity first"
   },
   "reports": {
     "analysisFailed": "Analysis failed",
