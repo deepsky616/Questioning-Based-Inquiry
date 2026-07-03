@@ -13,6 +13,7 @@ import { SessionVisibilitySettings } from "@/components/shared/SessionVisibility
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { filterSortSavedDesigns } from "@/lib/saved-designs";
@@ -331,10 +332,11 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                   <button
                     type="button"
                     onClick={() => handleSelectSavedDesign(d)}
+                    aria-expanded={selectedSavedId === d.id}
                     className="min-w-0 flex-1 text-left"
                   >
                     <span className="flex items-center gap-1.5 font-medium text-sm text-foreground">
-                      <span className="text-xs text-muted-foreground">{selectedSavedId === d.id ? "▾" : "▸"}</span>
+                      <CollapseChevron open={selectedSavedId === d.id} />
                       <span className="truncate">{d.title}</span>
                     </span>
                     <span className="text-xs text-muted-foreground">

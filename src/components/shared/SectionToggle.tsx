@@ -18,6 +18,19 @@ interface SectionToggleProps {
 }
 
 /**
+ * 접기/펼치기 셰브론 공통 표기 — 펼침 ▾ / 접힘 ▸.
+ * 모든 접기 UI(섹션 헤더·목록 항목·참고자료 패널)가 이 컴포넌트를 사용해
+ * 글리프·크기·색을 통일한다.
+ */
+export function CollapseChevron({ open, className }: { open: boolean; className?: string }) {
+  return (
+    <span aria-hidden className={cn("text-xs text-muted-foreground", className)}>
+      {open ? "▾" : "▸"}
+    </span>
+  );
+}
+
+/**
  * 교사·학생 페이지의 섹션 접기/펼치기 토글 공통 구현.
  * 펼침 ▾ / 접힘 ▸ 셰브론 패턴으로 통일한다.
  */
@@ -35,7 +48,7 @@ export function SectionToggle({ title, open, onToggle, icon, suffix, className }
       {icon}
       {title}
       {suffix}
-      <span className="text-sm text-muted-foreground">{open ? "▾" : "▸"}</span>
+      <CollapseChevron open={open} className="text-sm" />
     </button>
   );
 }

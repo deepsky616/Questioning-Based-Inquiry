@@ -760,11 +760,11 @@ export default function QuestionsPage() {
 
       {/* 학생 참여 현황 — 세션 변경 시 key로 상태 초기화 */}
       {currentSession && (
-        <ParticipationSection key={currentSession.id} sessionId={currentSession.id} sessionDate={currentSession.date} />
+        <ParticipationSection key={`participation-${currentSession.id}`} sessionId={currentSession.id} sessionDate={currentSession.date} />
       )}
 
       {/* AI 세션 분석 — 세션 변경 시 key로 상태 초기화, 저장된 분석은 마운트 시 로드 */}
-      {currentSession && <SessionAnalysisCard key={currentSession.id} sessionId={currentSession.id} />}
+      {currentSession && <SessionAnalysisCard key={`analysis-${currentSession.id}`} sessionId={currentSession.id} />}
 
       {/* 탐구질문 수업 세션이면 학생 배포 참고자료 표시(접기) — 질문 분류 통계 위 */}
       {currentSession && <SessionReferencePanel sessionId={currentSession.id} />}

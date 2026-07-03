@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { DesignReferenceView, type DesignReference } from "@/components/shared/DesignReferenceView";
+import { CollapseChevron } from "@/components/shared/SectionToggle";
 
 /**
  * 세션이 탐구설계(탐구질문 수업)와 연결됐을 때 참고자료를 접기 패널로 보여준다.
@@ -43,7 +44,7 @@ export function SessionReferencePanel({
       >
         <span>📚</span>
         {t("referenceTitle")}
-        <span className="text-xs text-indigo-500">{open ? "▾" : "▸"}</span>
+        <CollapseChevron open={open} />
       </button>
       {open && <DesignReferenceView data={ctx} className="mt-3" />}
     </div>

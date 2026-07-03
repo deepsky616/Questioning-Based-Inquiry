@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -424,7 +425,7 @@ export default function AskPage() {
                 <span className="flex items-center gap-1.5 text-sm font-semibold text-indigo-700 dark:text-indigo-300">
                   <span>📚</span>
                   {t("referenceTitle")}
-                  <span className="text-xs text-indigo-500">{showRef ? "▾" : "▸"}</span>
+                  <CollapseChevron open={showRef} />
                 </span>
                 <span className="shrink-0 text-xs font-normal text-indigo-500">{t("referenceHint")}</span>
               </button>

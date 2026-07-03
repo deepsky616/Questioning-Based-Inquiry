@@ -43,10 +43,11 @@ export async function GET(
   }
 
   try {
-    // 5. 해당 교사의 담당 학급 조회
+    // 5. 해당 교사의 담당 학급·학교 조회
     const teacher = await prisma.user.findUnique({
       where: { id: teacherId },
       select: {
+        school: true,
         teacherClasses: {
           select: { grade: true, className: true },
         },
@@ -54,16 +55,37 @@ export async function GET(
     });
 
     const classes = teacher?.teacherClasses ?? [];
+    // 같은 학교 학생만(다른 학교의 동일 학년·반 학생이 섞이지 않도록)
+    const schoolFilter = teacher?.school ? { school: teacher.school } : {};
 
-    // 6. 담당 학급에 속한 모든 학생 조회
+    // 6. 이 세션의 배포 대상 학생만 조회 — 세션과 무관한 학생이 목록에 섞이지 않도록
+    //    ALL: 담당 학급 전체 / CLASS: 해당 학급 / STUDENT·CUSTOM: 지정 학생
+    const targetIds = Array.isArray(questionSession.targetStudentIds)
+      ? (questionSession.targetStudentIds as string[])
+      : [];
+    const studentWhere =
+      questionSession.targetType === "CLASS" && questionSession.targetGrade && questionSession.targetClassName
+        ? {
+            role: "STUDENT" as const,
+            ...schoolFilter,
+            grade: questionSession.targetGrade,
+            className: questionSession.targetClassName,
+          }
+        : questionSession.targetType === "STUDENT" && questionSession.targetStudentId
+        ? { role: "STUDENT" as const, id: questionSession.targetStudentId }
+        : questionSession.targetType === "CUSTOM" && targetIds.length > 0
+        ? { role: "STUDENT" as const, id: { in: targetIds } }
+        : {
+            role: "STUDENT" as const,
+            ...schoolFilter,
+            OR:
+              classes.length > 0
+                ? classes.map((c) => ({ grade: c.grade, className: c.className }))
+                : [{ id: "" }], // 담당 학급이 없으면 결과 없음
+          };
+
     const students = await prisma.user.findMany({
-      where: {
-        role: "STUDENT",
-        OR:
-          classes.length > 0
-            ? classes.map((c) => ({ grade: c.grade, className: c.className }))
-            : [{ id: "" }], // 담당 학급이 없으면 결과 없음
-      },
+      where: studentWhere,
       select: {
         id: true,
         name: true,

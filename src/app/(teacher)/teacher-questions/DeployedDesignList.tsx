@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
+import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { groupSharedQuestions } from "@/lib/shared-questions";
 import {
   buildSessionLabel,
@@ -162,9 +163,9 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
           return (
             <div key={s.id} className="rounded-lg border bg-background">
               <div className="flex flex-wrap items-center justify-between gap-2 p-3">
-                <button type="button" onClick={() => toggleDeploy(s.id)} className="min-w-0 flex-1 text-left">
+                <button type="button" onClick={() => toggleDeploy(s.id)} aria-expanded={openDeploy.has(s.id)} className="min-w-0 flex-1 text-left">
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                    <span className="text-xs text-muted-foreground">{openDeploy.has(s.id) ? "▾" : "▸"}</span>
+                    <CollapseChevron open={openDeploy.has(s.id)} />
                     <span className="truncate">{buildSessionLabel(s.date, s.subject, s.topic)}</span>
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
