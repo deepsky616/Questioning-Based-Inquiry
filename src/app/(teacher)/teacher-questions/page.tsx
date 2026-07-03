@@ -924,12 +924,6 @@ export default function QuestionsPage() {
               sessionId={currentSession.id}
               subject={currentSession.subject}
               topic={currentSession.topic}
-              initialSettings={{
-                isActive: currentSession.isActive,
-                defaultQuestionPublic: currentSession.defaultQuestionPublic,
-                likesVisibleToPeers: currentSession.likesVisibleToPeers,
-                commentsVisibleToPeers: currentSession.commentsVisibleToPeers,
-              }}
               onDeployed={reloadSessions}
             />
           </div>

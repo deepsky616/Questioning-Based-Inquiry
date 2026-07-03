@@ -9,6 +9,7 @@ import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector
 import { QuestionSequenceEditor } from "@/components/teacher/QuestionSequenceEditor";
 import {
   buildClassStudentTargetPayload,
+  defaultTargetSelection,
   type SessionTargetClass,
   type SessionTargetStudent,
 } from "@/lib/session-targeting";
@@ -22,12 +23,11 @@ interface DeploySettings {
 }
 
 export function QuestionSequencePanel({
-  sessionId, subject, topic, initialSettings, onDeployed, initialQuestions, editMode,
+  sessionId, subject, topic, onDeployed, initialQuestions, editMode,
 }: {
   sessionId: string;
   subject?: string;
   topic?: string;
-  initialSettings?: Partial<DeploySettings>;
   onDeployed?: () => void;
   initialQuestions?: SequencedQuestion[];
   editMode?: boolean;
@@ -36,11 +36,12 @@ export function QuestionSequencePanel({
   const [result, setResult] = useState<SequencedQuestion[]>([]);
   const [isPublishing, setIsPublishing] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // 배포 설정 기본값: 항상 모두 활성화
   const [settings, setSettings] = useState<DeploySettings>({
-    isActive: initialSettings?.isActive ?? true,
-    defaultQuestionPublic: initialSettings?.defaultQuestionPublic ?? true,
-    likesVisibleToPeers: initialSettings?.likesVisibleToPeers ?? true,
-    commentsVisibleToPeers: initialSettings?.commentsVisibleToPeers ?? true,
+    isActive: true,
+    defaultQuestionPublic: true,
+    likesVisibleToPeers: true,
+    commentsVisibleToPeers: true,
   });
 
   // 배포 대상 선택(수업세션 페이지와 동일 UI) — 기본값은 항상 전체 학생 모두 선택
@@ -54,10 +55,13 @@ export function QuestionSequencePanel({
       .then((r) => r.json())
       .then((d) => {
         const list: SessionTargetStudent[] = d.students ?? [];
+        const classes: SessionTargetClass[] = d.teacherClasses ?? [];
         setStudents(list);
-        setTeacherClasses(d.teacherClasses ?? []);
-        // 기본값: 전체 학생 모두 선택(교사가 필요 시 좁힌다)
-        setSelectedStudentIds(list.map((s) => s.id));
+        setTeacherClasses(classes);
+        // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
+        const defaults = defaultTargetSelection(list, classes);
+        setTargetClassValue(defaults.targetClassValue);
+        setSelectedStudentIds(defaults.selectedStudentIds);
       })
       .catch(() => {});
   }, []);

@@ -271,12 +271,6 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                       rationale: "",
                       ...(q.mergedFrom && q.mergedFrom.length > 0 ? { mergedFrom: q.mergedFrom } : {}),
                     }))}
-                    initialSettings={{
-                      isActive: s.isActive,
-                      defaultQuestionPublic: s.defaultQuestionPublic,
-                      likesVisibleToPeers: s.likesVisibleToPeers,
-                      commentsVisibleToPeers: s.commentsVisibleToPeers,
-                    }}
                     onDeployed={onChanged}
                   />
                 </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { useTranslations } from "next-intl";
 import {
   buildClassTargetValue,
+  defaultTargetSelection,
   buildClassStudentTargetPayload,
   buildTargetLabel,
   getSubjectsForGrade,
@@ -113,14 +115,9 @@ export default function TeacherSessionsPage() {
       .then((targetData) => {
         setStudents(targetData.students ?? []);
         setTeacherClasses(targetData.teacherClasses ?? []);
-        const classes = targetData.teacherClasses ?? [];
-        if (classes.length > 0) {
-          const targetClassValue = buildClassTargetValue(classes[0]);
-          const selectedStudentIds = (targetData.students ?? [])
-            .filter((student: SessionTargetStudent) => student.grade === classes[0].grade && student.className === classes[0].className)
-            .map((student: SessionTargetStudent) => student.id);
-          setSessForm((prev) => ({ ...prev, targetClassValue, selectedStudentIds }));
-        }
+        // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
+        const defaults = defaultTargetSelection(targetData.students ?? [], targetData.teacherClasses ?? []);
+        setSessForm((prev) => ({ ...prev, ...defaults }));
       })
       .catch(() => {});
   }, []);
@@ -376,12 +373,15 @@ export default function TeacherSessionsPage() {
             </div>
           </div>
 
-          <div className="flex justify-end border-t border-border pt-4">
+          <div className="border-t border-border pt-4">
+            {/* 전체 폭 + 큰 높이로 어느 위치에서든 누르기 쉽게 */}
             <Button
               onClick={handleCreate}
               disabled={isSaving || !sessForm.date || !sessForm.subject.trim() || !sessForm.topic.trim()}
-              className="w-full sm:w-auto"
+              variant="gradient"
+              className="h-11 w-full gap-1.5 text-base font-semibold"
             >
+              <Plus className="h-5 w-5" />
               {isSaving ? t("saving") : t("addSession")}
             </Button>
           </div>

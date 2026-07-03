@@ -38,6 +38,26 @@ export function buildClassTargetValue(targetClass: SessionTargetClass): string {
   return `class:${targetClass.grade}:${targetClass.className}`;
 }
 
+/**
+ * 배포 대상 기본값 — 담당 학급이 여러 개면 전체 담당 학급(모든 학생),
+ * 한 개뿐이면 그 학급(그 학급 전체 학생)을 선택한다.
+ */
+export function defaultTargetSelection(
+  students: SessionTargetStudent[],
+  classes: SessionTargetClass[],
+): { targetClassValue: string; selectedStudentIds: string[] } {
+  if (classes.length === 1) {
+    const only = classes[0];
+    return {
+      targetClassValue: buildClassTargetValue(only),
+      selectedStudentIds: students
+        .filter((s) => s.grade === only.grade && s.className === only.className)
+        .map((s) => s.id),
+    };
+  }
+  return { targetClassValue: "all", selectedStudentIds: students.map((s) => s.id) };
+}
+
 export function buildStudentTargetValue(student: SessionTargetStudent): string {
   return `student:${student.id}`;
 }

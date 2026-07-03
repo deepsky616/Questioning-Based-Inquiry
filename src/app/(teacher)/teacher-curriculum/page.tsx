@@ -9,6 +9,7 @@ import { SessionVisibilitySettings } from "@/components/shared/SessionVisibility
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import {
   buildClassStudentTargetPayload,
+  defaultTargetSelection,
   type SessionTargetClass,
   type SessionTargetStudent,
 } from "@/lib/session-targeting";
@@ -213,8 +214,14 @@ export default function CurriculumPage() {
     fetch("/api/teacher/students")
       .then((r) => r.json())
       .then((d) => {
-        setStudents(d.students ?? []);
-        setTeacherClasses(d.teacherClasses ?? []);
+        const list = d.students ?? [];
+        const classes = d.teacherClasses ?? [];
+        setStudents(list);
+        setTeacherClasses(classes);
+        // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
+        const defaults = defaultTargetSelection(list, classes);
+        setTargetClassValue(defaults.targetClassValue);
+        setSelectedStudentIds(defaults.selectedStudentIds);
       })
       .catch(() => {});
   }, []);
