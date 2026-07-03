@@ -1061,7 +1061,10 @@
     "unitStudents": "{count} students",
     "unitClasses": "{count} classes",
     "docColPoints": "Points",
-    "docColRank": "Rank"
+    "docColRank": "Rank",
+    "statQuestions": "{count} questions",
+    "statLikes": "{count} likes",
+    "statComments": "{count} comments"
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

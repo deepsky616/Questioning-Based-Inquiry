@@ -1061,7 +1061,10 @@
     "unitStudents": "{count}명",
     "unitClasses": "{count}개 반",
     "docColPoints": "포인트",
-    "docColRank": "순위"
+    "docColRank": "순위",
+    "statQuestions": "질문 {count}개",
+    "statLikes": "좋아요 {count}개",
+    "statComments": "댓글 {count}개"
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",
