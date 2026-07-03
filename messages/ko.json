@@ -1086,7 +1086,9 @@
     "emptyHasQuestions": "‘③ 추가’로 질문을 넣거나 위 버튼으로 정렬해 보세요",
     "emptyNoQuestions": "‘① 비슷한 질문 묶기’를 눌러 이 세션의 학생 질문을 묶어보세요",
     "moveUp": "위로 이동",
-    "moveDown": "아래로 이동"
+    "moveDown": "아래로 이동",
+    "mergeSummary": "질문 {from}개를 대표 질문 {to}개로 묶었어요",
+    "mergedFromLabel": "묶인 질문 {count}개"
   },
   "publishDialog": {
     "deployedCount": "{created}개 배포됨",

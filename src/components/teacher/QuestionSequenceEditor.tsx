@@ -12,6 +12,7 @@ import {
   UNIT_FLOW_OPTIONS,
   type SequencedQuestion,
 } from "@/lib/unit-sequence";
+import { CollapseChevron } from "@/components/shared/SectionToggle";
 
 export interface QuestionSequenceEditorProps {
   sessionId: string;
@@ -45,6 +46,15 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
   // 인라인 내용 편집 상태
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  // 묶기 결과 검토: 항목별 '묶인 질문' 펼침 상태
+  const [openMerged, setOpenMerged] = useState<Set<string>>(new Set());
+  const toggleMerged = (id: string) =>
+    setOpenMerged((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const update = useCallback((next: SequencedQuestion[]) => {
     setSequenced(next);
@@ -88,7 +98,16 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? t("sortFailed"));
-      update(data.sequencedQuestions ?? []);
+      let next: SequencedQuestion[] = data.sequencedQuestions ?? [];
+      if (mode === "sort" && current) {
+        // 정렬 응답에는 mergedFrom이 없으므로 내용 일치로 묶음 정보를 보존한다
+        const byContent = new Map(current.filter((q) => q.mergedFrom).map((q) => [q.content.trim(), q.mergedFrom!]));
+        next = next.map((q) => {
+          const kept = byContent.get(q.content.trim());
+          return kept ? { ...q, mergedFrom: kept } : q;
+        });
+      }
+      update(next);
       setGeneratedBy(data.generatedBy ?? "rules");
       if (mode === "merge") setMerged(true);
     } catch (e) {
@@ -182,6 +201,17 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {/* 묶기 결과 요약 — 원본 몇 개가 대표 질문 몇 개로 묶였는지 */}
+      {(() => {
+        if (!sequenced.some((q) => (q.mergedFrom?.length ?? 0) > 1)) return null;
+        const originals = sequenced.reduce((sum, q) => sum + (q.mergedFrom?.length ?? 1), 0);
+        return (
+          <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-300">
+            🧩 {t("mergeSummary", { from: originals, to: sequenced.length })}
+          </p>
+        );
+      })()}
+
       {/* ③ 교사 질문 추가 */}
       <div className="flex gap-2">
         <Input
@@ -255,6 +285,27 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{q.content}</p>
                   <p className="text-xs text-muted-foreground">{q.contentGroup}{q.source === "teacher" ? t("teacherAdded") : ""}</p>
+                  {/* 이 대표 질문에 묶인 학생 원본 질문들(검토용, 접기) */}
+                  {(q.mergedFrom?.length ?? 0) > 1 && (
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleMerged(q.id)}
+                        aria-expanded={openMerged.has(q.id)}
+                        className="flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400"
+                      >
+                        <CollapseChevron open={openMerged.has(q.id)} />
+                        🧩 {t("mergedFromLabel", { count: q.mergedFrom!.length })}
+                      </button>
+                      {openMerged.has(q.id) && (
+                        <ul className="mt-1 space-y-0.5 rounded-md border border-emerald-200 bg-emerald-50/60 px-2.5 py-1.5 text-xs text-muted-foreground dark:border-emerald-500/30 dark:bg-emerald-950/20">
+                          {q.mergedFrom!.map((original, i) => (
+                            <li key={`${original}-${i}`} className="break-words">· {original}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => { setEditingId(q.id); setEditValue(q.content); }} className="shrink-0 text-muted-foreground hover:text-indigo-600" title={t("editTitle")}><Pencil className="h-4 w-4" /></button>
                 <button onClick={() => removeAt(index)} className="shrink-0 text-muted-foreground hover:text-red-500" title={t("deleteTitle")}><Trash2 className="h-4 w-4" /></button>

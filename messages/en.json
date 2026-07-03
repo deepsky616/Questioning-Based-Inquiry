@@ -1086,7 +1086,9 @@
     "emptyHasQuestions": "Add questions with '③ Add' or sort with the buttons above",
     "emptyNoQuestions": "Press '① Group similar questions' to group this session's student questions",
     "moveUp": "Move up",
-    "moveDown": "Move down"
+    "moveDown": "Move down",
+    "mergeSummary": "Grouped {from} questions into {to} representative questions",
+    "mergedFromLabel": "{count} merged questions"
   },
   "publishDialog": {
     "deployedCount": "{created} deployed",

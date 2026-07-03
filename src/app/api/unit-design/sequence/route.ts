@@ -45,8 +45,17 @@ function normalizeSequencedQuestions(
       const content = typeof raw.content === "string" ? raw.content : source?.content;
       if (!id || !content) return null;
 
+      // 묶기 추적: AI가 돌려준 원본 질문 id들을 검증해 원본 내용으로 되매핑(검토 표시용)
+      const mergedFrom =
+        mode === "merge" && Array.isArray(raw.mergedFrom)
+          ? raw.mergedFrom
+              .map((mid) => (typeof mid === "string" ? sourceById.get(mid)?.content : undefined))
+              .filter((c): c is string => Boolean(c))
+          : undefined;
+
       return {
         id,
+        ...(mergedFrom && mergedFrom.length > 0 ? { mergedFrom } : {}),
         type: typeof raw.type === "string" ? raw.type : source?.cognitive ?? "student",
         content,
         source: raw.source === "teacher" ? "teacher" : source?.source ?? "student",

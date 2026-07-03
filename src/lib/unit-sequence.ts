@@ -99,6 +99,8 @@ export interface SequencedQuestion {
   priority: number;
   lessonPhase: string;
   rationale: string;
+  /** 묶기(merge)로 이 대표 질문에 합쳐진 원본 질문 내용들(검토 표시용) */
+  mergedFrom?: string[];
 }
 
 const QUESTION_WORD_SCORE = [
@@ -215,10 +217,11 @@ ${questionList}
 
 ${mode === "merge"
   ? `작업 규칙:
-- 의미가 비슷한 질문들을 하나의 대표 질문으로 통합하세요. 대표 질문의 content는 묶인 질문들의 공통 관심사를 관통하는, 간결하고 자연스러운 한 문장의 질문이어야 합니다.
+- 주제·소재·답이 겹치는 질문들은 적극적으로 하나의 대표 질문으로 통합하세요. 목표는 원본보다 눈에 띄게 적은 대표 질문 목록입니다(예: 10개 → 4~6개). 정말 성격이 다른 질문만 그대로 남기세요.
+- 대표 질문의 content는 묶인 질문들의 공통 관심사를 관통하는, 간결하고 자연스러운 한 문장의 질문이어야 합니다.
 - 여러 질문의 문장을 그대로 이어 붙이거나 나열하지 마세요. 세부 표현은 생략하고, 공통된 핵심을 아우르는 상위 질문 한 문장으로 다시 표현하세요.
 - content는 물음표로 끝나는 하나의 질문 문장으로 작성하세요.
-- 통합한 질문만 출력하세요(원본 여러 개 → 통합 1개). 비슷한 질문이 없으면 원래 질문을 그대로 두세요.
+- 모든 출력 질문에 mergedFrom 배열을 반드시 포함하세요: 그 대표 질문에 묶인 원본 질문들의 id 목록입니다. 묶지 않고 그대로 남긴 질문도 자기 자신의 id 1개를 넣으세요. 모든 원본 id가 정확히 한 번씩 어떤 mergedFrom에든 포함되어야 합니다.
 - contentGroup에는 어떤 주제로 묶었는지 쓰세요.
 - priority는 실제 수업 순서이며 1부터 연속된 숫자로 부여하세요.
 - lessonPhase는 12자 이내 한국어, rationale은 한 문장, type은 factual/conceptual/controversial/student 중 가장 가까운 값.`
@@ -232,6 +235,6 @@ ${mode === "merge"
 
 아래 JSON만 출력하세요:
 {"sequencedQuestions":[
-  {"id":"질문 id","type":"factual","content":"질문 내용","source":"student","contentGroup":"내용 묶음","priority":1,"lessonPhase":"기초 확인","rationale":"배치 이유"}
+  {"id":"질문 id","type":"factual","content":"질문 내용","source":"student","contentGroup":"내용 묶음","priority":1,"lessonPhase":"기초 확인","rationale":"배치 이유"${mode === "merge" ? ',"mergedFrom":["원본 질문 id","원본 질문 id"]' : ""}}
 ]}`;
 }
