@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
-import { chooseModelAuto } from "@/lib/api-config";
+import { chooseModelAuto, chooseQualityModel } from "@/lib/api-config";
 import { logger } from "@/lib/logger";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import {
@@ -156,8 +156,12 @@ export async function POST(req: Request) {
           mode: data.mode,
         }) + languageDirective(getRequestLocale(req));
         const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-        // 프롬프트 크기에 따라 모델 자동 선택(질문이 많으면 flash로 품질 확보)
-        const model = genAI.getGenerativeModel({ model: chooseModelAuto(aiCfg.model, prompt.length) });
+        // 묶기(merge)는 의미 군집화+대표 문장 재작성이라 크기와 무관하게 품질 우선(flash 이상),
+        // 정렬(sort)은 프롬프트 크기에 따라 자동 선택
+        const modelName = data.mode === "merge"
+          ? chooseQualityModel(aiCfg.model)
+          : chooseModelAuto(aiCfg.model, prompt.length);
+        const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);

@@ -39,6 +39,16 @@ export function alternateModel(model: GeminiModel): GeminiModel {
   return model === "gemini-2.5-flash-lite" ? "gemini-2.5-flash" : "gemini-2.5-flash-lite";
 }
 
+/**
+ * 품질 우선 작업용 모델 선택 — 크기와 무관하게 항상 flash 이상을 쓴다.
+ * 의미 군집화·문장 재작성처럼 결과물이 수업 자료로 직결되는 작업(비슷한 질문 묶기 등)에 사용.
+ * 교사가 pro를 명시했으면 그대로 존중.
+ */
+export function chooseQualityModel(configured: string | null | undefined): GeminiModel {
+  const base = resolveGeminiModel(configured);
+  return base === "gemini-2.5-pro" ? base : "gemini-2.5-flash";
+}
+
 export function maskApiKey(key: string): string {
   if (!key) return "";
   if (key.length < 12) return "*".repeat(key.length);

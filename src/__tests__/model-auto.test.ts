@@ -3,6 +3,7 @@ import {
   AUTO_MODEL_CHAR_THRESHOLD,
   alternateModel,
   chooseModelAuto,
+  chooseQualityModel,
 } from "@/lib/api-config";
 import { isTransientAiError } from "@/lib/ai-errors";
 
@@ -25,6 +26,18 @@ describe("chooseModelAuto — 프롬프트 크기 기반 자동 모델 선택", 
   it("알 수 없는 모델 설정은 기본값 기준으로 자동 선택", () => {
     expect(chooseModelAuto("gpt-4", 100)).toBe("gemini-2.5-flash-lite");
     expect(chooseModelAuto(undefined, 100000)).toBe("gemini-2.5-flash");
+  });
+});
+
+describe("chooseQualityModel — 품질 우선 작업(질문 묶기 등)", () => {
+  it("크기와 무관하게 항상 flash 이상", () => {
+    expect(chooseQualityModel("gemini-2.5-flash-lite")).toBe("gemini-2.5-flash");
+    expect(chooseQualityModel("gemini-2.5-flash")).toBe("gemini-2.5-flash");
+    expect(chooseQualityModel(null)).toBe("gemini-2.5-flash");
+  });
+
+  it("교사가 pro를 명시하면 pro 유지", () => {
+    expect(chooseQualityModel("gemini-2.5-pro")).toBe("gemini-2.5-pro");
   });
 });
 
