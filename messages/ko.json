@@ -456,7 +456,13 @@
     "topicFilterLabel": "주제(단원)",
     "groupTitle": "내용별 묶음",
     "groupDesc": "비슷한 질문끼리 정리된 결과입니다",
-    "groupCount": "총 {count}개"
+    "groupCount": "총 {count}개",
+    "includeInSend": "전송 대상에 포함",
+    "excludedBadge": "전송 제외",
+    "editedBadge": "수정됨",
+    "regenerateBtn": "재생성",
+    "regenerating": "재생성 중...",
+    "overLimitWarn": "150자를 넘었어요. 학생이 읽기 쉽게 줄여 주세요."
   },
   "sequencePanel": {
     "published": "학생에게 배포했습니다",

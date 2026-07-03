@@ -103,6 +103,9 @@ export default function QuestionsPage() {
   }> | null>(null);
   const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
   const [isSendingPreviews, setIsSendingPreviews] = useState(false);
+  // 전송 제외 학생 + 항목별 재생성 진행 상태
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [bulkMsg, setBulkMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showBulkSuccess, setShowBulkSuccess] = useState(false);
 
@@ -155,6 +158,7 @@ export default function QuestionsPage() {
     setSelectedIds(new Set());
     setBulkPreviews(null);
     setEditedAnswers({});
+    setExcludedIds(new Set());
     setBulkMsg(null);
     setShowBulkSuccess(false);
   };
@@ -337,6 +341,7 @@ export default function QuestionsPage() {
         const initial: Record<string, string> = {};
         previews.forEach((p) => { initial[p.questionId] = p.answer; });
         setEditedAnswers(initial);
+        setExcludedIds(new Set());
         setBulkPreviews(previews);
         if (previews.length < ids.length) {
           setBulkMsg({
@@ -352,10 +357,30 @@ export default function QuestionsPage() {
     }
   };
 
+  // 항목별 AI 답변 재생성(저장 없음) — 어색한 답변만 다시 생성
+  const handleRegenerateAnswer = async (questionId: string) => {
+    if (regeneratingId) return;
+    setRegeneratingId(questionId);
+    try {
+      const res = await fetch(`/api/questions/${questionId}/ai-answer`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? t("aiAnswerFailed"));
+      const answer = (data.answer as string) ?? "";
+      setBulkPreviews((prev) => prev ? prev.map((p) => (p.questionId === questionId ? { ...p, answer } : p)) : prev);
+      setEditedAnswers((prev) => ({ ...prev, [questionId]: answer }));
+    } catch (err) {
+      toast({ variant: "destructive", description: err instanceof Error ? err.message : t("aiAnswerFailed") });
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
+
   // 2단계: 교사 확인 후 댓글로 전송
   const handleConfirmBulkAi = async () => {
     if (!bulkPreviews || bulkPreviews.length === 0) return;
-    const answerTexts = bulkPreviews.map((p) => editedAnswers[p.questionId] ?? p.answer);
+    // 체크 해제(제외)된 학생은 전송하지 않는다
+    const targets = bulkPreviews.filter((p) => !excludedIds.has(p.questionId));
+    const answerTexts = targets.map((p) => editedAnswers[p.questionId] ?? p.answer);
     if (answerTexts.length === 0) {
       setBulkMsg({ type: "error", text: t("noAnswers") });
       return;
@@ -368,7 +393,7 @@ export default function QuestionsPage() {
     setBulkMsg(null);
     try {
       const results = await Promise.allSettled(
-        bulkPreviews.map(async (p) => {
+        targets.map(async (p) => {
           const answer = (editedAnswers[p.questionId] ?? p.answer).trim();
           const res = await fetch(`/api/questions/${p.questionId}/comments`, {
             method: "POST",
@@ -381,7 +406,8 @@ export default function QuestionsPage() {
       const success = results.filter((r) => r.status === "fulfilled").length;
       setBulkPreviews(null);
       setEditedAnswers({});
-      setBulkMsg({ type: "success", text: bulkPreviews.length - success === 0 ? t("bulkSentAll", { count: success }) : t("bulkSentPartial", { success, failed: bulkPreviews.length - success }) });
+      setExcludedIds(new Set());
+      setBulkMsg({ type: "success", text: targets.length - success === 0 ? t("bulkSentAll", { count: success }) : t("bulkSentPartial", { success, failed: targets.length - success }) });
       setShowBulkSuccess(true);
       window.setTimeout(() => {
         setSelectedIds(new Set());
@@ -1064,33 +1090,76 @@ export default function QuestionsPage() {
               const answerText = editedAnswers[preview.questionId] ?? preview.answer;
               const answerLength = answerText.length;
               const initial = preview.authorName.trim().slice(0, 1) || "?";
+              const excluded = excludedIds.has(preview.questionId);
+              const edited = answerText !== preview.answer;
+              const regenerating = regeneratingId === preview.questionId;
+              const overLimit = answerLength > 150;
 
               return (
-                <div key={preview.questionId} className="overflow-hidden rounded-xl border bg-muted/40">
+                <div
+                  key={preview.questionId}
+                  className={`overflow-hidden rounded-xl border bg-muted/40 transition-opacity ${excluded ? "opacity-50" : ""}`}
+                >
                   <div className="border-b bg-card px-4 py-3">
                     <div className="mb-2 flex items-center gap-3">
+                      {/* 전송 포함/제외 체크 */}
+                      <input
+                        type="checkbox"
+                        checked={!excluded}
+                        disabled={isSendingPreviews}
+                        aria-label={t("includeInSend")}
+                        title={t("includeInSend")}
+                        onChange={() =>
+                          setExcludedIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(preview.questionId)) next.delete(preview.questionId);
+                            else next.add(preview.questionId);
+                            return next;
+                          })
+                        }
+                        className="h-4 w-4 shrink-0 accent-indigo-600"
+                      />
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white shadow-sm">
                         {initial}
                       </span>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-foreground">{preview.authorName}</p>
                         {preview.authorInfo && (
                           <p className="text-xs text-muted-foreground">{preview.authorInfo}</p>
                         )}
                       </div>
+                      {excluded && (
+                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          {t("excludedBadge")}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm leading-relaxed text-foreground">{preview.questionContent}</p>
                   </div>
                   <div className="px-4 py-3">
                     <div className="mb-1.5 flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold text-indigo-600">{t("aiGeneratedAnswer")}</p>
-                      <span
-                        className={`text-xs font-medium ${
-                          answerLength > 150 ? "text-amber-700" : "text-muted-foreground"
-                        }`}
-                      >
-                        {t("charCount", { n: answerLength })}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-semibold text-indigo-600">{t("aiGeneratedAnswer")}</p>
+                        {edited && (
+                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                            {t("editedBadge")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${overLimit ? "text-amber-700" : "text-muted-foreground"}`}>
+                          {t("charCount", { n: answerLength })}
+                        </span>
+                        {/* 이 답변만 AI 재생성 */}
+                        <button
+                          type="button"
+                          onClick={() => handleRegenerateAnswer(preview.questionId)}
+                          disabled={isSendingPreviews || Boolean(regeneratingId) || excluded}
+                          className="rounded-md border border-indigo-200 px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+                        >
+                          {regenerating ? t("regenerating") : `🔄 ${t("regenerateBtn")}`}
+                        </button>
+                      </div>
                     </div>
                     <Textarea
                       value={answerText}
@@ -1098,9 +1167,12 @@ export default function QuestionsPage() {
                         setEditedAnswers((prev) => ({ ...prev, [preview.questionId]: e.target.value }))
                       }
                       rows={3}
-                      className="resize-none text-sm"
-                      disabled={isSendingPreviews}
+                      className={`resize-none text-sm ${overLimit ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
+                      disabled={isSendingPreviews || excluded || regenerating}
                     />
+                    {overLimit && (
+                      <p className="mt-1 text-xs text-amber-700">{t("overLimitWarn")}</p>
+                    )}
                   </div>
                 </div>
               );
@@ -1112,19 +1184,19 @@ export default function QuestionsPage() {
           <DialogFooter className="gap-2 mt-4">
             <Button
               variant="outline"
-              onClick={() => { setBulkPreviews(null); setEditedAnswers({}); setBulkMsg(null); }}
+              onClick={() => { setBulkPreviews(null); setEditedAnswers({}); setExcludedIds(new Set()); setBulkMsg(null); }}
               disabled={isSendingPreviews}
             >
               {tc("cancel")}
             </Button>
             <Button
               onClick={handleConfirmBulkAi}
-              disabled={isSendingPreviews}
+              disabled={isSendingPreviews || (bulkPreviews?.filter((p) => !excludedIds.has(p.questionId)).length ?? 0) === 0}
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
             >
               {isSendingPreviews
                 ? t("sending")
-                : t("sendCount", { count: bulkPreviews?.length ?? 0 })}
+                : t("sendCount", { count: bulkPreviews?.filter((p) => !excludedIds.has(p.questionId)).length ?? 0 })}
             </Button>
           </DialogFooter>
         </DialogContent>

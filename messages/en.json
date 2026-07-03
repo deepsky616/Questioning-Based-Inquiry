@@ -456,7 +456,13 @@
     "topicFilterLabel": "Topic (unit)",
     "groupTitle": "Grouped by content",
     "groupDesc": "Similar questions organized together",
-    "groupCount": "{count} total"
+    "groupCount": "{count} total",
+    "includeInSend": "Include in send",
+    "excludedBadge": "Excluded",
+    "editedBadge": "Edited",
+    "regenerateBtn": "Regenerate",
+    "regenerating": "Regenerating...",
+    "overLimitWarn": "Over 150 characters — consider shortening for readability."
   },
   "sequencePanel": {
     "published": "Shared with students",
