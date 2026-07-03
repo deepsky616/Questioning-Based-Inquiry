@@ -42,8 +42,9 @@ export async function GET(req: NextRequest) {
   const students = await prisma.user.findMany({
     where: { role: "STUDENT", grade, className, ...(school ? { school } : {}) },
     select: { id: true, name: true, studentNumber: true },
-    orderBy: { studentNumber: "asc" },
   });
+  // 번호순 정렬 — studentNumber는 문자열이라 DB 사전순("10"<"2")을 피해 숫자로 비교
+  students.sort((a, b) => compareStudentNumber(a.studentNumber, b.studentNumber));
   const ids = students.map((s) => s.id);
 
   if (ids.length === 0) {

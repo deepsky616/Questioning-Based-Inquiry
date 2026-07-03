@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { compareByClassAndNumber } from "@/lib/student-sort";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { calcTrend, calcStartDate, aggregateByStudent, buildTimeline } from "@/lib/stats-calc";
@@ -119,11 +120,14 @@ export async function GET(req: Request) {
     }))
   );
 
-  const byStudent = byStudentBase.map((student) => {
-    const s1 = firstHalf.filter((q) => q.author.id === student.studentId).length;
-    const s2 = secondHalf.filter((q) => q.author.id === student.studentId).length;
-    return { ...student, trend: calcTrend(s1, s2) };
-  });
+  const byStudent = byStudentBase
+    .map((student) => {
+      const s1 = firstHalf.filter((q) => q.author.id === student.studentId).length;
+      const s2 = secondHalf.filter((q) => q.author.id === student.studentId).length;
+      return { ...student, trend: calcTrend(s1, s2) };
+    })
+    // 학급(학년·반) → 번호순 정렬(번호는 숫자 해석 — 문자열 사전순 방지)
+    .sort(compareByClassAndNumber);
 
   const timeline = buildTimeline(
     questions.map((q) => ({

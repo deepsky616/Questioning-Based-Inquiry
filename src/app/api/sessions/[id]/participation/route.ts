@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
+import { compareByClassAndNumber } from "@/lib/student-sort";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
@@ -93,8 +94,9 @@ export async function GET(
         className: true,
         studentNumber: true,
       },
-      orderBy: [{ grade: "asc" }, { className: "asc" }, { studentNumber: "asc" }],
     });
+    // 학급(학년·반) → 번호순 정렬(번호는 숫자 해석 — 문자열 사전순 "10"<"2" 방지)
+    students.sort(compareByClassAndNumber);
 
     // 7. 해당 세션의 모든 질문 조회
     const questions = await prisma.question.findMany({
