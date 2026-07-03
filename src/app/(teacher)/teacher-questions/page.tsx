@@ -948,8 +948,15 @@ export default function QuestionsPage() {
                 <p className="font-medium">{t("questionContentLabel")}</p>
                 <p className="mt-1 text-foreground">{selectedQuestion.content}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {t("authorPrefix")}{selectedQuestion.author.name}
-                  {selectedQuestion.author.className && ` (${selectedQuestion.author.className})`}
+                  {t("authorPrefix")}
+                  {[
+                    selectedQuestion.author.grade && t("gradeLabel", { grade: selectedQuestion.author.grade }),
+                    selectedQuestion.author.className && t("classLabel", { className: selectedQuestion.author.className }),
+                    selectedQuestion.author.studentNumber && t("numberLabel", { studentNumber: selectedQuestion.author.studentNumber }),
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}{" "}
+                  <span className="font-medium text-foreground">{selectedQuestion.author.name}</span>
                 </p>
                 {selectedQuestion.session && (
                   <p className="text-xs text-indigo-600 mt-1">
