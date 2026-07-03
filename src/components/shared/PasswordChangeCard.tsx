@@ -88,7 +88,7 @@ export function PasswordChangeCard() {
         {msg && (
           <p className={`text-sm ${msg.type === "success" ? "text-green-600" : "text-red-600"}`}>{msg.text}</p>
         )}
-        <Button onClick={handleChangePassword} disabled={saving} className="font-semibold">
+        <Button onClick={handleChangePassword} disabled={saving} variant="gradient" className="h-11 w-full text-base font-semibold">
           {saving ? t("changing") : t("changeBtn")}
         </Button>
       </CardContent>

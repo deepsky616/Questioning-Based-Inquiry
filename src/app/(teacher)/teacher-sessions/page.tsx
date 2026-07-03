@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -625,12 +625,25 @@ function SessionRow({
           <div className="w-20 flex justify-center"><Switch checked={session.likesVisibleToPeers} onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)} /></div>
           <div className="w-20 flex justify-center"><Switch checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} /></div>
           <div className="w-24 flex justify-center gap-1">
-            <Button variant="ghost" size="sm" className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 h-7 px-2 text-xs" onClick={openEdit}>
-              {tc("edit")}
-            </Button>
-            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50 h-7 px-2 text-xs" onClick={() => onDelete(session.id)}>
-              {tc("delete")}
-            </Button>
+            {/* 아이콘 버튼(질문 목록 관리 열과 동일 패턴) */}
+            <button
+              type="button"
+              onClick={openEdit}
+              className="rounded-md border border-indigo-200 p-1.5 text-indigo-600 hover:bg-indigo-50"
+              title={tc("edit")}
+              aria-label={tc("edit")}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(session.id)}
+              className="rounded-md border border-red-200 p-1.5 text-red-500 hover:bg-red-50"
+              title={tc("delete")}
+              aria-label={tc("delete")}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </div>

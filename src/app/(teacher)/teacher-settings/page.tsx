@@ -285,17 +285,20 @@ export default function TeacherSettingsPage() {
             </Select>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               variant="outline"
               onClick={handleTest}
               disabled={isTesting || (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) || (!!apiKey && apiKey.length < 10)}
+              className="h-11 flex-1 text-base"
             >
               {isTesting ? t("testing") : t("connectionTest")}
             </Button>
             <Button
               onClick={handleSave}
               disabled={isSaving || (!currentConfig?.configured && (!apiKey || apiKey.length < 10)) || (!!apiKey && apiKey.length < 10)}
+              variant="gradient"
+              className="h-11 flex-1 text-base font-semibold"
             >
               {isSaving ? t("saving") : tc("save")}
             </Button>

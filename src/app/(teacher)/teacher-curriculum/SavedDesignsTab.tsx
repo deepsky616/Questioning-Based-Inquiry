@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
+import { GripVertical, ChevronUp, ChevronDown, Pencil, Trash2, X } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -351,22 +351,30 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                       {[d.sessionDate, d.subject, d.area].filter(Boolean).join(" · ")}
                     </span>
                   </button>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Button
-                      variant={editingDesignId === d.id ? "secondary" : "outline"}
-                      size="sm"
+                  <div className="flex shrink-0 items-center gap-1">
+                    {/* 아이콘 버튼(관리 열 공통 패턴) — 편집 중엔 X(취소)로 전환 */}
+                    <button
+                      type="button"
                       onClick={() => (editingDesignId === d.id ? cancelEditDesign() : startEditDesign(d))}
+                      className={`rounded-md border p-1.5 ${
+                        editingDesignId === d.id
+                          ? "border-border bg-muted text-foreground hover:bg-muted/70"
+                          : "border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+                      }`}
+                      title={editingDesignId === d.id ? tc("cancel") : tc("edit")}
+                      aria-label={editingDesignId === d.id ? tc("cancel") : tc("edit")}
                     >
-                      {editingDesignId === d.id ? tc("cancel") : tc("edit")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700"
+                      {editingDesignId === d.id ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleDelete(d.id)}
+                      className="rounded-md border border-red-200 p-1.5 text-red-500 hover:bg-red-50"
+                      title={tc("delete")}
+                      aria-label={tc("delete")}
                     >
-                      {tc("delete")}
-                    </Button>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
 
