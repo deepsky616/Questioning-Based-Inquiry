@@ -165,7 +165,8 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
               <Button
                 onClick={handleReset}
                 disabled={saving || checked.size === 0 || !newPassword}
-                className="w-full sm:w-auto font-semibold"
+                variant="gradient"
+                className="h-11 w-full text-base font-semibold sm:flex-1"
               >
                 {saving ? t("resetting") : checked.size === 0 ? t("resetBtnEmpty") : t("resetBtn", { count: checked.size })}
               </Button>

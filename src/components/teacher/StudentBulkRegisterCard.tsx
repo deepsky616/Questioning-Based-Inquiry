@@ -216,7 +216,8 @@ export function StudentBulkRegisterCard() {
               <Button
                 onClick={handleBulkRegister}
                 disabled={isBulkSaving || parseBulkText().length === 0}
-                className="w-full sm:w-auto"
+                variant="gradient"
+                className="h-11 w-full text-base font-semibold sm:flex-1"
               >
                 {isBulkSaving ? t("registering") : t("bulkRegisterBtn", { count: parseBulkText().length })}
               </Button>

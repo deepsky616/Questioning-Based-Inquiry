@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { filterSortSavedDesigns } from "@/lib/saved-designs";
 import {
   buildClassStudentTargetPayload,
+  defaultTargetSelection,
   type SessionTargetClass,
   type SessionTargetStudent,
 } from "@/lib/session-targeting";
@@ -118,8 +119,15 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
       likesVisibleToPeers: design.likesVisibleToPeers ?? true,
       commentsVisibleToPeers: design.commentsVisibleToPeers ?? true,
     });
-    setEditTargetClassValue(design.targetClassValue ?? "all");
-    setEditSelectedStudentIds([...(design.targetStudentIds ?? [])]);
+    // 저장된 대상이 구체적이면 그대로 복원, '전체'면 기본값 정책(단일 학급 → 그 학급 전체 학생) 적용
+    if ((design.targetClassValue ?? "all") === "all") {
+      const defaults = defaultTargetSelection(students, targetClasses);
+      setEditTargetClassValue(defaults.targetClassValue);
+      setEditSelectedStudentIds(defaults.selectedStudentIds);
+    } else {
+      setEditTargetClassValue(design.targetClassValue!);
+      setEditSelectedStudentIds([...(design.targetStudentIds ?? [])]);
+    }
     setEditCoreIdea(design.coreIdea ?? "");
     setEditCoreSentences([...(design.coreSentences ?? [])]);
     setEditEssentialQuestions([...(design.essentialQuestions ?? [])]);
@@ -528,14 +536,29 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                         <Button variant="outline" size="sm" onClick={() => addEditQuestion(addType)}>＋ {t("addQuestion")}</Button>
                       </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button size="sm" onClick={() => saveEditDesign(d.id)} disabled={savingEdit || !editTitle.trim()}>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                      <Button
+                        onClick={() => saveEditDesign(d.id)}
+                        disabled={savingEdit || !editTitle.trim()}
+                        variant="gradient"
+                        className="h-11 flex-1 text-base font-semibold"
+                      >
                         💾 {savingEdit ? tc("loading") : tc("save")}
                       </Button>
-                      <Button size="sm" variant="secondary" onClick={() => redeployEditDesign(d.id)} disabled={savingEdit || !editTitle.trim() || !editDate}>
+                      <Button
+                        variant="secondary"
+                        onClick={() => redeployEditDesign(d.id)}
+                        disabled={savingEdit || !editTitle.trim() || !editDate}
+                        className="h-11 flex-1 text-base font-semibold"
+                      >
                         📤 {t("redeployToSession")}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={cancelEditDesign} disabled={savingEdit}>
+                      <Button
+                        variant="outline"
+                        onClick={cancelEditDesign}
+                        disabled={savingEdit}
+                        className="h-11 sm:w-28"
+                      >
                         {tc("cancel")}
                       </Button>
                     </div>
