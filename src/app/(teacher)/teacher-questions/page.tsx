@@ -930,13 +930,6 @@ export default function QuestionsPage() {
                 likesVisibleToPeers: currentSession.likesVisibleToPeers,
                 commentsVisibleToPeers: currentSession.commentsVisibleToPeers,
               }}
-              initialTarget={{
-                targetType: currentSession.targetType,
-                targetGrade: currentSession.targetGrade,
-                targetClassName: currentSession.targetClassName,
-                targetStudentId: currentSession.targetStudentId,
-                targetStudentIds: currentSession.targetStudentIds,
-              }}
               onDeployed={reloadSessions}
             />
           </div>

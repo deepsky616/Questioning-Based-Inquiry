@@ -277,13 +277,6 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                       likesVisibleToPeers: s.likesVisibleToPeers,
                       commentsVisibleToPeers: s.commentsVisibleToPeers,
                     }}
-                    initialTarget={{
-                      targetType: s.targetType,
-                      targetGrade: s.targetGrade,
-                      targetClassName: s.targetClassName,
-                      targetStudentId: s.targetStudentId,
-                      targetStudentIds: s.targetStudentIds,
-                    }}
                     onDeployed={onChanged}
                   />
                 </div>

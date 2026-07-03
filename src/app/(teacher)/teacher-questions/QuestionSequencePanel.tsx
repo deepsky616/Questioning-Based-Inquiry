@@ -21,24 +21,13 @@ interface DeploySettings {
   commentsVisibleToPeers: boolean;
 }
 
-/** 세션에 저장된 배포 대상(초기값 복원용) */
-export interface InitialTarget {
-  targetType?: string | null;
-  targetGrade?: string | null;
-  targetClassName?: string | null;
-  targetStudentId?: string | null;
-  targetStudentIds?: string[] | null;
-}
-
 export function QuestionSequencePanel({
-  sessionId, subject, topic, initialSettings, initialTarget, onDeployed, initialQuestions, editMode,
+  sessionId, subject, topic, initialSettings, onDeployed, initialQuestions, editMode,
 }: {
   sessionId: string;
   subject?: string;
   topic?: string;
   initialSettings?: Partial<DeploySettings>;
-  /** 세션의 현재 배포 대상 — 수업세션의 새 세션 만들기와 동일한 대상 선택 UI 초기값 */
-  initialTarget?: InitialTarget;
   onDeployed?: () => void;
   initialQuestions?: SequencedQuestion[];
   editMode?: boolean;
@@ -54,51 +43,24 @@ export function QuestionSequencePanel({
     commentsVisibleToPeers: initialSettings?.commentsVisibleToPeers ?? true,
   });
 
-  // 배포 대상 선택(수업세션 페이지와 동일 UI) — 세션의 현재 대상으로 초기화
+  // 배포 대상 선택(수업세션 페이지와 동일 UI) — 기본값은 항상 전체 학생 모두 선택
   const [students, setStudents] = useState<SessionTargetStudent[]>([]);
   const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
   const [targetClassValue, setTargetClassValue] = useState("all");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
-  const [targetReady, setTargetReady] = useState(false);
 
   useEffect(() => {
     fetch("/api/teacher/students")
       .then((r) => r.json())
       .then((d) => {
-        setStudents(d.students ?? []);
+        const list: SessionTargetStudent[] = d.students ?? [];
+        setStudents(list);
         setTeacherClasses(d.teacherClasses ?? []);
+        // 기본값: 전체 학생 모두 선택(교사가 필요 시 좁힌다)
+        setSelectedStudentIds(list.map((s) => s.id));
       })
       .catch(() => {});
   }, []);
-
-  // 학생 목록 로드 후 세션의 저장된 대상을 1회 복원
-  useEffect(() => {
-    if (targetReady || students.length === 0) return;
-    const init = initialTarget;
-    const ids = Array.isArray(init?.targetStudentIds)
-      ? init!.targetStudentIds!.filter((id): id is string => typeof id === "string")
-      : [];
-    if (init?.targetType === "CLASS" && init.targetGrade && init.targetClassName) {
-      setTargetClassValue(`class:${init.targetGrade}:${init.targetClassName}`);
-      setSelectedStudentIds(
-        ids.length > 0
-          ? ids
-          : students.filter((s) => s.grade === init.targetGrade && s.className === init.targetClassName).map((s) => s.id),
-      );
-    } else if (init?.targetType === "STUDENT" || init?.targetType === "CUSTOM") {
-      const selected = init.targetType === "STUDENT" && init.targetStudentId ? [init.targetStudentId] : ids;
-      const first = students.find((s) => selected.includes(s.id));
-      if (first) {
-        setTargetClassValue(`class:${first.grade}:${first.className}`);
-        setSelectedStudentIds(selected);
-      } else {
-        setSelectedStudentIds(students.map((s) => s.id));
-      }
-    } else {
-      setSelectedStudentIds(students.map((s) => s.id));
-    }
-    setTargetReady(true);
-  }, [students, targetReady, initialTarget]);
 
   const targetClasses = useMemo(() => {
     if (teacherClasses.length > 0) return teacherClasses;
