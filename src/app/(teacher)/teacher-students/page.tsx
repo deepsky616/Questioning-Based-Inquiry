@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
+import { formatShortDateTime } from "@/lib/datetime";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,8 +45,11 @@ interface TeacherClass { grade: string; className: string }
 
 interface RawEvent { type: "question" | "comment" | "point"; createdAt: string; weight: number }
 interface PointLogItem { id: string; createdAt: string; points: number; gameId: string; bonusType: string; reason: string }
-interface QuestionItem { id: string; createdAt: string; content: string; closure: string; cognitive: string }
-interface CommentItem { id: string; createdAt: string; content: string }
+interface QuestionItem {
+  id: string; createdAt: string; content: string; closure: string; cognitive: string;
+  _count?: { likes: number; comments: number };
+}
+interface CommentItem { id: string; createdAt: string; content: string; question?: { content: string } }
 interface ClassificationSummary {
   total: number;
   closure: { closed: number; open: number };
@@ -204,6 +209,16 @@ function StudentDetailDialog({
   const [metric, setMetric] = useState<Metric>("question");
   const [delta, setDelta] = useState(0);
   const [reason, setReason] = useState("");
+  // 최근 활동 탭(질문/답변/포인트) — 폭 전체를 써서 내용을 읽을 수 있게
+  const [activityTab, setActivityTab] = useState<"questions" | "answers" | "points">("questions");
+  // 항목에서 '지급' 클릭 → 사유 자동 채움 + 점수 입력 포커스
+  const deltaInputRef = useRef<HTMLInputElement>(null);
+  const fillReasonFrom = (prefix: string, content: string) => {
+    const snippet = content.length > 40 ? `${content.slice(0, 40)}...` : content;
+    setReason(`${prefix}: ${snippet}`);
+    deltaInputRef.current?.focus();
+    deltaInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const [saving, setSaving] = useState(false);
 
   // 학생 상세 통계(질문·댓글·포인트)는 react-query로 주기 폴링(12초)+포커스 재조회.
@@ -372,32 +387,81 @@ function StudentDetailDialog({
           )}
         </div>
 
-        {/* 최근 활동 */}
+        {/* 최근 활동 — 탭 전환으로 폭 전체 사용(포인트 판단 근거를 읽을 수 있게) */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="bg-card border border-border rounded-xl p-3">
-              <h4 className="text-xs font-black text-indigo-600 mb-2">{t("recentQuestions")}</h4>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
+          <div className="bg-card border border-border rounded-xl p-3 space-y-2">
+            <div className="flex rounded-md border overflow-hidden w-fit">
+              {([
+                ["questions", t("recentQuestions"), stats.recentQuestions.length],
+                ["answers", t("recentAnswers"), stats.recentComments.length],
+                ["points", t("recentPoints"), stats.recentPoints.length],
+              ] as const).map(([key, label, count], i) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActivityTab(key)}
+                  className={`px-3 py-1.5 text-xs font-bold transition-colors ${i > 0 ? "border-l" : ""} ${
+                    activityTab === key ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
+
+            {activityTab === "questions" && (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                 {stats.recentQuestions.length === 0 ? (
                   <p className="text-xs text-muted-foreground">{t("none")}</p>
                 ) : stats.recentQuestions.map((q) => (
-                  <div key={q.id} className="text-xs text-foreground truncate">{q.content}</div>
+                  <div key={q.id} className="rounded-lg border bg-background p-2.5">
+                    <p className="text-sm text-foreground leading-snug line-clamp-2">{q.content}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      <span className={`px-1.5 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure] ?? "bg-muted"}`}>{CLOSURE_LABEL[q.closure] ?? q.closure}</span>
+                      <span className={`px-1.5 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive] ?? "bg-muted"}`}>{COGNITIVE_LABEL[q.cognitive] ?? q.cognitive}</span>
+                      <span>❤️ {q._count?.likes ?? 0}</span>
+                      <span>💬 {q._count?.comments ?? 0}</span>
+                      <span className="inline-flex items-center gap-0.5">🕒 {formatShortDateTime(q.createdAt)}</span>
+                      <button
+                        type="button"
+                        onClick={() => fillReasonFrom(t("reasonQuestionPrefix"), q.content)}
+                        className="ml-auto rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
+                      >
+                        {t("awardFromItem")}
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-            <div className="bg-card border border-border rounded-xl p-3">
-              <h4 className="text-xs font-black text-emerald-600 mb-2">{t("recentAnswers")}</h4>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
+            )}
+
+            {activityTab === "answers" && (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                 {stats.recentComments.length === 0 ? (
                   <p className="text-xs text-muted-foreground">{t("none")}</p>
                 ) : stats.recentComments.map((c) => (
-                  <div key={c.id} className="text-xs text-foreground truncate">{c.content}</div>
+                  <div key={c.id} className="rounded-lg border bg-background p-2.5">
+                    <p className="text-sm text-foreground leading-snug line-clamp-2">{c.content}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      {c.question?.content && (
+                        <span className="max-w-[55%] truncate">↳ {c.question.content}</span>
+                      )}
+                      <span className="inline-flex items-center gap-0.5">🕒 {formatShortDateTime(c.createdAt)}</span>
+                      <button
+                        type="button"
+                        onClick={() => fillReasonFrom(t("reasonAnswerPrefix"), c.content)}
+                        className="ml-auto rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
+                      >
+                        {t("awardFromItem")}
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-            <div className="bg-card border border-border rounded-xl p-3">
-              <h4 className="text-xs font-black text-amber-600 mb-2">{t("recentPoints")}</h4>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
+            )}
+
+            {activityTab === "points" && (
+              <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
                 {stats.recentPoints.length === 0 ? (
                   <p className="text-xs text-muted-foreground">{t("none")}</p>
                 ) : stats.recentPoints.map((p) => {
@@ -418,17 +482,54 @@ function StudentDetailDialog({
                   );
                 })}
               </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* 포인트 수동 지급/회수 */}
         <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-xl p-4 space-y-3">
           <h3 className="font-black text-amber-700 text-sm">{t("pointManual")}</h3>
+          {/* 빠른 지급 프리셋 — 칩 두 번으로 지급 완료 */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[1, 3, 5, -1, -3].map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setDelta(v)}
+                className={`rounded-full border px-2.5 py-0.5 text-xs font-bold transition-colors ${
+                  delta === v
+                    ? v >= 0 ? "border-indigo-500 bg-indigo-600 text-white" : "border-red-400 bg-red-500 text-white"
+                    : v >= 0 ? "border-amber-300 bg-white text-amber-700 hover:bg-amber-100 dark:bg-transparent dark:text-amber-300" : "border-red-200 bg-white text-red-500 hover:bg-red-50 dark:bg-transparent"
+                }`}
+              >
+                {v > 0 ? `+${v}` : v}
+              </button>
+            ))}
+            <span className="mx-1 h-4 w-px bg-amber-300/60" aria-hidden />
+            {([
+              t("presetGoodQuestion"),
+              t("presetKindAnswer"),
+              t("presetParticipation"),
+              t("presetRuleViolation"),
+            ] as string[]).map((label) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setReason(label)}
+                className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  reason === label
+                    ? "border-amber-500 bg-amber-500 text-white"
+                    : "border-amber-300 bg-white text-amber-700 hover:bg-amber-100 dark:bg-transparent dark:text-amber-300"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-xs text-amber-700 font-bold">{t("scoreLabel")}</Label>
-              <Input type="number" value={delta || ""}
+              <Input ref={deltaInputRef} type="number" value={delta || ""}
                 onChange={(e) => setDelta(parseInt(e.target.value) || 0)}
                 placeholder={t("scorePlaceholder")} className="mt-1" />
             </div>

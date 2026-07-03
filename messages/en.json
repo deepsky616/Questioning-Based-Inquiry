@@ -795,7 +795,14 @@
     "colDetail": "Details",
     "detailBtn": "Details",
     "loading": "Loading...",
-    "tabList": "Students"
+    "tabList": "Students",
+    "awardFromItem": "+P award",
+    "reasonQuestionPrefix": "Good question",
+    "reasonAnswerPrefix": "Kind answer",
+    "presetGoodQuestion": "Good question",
+    "presetKindAnswer": "Kind answer",
+    "presetParticipation": "Great participation",
+    "presetRuleViolation": "Rule violation"
   },
   "sessions": {
     "dateRequired": "Date, subject, and topic are required",

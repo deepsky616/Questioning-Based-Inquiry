@@ -55,7 +55,10 @@ export async function GET(
     }),
     prisma.comment.findMany({
       where: { authorId: studentId },
-      select: { id: true, createdAt: true, content: true },
+      select: {
+        id: true, createdAt: true, content: true,
+        question: { select: { content: true } },
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.pointLog.findMany({

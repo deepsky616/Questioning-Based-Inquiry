@@ -795,7 +795,14 @@
     "colDetail": "상세",
     "detailBtn": "상세",
     "loading": "로딩 중...",
-    "tabList": "학생 현황"
+    "tabList": "학생 현황",
+    "awardFromItem": "+P 지급",
+    "reasonQuestionPrefix": "좋은 질문",
+    "reasonAnswerPrefix": "친절한 답변",
+    "presetGoodQuestion": "좋은 질문",
+    "presetKindAnswer": "친절한 답변",
+    "presetParticipation": "참여 우수",
+    "presetRuleViolation": "규칙 위반"
   },
   "sessions": {
     "dateRequired": "날짜, 교과, 주제는 필수입니다",
