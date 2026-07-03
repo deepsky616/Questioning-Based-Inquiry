@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildActivityReport } from "@/lib/report-stats";
+import { compareStudentNumber } from "@/lib/student-sort";
 
 // 학급 활동 리포트(교사용)
 //  - grade/className 미지정: 교사의 담당 학급 목록 반환(선택용)
