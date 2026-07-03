@@ -222,6 +222,7 @@ export function MyQuestionsView() {
             <TableHead>{t("colContent")}</TableHead>
             <TableHead className="w-20 break-keep text-center">{t("colLikes")}</TableHead>
             <TableHead className="w-24 text-center">{t("colComments")}</TableHead>
+            <TableHead className="w-24 text-center">{t("colManage")}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -265,27 +266,6 @@ export function MyQuestionsView() {
                       <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
                       <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
                       <span className={`text-xs px-2 py-0.5 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{q.isPublic ? t("public") : t("private")}</span>
-                      {/* 반응(좋아요·댓글)이 달리기 전까지만 수정·삭제 가능 */}
-                      {(q.likeCount ?? 0) === 0 && commentCount === 0 && editingQuestionId !== q.id && (
-                        <span className="inline-flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => { setEditingQuestionId(q.id); setEditContent(q.content); }}
-                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-                            title={t("editBtn")}
-                          >
-                            <Pencil className="h-3 w-3" /> {t("editBtn")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteQuestion(q.id)}
-                            className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium text-red-500 hover:bg-red-50"
-                            title={t("deleteBtn")}
-                          >
-                            <Trash2 className="h-3 w-3" /> {t("deleteBtn")}
-                          </button>
-                        </span>
-                      )}
                     </div>
                     {/* 수업세션(📚 칩) · 작성일시(🕒) — 한눈에 구분 */}
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -319,10 +299,38 @@ export function MyQuestionsView() {
                       <span>{isExpanded ? tEx("close") : tEx("comment")}</span>
                     </button>
                   </TableCell>
+                  <TableCell className="text-center align-top">
+                    {/* 관리: 반응(좋아요·댓글)이 달리기 전까지만 수정·삭제 가능 */}
+                    {(q.likeCount ?? 0) === 0 && commentCount === 0 ? (
+                      <div className="flex justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => { setEditingQuestionId(q.id); setEditContent(q.content); }}
+                          disabled={editingQuestionId === q.id}
+                          className="rounded-md border border-indigo-200 p-1.5 text-indigo-600 hover:bg-indigo-50 disabled:opacity-40"
+                          title={t("editBtn")}
+                          aria-label={t("editBtn")}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteQuestion(q.id)}
+                          className="rounded-md border border-red-200 p-1.5 text-red-500 hover:bg-red-50"
+                          title={t("deleteBtn")}
+                          aria-label={t("deleteBtn")}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground" title={t("lockedHint")}>🔒</span>
+                    )}
+                  </TableCell>
                 </TableRow>
                 {isExpanded && (
                   <TableRow>
-                    <TableCell colSpan={4} className="bg-muted/30 px-6 py-4">
+                    <TableCell colSpan={5} className="bg-muted/30 px-6 py-4">
                       <CommentThread
                         questionId={q.id}
                         onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}

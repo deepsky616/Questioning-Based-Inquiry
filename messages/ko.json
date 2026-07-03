@@ -1194,7 +1194,8 @@
     "reclassifyNote": "저장하면 자동으로 다시 분류돼요",
     "editDone": "질문을 수정했어요",
     "editFailed": "질문 수정에 실패했어요",
-    "deleteDone": "질문을 삭제했어요"
+    "deleteDone": "질문을 삭제했어요",
+    "lockedHint": "좋아요·댓글이 달린 질문은 수정할 수 없어요. 선생님께 요청해 주세요."
   },
   "ranking": {
     "gradeLabel": "{grade}학년",

@@ -1194,7 +1194,8 @@
     "reclassifyNote": "Saving re-classifies your question automatically",
     "editDone": "Question updated",
     "editFailed": "Failed to update question",
-    "deleteDone": "Question deleted"
+    "deleteDone": "Question deleted",
+    "lockedHint": "Questions with likes or comments can't be edited. Ask your teacher."
   },
   "ranking": {
     "gradeLabel": "Grade {grade}",
