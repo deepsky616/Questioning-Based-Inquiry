@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
+import { chooseModelAuto } from "@/lib/api-config";
 import { logger } from "@/lib/logger";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import {
@@ -147,17 +148,17 @@ export async function POST(req: Request) {
 
     if (aiCfg.apiKey) {
       try {
+        const prompt = buildSequencePrompt({
+          flowId: flow.id,
+          subject: questionSession.subject,
+          topic: questionSession.topic,
+          questions,
+          mode: data.mode,
+        }) + languageDirective(getRequestLocale(req));
         const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-        const model = genAI.getGenerativeModel({ model: aiCfg.model });
-        const result = await model.generateContent(
-          buildSequencePrompt({
-            flowId: flow.id,
-            subject: questionSession.subject,
-            topic: questionSession.topic,
-            questions,
-            mode: data.mode,
-          }) + languageDirective(getRequestLocale(req)),
-        );
+        // 프롬프트 크기에 따라 모델 자동 선택(질문이 많으면 flash로 품질 확보)
+        const model = genAI.getGenerativeModel({ model: chooseModelAuto(aiCfg.model, prompt.length) });
+        const result = await model.generateContent(prompt);
         const text = result.response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;

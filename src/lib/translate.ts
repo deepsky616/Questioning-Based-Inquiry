@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createHash } from "crypto";
 import { languageName } from "@/lib/locale";
+import { alternateModel, chooseModelAuto } from "@/lib/api-config";
+import { isTransientAiError } from "@/lib/ai-errors";
 
 /** 원문 변경 감지용 해시 (원문이 수정되면 캐시된 번역을 폐기·재생성한다) */
 export function contentHash(text: string): string {
@@ -21,13 +23,6 @@ export async function translateTexts(
   if (texts.length === 0) return [];
   const target = languageName(targetLocale);
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  // JSON 출력 강제 — 마크다운·설명이 섞여 파싱에 실패하는 것을 방지
-  const gemini = genAI.getGenerativeModel({
-    model,
-    generationConfig: { responseMimeType: "application/json" },
-  });
-
   const numbered = texts.map((t, i) => `${i + 1}. ${t}`).join("\n");
   const prompt = `Translate the following numbered Korean texts (questions or comments written by K-12 students) into ${target}.
 Keep the meaning faithful and the tone natural for students. Do not add explanations.
@@ -36,7 +31,26 @@ Return ONLY a JSON array of strings, one per input, in the same order. No markdo
 Texts:
 ${numbered}`;
 
-  const result = await gemini.generateContent(prompt);
+  // 프롬프트 크기에 따라 모델 자동 선택(짧은 배치 flash-lite / 긴 배치 flash)
+  const primary = chooseModelAuto(model, prompt.length);
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const runWith = async (modelName: string) => {
+    // JSON 출력 강제 — 마크다운·설명이 섞여 파싱에 실패하는 것을 방지
+    const gemini = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: { responseMimeType: "application/json" },
+    });
+    return gemini.generateContent(prompt);
+  };
+
+  let result;
+  try {
+    result = await runWith(primary);
+  } catch (err) {
+    // 혼잡(503/429)이면 대체 모델로 1회 페일오버
+    if (!isTransientAiError(err)) throw err;
+    result = await runWith(alternateModel(primary));
+  }
   const raw = result.response.text().trim();
   const match = raw.match(/\[[\s\S]*\]/);
   if (!match) throw new Error("Invalid translation response");

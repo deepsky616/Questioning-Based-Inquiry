@@ -4,6 +4,7 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
+import { chooseModelAuto } from "@/lib/api-config";
 import {
   BASE_POINTS,
   AI_BONUS_TYPES,
@@ -89,11 +90,12 @@ async function callAI(req: AwardRequest, userId: string): Promise<AIVerdictRespo
   const aiCfg = await resolveUserAiConfig(userId);
   if (!aiCfg.apiKey) return null;
 
-  const model = aiCfg.model;
   const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-  const gemini = genAI.getGenerativeModel({ model, systemInstruction: AI_SYSTEM });
+  const prompt = buildPrompt(req);
+  // 프롬프트 크기에 따라 모델 자동 선택
+  const gemini = genAI.getGenerativeModel({ model: chooseModelAuto(aiCfg.model, prompt.length), systemInstruction: AI_SYSTEM });
   try {
-    const result = await gemini.generateContent(buildPrompt(req));
+    const result = await gemini.generateContent(prompt);
     return tryParseAI(result.response.text());
   } catch {
     return null;

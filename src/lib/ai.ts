@@ -2,28 +2,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
+import { alternateModel, chooseModelAuto } from "@/lib/api-config";
+import { AiBusyError, AiKeyMissingError, isTransientAiError } from "@/lib/ai-errors";
 
-/** AI 키가 없을 때(교사 미설정 등) 던지는 에러. 라우트에서 503 응답으로 매핑한다. */
-export class AiKeyMissingError extends Error {
-  constructor() {
-    super("AI_KEY_MISSING");
-    this.name = "AiKeyMissingError";
-  }
-}
-
-/** Gemini가 일시적으로 혼잡(503/429)할 때 던지는 에러. 라우트에서 사용자 안내로 매핑한다. */
-export class AiBusyError extends Error {
-  constructor() {
-    super("AI_BUSY");
-    this.name = "AiBusyError";
-  }
-}
-
-/** 일시 오류(모델 혼잡·레이트 리밋) 판별 — 재시도 대상 */
-export function isTransientAiError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
-  return /\b(503|429)\b|Service Unavailable|high demand|overloaded|Resource has been exhausted|Too Many Requests/i.test(msg);
-}
+// 기존 import 경로 호환을 위해 재노출 (라우트들은 @/lib/ai에서 가져온다)
+export { AiBusyError, AiKeyMissingError, isTransientAiError };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -39,29 +22,41 @@ export interface GenerateOptions {
 }
 
 /**
- * 통합 AI 호출 계층. resolveUserAiConfig로 키·모델을 결정하고 Gemini를 호출한다.
- * 키가 없으면 AiKeyMissingError를 던진다(라우트에서 503 처리).
- * 모델 혼잡(503/429)은 짧은 백오프로 최대 3회 재시도하고, 그래도 실패하면
- * AiBusyError를 던진다(라우트에서 "잠시 후 다시" 안내로 매핑).
+ * 통합 AI 호출 계층. resolveUserAiConfig로 키를 결정하고 Gemini를 호출한다.
+ * - 모델은 프롬프트 크기에 따라 자동 선택(짧은 작업 flash-lite / 긴 작업 flash, pro 설정은 존중)
+ * - 모델 혼잡(503/429)은 백오프 재시도 후 대체 모델(lite↔flash)로 자동 전환
+ * - 키가 없으면 AiKeyMissingError, 대체 모델까지 혼잡하면 AiBusyError를 던진다
  */
 async function callGemini({ userId, prompt, req, localize, systemInstruction }: GenerateOptions): Promise<string> {
   const cfg = await resolveUserAiConfig(userId);
   if (!cfg.apiKey) throw new AiKeyMissingError();
 
-  const genAI = new GoogleGenerativeAI(cfg.apiKey);
-  const model = genAI.getGenerativeModel(systemInstruction ? { model: cfg.model, systemInstruction } : { model: cfg.model });
   const fullPrompt = localize && req ? prompt + languageDirective(getRequestLocale(req)) : prompt;
+  const primary = chooseModelAuto(cfg.model, fullPrompt.length);
 
-  const MAX_ATTEMPTS = 3;
-  for (let attempt = 1; ; attempt++) {
-    try {
-      const result = await model.generateContent(fullPrompt);
-      return result.response.text().trim();
-    } catch (err) {
-      if (!isTransientAiError(err)) throw err;
-      if (attempt >= MAX_ATTEMPTS) throw new AiBusyError();
-      await sleep(800 * attempt); // 0.8s, 1.6s
+  const genAI = new GoogleGenerativeAI(cfg.apiKey);
+  const runWith = async (modelName: string, attempts: number): Promise<string> => {
+    const model = genAI.getGenerativeModel(
+      systemInstruction ? { model: modelName, systemInstruction } : { model: modelName },
+    );
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const result = await model.generateContent(fullPrompt);
+        return result.response.text().trim();
+      } catch (err) {
+        if (!isTransientAiError(err)) throw err;
+        if (attempt >= attempts) throw new AiBusyError();
+        await sleep(800 * attempt);
+      }
     }
+  };
+
+  try {
+    return await runWith(primary, 2);
+  } catch (err) {
+    // 주 모델이 계속 혼잡하면 대체 모델로 페일오버(모델별 용량 풀이 달라 대개 성공)
+    if (!(err instanceof AiBusyError)) throw err;
+    return runWith(alternateModel(primary), 2);
   }
 }
 

@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { buildAnswerPrompt } from "@/lib/ai-prompts";
 import { validateBulkAiRequest } from "@/lib/questions";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
+import { chooseModelAuto } from "@/lib/api-config";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 
 const schema = z.object({
@@ -53,9 +54,8 @@ export async function POST(req: Request) {
     });
 
     const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-    const model = genAI.getGenerativeModel({ model: aiCfg.model });
 
-    // 각 질문에 대해 AI 답변 동시 생성
+    // 각 질문에 대해 AI 답변 동시 생성 (프롬프트 크기에 따라 모델 자동 선택)
     const aiResults = await Promise.allSettled(
       questions.map(async (q) => {
         const prompt = buildAnswerPrompt(
@@ -63,8 +63,9 @@ export async function POST(req: Request) {
           q.closure ?? undefined,
           q.cognitive ?? undefined,
           q.context ?? undefined
-        );
-        const result = await model.generateContent(prompt + languageDirective(getRequestLocale(req)));
+        ) + languageDirective(getRequestLocale(req));
+        const model = genAI.getGenerativeModel({ model: chooseModelAuto(aiCfg.model, prompt.length) });
+        const result = await model.generateContent(prompt);
         return { id: q.id, answer: result.response.text().trim() };
       })
     );

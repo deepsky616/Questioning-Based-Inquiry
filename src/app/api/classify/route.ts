@@ -5,7 +5,7 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { fallbackClassification, parseClassificationResponse } from "@/lib/classify";
-import { isAllowedGeminiModel, resolveApiKey, resolveGeminiModel } from "@/lib/api-config";
+import { chooseModelAuto, isAllowedGeminiModel, resolveApiKey, resolveGeminiModel } from "@/lib/api-config";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 
@@ -81,9 +81,10 @@ export async function POST(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const genModel = genAI.getGenerativeModel({ model });
-
     const fullPrompt = `${CLASSIFICATION_PROMPT}\n\n[분석할 질문]\n${content}${languageDirective(getRequestLocale(req))}`;
+
+    // 프롬프트 크기에 따라 모델 자동 선택(요청에서 모델을 명시하면 그대로 사용)
+    const genModel = genAI.getGenerativeModel({ model: requestModel ? model : chooseModelAuto(model, fullPrompt.length) });
 
     const result = await genModel.generateContent(fullPrompt);
     const text = result.response.text();
