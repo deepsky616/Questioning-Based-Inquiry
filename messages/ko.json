@@ -952,7 +952,14 @@
     "numberLabel": "{n}번",
     "tabOverview": "개요",
     "tabReports": "상세 리포트",
-    "trendSortTitle": "누르면 활동이 줄어든 학생부터 정렬해요"
+    "trendSortTitle": "누르면 활동이 줄어든 학생부터 정렬해요",
+    "trendBadgeNew": "새 참여",
+    "trendBadgeUp": "늘어남",
+    "trendBadgeFlat": "비슷함",
+    "trendBadgeDown": "줄어듦",
+    "trendSortLabel": "줄어든 학생 먼저 보기",
+    "trendLegend": "추세 막대는 선택한 기간을 6칸으로 나눈 질문 수예요. 배지는 기간 전반과 후반을 비교한 변화입니다 (막대에 마우스를 올리면 칸별 개수가 보여요).",
+    "sparklineTooltip": "구간별 질문 수: {counts}"
   },
   "reports": {
     "analysisFailed": "분석 실패",

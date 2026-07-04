@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { canModerateQuestion } from "@/lib/content-visibility";
+import { normalizeContent } from "@/lib/content-normalize";
+import { checkProfanity } from "@/lib/profanity";
 import { cleanupCommentTranslations } from "@/lib/translation-cleanup";
 import { z } from "zod";
 
@@ -8,6 +11,20 @@ const patchSchema = z.object({
   flagged: z.boolean().optional(),
   content: z.string().min(1).max(300).optional(),
 });
+
+async function getViewer(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      role: true,
+      school: true,
+      grade: true,
+      className: true,
+      teacherClasses: { select: { grade: true, className: true } },
+    },
+  });
+}
 
 /**
  * 댓글 수정.
@@ -28,26 +45,48 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
   const data = patchSchema.parse(body);
 
-  const existing = await prisma.comment.findUnique({
-    where: { id: params.commentId },
-    select: { authorId: true },
-  });
+  const [viewer, existing] = await Promise.all([
+    getViewer(userId),
+    prisma.comment.findUnique({
+      where: { id: params.commentId },
+      select: {
+        authorId: true,
+        questionId: true,
+        question: {
+          select: {
+            isPublic: true,
+            authorId: true,
+            author: { select: { role: true, school: true, grade: true, className: true } },
+          },
+        },
+      },
+    }),
+  ]);
   if (!existing) {
     return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
   }
+  if (existing.questionId !== params.id) {
+    return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
+  }
 
-  const updateData: { flagged?: boolean; content?: string } = {};
+  const updateData: { flagged?: boolean; flagReason?: string | null; content?: string; normalizedContent?: string } = {};
   if (data.flagged !== undefined) {
-    if (role !== "TEACHER") {
+    if (role !== "TEACHER" || !canModerateQuestion(viewer, existing.question)) {
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
     updateData.flagged = data.flagged;
+    if (!data.flagged) updateData.flagReason = null;
   }
   if (data.content !== undefined) {
     if (existing.authorId !== userId) {
       return NextResponse.json({ error: "본인 댓글만 수정할 수 있습니다" }, { status: 403 });
     }
-    updateData.content = data.content.trim();
+    const content = data.content.trim();
+    const profanity = checkProfanity(content);
+    updateData.content = content;
+    updateData.normalizedContent = normalizeContent(content);
+    updateData.flagged = profanity.flagged;
+    updateData.flagReason = profanity.flagged ? profanity.reason : null;
   }
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: "변경할 내용이 없습니다" }, { status: 400 });
@@ -58,6 +97,10 @@ export async function PATCH(
     data: updateData,
     include: { author: { select: { id: true, name: true } } },
   });
+
+  if (data.content !== undefined) {
+    await cleanupCommentTranslations([params.commentId]);
+  }
 
   return NextResponse.json(comment);
 }
@@ -74,14 +117,30 @@ export async function DELETE(
   const userId = (session.user as { id: string }).id;
   const role = (session.user as { role?: string }).role;
 
-  const comment = await prisma.comment.findUnique({
-    where: { id: params.commentId },
-    select: { authorId: true },
-  });
+  const [viewer, comment] = await Promise.all([
+    getViewer(userId),
+    prisma.comment.findUnique({
+      where: { id: params.commentId },
+      select: {
+        authorId: true,
+        questionId: true,
+        question: {
+          select: {
+            isPublic: true,
+            authorId: true,
+            author: { select: { role: true, school: true, grade: true, className: true } },
+          },
+        },
+      },
+    }),
+  ]);
   if (!comment) {
     return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
   }
-  if (comment.authorId !== userId && role !== "TEACHER") {
+  if (comment.questionId !== params.id) {
+    return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
+  }
+  if (comment.authorId !== userId && (role !== "TEACHER" || !canModerateQuestion(viewer, comment.question))) {
     return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
   }
 

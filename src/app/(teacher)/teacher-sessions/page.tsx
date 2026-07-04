@@ -398,26 +398,26 @@ export default function TeacherSessionsPage() {
           <CardHeader className="pb-3 space-y-3">
             <CardTitle className="text-base">{t("listTitle")}</CardTitle>
             {/* 조회(필터, 왼쪽) · 정렬(오른쪽) */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-2">
             {/* 필터 그룹 */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground">{t("filterLabel")}</span>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <span className="col-span-2 text-xs font-medium text-muted-foreground sm:col-span-1">{t("filterLabel")}</span>
               <Select value={listFilterDate || "__all__"} onValueChange={(v) => setListFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 text-sm bg-background w-32"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
+                <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-32"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("allDates")}</SelectItem>
                   {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={listFilterSubject || "__all__"} onValueChange={(v) => setListFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 text-sm bg-background w-28"><SelectValue placeholder={t("allSubjects")} /></SelectTrigger>
+                <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-28"><SelectValue placeholder={t("allSubjects")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
                   {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={listFilterTopic || "__all__"} onValueChange={(v) => setListFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 text-sm bg-background w-36"><SelectValue placeholder={t("allTopics")} /></SelectTrigger>
+                <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-36"><SelectValue placeholder={t("allTopics")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("allTopics")}</SelectItem>
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -427,7 +427,7 @@ export default function TeacherSessionsPage() {
                 <button
                   type="button"
                   onClick={() => { setListFilterDate(""); setListFilterSubject(""); setListFilterTopic(""); }}
-                  className="h-9 px-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                  className="h-9 px-1 text-left text-xs font-medium text-indigo-600 hover:text-indigo-800 sm:text-center"
                 >
                   {tc("reset")}
                 </button>
@@ -435,7 +435,7 @@ export default function TeacherSessionsPage() {
             </div>
 
             {/* 정렬 그룹 (오른쪽) */}
-            <div className="ml-auto flex items-center gap-2">
+            <div className="flex items-center gap-2 lg:ml-auto">
               <span className="text-xs font-medium text-muted-foreground">{t("sortLabel")}</span>
               <div className="flex rounded-md border overflow-hidden h-9">
                 {(["desc", "asc"] as const).map((v, i) => (
@@ -467,7 +467,7 @@ export default function TeacherSessionsPage() {
                     {t("upcomingSessions")}
                     <span className="text-xs font-normal text-muted-foreground">{t("countSuffix", { count: activeSessions.length })}</span>
                   </h3>
-                  <div className="hidden sm:flex items-center gap-5 pr-4 text-xs font-normal text-foreground whitespace-nowrap">
+                  <div className="hidden lg:flex items-center gap-5 pr-4 text-xs font-normal text-foreground whitespace-nowrap">
                     <span className="w-20 text-center">{tSeq("activeLabel")}</span>
                     <span className="w-20 text-center">{tSeq("publicLabel")}</span>
                     <span className="w-20 text-center">{tSeq("likesLabel")}</span>
@@ -500,7 +500,7 @@ export default function TeacherSessionsPage() {
                     {t("pastSessions")}
                     <span className="text-xs font-normal text-muted-foreground">{t("countSuffix", { count: pastSessions.length })}</span>
                   </h3>
-                  <div className="hidden sm:flex items-center gap-5 pr-4 text-xs font-normal text-foreground whitespace-nowrap">
+                  <div className="hidden lg:flex items-center gap-5 pr-4 text-xs font-normal text-foreground whitespace-nowrap">
                     <span className="w-20 text-center">{tSeq("activeLabel")}</span>
                     <span className="w-20 text-center">{tSeq("publicLabel")}</span>
                     <span className="w-20 text-center">{tSeq("likesLabel")}</span>
@@ -550,6 +550,7 @@ function SessionRow({
 }) {
   const t = useTranslations("sessions");
   const tc = useTranslations("common");
+  const tSeq = useTranslations("sequencePanel");
   const isDesignSession = !!session.unitDesignId;
   const [editing, setEditing] = useState(false);
   const [eDate, setEDate] = useState(session.date);
@@ -585,11 +586,11 @@ function SessionRow({
 
   return (
     <div className={session.isActive ? "bg-card" : "bg-muted/40"}>
-      <div className={`flex items-center justify-between px-4 py-3 transition-colors ${session.isActive ? "hover:bg-muted/50" : "hover:bg-muted"}`}>
-        <div className="flex items-center gap-3 min-w-0">
+      <div className={`flex flex-col gap-3 px-4 py-3 transition-colors lg:flex-row lg:items-center lg:justify-between ${session.isActive ? "hover:bg-muted/50" : "hover:bg-muted"}`}>
+        <div className="flex min-w-0 items-start gap-3 lg:items-center">
           <span className={`shrink-0 w-2 h-2 rounded-full ${session.isActive ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} />
           <div className="min-w-0">
-            <p className={`text-sm font-medium truncate ${session.isActive ? "text-foreground" : "text-muted-foreground"}`}>
+            <p className={`line-clamp-2 text-sm font-medium lg:truncate ${session.isActive ? "text-foreground" : "text-muted-foreground"}`}>
               {buildSessionLabel(session.date, session.subject, session.topic)}
             </p>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -619,12 +620,19 @@ function SessionRow({
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-5 shrink-0">
-          <div className="w-20 flex justify-center"><Switch checked={session.isActive} onCheckedChange={() => onToggleActive(session.id, session.isActive)} /></div>
-          <div className="w-20 flex justify-center"><Switch checked={session.defaultQuestionPublic} onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)} /></div>
-          <div className="w-20 flex justify-center"><Switch checked={session.likesVisibleToPeers} onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)} /></div>
-          <div className="w-20 flex justify-center"><Switch checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} /></div>
-          <div className="w-24 flex justify-center gap-1">
+        <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 lg:flex lg:shrink-0 lg:items-center lg:gap-5 lg:border-t-0 lg:pt-0">
+          {([
+            [tSeq("activeLabel"), <Switch key="active" checked={session.isActive} onCheckedChange={() => onToggleActive(session.id, session.isActive)} />],
+            [tSeq("publicLabel"), <Switch key="public" checked={session.defaultQuestionPublic} onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)} />],
+            [tSeq("likesLabel"), <Switch key="likes" checked={session.likesVisibleToPeers} onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)} />],
+            [tSeq("commentsLabel"), <Switch key="comments" checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} />],
+          ] as const).map(([label, control]) => (
+            <div key={label} className="flex items-center justify-between rounded-md border bg-background px-3 py-2 lg:w-20 lg:justify-center lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
+              <span className="text-xs font-medium text-muted-foreground lg:hidden">{label}</span>
+              {control}
+            </div>
+          ))}
+          <div className="col-span-2 flex justify-end gap-1 lg:col-span-1 lg:w-24 lg:justify-center">
             {/* 아이콘 버튼(질문 목록 관리 열과 동일 패턴) */}
             <button
               type="button"

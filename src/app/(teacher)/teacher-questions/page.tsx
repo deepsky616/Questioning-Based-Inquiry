@@ -76,6 +76,7 @@ export default function QuestionsPage() {
   const t = useTranslations("teacherQ");
   const tc = useTranslations("common");
   const tSess = useTranslations("sessions");
+  const tTarget = useTranslations("targetSelector");
   const ct = useContentTranslation();
   const queryClient = useQueryClient();
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -559,118 +560,99 @@ export default function QuestionsPage() {
     return list.length === 0 ? (
       <EmptyState icon="🔍" title={t("noQuestions")} />
     ) : (
-      <div className="overflow-x-auto"><Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-8">
-              <input
-                type="checkbox"
-                checked={allChecked}
-                onChange={() => allChecked ? clearSelection() : selectAll(list)}
-                className="h-4 w-4 rounded border-input accent-indigo-600"
-              />
-            </TableHead>
-            <TableHead>{t("colStudent")}</TableHead>
-            <TableHead>{t("colContent")}</TableHead>
-            <TableHead className="w-20 text-center break-keep">{t("colLikes")}</TableHead>
-            <TableHead className="w-16 text-center">{t("colComments")}</TableHead>
-            <TableHead className="w-20 text-center">{t("colPublic")}</TableHead>
-            <TableHead className="w-28 text-center">{t("colManage")}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {list.map((q) => (
-            <Fragment key={q.id}>
-            <TableRow className={selectedIds.has(q.id) ? "bg-indigo-50 dark:bg-indigo-950/40/40" : ""}>
-              <TableCell>
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(q.id)}
-                  onChange={() => toggleSelect(q.id)}
-                  className="h-4 w-4 rounded border-input accent-indigo-600"
-                />
-              </TableCell>
-              <TableCell>
-                <div className="text-sm font-medium">{q.author.name}</div>
-                {q.author.className && (
-                  <div className="text-xs text-muted-foreground">
-                    {[
-                      q.author.grade && t("gradeLabel", { grade: q.author.grade }),
-                      q.author.className && t("classLabel", { className: q.author.className }),
-                      q.author.studentNumber && t("numberLabel", { studentNumber: q.author.studentNumber }),
-                    ].filter(Boolean).join(" ")}
-                  </div>
-                )}
-              </TableCell>
-              <TableCell className="max-w-md">
-                {q.flagged && (
-                  <div className="mb-1.5 flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                      ⚠️ {q.flagReason || t("flagSuspected")}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleClearFlag(q)}
-                      className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800"
-                    >
-                      {t("clearFlag")}
-                    </button>
-                  </div>
-                )}
-                <p className="whitespace-pre-wrap break-words text-sm">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
-                {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
-                {/* 분류 배지(답의 개방성·생각의 깊이)를 내용 아래에 */}
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
-                </div>
-                {/* 수업세션(📚) · 작성일시(🕒) — 수업세션은 전체 조회일 때만(특정 세션 선택 시엔 중복) */}
-                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                  {selectedSessionId === "all" && q.session && (
-                    <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
-                      <span>📚</span>
-                      <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-1"><span>🕒</span><span>{formatDateTime(q.createdAt)}</span></span>
-                </div>
-              </TableCell>
-              <TableCell className="text-center">
-                <div className="group relative inline-block">
-                  <span className="flex items-center gap-1 text-sm font-medium text-rose-500">
-                    ❤️ {q.likeCount}
-                  </span>
-                  {(q.likedBy?.length ?? 0) > 0 && (
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-36 shadow-lg">
-                      <p className="font-semibold mb-1">{t("likedByStudents")}</p>
-                      {q.likedBy!.map((u) => (
-                        <p key={u.id} className="truncate">{u.name}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell className="text-center">
-                <button
-                  type="button"
-                  onClick={() => setExpandedCommentId((prev) => (prev === q.id ? null : q.id))}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800"
-                  title={t("commentTooltip")}
-                >
-                  💬 {commentCountOverride[q.id] ?? q.comments?.length ?? 0}
-                </button>
-              </TableCell>
-              <TableCell>
-                <div className="flex justify-center">
-                  <Switch
-                    checked={q.isPublic}
-                    onCheckedChange={() => handleToggleQuestionPublic(q)}
+      <>
+        <div className="space-y-3 lg:hidden">
+          <label className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={allChecked}
+              onChange={() => allChecked ? clearSelection() : selectAll(list)}
+              className="h-4 w-4 rounded border-input accent-indigo-600"
+            />
+            {tTarget("selectAll")}
+          </label>
+          {list.map((q) => {
+            const commentCount = commentCountOverride[q.id] ?? q.comments?.length ?? 0;
+            return (
+              <div key={q.id} className={`rounded-lg border bg-card p-3 ${selectedIds.has(q.id) ? "border-indigo-300 bg-indigo-50/50 dark:bg-indigo-950/20" : ""}`}>
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(q.id)}
+                    onChange={() => toggleSelect(q.id)}
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-input accent-indigo-600"
                   />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="text-sm font-semibold text-foreground">{q.author.name}</span>
+                      {q.author.className && (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                          {[
+                            q.author.grade && t("gradeLabel", { grade: q.author.grade }),
+                            q.author.className && t("classLabel", { className: q.author.className }),
+                            q.author.studentNumber && t("numberLabel", { studentNumber: q.author.studentNumber }),
+                          ].filter(Boolean).join(" ")}
+                        </span>
+                      )}
+                    </div>
+
+                    {q.flagged && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                          ⚠️ {q.flagReason || t("flagSuspected")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleClearFlag(q)}
+                          className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800"
+                        >
+                          {t("clearFlag")}
+                        </button>
+                      </div>
+                    )}
+
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-foreground">
+                      {ct.text({ type: "QUESTION", id: q.id }, q.content)}
+                    </p>
+                    {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-1" />}
+
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className={`rounded px-2 py-0.5 text-xs break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
+                      <span className={`rounded px-2 py-0.5 text-xs break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      {selectedSessionId === "all" && q.session && (
+                        <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
+                          <span>📚</span>
+                          <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1"><span>🕒</span><span>{formatDateTime(q.createdAt)}</span></span>
+                    </div>
+                  </div>
                 </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-1 justify-center">
-                  {/* 아이콘 버튼(학생 내 질문 관리 열과 동일 패턴) — 툴팁·aria로 의미 유지 */}
+
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
+                  <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
+                    <p className="text-[11px] text-muted-foreground">{t("colLikes")}</p>
+                    <p className="text-sm font-semibold text-rose-500">❤️ {q.likeCount}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCommentId((prev) => (prev === q.id ? null : q.id))}
+                    className="rounded-md bg-muted/40 px-2 py-2 text-center text-indigo-600"
+                    title={t("commentTooltip")}
+                  >
+                    <p className="text-[11px] text-muted-foreground">{t("colComments")}</p>
+                    <p className="text-sm font-semibold">💬 {commentCount}</p>
+                  </button>
+                  <div className="flex flex-col items-center justify-center rounded-md bg-muted/40 px-2 py-2">
+                    <p className="mb-1 text-[11px] text-muted-foreground">{t("colPublic")}</p>
+                    <Switch checked={q.isPublic} onCheckedChange={() => handleToggleQuestionPublic(q)} />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex justify-end gap-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -678,40 +660,189 @@ export default function QuestionsPage() {
                       setCorrectionClosure(q.closure);
                       setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
                     }}
-                    className="rounded-md border border-indigo-200 p-1.5 text-indigo-600 hover:bg-indigo-50"
+                    className="rounded-md border border-indigo-200 p-2 text-indigo-600 hover:bg-indigo-50"
                     title={tc("edit")}
                     aria-label={tc("edit")}
                   >
-                    <Pencil className="h-3.5 w-3.5" />
+                    <Pencil className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteQuestion(q)}
-                    className="rounded-md border border-red-200 p-1.5 text-red-500 hover:bg-red-50"
+                    className="rounded-md border border-red-200 p-2 text-red-500 hover:bg-red-50"
                     title={tc("delete")}
                     aria-label={tc("delete")}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-              </TableCell>
+
+                {expandedCommentId === q.id && (
+                  <div className="mt-3 rounded-lg bg-muted/30 p-3">
+                    <CommentThread
+                      questionId={q.id}
+                      preloaded={q.comments ?? []}
+                      canModerate
+                      onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden overflow-x-auto lg:block"><Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-8">
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  onChange={() => allChecked ? clearSelection() : selectAll(list)}
+                  className="h-4 w-4 rounded border-input accent-indigo-600"
+                />
+              </TableHead>
+              <TableHead>{t("colStudent")}</TableHead>
+              <TableHead>{t("colContent")}</TableHead>
+              <TableHead className="w-20 text-center break-keep">{t("colLikes")}</TableHead>
+              <TableHead className="w-16 text-center">{t("colComments")}</TableHead>
+              <TableHead className="w-20 text-center">{t("colPublic")}</TableHead>
+              <TableHead className="w-28 text-center">{t("colManage")}</TableHead>
             </TableRow>
-            {expandedCommentId === q.id && (
-              <TableRow>
-                <TableCell colSpan={7} className="bg-muted/30 px-6 py-4">
-                  <CommentThread
-                    questionId={q.id}
-                    preloaded={q.comments ?? []}
-                    canModerate
-                    onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}
+          </TableHeader>
+          <TableBody>
+            {list.map((q) => (
+              <Fragment key={q.id}>
+              <TableRow className={selectedIds.has(q.id) ? "bg-indigo-50 dark:bg-indigo-950/40/40" : ""}>
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(q.id)}
+                    onChange={() => toggleSelect(q.id)}
+                    className="h-4 w-4 rounded border-input accent-indigo-600"
                   />
                 </TableCell>
+                <TableCell>
+                  <div className="text-sm font-medium">{q.author.name}</div>
+                  {q.author.className && (
+                    <div className="text-xs text-muted-foreground">
+                      {[
+                        q.author.grade && t("gradeLabel", { grade: q.author.grade }),
+                        q.author.className && t("classLabel", { className: q.author.className }),
+                        q.author.studentNumber && t("numberLabel", { studentNumber: q.author.studentNumber }),
+                      ].filter(Boolean).join(" ")}
+                    </div>
+                  )}
+                </TableCell>
+                <TableCell className="max-w-md">
+                  {q.flagged && (
+                    <div className="mb-1.5 flex items-center gap-2 flex-wrap">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                        ⚠️ {q.flagReason || t("flagSuspected")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleClearFlag(q)}
+                        className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800"
+                      >
+                        {t("clearFlag")}
+                      </button>
+                    </div>
+                  )}
+                  <p className="whitespace-pre-wrap break-words text-sm">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
+                  {ct.canTranslate && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    {selectedSessionId === "all" && q.session && (
+                      <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
+                        <span>📚</span>
+                        <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1"><span>🕒</span><span>{formatDateTime(q.createdAt)}</span></span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-center">
+                  <div className="group relative inline-block">
+                    <span className="flex items-center gap-1 text-sm font-medium text-rose-500">
+                      ❤️ {q.likeCount}
+                    </span>
+                    {(q.likedBy?.length ?? 0) > 0 && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-36 shadow-lg">
+                        <p className="font-semibold mb-1">{t("likedByStudents")}</p>
+                        {q.likedBy!.map((u) => (
+                          <p key={u.id} className="truncate">{u.name}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedCommentId((prev) => (prev === q.id ? null : q.id))}
+                    className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                    title={t("commentTooltip")}
+                  >
+                    💬 {commentCountOverride[q.id] ?? q.comments?.length ?? 0}
+                  </button>
+                </TableCell>
+                <TableCell>
+                  <div className="flex justify-center">
+                    <Switch
+                      checked={q.isPublic}
+                      onCheckedChange={() => handleToggleQuestionPublic(q)}
+                    />
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-1 justify-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedQuestion(q);
+                        setCorrectionClosure(q.closure);
+                        setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
+                      }}
+                      className="rounded-md border border-indigo-200 p-1.5 text-indigo-600 hover:bg-indigo-50"
+                      title={tc("edit")}
+                      aria-label={tc("edit")}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteQuestion(q)}
+                      className="rounded-md border border-red-200 p-1.5 text-red-500 hover:bg-red-50"
+                      title={tc("delete")}
+                      aria-label={tc("delete")}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </TableCell>
               </TableRow>
-            )}
-            </Fragment>
-          ))}
-        </TableBody>
-      </Table></div>
+              {expandedCommentId === q.id && (
+                <TableRow>
+                  <TableCell colSpan={7} className="bg-muted/30 px-6 py-4">
+                    <CommentThread
+                      questionId={q.id}
+                      preloaded={q.comments ?? []}
+                      canModerate
+                      onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
+              </Fragment>
+            ))}
+          </TableBody>
+        </Table></div>
+      </>
     );
   };
 

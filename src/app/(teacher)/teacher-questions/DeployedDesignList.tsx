@@ -101,25 +101,25 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
           <span className="text-xs font-normal text-muted-foreground">{t("listCountSuffix", { count: deployedAll.length })}</span>
         </div>
         {/* 조회(필터, 왼쪽) · 정렬(오른쪽) — 수업세션 목록과 동일 */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">{tSess("filterLabel")}</span>
+        <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <span className="col-span-2 text-xs font-medium text-muted-foreground sm:col-span-1">{tSess("filterLabel")}</span>
             <Select value={deployFilterDate || "__all__"} onValueChange={(v) => setDeployFilterDate(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-9 text-sm bg-background w-32"><SelectValue placeholder={tSess("allDates")} /></SelectTrigger>
+              <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-32"><SelectValue placeholder={tSess("allDates")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">{tSess("allDates")}</SelectItem>
                 {deployOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={deployFilterSubject || "__all__"} onValueChange={(v) => setDeployFilterSubject(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-9 text-sm bg-background w-28"><SelectValue placeholder={tSess("allSubjects")} /></SelectTrigger>
+              <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-28"><SelectValue placeholder={tSess("allSubjects")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">{tSess("allSubjects")}</SelectItem>
                 {deployOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={deployFilterTopic || "__all__"} onValueChange={(v) => setDeployFilterTopic(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-9 text-sm bg-background w-36"><SelectValue placeholder={tSess("allTopics")} /></SelectTrigger>
+              <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-36"><SelectValue placeholder={tSess("allTopics")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">{tSess("allTopics")}</SelectItem>
                 {deployOptions.topics.map((tp) => <SelectItem key={tp} value={tp}>{tp}</SelectItem>)}
@@ -129,13 +129,13 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
               <button
                 type="button"
                 onClick={() => { setDeployFilterDate(""); setDeployFilterSubject(""); setDeployFilterTopic(""); }}
-                className="h-9 px-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                className="h-9 px-1 text-left text-xs font-medium text-indigo-600 hover:text-indigo-800 sm:text-center"
               >
                 {tc("reset")}
               </button>
             )}
           </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-2 lg:ml-auto">
             <span className="text-xs font-medium text-muted-foreground">{tSess("sortLabel")}</span>
             <div className="flex rounded-md border overflow-hidden h-9">
               {(["desc", "asc"] as const).map((v, i) => (

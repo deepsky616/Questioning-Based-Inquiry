@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { teacherCanSeeAuthor, canViewQuestion, isCommentVisibleToViewer, type Viewer, type AuthorInfo } from "@/lib/content-visibility";
+import {
+  teacherCanSeeAuthor,
+  canViewQuestion,
+  canCommentOnQuestion,
+  canModerateQuestion,
+  isCommentVisibleToViewer,
+  type Viewer,
+  type AuthorInfo,
+} from "@/lib/content-visibility";
 
 const student: AuthorInfo = { role: "STUDENT", school: "한빛초", grade: "5", className: "1" };
 
@@ -37,6 +45,61 @@ describe("canViewQuestion", () => {
   it("비공개 질문은 담당 교사만, 다른 학급 교사는 불가", () => {
     expect(canViewQuestion(teacherOf([{ grade: "5", className: "1" }]), q())).toBe(true);
     expect(canViewQuestion(teacherOf([{ grade: "6", className: "2" }]), q())).toBe(false);
+  });
+});
+
+describe("canCommentOnQuestion", () => {
+  const studentQuestion = (over: Partial<{ isPublic: boolean; authorId: string; author: AuthorInfo }> = {}) => ({
+    isPublic: true,
+    authorId: "s1",
+    author: student,
+    ...over,
+  });
+  const teacherQuestion = (authorId = "t1", school = "한빛초") => ({
+    isPublic: true,
+    authorId,
+    author: { role: "TEACHER", school, grade: null, className: null },
+  });
+
+  it("같은 학급 학생은 공개 질문에 댓글을 쓸 수 있다", () => {
+    expect(canCommentOnQuestion({ ...studentViewer("s2"), grade: "5", className: "1" }, studentQuestion())).toBe(true);
+  });
+
+  it("다른 학급 학생은 공개 질문 id를 알아도 댓글을 쓸 수 없다", () => {
+    expect(canCommentOnQuestion({ ...studentViewer("s2"), grade: "6", className: "2" }, studentQuestion())).toBe(false);
+  });
+
+  it("학생은 같은 학교 교사가 배포한 공개 질문에 댓글을 쓸 수 있다", () => {
+    expect(canCommentOnQuestion({ ...studentViewer("s2"), grade: "5", className: "1" }, teacherQuestion())).toBe(true);
+  });
+
+  it("학생은 다른 학교 교사 질문에 댓글을 쓸 수 없다", () => {
+    expect(canCommentOnQuestion({ ...studentViewer("s2"), grade: "5", className: "1" }, teacherQuestion("t1", "다른초"))).toBe(false);
+  });
+
+  it("담당 학급 교사만 학생 질문에 댓글을 쓸 수 있다", () => {
+    expect(canCommentOnQuestion(teacherOf([{ grade: "5", className: "1" }]), studentQuestion())).toBe(true);
+    expect(canCommentOnQuestion(teacherOf([{ grade: "6", className: "2" }]), studentQuestion())).toBe(false);
+  });
+
+  it("비공개 질문은 담당 교사와 작성자 본인만 댓글을 쓸 수 있다", () => {
+    const privateQuestion = studentQuestion({ isPublic: false });
+    expect(canCommentOnQuestion(teacherOf([{ grade: "5", className: "1" }]), privateQuestion)).toBe(true);
+    expect(canCommentOnQuestion({ ...studentViewer("s1"), grade: "5", className: "1" }, privateQuestion)).toBe(true);
+    expect(canCommentOnQuestion({ ...studentViewer("s2"), grade: "5", className: "1" }, privateQuestion)).toBe(false);
+  });
+});
+
+describe("canModerateQuestion", () => {
+  const q = { isPublic: true, authorId: "s1", author: student };
+
+  it("담당 학급 교사만 질문 댓글을 관리할 수 있다", () => {
+    expect(canModerateQuestion(teacherOf([{ grade: "5", className: "1" }]), q)).toBe(true);
+    expect(canModerateQuestion(teacherOf([{ grade: "6", className: "2" }]), q)).toBe(false);
+  });
+
+  it("교사는 본인이 만든 교사 질문을 관리할 수 있다", () => {
+    expect(canModerateQuestion(teacherOf([]), { isPublic: true, authorId: "t1", author: { role: "TEACHER", school: "한빛초", grade: null, className: null } })).toBe(true);
   });
 });
 

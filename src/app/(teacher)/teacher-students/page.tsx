@@ -733,7 +733,46 @@ export default function StudentsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto"><Table>
+                <div className="space-y-2 lg:hidden">
+                  {classStudents.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSelected(s)}
+                      className="w-full rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/40"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground">{s.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {s.studentNumber ? t("numberSuffix", { n: s.studentNumber }) : "-"}
+                            {" · "}
+                            {(() => { const r = lastActiveLabel(s.lastActivityAt); return r ? t(r.key, r.v) : "-"; })()}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
+                          {t("detailBtn")}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
+                          <p className="text-[11px] text-muted-foreground">{t("colQuestion")}</p>
+                          <p className={`text-sm font-semibold ${s.questionCount > 0 ? "text-indigo-600" : "text-muted-foreground"}`}>{s.questionCount}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
+                          <p className="text-[11px] text-muted-foreground">{t("colAnswer")}</p>
+                          <p className={`text-sm font-semibold ${s.commentCount > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>{s.commentCount}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
+                          <p className="text-[11px] text-muted-foreground">{t("colPoint")}</p>
+                          <p className={`text-sm font-semibold ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>{s.totalPoints}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto lg:block"><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-16 text-center whitespace-nowrap">{t("colNumber")}</TableHead>

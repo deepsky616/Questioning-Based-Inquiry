@@ -860,7 +860,52 @@ export default function CurriculumPage() {
               </div>
 
               {/* 내용 요소 표 (선택 가능) */}
-              <div className="rounded-lg border overflow-hidden">
+              <div className="space-y-3 lg:hidden">
+                {([
+                  [t("knowledge"), curriculumData.knowledgeItems.slice(0, KNOWLEDGE_ITEM_LIMIT), selectedKnowledge, setSelectedKnowledge, KNOWLEDGE_ITEM_LIMIT, "k-mobile"],
+                  [t("process"), curriculumData.processItems.slice(0, PROCESS_ITEM_LIMIT), selectedProcess, setSelectedProcess, PROCESS_ITEM_LIMIT, "p-mobile"],
+                  [t("value"), curriculumData.valueItems.slice(0, VALUE_ITEM_LIMIT), selectedValue, setSelectedValue, VALUE_ITEM_LIMIT, "v-mobile"],
+                ] as const).map(([label, items, selected, setSelected, limit, prefix]) => (
+                  <div key={prefix} className="rounded-lg border bg-card">
+                    <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+                      <span className="text-sm font-semibold text-foreground">{label}</span>
+                      <span className="flex gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelected(selectAllContentItems(items, limit))}
+                          className="text-xs font-normal text-indigo-600 underline hover:text-indigo-800"
+                        >
+                          {t("selectAll")}
+                        </button>
+                        <span className="text-xs font-normal text-muted-foreground">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelected([])}
+                          className="text-xs font-normal text-indigo-600 underline hover:text-indigo-800"
+                        >
+                          {t("deselectAll")}
+                        </button>
+                      </span>
+                    </div>
+                    <ul className="space-y-1.5 px-3 py-3">
+                      {items.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            id={`${prefix}-${i}`}
+                            checked={selected.includes(item)}
+                            onChange={() => setSelected((prev) => toggleContentItem(prev, item))}
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-input"
+                          />
+                          <label htmlFor={`${prefix}-${i}`} className="cursor-pointer text-xs leading-snug text-foreground">{item}</label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden rounded-lg border overflow-hidden lg:block">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/40">
                     <tr>
@@ -1399,9 +1444,9 @@ export default function CurriculumPage() {
                   onDragStart={() => setDragInquiryIndex(i)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => handleInquiryDrop(i)}
-                  className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 ${TYPE_COLOR[q.type] ?? "bg-card"}`}
+                  className={`flex flex-col gap-2 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-start ${TYPE_COLOR[q.type] ?? "bg-card"}`}
                 >
-                  <div className="mt-1 flex shrink-0 flex-col items-center">
+                  <div className="flex shrink-0 items-center justify-between sm:mt-1 sm:flex-col">
                     <GripVertical className="hidden h-4 w-4 cursor-grab text-muted-foreground sm:block" />
                     <div className="flex sm:flex-col">
                       <button type="button" onClick={() => moveInquiry(i, -1)} disabled={i === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30" aria-label={t("moveUp")}>
@@ -1415,19 +1460,19 @@ export default function CurriculumPage() {
                   <select
                     value={q.type}
                     onChange={(e) => updateInquiry(i, { type: e.target.value as InquiryQuestion["type"] })}
-                    className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground sm:w-auto sm:shrink-0"
                   >
                     <option value="factual">{typeLabel("factual")}</option>
                     <option value="conceptual">{typeLabel("conceptual")}</option>
                     <option value="controversial">{typeLabel("controversial")}</option>
                   </select>
                   <textarea
-                    className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                    className="w-full flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                     rows={2}
                     value={q.content}
                     onChange={(e) => updateInquiry(i, { content: e.target.value })}
                   />
-                  <button type="button" onClick={() => removeInquiry(i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>
+                  <button type="button" onClick={() => removeInquiry(i)} className="self-end text-sm text-red-500 hover:text-red-700 sm:mt-1 sm:shrink-0 sm:self-auto" aria-label={tc("delete")}>
                     ✕
                   </button>
                 </div>

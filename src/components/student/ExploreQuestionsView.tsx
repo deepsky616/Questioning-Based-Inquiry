@@ -138,8 +138,8 @@ function QuestionCard({
       <div
         className={
           isTeacherShared
-            ? "p-4 bg-indigo-50 dark:bg-indigo-950/40/30 flex justify-between items-start gap-4"
-            : "p-4 bg-muted/40 flex justify-between items-start gap-4"
+            ? "flex flex-col gap-4 bg-indigo-50 p-4 dark:bg-indigo-950/40/30 sm:flex-row sm:items-start sm:justify-between"
+            : "flex flex-col gap-4 bg-muted/40 p-4 sm:flex-row sm:items-start sm:justify-between"
         }
       >
         <div className="flex-1 min-w-0">
@@ -182,8 +182,8 @@ function QuestionCard({
             </span>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          <div className="text-right">
+        <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+          <div className="sm:text-right">
             <div className="text-sm font-semibold text-foreground">
               {isTeacherShared ? t("teacherName", { name: q.author.name }) : q.author.name}
             </div>
@@ -199,7 +199,7 @@ function QuestionCard({
               </div>
             )}
             {/* 수업세션(📚 칩) · 작성일시(🕒) — 내 질문 탭과 동일 톤 */}
-            <div className="mt-0.5 flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:justify-end">
               {showSession && q.session && (
                 <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                   <span>📚</span>

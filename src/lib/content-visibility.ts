@@ -12,8 +12,12 @@ export interface Viewer {
   id: string;
   role: string;
   school: string | null;
+  grade?: string | null;
+  className?: string | null;
   teacherClasses: { grade: string; className: string }[];
 }
+
+type QuestionAccessInfo = { isPublic: boolean; authorId: string; author: AuthorInfo | null };
 
 /** 교사가 해당 학생 작성자를 볼 수 있는가: 같은 학교 + (담당 학급 없으면 학교 전체 / 있으면 해당 학급) */
 export function teacherCanSeeAuthor(viewer: Viewer | null | undefined, author: AuthorInfo | null | undefined): boolean {
@@ -26,10 +30,50 @@ export function teacherCanSeeAuthor(viewer: Viewer | null | undefined, author: A
 /** 질문 열람 가능: 공개 / 본인 작성 / 담당 학급 교사 */
 export function canViewQuestion(
   viewer: Viewer | null | undefined,
-  q: { isPublic: boolean; authorId: string; author: AuthorInfo | null },
+  q: QuestionAccessInfo,
 ): boolean {
   if (!viewer) return false;
   return q.isPublic || q.authorId === viewer.id || teacherCanSeeAuthor(viewer, q.author);
+}
+
+/** 교사가 질문과 그 댓글을 관리할 수 있는가. */
+export function canModerateQuestion(
+  viewer: Viewer | null | undefined,
+  q: QuestionAccessInfo,
+): boolean {
+  if (!viewer || viewer.role !== "TEACHER") return false;
+  if (q.authorId === viewer.id && q.author?.role === "TEACHER") return true;
+  return teacherCanSeeAuthor(viewer, q.author);
+}
+
+/** 댓글 작성 가능: 본인 질문 / 담당 교사 / 같은 학급 공개 학생 질문 / 같은 학교 교사 배포 공개 질문. */
+export function canCommentOnQuestion(
+  viewer: Viewer | null | undefined,
+  q: QuestionAccessInfo,
+): boolean {
+  if (!viewer) return false;
+  if (viewer.role === "TEACHER") return canModerateQuestion(viewer, q);
+  if (viewer.role !== "STUDENT") return false;
+
+  if (q.authorId === viewer.id) return true;
+  if (!q.isPublic || !q.author) return false;
+
+  if (q.author.role === "STUDENT") {
+    return Boolean(
+      viewer.school &&
+      viewer.grade &&
+      viewer.className &&
+      viewer.school === q.author.school &&
+      viewer.grade === q.author.grade &&
+      viewer.className === q.author.className,
+    );
+  }
+
+  if (q.author.role === "TEACHER") {
+    return Boolean(viewer.school && viewer.school === q.author.school);
+  }
+
+  return false;
 }
 
 /**

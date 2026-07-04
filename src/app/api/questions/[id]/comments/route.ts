@@ -2,7 +2,7 @@ import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { canCreateComment } from "@/lib/questions";
+import { canCommentOnQuestion, isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { checkProfanity } from "@/lib/profanity";
 import { Prisma } from "@prisma/client";
@@ -13,73 +13,57 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const question = await prisma.question.findUnique({
-    where: { id: params.id },
-    include: {
-      author: { select: { id: true, role: true, school: true, grade: true, className: true } },
-      session: { select: { id: true, isActive: true, commentsVisibleToPeers: true } },
-    },
-  });
+  const userRole = (session.user as { id: string; role?: string }).role;
+  const userId = (session.user as { id: string; role?: string }).id;
+  const [viewer, question] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        school: true,
+        grade: true,
+        className: true,
+        teacherClasses: { select: { grade: true, className: true } },
+      },
+    }),
+    prisma.question.findUnique({
+      where: { id: params.id },
+      include: {
+        author: { select: { id: true, role: true, school: true, grade: true, className: true } },
+        session: { select: { id: true, isActive: true, commentsVisibleToPeers: true } },
+      },
+    }),
+  ]);
   if (!question) {
     return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  const userRole = (session.user as { id: string; role?: string }).role;
-  const userId = (session.user as { id: string; role?: string }).id;
-  const isOwner = question.authorId === userId;
-
-  if (!question.isPublic && !isOwner && userRole !== "TEACHER") {
+  if (!canCommentOnQuestion(viewer, question)) {
     return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
   }
 
-  // 학생 + 본인 질문 아님 → 작성자가 같은 학교/학년/반 학생이거나 같은 학교 교사여야 댓글 조회 가능
-  if (userRole === "STUDENT" && !isOwner) {
-    const me = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { school: true, grade: true, className: true },
-    });
-    const a = question.author;
-    const sameClass = !!(me?.school && me.grade && me.className
-      && a?.school === me.school && a?.grade === me.grade && a?.className === me.className);
-    const teacherShared = a?.role === "TEACHER" && a?.school === me?.school;
-    if (!sameClass && !teacherShared) {
-      return NextResponse.json([]);
-    }
-    // 비활성 세션 차단은 제거: 질문 GET이 활성 필터를 적절히 적용함
-    // (날짜/교과/주제 검색에서는 전체 세션이 조회 대상이므로 댓글도 그대로 노출)
-  }
-
-  // 댓글 조회 권한
-  // - 세션의 commentsVisibleToPeers=true: 같은 학교/학년/반 학생끼리 댓글 공유
-  // - false(기본): 다른 학생 댓글은 숨기고 학생은 본인 댓글 + 교사 댓글만 본다
   const peersVisible = question.session?.commentsVisibleToPeers ?? false;
-  let commentWhere: Record<string, unknown> = { questionId: params.id };
-  if (userRole === "STUDENT") {
-    const me = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { school: true, grade: true, className: true },
-    });
-    if (me?.school) {
-      const orConds: Record<string, unknown>[] = [
-        { id: userId },
-        { role: "TEACHER", school: me.school },
-      ];
-      if (peersVisible && me.grade && me.className) {
-        orConds.push({ role: "STUDENT", school: me.school, grade: me.grade, className: me.className });
-      }
-      commentWhere = { questionId: params.id, author: { OR: orConds } };
-    } else {
-      commentWhere = { questionId: params.id, authorId: userId };
-    }
-  }
-
   const comments = await prisma.comment.findMany({
-    where: commentWhere,
-    include: { author: { select: { id: true, name: true } } },
+    where: { questionId: params.id },
+    include: { author: { select: { id: true, name: true, role: true } } },
     orderBy: { createdAt: "asc" },
   });
 
-  return NextResponse.json(comments);
+  return NextResponse.json(
+    comments
+      .filter((comment) =>
+        isCommentVisibleToViewer({
+          viewerRole: userRole ?? "",
+          viewerId: userId,
+          commentsVisibleToPeers: peersVisible,
+          commentAuthorId: comment.author.id,
+          commentAuthorRole: comment.author.role,
+          questionAuthorId: question.authorId,
+        }),
+      )
+      .map(({ author, ...comment }) => ({ ...comment, author: { id: author.id, name: author.name } })),
+  );
 }
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -100,15 +84,31 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       return NextResponse.json({ error: "댓글 내용을 입력해 주세요" }, { status: 400 });
     }
 
-    const question = await prisma.question.findUnique({
-      where: { id: params.id },
-      include: { session: { select: { isActive: true } } },
-    });
+    const [viewer, question] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          role: true,
+          school: true,
+          grade: true,
+          className: true,
+          teacherClasses: { select: { grade: true, className: true } },
+        },
+      }),
+      prisma.question.findUnique({
+        where: { id: params.id },
+        include: {
+          author: { select: { role: true, school: true, grade: true, className: true } },
+          session: { select: { isActive: true } },
+        },
+      }),
+    ]);
     if (!question) {
       return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
     }
 
-    if (!canCreateComment(userRole, question.isPublic)) {
+    if (!canCommentOnQuestion(viewer, question)) {
       return NextResponse.json({ error: "댓글 작성 권한이 없습니다" }, { status: 403 });
     }
 

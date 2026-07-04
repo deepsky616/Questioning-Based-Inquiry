@@ -952,7 +952,14 @@
     "numberLabel": "No. {n}",
     "tabOverview": "Overview",
     "tabReports": "Detailed report",
-    "trendSortTitle": "Click to sort students with declining activity first"
+    "trendSortTitle": "Click to sort students with declining activity first",
+    "trendBadgeNew": "New",
+    "trendBadgeUp": "Rising",
+    "trendBadgeFlat": "Steady",
+    "trendBadgeDown": "Declining",
+    "trendSortLabel": "Show declining students first",
+    "trendLegend": "Trend bars split the selected period into 6 slots of question counts. The badge compares the first vs second half (hover a bar strip for per-slot counts).",
+    "sparklineTooltip": "Questions per slot: {counts}"
   },
   "reports": {
     "analysisFailed": "Analysis failed",

@@ -219,7 +219,132 @@ export function MyQuestionsView() {
     list.length === 0 ? (
       <EmptyState icon="📝" title={t("empty")} description={t("emptyDesc")} />
     ) : (
-      <div className="overflow-x-auto"><Table>
+      <>
+      <div className="space-y-3 lg:hidden">
+        {list.map((q, i) => {
+          const commentCount = commentCountOverride[q.id] ?? q.comments?.length ?? 0;
+          const isExpanded = expandedQuestionId === q.id;
+          const canEdit = (q.likeCount ?? 0) === 0 && commentCount === 0;
+
+          return (
+            <div key={q.id} className="rounded-lg border bg-card p-3">
+              <div className="flex items-start justify-between gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  {editingQuestionId === q.id ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={editContent}
+                        maxLength={200}
+                        rows={4}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        className="text-sm"
+                        autoFocus
+                      />
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <span className="text-xs text-muted-foreground">{editContent.length}/200 · {t("reclassifyNote")}</span>
+                        <div className="flex justify-end gap-1.5">
+                          <Button size="sm" onClick={() => saveQuestionEdit(q.id)} disabled={isSavingEdit || !editContent.trim()}>
+                            {isSavingEdit ? t("savingEdit") : t("saveEdit")}
+                          </Button>
+                          <Button size="sm" variant="outline" disabled={isSavingEdit} onClick={() => { setEditingQuestionId(null); setEditContent(""); }}>
+                            {tEx("close")}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
+                  )}
+                  {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-1" />}
+                </div>
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className={`rounded px-2 py-0.5 text-xs break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
+                <span className={`rounded px-2 py-0.5 text-xs break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
+                <span className={`rounded px-2 py-0.5 text-xs ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{q.isPublic ? t("public") : t("private")}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                {selectedSessionId === "all" && q.session && (
+                  <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
+                    <span>📚</span>
+                    <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1">
+                  <span>🕒</span>
+                  <span>{formatDateTime(q.createdAt)}</span>
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 border-t pt-3">
+                <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
+                  <p className="text-[11px] text-muted-foreground">{t("colLikes")}</p>
+                  <p className="text-sm font-semibold text-rose-500">❤️ {q.likeCount ?? 0}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleComments(q.id)}
+                  className="rounded-md bg-muted/40 px-2 py-2 text-center text-indigo-600"
+                >
+                  <p className="text-[11px] text-muted-foreground">{t("colComments")}</p>
+                  <p className="text-sm font-semibold">💬 {commentCount}</p>
+                </button>
+              </div>
+
+              <div className="mt-3 flex justify-end gap-1">
+                {canEdit ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => { setEditingQuestionId(q.id); setEditContent(q.content); }}
+                      disabled={editingQuestionId === q.id}
+                      className="rounded-md border border-indigo-200 p-2 text-indigo-600 hover:bg-indigo-50 disabled:opacity-40"
+                      title={t("editBtn")}
+                      aria-label={t("editBtn")}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteQuestion(q.id)}
+                      className="rounded-md border border-red-200 p-2 text-red-500 hover:bg-red-50"
+                      title={t("deleteBtn")}
+                      aria-label={t("deleteBtn")}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => toast({ description: t("lockedHint") })}
+                    className="rounded-md border px-3 py-1.5 text-sm text-muted-foreground"
+                    title={t("lockedHint")}
+                    aria-label={t("lockedHint")}
+                  >
+                    🔒
+                  </button>
+                )}
+              </div>
+
+              {isExpanded && (
+                <div className="mt-3 rounded-lg bg-muted/30 p-3">
+                  <CommentThread
+                    questionId={q.id}
+                    onCountChange={(n) => setCommentCountOverride((p) => ({ ...p, [q.id]: n }))}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="hidden overflow-x-auto lg:block"><Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">#</TableHead>
@@ -355,6 +480,7 @@ export function MyQuestionsView() {
           })}
         </TableBody>
       </Table></div>
+      </>
     );
 
   return (

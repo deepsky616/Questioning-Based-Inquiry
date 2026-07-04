@@ -107,29 +107,29 @@ function TeacherDashboard() {
     setClassDefaulted(true);
   }, [stats, classDefaulted]);
 
-  // 추세 배지 — 방향만 압축 표시, 정확한 수치·설명은 툴팁으로
+  // 추세 배지 — 아이콘+짧은 단어로 뜻이 바로 읽히게, 정확한 수치·설명은 툴팁으로
   const getTrendBadge = (trend: number | null) => {
     if (trend === null)
       return (
-        <span className="rounded-full bg-blue-50 px-1.5 py-0.5 text-xs font-bold text-blue-600 dark:bg-blue-950/40" title={t("trendNewTitle")}>
-          🆕
+        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-600 dark:bg-blue-950/40" title={t("trendNewTitle")}>
+          🆕 {t("trendBadgeNew")}
         </span>
       );
     if (trend > 0)
       return (
-        <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-xs font-bold text-green-600 dark:bg-green-950/40" title={`${t("trendUpTitle")} (+${trend}%)`}>
-          ▲
+        <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-green-600 dark:bg-green-950/40" title={`${t("trendUpTitle")} (+${trend}%)`}>
+          ▲ {t("trendBadgeUp")}
         </span>
       );
     if (trend < 0)
       return (
-        <span className="rounded-full bg-orange-50 px-1.5 py-0.5 text-xs font-bold text-orange-600 dark:bg-orange-950/40" title={`${t("trendDownTitle")} (-${Math.abs(trend)}%)`}>
-          ▼
+        <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-600 dark:bg-orange-950/40" title={`${t("trendDownTitle")} (-${Math.abs(trend)}%)`}>
+          ▼ {t("trendBadgeDown")}
         </span>
       );
     return (
-      <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-bold text-muted-foreground" title={t("trendFlatTitle")}>
-        —
+      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground" title={t("trendFlatTitle")}>
+        — {t("trendBadgeFlat")}
       </span>
     );
   };
@@ -139,7 +139,10 @@ function TeacherDashboard() {
     if (!data || data.length === 0) return null;
     const max = Math.max(...data, 1);
     return (
-      <span className="inline-flex h-5 items-end gap-[2px]" aria-hidden>
+      <span
+        className="inline-flex h-5 items-end gap-[2px]"
+        title={t("sparklineTooltip", { counts: data.join(" · ") })}
+      >
         {data.map((v, i) => (
           <span
             key={i}
@@ -334,13 +337,88 @@ function TeacherDashboard() {
           {/* 학생별 통계 */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t("studentStats")}</CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-base">{t("studentStats")}</CardTitle>
+                {/* 무엇을 하는지 라벨로 보이는 정렬 토글 */}
+                <button
+                  type="button"
+                  onClick={() => setTrendSortOn((v) => !v)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                    trendSortOn
+                      ? "border-orange-400 bg-orange-500 text-white"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted"
+                  }`}
+                  title={t("trendSortTitle")}
+                >
+                  ▼ {t("trendSortLabel")}
+                </button>
+              </div>
+              {/* 추세 읽는 법 — 이미지만 보고도 이해되도록 한 줄 범례 */}
+              <p className="text-xs text-muted-foreground">{t("trendLegend")}</p>
             </CardHeader>
             <CardContent>
               {stats.byStudent.length === 0 ? (
                 <EmptyState icon="📊" title={t("noData")} />
               ) : (
-                <div className="overflow-x-auto"><Table>
+                <>
+                <div className="space-y-2 lg:hidden">
+                  {(trendSortOn
+                    ? [...stats.byStudent].sort((a, b) => trendRank(a.trend) - trendRank(b.trend) || (a.trend ?? 0) - (b.trend ?? 0))
+                    : stats.byStudent
+                  ).map((s) => (
+                    <div key={s.studentId} className="rounded-lg border bg-card p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground">{s.name}</p>
+                          {(s.grade || s.className || s.studentNumber) && (
+                            <p className="text-xs text-muted-foreground">
+                              {[
+                                s.grade && t("gradeLabel", { grade: s.grade }),
+                                s.className && t("classLabel", { className: s.className }),
+                                s.studentNumber && t("numberLabel", { n: s.studentNumber }),
+                              ].filter(Boolean).join(" ")}
+                            </p>
+                          )}
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-[11px] text-muted-foreground">{t("colTotal")}</p>
+                          <p className="text-xl font-bold text-foreground">{s.total}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <div className="rounded-md bg-blue-50 px-2 py-2 text-center dark:bg-blue-950/30">
+                          <p className="text-[11px] text-blue-600">{tCls("closed.label")}</p>
+                          <p className="text-sm font-semibold text-blue-600">{s.distribution.closed}</p>
+                        </div>
+                        <div className="rounded-md bg-green-50 px-2 py-2 text-center dark:bg-green-950/30">
+                          <p className="text-[11px] text-green-600">{tCls("open.label")}</p>
+                          <p className="text-sm font-semibold text-green-600">{s.distribution.open}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
+                          <p className="text-[11px] text-muted-foreground">{tCls("factual.label")}</p>
+                          <p className="text-sm font-semibold text-foreground">{s.cognitiveDistribution.factual}</p>
+                        </div>
+                        <div className="rounded-md bg-purple-50 px-2 py-2 text-center dark:bg-purple-950/30">
+                          <p className="text-[11px] text-purple-600">{tCls("conceptual.label")}</p>
+                          <p className="text-sm font-semibold text-purple-600">{s.cognitiveDistribution.conceptual}</p>
+                        </div>
+                        <div className="rounded-md bg-orange-50 px-2 py-2 text-center dark:bg-orange-950/30">
+                          <p className="text-[11px] text-orange-600">{tCls("controversial.label")}</p>
+                          <p className="text-sm font-semibold text-orange-600">{s.cognitiveDistribution.controversial}</p>
+                        </div>
+                        <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
+                          <p className="text-[11px] text-muted-foreground">{t("colTrend")}</p>
+                          <span className="inline-flex items-center justify-center gap-1.5">
+                            <Sparkline data={s.sparkline} />
+                            {getTrendBadge(s.trend)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto lg:block"><Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t("colStudent")}</TableHead>
@@ -350,15 +428,8 @@ function TeacherDashboard() {
                       <TableHead className="text-center whitespace-nowrap px-3 text-muted-foreground">{tCls("factual.label")}</TableHead>
                       <TableHead className="text-center whitespace-nowrap px-3 text-purple-600">{tCls("conceptual.label")}</TableHead>
                       <TableHead className="text-center whitespace-nowrap px-3 text-orange-600">{tCls("controversial.label")}</TableHead>
-                      <TableHead className="text-center w-32 whitespace-nowrap" title={t("colTrendTitle")}>
-                        <button
-                          type="button"
-                          onClick={() => setTrendSortOn((v) => !v)}
-                          className={`inline-flex items-center gap-1 hover:text-foreground ${trendSortOn ? "text-orange-600 font-bold" : ""}`}
-                          title={t("trendSortTitle")}
-                        >
-                          {t("colTrend")} {trendSortOn ? "▼" : "⇅"}
-                        </button>
+                      <TableHead className="text-center w-36 whitespace-nowrap" title={t("colTrendTitle")}>
+                        {t("colTrend")}
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -396,6 +467,7 @@ function TeacherDashboard() {
                     ))}
                   </TableBody>
                 </Table></div>
+                </>
               )}
             </CardContent>
           </Card>
