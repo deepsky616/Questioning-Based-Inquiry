@@ -102,10 +102,13 @@ function TeacherDashboard() {
   // 기본값: 담당 학급이 1개뿐이면 그 학급을 자동 선택(최초 1회, 이후 교사 선택 존중)
   const [classDefaulted, setClassDefaulted] = useState(false);
   useEffect(() => {
-    if (classDefaulted || !stats) return;
-    if (stats.teacherClasses.length === 1) setSelectedClass(classKey(stats.teacherClasses[0]));
+    if (classDefaulted || !stats || selectedClass !== "all") return;
+    if (stats.teacherClasses.length === 0) return;
+    if (stats.teacherClasses.length === 1) {
+      setSelectedClass(classKey(stats.teacherClasses[0]));
+    }
     setClassDefaulted(true);
-  }, [stats, classDefaulted]);
+  }, [stats, selectedClass, classDefaulted]);
 
   // 추세 배지 — 아이콘+짧은 단어로 뜻이 바로 읽히게, 정확한 수치·설명은 툴팁으로
   const getTrendBadge = (trend: number | null) => {
@@ -159,6 +162,14 @@ function TeacherDashboard() {
   const trendRank = (trend: number | null) => (trend === null ? 3 : trend < 0 ? 0 : trend === 0 ? 1 : 2);
 
   const teacherClasses = stats?.teacherClasses ?? [];
+  const dashboardScopeLabel = (() => {
+    if (!stats) return "";
+    if (selectedClass === "all") {
+      return `${stats.school ? `${stats.school} ` : ""}${t("allClasses")}`;
+    }
+    const [grade, className] = selectedClass.split("|");
+    return `${stats.school ? `${stats.school} ` : ""}${t("gradeClass", { grade, className })}`;
+  })();
 
   return (
     <div className="space-y-6">
@@ -231,11 +242,7 @@ function TeacherDashboard() {
                   {period === "week" && t("periodWeekBasis")}
                   {period === "month" && t("periodMonthBasis")}
                   {period === "semester" && t("periodSemesterBasis")}
-                  {selectedClass !== "all" && (() => {
-                    const [grade, className] = selectedClass.split("|");
-                    const classLabel = `${stats.school ? `${stats.school} ` : ""}${t("gradeClass", { grade, className })}`;
-                    return ` · ${classLabel}`;
-                  })()}
+                  {dashboardScopeLabel ? ` · ${dashboardScopeLabel}` : ""}
                 </div>
               </div>
             </CardContent>
