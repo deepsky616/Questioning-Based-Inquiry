@@ -9,7 +9,12 @@ export type AiLoadingKind =
   | "questionSorting"
   | "pointReview"
   | "sessionAnalysis"
-  | "bulkSessionAnalysis";
+  | "bulkSessionAnalysis"
+  | "unitDesignRecommendation"
+  | "unitDesignKeywords"
+  | "unitDesignSentences"
+  | "unitDesignQuestions"
+  | "unitDesignInquiry";
 
 const STAGE_KEYS: Record<AiLoadingKind, string[]> = {
   questionGrouping: ["prepare", "connect", "analyze", "organize", "finish"],
@@ -17,6 +22,11 @@ const STAGE_KEYS: Record<AiLoadingKind, string[]> = {
   pointReview: ["prepare", "connect", "analyze", "organize", "finish"],
   sessionAnalysis: ["prepare", "connect", "analyze", "organize", "finish"],
   bulkSessionAnalysis: ["prepare", "connect", "analyze", "organize", "finish"],
+  unitDesignRecommendation: ["prepare", "connect", "analyze", "organize", "finish"],
+  unitDesignKeywords: ["prepare", "connect", "analyze", "organize", "finish"],
+  unitDesignSentences: ["prepare", "connect", "analyze", "organize", "finish"],
+  unitDesignQuestions: ["prepare", "connect", "analyze", "organize", "finish"],
+  unitDesignInquiry: ["prepare", "connect", "analyze", "organize", "finish"],
 };
 
 interface AiLoadingProcessProps {

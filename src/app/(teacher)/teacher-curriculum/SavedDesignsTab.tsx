@@ -17,6 +17,7 @@ import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { filterSortSavedDesigns } from "@/lib/saved-designs";
+import { formatDateTime } from "@/lib/datetime";
 import {
   buildClassStudentTargetPayload,
   defaultTargetSelection,
@@ -208,7 +209,8 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         inquiryQuestions: cleaned,
       }),
     });
-    return { ok: res.ok, cleaned };
+    const result = await res.json().catch(() => ({}));
+    return { ok: res.ok, cleaned, updatedAt: typeof result.updatedAt === "string" ? result.updatedAt : undefined };
   };
 
   // 저장만(설계 업데이트 — 라이브 참고자료에 즉시 반영)
@@ -216,11 +218,11 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     if (!editTitle.trim() || savingEdit) return;
     setSavingEdit(true);
     try {
-      const { ok } = await patchEditDesign(id);
+      const { ok, updatedAt } = await patchEditDesign(id);
       if (!ok) throw new Error();
       cancelEditDesign();
       onChanged();
-      toast({ variant: "success", description: t("designRedeployed") });
+      toast({ variant: "success", description: t("designSavedAt", { time: formatDateTime(updatedAt ?? new Date().toISOString()) }) });
     } catch {
       toast({ variant: "destructive", description: t("designUpdateFailed") });
     } finally {
@@ -259,9 +261,15 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         toast({ variant: "destructive", description: d.error || t("sessionCreateFailed") });
         return;
       }
+      const createdSession = await res.json().catch(() => null);
       cancelEditDesign();
       onChanged();
-      toast({ variant: "success", description: t("inquirySessionCreated", { date: editDate, subject: editTitle.trim() }) });
+      toast({
+        variant: "success",
+        description: t("designRedeployedAt", {
+          time: formatDateTime(createdSession?.createdAt ?? new Date().toISOString()),
+        }),
+      });
     } catch {
       toast({ variant: "destructive", description: t("designUpdateFailed") });
     } finally {
@@ -350,6 +358,14 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                     <span className="text-xs text-muted-foreground">
                       {[d.sessionDate, d.subject, d.area].filter(Boolean).join(" · ")}
                     </span>
+                    {(d.createdAt || d.updatedAt) && (
+                      <span className="mt-0.5 block text-xs text-muted-foreground">
+                        {[
+                          d.createdAt ? t("savedCreatedAt", { time: formatDateTime(d.createdAt) }) : "",
+                          d.updatedAt ? t("savedUpdatedAt", { time: formatDateTime(d.updatedAt) }) : "",
+                        ].filter(Boolean).join(" · ")}
+                      </span>
+                    )}
                   </button>
                   <div className="flex shrink-0 items-center gap-1">
                     {/* 아이콘 버튼(관리 열 공통 패턴) — 편집 중엔 X(취소)로 전환 */}

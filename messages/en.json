@@ -407,6 +407,7 @@
     "sequenceTitle": "Question-centered inquiry design",
     "deployedTitle": "Shared inquiry designs",
     "deployedDesc": "Inquiry questions shared with students per class session. You can edit and re-share or delete them.",
+    "deployedAt": "Shared {time}",
     "activeOn": "Student activity on",
     "activeOff": "Student activity off",
     "likesByline": " · Likes {v}",
@@ -466,6 +467,7 @@
   },
   "sequencePanel": {
     "published": "Shared with students",
+    "publishedAt": "Shared with students · {time}",
     "publishFailed": "Failed to share",
     "settingsTitle": "③ Sharing settings",
     "activeLabel": "Student activity",
@@ -653,6 +655,9 @@
     "topic": "Topic",
     "topicPlaceholder": "Class topic (e.g., Photosynthesis and energy)",
     "sessionCreated": "Presented inquiry questions to the {date} {subject} class session.",
+    "lastSavedAt": "Last saved {time}",
+    "lastDeployedAt": "Last shared {time}",
+    "lastSessionCreatedAt": "Last session created {time}",
     "sessionCreateFailed": "Failed to create class session",
     "step1Title": "Step 1 · Explore curriculum",
     "step1Desc": "Select subject · grade band · area to see the 2022 revised curriculum data in a table",
@@ -738,6 +743,10 @@
     "addItem": "Add item",
     "referencePreview": "Reference material students see",
     "designRedeployed": "Saved and applied the changes to the student reference material.",
+    "designSavedAt": "Saved changes · {time}",
+    "designRedeployedAt": "Redeployed to a class session · {time}",
+    "savedCreatedAt": "Saved {time}",
+    "savedUpdatedAt": "Edited {time}",
     "redeployToSession": "Redeploy to class session",
     "redeployHint": "Save updates the content (reflected live in linked reference); Redeploy creates a new inquiry-question class session with these settings.",
     "unitFieldLabel": "Unit",
@@ -818,6 +827,7 @@
     "dateRequired": "Date, subject, and topic are required",
     "selectTargets": "Select at least one student to share with",
     "sessionAdded": "Session added",
+    "createdAt": "Created {time}",
     "saveFailed": "Failed to save the session",
     "toggleFailed": "Change failed. Please try again in a moment.",
     "deleteConfirm": "Delete this session? Linked questions will become session-less.",
@@ -1188,6 +1198,61 @@
           "analyze": "Analyze each session",
           "organize": "Save results",
           "finish": "Prepare next batch"
+        }
+      },
+      "unitDesignRecommendation": {
+        "title": "AI is matching the unit to curriculum items",
+        "description": "The model is comparing the typed unit name with achievement standards and content elements.",
+        "stages": {
+          "prepare": "Check unit name",
+          "connect": "Connect model",
+          "analyze": "Compare curriculum",
+          "organize": "Organize recommendations",
+          "finish": "Apply selections"
+        }
+      },
+      "unitDesignKeywords": {
+        "title": "AI is recommending key terms",
+        "description": "The model is finding key concepts for inquiry-question design from the selected standards and content.",
+        "stages": {
+          "prepare": "Check selections",
+          "connect": "Connect model",
+          "analyze": "Analyze key concepts",
+          "organize": "Organize terms",
+          "finish": "Apply result"
+        }
+      },
+      "unitDesignSentences": {
+        "title": "AI is generating key sentences",
+        "description": "The model is building lesson key sentences from the selected key terms and curriculum materials.",
+        "stages": {
+          "prepare": "Check key terms",
+          "connect": "Connect model",
+          "analyze": "Analyze sentence structure",
+          "organize": "Write key sentences",
+          "finish": "Apply result"
+        }
+      },
+      "unitDesignQuestions": {
+        "title": "AI is deriving key questions",
+        "description": "The model is creating key questions that guide the unit flow from the key sentences.",
+        "stages": {
+          "prepare": "Check key sentences",
+          "connect": "Connect model",
+          "analyze": "Analyze question direction",
+          "organize": "Write key questions",
+          "finish": "Apply result"
+        }
+      },
+      "unitDesignInquiry": {
+        "title": "AI is refining inquiry questions",
+        "description": "The model is organizing factual, conceptual, and debatable inquiry questions for classroom use.",
+        "stages": {
+          "prepare": "Check key questions",
+          "connect": "Connect model",
+          "analyze": "Analyze question types",
+          "organize": "Write inquiry questions",
+          "finish": "Apply result"
         }
       }
     }

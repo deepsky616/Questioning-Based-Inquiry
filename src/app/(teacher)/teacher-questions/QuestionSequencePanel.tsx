@@ -13,6 +13,7 @@ import {
   type SessionTargetClass,
   type SessionTargetStudent,
 } from "@/lib/session-targeting";
+import { formatDateTime } from "@/lib/datetime";
 import type { SequencedQuestion } from "@/lib/unit-sequence";
 
 interface DeploySettings {
@@ -100,7 +101,9 @@ export function QuestionSequencePanel({
         }),
       });
       if (!res.ok) throw new Error();
-      setMsg(t("published"));
+      const data = await res.json().catch(() => ({}));
+      const publishedAt = typeof data.publishedAt === "string" ? data.publishedAt : new Date().toISOString();
+      setMsg(t("publishedAt", { time: formatDateTime(publishedAt) }));
       onDeployed?.();
     } catch {
       setMsg(t("publishFailed"));

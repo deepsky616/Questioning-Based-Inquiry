@@ -74,10 +74,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       : [];
 
     const savedKeys = new Set(savedQuestions.map(questionKey));
+    const publishedAt = new Date().toISOString();
     const selectedQuestions = data.sharedQuestions.map((question) => ({
       ...question,
       type: question.type,
       content: question.content.trim(),
+      publishedAt,
     }));
 
     if (selectedQuestions.some((question) => !savedKeys.has(questionKey(question)))) {

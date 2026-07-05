@@ -62,6 +62,7 @@ export async function GET(req: Request) {
       target_student_ids: unknown;
       session_count: bigint | number;
       created_at: Date;
+      updated_at: Date;
     }[]
   >`
     SELECT id, title, subject, grade_range, grade, session_date, area,
@@ -69,7 +70,7 @@ export async function GET(req: Request) {
            is_active, default_question_public, likes_visible_to_peers, comments_visible_to_peers,
            target_class_value, target_student_ids,
            (SELECT count(*) FROM question_sessions qs WHERE qs.unit_design_id = unit_designs.id) AS session_count,
-           created_at
+           created_at, updated_at
     FROM unit_designs
     WHERE teacher_id = ${teacherId}
     ORDER BY created_at DESC
@@ -92,6 +93,7 @@ export async function GET(req: Request) {
       targetStudentIds: asArray(d.target_student_ids) as string[],
       sessionCount: Number(d.session_count ?? 0),
       createdAt: d.created_at,
+      updatedAt: d.updated_at,
     }))
   );
 }
@@ -108,7 +110,7 @@ export async function POST(req: Request) {
     const teacherId = (session.user as { id: string }).id;
 
     // 탐구 질문 저장 (ID를 RETURNING으로 회수)
-    const inserted = await prisma.$queryRawUnsafe<{ id: string }[]>(
+    const inserted = await prisma.$queryRawUnsafe<{ id: string; created_at: Date; updated_at: Date }[]>(
       `INSERT INTO unit_designs
          (id, teacher_id, curriculum_area_id, title, subject, grade_range, area,
           core_idea, selected_keywords, core_sentences, essential_questions, inquiry_questions,
@@ -118,7 +120,7 @@ export async function POST(req: Request) {
          (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
           $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb,
           $12, $13, $14, $15, $16, $17, $18, $19::jsonb, now(), now())
-       RETURNING id`,
+       RETURNING id, created_at, updated_at`,
       teacherId,
       data.curriculumAreaId ?? null,
       data.title,
@@ -140,7 +142,8 @@ export async function POST(req: Request) {
       JSON.stringify(data.targetStudentIds)
     );
 
-    const designId = inserted[0]?.id ?? null;
+    const insertedDesign = inserted[0] ?? null;
+    const designId = insertedDesign?.id ?? null;
 
     return NextResponse.json({
       ok: true,
@@ -155,6 +158,8 @@ export async function POST(req: Request) {
             sessionDate: data.sessionDate ?? null,
             area: data.area,
             inquiryQuestions: data.inquiryQuestions,
+            createdAt: insertedDesign?.created_at,
+            updatedAt: insertedDesign?.updated_at,
           }
         : null,
     });

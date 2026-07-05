@@ -17,6 +17,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useTranslations } from "next-intl";
+import { formatDateTime } from "@/lib/datetime";
 import {
   buildClassTargetValue,
   defaultTargetSelection,
@@ -33,6 +34,7 @@ interface QuestionSession {
   date: string;
   subject: string;
   topic: string;
+  createdAt?: string;
   teacher: { name: string };
   unitDesignId?: string | null;
   sharedQuestions?: { type: string; content: string }[];
@@ -617,6 +619,11 @@ function SessionRow({
                   targetStudentName: session.targetStudent?.name,
                 })}
               </span>
+              {session.createdAt && (
+                <span className="text-xs bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded dark:bg-indigo-950/40 dark:text-indigo-200">
+                  {t("createdAt", { time: formatDateTime(session.createdAt) })}
+                </span>
+              )}
             </div>
           </div>
         </div>

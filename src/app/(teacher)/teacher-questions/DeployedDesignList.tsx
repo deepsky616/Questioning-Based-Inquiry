@@ -23,6 +23,7 @@ import {
 } from "@/lib/sessions";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { formatDateTime } from "@/lib/datetime";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import type { QuestionSession } from "./types";
 
@@ -91,6 +92,8 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
   });
   const deployed = deploySort === "asc" ? sortSessionsAsc(deployFiltered) : sortSessionsDesc(deployFiltered);
   const hasDeployFilter = Boolean(deployFilterDate || deployFilterSubject || deployFilterTopic);
+  const getPublishedAt = (session: QuestionSession) =>
+    session.sharedQuestions?.find((q) => q.publishedAt)?.publishedAt ?? session.createdAt;
 
   return (
     <div className="rounded-xl border bg-card p-4">
@@ -160,6 +163,7 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
       <div className="mt-3 space-y-2">
         {deployed.map((s) => {
           const isEditing = editDeploySessionId === s.id;
+          const publishedAt = getPublishedAt(s);
           return (
             <div key={s.id} className="rounded-lg border bg-background">
               <div className="flex flex-wrap items-center justify-between gap-2 p-3">
@@ -175,6 +179,11 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                     {t("likesByline", { v: s.likesVisibleToPeers ? t("publicWord") : t("privateWord") })}
                     {t("commentsByline", { v: s.commentsVisibleToPeers ? t("publicWord") : t("privateWord") })}
                   </p>
+                  {publishedAt && (
+                    <p className="mt-0.5 text-xs font-medium text-indigo-600 dark:text-indigo-300">
+                      {t("deployedAt", { time: formatDateTime(publishedAt) })}
+                    </p>
+                  )}
                 </button>
                 <div className="flex shrink-0 items-center gap-1">
                   {/* 아이콘 버튼(관리 열 공통 패턴) — 편집 중엔 X(닫기)로 전환 */}

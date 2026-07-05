@@ -5,7 +5,7 @@ import { cleanupQuestionTranslations } from "@/lib/translation-cleanup";
 import { Prisma } from "@prisma/client";
 import { normalizeSharedQuestions, type SharedQuestionItem } from "@/lib/shared-questions";
 
-interface PublishItem { type?: string; content: string }
+interface PublishItem { type?: string; content: string; publishedAt?: string }
 
 // 현재 세션에 배포된 교사 질문 + 댓글 수 조회
 export async function GET(
@@ -82,6 +82,8 @@ export async function POST(
   //  - 참여가 전혀 없는(좋아요 0·댓글 0) 빠진 질문만 정리해 목록을 깔끔히 유지
   if (Array.isArray(body.sequence)) {
     const seq = normalizeSharedQuestions(body.sequence as SharedQuestionItem[]);
+    const publishedAt = new Date().toISOString();
+    const publishedSeq = seq.map((q) => ({ ...q, publishedAt }));
 
     const existing = await prisma.question.findMany({
       where: { sessionId, source: "TEACHER_SHARED" },
@@ -131,7 +133,7 @@ export async function POST(
     // sharedQuestions에 전체 시퀀스(그룹/순서) 저장
     await prisma.questionSession.update({
       where: { id: sessionId },
-      data: { sharedQuestions: seq as unknown as Prisma.InputJsonValue },
+      data: { sharedQuestions: publishedSeq as unknown as Prisma.InputJsonValue },
     });
 
     return NextResponse.json({
@@ -140,6 +142,7 @@ export async function POST(
       created: toCreate.length,
       reused: seq.length - toCreate.length,
       cleaned: removable.length,
+      publishedAt,
     });
   }
 
@@ -172,8 +175,9 @@ export async function POST(
   );
 
   // sharedQuestions JSON 동기화 (시각화 호환)
-  const all = [...existing.map((q) => ({ type: "", content: q.content })),
-                ...created.map((q) => ({ type: q.inquiryType ?? "", content: q.content }))];
+  const publishedAt = new Date().toISOString();
+  const all = [...existing.map((q) => ({ type: "", content: q.content, publishedAt })),
+                ...created.map((q) => ({ type: q.inquiryType ?? "", content: q.content, publishedAt }))];
   await prisma.questionSession.update({
     where: { id: sessionId },
     data: { sharedQuestions: all as unknown as Prisma.InputJsonValue },
@@ -183,6 +187,7 @@ export async function POST(
     created: created.length,
     skipped: items.length - newItems.length,
     questions: created,
+    publishedAt,
   });
 }
 

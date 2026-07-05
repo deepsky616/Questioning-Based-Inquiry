@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import {
@@ -19,6 +20,7 @@ import DatePicker from "@/components/shared/DatePicker";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
+import { formatDateTime } from "@/lib/datetime";
 import {
   extractUnitCode,
   filterAchievementsByUnitCodes,
@@ -72,6 +74,7 @@ interface CurriculumArea {
 }
 
 type Step = 1 | 2 | 3 | 4 | 5;
+type LastDesignAction = { type: "saved" | "deployed"; at: string };
 
 const TYPE_COLOR: Record<string, string> = {
   factual: "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-500/30 text-blue-800 dark:text-blue-300",
@@ -137,6 +140,7 @@ export default function CurriculumPage() {
   const [saveTitle, setSaveTitle] = useState("");
   const [saveGrade, setSaveGrade] = useState("");
   const [saveDate, setSaveDate] = useState(todayStr);
+  const [lastDesignAction, setLastDesignAction] = useState<LastDesignAction | null>(null);
   const queryClient = useQueryClient();
   // 저장 목록(조회·정렬·인라인 편집)은 SavedDesignsTab이 자체 상태로 처리한다
   const [mainTab, setMainTab] = useState<"create" | "saved">("create");
@@ -498,7 +502,7 @@ export default function CurriculumPage() {
     const savedDesign: SavedInquiryDesign | null = data.design ?? null;
     if (savedDesign?.id) {
       queryClient.setQueryData<SavedInquiryDesign[]>(["unit-designs"], (prev) => [
-        { ...savedDesign, createdAt: new Date().toISOString() },
+        savedDesign,
         ...(prev ?? []).filter((design) => design.id !== savedDesign.id),
       ]);
     }
@@ -519,6 +523,7 @@ export default function CurriculumPage() {
     try {
       const d = await saveDesign();
       if (d?.id) {
+        setLastDesignAction({ type: "saved", at: d.updatedAt ?? d.createdAt ?? new Date().toISOString() });
         resetSaveForm();
         // 저장 탭은 SavedDesignsTab이 새로 마운트되며 접힌 상태로 시작한다
         setMainTab("saved");
@@ -551,6 +556,12 @@ export default function CurriculumPage() {
         }),
       });
       if (res.ok) {
+        const createdSession = await res.json().catch(() => null);
+        const actionAt = createdSession?.createdAt ?? new Date().toISOString();
+        setLastDesignAction({
+          type: "deployed",
+          at: actionAt,
+        });
         toast({
           variant: "success",
           description: t(mode === "deploy" ? "sessionCreated" : "inquirySessionCreated", {
@@ -793,6 +804,9 @@ export default function CurriculumPage() {
                     {isRecommending ? t("recommending") : t("recommendByUnitNameBtn")}
                   </Button>
                 </div>
+                {isRecommending && (
+                  <AiLoadingProcess kind="unitDesignRecommendation" compact />
+                )}
                 {/* 교육과정 단원명과 정확히 일치하면 데이터 기반 정확 추천도 제공 */}
                 {unitNameInput.trim() && unitMatches.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -1242,6 +1256,9 @@ export default function CurriculumPage() {
               >
                 {loadingKeywords ? t("loadingKeywords") : t("nextKeywords")}
               </Button>
+              {loadingKeywords && (
+                <AiLoadingProcess kind="unitDesignKeywords" />
+              )}
             </div>
           )}
         </CardContent>
@@ -1296,6 +1313,9 @@ export default function CurriculumPage() {
             >
               {loadingSentences ? t("loadingSentences") : t("nextSentences")}
             </Button>
+            {loadingSentences && (
+              <AiLoadingProcess kind="unitDesignSentences" />
+            )}
           </CardContent>
         </Card>
       )}
@@ -1359,6 +1379,9 @@ export default function CurriculumPage() {
             >
               {loadingQuestions ? t("loadingQuestions") : t("nextQuestions")}
             </Button>
+            {loadingQuestions && (
+              <AiLoadingProcess kind="unitDesignQuestions" />
+            )}
           </CardContent>
         </Card>
       )}
@@ -1422,6 +1445,9 @@ export default function CurriculumPage() {
             >
               {loadingInquiry ? t("loadingInquiry") : t("nextInquiry")}
             </Button>
+            {loadingInquiry && (
+              <AiLoadingProcess kind="unitDesignInquiry" />
+            )}
           </CardContent>
         </Card>
       )}
@@ -1579,6 +1605,16 @@ export default function CurriculumPage() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">{t("addSessionHint")}</p>
+              {lastDesignAction && (
+                <p className="rounded-md border bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
+                  {t(
+                    lastDesignAction.type === "saved"
+                      ? "lastSavedAt"
+                      : "lastDeployedAt",
+                    { time: formatDateTime(lastDesignAction.at) },
+                  )}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

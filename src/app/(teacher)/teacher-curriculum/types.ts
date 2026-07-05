@@ -25,6 +25,7 @@ export interface SavedInquiryDesign {
   targetStudentIds?: string[];
   sessionCount?: number;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 // 오늘 날짜(YYYY-MM-DD, 로컬 기준)

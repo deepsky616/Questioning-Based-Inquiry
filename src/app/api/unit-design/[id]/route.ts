@@ -80,14 +80,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (data.commentsVisibleToPeers !== undefined) add("comments_visible_to_peers", data.commentsVisibleToPeers);
     if (data.targetClassValue !== undefined) add("target_class_value", data.targetClassValue);
     if (data.targetStudentIds !== undefined) add("target_student_ids", JSON.stringify(data.targetStudentIds), "::jsonb");
-    if (sets.length === 0) return NextResponse.json({ ok: true, designId: id });
+    if (sets.length === 0) {
+      const current = await prisma.$queryRaw<{ updated_at: Date }[]>`
+        SELECT updated_at FROM unit_designs WHERE id = ${id} LIMIT 1
+      `;
+      return NextResponse.json({ ok: true, designId: id, updatedAt: current[0]?.updated_at });
+    }
     sets.push("updated_at = now()");
     vals.push(id);
-    await prisma.$executeRawUnsafe(
-      `UPDATE unit_designs SET ${sets.join(", ")} WHERE id = $${vals.length}`,
+    const updated = await prisma.$queryRawUnsafe<{ updated_at: Date }[]>(
+      `UPDATE unit_designs SET ${sets.join(", ")} WHERE id = $${vals.length} RETURNING updated_at`,
       ...vals,
     );
-    return NextResponse.json({ ok: true, designId: id });
+    return NextResponse.json({ ok: true, designId: id, updatedAt: updated[0]?.updated_at });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });

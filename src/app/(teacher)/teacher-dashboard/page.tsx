@@ -185,9 +185,9 @@ function TeacherDashboard() {
       ) : (
       <>
       {/* 필터 */}
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -199,10 +199,10 @@ function TeacherDashboard() {
 
         {/* 담당 학급 드롭다운 — 동적으로 생성 */}
         <Select value={selectedClass} onValueChange={setSelectedClass}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-[22rem] md:w-[28rem]">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="w-[var(--radix-select-trigger-width)]">
             <SelectItem value="all">{t("allClasses")}</SelectItem>
             {teacherClasses.map((tc) => (
               <SelectItem key={classKey(tc)} value={classKey(tc)}>
@@ -233,7 +233,8 @@ function TeacherDashboard() {
                   {period === "semester" && t("periodSemesterBasis")}
                   {selectedClass !== "all" && (() => {
                     const [grade, className] = selectedClass.split("|");
-                    return t("gradeClassDot", { grade, className });
+                    const classLabel = `${stats.school ? `${stats.school} ` : ""}${t("gradeClass", { grade, className })}`;
+                    return ` · ${classLabel}`;
                   })()}
                 </div>
               </div>

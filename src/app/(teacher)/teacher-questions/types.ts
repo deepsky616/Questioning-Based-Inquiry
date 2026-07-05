@@ -4,6 +4,7 @@ export interface QuestionSession {
   date: string;
   subject: string;
   topic: string;
+  createdAt?: string;
   teacher: { name: string };
   unitDesignId?: string | null;
   defaultQuestionPublic?: boolean;
@@ -16,5 +17,5 @@ export interface QuestionSession {
   targetClassName?: string | null;
   targetStudentId?: string | null;
   targetStudentIds?: string[] | null;
-  sharedQuestions?: Array<{ type: string; content: string; contentGroup?: string; source?: "student" | "teacher"; priority?: number; mergedFrom?: string[] }>;
+  sharedQuestions?: Array<{ type: string; content: string; contentGroup?: string; source?: "student" | "teacher"; priority?: number; mergedFrom?: string[]; publishedAt?: string }>;
 }
