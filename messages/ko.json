@@ -1025,6 +1025,7 @@
     "analyzing": "분석 중...",
     "analyzeAllBtn": "📋 전체 분석 ({count}개)",
     "analyzeAllStudentBtn": "📋 개별 학생 전체 분석 ({count}개)",
+    "analyzeAllRunning": "수업세션 분석 중… {processed}/{total}",
     "analysisDone": "✅ 분석을 완료했어요",
     "analysisAllDone": "✅ {count}개 세션 분석을 완료했어요",
     "editSaved": "✅ 수정 내용을 저장했어요",
@@ -1105,8 +1106,14 @@
     "addedGroup": "추가 질문",
     "addedRationale": "교사가 직접 추가한 질문",
     "groupBtn": "① 비슷한 질문 묶기",
+    "groupStepTitle": "비슷한 질문 묶기",
+    "groupStepDesc": "학생 질문을 의미가 가까운 묶음으로 정리합니다.",
     "flowPlaceholder": "탐구 흐름 기준",
+    "flowStepTitle": "단원 설계 기준 선택",
     "sortBtn": "② 흐름 기준 정렬",
+    "sortStepTitle": "질문 순서 정하기",
+    "sortStepReady": "묶은 질문을 선택한 흐름에 맞춰 정렬할 수 있습니다.",
+    "sortStepLocked": "먼저 비슷한 질문 묶기를 실행하면 정렬할 수 있습니다.",
     "aiSuggested": "AI 제안",
     "ruleSuggested": "기본 규칙 제안",
     "addPlaceholder": "교사 추가 질문을 입력하고 ‘추가’를 누르세요",
@@ -1123,6 +1130,67 @@
     "moveDown": "아래로 이동",
     "mergeSummary": "질문 {from}개를 대표 질문 {to}개로 묶었어요",
     "mergedFromLabel": "묶인 질문 {count}개"
+  },
+  "aiProgress": {
+    "elapsed": "{seconds}초 경과",
+    "note": "질문 수, 답변 수, 모델 혼잡도에 따라 시간이 더 걸릴 수 있습니다.",
+    "kinds": {
+      "questionGrouping": {
+        "title": "AI가 비슷한 질문을 묶는 중입니다",
+        "description": "학생 질문을 읽고 의미가 가까운 질문끼리 대표 질문으로 정리하고 있습니다.",
+        "stages": {
+          "prepare": "질문 모으기",
+          "connect": "모델 연결",
+          "analyze": "의미 분석",
+          "organize": "대표 질문 정리",
+          "finish": "결과 반영"
+        }
+      },
+      "questionSorting": {
+        "title": "AI가 질문 순서를 정하는 중입니다",
+        "description": "선택한 단원 설계 흐름에 맞춰 질문의 수업 순서를 정리하고 있습니다.",
+        "stages": {
+          "prepare": "질문 확인",
+          "connect": "모델 연결",
+          "analyze": "흐름 분석",
+          "organize": "순서 정리",
+          "finish": "결과 반영"
+        }
+      },
+      "pointReview": {
+        "title": "AI가 추천 포인트를 분석하는 중입니다",
+        "description": "학생 질문과 답변을 읽고 보너스 후보와 중복 가능성을 함께 확인하고 있습니다.",
+        "stages": {
+          "prepare": "활동 수집",
+          "connect": "모델 연결",
+          "analyze": "질문·답변 평가",
+          "organize": "후보 정리",
+          "finish": "대기 목록 저장"
+        }
+      },
+      "sessionAnalysis": {
+        "title": "AI가 수업세션을 분석하는 중입니다",
+        "description": "질문, 답변, 좋아요 흐름을 바탕으로 수업 피드백을 작성하고 있습니다.",
+        "stages": {
+          "prepare": "세션 자료 수집",
+          "connect": "모델 연결",
+          "analyze": "참여 흐름 분석",
+          "organize": "피드백 작성",
+          "finish": "결과 저장"
+        }
+      },
+      "bulkSessionAnalysis": {
+        "title": "AI가 여러 수업세션을 분석하는 중입니다",
+        "description": "선택한 기간의 여러 세션을 나누어 분석하고 있습니다.",
+        "stages": {
+          "prepare": "대상 세션 확인",
+          "connect": "모델 연결",
+          "analyze": "세션별 분석",
+          "organize": "결과 저장",
+          "finish": "다음 묶음 준비"
+        }
+      }
+    }
   },
   "publishDialog": {
     "deployedCount": "{created}개 배포됨",

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { ACTIVITY_BONUS_TYPES } from "@/lib/activity-bonus-policy";
 import { buildSessionLabel } from "@/lib/sessions";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 
 interface SessionItem { id: string; date: string; subject: string; topic: string }
 interface PendingLog {
@@ -62,6 +63,7 @@ export function PointReviewView() {
   const [pending, setPending] = useState<PendingLog[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [overrideEdit, setOverrideEdit] = useState<Record<string, number>>({});
   const focusStudentId = searchParams.get("studentId");
@@ -91,7 +93,7 @@ export function PointReviewView() {
       setMessage(t("selectSessionFirst"));
       return;
     }
-    setBusy(true); setMessage(null);
+    setBusy(true); setAiLoading(true); setMessage(null);
     try {
       const res = await fetch("/api/teacher/points/analyze", {
         method: "POST",
@@ -118,7 +120,7 @@ export function PointReviewView() {
         setMessage(data.error || t("analyzeFailed"));
       }
     } catch { setMessage(t("networkError")); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setAiLoading(false); }
   }
 
   async function decide(decision: "APPROVE" | "REJECT", ids?: string[]) {
@@ -203,10 +205,11 @@ export function PointReviewView() {
               onClick={runAnalyze}
               disabled={busy || selectedSessionId === "all"}
               className="flex-1">
-              {busy ? t("analyzing") : t("runAnalyze")}
+              {aiLoading ? t("analyzing") : t("runAnalyze")}
             </Button>
             <Button variant="outline" onClick={loadPending}>{t("refresh")}</Button>
           </div>
+          {aiLoading && <AiLoadingProcess kind="pointReview" />}
           {message && (
             <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl px-3 py-2 text-sm">
               {message}

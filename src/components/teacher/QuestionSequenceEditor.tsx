@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { Check, ChevronDown, ChevronUp, GripVertical, Layers, ListOrdered, Pencil, Plus, RotateCw, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, GripVertical, Layers, ListOrdered, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +13,7 @@ import {
   type SequencedQuestion,
 } from "@/lib/unit-sequence";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
+import { AiLoadingProcess, type AiLoadingKind } from "@/components/shared/AiLoadingProcess";
 
 export interface QuestionSequenceEditorProps {
   sessionId: string;
@@ -38,6 +39,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
   const [additionalQuestions, setAdditionalQuestions] = useState<string[]>([]);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [runningKind, setRunningKind] = useState<AiLoadingKind | null>(null);
   const [teacherInput, setTeacherInput] = useState("");
   const [generatedBy, setGeneratedBy] = useState<"ai" | "rules" | "">("");
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +88,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
     current?: SequencedQuestion[],
   ) {
     setIsRunning(true);
+    setRunningKind(mode === "merge" ? "questionGrouping" : "questionSorting");
     setError(null);
     try {
       const res = await fetch("/api/unit-design/sequence", {
@@ -112,8 +115,10 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
       if (mode === "merge") setMerged(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("sortFailed"));
+    } finally {
+      setIsRunning(false);
+      setRunningKind(null);
     }
-    setIsRunning(false);
   }
 
   // ③ 교사 질문 추가 — 입력한 문장을 그대로 목록 맨 뒤에 추가(AI 재정리 없음).
@@ -154,41 +159,79 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
     update(reorder(sequenced, index, to).map((q, i) => ({ ...q, priority: i + 1 })));
   }
 
+  const activeFlow = UNIT_FLOW_OPTIONS.find((x) => x.id === flowId);
+  const canSort = merged && !isRunning;
+
   return (
     <div className="space-y-4">
       {/* ① 묶기 + ② 흐름 정렬 (편집 모드에서는 묶기 없이 흐름 정렬만) */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
-        {!editMode && (
-          <>
-            <Button onClick={() => runSequence(additionalQuestions, "merge")} disabled={isRunning} className="gap-1.5 font-semibold">
-              <Layers className="h-4 w-4" /> {t("groupBtn")}
+      <div className="rounded-lg border bg-background p-3 shadow-sm">
+        <div className="grid gap-3 lg:grid-cols-[1fr_1.25fr_1fr]">
+          {!editMode && (
+            <div className="rounded-md border bg-muted/25 p-3">
+              <div className="mb-3 flex items-start gap-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">1</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-foreground">{t("groupStepTitle")}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{t("groupStepDesc")}</p>
+                </div>
+              </div>
+              <Button onClick={() => runSequence(additionalQuestions, "merge")} disabled={isRunning} className="h-9 w-full gap-1.5 font-semibold">
+                <Layers className="h-4 w-4" /> {t("groupBtn")}
+              </Button>
+            </div>
+          )}
+
+          <div className="rounded-md border bg-muted/25 p-3">
+            <div className="mb-3 flex items-start gap-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-white">
+                {editMode ? "1" : "2"}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">{t("flowStepTitle")}</p>
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{activeFlow ? `${activeFlow.title} · ${activeFlow.axis}` : t("flowPlaceholder")}</p>
+              </div>
+            </div>
+            <Select value={flowId} onValueChange={setFlowId}>
+              <SelectTrigger className="h-9 w-full bg-background"><SelectValue placeholder={t("flowPlaceholder")} /></SelectTrigger>
+              <SelectContent>
+                {UNIT_FLOW_OPTIONS.map((flow) => (
+                  <SelectItem key={flow.id} value={flow.id}>
+                    <span className="font-medium">{flow.title}</span>
+                    <span className="ml-1.5 text-xs text-muted-foreground">{flow.axis}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="rounded-md border bg-muted/25 p-3">
+            <div className="mb-3 flex items-start gap-2">
+              <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${merged ? "bg-emerald-600" : "bg-muted-foreground"}`}>
+                {editMode ? "2" : "3"}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">{t("sortStepTitle")}</p>
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{merged ? t("sortStepReady") : t("sortStepLocked")}</p>
+              </div>
+            </div>
+            <Button onClick={() => runSequence(additionalQuestions, "sort", sequenced)} disabled={!canSort} className="h-9 w-full gap-1.5 font-semibold">
+              <ListOrdered className="h-4 w-4" /> {t("sortBtn")}
             </Button>
-            <span className="text-muted-foreground text-xs">→</span>
-          </>
-        )}
-        <Select value={flowId} onValueChange={setFlowId}>
-          <SelectTrigger className="h-9 w-56 bg-background"><SelectValue placeholder={t("flowPlaceholder")} /></SelectTrigger>
-          <SelectContent>
-            {UNIT_FLOW_OPTIONS.map((flow) => (
-              <SelectItem key={flow.id} value={flow.id}>
-                <span className="font-medium">{flow.title}</span>
-                <span className="ml-1.5 text-xs text-muted-foreground">{flow.axis}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button onClick={() => runSequence(additionalQuestions, "sort", sequenced)} disabled={isRunning || !merged} className="gap-1.5 font-semibold">
-          <ListOrdered className="h-4 w-4" /> {t("sortBtn")}
-        </Button>
-        {isRunning && <RotateCw className="h-4 w-4 animate-spin text-muted-foreground" />}
+          </div>
+        </div>
         {generatedBy && !isRunning && (
-          <span className="text-xs text-muted-foreground">{generatedBy === "ai" ? t("aiSuggested") : t("ruleSuggested")}</span>
+          <div className="mt-3 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            {generatedBy === "ai" ? t("aiSuggested") : t("ruleSuggested")}
+          </div>
         )}
       </div>
 
+      {isRunning && runningKind && <AiLoadingProcess kind={runningKind} />}
+
       {/* 선택한 탐구 흐름 설명 (용어 이해 도움) */}
       {(() => {
-        const f = UNIT_FLOW_OPTIONS.find((x) => x.id === flowId);
+        const f = activeFlow;
         if (!f) return null;
         return (
           <div className="rounded-md border bg-muted/40 p-2.5 text-xs">

@@ -1025,6 +1025,7 @@
     "analyzing": "Analyzing...",
     "analyzeAllBtn": "📋 Analyze all ({count})",
     "analyzeAllStudentBtn": "📋 Analyze this student ({count})",
+    "analyzeAllRunning": "Analyzing class sessions… {processed}/{total}",
     "analysisDone": "✅ Analysis complete",
     "analysisAllDone": "✅ Analyzed {count} session(s)",
     "editSaved": "✅ Saved your changes",
@@ -1105,8 +1106,14 @@
     "addedGroup": "Added questions",
     "addedRationale": "Question added directly by the teacher",
     "groupBtn": "① Group similar questions",
+    "groupStepTitle": "Group similar questions",
+    "groupStepDesc": "Organize student questions into close-meaning groups.",
     "flowPlaceholder": "Inquiry flow basis",
+    "flowStepTitle": "Choose unit design basis",
     "sortBtn": "② Sort by flow",
+    "sortStepTitle": "Set question order",
+    "sortStepReady": "The grouped questions can now be sorted by the selected flow.",
+    "sortStepLocked": "Group similar questions first to unlock sorting.",
     "aiSuggested": "AI suggestion",
     "ruleSuggested": "Default rule suggestion",
     "addPlaceholder": "Type a teacher question and press 'Add'",
@@ -1123,6 +1130,67 @@
     "moveDown": "Move down",
     "mergeSummary": "Grouped {from} questions into {to} representative questions",
     "mergedFromLabel": "{count} merged questions"
+  },
+  "aiProgress": {
+    "elapsed": "{seconds}s elapsed",
+    "note": "This can take longer depending on the number of questions, answers, and model traffic.",
+    "kinds": {
+      "questionGrouping": {
+        "title": "AI is grouping similar questions",
+        "description": "The model is reading student questions and combining close meanings into representative questions.",
+        "stages": {
+          "prepare": "Collect questions",
+          "connect": "Connect model",
+          "analyze": "Analyze meaning",
+          "organize": "Build representatives",
+          "finish": "Apply result"
+        }
+      },
+      "questionSorting": {
+        "title": "AI is sorting question order",
+        "description": "The model is arranging questions to match the selected unit design flow.",
+        "stages": {
+          "prepare": "Check questions",
+          "connect": "Connect model",
+          "analyze": "Analyze flow",
+          "organize": "Organize order",
+          "finish": "Apply result"
+        }
+      },
+      "pointReview": {
+        "title": "AI is analyzing recommended points",
+        "description": "The model is reviewing student questions and answers for bonus candidates and possible duplicates.",
+        "stages": {
+          "prepare": "Collect activity",
+          "connect": "Connect model",
+          "analyze": "Evaluate questions and answers",
+          "organize": "Organize candidates",
+          "finish": "Save pending list"
+        }
+      },
+      "sessionAnalysis": {
+        "title": "AI is analyzing the class session",
+        "description": "The model is writing feedback from questions, answers, likes, and participation flow.",
+        "stages": {
+          "prepare": "Collect session data",
+          "connect": "Connect model",
+          "analyze": "Analyze participation",
+          "organize": "Write feedback",
+          "finish": "Save result"
+        }
+      },
+      "bulkSessionAnalysis": {
+        "title": "AI is analyzing multiple sessions",
+        "description": "The model is analyzing the selected period in batches.",
+        "stages": {
+          "prepare": "Check sessions",
+          "connect": "Connect model",
+          "analyze": "Analyze each session",
+          "organize": "Save results",
+          "finish": "Prepare next batch"
+        }
+      }
+    }
   },
   "publishDialog": {
     "deployedCount": "{created} deployed",

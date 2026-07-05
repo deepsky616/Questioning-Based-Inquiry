@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { SectionToggle } from "@/components/shared/SectionToggle";
 
 interface SessionAnalysis {
@@ -170,7 +171,7 @@ export function SessionAnalysisCard({ sessionId }: SessionAnalysisCardProps) {
       </CardHeader>
       {show && isAnalyzing && !editing && (
         <CardContent>
-          <p className="text-sm text-muted-foreground">{t("analyzing")}</p>
+          <AiLoadingProcess kind="sessionAnalysis" />
         </CardContent>
       )}
       {show && !isAnalyzing && (analysis || error || editing) && (

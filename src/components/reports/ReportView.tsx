@@ -14,6 +14,7 @@ import type { ReportRange, SeriesPoint, ReportTotals } from "@/lib/report-stats"
 import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
+import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 
 export interface PerStudentRow {
   id: string;
@@ -164,6 +165,7 @@ export function ReportView({
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [errs, setErrs] = useState<Record<string, string>>({});
   const [analyzingAll, setAnalyzingAll] = useState(false);
+  const [sessionBatch, setSessionBatch] = useState<{ running: boolean; processed: number; total: number }>({ running: false, processed: 0, total: 0 });
   // 전체 학생 일괄 분석(학급 보기)
   const [bulk, setBulk] = useState<{ running: boolean; processed: number; total: number; analyzed: number; note?: string }>({ running: false, processed: 0, total: 0, analyzed: 0 });
   const bulkStop = useRef(false);
@@ -345,10 +347,11 @@ export function ReportView({
   const analyzeAll = async () => {
     if (!analyzeSession) return;
     setAnalyzingAll(true);
+    const targets = filteredSessions.filter((s) => !res[s.id]);
+    setSessionBatch({ running: true, processed: 0, total: targets.length });
     let analyzedCount = 0, failed = false;
-    for (const s of filteredSessions) {
-      setOpen((o) => ({ ...o, [s.id]: true }));
-      if (res[s.id]) continue;
+    setOpen((o) => filteredSessions.reduce((next, s) => ({ ...next, [s.id]: true }), o));
+    for (const s of targets) {
       setBusy((b) => ({ ...b, [s.id]: true })); setErrs((e) => ({ ...e, [s.id]: "" }));
       try {
         const r = await analyzeSession(s.id);
@@ -362,9 +365,11 @@ export function ReportView({
         setErrs((x) => ({ ...x, [s.id]: e instanceof Error ? e.message : t("analysisFailed") }));
       } finally {
         setBusy((b) => ({ ...b, [s.id]: false }));
+        setSessionBatch((p) => ({ ...p, processed: Math.min(p.processed + 1, p.total) }));
       }
     }
     setAnalyzingAll(false);
+    setSessionBatch((p) => ({ ...p, running: false }));
     if (failed) toast({ variant: "destructive", description: t("analysisFailed") });
     else toast({ description: t("analysisAllDone", { count: analyzedCount }) });
   };
@@ -626,6 +631,21 @@ export function ReportView({
           {canAnalyze && bulkAnalyze && bulk.note && !bulk.running && (
             <p className="no-print -mt-1 text-xs text-muted-foreground">{bulk.note}</p>
           )}
+          {analyzingAll && (
+            <AiLoadingProcess
+              kind="sessionAnalysis"
+              detail={t("analyzeAllRunning", { processed: sessionBatch.processed, total: sessionBatch.total })}
+              className="no-print mb-3"
+            />
+          )}
+          {bulk.running && (
+            <AiLoadingProcess
+              kind="bulkSessionAnalysis"
+              compact
+              detail={t("bulkRunning", { processed: bulk.processed, total: bulk.total })}
+              className="no-print mb-3"
+            />
+          )}
 
           {/* 수업세션별 개별 분석 목록(선택한 주/월의 세션만 표시) */}
           {filteredSessions.length === 0 ? (
@@ -711,7 +731,7 @@ export function ReportView({
                   {open[s.id] && (
                     <div className="border-t px-3 py-2 text-sm">
                       {busy[s.id] ? (
-                        <p className="text-muted-foreground">{t("analyzingNow")}</p>
+                        <AiLoadingProcess kind="sessionAnalysis" compact />
                       ) : errs[s.id] ? (
                         <p className="text-red-600">{errs[s.id]}</p>
                       ) : editing === s.id ? (
