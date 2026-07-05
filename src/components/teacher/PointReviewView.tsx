@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +28,15 @@ interface PendingLog {
   alreadyForTarget: number;
   alreadyInSession: number;
 }
+type AnalyzeResponse = {
+  createdPending?: number;
+  questionCount?: number;
+  commentCount?: number;
+  aiStatus?: "success" | "skipped" | "failed";
+  aiErrorType?: "missing_key" | "busy" | "invalid_response" | "unknown" | null;
+  fallbackUsed?: boolean;
+  error?: string;
+};
 
 // 라벨은 번역키(labelKey)로 반환하고 표시 시점에 t로 해석. 미지정 타입은 raw 노출.
 function bonusLabel(bt: string): { labelKey: string | null; raw: string; emoji: string; color: string } {
@@ -44,6 +55,7 @@ function bonusLabel(bt: string): { labelKey: string | null; raw: string; emoji: 
 
 export function PointReviewView() {
   const t = useTranslations("pointReview");
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("all");
@@ -52,6 +64,7 @@ export function PointReviewView() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [overrideEdit, setOverrideEdit] = useState<Record<string, number>>({});
+  const focusStudentId = searchParams.get("studentId");
 
   const loadSessions = useCallback(() => {
     fetch("/api/sessions").then((r) => r.json()).then((d) => {
@@ -71,6 +84,7 @@ export function PointReviewView() {
 
   useEffect(() => { loadSessions(); }, [loadSessions]);
   useEffect(() => { loadPending(); }, [loadPending]);
+  useEffect(() => { setSelected(new Set()); }, [focusStudentId]);
 
   async function runAnalyze() {
     if (selectedSessionId === "all") {
@@ -84,9 +98,21 @@ export function PointReviewView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: selectedSessionId }),
       });
-      const data = await res.json();
+      const data = await res.json() as AnalyzeResponse;
       if (res.ok) {
-        setMessage(t("analyzeDone", { created: data.createdPending, questions: data.questionCount, comments: data.commentCount }));
+        if (data.aiStatus === "failed") {
+          const fallback = data.fallbackUsed ? ` ${t("fallbackUsed")}` : "";
+          const key = data.aiErrorType === "missing_key"
+            ? "aiErrorMissingKey"
+            : data.aiErrorType === "busy"
+            ? "aiErrorBusy"
+            : data.aiErrorType === "invalid_response"
+            ? "aiErrorInvalidResponse"
+            : "aiErrorUnknown";
+          setMessage(`${t(key)}${fallback}`);
+        } else {
+          setMessage(t("analyzeDone", { created: data.createdPending ?? 0, questions: data.questionCount ?? 0, comments: data.commentCount ?? 0 }));
+        }
         loadPending();
       } else {
         setMessage(data.error || t("analyzeFailed"));
@@ -126,19 +152,35 @@ export function PointReviewView() {
     } catch {} finally { setBusy(false); }
   }
 
-  function toggleAll() {
-    if (selected.size === pending.length) setSelected(new Set());
-    else setSelected(new Set(pending.map((p) => p.id)));
-  }
-
   const duplicateRows = pending.filter((p) => p.bonusType.includes("DUPLICATE"));
   const normalRows = pending.filter((p) => !p.bonusType.includes("DUPLICATE"));
+  const focusedPending = focusStudentId ? pending.filter((p) => p.studentId === focusStudentId) : pending;
+  const displayedDuplicateRows = focusStudentId ? duplicateRows.filter((p) => p.studentId === focusStudentId) : duplicateRows;
+  const displayedNormalRows = focusStudentId ? normalRows.filter((p) => p.studentId === focusStudentId) : normalRows;
+  const displayedNormalIds = displayedNormalRows.map((p) => p.id);
+  const allDisplayedNormalSelected = displayedNormalIds.length > 0 && displayedNormalIds.every((id) => selected.has(id));
+  const focusStudentName = focusedPending[0]?.studentName;
+
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allDisplayedNormalSelected) displayedNormalIds.forEach((id) => next.delete(id));
+      else displayedNormalIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
         {t("intro")}
       </p>
+
+      {focusStudentId && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300">
+          {focusStudentName ? t("studentFocus", { name: focusStudentName, count: focusedPending.length }) : t("studentFocusEmpty")}
+        </div>
+      )}
 
       {/* 세션 선택 + 분석 실행 */}
       <Card>
@@ -174,18 +216,18 @@ export function PointReviewView() {
       </Card>
 
       {/* 중복 가능성 */}
-      {duplicateRows.length > 0 && (
+      {displayedDuplicateRows.length > 0 && (
         <Card className="border-red-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2 text-red-700">
-              {t("duplicateTitle", { count: duplicateRows.length })}
+              {t("duplicateTitle", { count: displayedDuplicateRows.length })}
             </CardTitle>
             <CardDescription className="text-red-600 text-xs">
               {t("duplicateDesc")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {duplicateRows.map((p) => (
+            {displayedDuplicateRows.map((p) => (
               <PendingRow key={p.id} p={p} selected={selected.has(p.id)}
                 onToggle={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
                 onDecideOne={(d) => decide(d, [p.id])}
@@ -202,10 +244,10 @@ export function PointReviewView() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">{t("recommendedTitle", { count: normalRows.length })}</CardTitle>
+            <CardTitle className="text-base">{t("recommendedTitle", { count: displayedNormalRows.length })}</CardTitle>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={toggleAll} disabled={normalRows.length === 0}>
-                {selected.size === pending.length ? t("deselectAll") : t("selectAll")}
+              <Button size="sm" variant="outline" onClick={toggleAll} disabled={displayedNormalRows.length === 0}>
+                {allDisplayedNormalSelected ? t("deselectAll") : t("selectAll")}
               </Button>
               <Button size="sm" onClick={() => decide("APPROVE")}
                 disabled={selected.size === 0 || busy}>
@@ -220,9 +262,9 @@ export function PointReviewView() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {normalRows.length === 0 ? (
+          {displayedNormalRows.length === 0 ? (
             <EmptyState icon="✅" title={t("noPending")} />
-          ) : normalRows.map((p) => (
+          ) : displayedNormalRows.map((p) => (
             <PendingRow key={p.id} p={p} selected={selected.has(p.id)}
               onToggle={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
               onDecideOne={(d) => decide(d, [p.id])}
@@ -259,7 +301,12 @@ function PendingRow({
         <input type="checkbox" checked={selected} onChange={onToggle} className="mt-1 w-4 h-4 accent-indigo-500" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-foreground text-sm">{p.studentName}</span>
+            <Link
+              href={`/teacher-students?studentId=${p.studentId}`}
+              className="text-sm font-bold text-foreground underline-offset-2 hover:text-indigo-600 hover:underline"
+            >
+              {p.studentName}
+            </Link>
             <span className="text-xs text-muted-foreground">{t("gradeClass", { grade: p.grade ?? "", className: p.className ?? "" })}</span>
             <span className="text-xs font-bold px-2 py-0.5 rounded-full text-white"
               style={{ background: b.color }}>

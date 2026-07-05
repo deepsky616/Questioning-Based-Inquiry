@@ -12,15 +12,16 @@ export async function GET() {
 
   const teacher = await prisma.user.findUnique({
     where: { id: teacherId },
-    select: { teacherClasses: { select: { grade: true, className: true } } },
+    select: { school: true, teacherClasses: { select: { grade: true, className: true } } },
   });
   const classes = teacher?.teacherClasses ?? [];
-  if (classes.length === 0) {
+  if (!teacher?.school || classes.length === 0) {
     return NextResponse.json({ total: 0, questions: 0, comments: 0 });
   }
 
   const studentWhere = {
     role: "STUDENT" as const,
+    school: teacher.school,
     OR: classes.map((c) => ({ grade: c.grade, className: c.className })),
   };
   const students = await prisma.user.findMany({ where: studentWhere, select: { id: true } });

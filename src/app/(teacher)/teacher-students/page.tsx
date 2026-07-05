@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
 import { formatShortDateTime } from "@/lib/datetime";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -45,6 +47,7 @@ interface TeacherClass { grade: string; className: string }
 
 interface RawEvent { type: "question" | "comment" | "point"; createdAt: string; weight: number }
 interface PointLogItem { id: string; createdAt: string; points: number; gameId: string; bonusType: string; reason: string }
+interface PendingPointItem { id: string; studentId: string; sessionId: string | null; bonusType: string; points: number; reason: string }
 interface QuestionItem {
   id: string; createdAt: string; content: string; closure: string; cognitive: string;
   _count?: { likes: number; comments: number };
@@ -66,6 +69,9 @@ interface StudentStats {
   recentComments: CommentItem[];
   recentPoints: PointLogItem[];
 }
+
+const EMPTY_STUDENTS: Student[] = [];
+const EMPTY_TEACHER_CLASSES: TeacherClass[] = [];
 
 type Period = "month" | "week" | "dow";
 type Metric = "question" | "comment" | "point";
@@ -232,6 +238,18 @@ function StudentDetailDialog({
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
   });
+  const { data: pendingAiPoints = [] } = useQuery<PendingPointItem[]>({
+    queryKey: ["student-pending-ai-points", student.id],
+    queryFn: async () => {
+      const r = await fetch("/api/teacher/points/pending");
+      if (!r.ok) return [];
+      const d = await r.json();
+      const rows = Array.isArray(d.pending) ? d.pending : [];
+      return rows.filter((p: PendingPointItem) => p.studentId === student.id);
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   const series = useMemo(
     () => (stats ? buildSeries(stats.events, period, locale) : []),
@@ -267,6 +285,21 @@ function StudentDetailDialog({
             </span>
           </DialogTitle>
         </DialogHeader>
+
+        {pendingAiPoints.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="font-semibold">{t("pendingAiTitle", { count: pendingAiPoints.length })}</p>
+              <Link
+                href={`/teacher-questions?tab=review&studentId=${student.id}`}
+                className="inline-flex h-8 items-center justify-center rounded-md bg-amber-600 px-3 text-xs font-semibold text-white hover:bg-amber-700"
+              >
+                {t("pendingAiAction")}
+              </Link>
+            </div>
+            <p className="mt-1 text-xs">{t("pendingAiDesc")}</p>
+          </div>
+        )}
 
         {/* 누적 통계 */}
         <div className="grid grid-cols-3 gap-2">
@@ -560,6 +593,8 @@ export default function StudentsPage() {
   const tPages = useTranslations("pages");
   const t = useTranslations("students");
   const tSet = useTranslations("settings");
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [mgmtTab, setMgmtTab] = useState<"list" | "bulk" | "reset">("list");
   const [search, setSearch] = useState("");
@@ -577,8 +612,8 @@ export default function StudentsPage() {
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
   });
-  const students = data?.students ?? [];
-  const teacherClasses = data?.teacherClasses ?? [];
+  const students = data?.students ?? EMPTY_STUDENTS;
+  const teacherClasses = data?.teacherClasses ?? EMPTY_TEACHER_CLASSES;
   const refetchList = () => queryClient.invalidateQueries({ queryKey: ["teacher-student-list"] });
 
   const normalizedSearch = search.trim().replace(/학년|반/g, "").trim();
@@ -607,6 +642,21 @@ export default function StudentsPage() {
   const totalC = students.reduce((a, b) => a + b.commentCount, 0);
   const totalP = students.reduce((a, b) => a + b.totalPoints, 0);
   const avgP = students.length === 0 ? 0 : Math.round(totalP / students.length);
+  const selectedStudentId = searchParams.get("studentId");
+
+  useEffect(() => {
+    if (!selectedStudentId || students.length === 0) return;
+    const target = students.find((s) => s.id === selectedStudentId);
+    if (target) {
+      setSelected(target);
+      setMgmtTab("list");
+    }
+  }, [selectedStudentId, students]);
+
+  const closeSelected = () => {
+    setSelected(null);
+    if (selectedStudentId) router.replace("/teacher-students");
+  };
 
   return (
     <div className="space-y-6">
@@ -829,7 +879,7 @@ export default function StudentsPage() {
       {selected && (
         <StudentDetailDialog
           student={selected}
-          onClose={() => setSelected(null)}
+          onClose={closeSelected}
           onChanged={refetchList}
         />
       )}

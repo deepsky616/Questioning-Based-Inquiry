@@ -1,14 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const generateContent = vi.hoisted(() => vi.fn());
+const getGenerativeModel = vi.hoisted(() => vi.fn(() => ({ generateContent })));
 const aiState = vi.hoisted(() => ({ apiKey: "k" as string | null, model: "gemini-2.5-flash" }));
 
 vi.mock("@/lib/resolve-ai-config", () => ({ resolveUserAiConfig: vi.fn(async () => ({ ...aiState })) }));
 vi.mock("@google/generative-ai", () => ({
   GoogleGenerativeAI: class {
-    getGenerativeModel() {
-      return { generateContent };
-    }
+    getGenerativeModel = getGenerativeModel;
   },
 }));
 
@@ -19,7 +18,9 @@ const enReq = () => new Request("http://x", { headers: { cookie: "NEXT_LOCALE=en
 
 beforeEach(() => {
   generateContent.mockReset();
+  getGenerativeModel.mockClear();
   aiState.apiKey = "k";
+  aiState.model = "gemini-2.5-flash";
 });
 
 describe("lib/ai 서비스 계층", () => {
@@ -51,5 +52,29 @@ describe("lib/ai 서비스 계층", () => {
     generateContent.mockResolvedValue(reply("{}"));
     await generateJson({ userId: "u", prompt: "ASK" });
     expect(generateContent.mock.calls[0][0]).toBe("ASK");
+  });
+
+  it("quality 작업은 flash-lite 설정이어도 gemini-2.5-flash와 낮은 온도로 호출", async () => {
+    aiState.model = "gemini-2.5-flash-lite";
+    generateContent.mockResolvedValue(reply("{}"));
+
+    await generateJson({ userId: "u", prompt: "ASK", quality: true });
+
+    expect(getGenerativeModel).toHaveBeenCalledWith({
+      model: "gemini-2.5-flash",
+      generationConfig: { temperature: 0.1 },
+    });
+  });
+
+  it("quality 작업에서 교사가 pro를 명시하면 pro 모델은 존중", async () => {
+    aiState.model = "gemini-2.5-pro";
+    generateContent.mockResolvedValue(reply("{}"));
+
+    await generateJson({ userId: "u", prompt: "ASK", quality: true });
+
+    expect(getGenerativeModel).toHaveBeenCalledWith({
+      model: "gemini-2.5-pro",
+      generationConfig: { temperature: 0.1 },
+    });
   });
 });

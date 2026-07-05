@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { generateJson } from "@/lib/ai";
+import { AiBusyError, AiKeyMissingError } from "@/lib/ai-errors";
 import {
   ACTIVITY_BONUS_TYPES, VALID_ACTIVITY_BONUS,
   MAX_ACTIVITY_BONUS_PER_STUDENT,
@@ -18,6 +19,17 @@ const SYS = `당신은 초·중학생 질문기반 탐구 수업을 따뜻하게
 
 interface AIBonusItem { studentId: string; targetId: string; targetType: "question" | "comment"; bonusType: string; reason: string }
 interface AIResp { bonuses: AIBonusItem[]; summary?: string }
+type AiStatus = "success" | "skipped" | "failed";
+type AiErrorType = "missing_key" | "busy" | "invalid_response" | "unknown";
+
+function classifyAiError(error: unknown): AiErrorType {
+  if (error instanceof AiKeyMissingError) return "missing_key";
+  if (error instanceof AiBusyError) return "busy";
+  if (error instanceof SyntaxError) return "invalid_response";
+  const message = error instanceof Error ? error.message : String(error);
+  if (/json|parse|unexpected token|invalid response/i.test(message)) return "invalid_response";
+  return "unknown";
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -57,7 +69,13 @@ export async function POST(req: NextRequest) {
   });
 
   if (questions.length === 0) {
-    return NextResponse.json({ error: "분석할 활동이 없습니다", count: 0 }, { status: 400 });
+    return NextResponse.json({
+      error: "분석할 활동이 없습니다",
+      count: 0,
+      aiStatus: "skipped" satisfies AiStatus,
+      aiErrorType: null,
+      fallbackUsed: false,
+    }, { status: 400 });
   }
 
   // 학생 ID 집합
@@ -95,6 +113,8 @@ export async function POST(req: NextRequest) {
 
   // AI 호출 (교사 본인 설정)
   let aiResp: AIResp | null = null;
+  let aiStatus: AiStatus = "skipped";
+  let aiErrorType: AiErrorType | null = null;
   {
     const qBlock = questions.map((q) =>
       `[Q:${q.id}] ${q.author.name}(${q.authorId}): ${q.content}`
@@ -132,9 +152,15 @@ ${cBlock || "(없음)"}
 }`;
 
     try {
-      // 키 없음·파싱 실패는 AI 결과 없이 진행(키워드 기반 후보만 사용)
+      // AI 추천 포인트는 평가 품질이 중요하므로 탐구설계와 동일하게 quality 작업으로 호출한다.
+      // 교사가 flash-lite를 설정했더라도 공통 AI 계층에서 gemini-2.5-flash로 올리고, pro 설정은 존중한다.
+      // 키 없음·파싱 실패는 AI 결과 없이 진행(정규화 기반 중복 후보만 사용)
       aiResp = await generateJson<AIResp>({ userId: teacherId, prompt, req, localize: true, systemInstruction: SYS, quality: true });
-    } catch {}
+      aiStatus = "success";
+    } catch (error) {
+      aiStatus = "failed";
+      aiErrorType = classifyAiError(error);
+    }
   }
 
   // 결합 + 검증 + 클램프
@@ -196,9 +222,17 @@ ${cBlock || "(없음)"}
 
   // 세션에 normalized_content가 없는 옛 질문/답변은 보완 (다음 분석 정확도 향상)
   const missingNormQ = questions.filter((q) => !q.normalizedContent && q.content);
-  await Promise.all(missingNormQ.map((q) =>
-    prisma.question.update({ where: { id: q.id }, data: { normalizedContent: normalizeContent(q.content) } })
-  ));
+  const missingNormC = questions.flatMap((q) =>
+    q.comments.filter((c) => !c.normalizedContent && c.content)
+  );
+  await Promise.all([
+    ...missingNormQ.map((q) =>
+      prisma.question.update({ where: { id: q.id }, data: { normalizedContent: normalizeContent(q.content) } })
+    ),
+    ...missingNormC.map((c) =>
+      prisma.comment.update({ where: { id: c.id }, data: { normalizedContent: normalizeContent(c.content) } })
+    ),
+  ]);
 
   return NextResponse.json({
     sessionId,
@@ -207,5 +241,8 @@ ${cBlock || "(없음)"}
     commentCount: questions.reduce((a, q) => a + q.comments.length, 0),
     createdPending: created.length,
     summary: aiResp?.summary ?? null,
+    aiStatus,
+    aiErrorType,
+    fallbackUsed: duplicateCandidates.length > 0,
   });
 }
