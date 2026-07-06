@@ -3,6 +3,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { compareByClassAndNumber } from "@/lib/student-sort";
 
+function jsonStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user) {
@@ -62,33 +66,81 @@ export async function GET() {
 
   // 마지막 활동일(질문·댓글 중 최신) — 학생별 max createdAt
   const ids = students.map((s) => s.id);
-  const [qMax, cMax] = ids.length
+  const [qMax, cMax, sessions, questionPairs] = ids.length
     ? await Promise.all([
         prisma.question.groupBy({ by: ["authorId"], where: { authorId: { in: ids } }, _max: { createdAt: true } }),
         prisma.comment.groupBy({ by: ["authorId"], where: { authorId: { in: ids } }, _max: { createdAt: true } }),
+        prisma.questionSession.findMany({
+          where: { teacherId, isActive: true },
+          select: {
+            id: true,
+            targetType: true,
+            targetGrade: true,
+            targetClassName: true,
+            targetStudentId: true,
+            targetStudentIds: true,
+          },
+        }),
+        prisma.question.findMany({
+          where: { authorId: { in: ids }, sessionId: { not: null }, source: { not: "TEACHER_SHARED" } },
+          select: { authorId: true, sessionId: true },
+        }),
       ])
-    : [[], []];
+    : [[], [], [], []];
   const lastActivity = new Map<string, number>();
   for (const r of qMax) if (r._max.createdAt) lastActivity.set(r.authorId, r._max.createdAt.getTime());
   for (const r of cMax) {
     const t = r._max.createdAt?.getTime();
     if (t && t > (lastActivity.get(r.authorId) ?? 0)) lastActivity.set(r.authorId, t);
   }
+  const answeredByStudent = new Map<string, Set<string>>();
+  for (const pair of questionPairs) {
+    if (!pair.sessionId) continue;
+    const set = answeredByStudent.get(pair.authorId) ?? new Set<string>();
+    set.add(pair.sessionId);
+    answeredByStudent.set(pair.authorId, set);
+  }
+
+  const visibleSessionsFor = (student: (typeof students)[number]) =>
+    sessions.filter((s) => {
+      const targetStudentIds = jsonStringArray(s.targetStudentIds);
+      if (s.targetType === "ALL") return true;
+      if (s.targetType === "CLASS") {
+        return (
+          (s.targetGrade === student.grade && s.targetClassName === student.className) ||
+          targetStudentIds.includes(student.id)
+        );
+      }
+      if (s.targetType === "STUDENT") {
+        return s.targetStudentId === student.id || targetStudentIds.includes(student.id);
+      }
+      if (s.targetType === "CUSTOM") return targetStudentIds.includes(student.id);
+      return false;
+    });
 
   return NextResponse.json({
-    students: students.map((s) => ({
-      id: s.id,
-      name: s.name,
-      grade: s.grade ?? "",
-      className: s.className ?? "",
-      studentNumber: s.studentNumber ?? "",
-      school: s.school ?? "",
-      questionCount: s._count.questions,
-      commentCount: s._count.comments,
-      pointLogCount: s._count.pointLogs,
-      totalPoints: s.totalPoints,
-      lastActivityAt: lastActivity.has(s.id) ? new Date(lastActivity.get(s.id)!).toISOString() : null,
-    })),
+    students: students.map((s) => {
+      const visibleSessions = visibleSessionsFor(s);
+      const answered = answeredByStudent.get(s.id) ?? new Set<string>();
+      const completed = visibleSessions.filter((item) => answered.has(item.id)).length;
+      const total = visibleSessions.length;
+      const remaining = Math.max(total - completed, 0);
+      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+      return {
+        id: s.id,
+        name: s.name,
+        grade: s.grade ?? "",
+        className: s.className ?? "",
+        studentNumber: s.studentNumber ?? "",
+        school: s.school ?? "",
+        questionCount: s._count.questions,
+        commentCount: s._count.comments,
+        pointLogCount: s._count.pointLogs,
+        totalPoints: s.totalPoints,
+        lastActivityAt: lastActivity.has(s.id) ? new Date(lastActivity.get(s.id)!).toISOString() : null,
+        sessionProgress: { total, completed, remaining, percent },
+      };
+    }),
     teacherClasses,
   });
 }

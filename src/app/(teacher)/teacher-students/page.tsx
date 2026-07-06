@@ -42,6 +42,7 @@ interface Student {
   studentNumber: string; school: string;
   questionCount: number; commentCount: number; pointLogCount: number; totalPoints: number;
   lastActivityAt?: string | null;
+  sessionProgress?: { total: number; completed: number; remaining: number; percent: number };
 }
 interface TeacherClass { grade: string; className: string }
 interface TeacherStatsSummary {
@@ -71,6 +72,34 @@ interface StudentStats {
   recentQuestions: QuestionItem[];
   recentComments: CommentItem[];
   recentPoints: PointLogItem[];
+}
+
+function StudentSessionProgress({ student }: { student: Student }) {
+  const t = useTranslations("students");
+  const progress = student.sessionProgress;
+  if (!progress || progress.total === 0) {
+    return <span className="text-xs text-muted-foreground">{t("sessionProgressEmpty")}</span>;
+  }
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="font-medium text-foreground">
+          {t("sessionProgressInline", {
+            completed: progress.completed,
+            total: progress.total,
+            remaining: progress.remaining,
+          })}
+        </span>
+        <span className="font-bold text-emerald-600">{progress.percent}%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-all"
+          style={{ width: `${progress.percent}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 const EMPTY_STUDENTS: Student[] = [];
@@ -343,6 +372,13 @@ function StudentDetailDialog({
           <div className="rounded-xl bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-500/30 p-3 text-center">
             <p className="text-xs text-teal-500 font-medium">{t("gamePlays")}</p>
             <p className="text-2xl font-black text-teal-600">{stats?.student.gamePlays ?? "-"}</p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-950/30">
+          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">{t("sessionProgressTitle")}</p>
+          <div className="mt-2">
+            <StudentSessionProgress student={student} />
           </div>
         </div>
 
@@ -879,6 +915,9 @@ export default function StudentsPage() {
                           <p className={`text-sm font-semibold ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>{s.totalPoints}</p>
                         </div>
                       </div>
+                      <div className="mt-3 rounded-md bg-emerald-50 px-2 py-2 dark:bg-emerald-950/30">
+                        <StudentSessionProgress student={s} />
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -891,6 +930,7 @@ export default function StudentsPage() {
                       <TableHead className="text-center w-20 whitespace-nowrap">{t("colQuestion")}</TableHead>
                       <TableHead className="text-center w-20 whitespace-nowrap">{t("colAnswer")}</TableHead>
                       <TableHead className="text-center w-20 whitespace-nowrap">{t("colPoint")}</TableHead>
+                      <TableHead className="w-44 whitespace-nowrap">{t("colSessionProgress")}</TableHead>
                       <TableHead className="text-center w-28 whitespace-nowrap hidden sm:table-cell">{t("colLastActive")}</TableHead>
                       <TableHead className="text-center w-20 whitespace-nowrap">{t("colDetail")}</TableHead>
                     </TableRow>
@@ -915,6 +955,9 @@ export default function StudentsPage() {
                           <span className={`font-semibold ${s.totalPoints > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
                             {s.totalPoints}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          <StudentSessionProgress student={s} />
                         </TableCell>
                         <TableCell className="text-center text-xs text-muted-foreground whitespace-nowrap hidden sm:table-cell">
                           {(() => { const r = lastActiveLabel(s.lastActivityAt); return r ? t(r.key, r.v) : "-"; })()}
