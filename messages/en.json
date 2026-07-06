@@ -199,6 +199,8 @@
     "taskScopeShared": "Showing only teacher-shared inquiry question classes selected from the dashboard.",
     "showAllSessions": "Show all classes",
     "selectedSessionBadge": "Selected",
+    "completedSessionBadge": "Done",
+    "completedSessionShort": "Done",
     "todayBadge": "Today",
     "futureBadge": "Upcoming",
     "pastBadge": "Past",

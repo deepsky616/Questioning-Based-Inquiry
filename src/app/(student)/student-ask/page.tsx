@@ -330,6 +330,7 @@ function AskContent() {
         id: typeof saved?.id === "string" ? saved.id : existingQuestion?.id ?? "saved",
         content,
       });
+      setQuestionSessionIds((prev) => new Set(prev).add(selectedSessionId));
       setSaveComplete(true);
     } catch {
       toast({ variant: "destructive", description: t("saveError") });
@@ -547,6 +548,7 @@ function AskContent() {
                 {filteredSessions.map((session) => {
                   const active = selectedSessionId === session.id;
                   const isInquiry = isInquiryDesignSession(session);
+                  const alreadyAskedInSession = questionSessionIds.has(session.id);
                   return (
                     <button
                       key={session.id}
@@ -572,6 +574,11 @@ function AskContent() {
                             {t("selectedSessionBadge")}
                           </span>
                         )}
+                        {!active && alreadyAskedInSession && (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                            {t("completedSessionBadge")}
+                          </span>
+                        )}
                       </div>
                       <div className="mt-2 space-y-1">
                         <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
@@ -584,6 +591,11 @@ function AskContent() {
                           {isInquiry && (
                             <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">
                               {t("inquiryClassTag")}
+                            </span>
+                          )}
+                          {alreadyAskedInSession && (
+                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                              {t("completedSessionShort")}
                             </span>
                           )}
                         </div>

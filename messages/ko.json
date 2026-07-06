@@ -199,6 +199,8 @@
     "taskScopeShared": "대시보드에서 선택한 선생님이 배포한 탐구질문 수업만 보여줍니다.",
     "showAllSessions": "전체 수업 보기",
     "selectedSessionBadge": "선택됨",
+    "completedSessionBadge": "작성 완료",
+    "completedSessionShort": "완료",
     "todayBadge": "오늘",
     "futureBadge": "예정",
     "pastBadge": "지난 수업",
