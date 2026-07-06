@@ -1526,6 +1526,8 @@
     "taskUnaskedDesc": "참여 가능하지만 아직 내 질문이 없는 수업입니다.",
     "taskTodayQuestionTitle": "오늘 질문할 수업",
     "taskTodayQuestionDesc": "오늘 수업 중 아직 내 질문이 없는 수업입니다.",
+    "taskTeacherRequestTitle": "선생님 요청",
+    "taskTeacherRequestDescWithSession": "{teacherName} 선생님이 {sessionTitle} 질문 작성을 요청했어요.",
     "taskFutureQuestionTitle": "앞으로 질문할 수업",
     "taskFutureQuestionDesc": "앞으로 열릴 수업 중 아직 내 질문이 없는 수업입니다.",
     "taskPastQuestionTitle": "지난 수업 중 미작성",

@@ -1526,6 +1526,8 @@
     "taskUnaskedDesc": "Available sessions where I have not written a question yet.",
     "taskTodayQuestionTitle": "Classes to ask in today",
     "taskTodayQuestionDesc": "Today's classes where I have not written a question yet.",
+    "taskTeacherRequestTitle": "Teacher requests",
+    "taskTeacherRequestDescWithSession": "{teacherName} asked you to write a question for {sessionTitle}.",
     "taskFutureQuestionTitle": "Upcoming classes to ask in",
     "taskFutureQuestionDesc": "Upcoming classes where I have not written a question yet.",
     "taskPastQuestionTitle": "Past classes without my question",

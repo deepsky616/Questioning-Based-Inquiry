@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { StudentReportView } from "@/components/reports/StudentReportView";
@@ -49,6 +49,29 @@ interface PointLog {
   createdAt: string;
 }
 
+interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  href: string | null;
+  sessionId: string | null;
+  metadata: unknown;
+  readAt: string | null;
+  createdAt: string;
+}
+
+interface NotificationResponse {
+  notifications: AppNotification[];
+  unreadCount: number;
+}
+
+function metadataText(metadata: unknown, key: "teacherName" | "sessionTitle"): string {
+  if (!metadata || typeof metadata !== "object") return "";
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : "";
+}
+
 export default function StudentDashboardPage() {
   // useSearchParams(탭 쿼리)는 Suspense 경계가 필요하다
   return (
@@ -61,6 +84,7 @@ export default function StudentDashboardPage() {
 function StudentDashboard() {
   const { data: session } = useSession();
   const user = getSessionUser(session);
+  const queryClient = useQueryClient();
   const tCls = useTranslations("classification");
   const t = useTranslations("studentDash");
   const tDash = useTranslations("dashboard");
@@ -106,6 +130,17 @@ function StudentDashboard() {
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
   });
+  const { data: notificationData } = useQuery<NotificationResponse>({
+    queryKey: ["student-notifications"],
+    queryFn: async () => {
+      const r = await fetch("/api/notifications");
+      if (!r.ok) return { notifications: [], unreadCount: 0 };
+      return r.json();
+    },
+    enabled: Boolean(user.id),
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   const questions = allQuestions.slice(0, 5);
   const stats: Stats = {
@@ -145,6 +180,26 @@ function StudentDashboard() {
     if (Number.isNaN(time)) return false;
     return Date.now() - time <= 7 * 24 * 60 * 60 * 1000;
   }).length;
+  const teacherRequestNotifications = (notificationData?.notifications ?? []).filter(
+    (item) =>
+      item.type === "SESSION_REMINDER" &&
+      !item.readAt &&
+      (!item.sessionId || !questionSessionIds.has(item.sessionId)),
+  );
+  const visibleTeacherRequests = teacherRequestNotifications.slice(0, 3);
+  const markNotificationRead = async (id: string) => {
+    queryClient.setQueryData<NotificationResponse>(["student-notifications"], (prev) => {
+      if (!prev) return prev;
+      const wasUnread = prev.notifications.some((item) => item.id === id && !item.readAt);
+      return {
+        unreadCount: wasUnread ? Math.max(0, prev.unreadCount - 1) : prev.unreadCount,
+        notifications: prev.notifications.map((item) =>
+          item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item,
+        ),
+      };
+    });
+    await fetch(`/api/notifications/${id}`, { method: "PATCH" }).catch(() => null);
+  };
   const taskItems = [
     {
       key: "todayUnasked",
@@ -216,7 +271,7 @@ function StudentDashboard() {
       activeClass: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200",
     },
   ];
-  const hasStudentTasks = taskItems.some((item) => item.count > 0);
+  const hasStudentTasks = teacherRequestNotifications.length > 0 || taskItems.some((item) => item.count > 0);
 
   return (
     <div className="space-y-6">
@@ -277,6 +332,40 @@ function StudentDashboard() {
           </div>
         </CardHeader>
         <CardContent>
+          {visibleTeacherRequests.length > 0 && (
+            <div className="mb-3 rounded-lg border border-indigo-200 bg-indigo-50/80 p-3 dark:border-indigo-500/30 dark:bg-indigo-950/30">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-indigo-700 dark:text-indigo-200">{t("taskTeacherRequestTitle")}</p>
+                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-background/70 dark:text-indigo-200">
+                  {teacherRequestNotifications.length}
+                </span>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {visibleTeacherRequests.map((item) => {
+                  const sessionTitle = metadataText(item.metadata, "sessionTitle");
+                  const teacherName = metadataText(item.metadata, "teacherName");
+                  const label = sessionTitle
+                    ? t("taskTeacherRequestDescWithSession", { teacherName, sessionTitle })
+                    : item.message || item.title;
+                  const href = item.href ?? "/student-ask";
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={async () => {
+                        await markNotificationRead(item.id);
+                        router.push(href);
+                      }}
+                      className="rounded-md border border-indigo-200 bg-white px-3 py-2 text-left text-sm transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-background/80 dark:hover:bg-indigo-950/50"
+                    >
+                      <p className="font-semibold text-foreground">{label}</p>
+                      <p className="mt-1 text-xs font-semibold text-indigo-700 dark:text-indigo-200">{t("taskAsk")}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {taskItems.map((item) => {
               const active = item.count > 0;

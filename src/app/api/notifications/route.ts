@@ -20,6 +20,7 @@ export async function GET() {
         title: true,
         message: true,
         href: true,
+        sessionId: true,
         metadata: true,
         readAt: true,
         createdAt: true,
