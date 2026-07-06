@@ -62,6 +62,19 @@ export function StudentNotificationBell() {
     });
     await fetch(`/api/notifications/${id}`, { method: "PATCH" }).catch(() => null);
   };
+  const markAllRead = async () => {
+    queryClient.setQueryData<NotificationResponse>(["student-notifications"], (prev) => {
+      if (!prev) return prev;
+      return {
+        unreadCount: 0,
+        notifications: prev.notifications.map((item) => ({
+          ...item,
+          readAt: item.readAt ?? new Date().toISOString(),
+        })),
+      };
+    });
+    await fetch("/api/notifications", { method: "PATCH" }).catch(() => null);
+  };
 
   const renderMessage = (item: AppNotification) => {
     if (item.type === "SESSION_REMINDER") {
@@ -91,6 +104,9 @@ export function StudentNotificationBell() {
       unreadText={t("unread")}
       count={unreadCount}
       items={items}
+      actionText={unreadCount > 0 ? t("markAllRead") : undefined}
+      onAction={markAllRead}
+      actionDisabled={unreadCount === 0}
     />
   );
 }

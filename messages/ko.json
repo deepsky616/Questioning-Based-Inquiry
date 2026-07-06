@@ -610,6 +610,7 @@
     "pendingItem": "<b>AI 추천 검토</b> 대기",
     "sessionReminderItem": "{teacherName} 선생님이 {sessionTitle} 질문 작성을 요청했어요",
     "unread": "새 알림",
+    "markAllRead": "모두 읽음",
     "newFlagged": "⚠️ 부적절 의심 질문·댓글 {added}건이 새로 감지됐어요",
     "tapToView": "눌러서 확인하기 →"
   },

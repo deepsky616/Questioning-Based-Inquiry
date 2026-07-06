@@ -48,6 +48,9 @@ export function NotificationBellMenu({
   open,
   onOpenChange,
   className,
+  actionText,
+  onAction,
+  actionDisabled,
 }: {
   title: string;
   emptyText: string;
@@ -58,6 +61,9 @@ export function NotificationBellMenu({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   className?: string;
+  actionText?: string;
+  onAction?: () => void | Promise<void>;
+  actionDisabled?: boolean;
 }) {
   const renderItem = (item: NotificationMenuItem) => {
     const tone = item.tone ?? "default";
@@ -123,7 +129,19 @@ export function NotificationBellMenu({
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
-        <div className="border-b border-border px-3 py-2 text-sm font-semibold text-foreground">{title}</div>
+        <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+          <span className="text-sm font-semibold text-foreground">{title}</span>
+          {actionText && onAction && (
+            <button
+              type="button"
+              disabled={actionDisabled}
+              onClick={() => void onAction()}
+              className="rounded-md px-2 py-1 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+            >
+              {actionText}
+            </button>
+          )}
+        </div>
         {items.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">{emptyText}</p>
         ) : (

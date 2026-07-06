@@ -95,6 +95,19 @@ export function NotificationBell() {
     });
     await fetch(`/api/notifications/${id}`, { method: "PATCH" }).catch(() => null);
   };
+  const markAllRead = async () => {
+    queryClient.setQueryData<NotificationResponse>(["teacher-app-notifications"], (prev) => {
+      if (!prev) return prev;
+      return {
+        unreadCount: 0,
+        notifications: prev.notifications.map((item) => ({
+          ...item,
+          readAt: item.readAt ?? new Date().toISOString(),
+        })),
+      };
+    });
+    await fetch("/api/notifications", { method: "PATCH" }).catch(() => null);
+  };
 
   const calculatedItems: NotificationMenuItem[] = [
     ...(flaggedCount > 0
@@ -155,6 +168,9 @@ export function NotificationBell() {
         items={items}
         open={open}
         onOpenChange={setOpen}
+        actionText={unreadSavedCount > 0 ? t("markAllRead") : undefined}
+        onAction={markAllRead}
+        actionDisabled={unreadSavedCount === 0}
       />
 
       {toast && (

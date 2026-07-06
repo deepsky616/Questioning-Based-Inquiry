@@ -610,6 +610,7 @@
     "pendingItem": "<b>AI recommendation review</b> pending",
     "sessionReminderItem": "{teacherName} asked you to write a question for {sessionTitle}",
     "unread": "New",
+    "markAllRead": "Mark all read",
     "newFlagged": "⚠️ {added} new possibly inappropriate questions/comments detected",
     "tapToView": "Tap to review →"
   },
