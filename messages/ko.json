@@ -752,6 +752,8 @@
     "statusDeployed": "배포 완료",
     "statusNeedsRedeploy": "재배포 필요",
     "redeployToSession": "수업세션에 재배포",
+    "redeployNeededButton": "수정 내용 재배포",
+    "redeployNeededNotice": "수정한 내용이 아직 학생 수업세션에 다시 반영되지 않았어요. 수업 전에 재배포해 주세요.",
     "redeployHint": "‘저장’은 내용만 갱신(연결된 참고자료에 즉시 반영), ‘수업세션에 재배포’는 이 설정으로 새 탐구질문 수업 세션을 만들어요.",
     "unitFieldLabel": "단원",
     "savedFilterAllDates": "전체 날짜",

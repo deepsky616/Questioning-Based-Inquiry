@@ -752,6 +752,8 @@
     "statusDeployed": "Shared",
     "statusNeedsRedeploy": "Needs reshare",
     "redeployToSession": "Redeploy to class session",
+    "redeployNeededButton": "Reshare changes",
+    "redeployNeededNotice": "Your edits have not been reflected in a student class session yet. Reshare before class.",
     "redeployHint": "Save updates the content (reflected live in linked reference); Redeploy creates a new inquiry-question class session with these settings.",
     "unitFieldLabel": "Unit",
     "savedFilterAllDates": "All dates",

@@ -73,6 +73,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
       className: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200",
     };
   };
+  const needsRedeploy = (design: SavedInquiryDesign) => Boolean(design.lastDeployedAt) && isAfter(design.updatedAt, design.lastDeployedAt);
 
   // 항목 접기(참고자료 미리보기) — 기본 접힘
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
@@ -369,6 +370,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
           <ul className="divide-y rounded-md border">
             {visibleSaved.map((d) => {
               const status = getDesignStatus(d);
+              const redeployNeeded = needsRedeploy(d);
               return (
               <li key={d.id} className="p-3">
                 <div className="flex items-center justify-between gap-3">
@@ -428,6 +430,11 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                 {/* 인라인 편집: 제목 + 질문 수정/추가/삭제 */}
                 {editingDesignId === d.id && (
                   <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
+                    {redeployNeeded && (
+                      <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-medium text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/30 dark:text-orange-200">
+                        {t("redeployNeededNotice")}
+                      </div>
+                    )}
                     {/* 학년 (읽기 전용) */}
                     <p className="text-xs text-muted-foreground">
                       {d.grade ? t("gradeLabel", { grade: d.grade }) : t("gradeRangeLabel", { range: d.gradeRange })}
@@ -601,12 +608,14 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                         💾 {savingEdit ? tc("loading") : tc("save")}
                       </Button>
                       <Button
-                        variant="secondary"
+                        variant={redeployNeeded ? "default" : "secondary"}
                         onClick={() => redeployEditDesign(d.id)}
                         disabled={savingEdit || !editTitle.trim() || !editDate}
-                        className="h-11 flex-1 text-base font-semibold"
+                        className={`h-11 flex-1 text-base font-semibold ${
+                          redeployNeeded ? "bg-orange-600 text-white hover:bg-orange-700" : ""
+                        }`}
                       >
-                        📤 {t("redeployToSession")}
+                        📤 {t(redeployNeeded ? "redeployNeededButton" : "redeployToSession")}
                       </Button>
                       <Button
                         variant="outline"
