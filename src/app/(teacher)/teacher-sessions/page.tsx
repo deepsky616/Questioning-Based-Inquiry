@@ -56,6 +56,9 @@ interface QuestionSession {
   };
 }
 
+type SessionListSort = "desc" | "asc" | "missingDesc";
+type SessionParticipationFilter = "all" | "missing" | "completed";
+
 export default function TeacherSessionsPage() {
   const tPages = useTranslations("pages");
   const t = useTranslations("sessions");
@@ -97,7 +100,8 @@ export default function TeacherSessionsPage() {
   const [listFilterDate, setListFilterDate] = useState("");
   const [listFilterSubject, setListFilterSubject] = useState("");
   const [listFilterTopic, setListFilterTopic] = useState("");
-  const [listSort, setListSort] = useState<"desc" | "asc">("desc");
+  const [listParticipationFilter, setListParticipationFilter] = useState<SessionParticipationFilter>("all");
+  const [listSort, setListSort] = useState<SessionListSort>("desc");
 
   const targetClasses = useMemo(() => {
     if (teacherClasses.length > 0) return teacherClasses;
@@ -279,14 +283,30 @@ export default function TeacherSessionsPage() {
     }
   };
 
-  // 세션 목록 조회 필터(날짜·교과·주제) + 정렬(날짜 최신순/오래된순)
+  // 세션 목록 조회 필터(날짜·교과·주제·참여 상태) + 정렬
   const filterOptions = getSessionFilterOptions(sessions);
-  const visibleSessions = filterSessions(sessions, {
+  const baseVisibleSessions = filterSessions(sessions, {
     date: listFilterDate || undefined,
     subject: listFilterSubject || undefined,
     topic: listFilterTopic || undefined,
   });
-  const sortedSessions = listSort === "asc" ? sortSessionsAsc(visibleSessions) : sortSessionsDesc(visibleSessions);
+  const visibleSessions = baseVisibleSessions.filter((item) => {
+    const missing = item.participation?.missing ?? 0;
+    const total = item.participation?.total ?? 0;
+    if (listParticipationFilter === "missing") return missing > 0;
+    if (listParticipationFilter === "completed") return total > 0 && missing === 0;
+    return true;
+  });
+  const sortedSessions =
+    listSort === "asc"
+      ? sortSessionsAsc(visibleSessions)
+      : listSort === "missingDesc"
+        ? [...visibleSessions].sort((a, b) => {
+            const missingDiff = (b.participation?.missing ?? 0) - (a.participation?.missing ?? 0);
+            if (missingDiff !== 0) return missingDiff;
+            return b.date.localeCompare(a.date);
+          })
+        : sortSessionsDesc(visibleSessions);
   const activeSessions = sortedSessions.filter((s) => isSessionAvailable(s.date));
   const pastSessions = sortedSessions.filter((s) => !isSessionAvailable(s.date));
 
@@ -431,10 +451,23 @@ export default function TeacherSessionsPage() {
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {(listFilterDate || listFilterSubject || listFilterTopic) && (
+              <Select value={listParticipationFilter} onValueChange={(value) => setListParticipationFilter(value as SessionParticipationFilter)}>
+                <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-36"><SelectValue placeholder={t("allParticipation")} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("allParticipation")}</SelectItem>
+                  <SelectItem value="missing">{t("participationFilterMissing")}</SelectItem>
+                  <SelectItem value="completed">{t("participationFilterCompleted")}</SelectItem>
+                </SelectContent>
+              </Select>
+              {(listFilterDate || listFilterSubject || listFilterTopic || listParticipationFilter !== "all") && (
                 <button
                   type="button"
-                  onClick={() => { setListFilterDate(""); setListFilterSubject(""); setListFilterTopic(""); }}
+                  onClick={() => {
+                    setListFilterDate("");
+                    setListFilterSubject("");
+                    setListFilterTopic("");
+                    setListParticipationFilter("all");
+                  }}
                   className="h-9 px-1 text-left text-xs font-medium text-indigo-600 hover:text-indigo-800 sm:text-center"
                 >
                   {tc("reset")}
@@ -446,7 +479,7 @@ export default function TeacherSessionsPage() {
             <div className="flex items-center gap-2 lg:ml-auto">
               <span className="text-xs font-medium text-muted-foreground">{t("sortLabel")}</span>
               <div className="flex rounded-md border overflow-hidden h-9">
-                {(["desc", "asc"] as const).map((v, i) => (
+                {(["desc", "asc", "missingDesc"] as const).map((v, i) => (
                   <button
                     key={v}
                     type="button"
@@ -455,7 +488,7 @@ export default function TeacherSessionsPage() {
                       listSort === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
                     }`}
                   >
-                    {v === "desc" ? t("sortDesc") : t("sortAsc")}
+                    {v === "desc" ? t("sortDesc") : v === "asc" ? t("sortAsc") : t("sortMissingDesc")}
                   </button>
                 ))}
               </div>
