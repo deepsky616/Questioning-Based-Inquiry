@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -65,6 +65,8 @@ function StudentDashboard() {
   const t = useTranslations("studentDash");
   const tDash = useTranslations("dashboard");
   const router = useRouter();
+  const pointsSectionRef = useRef<HTMLDivElement | null>(null);
+  const [highlightPoints, setHighlightPoints] = useState(false);
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
   const setTab = (v: "overview" | "reports") =>
@@ -179,7 +181,7 @@ function StudentDashboard() {
       description: t("taskPointsDesc"),
       count: recentPointCount,
       action: t("taskCheckPoints"),
-      href: "/student-dashboard",
+      href: "#points",
       activeClass: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200",
     },
   ];
@@ -215,7 +217,14 @@ function StudentDashboard() {
       ) : (
       <>
       {/* 포인트 카드 */}
-      <PointsCard />
+      <div
+        ref={pointsSectionRef}
+        className={`scroll-mt-24 rounded-2xl transition-shadow ${
+          highlightPoints ? "shadow-[0_0_0_3px_rgba(245,158,11,0.55)]" : ""
+        }`}
+      >
+        <PointsCard />
+      </div>
 
       {isLoading ? (
         <DashboardSkeleton />
@@ -240,11 +249,20 @@ function StudentDashboard() {
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {taskItems.map((item) => {
               const active = item.count > 0;
+              const handleTaskClick = () => {
+                if (item.key === "points") {
+                  pointsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  setHighlightPoints(true);
+                  window.setTimeout(() => setHighlightPoints(false), 1600);
+                  return;
+                }
+                router.push(item.href);
+              };
               return (
                 <button
                   key={item.key}
                   type="button"
-                  onClick={() => router.push(item.href)}
+                  onClick={handleTaskClick}
                   className={`rounded-lg border px-3 py-3 text-left transition-colors ${
                     active
                       ? item.activeClass

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,6 +77,8 @@ function TeacherDashboard() {
   const tCls = useTranslations("classification");
   const t = useTranslations("dashboard");
   const router = useRouter();
+  const studentStatsRef = useRef<HTMLDivElement | null>(null);
+  const [highlightStudentStats, setHighlightStudentStats] = useState(false);
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
   const setTab = (v: "overview" | "reports") =>
@@ -203,6 +205,11 @@ function TeacherDashboard() {
   // 추세 열 정렬: 기본(번호순) ↔ 감소 학생 우선(지도가 필요한 학생 찾기)
   const [trendSortOn, setTrendSortOn] = useState(false);
   const trendRank = (trend: number | null) => (trend === null ? 3 : trend < 0 ? 0 : trend === 0 ? 1 : 2);
+  const focusStudentStats = () => {
+    studentStatsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setHighlightStudentStats(true);
+    window.setTimeout(() => setHighlightStudentStats(false), 1600);
+  };
 
   const teacherClasses = stats?.teacherClasses ?? [];
   const scopedStudents = useMemo(() => {
@@ -363,6 +370,7 @@ function TeacherDashboard() {
                   const handleTaskClick = () => {
                     if (item.key === "declining") {
                       setTrendSortOn(true);
+                      focusStudentStats();
                       return;
                     }
                     if (item.href) router.push(item.href);
@@ -492,7 +500,12 @@ function TeacherDashboard() {
           </Card>
 
           {/* 학생별 통계 */}
-          <Card>
+          <Card
+            ref={studentStatsRef}
+            className={`scroll-mt-24 transition-shadow ${
+              highlightStudentStats ? "shadow-[0_0_0_3px_rgba(249,115,22,0.5)]" : ""
+            }`}
+          >
             <CardHeader className="pb-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-base">{t("studentStats")}</CardTitle>
