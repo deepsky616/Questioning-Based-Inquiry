@@ -72,7 +72,7 @@ export default function AskPage() {
 function AskPageFallback() {
   const t = useTranslations("ask");
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
       </div>
@@ -229,6 +229,12 @@ function AskContent() {
     router.replace("/student-ask", { scroll: false });
   };
 
+  const getSessionDateBadge = (date: string) => {
+    if (date === todayStr) return t("todayBadge");
+    if (date > todayStr) return t("futureBadge");
+    return t("pastBadge");
+  };
+
   // 필터 변경 시 선택 세션 보정: 목록에 없으면 첫 세션으로, 목록이 비면 선택 해제
   useEffect(() => {
     if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) return;
@@ -326,7 +332,7 @@ function AskContent() {
   // issue #1: 로딩 중에는 아무것도 표시하지 않음
   if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         </div>
@@ -340,7 +346,7 @@ function AskContent() {
   // issue #1 & #2: 네트워크 오류
   if (sessionsError) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         </div>
@@ -356,7 +362,7 @@ function AskContent() {
   // issue #1 & #2: 세션 없음 — 폼 차단
   if (sessions.length === 0) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         </div>
@@ -373,7 +379,7 @@ function AskContent() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         <p className="text-muted-foreground">{t("subtitle")}</p>
@@ -481,6 +487,58 @@ function AskContent() {
                 ))
               )}
             </select>
+
+            {filteredSessions.length > 0 && (
+              <div className="grid max-h-[22rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                {filteredSessions.map((session) => {
+                  const active = selectedSessionId === session.id;
+                  const isInquiry = isInquiryDesignSession(session);
+                  return (
+                    <button
+                      key={session.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => selectSession(session.id)}
+                      className={`min-h-[104px] rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                        active
+                          ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
+                          : "border-border bg-background hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          active
+                            ? "bg-white text-indigo-700 dark:bg-indigo-900 dark:text-indigo-100"
+                            : "bg-muted text-muted-foreground"
+                        }`}>
+                          {getSessionDateBadge(session.date)}
+                        </span>
+                        {active && (
+                          <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                            {t("selectedSessionBadge")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
+                        <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
+                          {session.topic.trim() || t("emptyTopic")}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <span>{session.date}</span>
+                          <span>{session.teacher.name} {t("teacherSuffix")}</span>
+                          {isInquiry && (
+                            <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">
+                              {t("inquiryClassTag")}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {selectedSession && (
               <div className="rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-3 space-y-1">
