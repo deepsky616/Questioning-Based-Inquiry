@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
@@ -92,6 +92,7 @@ export function MyQuestionsView() {
 
   const refreshMyQuestions = () => {
     queryClient.invalidateQueries({ queryKey: ["my-questions"] });
+    queryClient.invalidateQueries({ queryKey: ["my-questions-all-sessions"] });
     // 같은 기기에서 전체 질문 탐구로 이동해도 바로 반영되도록 함께 무효화
     queryClient.invalidateQueries({ queryKey: ["explore-questions"] });
   };
@@ -168,6 +169,18 @@ export function MyQuestionsView() {
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
   });
+  const { data: allSessionQuestions = [] } = useQuery<Question[]>({
+    queryKey: ["my-questions-all-sessions", user.id],
+    queryFn: async () => {
+      const params = new URLSearchParams({ authorId: user.id });
+      const res = await fetch(`/api/questions?${params}`);
+      if (!res.ok) throw new Error("failed to load questions");
+      return res.json();
+    },
+    enabled: Boolean(user.id),
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
 
   useEffect(() => {
     if (!user.id) return;
@@ -191,6 +204,18 @@ export function MyQuestionsView() {
     subject: filterSubject || undefined,
     topic: filterTopic || undefined,
   });
+  const allQuestionSessionIds = useMemo(
+    () => new Set(allSessionQuestions.map((q) => q.session?.id).filter((id): id is string => Boolean(id))),
+    [allSessionQuestions],
+  );
+  const sessionProgress = useMemo(() => {
+    const total = filteredSessions.length;
+    const completed = filteredSessions.filter((s) => allQuestionSessionIds.has(s.id)).length;
+    const remaining = Math.max(total - completed, 0);
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const remainingSessions = filteredSessions.filter((s) => !allQuestionSessionIds.has(s.id)).slice(0, 3);
+    return { total, completed, remaining, percent, remainingSessions };
+  }, [allQuestionSessionIds, filteredSessions]);
 
   // 필터로 선택 세션이 목록 밖이 되면 전체로 보정
   useEffect(() => {
@@ -539,6 +564,46 @@ export function MyQuestionsView() {
           <p className="text-xs text-muted-foreground mt-2">{tEx("filterHint")}</p>
         </CardContent>
       </Card>
+
+      {sessionProgress.total > 0 && (
+        <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-950/30">
+          <CardContent className="pt-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-100">
+                  {t("sessionProgressTitle")}
+                </p>
+                <p className="mt-1 text-sm text-emerald-700 dark:text-emerald-200">
+                  {t("sessionProgressSummary", {
+                    total: sessionProgress.total,
+                    completed: sessionProgress.completed,
+                    remaining: sessionProgress.remaining,
+                  })}
+                </p>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">
+                {sessionProgress.percent}%
+              </span>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white dark:bg-emerald-950">
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all"
+                style={{ width: `${sessionProgress.percent}%` }}
+              />
+            </div>
+            {sessionProgress.remainingSessions.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-200">
+                <span className="font-semibold">{t("remainingSessionLabel")}</span>
+                {sessionProgress.remainingSessions.map((s) => (
+                  <span key={s.id} className="rounded-full bg-white px-2 py-1 dark:bg-emerald-950">
+                    {buildSessionLabel(s.date, s.subject, s.topic)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 탐구질문 수업 세션 선택 시 참고자료(접기, 기본 닫힘) */}
       {selectedSessionId !== "all" && <SessionReferencePanel sessionId={selectedSessionId} />}
