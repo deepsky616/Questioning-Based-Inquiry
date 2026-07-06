@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Pencil, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,6 +58,19 @@ interface QuestionSession {
 
 type SessionListSort = "desc" | "asc" | "missingDesc";
 type SessionParticipationFilter = "all" | "missing" | "completed";
+
+interface SessionParticipationStudent {
+  id: string;
+  name: string;
+  grade: string | null;
+  className: string | null;
+  studentNumber: string | null;
+  hasQuestion: boolean;
+}
+
+interface SessionParticipationResponse {
+  students: SessionParticipationStudent[];
+}
 
 export default function TeacherSessionsPage() {
   const tPages = useTranslations("pages");
@@ -599,6 +612,19 @@ function SessionRow({
   const [eTopic, setETopic] = useState(session.topic);
   const [eArea, setEArea] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [showMissingStudents, setShowMissingStudents] = useState(false);
+  const missingCount = session.participation?.missing ?? 0;
+  const { data: participationDetail, isLoading: isLoadingParticipation, isError: isParticipationError } = useQuery<SessionParticipationResponse>({
+    queryKey: ["session-participation", session.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/sessions/${session.id}/participation`);
+      if (!res.ok) throw new Error("failed to load session participation");
+      return res.json();
+    },
+    enabled: showMissingStudents,
+    staleTime: 30000,
+  });
+  const missingStudents = (participationDetail?.students ?? []).filter((student) => !student.hasQuestion);
 
   const openEdit = () => {
     setEDate(session.date);
@@ -685,6 +711,16 @@ function SessionRow({
                         style={{ width: `${Math.max(0, Math.min(100, session.participation.percent))}%` }}
                       />
                     </div>
+                    {missingCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowMissingStudents((value) => !value)}
+                        className="mt-2 inline-flex h-7 items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60"
+                      >
+                        {showMissingStudents ? t("missingStudentsHide") : t("missingStudentsShow")}
+                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showMissingStudents ? "rotate-180" : ""}`} />
+                      </button>
+                    )}
                   </>
                 ) : (
                   <p className="text-xs font-medium text-muted-foreground">{t("participationEmpty")}</p>
@@ -728,6 +764,34 @@ function SessionRow({
           </div>
         </div>
       </div>
+
+      {showMissingStudents && (
+        <div className="border-t border-emerald-100 bg-emerald-50/40 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+          {isLoadingParticipation ? (
+            <p className="text-xs font-medium text-muted-foreground">{t("missingStudentsLoading")}</p>
+          ) : isParticipationError ? (
+            <p className="text-xs font-medium text-destructive">{t("missingStudentsLoadFailed")}</p>
+          ) : missingStudents.length === 0 ? (
+            <p className="text-xs font-medium text-emerald-700 dark:text-emerald-200">{t("missingStudentsEmpty")}</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {missingStudents.map((student) => (
+                <span
+                  key={student.id}
+                  className="inline-flex items-center rounded-md border border-emerald-200 bg-background px-2 py-1 text-xs font-medium text-foreground dark:border-emerald-900"
+                >
+                  {t("missingStudentLabel", {
+                    grade: student.grade ?? "-",
+                    className: student.className ?? "-",
+                    number: student.studentNumber ?? "-",
+                    name: student.name,
+                  })}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {editing && (
         <div className="border-t bg-indigo-50/40 dark:bg-indigo-950/30 px-4 py-3">

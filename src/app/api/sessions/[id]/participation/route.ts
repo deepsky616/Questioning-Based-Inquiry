@@ -79,10 +79,9 @@ export async function GET(
         : {
             role: "STUDENT" as const,
             ...schoolFilter,
-            OR:
-              classes.length > 0
-                ? classes.map((c) => ({ grade: c.grade, className: c.className }))
-                : [{ id: "" }], // 담당 학급이 없으면 결과 없음
+            ...(classes.length > 0 && {
+              OR: classes.map((c) => ({ grade: c.grade, className: c.className })),
+            }),
           };
 
     const students = await prisma.user.findMany({
@@ -100,7 +99,7 @@ export async function GET(
 
     // 7. 해당 세션의 모든 질문 조회
     const questions = await prisma.question.findMany({
-      where: { sessionId: id },
+      where: { sessionId: id, source: { not: "TEACHER_SHARED" } },
       select: { id: true, authorId: true, content: true, createdAt: true },
     });
 
