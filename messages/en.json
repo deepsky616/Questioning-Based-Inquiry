@@ -194,6 +194,7 @@
     "taskScopeFutureUnasked": "Showing only upcoming classes selected from the dashboard where I have not asked yet.",
     "taskScopePastUnasked": "Showing only past classes selected from the dashboard where I have not asked yet.",
     "taskScopeShared": "Showing only teacher-shared inquiry question classes selected from the dashboard.",
+    "showAllSessions": "Show all classes",
     "currentSession": "Current class session",
     "teacherSuffix": "Teacher",
     "inquiryClassNotice": "This is an inquiry-question lesson created by your teacher. Use the inquiry questions below to create your own.",

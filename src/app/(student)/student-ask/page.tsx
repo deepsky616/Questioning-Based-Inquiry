@@ -222,6 +222,13 @@ function AskContent() {
     selectSession(e.target.value);
   };
 
+  const showAllSessions = () => {
+    setFilterDate("");
+    setFilterSubject("");
+    setFilterTopic("");
+    router.replace("/student-ask", { scroll: false });
+  };
+
   // 필터 변경 시 선택 세션 보정: 목록에 없으면 첫 세션으로, 목록이 비면 선택 해제
   useEffect(() => {
     if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) return;
@@ -402,11 +409,21 @@ function AskContent() {
 
             {/* 날짜·교과·주제로 좁혀서 찾기 (선택) */}
             {taskScope && (
-              <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200">
-                {taskScope === "today-unasked" && t("taskScopeTodayUnasked")}
-                {taskScope === "future-unasked" && t("taskScopeFutureUnasked")}
-                {taskScope === "past-unasked" && t("taskScopePastUnasked")}
-                {taskScope === "shared" && t("taskScopeShared")}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200">
+                <span>
+                  {taskScope === "today-unasked" && t("taskScopeTodayUnasked")}
+                  {taskScope === "future-unasked" && t("taskScopeFutureUnasked")}
+                  {taskScope === "past-unasked" && t("taskScopePastUnasked")}
+                  {taskScope === "shared" && t("taskScopeShared")}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 border-indigo-200 bg-white px-3 text-xs text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-100"
+                  onClick={showAllSessions}
+                >
+                  {t("showAllSessions")}
+                </Button>
               </div>
             )}
 
