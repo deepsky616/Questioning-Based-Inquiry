@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -86,6 +87,7 @@ function AskPageFallback() {
 function AskContent() {
   const t = useTranslations("ask");
   const tCls = useTranslations("classification");
+  const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -344,6 +346,7 @@ function AskContent() {
         content,
       });
       setQuestionSessionIds((prev) => new Set(prev).add(selectedSessionId));
+      queryClient.invalidateQueries({ queryKey: ["student-notifications"] });
       setSaveComplete(true);
     } catch {
       toast({ variant: "destructive", description: t("saveError") });

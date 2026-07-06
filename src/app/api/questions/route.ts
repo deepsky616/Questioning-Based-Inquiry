@@ -293,6 +293,20 @@ export async function POST(req: Request) {
           logger.error("Question point award failed:", e);
         }
       }
+
+      try {
+        await prisma.appNotification.updateMany({
+          where: {
+            recipientId: userId,
+            sessionId: question.sessionId,
+            type: "SESSION_REMINDER",
+            readAt: null,
+          },
+          data: { readAt: new Date() },
+        });
+      } catch (e) {
+        logger.error("Session reminder completion failed:", e);
+      }
     }
 
     if (question.session?.teacher.email && question.session.teacher.email !== session.user.email) {
