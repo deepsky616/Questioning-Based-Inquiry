@@ -4,10 +4,9 @@ import { compareByClassAndNumber } from "@/lib/student-sort";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildSessionLabel } from "@/lib/sessions";
-import { canSendExternalEmail, isEmailEnabled, sendSessionReminderEmail } from "@/lib/email";
 
 export async function POST(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await auth();
@@ -75,7 +74,6 @@ export async function POST(
         select: {
           id: true,
           name: true,
-          email: true,
           grade: true,
           className: true,
           studentNumber: true,
@@ -90,50 +88,69 @@ export async function POST(
 
     const submittedIds = new Set(questions.map((question) => question.authorId));
     const missingStudents = students.filter((student) => !submittedIds.has(student.id));
-    const emailTargets = missingStudents.filter((student) => student.email && canSendExternalEmail(student.email));
-    const skippedNoEmail = missingStudents.length - emailTargets.length;
-
-    if (!isEmailEnabled()) {
-      return NextResponse.json({
-        sent: 0,
-        failed: 0,
-        skippedNoEmail,
-        skippedEmailDisabled: emailTargets.length,
-        totalMissing: missingStudents.length,
-      });
+    if (missingStudents.length === 0) {
+      return NextResponse.json({ created: 0, refreshed: 0, totalMissing: 0 });
     }
 
-    const origin = process.env.NEXTAUTH_URL ?? new URL(req.url).origin;
-    const askUrl = new URL("/student-ask", origin);
-    askUrl.searchParams.set("sessionId", id);
+    const recipientIds = missingStudents.map((student) => student.id);
+    const existingNotifications = await prisma.appNotification.findMany({
+      where: {
+        recipientId: { in: recipientIds },
+        senderId: teacherId,
+        sessionId: id,
+        type: "SESSION_REMINDER",
+      },
+      select: { recipientId: true },
+    });
+    const existingRecipientIds = new Set(existingNotifications.map((item) => item.recipientId));
+
     const sessionTitle = buildSessionLabel(questionSession.date, questionSession.subject, questionSession.topic);
-
-    let sent = 0;
-    let failed = 0;
-    for (const student of emailTargets) {
-      const result = await sendSessionReminderEmail({
-        to: student.email!,
-        studentName: student.name,
-        teacherName: questionSession.teacher.name,
-        sessionTitle,
-        askUrl: askUrl.toString(),
-      });
-      if (result.ok && !result.skipped) sent += 1;
-      if (!result.ok) {
-        failed += 1;
-        logger.error("Session reminder email error:", result.error);
-      }
-    }
+    const href = `/student-ask?sessionId=${id}`;
+    await prisma.$transaction(
+      missingStudents.map((student) =>
+        prisma.appNotification.upsert({
+          where: {
+            uniq_app_notification_once: {
+              recipientId: student.id,
+              senderId: teacherId,
+              sessionId: id,
+              type: "SESSION_REMINDER",
+            },
+          },
+          create: {
+            recipientId: student.id,
+            senderId: teacherId,
+            sessionId: id,
+            type: "SESSION_REMINDER",
+            title: "수업 질문 작성 요청",
+            message: `${questionSession.teacher.name} 선생님이 '${sessionTitle}' 질문 작성을 요청했습니다.`,
+            href,
+            metadata: {
+              teacherName: questionSession.teacher.name,
+              sessionTitle,
+            },
+          },
+          update: {
+            title: "수업 질문 작성 요청",
+            message: `${questionSession.teacher.name} 선생님이 '${sessionTitle}' 질문 작성을 요청했습니다.`,
+            href,
+            metadata: {
+              teacherName: questionSession.teacher.name,
+              sessionTitle,
+            },
+            readAt: null,
+          },
+        }),
+      ),
+    );
 
     return NextResponse.json({
-      sent,
-      failed,
-      skippedNoEmail,
-      skippedEmailDisabled: 0,
+      created: missingStudents.length - existingRecipientIds.size,
+      refreshed: existingRecipientIds.size,
       totalMissing: missingStudents.length,
     });
   } catch (error) {
-    logger.error("Session reminder error:", error);
+    logger.error("Session reminder notification error:", error);
     return NextResponse.json({ error: "서버 오류" }, { status: 500 });
   }
 }

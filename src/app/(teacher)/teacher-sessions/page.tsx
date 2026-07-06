@@ -73,10 +73,8 @@ interface SessionParticipationResponse {
 }
 
 interface SessionReminderResponse {
-  sent: number;
-  failed: number;
-  skippedNoEmail: number;
-  skippedEmailDisabled: number;
+  created: number;
+  refreshed: number;
   totalMissing: number;
 }
 
@@ -643,17 +641,9 @@ function SessionRow({
       const res = await fetch(`/api/sessions/${session.id}/remind`, { method: "POST" });
       if (!res.ok) throw new Error("failed to send reminder");
       const result = (await res.json()) as SessionReminderResponse;
-      if (result.sent > 0 && result.failed === 0) {
-        toast({ variant: "success", description: t("reminderSent", { sent: result.sent }) });
-      } else if (result.sent > 0 && result.failed > 0) {
-        toast({
-          variant: "destructive",
-          description: t("reminderPartialFailed", { sent: result.sent, failed: result.failed }),
-        });
-      } else if (result.skippedEmailDisabled > 0) {
-        toast({ variant: "destructive", description: t("reminderEmailDisabled") });
-      } else if (result.skippedNoEmail > 0 || result.totalMissing > 0) {
-        toast({ variant: "destructive", description: t("reminderNoRecipients") });
+      const notified = result.created + result.refreshed;
+      if (notified > 0) {
+        toast({ variant: "success", description: t("reminderSent", { count: notified }) });
       } else {
         toast({ variant: "success", description: t("missingStudentsEmpty") });
       }

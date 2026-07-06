@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { PageNav } from "@/components/shared/PageNav";
 import { AppNav } from "@/components/shared/AppNav";
+import { StudentNotificationBell } from "@/components/student/StudentNotificationBell";
 import { getSessionUser } from "@/lib/auth-helpers";
 
 // 학습 흐름 순서: 홈(대시보드+상세 리포트 탭) → 질문하기 → 질문탐구 → 질문놀이 → 설정
@@ -49,6 +50,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         pages={pages}
         userName={user.name ?? ""}
         roleSuffix={t("studentSuffix")}
+        extra={<StudentNotificationBell />}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}

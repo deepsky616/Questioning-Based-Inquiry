@@ -153,31 +153,6 @@ export async function sendQuestionNotificationEmail({
   });
 }
 
-export async function sendSessionReminderEmail({
-  to,
-  studentName,
-  teacherName,
-  sessionTitle,
-  askUrl,
-}: {
-  to: string;
-  studentName: string;
-  teacherName: string;
-  sessionTitle: string;
-  askUrl: string;
-}): Promise<SendEmailResult> {
-  return sendEmail({
-    to,
-    subject: "Question Lab 수업 질문 작성 안내",
-    text: `${studentName} 학생, ${teacherName} 선생님이 아직 작성하지 않은 수업 질문 작성을 요청했습니다.\n\n수업: ${sessionTitle}\n질문 작성하기: ${askUrl}`,
-    html: [
-      `<p>${escapeHtml(studentName)} 학생, ${escapeHtml(teacherName)} 선생님이 아직 작성하지 않은 수업 질문 작성을 요청했습니다.</p>`,
-      `<p><strong>수업:</strong> ${escapeHtml(sessionTitle)}</p>`,
-      `<p><a href="${escapeHtml(askUrl)}">질문 작성하러 가기</a></p>`,
-    ].join(""),
-  });
-}
-
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")

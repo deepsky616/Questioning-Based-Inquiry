@@ -72,6 +72,27 @@ model PointLog {
   @@map("point_logs")
 }
 
+model AppNotification {
+  id          String    @id @default(cuid())
+  recipientId String    @map("recipient_id")
+  senderId    String?   @map("sender_id")
+  sessionId   String?   @map("session_id")
+  type        String    @default("SESSION_REMINDER") @map("type")
+  title       String    @map("title")
+  message     String    @default("") @map("message")
+  href        String?   @map("href")
+  metadata    Json      @default("{}") @map("metadata")
+  readAt      DateTime? @map("read_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([recipientId, senderId, sessionId, type], name: "uniq_app_notification_once")
+  @@index([recipientId, readAt, createdAt])
+  @@index([senderId])
+  @@index([sessionId])
+  @@map("app_notifications")
+}
+
 model PasswordResetToken {
   id        String    @id @default(cuid())
   tokenHash String    @unique @map("token_hash")
