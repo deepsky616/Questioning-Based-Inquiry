@@ -183,6 +183,9 @@
     "aiActive": "AI 분류가 활성화됐습니다.",
     "inputHeader": "질문 입력",
     "inputDesc": "수업 세션을 선택하고 탐구하고 싶은 질문을 적어보세요",
+    "stepSession": "수업 선택",
+    "stepQuestion": "질문 작성",
+    "stepResult": "분석 확인",
     "allDates": "전체 날짜",
     "allSubjects": "전체 교과",
     "allTopics": "전체 주제(단원)",
@@ -246,7 +249,11 @@
     "rewriteQuestion": "✏️ 질문 다시 작성하기",
     "inquiryClassTag": "탐구질문 수업",
     "referenceTitle": "참고 자료",
-    "referenceHint": "이 내용을 참고해 나만의 질문을 만들어요"
+    "referenceHint": "이 내용을 참고해 나만의 질문을 만들어요",
+    "referenceGuideTitle": "질문을 쓰기 전에 참고 자료를 확인하세요",
+    "referenceGuideDesc": "선생님이 만든 탐구설계 내용을 보고 나만의 질문을 만들 수 있습니다.",
+    "showReference": "참고 자료 보기",
+    "hideReference": "참고 자료 접기"
   },
   "comment": {
     "loading": "댓글 불러오는 중...",

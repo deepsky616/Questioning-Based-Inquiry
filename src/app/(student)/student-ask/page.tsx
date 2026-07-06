@@ -262,6 +262,12 @@ function AskContent() {
   }, [selectedSessionId, user.id]);
 
   const canAsk = sessionsLoaded && !sessionsError && sessions.length > 0 && !!selectedSessionId;
+  const currentStep = result ? 3 : content.trim().length > 0 ? 2 : 1;
+  const flowSteps = [
+    { step: 1, label: t("stepSession") },
+    { step: 2, label: t("stepQuestion") },
+    { step: 3, label: t("stepResult") },
+  ];
 
   const handleClassify = async () => {
     // issue #3: handler 단에서도 세션 필수 검증
@@ -409,6 +415,28 @@ function AskContent() {
           <CardDescription>{t("inputDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-2">
+            {flowSteps.map((item) => {
+              const active = item.step === currentStep;
+              const done = item.step < currentStep;
+              return (
+                <div
+                  key={item.step}
+                  className={`rounded-lg border px-3 py-2 text-center text-xs font-semibold ${
+                    active
+                      ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-200"
+                      : done
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200"
+                        : "border-border bg-muted/30 text-muted-foreground"
+                  }`}
+                >
+                  <span className="mr-1">{item.step}</span>
+                  {item.label}
+                </div>
+              );
+            })}
+          </div>
+
           {/* 세션 선택 — 필수 */}
           <div className="space-y-2">
             <Label htmlFor="session">{t("sessionSelectLabel")} <span className="text-red-500">*</span></Label>
@@ -566,19 +594,29 @@ function AskContent() {
 
           {/* 탐구질문 수업 — 참고 자료(탐구설계 맥락) 접기 패널 */}
           {isInquirySession && designContext && (
-            <div className="rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4">
-              <button
-                type="button"
-                onClick={() => setShowRef((v) => !v)}
-                className="flex w-full items-center justify-between gap-2 text-left"
-              >
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-indigo-700 dark:text-indigo-300">
-                  <span>📚</span>
-                  {t("referenceTitle")}
+            <div className="rounded-lg border-2 border-indigo-300 bg-indigo-50 p-4 dark:border-indigo-500/40 dark:bg-indigo-950/40">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+                    {t("referenceTitle")}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-indigo-900 dark:text-indigo-100">
+                    {t("referenceGuideTitle")}
+                  </p>
+                  <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-200">
+                    {t("referenceGuideDesc")}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 border-indigo-200 bg-white px-3 text-xs text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-100"
+                  onClick={() => setShowRef((v) => !v)}
+                >
+                  {showRef ? t("hideReference") : t("showReference")}
                   <CollapseChevron open={showRef} />
-                </span>
-                <span className="shrink-0 text-xs font-normal text-indigo-500">{t("referenceHint")}</span>
-              </button>
+                </Button>
+              </div>
               {showRef && <DesignReferenceView data={designContext} className="mt-3" />}
             </div>
           )}

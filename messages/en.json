@@ -183,6 +183,9 @@
     "aiActive": "AI classification is enabled.",
     "inputHeader": "Enter a question",
     "inputDesc": "Pick a class session and write the question you want to explore",
+    "stepSession": "Pick class",
+    "stepQuestion": "Write question",
+    "stepResult": "Review analysis",
     "allDates": "All dates",
     "allSubjects": "All subjects",
     "allTopics": "All topics (units)",
@@ -246,7 +249,11 @@
     "rewriteQuestion": "✏️ Rewrite question",
     "inquiryClassTag": "Inquiry-question class",
     "referenceTitle": "Reference material",
-    "referenceHint": "Use this to make your own question"
+    "referenceHint": "Use this to make your own question",
+    "referenceGuideTitle": "Check the reference material before writing",
+    "referenceGuideDesc": "Use your teacher's inquiry design to create your own question.",
+    "showReference": "Show reference",
+    "hideReference": "Hide reference"
   },
   "comment": {
     "loading": "Loading comments...",
