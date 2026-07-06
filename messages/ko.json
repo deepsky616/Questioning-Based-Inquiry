@@ -201,6 +201,8 @@
     "selectedSessionBadge": "선택됨",
     "completedSessionBadge": "작성 완료",
     "completedSessionShort": "완료",
+    "sessionProgressTitle": "현재 목록 진행 상황",
+    "sessionProgressSummary": "전체 {total}개 중 {completed}개 작성 완료, {remaining}개 남음",
     "todayBadge": "오늘",
     "futureBadge": "예정",
     "pastBadge": "지난 수업",

@@ -201,6 +201,8 @@
     "selectedSessionBadge": "Selected",
     "completedSessionBadge": "Done",
     "completedSessionShort": "Done",
+    "sessionProgressTitle": "Progress in this list",
+    "sessionProgressSummary": "{completed} of {total} completed, {remaining} remaining",
     "todayBadge": "Today",
     "futureBadge": "Upcoming",
     "pastBadge": "Past",

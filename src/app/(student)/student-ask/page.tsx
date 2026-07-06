@@ -211,6 +211,13 @@ function AskContent() {
     }),
     [filterDate, filterSubject, filterTopic, scopedSessions],
   );
+  const sessionProgress = useMemo(() => {
+    const total = filteredSessions.length;
+    const completed = filteredSessions.filter((session) => questionSessionIds.has(session.id)).length;
+    const remaining = Math.max(total - completed, 0);
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { total, completed, remaining, percent };
+  }, [filteredSessions, questionSessionIds]);
 
   const selectSession = (id: string) => {
     setSelectedSessionId(id);
@@ -544,65 +551,89 @@ function AskContent() {
             </select>
 
             {filteredSessions.length > 0 && (
-              <div className="grid max-h-[22rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                {filteredSessions.map((session) => {
-                  const active = selectedSessionId === session.id;
-                  const isInquiry = isInquiryDesignSession(session);
-                  const alreadyAskedInSession = questionSessionIds.has(session.id);
-                  return (
-                    <button
-                      key={session.id}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => selectSession(session.id)}
-                      className={`min-h-[104px] rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                        active
-                          ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
-                          : "border-border bg-background hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              <div className="space-y-2">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-950/30">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">
+                        {t("sessionProgressTitle")}
+                      </p>
+                      <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                        {t("sessionProgressSummary", sessionProgress)}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">
+                      {sessionProgress.percent}%
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-white dark:bg-emerald-950">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all"
+                      style={{ width: `${sessionProgress.percent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid max-h-[22rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+                  {filteredSessions.map((session) => {
+                    const active = selectedSessionId === session.id;
+                    const isInquiry = isInquiryDesignSession(session);
+                    const alreadyAskedInSession = questionSessionIds.has(session.id);
+                    return (
+                      <button
+                        key={session.id}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => selectSession(session.id)}
+                        className={`min-h-[104px] rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                           active
-                            ? "bg-white text-indigo-700 dark:bg-indigo-900 dark:text-indigo-100"
-                            : "bg-muted text-muted-foreground"
-                        }`}>
-                          {getSessionDateBadge(session.date)}
-                        </span>
-                        {active && (
-                          <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white">
-                            {t("selectedSessionBadge")}
+                            ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
+                            : "border-border bg-background hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            active
+                              ? "bg-white text-indigo-700 dark:bg-indigo-900 dark:text-indigo-100"
+                              : "bg-muted text-muted-foreground"
+                          }`}>
+                            {getSessionDateBadge(session.date)}
                           </span>
-                        )}
-                        {!active && alreadyAskedInSession && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                            {t("completedSessionBadge")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-2 space-y-1">
-                        <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
-                        <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
-                          {session.topic.trim() || t("emptyTopic")}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <span>{session.date}</span>
-                          <span>{session.teacher.name} {t("teacherSuffix")}</span>
-                          {isInquiry && (
-                            <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">
-                              {t("inquiryClassTag")}
+                          {active && (
+                            <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                              {t("selectedSessionBadge")}
                             </span>
                           )}
-                          {alreadyAskedInSession && (
-                            <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                              {t("completedSessionShort")}
+                          {!active && alreadyAskedInSession && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                              {t("completedSessionBadge")}
                             </span>
                           )}
                         </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                        <div className="mt-2 space-y-1">
+                          <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
+                          <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
+                            {session.topic.trim() || t("emptyTopic")}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <span>{session.date}</span>
+                            <span>{session.teacher.name} {t("teacherSuffix")}</span>
+                            {isInquiry && (
+                              <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">
+                                {t("inquiryClassTag")}
+                              </span>
+                            )}
+                            {alreadyAskedInSession && (
+                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                                {t("completedSessionShort")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
