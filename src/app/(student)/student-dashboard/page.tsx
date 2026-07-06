@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useMemo, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { StudentReportView } from "@/components/reports/StudentReportView";
@@ -18,6 +18,11 @@ import PointsCard from "@/components/shared/PointsCard";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { isSessionAvailable } from "@/lib/sessions";
+import {
+  appNotificationQueryKeys,
+  notificationMetadataText,
+  useAppNotifications,
+} from "@/lib/app-notifications";
 
 interface Question {
   id: string;
@@ -49,29 +54,6 @@ interface PointLog {
   createdAt: string;
 }
 
-interface AppNotification {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  href: string | null;
-  sessionId: string | null;
-  metadata: unknown;
-  readAt: string | null;
-  createdAt: string;
-}
-
-interface NotificationResponse {
-  notifications: AppNotification[];
-  unreadCount: number;
-}
-
-function metadataText(metadata: unknown, key: "teacherName" | "sessionTitle"): string {
-  if (!metadata || typeof metadata !== "object") return "";
-  const value = (metadata as Record<string, unknown>)[key];
-  return typeof value === "string" ? value : "";
-}
-
 export default function StudentDashboardPage() {
   // useSearchParams(탭 쿼리)는 Suspense 경계가 필요하다
   return (
@@ -84,7 +66,6 @@ export default function StudentDashboardPage() {
 function StudentDashboard() {
   const { data: session } = useSession();
   const user = getSessionUser(session);
-  const queryClient = useQueryClient();
   const tCls = useTranslations("classification");
   const t = useTranslations("studentDash");
   const tDash = useTranslations("dashboard");
@@ -130,16 +111,10 @@ function StudentDashboard() {
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
   });
-  const { data: notificationData } = useQuery<NotificationResponse>({
-    queryKey: ["student-notifications"],
-    queryFn: async () => {
-      const r = await fetch("/api/notifications");
-      if (!r.ok) return { notifications: [], unreadCount: 0 };
-      return r.json();
-    },
+  const { notifications, markRead: markNotificationRead } = useAppNotifications({
+    queryKey: appNotificationQueryKeys.student,
     enabled: Boolean(user.id),
     refetchInterval: 12000,
-    refetchOnWindowFocus: true,
   });
 
   const questions = allQuestions.slice(0, 5);
@@ -180,26 +155,13 @@ function StudentDashboard() {
     if (Number.isNaN(time)) return false;
     return Date.now() - time <= 7 * 24 * 60 * 60 * 1000;
   }).length;
-  const teacherRequestNotifications = (notificationData?.notifications ?? []).filter(
+  const teacherRequestNotifications = notifications.filter(
     (item) =>
       item.type === "SESSION_REMINDER" &&
       !item.readAt &&
       (!item.sessionId || !questionSessionIds.has(item.sessionId)),
   );
   const visibleTeacherRequests = teacherRequestNotifications.slice(0, 3);
-  const markNotificationRead = async (id: string) => {
-    queryClient.setQueryData<NotificationResponse>(["student-notifications"], (prev) => {
-      if (!prev) return prev;
-      const wasUnread = prev.notifications.some((item) => item.id === id && !item.readAt);
-      return {
-        unreadCount: wasUnread ? Math.max(0, prev.unreadCount - 1) : prev.unreadCount,
-        notifications: prev.notifications.map((item) =>
-          item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item,
-        ),
-      };
-    });
-    await fetch(`/api/notifications/${id}`, { method: "PATCH" }).catch(() => null);
-  };
   const taskItems = [
     {
       key: "todayUnasked",
@@ -342,8 +304,8 @@ function StudentDashboard() {
               </div>
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {visibleTeacherRequests.map((item) => {
-                  const sessionTitle = metadataText(item.metadata, "sessionTitle");
-                  const teacherName = metadataText(item.metadata, "teacherName");
+                  const sessionTitle = notificationMetadataText(item.metadata, "sessionTitle");
+                  const teacherName = notificationMetadataText(item.metadata, "teacherName");
                   const label = sessionTitle
                     ? t("taskTeacherRequestDescWithSession", { teacherName, sessionTitle })
                     : item.message || item.title;

@@ -1,85 +1,26 @@
 "use client";
 
 import { MessageSquareText } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NotificationBellMenu, type NotificationMenuItem } from "@/components/shared/NotificationBellMenu";
 import { useTranslations } from "next-intl";
 import { formatShortDateTime } from "@/lib/datetime";
-
-const POLL_MS = 25000;
-
-interface AppNotification {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  href: string | null;
-  metadata: unknown;
-  readAt: string | null;
-  createdAt: string;
-}
-
-interface NotificationResponse {
-  notifications: AppNotification[];
-  unreadCount: number;
-}
-
-function metadataText(metadata: unknown, key: "teacherName" | "sessionTitle"): string {
-  if (!metadata || typeof metadata !== "object") return "";
-  const value = (metadata as Record<string, unknown>)[key];
-  return typeof value === "string" ? value : "";
-}
-
-async function fetchNotifications(): Promise<NotificationResponse> {
-  const res = await fetch("/api/notifications");
-  if (!res.ok) throw new Error("notifications failed");
-  return res.json();
-}
+import {
+  appNotificationQueryKeys,
+  notificationMetadataText,
+  type AppNotification,
+  useAppNotifications,
+} from "@/lib/app-notifications";
 
 export function StudentNotificationBell() {
   const t = useTranslations("notify");
-  const queryClient = useQueryClient();
-  const { data } = useQuery({
-    queryKey: ["student-notifications"],
-    queryFn: fetchNotifications,
-    refetchInterval: POLL_MS,
-    refetchOnWindowFocus: true,
+  const { notifications, unreadCount, markRead, markAllRead } = useAppNotifications({
+    queryKey: appNotificationQueryKeys.student,
   });
-
-  const notifications = data?.notifications ?? [];
-  const unreadCount = data?.unreadCount ?? 0;
-
-  const markRead = async (id: string) => {
-    queryClient.setQueryData<NotificationResponse>(["student-notifications"], (prev) => {
-      if (!prev) return prev;
-      const wasUnread = prev.notifications.some((item) => item.id === id && !item.readAt);
-      return {
-        unreadCount: wasUnread ? Math.max(0, prev.unreadCount - 1) : prev.unreadCount,
-        notifications: prev.notifications.map((item) =>
-          item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item,
-        ),
-      };
-    });
-    await fetch(`/api/notifications/${id}`, { method: "PATCH" }).catch(() => null);
-  };
-  const markAllRead = async () => {
-    queryClient.setQueryData<NotificationResponse>(["student-notifications"], (prev) => {
-      if (!prev) return prev;
-      return {
-        unreadCount: 0,
-        notifications: prev.notifications.map((item) => ({
-          ...item,
-          readAt: item.readAt ?? new Date().toISOString(),
-        })),
-      };
-    });
-    await fetch("/api/notifications", { method: "PATCH" }).catch(() => null);
-  };
 
   const renderMessage = (item: AppNotification) => {
     if (item.type === "SESSION_REMINDER") {
-      const teacherName = metadataText(item.metadata, "teacherName");
-      const sessionTitle = metadataText(item.metadata, "sessionTitle");
+      const teacherName = notificationMetadataText(item.metadata, "teacherName");
+      const sessionTitle = notificationMetadataText(item.metadata, "sessionTitle");
       if (teacherName && sessionTitle) {
         return t("sessionReminderItem", { teacherName, sessionTitle });
       }

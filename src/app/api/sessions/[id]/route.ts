@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { requireTeacherSession } from "@/lib/session-helpers";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -24,16 +25,15 @@ const updateSchema = z.object({
 });
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session || (session.user as any)?.role !== "TEACHER") {
-    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  const authResult = requireTeacherSession(await auth());
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.message }, { status: authResult.status });
   }
 
   try {
     const { id } = await params;
-    const teacherId = (session.user as any).id as string;
     const existing = await prisma.questionSession.findUnique({ where: { id } });
-    if (!existing || existing.teacherId !== teacherId) {
+    if (!existing || existing.teacherId !== authResult.user.id) {
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
     const body = await req.json();
@@ -56,16 +56,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session || (session.user as any)?.role !== "TEACHER") {
-    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  const authResult = requireTeacherSession(await auth());
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.message }, { status: authResult.status });
   }
 
   try {
     const { id } = await params;
-    const teacherId = (session.user as any).id as string;
     const existing = await prisma.questionSession.findUnique({ where: { id } });
-    if (!existing || existing.teacherId !== teacherId) {
+    if (!existing || existing.teacherId !== authResult.user.id) {
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
     // 저장된 세션 AI 분석도 함께 정리(고아 행 방지)

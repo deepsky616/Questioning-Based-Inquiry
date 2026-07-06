@@ -13,6 +13,7 @@ import { buildSessionLabel, getSessionFilterOptions, filterSessions, isInquiryDe
 import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { COGNITIVE_LABEL } from "@/lib/question-labels";
+import { appNotificationQueryKeys } from "@/lib/app-notifications";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
 
@@ -346,7 +347,7 @@ function AskContent() {
         content,
       });
       setQuestionSessionIds((prev) => new Set(prev).add(selectedSessionId));
-      queryClient.invalidateQueries({ queryKey: ["student-notifications"] });
+      queryClient.invalidateQueries({ queryKey: appNotificationQueryKeys.student });
       setSaveComplete(true);
     } catch {
       toast({ variant: "destructive", description: t("saveError") });

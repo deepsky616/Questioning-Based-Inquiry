@@ -314,7 +314,7 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
         topic: "광합성 탐구 수업",
         teacherId: "teacher-1",
         unitDesignId: "ud-1",
-        sharedQuestions: [SAVED_DESIGN.inquiry_questions[1]],
+        sharedQuestions: [{ ...SAVED_DESIGN.inquiry_questions[1], publishedAt: expect.any(String) }],
         targetType: "ALL",
         targetGrade: null,
         targetClassName: null,

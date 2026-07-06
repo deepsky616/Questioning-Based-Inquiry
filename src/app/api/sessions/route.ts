@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { requireTeacherSession } from "@/lib/session-helpers";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -158,9 +159,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session || (session.user as any)?.role !== "TEACHER") {
-    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  const authResult = requireTeacherSession(await auth());
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.message }, { status: authResult.status });
   }
 
   try {
@@ -168,13 +169,12 @@ export async function POST(req: Request) {
     const { date, subject, topic, targetType, targetGrade, targetClassName, targetStudentId, targetStudentIds, defaultQuestionPublic, likesVisibleToPeers, commentsVisibleToPeers, isActive } =
       createSchema.parse(body);
 
-    const teacherId = (session.user as any).id as string;
     const newSession = await prisma.questionSession.create({
       data: {
         date,
         subject,
         topic,
-        teacherId,
+        teacherId: authResult.user.id,
         targetType,
         targetGrade: targetType === "CLASS" || targetType === "CUSTOM" ? targetGrade ?? null : null,
         targetClassName: targetType === "CLASS" || targetType === "CUSTOM" ? targetClassName ?? null : null,
