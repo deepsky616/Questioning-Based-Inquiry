@@ -107,6 +107,7 @@ function AskContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ClassificationResult | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveComplete, setSaveComplete] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [sessionsLoaded, setSessionsLoaded] = useState(false);
@@ -214,6 +215,7 @@ function AskContent() {
   const selectSession = (id: string) => {
     setSelectedSessionId(id);
     setResult(null); // issue #5: 세션 변경 시 분류 결과 초기화
+    setSaveComplete(false);
 
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
@@ -277,6 +279,7 @@ function AskContent() {
       return;
     }
 
+    setSaveComplete(false);
     setIsLoading(true);
     try {
       const res = await fetch("/api/classify", {
@@ -322,12 +325,35 @@ function AskContent() {
       });
 
       if (!res.ok) throw new Error(t("saveFailed"));
-      router.push("/student-questions");
+      const saved = await res.json().catch(() => null);
+      setExistingQuestion({
+        id: typeof saved?.id === "string" ? saved.id : existingQuestion?.id ?? "saved",
+        content,
+      });
+      setSaveComplete(true);
     } catch {
       toast({ variant: "destructive", description: t("saveError") });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const writeAnotherInSameSession = () => {
+    setContent("");
+    setResult(null);
+    setSaveComplete(false);
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
+
+  const chooseAnotherSession = () => {
+    setContent("");
+    setResult(null);
+    setSaveComplete(false);
+    setFilterDate("");
+    setFilterSubject("");
+    setFilterTopic("");
+    router.replace("/student-ask", { scroll: false });
+    requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   };
 
   const getCognitiveLabel = (c: string) =>
@@ -760,14 +786,56 @@ function AskContent() {
                 onClick={() => {
                   setResult(null);
                   setContent("");
+                  setSaveComplete(false);
                 }}
               >
                 {t("rewriteQuestion")}
               </Button>
-              <Button onClick={handleSave} disabled={isSaving} variant="gradient" className="h-11 flex-1 text-base font-semibold">
-                {isSaving ? t("saving") : t("saveQuestion")}
-              </Button>
+              {!saveComplete && (
+                <Button onClick={handleSave} disabled={isSaving} variant="gradient" className="h-11 flex-1 text-base font-semibold">
+                  {isSaving ? t("saving") : t("saveQuestion")}
+                </Button>
+              )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {saveComplete && (
+        <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-950/30">
+          <CardHeader>
+            <CardTitle className="text-emerald-800 dark:text-emerald-100">{t("saveCompleteTitle")}</CardTitle>
+            <CardDescription className="text-emerald-700 dark:text-emerald-200">
+              {selectedSession
+                ? t("saveCompleteDescWithSession", { session: buildSessionLabel(selectedSession.date, selectedSession.subject, selectedSession.topic) })
+                : t("saveCompleteDesc")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2 sm:grid-cols-3">
+            <Button
+              type="button"
+              variant="gradient"
+              className="h-11"
+              onClick={() => router.push("/student-questions")}
+            >
+              {t("viewMyQuestions")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-100"
+              onClick={writeAnotherInSameSession}
+            >
+              {t("writeMoreSameSession")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-100"
+              onClick={chooseAnotherSession}
+            >
+              {t("chooseAnotherSession")}
+            </Button>
           </CardContent>
         </Card>
       )}
