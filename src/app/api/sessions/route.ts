@@ -18,6 +18,35 @@ const createSchema = z.object({
   isActive: z.boolean().optional().default(true),
 });
 
+function jsonStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function sessionTargetsStudent(
+  session: {
+    targetType: string;
+    targetGrade: string | null;
+    targetClassName: string | null;
+    targetStudentId: string | null;
+    targetStudentIds: unknown;
+  },
+  student: { id: string; grade: string | null; className: string | null },
+) {
+  const targetStudentIds = jsonStringArray(session.targetStudentIds);
+  if (session.targetType === "ALL") return true;
+  if (session.targetType === "CLASS") {
+    return (
+      (session.targetGrade === student.grade && session.targetClassName === student.className) ||
+      targetStudentIds.includes(student.id)
+    );
+  }
+  if (session.targetType === "STUDENT") {
+    return session.targetStudentId === student.id || targetStudentIds.includes(student.id);
+  }
+  if (session.targetType === "CUSTOM") return targetStudentIds.includes(student.id);
+  return false;
+}
+
 export async function GET() {
   const session = await auth();
   if (!session?.user) {
@@ -27,12 +56,73 @@ export async function GET() {
   const user = session.user as { id: string; role?: string; grade?: string; className?: string };
 
   if (user.role === "TEACHER") {
-    const sessions = await prisma.questionSession.findMany({
-      where: { teacherId: user.id },
-      orderBy: { date: "asc" },
-      include: { teacher: { select: { name: true } } },
+    const [sessions, teacher] = await Promise.all([
+      prisma.questionSession.findMany({
+        where: { teacherId: user.id },
+        orderBy: { date: "asc" },
+        include: { teacher: { select: { name: true } } },
+      }),
+      prisma.user.findUnique({
+        where: { id: user.id },
+        select: {
+          school: true,
+          teacherClasses: { select: { grade: true, className: true } },
+        },
+      }),
+    ]);
+
+    if (sessions.length === 0 || !teacher?.school) {
+      return NextResponse.json(
+        sessions.map((item) => ({
+          ...item,
+          participation: { total: 0, submitted: 0, missing: 0, percent: 0 },
+        })),
+      );
+    }
+
+    const teacherClasses = teacher.teacherClasses;
+    const studentWhere =
+      teacherClasses.length === 0
+        ? { role: "STUDENT" as const, school: teacher.school }
+        : {
+            role: "STUDENT" as const,
+            school: teacher.school,
+            OR: teacherClasses.map((tc) => ({ grade: tc.grade, className: tc.className })),
+          };
+
+    const sessionIds = sessions.map((item) => item.id);
+    const [students, questionPairs] = await Promise.all([
+      prisma.user.findMany({
+        where: studentWhere,
+        select: { id: true, grade: true, className: true },
+      }),
+      prisma.question.findMany({
+        where: {
+          sessionId: { in: sessionIds },
+          source: { not: "TEACHER_SHARED" },
+        },
+        select: { authorId: true, sessionId: true },
+      }),
+    ]);
+
+    const submittedSet = new Set<string>();
+    questionPairs.forEach((question) => {
+      if (question.sessionId) submittedSet.add(`${question.sessionId}:${question.authorId}`);
     });
-    return NextResponse.json(sessions);
+
+    const sessionsWithParticipation = sessions.map((item) => {
+      const targetStudents = students.filter((student) => sessionTargetsStudent(item, student));
+      const submitted = targetStudents.filter((student) => submittedSet.has(`${item.id}:${student.id}`)).length;
+      const total = targetStudents.length;
+      const missing = Math.max(total - submitted, 0);
+      const percent = total > 0 ? Math.round((submitted / total) * 100) : 0;
+      return {
+        ...item,
+        participation: { total, submitted, missing, percent },
+      };
+    });
+
+    return NextResponse.json(sessionsWithParticipation);
   }
 
   // 학생: 같은 학년·반을 담당하는 교사의 세션만 반환

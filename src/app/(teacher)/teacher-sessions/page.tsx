@@ -48,6 +48,12 @@ interface QuestionSession {
   targetStudentId?: string | null;
   targetStudentIds?: string[];
   targetStudent?: { name: string } | null;
+  participation?: {
+    total: number;
+    submitted: number;
+    missing: number;
+    percent: number;
+  };
 }
 
 export default function TeacherSessionsPage() {
@@ -625,6 +631,33 @@ function SessionRow({
                 </span>
               )}
             </div>
+            {session.participation && (
+              <div className="mt-2 w-full max-w-xs rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+                {session.participation.total > 0 ? (
+                  <>
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-200">
+                        {t("participationSummary", {
+                          submitted: session.participation.submitted,
+                          total: session.participation.total,
+                        })}
+                      </span>
+                      <span className="text-emerald-700/80 dark:text-emerald-200/80">
+                        {t("participationMissing", { missing: session.participation.missing })}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/70">
+                      <div
+                        className="h-full rounded-full bg-emerald-500 transition-all"
+                        style={{ width: `${Math.max(0, Math.min(100, session.participation.percent))}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs font-medium text-muted-foreground">{t("participationEmpty")}</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 lg:flex lg:shrink-0 lg:items-center lg:gap-5 lg:border-t-0 lg:pt-0">
