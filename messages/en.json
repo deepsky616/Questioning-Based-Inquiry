@@ -1499,6 +1499,7 @@
     "taskFutureQuestionDesc": "Upcoming classes where I have not written a question yet.",
     "taskPastQuestionTitle": "Past classes without my question",
     "taskPastQuestionDesc": "Past classes where I still have not written a question.",
+    "taskSessionProgress": "{completed} of {total} completed, {remaining} remaining",
     "taskSharedTitle": "Teacher-shared inquiry questions",
     "taskSharedDesc": "Inquiry questions where I can join with likes or comments.",
     "taskCommentsTitle": "My questions with comments",

@@ -1499,6 +1499,7 @@
     "taskFutureQuestionDesc": "앞으로 열릴 수업 중 아직 내 질문이 없는 수업입니다.",
     "taskPastQuestionTitle": "지난 수업 중 미작성",
     "taskPastQuestionDesc": "지난 수업 중 아직 질문하지 않은 수업입니다.",
+    "taskSessionProgress": "전체 {total}개 중 {completed}개 완료, {remaining}개 남음",
     "taskSharedTitle": "선생님이 배포한 탐구질문",
     "taskSharedDesc": "좋아요나 댓글로 참여할 수 있는 탐구질문입니다.",
     "taskCommentsTitle": "댓글 받은 내 질문",

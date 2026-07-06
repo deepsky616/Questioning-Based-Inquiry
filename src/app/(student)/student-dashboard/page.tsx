@@ -134,6 +134,9 @@ function StudentDashboard() {
   const todayUnaskedSessionCount = todaySessions.filter((item) => !questionSessionIds.has(item.id)).length;
   const futureUnaskedSessionCount = futureSessions.filter((item) => !questionSessionIds.has(item.id)).length;
   const pastUnaskedSessionCount = pastSessions.filter((item) => !questionSessionIds.has(item.id)).length;
+  const todayAskedSessionCount = todaySessions.length - todayUnaskedSessionCount;
+  const futureAskedSessionCount = futureSessions.length - futureUnaskedSessionCount;
+  const pastAskedSessionCount = pastSessions.length - pastUnaskedSessionCount;
   const activeSessions = sessions.filter((item) => isSessionAvailable(item.date));
   const sharedQuestionSessionCount = activeSessions.filter((item) => (item.sharedQuestions?.length ?? 0) > 0).length;
   const commentedQuestionCount = allQuestions.filter((question) => (question.commentCount ?? question.comments?.length ?? 0) > 0).length;
@@ -148,6 +151,11 @@ function StudentDashboard() {
       title: t("taskTodayQuestionTitle"),
       description: t("taskTodayQuestionDesc"),
       count: todayUnaskedSessionCount,
+      progress: {
+        total: todaySessions.length,
+        completed: todayAskedSessionCount,
+        remaining: todayUnaskedSessionCount,
+      },
       action: t("taskAsk"),
       href: "/student-ask?task=today-unasked",
       activeClass: "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200",
@@ -157,6 +165,11 @@ function StudentDashboard() {
       title: t("taskFutureQuestionTitle"),
       description: t("taskFutureQuestionDesc"),
       count: futureUnaskedSessionCount,
+      progress: {
+        total: futureSessions.length,
+        completed: futureAskedSessionCount,
+        remaining: futureUnaskedSessionCount,
+      },
       action: t("taskAsk"),
       href: "/student-ask?task=future-unasked",
       activeClass: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200",
@@ -166,6 +179,11 @@ function StudentDashboard() {
       title: t("taskPastQuestionTitle"),
       description: t("taskPastQuestionDesc"),
       count: pastUnaskedSessionCount,
+      progress: {
+        total: pastSessions.length,
+        completed: pastAskedSessionCount,
+        remaining: pastUnaskedSessionCount,
+      },
       action: t("taskAsk"),
       href: "/student-ask?task=past-unasked",
       activeClass: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-200",
@@ -262,6 +280,9 @@ function StudentDashboard() {
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {taskItems.map((item) => {
               const active = item.count > 0;
+              const progressPercent = item.progress && item.progress.total > 0
+                ? Math.round((item.progress.completed / item.progress.total) * 100)
+                : 0;
               const handleTaskClick = () => {
                 if (item.key === "points") {
                   pointsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -293,6 +314,26 @@ function StudentDashboard() {
                       {item.count}
                     </span>
                   </div>
+                  {item.progress && item.progress.total > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 text-xs font-medium">
+                        <span>
+                          {t("taskSessionProgress", {
+                            total: item.progress.total,
+                            completed: item.progress.completed,
+                            remaining: item.progress.remaining,
+                          })}
+                        </span>
+                        <span>{progressPercent}%</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-white/70 dark:bg-background/50">
+                        <div
+                          className="h-full rounded-full bg-current opacity-70 transition-all"
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                   <p className="mt-2 text-xs font-semibold">{item.action}</p>
                 </button>
               );
