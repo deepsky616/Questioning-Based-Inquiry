@@ -2,14 +2,29 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ClipboardCheck } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle, ClipboardCheck, MessageSquareText } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { NotificationBellMenu, type NotificationMenuItem } from "@/components/shared/NotificationBellMenu";
 import { useTranslations } from "next-intl";
+import { formatShortDateTime } from "@/lib/datetime";
 
 const POLL_MS = 25000;
 
 interface FlaggedCount { total: number; questions: number; comments: number }
+interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  href: string | null;
+  metadata: unknown;
+  readAt: string | null;
+  createdAt: string;
+}
+interface NotificationResponse {
+  notifications: AppNotification[];
+  unreadCount: number;
+}
 
 async function fetchFlaggedCount(): Promise<FlaggedCount> {
   const res = await fetch("/api/teacher/flagged-count");
@@ -22,6 +37,11 @@ async function fetchPendingCount(): Promise<number> {
   const d = await res.json();
   return typeof d.count === "number" ? d.count : 0;
 }
+async function fetchNotifications(): Promise<NotificationResponse> {
+  const res = await fetch("/api/notifications");
+  if (!res.ok) throw new Error("notifications failed");
+  return res.json();
+}
 
 /**
  * 교사 알림 센터 — 두 가지 검토 항목을 한 벨로 모은다.
@@ -31,6 +51,7 @@ async function fetchPendingCount(): Promise<number> {
  */
 export function NotificationBell() {
   const t = useTranslations("notify");
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const prevRef = useRef<number | null>(null);
@@ -48,11 +69,34 @@ export function NotificationBell() {
     refetchInterval: POLL_MS,
     refetchOnWindowFocus: true,
   });
+  const { data: appNotifications } = useQuery({
+    queryKey: ["teacher-app-notifications"],
+    queryFn: fetchNotifications,
+    refetchInterval: POLL_MS,
+    refetchOnWindowFocus: true,
+  });
 
   const flaggedCount = flagged?.total ?? 0;
   const pendingCount = pending ?? 0;
-  const total = flaggedCount + pendingCount;
-  const items: NotificationMenuItem[] = [
+  const savedNotifications = appNotifications?.notifications ?? [];
+  const unreadSavedCount = appNotifications?.unreadCount ?? 0;
+  const total = flaggedCount + pendingCount + unreadSavedCount;
+
+  const markRead = async (id: string) => {
+    queryClient.setQueryData<NotificationResponse>(["teacher-app-notifications"], (prev) => {
+      if (!prev) return prev;
+      const wasUnread = prev.notifications.some((item) => item.id === id && !item.readAt);
+      return {
+        unreadCount: wasUnread ? Math.max(0, prev.unreadCount - 1) : prev.unreadCount,
+        notifications: prev.notifications.map((item) =>
+          item.id === id ? { ...item, readAt: item.readAt ?? new Date().toISOString() } : item,
+        ),
+      };
+    });
+    await fetch(`/api/notifications/${id}`, { method: "PATCH" }).catch(() => null);
+  };
+
+  const calculatedItems: NotificationMenuItem[] = [
     ...(flaggedCount > 0
       ? [{
           id: "flagged",
@@ -74,6 +118,17 @@ export function NotificationBell() {
         }]
       : []),
   ];
+  const savedItems: NotificationMenuItem[] = savedNotifications.map((item) => ({
+    id: item.id,
+    href: item.href,
+    label: item.message || item.title,
+    icon: <MessageSquareText className="h-4 w-4 text-indigo-500" />,
+    meta: formatShortDateTime(item.createdAt),
+    unread: !item.readAt,
+    tone: "default",
+    onClick: () => markRead(item.id),
+  }));
+  const items = [...calculatedItems, ...savedItems];
 
   // 부적절 의심이 늘면 토스트로 알림(첫 응답은 기준값만)
   useEffect(() => {
@@ -94,6 +149,7 @@ export function NotificationBell() {
       <NotificationBellMenu
         title={t("title")}
         emptyText={t("empty")}
+        unreadText={t("unread")}
         count={total}
         badgeTone={flaggedCount > 0 ? "danger" : "default"}
         items={items}
