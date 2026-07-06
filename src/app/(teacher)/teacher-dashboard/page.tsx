@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useTranslations } from "next-intl";
+import { useTeacherStudents } from "@/lib/app-queries";
 
 interface TeacherClass {
   grade: string;
@@ -126,17 +127,8 @@ function TeacherDashboard() {
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
   });
-  const { data: teacherStudents = [] } = useQuery<TeacherStudent[]>({
-    queryKey: ["teacher-dashboard-students"],
-    queryFn: async () => {
-      const r = await fetch("/api/teacher/students");
-      if (!r.ok) return [];
-      const data = await r.json();
-      return Array.isArray(data.students) ? data.students : [];
-    },
-    refetchInterval: 12000,
-    refetchOnWindowFocus: true,
-  });
+  const { data: teacherStudentData } = useTeacherStudents<TeacherStudent, TeacherClass>();
+  const teacherStudents = useMemo(() => teacherStudentData?.students ?? [], [teacherStudentData]);
 
   // 학급 변경 시 선택값이 새 목록에 없으면 "전체"로 초기화
   useEffect(() => {

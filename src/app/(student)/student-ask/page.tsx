@@ -14,6 +14,7 @@ import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { COGNITIVE_LABEL } from "@/lib/question-labels";
 import { appNotificationQueryKeys } from "@/lib/app-notifications";
+import { useStudentSessions } from "@/lib/app-queries";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
 
@@ -113,9 +114,12 @@ function AskContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
-  const [sessionsLoaded, setSessionsLoaded] = useState(false);
-  const [sessionsError, setSessionsError] = useState(false);
+  const {
+    data: sessions = [],
+    isLoading: isSessionsLoading,
+    isError: sessionsError,
+  } = useStudentSessions<QuestionSession>({ userId: user.id });
+  const sessionsLoaded = Boolean(user.id) && !isSessionsLoading;
   const [questionSessionIds, setQuestionSessionIds] = useState<Set<string>>(new Set());
   const [questionsLoaded, setQuestionsLoaded] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
@@ -131,26 +135,19 @@ function AskContent() {
       .then((data) => setAiConfigured(data.configured))
       .catch(() => setAiConfigured(false));
 
-    fetch("/api/sessions")
-      .then((r) => {
-        if (!r.ok) throw new Error("fetch failed");
-        return r.json();
-      })
-      .then((data: QuestionSession[]) => {
-        setSessions(data);
-        if (data.length > 0) {
-          const requestedSession = requestedSessionId
-            ? data.find((item) => item.id === requestedSessionId)
-            : null;
-          setSelectedSessionId(requestedSession?.id ?? data[0].id);
-        }
-        setSessionsLoaded(true);
-      })
-      .catch(() => {
-        setSessionsError(true);
-        setSessionsLoaded(true);
-      });
-  }, [requestedSessionId]);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionsLoaded || sessionsError) return;
+    setSelectedSessionId((prev) => {
+      const requestedSession = requestedSessionId
+        ? sessions.find((item) => item.id === requestedSessionId)
+        : null;
+      if (requestedSession) return requestedSession.id;
+      if (prev && sessions.some((item) => item.id === prev)) return prev;
+      return sessions[0]?.id ?? "";
+    });
+  }, [requestedSessionId, sessions, sessionsError, sessionsLoaded]);
 
   useEffect(() => {
     if (!user.id) return;

@@ -25,6 +25,7 @@ import { StudentPasswordResetCard } from "@/components/teacher/StudentPasswordRe
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { useTranslations, useLocale } from "next-intl";
+import { appQueryKeys, useTeacherStudents } from "@/lib/app-queries";
 
 /** ISO 날짜 → "오늘 / N일 전 / -" */
 function lastActiveLabel(iso?: string | null): { key: "today" | "yesterday" | "daysAgo" | "monthsAgo" | "yearsAgo"; v: Record<string, number> } | null {
@@ -651,20 +652,10 @@ export default function StudentsPage() {
   const progressParam = searchParams.get("progress");
   const sortParam = searchParams.get("sort");
 
-  // 학생 목록(질문수·댓글수·포인트 집계)은 react-query로 주기 폴링(12초)+포커스 재조회.
-  const { data, isLoading } = useQuery<{ students: Student[]; teacherClasses: TeacherClass[] }>({
-    queryKey: ["teacher-student-list"],
-    queryFn: async () => {
-      const r = await fetch("/api/teacher/students");
-      if (!r.ok) throw new Error("failed to load students");
-      return r.json();
-    },
-    refetchInterval: 12000,
-    refetchOnWindowFocus: true,
-  });
+  const { data, isLoading } = useTeacherStudents<Student, TeacherClass>();
   const students = data?.students ?? EMPTY_STUDENTS;
   const teacherClasses = data?.teacherClasses ?? EMPTY_TEACHER_CLASSES;
-  const refetchList = () => queryClient.invalidateQueries({ queryKey: ["teacher-student-list"] });
+  const refetchList = () => queryClient.invalidateQueries({ queryKey: appQueryKeys.teacherStudents });
   const { data: noQuestionsStats } = useQuery<TeacherStatsSummary | null>({
     queryKey: ["teacher-students-no-questions-filter", noQuestionsPeriod, noQuestionsGrade, noQuestionsClassName],
     queryFn: async () => {

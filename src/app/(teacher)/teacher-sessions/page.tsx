@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import DatePicker from "@/components/shared/DatePicker";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { buildSessionLabel, isSessionAvailable, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { appQueryKeys, useTeacherSessions, useTeacherStudents } from "@/lib/app-queries";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -85,24 +86,13 @@ export default function TeacherSessionsPage() {
   const tSeq = useTranslations("sequencePanel");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  // 수업 세션 목록은 react-query로 주기 폴링(12초)+창 포커스 재조회한다.
-  // 질문조회(배포한 탐구설계)와 같은 쿼리 키를 공유해 토글·삭제·재배포가 양쪽에 자동 반영된다.
-  const { data: sessions = [], isLoading } = useQuery<QuestionSession[]>({
-    queryKey: ["teacher-sessions"],
-    queryFn: async () => {
-      const r = await fetch("/api/sessions");
-      if (!r.ok) throw new Error("failed to load sessions");
-      const data = await r.json();
-      return sortSessionsAsc(Array.isArray(data) ? data : []);
-    },
-    refetchInterval: 12000,
-    refetchOnWindowFocus: true,
-  });
+  const { data: sessions = [], isLoading } = useTeacherSessions<QuestionSession>();
   // 기존 낙관적 업데이트 호출부를 그대로 유지하기 위해 캐시 기록 함수를 setSessions 이름으로 제공한다.
   const setSessions = (updater: (prev: QuestionSession[]) => QuestionSession[]) =>
-    queryClient.setQueryData<QuestionSession[]>(["teacher-sessions"], (prev) => updater(prev ?? []));
-  const [students, setStudents] = useState<SessionTargetStudent[]>([]);
-  const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
+    queryClient.setQueryData<QuestionSession[]>(appQueryKeys.teacherSessions, (prev) => updater(prev ?? []));
+  const { data: targetData } = useTeacherStudents<SessionTargetStudent, SessionTargetClass>();
+  const students = useMemo(() => targetData?.students ?? [], [targetData]);
+  const teacherClasses = useMemo(() => targetData?.teacherClasses ?? [], [targetData]);
   const [sessForm, setSessForm] = useState({
     targetClassValue: "all",
     selectedStudentIds: [] as string[],
@@ -121,6 +111,7 @@ export default function TeacherSessionsPage() {
   const [listFilterTopic, setListFilterTopic] = useState("");
   const [listParticipationFilter, setListParticipationFilter] = useState<SessionParticipationFilter>("all");
   const [listSort, setListSort] = useState<SessionListSort>("desc");
+  const [targetDefaulted, setTargetDefaulted] = useState(false);
 
   const targetClasses = useMemo(() => {
     if (teacherClasses.length > 0) return teacherClasses;
@@ -140,18 +131,12 @@ export default function TeacherSessionsPage() {
   const subjectOptions = getSubjectsForGrade(selectedTargetGrade);
 
   useEffect(() => {
-    // 세션 목록은 useQuery가 담당. 여기선 생성 폼용 학생/학급만 로드한다.
-    fetch("/api/teacher/students")
-      .then((r) => r.json())
-      .then((targetData) => {
-        setStudents(targetData.students ?? []);
-        setTeacherClasses(targetData.teacherClasses ?? []);
-        // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
-        const defaults = defaultTargetSelection(targetData.students ?? [], targetData.teacherClasses ?? []);
-        setSessForm((prev) => ({ ...prev, ...defaults }));
-      })
-      .catch(() => {});
-  }, []);
+    if (targetDefaulted || !targetData) return;
+    // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
+    const defaults = defaultTargetSelection(targetData.students, targetData.teacherClasses);
+    setSessForm((prev) => ({ ...prev, ...defaults }));
+    setTargetDefaulted(true);
+  }, [targetData, targetDefaulted]);
 
   useEffect(() => {
     if (!subjectOptions.includes(sessForm.subject)) {

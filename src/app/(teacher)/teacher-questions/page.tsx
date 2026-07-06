@@ -43,7 +43,8 @@ import {
   matchesCognitiveCategory,
   normalizeCognitiveType,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsAsc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { buildSessionLabel, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { appQueryKeys, useTeacherSessions } from "@/lib/app-queries";
 import { SectionToggle } from "@/components/shared/SectionToggle";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -111,19 +112,7 @@ export default function QuestionsPage() {
   const [bulkMsg, setBulkMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showBulkSuccess, setShowBulkSuccess] = useState(false);
 
-  // 세션 관련 상태 — 수업세션 목록은 react-query로 주기 폴링(12초)+창 포커스 재조회.
-  // teacher-sessions와 같은 쿼리 키를 공유해 토글·삭제·재배포가 양쪽에 자동 반영된다.
-  const { data: sessions = [] } = useQuery<QuestionSession[]>({
-    queryKey: ["teacher-sessions"],
-    queryFn: async () => {
-      const r = await fetch("/api/sessions");
-      if (!r.ok) throw new Error("failed to load sessions");
-      const data = await r.json();
-      return sortSessionsAsc(Array.isArray(data) ? data : []);
-    },
-    refetchInterval: 12000,
-    refetchOnWindowFocus: true,
-  });
+  const { data: sessions = [] } = useTeacherSessions<QuestionSession>();
   const [selectedSessionId, setSelectedSessionId] = useState("");
 
 
@@ -218,7 +207,7 @@ export default function QuestionsPage() {
   // 배포 삭제·재배포 후 세션 목록(sharedQuestions)을 최신화한다(선택/조회 상태는 유지).
   // 공유 쿼리를 무효화하면 teacher-sessions에도 반영된다.
   const reloadSessions = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: ["teacher-sessions"] }),
+    () => queryClient.invalidateQueries({ queryKey: appQueryKeys.teacherSessions }),
     [queryClient],
   );
 

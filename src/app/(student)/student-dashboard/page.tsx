@@ -23,6 +23,7 @@ import {
   notificationMetadataText,
   useAppNotifications,
 } from "@/lib/app-notifications";
+import { useStudentSessions } from "@/lib/app-queries";
 
 interface Question {
   id: string;
@@ -88,18 +89,7 @@ function StudentDashboard() {
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
   });
-  const { data: sessions = [] } = useQuery<StudentSession[]>({
-    queryKey: ["student-dashboard-sessions", user.id],
-    queryFn: async () => {
-      const r = await fetch("/api/sessions");
-      if (!r.ok) return [];
-      const data = await r.json();
-      return Array.isArray(data) ? data : [];
-    },
-    enabled: Boolean(user.id),
-    refetchInterval: 12000,
-    refetchOnWindowFocus: true,
-  });
+  const { data: sessions = [] } = useStudentSessions<StudentSession>({ userId: user.id });
   const { data: pointData } = useQuery<{ recent: PointLog[] }>({
     queryKey: ["student-dashboard-points", user.id],
     queryFn: async () => {
