@@ -48,6 +48,31 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   const confirm = useConfirm();
   const { toast } = useToast();
   const typeLabel = (type: string) => `${tCls(`${type}.label`)}`;
+  const isAfter = (a?: string | null, b?: string | null) => {
+    if (!a || !b) return false;
+    const left = new Date(a).getTime();
+    const right = new Date(b).getTime();
+    if (Number.isNaN(left) || Number.isNaN(right)) return false;
+    return left > right + 1000;
+  };
+  const getDesignStatus = (design: SavedInquiryDesign) => {
+    if (!design.lastDeployedAt) {
+      return {
+        label: t("statusNotDeployed"),
+        className: "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300",
+      };
+    }
+    if (isAfter(design.updatedAt, design.lastDeployedAt)) {
+      return {
+        label: t("statusNeedsRedeploy"),
+        className: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/30 dark:text-orange-200",
+      };
+    }
+    return {
+      label: t("statusDeployed"),
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200",
+    };
+  };
 
   // 항목 접기(참고자료 미리보기) — 기본 접힘
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
@@ -342,7 +367,9 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
           <EmptyState icon="🔍" title={t("savedFilterEmpty")} />
         ) : (
           <ul className="divide-y rounded-md border">
-            {visibleSaved.map((d) => (
+            {visibleSaved.map((d) => {
+              const status = getDesignStatus(d);
+              return (
               <li key={d.id} className="p-3">
                 <div className="flex items-center justify-between gap-3">
                   <button
@@ -354,6 +381,9 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                     <span className="flex items-center gap-1.5 font-medium text-sm text-foreground">
                       <CollapseChevron open={selectedSavedId === d.id} />
                       <span className="truncate">{d.title}</span>
+                      <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${status.className}`}>
+                        {status.label}
+                      </span>
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {[d.sessionDate, d.subject, d.area].filter(Boolean).join(" · ")}
@@ -363,6 +393,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                         {[
                           d.createdAt ? t("savedCreatedAt", { time: formatDateTime(d.createdAt) }) : "",
                           d.updatedAt ? t("savedUpdatedAt", { time: formatDateTime(d.updatedAt) }) : "",
+                          d.lastDeployedAt ? t("savedDeployedAt", { time: formatDateTime(d.lastDeployedAt) }) : "",
                         ].filter(Boolean).join(" · ")}
                       </span>
                     )}
@@ -611,7 +642,8 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                   </div>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </CardContent>

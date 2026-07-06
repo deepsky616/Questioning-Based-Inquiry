@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +47,17 @@ interface Stats {
   teacherClasses: TeacherClass[];
 }
 
+interface TeacherStudent {
+  id: string;
+  name: string;
+  grade: string;
+  className: string;
+  studentNumber: string;
+  questionCount: number;
+  commentCount: number;
+  lastActivityAt: string | null;
+}
+
 // 학급 Select에서 사용할 복합 키 (grade|className)
 function classKey(tc: TeacherClass) {
   return `${tc.grade}|${tc.className}`;
@@ -64,7 +75,6 @@ export default function TeacherDashboardPage() {
 function TeacherDashboard() {
   const tPages = useTranslations("pages");
   const tCls = useTranslations("classification");
-  const tc = useTranslations("common");
   const t = useTranslations("dashboard");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -87,6 +97,39 @@ function TeacherDashboard() {
       const r = await fetch(`/api/stats?${params}`);
       if (!r.ok) throw new Error("failed to load stats");
       return r.json();
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
+  const { data: pendingPointCount = 0 } = useQuery<number>({
+    queryKey: ["teacher-pending-point-count"],
+    queryFn: async () => {
+      const r = await fetch("/api/teacher/points/pending-count");
+      if (!r.ok) return 0;
+      const data = await r.json();
+      return Number(data.count ?? 0);
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
+  const { data: flaggedTotal = 0 } = useQuery<number>({
+    queryKey: ["teacher-flagged-count"],
+    queryFn: async () => {
+      const r = await fetch("/api/teacher/flagged-count");
+      if (!r.ok) return 0;
+      const data = await r.json();
+      return Number(data.total ?? 0);
+    },
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
+  const { data: teacherStudents = [] } = useQuery<TeacherStudent[]>({
+    queryKey: ["teacher-dashboard-students"],
+    queryFn: async () => {
+      const r = await fetch("/api/teacher/students");
+      if (!r.ok) return [];
+      const data = await r.json();
+      return Array.isArray(data.students) ? data.students : [];
     },
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
@@ -162,6 +205,17 @@ function TeacherDashboard() {
   const trendRank = (trend: number | null) => (trend === null ? 3 : trend < 0 ? 0 : trend === 0 ? 1 : 2);
 
   const teacherClasses = stats?.teacherClasses ?? [];
+  const scopedStudents = useMemo(() => {
+    if (selectedClass === "all") return teacherStudents;
+    const [grade, className] = selectedClass.split("|");
+    return teacherStudents.filter((student) => student.grade === grade && student.className === className);
+  }, [teacherStudents, selectedClass]);
+  const activeStudentIds = useMemo(
+    () => new Set((stats?.byStudent ?? []).map((student) => student.studentId)),
+    [stats],
+  );
+  const noQuestionStudentCount = scopedStudents.filter((student) => !activeStudentIds.has(student.id)).length;
+  const decliningStudentCount = (stats?.byStudent ?? []).filter((student) => student.trend !== null && student.trend < 0).length;
   const dashboardScopeLabel = (() => {
     if (!stats) return "";
     if (selectedClass === "all") {
@@ -170,6 +224,45 @@ function TeacherDashboard() {
     const [grade, className] = selectedClass.split("|");
     return `${stats.school ? `${stats.school} ` : ""}${t("gradeClass", { grade, className })}`;
   })();
+  const taskItems = [
+    {
+      key: "points",
+      title: t("taskPointsTitle"),
+      description: t("taskPointsDesc"),
+      count: pendingPointCount,
+      action: t("taskReview"),
+      href: "/teacher-questions?tab=review",
+      activeClass: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200",
+    },
+    {
+      key: "flagged",
+      title: t("taskFlaggedTitle"),
+      description: t("taskFlaggedDesc"),
+      count: flaggedTotal,
+      action: t("taskReview"),
+      href: "/teacher-questions?flagged=1",
+      activeClass: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-200",
+    },
+    {
+      key: "noQuestions",
+      title: t("taskNoQuestionsTitle"),
+      description: t("taskNoQuestionsDesc"),
+      count: noQuestionStudentCount,
+      action: t("taskOpenStudents"),
+      href: "/teacher-students",
+      activeClass: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200",
+    },
+    {
+      key: "declining",
+      title: t("taskDecliningTitle"),
+      description: t("taskDecliningDesc"),
+      count: decliningStudentCount,
+      action: t("taskSortTrend"),
+      href: "",
+      activeClass: "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-950/30 dark:text-orange-200",
+    },
+  ];
+  const hasOpenTasks = taskItems.some((item) => item.count > 0);
 
   return (
     <div className="space-y-6">
@@ -244,6 +337,62 @@ function TeacherDashboard() {
                   {period === "semester" && t("periodSemesterBasis")}
                   {dashboardScopeLabel ? ` · ${dashboardScopeLabel}` : ""}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 오늘 할 일 */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">{t("todayTasksTitle")}</CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">{t("todayTasksDesc")}</p>
+                </div>
+                {!hasOpenTasks && (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200">
+                    {t("taskDone")}
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 md:grid-cols-2">
+                {taskItems.map((item) => {
+                  const active = item.count > 0;
+                  const handleTaskClick = () => {
+                    if (item.key === "declining") {
+                      setTrendSortOn(true);
+                      return;
+                    }
+                    if (item.href) router.push(item.href);
+                  };
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={handleTaskClick}
+                      className={`rounded-lg border px-3 py-3 text-left transition-colors ${
+                        active
+                          ? item.activeClass
+                          : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                          <p className="mt-0.5 text-xs leading-5">{item.description}</p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-bold ${
+                          active ? "bg-white/80 text-foreground dark:bg-background/70" : "bg-background text-muted-foreground"
+                        }`}>
+                          {item.count}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs font-semibold">{item.action}</p>
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

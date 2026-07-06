@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -17,6 +17,7 @@ import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matches
 import PointsCard from "@/components/shared/PointsCard";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { isSessionAvailable } from "@/lib/sessions";
 
 interface Question {
   id: string;
@@ -24,12 +25,28 @@ interface Question {
   closure: string;
   cognitive: string;
   createdAt: string;
+  sessionId?: string | null;
+  commentCount?: number;
+  comments?: unknown[];
 }
 
 interface Stats {
   total: number;
   byClosure: { closed: number; open: number };
   byCognitive: { factual: number; conceptual: number; controversial: number };
+}
+
+interface StudentSession {
+  id: string;
+  date: string;
+  subject: string;
+  topic: string;
+  sharedQuestions?: Array<{ content: string }>;
+}
+
+interface PointLog {
+  id: string;
+  createdAt: string;
 }
 
 export default function StudentDashboardPage() {
@@ -45,7 +62,6 @@ function StudentDashboard() {
   const { data: session } = useSession();
   const user = getSessionUser(session);
   const tCls = useTranslations("classification");
-  const tc = useTranslations("common");
   const t = useTranslations("studentDash");
   const tDash = useTranslations("dashboard");
   const router = useRouter();
@@ -59,6 +75,29 @@ function StudentDashboard() {
     queryFn: async () => {
       const r = await fetch(`/api/questions?authorId=${user.id}`);
       if (!r.ok) throw new Error("failed to load questions");
+      return r.json();
+    },
+    enabled: Boolean(user.id),
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
+  const { data: sessions = [] } = useQuery<StudentSession[]>({
+    queryKey: ["student-dashboard-sessions", user.id],
+    queryFn: async () => {
+      const r = await fetch("/api/sessions");
+      if (!r.ok) return [];
+      const data = await r.json();
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: Boolean(user.id),
+    refetchInterval: 12000,
+    refetchOnWindowFocus: true,
+  });
+  const { data: pointData } = useQuery<{ recent: PointLog[] }>({
+    queryKey: ["student-dashboard-points", user.id],
+    queryFn: async () => {
+      const r = await fetch("/api/points/me");
+      if (!r.ok) return { recent: [] };
       return r.json();
     },
     enabled: Boolean(user.id),
@@ -79,6 +118,72 @@ function StudentDashboard() {
       controversial: allQuestions.filter((q) => matchesCognitiveCategory(q.cognitive, "controversial")).length,
     },
   };
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+  const questionSessionIds = useMemo(
+    () => new Set(allQuestions.map((question) => question.sessionId).filter(Boolean)),
+    [allQuestions],
+  );
+  const activeSessions = sessions.filter((item) => isSessionAvailable(item.date));
+  const todaySessionCount = sessions.filter((item) => item.date === todayStr).length;
+  const unaskedSessionCount = activeSessions.filter((item) => !questionSessionIds.has(item.id)).length;
+  const sharedQuestionSessionCount = activeSessions.filter((item) => (item.sharedQuestions?.length ?? 0) > 0).length;
+  const commentedQuestionCount = allQuestions.filter((question) => (question.commentCount ?? question.comments?.length ?? 0) > 0).length;
+  const recentPointCount = (pointData?.recent ?? []).filter((log) => {
+    const time = new Date(log.createdAt).getTime();
+    if (Number.isNaN(time)) return false;
+    return Date.now() - time <= 7 * 24 * 60 * 60 * 1000;
+  }).length;
+  const taskItems = [
+    {
+      key: "today",
+      title: t("taskTodayTitle"),
+      description: t("taskTodayDesc"),
+      count: todaySessionCount,
+      action: t("taskAsk"),
+      href: "/student-ask",
+      activeClass: "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200",
+    },
+    {
+      key: "unasked",
+      title: t("taskUnaskedTitle"),
+      description: t("taskUnaskedDesc"),
+      count: unaskedSessionCount,
+      action: t("taskAsk"),
+      href: "/student-ask",
+      activeClass: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200",
+    },
+    {
+      key: "shared",
+      title: t("taskSharedTitle"),
+      description: t("taskSharedDesc"),
+      count: sharedQuestionSessionCount,
+      action: t("taskAsk"),
+      href: "/student-ask",
+      activeClass: "border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-950/30 dark:text-purple-200",
+    },
+    {
+      key: "comments",
+      title: t("taskCommentsTitle"),
+      description: t("taskCommentsDesc"),
+      count: commentedQuestionCount,
+      action: t("taskOpenQuestions"),
+      href: "/student-questions",
+      activeClass: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200",
+    },
+    {
+      key: "points",
+      title: t("taskPointsTitle"),
+      description: t("taskPointsDesc"),
+      count: recentPointCount,
+      action: t("taskCheckPoints"),
+      href: "/student-dashboard",
+      activeClass: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200",
+    },
+  ];
+  const hasStudentTasks = taskItems.some((item) => item.count > 0);
 
   return (
     <div className="space-y-6">
@@ -116,6 +221,55 @@ function StudentDashboard() {
         <DashboardSkeleton />
       ) : (
         <>
+      {/* 내가 할 일 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-base">{t("todayTasksTitle")}</CardTitle>
+              <CardDescription>{t("todayTasksDesc")}</CardDescription>
+            </div>
+            {!hasStudentTasks && (
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200">
+                {t("taskDone")}
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {taskItems.map((item) => {
+              const active = item.count > 0;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => router.push(item.href)}
+                  className={`rounded-lg border px-3 py-3 text-left transition-colors ${
+                    active
+                      ? item.activeClass
+                      : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                      <p className="mt-0.5 text-xs leading-5">{item.description}</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-bold ${
+                      active ? "bg-white/80 text-foreground dark:bg-background/70" : "bg-background text-muted-foreground"
+                    }`}>
+                      {item.count}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs font-semibold">{item.action}</p>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* 총 질문 수 */}
       <Card>
         <CardContent className="pt-6">

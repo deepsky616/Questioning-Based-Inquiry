@@ -24,6 +24,7 @@ export interface SavedInquiryDesign {
   targetClassValue?: string;
   targetStudentIds?: string[];
   sessionCount?: number;
+  lastDeployedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

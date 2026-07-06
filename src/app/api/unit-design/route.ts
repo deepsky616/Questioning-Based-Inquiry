@@ -61,6 +61,7 @@ export async function GET(req: Request) {
       target_class_value: string;
       target_student_ids: unknown;
       session_count: bigint | number;
+      last_deployed_at: Date | null;
       created_at: Date;
       updated_at: Date;
     }[]
@@ -70,6 +71,7 @@ export async function GET(req: Request) {
            is_active, default_question_public, likes_visible_to_peers, comments_visible_to_peers,
            target_class_value, target_student_ids,
            (SELECT count(*) FROM question_sessions qs WHERE qs.unit_design_id = unit_designs.id) AS session_count,
+           (SELECT max(qs.created_at) FROM question_sessions qs WHERE qs.unit_design_id = unit_designs.id) AS last_deployed_at,
            created_at, updated_at
     FROM unit_designs
     WHERE teacher_id = ${teacherId}
@@ -92,6 +94,7 @@ export async function GET(req: Request) {
       targetClassValue: d.target_class_value ?? "all",
       targetStudentIds: asArray(d.target_student_ids) as string[],
       sessionCount: Number(d.session_count ?? 0),
+      lastDeployedAt: d.last_deployed_at,
       createdAt: d.created_at,
       updatedAt: d.updated_at,
     }))
@@ -158,6 +161,8 @@ export async function POST(req: Request) {
             sessionDate: data.sessionDate ?? null,
             area: data.area,
             inquiryQuestions: data.inquiryQuestions,
+            sessionCount: 0,
+            lastDeployedAt: null,
             createdAt: insertedDesign?.created_at,
             updatedAt: insertedDesign?.updated_at,
           }
