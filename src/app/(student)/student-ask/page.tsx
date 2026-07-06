@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,10 @@ interface QuestionSession {
   sharedQuestions: SharedQuestion[];
   unitDesignId?: string | null;
   defaultQuestionPublic?: boolean;
+}
+
+interface StudentQuestion {
+  sessionId?: string | null;
 }
 
 interface DesignContext {
@@ -58,13 +62,43 @@ interface ClassificationResult {
 const TYPE_LABEL = COGNITIVE_LABEL;
 
 export default function AskPage() {
+  return (
+    <Suspense fallback={<AskPageFallback />}>
+      <AskContent />
+    </Suspense>
+  );
+}
+
+function AskPageFallback() {
+  const t = useTranslations("ask");
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
+      </div>
+      <Card>
+        <CardContent className="p-6 text-center text-muted-foreground text-sm">{t("checkingSession")}</CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AskContent() {
   const t = useTranslations("ask");
   const tCls = useTranslations("classification");
-  const tc = useTranslations("common");
   const router = useRouter();
+  const searchParams = useSearchParams();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { data: authSession } = useSession();
   const user = getSessionUser(authSession);
+  const taskParam = searchParams.get("task");
+  const taskScope =
+    taskParam === "today-unasked" ||
+    taskParam === "future-unasked" ||
+    taskParam === "past-unasked" ||
+    taskParam === "shared"
+      ? taskParam
+      : null;
 
   const [content, setContent] = useState("");
   const { toast } = useToast();
@@ -77,6 +111,8 @@ export default function AskPage() {
   const [sessions, setSessions] = useState<QuestionSession[]>([]);
   const [sessionsLoaded, setSessionsLoaded] = useState(false);
   const [sessionsError, setSessionsError] = useState(false);
+  const [questionSessionIds, setQuestionSessionIds] = useState<Set<string>>(new Set());
+  const [questionsLoaded, setQuestionsLoaded] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
   const [designContext, setDesignContext] = useState<DesignContext | null>(null);
   const [showRef, setShowRef] = useState(true);
@@ -105,6 +141,18 @@ export default function AskPage() {
         setSessionsLoaded(true);
       });
   }, []);
+
+  useEffect(() => {
+    if (!user.id) return;
+    setQuestionsLoaded(false);
+    fetch(`/api/questions?authorId=${user.id}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((questions: StudentQuestion[]) => {
+        setQuestionSessionIds(new Set(questions.map((question) => question.sessionId).filter((id): id is string => Boolean(id))));
+      })
+      .catch(() => setQuestionSessionIds(new Set()))
+      .finally(() => setQuestionsLoaded(true));
+  }, [user.id]);
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
   const isInquirySession = selectedSession ? isInquiryDesignSession(selectedSession) : false;
@@ -136,31 +184,36 @@ export default function AskPage() {
     return () => window.removeEventListener("focus", onFocus);
   }, [selectedSessionId, sessions, fetchDesignContext]);
 
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+  const needsQuestionScope = taskScope === "today-unasked" || taskScope === "future-unasked" || taskScope === "past-unasked";
+  const scopedSessions = useMemo(() => {
+    if (needsQuestionScope && !questionsLoaded) return [];
+    return sessions.filter((session) => {
+      if (taskScope === "today-unasked") return session.date === todayStr && !questionSessionIds.has(session.id);
+      if (taskScope === "future-unasked") return session.date > todayStr && !questionSessionIds.has(session.id);
+      if (taskScope === "past-unasked") return session.date < todayStr && !questionSessionIds.has(session.id);
+      if (taskScope === "shared") return (session.sharedQuestions?.length ?? 0) > 0;
+      return true;
+    });
+  }, [needsQuestionScope, questionSessionIds, questionsLoaded, sessions, taskScope, todayStr]);
+
   // 날짜/교과/주제 필터로 좁힌 세션 목록
-  const filterOptions = getSessionFilterOptions(sessions);
-  const filteredSessions = filterSessions(sessions, {
-    date: filterDate || undefined,
-    subject: filterSubject || undefined,
-    topic: filterTopic || undefined,
-  });
+  const filterOptions = useMemo(() => getSessionFilterOptions(scopedSessions), [scopedSessions]);
+  const filteredSessions = useMemo(
+    () => filterSessions(scopedSessions, {
+      date: filterDate || undefined,
+      subject: filterSubject || undefined,
+      topic: filterTopic || undefined,
+    }),
+    [filterDate, filterSubject, filterTopic, scopedSessions],
+  );
 
   const selectSession = (id: string) => {
     setSelectedSessionId(id);
     setResult(null); // issue #5: 세션 변경 시 분류 결과 초기화
-
-    // 세션 변경 시 기존 질문 확인
-    setExistingQuestion(null);
-    if (id) {
-      setIsCheckingExisting(true);
-      const currentUserId = user.id;
-      fetch(`/api/questions?sessionId=${id}&authorId=${currentUserId}`)
-        .then(r => r.json())
-        .then((qs: Array<{id: string; content: string}>) => {
-          setExistingQuestion(qs.length > 0 ? { id: qs[0].id, content: qs[0].content } : null);
-        })
-        .catch(() => {})
-        .finally(() => setIsCheckingExisting(false));
-    }
 
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
@@ -171,7 +224,7 @@ export default function AskPage() {
 
   // 필터 변경 시 선택 세션 보정: 목록에 없으면 첫 세션으로, 목록이 비면 선택 해제
   useEffect(() => {
-    if (!sessionsLoaded) return;
+    if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) return;
     if (filteredSessions.length === 0) {
       if (selectedSessionId) setSelectedSessionId("");
       return;
@@ -180,7 +233,20 @@ export default function AskPage() {
       selectSession(filteredSessions[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterDate, filterSubject, filterTopic]);
+  }, [filterDate, filterSubject, filterTopic, sessionsLoaded, questionsLoaded, needsQuestionScope, filteredSessions, selectedSessionId]);
+
+  useEffect(() => {
+    setExistingQuestion(null);
+    if (!selectedSessionId || !user.id) return;
+    setIsCheckingExisting(true);
+    fetch(`/api/questions?sessionId=${selectedSessionId}&authorId=${user.id}`)
+      .then((r) => r.json())
+      .then((qs: Array<{ id: string; content: string }>) => {
+        setExistingQuestion(qs.length > 0 ? { id: qs[0].id, content: qs[0].content } : null);
+      })
+      .catch(() => {})
+      .finally(() => setIsCheckingExisting(false));
+  }, [selectedSessionId, user.id]);
 
   const canAsk = sessionsLoaded && !sessionsError && sessions.length > 0 && !!selectedSessionId;
 
@@ -251,7 +317,7 @@ export default function AskPage() {
       : c;
 
   // issue #1: 로딩 중에는 아무것도 표시하지 않음
-  if (!sessionsLoaded) {
+  if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) {
     return (
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
@@ -335,6 +401,15 @@ export default function AskPage() {
             <Label htmlFor="session">{t("sessionSelectLabel")} <span className="text-red-500">*</span></Label>
 
             {/* 날짜·교과·주제로 좁혀서 찾기 (선택) */}
+            {taskScope && (
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200">
+                {taskScope === "today-unasked" && t("taskScopeTodayUnasked")}
+                {taskScope === "future-unasked" && t("taskScopeFutureUnasked")}
+                {taskScope === "past-unasked" && t("taskScopePastUnasked")}
+                {taskScope === "shared" && t("taskScopeShared")}
+              </div>
+            )}
+
             <div className="grid grid-cols-3 gap-2">
               <select
                 aria-label={t("filterByDate")}

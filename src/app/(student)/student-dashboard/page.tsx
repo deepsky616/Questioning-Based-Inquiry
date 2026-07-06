@@ -128,9 +128,13 @@ function StudentDashboard() {
     () => new Set(allQuestions.map((question) => question.sessionId).filter(Boolean)),
     [allQuestions],
   );
+  const todaySessions = sessions.filter((item) => item.date === todayStr);
+  const futureSessions = sessions.filter((item) => item.date > todayStr);
+  const pastSessions = sessions.filter((item) => item.date < todayStr);
+  const todayUnaskedSessionCount = todaySessions.filter((item) => !questionSessionIds.has(item.id)).length;
+  const futureUnaskedSessionCount = futureSessions.filter((item) => !questionSessionIds.has(item.id)).length;
+  const pastUnaskedSessionCount = pastSessions.filter((item) => !questionSessionIds.has(item.id)).length;
   const activeSessions = sessions.filter((item) => isSessionAvailable(item.date));
-  const todaySessionCount = sessions.filter((item) => item.date === todayStr).length;
-  const unaskedSessionCount = activeSessions.filter((item) => !questionSessionIds.has(item.id)).length;
   const sharedQuestionSessionCount = activeSessions.filter((item) => (item.sharedQuestions?.length ?? 0) > 0).length;
   const commentedQuestionCount = allQuestions.filter((question) => (question.commentCount ?? question.comments?.length ?? 0) > 0).length;
   const recentPointCount = (pointData?.recent ?? []).filter((log) => {
@@ -140,22 +144,31 @@ function StudentDashboard() {
   }).length;
   const taskItems = [
     {
-      key: "today",
-      title: t("taskTodayTitle"),
-      description: t("taskTodayDesc"),
-      count: todaySessionCount,
+      key: "todayUnasked",
+      title: t("taskTodayQuestionTitle"),
+      description: t("taskTodayQuestionDesc"),
+      count: todayUnaskedSessionCount,
       action: t("taskAsk"),
-      href: "/student-ask",
+      href: "/student-ask?task=today-unasked",
       activeClass: "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200",
     },
     {
-      key: "unasked",
-      title: t("taskUnaskedTitle"),
-      description: t("taskUnaskedDesc"),
-      count: unaskedSessionCount,
+      key: "futureUnasked",
+      title: t("taskFutureQuestionTitle"),
+      description: t("taskFutureQuestionDesc"),
+      count: futureUnaskedSessionCount,
       action: t("taskAsk"),
-      href: "/student-ask",
+      href: "/student-ask?task=future-unasked",
       activeClass: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200",
+    },
+    {
+      key: "pastUnasked",
+      title: t("taskPastQuestionTitle"),
+      description: t("taskPastQuestionDesc"),
+      count: pastUnaskedSessionCount,
+      action: t("taskAsk"),
+      href: "/student-ask?task=past-unasked",
+      activeClass: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-200",
     },
     {
       key: "shared",
@@ -163,7 +176,7 @@ function StudentDashboard() {
       description: t("taskSharedDesc"),
       count: sharedQuestionSessionCount,
       action: t("taskAsk"),
-      href: "/student-ask",
+      href: "/student-ask?task=shared",
       activeClass: "border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-950/30 dark:text-purple-200",
     },
     {
