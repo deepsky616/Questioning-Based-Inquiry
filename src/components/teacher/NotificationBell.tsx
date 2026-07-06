@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { AlertTriangle, ClipboardCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { NotificationBellMenu, type NotificationMenuItem } from "@/components/shared/NotificationBellMenu";
 import { useTranslations } from "next-intl";
 
 const POLL_MS = 25000;
@@ -51,6 +52,28 @@ export function NotificationBell() {
   const flaggedCount = flagged?.total ?? 0;
   const pendingCount = pending ?? 0;
   const total = flaggedCount + pendingCount;
+  const items: NotificationMenuItem[] = [
+    ...(flaggedCount > 0
+      ? [{
+          id: "flagged",
+          href: "/teacher-questions?flagged=1",
+          label: t.rich("flaggedItem", { b: (c) => <b className="font-semibold text-red-600">{c}</b> }),
+          icon: <AlertTriangle className="h-4 w-4 text-red-500" />,
+          count: flaggedCount,
+          tone: "danger" as const,
+        }]
+      : []),
+    ...(pendingCount > 0
+      ? [{
+          id: "pending",
+          href: "/teacher-questions?tab=review",
+          label: t.rich("pendingItem", { b: (c) => <b className="font-semibold text-amber-600">{c}</b> }),
+          icon: <ClipboardCheck className="h-4 w-4 text-amber-500" />,
+          count: pendingCount,
+          tone: "warning" as const,
+        }]
+      : []),
+  ];
 
   // 부적절 의심이 늘면 토스트로 알림(첫 응답은 기준값만)
   useEffect(() => {
@@ -68,65 +91,15 @@ export function NotificationBell() {
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            title={t("title")}
-            className="relative inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-muted"
-          >
-            <span className="text-lg">🔔</span>
-            {total > 0 && (
-              <span
-                className={`absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full px-1 text-center text-[10px] font-bold leading-[18px] text-white ${
-                  flaggedCount > 0 ? "bg-red-500" : "bg-indigo-500"
-                }`}
-              >
-                {total > 99 ? "99+" : total}
-              </span>
-            )}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-72 p-0">
-          <div className="border-b border-border px-3 py-2 text-sm font-semibold text-foreground">{t("title")}</div>
-          {total === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("empty")}</p>
-          ) : (
-            <div className="py-1">
-              {flaggedCount > 0 && (
-                <Link
-                  href="/teacher-questions?flagged=1"
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted"
-                >
-                  <span className="text-lg">🚩</span>
-                  <span className="flex-1 text-sm text-foreground">
-                    {t.rich("flaggedItem", { b: (c) => <b className="font-semibold text-red-600">{c}</b> })}
-                  </span>
-                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:bg-red-950/40 dark:text-red-300">
-                    {flaggedCount}
-                  </span>
-                </Link>
-              )}
-              {pendingCount > 0 && (
-                <Link
-                  href="/teacher-questions?tab=review"
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted"
-                >
-                  <span className="text-lg">📝</span>
-                  <span className="flex-1 text-sm text-foreground">
-                    {t.rich("pendingItem", { b: (c) => <b className="font-semibold text-amber-600">{c}</b> })}
-                  </span>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                    {pendingCount}
-                  </span>
-                </Link>
-              )}
-            </div>
-          )}
-        </PopoverContent>
-      </Popover>
+      <NotificationBellMenu
+        title={t("title")}
+        emptyText={t("empty")}
+        count={total}
+        badgeTone={flaggedCount > 0 ? "danger" : "default"}
+        items={items}
+        open={open}
+        onOpenChange={setOpen}
+      />
 
       {toast && (
         <Link
