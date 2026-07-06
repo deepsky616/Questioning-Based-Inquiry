@@ -223,6 +223,15 @@ function TeacherDashboard() {
   );
   const noQuestionStudentCount = scopedStudents.filter((student) => !activeStudentIds.has(student.id)).length;
   const decliningStudentCount = (stats?.byStudent ?? []).filter((student) => student.trend !== null && student.trend < 0).length;
+  const noQuestionsHref = (() => {
+    const params = new URLSearchParams({ filter: "noQuestions", period });
+    if (selectedClass !== "all") {
+      const [grade, className] = selectedClass.split("|");
+      params.set("grade", grade);
+      params.set("className", className);
+    }
+    return `/teacher-students?${params.toString()}`;
+  })();
   const dashboardScopeLabel = (() => {
     if (!stats) return "";
     if (selectedClass === "all") {
@@ -256,7 +265,7 @@ function TeacherDashboard() {
       description: t("taskNoQuestionsDesc"),
       count: noQuestionStudentCount,
       action: t("taskOpenStudents"),
-      href: "/teacher-students",
+      href: noQuestionsHref,
       activeClass: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200",
     },
     {
