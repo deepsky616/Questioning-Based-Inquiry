@@ -17,6 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { buildTeacherClassLabel } from "@/lib/teacher";
+import { compareByClassAndNumber } from "@/lib/student-sort";
 import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StudentBulkRegisterCard } from "@/components/teacher/StudentBulkRegisterCard";
@@ -107,6 +108,8 @@ const EMPTY_TEACHER_CLASSES: TeacherClass[] = [];
 
 type Period = "month" | "week" | "dow";
 type Metric = "question" | "comment" | "point";
+type ProgressFilter = "all" | "remaining";
+type StudentSort = "class" | "progressAsc";
 
 /* ─── 기간 집계 헬퍼 ─── */
 function pad(n: number): string { return n < 10 ? `0${n}` : `${n}`; }
@@ -638,6 +641,8 @@ export default function StudentsPage() {
   const [mgmtTab, setMgmtTab] = useState<"list" | "bulk" | "reset">("list");
   const [search, setSearch] = useState("");
   const [filterClass, setFilterClass] = useState<string>("all");
+  const [progressFilter, setProgressFilter] = useState<ProgressFilter>("all");
+  const [studentSort, setStudentSort] = useState<StudentSort>("class");
   const [selected, setSelected] = useState<Student | null>(null);
   const noQuestionsFilterOn = searchParams.get("filter") === "noQuestions";
   const noQuestionsPeriod = searchParams.get("period") ?? "month";
@@ -705,10 +710,23 @@ export default function StudentsPage() {
     const matchNoQuestions =
       !noQuestionsFilterOn ||
       !activeStudentIdsForFilter.has(s.id);
-    return matchSearch && matchClass && matchNoQuestions;
+    const matchProgress =
+      progressFilter === "all" ||
+      (s.sessionProgress?.remaining ?? 0) > 0;
+    return matchSearch && matchClass && matchNoQuestions && matchProgress;
   });
 
-  const grouped = filtered.reduce<Record<string, Student[]>>((acc, s) => {
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    if (studentSort === "progressAsc") {
+      const percentDiff = (a.sessionProgress?.percent ?? 100) - (b.sessionProgress?.percent ?? 100);
+      if (percentDiff !== 0) return percentDiff;
+      const remainingDiff = (b.sessionProgress?.remaining ?? 0) - (a.sessionProgress?.remaining ?? 0);
+      if (remainingDiff !== 0) return remainingDiff;
+    }
+    return compareByClassAndNumber(a, b);
+  });
+
+  const grouped = sortedFiltered.reduce<Record<string, Student[]>>((acc, s) => {
     const key = buildTeacherClassLabel(s.grade, s.className);
     if (!acc[key]) acc[key] = [];
     acc[key].push(s);
@@ -826,13 +844,39 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {/* 검색 */}
-      <Input
-        placeholder={t("searchPlaceholder")}
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-xs"
-      />
+      {/* 검색 + 지도 우선순위 필터 */}
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <Input
+          placeholder={t("searchPlaceholder")}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setProgressFilter(progressFilter === "remaining" ? "all" : "remaining")}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+              progressFilter === "remaining"
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200"
+            }`}
+          >
+            {t("filterRemainingSessions")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setStudentSort(studentSort === "progressAsc" ? "class" : "progressAsc")}
+            className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+              studentSort === "progressAsc"
+                ? "border-indigo-600 bg-indigo-600 text-white"
+                : "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200"
+            }`}
+          >
+            {studentSort === "progressAsc" ? t("sortClassDefault") : t("sortLowProgress")}
+          </button>
+        </div>
+      </div>
 
       {noQuestionsFilterOn && (
         <div className="flex flex-col gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200 sm:flex-row sm:items-center sm:justify-between">
