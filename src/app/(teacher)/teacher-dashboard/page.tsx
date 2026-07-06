@@ -56,6 +56,7 @@ interface TeacherStudent {
   questionCount: number;
   commentCount: number;
   lastActivityAt: string | null;
+  sessionProgress?: { total: number; completed: number; remaining: number; percent: number };
 }
 
 // 학급 Select에서 사용할 복합 키 (grade|className)
@@ -222,9 +223,19 @@ function TeacherDashboard() {
     [stats],
   );
   const noQuestionStudentCount = scopedStudents.filter((student) => !activeStudentIds.has(student.id)).length;
+  const unfinishedSessionStudentCount = scopedStudents.filter((student) => (student.sessionProgress?.remaining ?? 0) > 0).length;
   const decliningStudentCount = (stats?.byStudent ?? []).filter((student) => student.trend !== null && student.trend < 0).length;
   const noQuestionsHref = (() => {
     const params = new URLSearchParams({ filter: "noQuestions", period });
+    if (selectedClass !== "all") {
+      const [grade, className] = selectedClass.split("|");
+      params.set("grade", grade);
+      params.set("className", className);
+    }
+    return `/teacher-students?${params.toString()}`;
+  })();
+  const unfinishedSessionsHref = (() => {
+    const params = new URLSearchParams({ progress: "remaining", sort: "progressAsc" });
     if (selectedClass !== "all") {
       const [grade, className] = selectedClass.split("|");
       params.set("grade", grade);
@@ -267,6 +278,15 @@ function TeacherDashboard() {
       action: t("taskOpenStudents"),
       href: noQuestionsHref,
       activeClass: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200",
+    },
+    {
+      key: "unfinishedSessions",
+      title: t("taskUnfinishedSessionsTitle"),
+      description: t("taskUnfinishedSessionsDesc"),
+      count: unfinishedSessionStudentCount,
+      action: t("taskOpenStudents"),
+      href: unfinishedSessionsHref,
+      activeClass: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200",
     },
     {
       key: "declining",

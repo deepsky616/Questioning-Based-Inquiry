@@ -1029,6 +1029,8 @@
     "taskFlaggedDesc": "질문이나 댓글 중 확인이 필요한 항목입니다.",
     "taskNoQuestionsTitle": "질문 없는 학생",
     "taskNoQuestionsDesc": "선택 기간 동안 질문을 작성하지 않은 학생입니다.",
+    "taskUnfinishedSessionsTitle": "미작성 수업 학생",
+    "taskUnfinishedSessionsDesc": "담당 수업 중 아직 질문하지 않은 수업이 남은 학생입니다.",
     "taskDecliningTitle": "질문 활동 감소",
     "taskDecliningDesc": "기간 전반보다 후반 질문 수가 줄어든 학생입니다.",
     "trendSortTitle": "누르면 활동이 줄어든 학생부터 정렬해요",

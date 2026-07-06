@@ -1029,6 +1029,8 @@
     "taskFlaggedDesc": "Questions or comments that need review.",
     "taskNoQuestionsTitle": "Students with no questions",
     "taskNoQuestionsDesc": "Students who have not written a question in the selected period.",
+    "taskUnfinishedSessionsTitle": "Students with unfinished classes",
+    "taskUnfinishedSessionsDesc": "Students who still have assigned classes without a question.",
     "taskDecliningTitle": "Declining question activity",
     "taskDecliningDesc": "Students with fewer questions in the latter half of the period.",
     "trendSortTitle": "Click to sort students with declining activity first",

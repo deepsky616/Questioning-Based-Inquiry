@@ -648,6 +648,8 @@ export default function StudentsPage() {
   const noQuestionsPeriod = searchParams.get("period") ?? "month";
   const noQuestionsGrade = searchParams.get("grade");
   const noQuestionsClassName = searchParams.get("className");
+  const progressParam = searchParams.get("progress");
+  const sortParam = searchParams.get("sort");
 
   // 학생 목록(질문수·댓글수·포인트 집계)은 react-query로 주기 폴링(12초)+포커스 재조회.
   const { data, isLoading } = useQuery<{ students: Student[]; teacherClasses: TeacherClass[] }>({
@@ -695,6 +697,16 @@ export default function StudentsPage() {
       setFilterClass("all");
     }
   }, [noQuestionsFilterOn, noQuestionsGrade, noQuestionsClassName]);
+
+  useEffect(() => {
+    if (progressParam !== "remaining" && sortParam !== "progressAsc") return;
+    setMgmtTab("list");
+    if (progressParam === "remaining") setProgressFilter("remaining");
+    if (sortParam === "progressAsc") setStudentSort("progressAsc");
+    if (noQuestionsGrade && noQuestionsClassName) {
+      setFilterClass(`${noQuestionsGrade}-${noQuestionsClassName}`);
+    }
+  }, [progressParam, sortParam, noQuestionsGrade, noQuestionsClassName]);
 
   const normalizedSearch = search.trim().replace(/학년|반/g, "").trim();
 
