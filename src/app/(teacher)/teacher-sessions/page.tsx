@@ -72,6 +72,14 @@ interface SessionParticipationResponse {
   students: SessionParticipationStudent[];
 }
 
+interface SessionReminderResponse {
+  sent: number;
+  failed: number;
+  skippedNoEmail: number;
+  skippedEmailDisabled: number;
+  totalMissing: number;
+}
+
 export default function TeacherSessionsPage() {
   const tPages = useTranslations("pages");
   const t = useTranslations("sessions");
@@ -605,6 +613,7 @@ function SessionRow({
   const t = useTranslations("sessions");
   const tc = useTranslations("common");
   const tSeq = useTranslations("sequencePanel");
+  const { toast } = useToast();
   const isDesignSession = !!session.unitDesignId;
   const [editing, setEditing] = useState(false);
   const [eDate, setEDate] = useState(session.date);
@@ -613,6 +622,7 @@ function SessionRow({
   const [eArea, setEArea] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [showMissingStudents, setShowMissingStudents] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
   const missingCount = session.participation?.missing ?? 0;
   const { data: participationDetail, isLoading: isLoadingParticipation, isError: isParticipationError } = useQuery<SessionParticipationResponse>({
     queryKey: ["session-participation", session.id],
@@ -625,6 +635,34 @@ function SessionRow({
     staleTime: 30000,
   });
   const missingStudents = (participationDetail?.students ?? []).filter((student) => !student.hasQuestion);
+
+  const handleSendReminder = async () => {
+    if (missingCount <= 0 || sendingReminder) return;
+    setSendingReminder(true);
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/remind`, { method: "POST" });
+      if (!res.ok) throw new Error("failed to send reminder");
+      const result = (await res.json()) as SessionReminderResponse;
+      if (result.sent > 0 && result.failed === 0) {
+        toast({ variant: "success", description: t("reminderSent", { sent: result.sent }) });
+      } else if (result.sent > 0 && result.failed > 0) {
+        toast({
+          variant: "destructive",
+          description: t("reminderPartialFailed", { sent: result.sent, failed: result.failed }),
+        });
+      } else if (result.skippedEmailDisabled > 0) {
+        toast({ variant: "destructive", description: t("reminderEmailDisabled") });
+      } else if (result.skippedNoEmail > 0 || result.totalMissing > 0) {
+        toast({ variant: "destructive", description: t("reminderNoRecipients") });
+      } else {
+        toast({ variant: "success", description: t("missingStudentsEmpty") });
+      }
+    } catch {
+      toast({ variant: "destructive", description: t("reminderFailed") });
+    } finally {
+      setSendingReminder(false);
+    }
+  };
 
   const openEdit = () => {
     setEDate(session.date);
@@ -712,14 +750,24 @@ function SessionRow({
                       />
                     </div>
                     {missingCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowMissingStudents((value) => !value)}
-                        className="mt-2 inline-flex h-7 items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60"
-                      >
-                        {showMissingStudents ? t("missingStudentsHide") : t("missingStudentsShow")}
-                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showMissingStudents ? "rotate-180" : ""}`} />
-                      </button>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setShowMissingStudents((value) => !value)}
+                          className="inline-flex h-7 items-center gap-1 rounded-md border border-emerald-200 bg-white px-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 dark:hover:bg-emerald-900/60"
+                        >
+                          {showMissingStudents ? t("missingStudentsHide") : t("missingStudentsShow")}
+                          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showMissingStudents ? "rotate-180" : ""}`} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSendReminder}
+                          disabled={sendingReminder}
+                          className="inline-flex h-7 items-center rounded-md border border-indigo-200 bg-white px-2 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50"
+                        >
+                          {sendingReminder ? t("reminderSending") : t("reminderSend")}
+                        </button>
+                      </div>
                     )}
                   </>
                 ) : (

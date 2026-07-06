@@ -92,6 +92,7 @@ function AskContent() {
   const { data: authSession } = useSession();
   const user = getSessionUser(authSession);
   const taskParam = searchParams.get("task");
+  const requestedSessionId = searchParams.get("sessionId");
   const taskScope =
     taskParam === "today-unasked" ||
     taskParam === "future-unasked" ||
@@ -134,14 +135,19 @@ function AskContent() {
       })
       .then((data: QuestionSession[]) => {
         setSessions(data);
-        if (data.length > 0) setSelectedSessionId(data[0].id);
+        if (data.length > 0) {
+          const requestedSession = requestedSessionId
+            ? data.find((item) => item.id === requestedSessionId)
+            : null;
+          setSelectedSessionId(requestedSession?.id ?? data[0].id);
+        }
         setSessionsLoaded(true);
       })
       .catch(() => {
         setSessionsError(true);
         setSessionsLoaded(true);
       });
-  }, []);
+  }, [requestedSessionId]);
 
   useEffect(() => {
     if (!user.id) return;
