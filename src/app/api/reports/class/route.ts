@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildActivityReport } from "@/lib/report-stats";
+import { summarizeClassSessionActivity } from "@/lib/report-session-activity";
 import { compareStudentNumber } from "@/lib/student-sort";
 
 // 학급 활동 리포트(교사용)
@@ -81,11 +82,11 @@ export async function GET(req: NextRequest) {
     select: { sessionId: true, result: true },
   });
   const analysisBySession = new Map(analyses.map((a) => [a.sessionId, a.result]));
-  const sessionActivity = await Promise.all(
-    sessions.map(async (s) => {
-      const sessionQuestions = await prisma.question.findMany({
+  const sessionIds = sessions.map((s) => s.id);
+  const sessionQuestions = sessionIds.length > 0
+    ? await prisma.question.findMany({
         where: {
-          sessionId: s.id,
+          sessionId: { in: sessionIds },
           OR: [
             { authorId: { in: ids } },
             { source: "TEACHER_SHARED" },
@@ -93,24 +94,26 @@ export async function GET(req: NextRequest) {
         },
         select: {
           id: true,
+          sessionId: true,
           _count: { select: { likes: true } },
         },
-      });
-      const questionIds = sessionQuestions.map((q) => q.id);
-      const currentComments = questionIds.length > 0
-        ? await prisma.comment.count({ where: { questionId: { in: questionIds }, authorId: { in: ids } } })
-        : 0;
-      return [
-        s.id,
-        {
-          currentQuestions: sessionQuestions.length,
-          currentLikes: sessionQuestions.reduce((sum, q) => sum + q._count.likes, 0),
-          currentComments,
-        },
-      ] as const;
-    }),
-  );
-  const activityBySession = new Map(sessionActivity);
+      })
+    : [];
+  const sessionQuestionIds = sessionQuestions.map((q) => q.id);
+  const sessionComments = sessionQuestionIds.length > 0
+    ? await prisma.comment.findMany({
+        where: { questionId: { in: sessionQuestionIds }, authorId: { in: ids } },
+        select: { questionId: true },
+      })
+    : [];
+  const activityBySession = summarizeClassSessionActivity({
+    questions: sessionQuestions.map((q) => ({
+      id: q.id,
+      sessionId: q.sessionId,
+      likeCount: q._count.likes,
+    })),
+    comments: sessionComments,
+  });
   const sessionsWithAnalysis = sessions.map((s) => ({
     ...s,
     ...(activityBySession.get(s.id) ?? {}),
