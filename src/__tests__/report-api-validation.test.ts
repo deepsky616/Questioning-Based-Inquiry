@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: vi.fn(() => null) }));
@@ -25,9 +26,10 @@ import { POST as postBulkStudentAnalysis } from "@/app/api/reports/bulk-student-
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mockRunStudentAnalysis = runStudentSessionAnalysis as unknown as ReturnType<typeof vi.fn>;
+const mockSessionFindUnique = prisma.questionSession.findUnique as unknown as ReturnType<typeof vi.fn>;
 
 function jsonReq(url: string, body: unknown) {
-  return new Request(url, {
+  return new NextRequest(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -41,7 +43,7 @@ describe("리포트 API 입력 검증", () => {
   });
 
   it("세션 분석 저장은 result 배열을 거부한다", async () => {
-    prisma.questionSession.findUnique.mockResolvedValue({ teacherId: "teacher-1" });
+    mockSessionFindUnique.mockResolvedValue({ teacherId: "teacher-1" });
 
     const res = await patchSessionAnalysis(
       jsonReq("http://localhost/api/reports/session-analysis", {
