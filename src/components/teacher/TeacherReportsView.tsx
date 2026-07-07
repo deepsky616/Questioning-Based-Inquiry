@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 import { ReportView, type PerStudentRow, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 import { ReportPrintDoc, type PrintReportItem } from "@/components/reports/ReportPrintDoc";
 import { useTranslations } from "next-intl";
+import { formatClock } from "@/lib/datetime";
 
 interface ClassItem { grade: string; className: string; studentCount: number }
 interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
@@ -243,6 +245,24 @@ export function TeacherReportsView() {
     staleTime: 60000,
     refetchOnWindowFocus: true,
   });
+  const visibleUpdatedAt = view === "student" ? studentReportQuery.dataUpdatedAt : classReportQuery.dataUpdatedAt;
+  const visibleRefreshing = view === "student"
+    ? studentReportQuery.isFetching || classReportQuery.isFetching
+    : classReportQuery.isFetching || classRankingQuery.isFetching;
+  const refreshVisibleReport = async () => {
+    if (view === "student") {
+      await Promise.all([
+        studentReportQuery.refetch(),
+        classReportQuery.refetch(),
+        classRankingQuery.refetch(),
+      ]);
+      return;
+    }
+    await Promise.all([
+      classReportQuery.refetch(),
+      classRankingQuery.refetch(),
+    ]);
+  };
   const studentRanking = (rk: Awaited<ReturnType<typeof fetchRanking>>, id: string): PrintReportItem["ranking"] => {
     const s = rk.byId.get(id);
     return s ? {
@@ -402,6 +422,18 @@ export function TeacherReportsView() {
             {/* 출력(인쇄) — 새 탭 없이 현재 페이지에서 인쇄.
                 학급 전체 탭: 학급 집계 분석 / 학생별 탭: 학생 개별·전체 학생 */}
             <div className="ml-auto flex items-center gap-2">
+              <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
+                <span>{visibleUpdatedAt ? t("lastUpdated", { time: formatClock(new Date(visibleUpdatedAt)) }) : t("autoRefreshNote")}</span>
+                <button
+                  type="button"
+                  onClick={refreshVisibleReport}
+                  disabled={visibleRefreshing}
+                  className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${visibleRefreshing ? "animate-spin" : ""}`} />
+                  {visibleRefreshing ? t("refreshingReport") : t("refreshReport")}
+                </button>
+              </div>
               {view === "class" && (
                 <button
                   onClick={printClassReport}

@@ -1,8 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ReportView, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
+import { formatClock } from "@/lib/datetime";
 
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
   student: { name: string; grade?: string | null; className?: string | null; studentNumber?: string | null };
@@ -35,7 +37,7 @@ async function analyzeStudentSession(sessionId: string, failMsg: string): Promis
 export function StudentReportView() {
   const t = useTranslations("reports");
   // 내 리포트는 무거운 집계라 긴 폴링(60초)+포커스 재조회로 신선도만 유지한다.
-  const { data, isLoading: loading, error } = useQuery<StudentReport>({
+  const { data, isLoading: loading, error, isFetching, dataUpdatedAt, refetch } = useQuery<StudentReport>({
     queryKey: ["student-report"],
     queryFn: async () => {
       const r = await fetch("/api/reports/student");
@@ -54,19 +56,33 @@ export function StudentReportView() {
     .filter(Boolean).join(" ");
 
   return (
-    <ReportView
-      scope="student"
-      title={t("studentReportTitle", { name: s.name })}
-      subtitle={sub || undefined}
-      totals={data.totals}
-      weekly={data.weekly}
-      monthly={data.monthly}
-      classification={data.classification}
-      sessions={data.sessions}
-      analyzeSession={(id) => analyzeStudentSession(id, t("analysisFailed"))}
-      analysisCacheKey="student-self"
-      canAnalyze={false}
-      showPrintButton={false}
-    />
+    <div className="space-y-3">
+      <div className="no-print flex flex-wrap items-center justify-end gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <span>{dataUpdatedAt ? t("lastUpdated", { time: formatClock(new Date(dataUpdatedAt)) }) : t("autoRefreshNote")}</span>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1.5 font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+          {isFetching ? t("refreshingReport") : t("refreshReport")}
+        </button>
+      </div>
+      <ReportView
+        scope="student"
+        title={t("studentReportTitle", { name: s.name })}
+        subtitle={sub || undefined}
+        totals={data.totals}
+        weekly={data.weekly}
+        monthly={data.monthly}
+        classification={data.classification}
+        sessions={data.sessions}
+        analyzeSession={(id) => analyzeStudentSession(id, t("analysisFailed"))}
+        analysisCacheKey="student-self"
+        canAnalyze={false}
+        showPrintButton={false}
+      />
+    </div>
   );
 }
