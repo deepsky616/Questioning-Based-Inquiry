@@ -189,6 +189,7 @@ export function TeacherReportsView() {
     }, 1000);
     window.print();
   };
+
   // 포인트·순위: class-ranks(반 전원 포인트+우리반/교내/전체 석차) + class-leaderboard(교내·전체 반 순위)
   interface RankRow { id: string; totalPoints: number; classRank: number; schoolRank: number; allRank: number }
   const fetchRanking = async (grade: string, className: string) => {
@@ -212,6 +213,16 @@ export function TeacherReportsView() {
       classOrderAllTotal: lbAll?.total as number | undefined,
     };
   };
+  const classRankingQuery = useQuery({
+    queryKey: ["report-class-ranking", selected],
+    queryFn: async () => {
+      const [grade, className] = selected.split("|");
+      return fetchRanking(grade, className);
+    },
+    enabled: Boolean(selected && report),
+    staleTime: 60000,
+    refetchOnWindowFocus: true,
+  });
   const studentRanking = (rk: Awaited<ReturnType<typeof fetchRanking>>, id: string): PrintReportItem["ranking"] => {
     const s = rk.byId.get(id);
     return s ? {
@@ -223,29 +234,45 @@ export function TeacherReportsView() {
   };
 
   // 학급 전체 출력: 학급 집계(전체 학생 종합) 리포트 1부 — 세션 전체(scope=class) 분석 + 반 포인트·순위
-  const printClassReport = async () => {
+  const printClassReport = () => {
     if (!report || printBusy) return;
-    setPrintBusy(true);
-    try {
-      const klass = report.klass as { grade: string; className: string; school?: string | null };
-      const rk = await fetchRanking(klass.grade, klass.className);
-      doPrint([{
-        name: t("gradeClass", { grade: klass.grade, className: klass.className }),
-        school: klass.school ?? undefined,
-        totals: report.totals,
-        classification: report.classification,
-        weekly: report.weekly,
-        monthly: report.monthly,
-        sessions: (report.sessions as PrintReportItem["sessions"]) ?? [],
-        ranking: {
-          avgPoints: rk.avgPoints, points: rk.sumPoints,
-          classOrderSchool: rk.classOrderSchool, classOrderSchoolTotal: rk.classOrderSchoolTotal,
-          classOrderAll: rk.classOrderAll, classOrderAllTotal: rk.classOrderAllTotal,
-        },
-      }]);
-    } finally {
-      setPrintBusy(false);
-    }
+    const klass = report.klass as { grade: string; className: string; school?: string | null };
+    const rk = classRankingQuery.data ?? null;
+    doPrint([{
+      kind: "class",
+      name: t("gradeClass", { grade: klass.grade, className: klass.className }),
+      grade: klass.grade,
+      className: klass.className,
+      school: klass.school ?? undefined,
+      totals: report.totals,
+      classification: report.classification,
+      weekly: report.weekly,
+      monthly: report.monthly,
+      sessions: (report.sessions as PrintReportItem["sessions"]) ?? [],
+      roster: (report.perStudent ?? []).map((student) => {
+        const rank = rk?.byId.get(student.id);
+        return {
+          id: student.id,
+          name: student.name,
+          studentNumber: student.studentNumber,
+          questions: student.questions,
+          likesGiven: student.likesGiven,
+          comments: student.comments,
+          points: rank?.totalPoints,
+          classRank: rank?.classRank,
+        };
+      }),
+      ranking: rk
+        ? {
+            avgPoints: rk.avgPoints,
+            sumPoints: rk.sumPoints,
+            classOrderSchool: rk.classOrderSchool,
+            classOrderSchoolTotal: rk.classOrderSchoolTotal,
+            classOrderAll: rk.classOrderAll,
+            classOrderAllTotal: rk.classOrderAllTotal,
+          }
+        : undefined,
+    }]);
   };
 
   // 학생 개별 출력: 현재 선택 학생 + 포인트·순위

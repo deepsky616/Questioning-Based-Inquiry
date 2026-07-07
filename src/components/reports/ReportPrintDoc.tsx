@@ -16,6 +16,7 @@ const TREND_SERIES: { key: keyof SeriesPoint; color: string }[] = [
 ];
 
 export interface PrintReportItem {
+  kind?: "student" | "class";
   name: string;
   grade?: string | null;
   className?: string | null;
@@ -26,6 +27,16 @@ export interface PrintReportItem {
   weekly?: SeriesPoint[];
   monthly?: SeriesPoint[];
   sessions: { id: string; date: string; subject: string; topic: string; analysis?: SessionAnalysisResult | null }[];
+  roster?: {
+    id: string;
+    name: string;
+    studentNumber?: string | null;
+    questions: number;
+    likesGiven: number;
+    comments: number;
+    points?: number;
+    classRank?: number;
+  }[];
   // 포인트·순위(있을 때만 표시). 학생: 포인트 + 우리반/교내/전체 석차(각 총원), 학급: 평균 + 교내/전체 반 순위(각 총반수)
   ranking?: {
     points?: number;
@@ -220,12 +231,39 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
                   {it.ranking.avgPoints != null && (
                     <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#d97706" }}>{it.ranking.avgPoints}</div><div className="rdoc-kpi-l">{t("docAvgPoints")}</div></div>
                   )}
+                  {it.ranking.sumPoints != null && (
+                    <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#d97706" }}>{it.ranking.sumPoints}</div><div className="rdoc-kpi-l">{t("docTotalPoints")}</div></div>
+                  )}
                   {rankCell(it.ranking.classRank, it.ranking.classTotal, t("docClassRank"), "students")}
                   {rankCell(it.ranking.schoolRank, it.ranking.schoolTotal, t("docSchoolRank"), "students")}
                   {rankCell(it.ranking.allRank, it.ranking.allTotal, t("docAllRank"), "students")}
                   {rankCell(it.ranking.classOrderSchool, it.ranking.classOrderSchoolTotal, t("docClassOrderSchool"), "classes")}
                   {rankCell(it.ranking.classOrderAll, it.ranking.classOrderAllTotal, t("docClassOrderAll"), "classes")}
                 </div>
+              </>
+            )}
+
+            {it.kind === "class" && it.roster && it.roster.length > 0 && (
+              <>
+                <div className="rdoc-section-label">{t("docClassRoster")}</div>
+                <table className="rdoc-table">
+                  <thead>
+                    <tr>
+                      <th>{t("docColNo")}</th><th className="rdoc-l">{t("docColName")}</th>
+                      <th>{t("metric_questions")}</th><th>{t("metric_likesGiven")}</th><th>{t("metric_comments")}</th>
+                      <th>{t("docColPoints")}</th><th>{t("docColRank")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {it.roster.map((student) => (
+                      <tr key={student.id}>
+                        <td>{student.studentNumber ?? "-"}</td><td className="rdoc-l">{student.name}</td>
+                        <td>{student.questions}</td><td>{student.likesGiven}</td><td>{student.comments}</td>
+                        <td>{student.points ?? "-"}</td><td>{student.classRank ?? "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </>
             )}
 

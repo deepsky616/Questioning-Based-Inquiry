@@ -1180,6 +1180,8 @@
     "docRanking": "Points & rank",
     "docPoints": "Points",
     "docAvgPoints": "Class avg points",
+    "docTotalPoints": "Class total points",
+    "docClassRoster": "Student activity list",
     "docClassRank": "Class rank",
     "docSchoolRank": "School rank",
     "docAllRank": "Overall rank",

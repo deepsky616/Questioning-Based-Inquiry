@@ -1180,6 +1180,8 @@
     "docRanking": "포인트 · 순위",
     "docPoints": "획득 포인트",
     "docAvgPoints": "반 평균 포인트",
+    "docTotalPoints": "반 전체 포인트",
+    "docClassRoster": "학생별 활동 목록",
     "docClassRank": "우리반 순위",
     "docSchoolRank": "교내 순위",
     "docAllRank": "전체 순위",
