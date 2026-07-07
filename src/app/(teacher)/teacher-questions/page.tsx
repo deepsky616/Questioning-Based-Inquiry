@@ -243,6 +243,9 @@ export default function QuestionsPage() {
 
   // 필터 변경 반영: 전체 세션이면 좁혀진 범위로 다시 조회, 특정 세션이면 목록 밖일 때 첫 세션으로 보정
   useEffect(() => {
+    // 마운트 직후 초기 상태("")에서는 보정하지 않는다. 다른 페이지에서 세션 캐시를 채워온 경우
+    // "all" 초기화 effect가 반영되기 전에 이 effect가 첫 세션을 잘못 선택하는 문제 방지.
+    if (!selectedSessionId) return;
     if (selectedSessionId === "all") {
       fetchQuestions("all", {
         date: filterDate || undefined,
