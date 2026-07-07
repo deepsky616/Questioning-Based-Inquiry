@@ -28,7 +28,7 @@ const sequenceSchema = z.object({
     .optional(),
 });
 
-function normalizeSequencedQuestions(
+export function normalizeSequencedQuestions(
   value: unknown,
   sourceQuestions: SequenceInputQuestion[],
   mode: "merge" | "sort" = "sort",

@@ -1,0 +1,436 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for app/api/question-games/ai-play/route.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../../../prettify.css" />
+    <link rel="stylesheet" href="../../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../../../index.html">All files</a> / <a href="index.html">app/api/question-games/ai-play</a> route.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/42</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/24</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/18</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/41</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import { generateText, AiKeyMissingError } from "@/lib/ai";
+import { extractJsonObject } from "@/lib/json-extract";
+&nbsp;
+const SYSTEM_PROMPT = <span class="cstat-no" title="statement not covered" >`당신은 초등학생과 중학생을 위한 질문놀이 파트너입니다.</span>
+- 쉽고 친근한 말투로 대화하세요.
+- 학생들이 스스로 생각하도록 돕는 좋은 질문을 만들어주세요.
+- 대답은 항상 간결하고 명확하게 해주세요.
+- 한국어로만 답하세요.`;
+&nbsp;
+const PROMPTS: Record&lt;string, (ctx: Record&lt;string, string&gt;) =&gt; string&gt; = <span class="cstat-no" title="statement not covered" >{</span>
+<span class="fstat-no" title="function not covered" >  "dice:generate": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `"${c.questionType}" 유형의 질문을 하나 만들어주세요.\n유형 설명: ${c.typeDesc ?? ""}\n질문만 한 줄로 출력하세요. 다른 말은 하지 마세요.`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "dice:feedback": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `학생 질문: "${c.studentQuestion}"\nAI 질문: "${c.aiQuestion}"\n두 질문을 비교하며 학생에게 격려와 한 줄 팁을 주세요. 두 문장 이내로.`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "hot-potato:generate": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `주제: "${c.topic}"\n이 주제와 관련된 좋은 질문을 하나 만들어주세요.\n질문만 한 줄로 출력하세요.`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "hot-potato:feedback": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `학생 질문: "${c.studentQuestion}"\nAI 질문: "${c.aiQuestion}"\n두 질문 중 어떤 점이 좋은지 한 줄로 비교해 주세요.`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "bingo:fill": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `"${c.questionType}" 유형의 질문을 하나 만들어주세요.\n질문만 한 줄로 출력하세요.`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "relay:check": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `질문 릴레이 게임입니다. 규칙: 대답 금지, 질문만 이어가기, 앞 질문과 반드시 연결되어야 함.\n\n앞 질문: "${c.prev}"\n학생의 새 질문: "${c.next}"\n\n새 질문이 앞 질문과 연결되는지 확인해주세요. 느슨한 연결도 인정해요.\n다음 형식으로만 답하세요 (다른 말 없이):\n판정: 연결돼요 또는 연결 안 돼요\n이유: (한 문장)\n격려: (한 문장)`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "relay:ai-turn": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `질문 릴레이 게임입니다. 규칙: 대답 금지, 질문만 이어가기.\n\n처음 주제: "${c.topic}"\n가장 최근 질문: "${c.prev}"\n지금까지 나온 질문들: ${c.history}\n\n이 게임의 다음 질문 하나를 만들어주세요.\n조건: 1) 가장 최근 질문과 연결될 것 2) 지금까지 나온 질문과 중복되지 않을 것 3) 질문 형태일 것\n질문만 한 줄로 출력하세요.`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "mystery-box:setup": (_</span>c) =&gt;
+<span class="cstat-no" title="statement not covered" >    `미스터리 박스 게임용 물건을 초등학생이 알만한 것에서 하나 골라주세요.\n다음 JSON 형식으로만 답하세요 (다른 말 없이):\n{"name":"물건 이름","category":"카테고리","emoji":"이모지 1개"}`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "mystery-box:answer": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `미스터리 박스 게임입니다. 상자 안의 것은 "${c.itemName}"입니다.\n질문: "${c.question}"\n반드시 "네", "아니오", "잘 모르겠어요" 중 하나만 답하세요. 다른 말은 절대 하지 마세요.`,</span>
+&nbsp;
+  // AI가 참가자로서 자기 차례에 예/아니오 질문을 만들고, 확신하면 추측까지 한다(물건 이름은 절대 모름)
+<span class="fstat-no" title="function not covered" >  "mystery-box:ai-turn": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `미스터리 박스 스무고개 게임이에요. 당신(AI)은 상자 안의 숨은 물건을 맞히려는 참가자입니다. 물건이 무엇인지 전혀 모릅니다.\n지금까지 나온 질문과 대답:\n${c.history || "(아직 없음)"}\n\n규칙:\n1) 단서로 물건을 확신할 수 있으면 "guess"에 물건 이름 하나를 쓰세요. 확신이 없으면 "guess"는 빈 문자열("")로 두세요.\n2) "question"에는 다음에 물어볼, 아직 안 물어본 새로운 예/아니오 질문 하나를 쓰세요(짧게).\n\n반드시 아래 JSON으로만 답하세요 (다른 말 없이):\n{"question":"...","guess":""}`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "ladder:suggest": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `주제: "${c.topic}"\n이 주제로 만들 수 있는 좋은 질문 2가지를 짧게 제안해주세요.\n번호 없이 각 질문을 한 줄씩, 총 2줄로 출력하세요.`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "memory:pairs": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `초등학생이 흥미를 느낄 만한 질문과 그에 가장 알맞은 짧은 대답 ${c.count}쌍을 만들어주세요.\n- 질문은 호기심을 자극하는 한 문장, 너무 어려운 학술 용어는 피해주세요.\n- 대답은 1~2문장, 초등학생이 이해할 수 있는 표현으로.\n- 질문과 대답은 명확하게 짝이 맞아야 합니다.\n\n반드시 JSON 배열로만 응답하세요 (다른 텍스트 금지):\n[\n  {"question": "...", "answer": "..."},\n  {"question": "...", "answer": "..."}\n]`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "story-dice:words": (_</span>c) =&gt;
+<span class="cstat-no" title="statement not covered" >    `초등학생이 이야기를 만들 수 있는 수준의 단어를 다음 세 카테고리로 각각 8개씩 골라주세요. 매번 새롭게 만들어야 하므로 흔하지 않은 조합도 환영합니다.\n\n- 주인공: 사람·동물·상상의 존재 (예: 로봇, 탐정, 마법사, 외계인)\n- 장소: 어디서 일어나는 일인지 (예: 학교, 숲, 우주, 무인도)\n- 사건/물건: 이야기를 흥미롭게 만드는 요소 (예: 보물상자, 비밀지도, 타임머신, 알 수 없는 소리)\n\n또한 각 단어에 가장 어울리는 이모지 1개씩을 "emojis" 맵에 함께 담아주세요. 단어마다 서로 다른 이모지를 골라 같은 이모지가 반복되지 않게 하세요.\n\n반드시 다음 JSON 형식으로만 답하세요 (다른 텍스트 금지):\n{\n  "protagonist": ["...", "...", ... 8개],\n  "place": ["...", "...", ... 8개],\n  "event": ["...", "...", ... 8개],\n  "emojis": { "단어": "이모지", ... 24개 단어 모두 }\n}`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "story-dice:ai-question": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `이야기 주사위 놀이입니다.\n주사위로 나온 단어: 주인공=${c.protagonist}, 장소=${c.place}, 사건/물건=${c.event}\n술래가 만든 이야기: "${c.story}"\n지금까지의 질문·대답: ${c.history || "(없음)"}\n\n위 이야기와 흐름에 어울리는 새 질문 한 개를 만들어주세요. 너무 길지 않게 한 문장이면 좋아요.\n질문만 한 줄로 출력하세요.`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "story-dice:ai-answer": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `이야기 주사위 놀이입니다. 당신은 술래입니다.\n주사위 단어: 주인공=${c.protagonist}, 장소=${c.place}, 사건/물건=${c.event}\n이야기: "${c.story}"\n지금까지의 흐름: ${c.history || "(없음)"}\n학생의 질문: "${c.question}"\n\n이야기 흐름에 어울리고 자연스럽게 이야기를 확장하는 짧은 대답을 한 문장으로 해주세요.\n대답만 한 줄로 출력하세요.`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "game:best": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `초등·중학생이 질문놀이에서 만든 질문 목록입니다:\n${c.questions}\n\n이 중에서 가장 창의적이고 좋은 질문 1개를 골라주세요.\n반드시 아래 형식으로만 답하세요 (다른 말 없이):\n베스트: (질문을 그대로)\n학생: (그 질문을 만든 학생 이름)\n총평: (왜 좋은 질문인지 따뜻하게 한 문장)`,</span>
+&nbsp;
+<span class="fstat-no" title="function not covered" >  "kaba:check": (c</span>) =&gt;
+<span class="cstat-no" title="statement not covered" >    `초등학교 1~2학년 학생이 평서문을 질문으로 바꾸는 '까바놀이'를 하고 있어요.\n\n원래 평서문: "${c.original}"\n학생이 바꾼 질문: "${c.student}"\n\n다음 두 가지를 확인해 주세요:\n1. 평서문이 질문 형태(~나요? ~인가요? ~할까요? 등)로 바뀌었나요?\n2. 원래 문장의 의미가 잘 담겨 있나요?\n\n반드시 아래 형식으로만 답하세요 (다른 말 없이):\n판정: 잘했어요 또는 다시해봐요\n이유: (한 문장)\n격려: (따뜻한 한 문장)`,</span>
+};
+&nbsp;
+export async function <span class="fstat-no" title="function not covered" >POST(r</span>eq: NextRequest) {
+  const session = <span class="cstat-no" title="statement not covered" >await auth();</span>
+<span class="cstat-no" title="statement not covered" >  if (!session?.user) {</span>
+<span class="cstat-no" title="statement not covered" >    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });</span>
+  }
+&nbsp;
+  const <span class="cstat-no" title="statement not covered" >limited = checkRateLimit(`ai-play:${(session.user as { id: string }).id}`, 20);</span>
+<span class="cstat-no" title="statement not covered" >  if (limited) <span class="cstat-no" title="statement not covered" >return limited;</span></span>
+&nbsp;
+  const body = <span class="cstat-no" title="statement not covered" >await req.json() </span>as { action: string; context?: Record&lt;string, string&gt; };
+  const { action, context = <span class="branch-0 cbranch-no" title="branch not covered" >{} </span>} = <span class="cstat-no" title="statement not covered" >body;</span>
+&nbsp;
+  const promptFn = <span class="cstat-no" title="statement not covered" >PROMPTS[action];</span>
+<span class="cstat-no" title="statement not covered" >  if (!promptFn) {</span>
+<span class="cstat-no" title="statement not covered" >    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });</span>
+  }
+&nbsp;
+  const userPrompt = <span class="cstat-no" title="statement not covered" >promptFn(context);</span>
+&nbsp;
+  let text: string;
+<span class="cstat-no" title="statement not covered" >  try {</span>
+<span class="cstat-no" title="statement not covered" >    text = await generateText({</span>
+      userId: (session.user as { id: string }).id,
+      prompt: userPrompt,
+      req,
+      localize: true,
+      systemInstruction: SYSTEM_PROMPT,
+    });
+  } catch (err: unknown) {
+<span class="cstat-no" title="statement not covered" >    if (err instanceof AiKeyMissingError) {</span>
+<span class="cstat-no" title="statement not covered" >      return NextResponse.json(</span>
+        { error: "AI 모델이 설정되지 않았습니다. 선생님께 API 키 설정을 요청하세요." },
+        { status: 503 }
+      );
+    }
+    const msg = <span class="cstat-no" title="statement not covered" >err instanceof Error ? err.message : "AI 응답 오류";</span>
+<span class="cstat-no" title="statement not covered" >    return NextResponse.json({ error: msg }, { status: 500 });</span>
+  }
+&nbsp;
+  // JSON 응답 파싱이 필요한 액션들 — 실패 시 텍스트만 반환
+<span class="cstat-no" title="statement not covered" >  if (action === "mystery-box:setup" || action === "mystery-box:ai-turn" || action === "story-dice:words") {</span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+      const <span class="cstat-no" title="statement not covered" >parsed = extractJsonObject(text);</span>
+<span class="cstat-no" title="statement not covered" >      return NextResponse.json({ text, parsed });</span>
+    } catch {
+      // JSON 파싱 실패 시 텍스트만 반환
+    }
+  }
+&nbsp;
+<span class="cstat-no" title="statement not covered" >  return NextResponse.json({ text });</span>
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-07-07T14:22:02.083Z
+            </div>
+        <script src="../../../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../../../sorter.js"></script>
+        <script src="../../../../block-navigation.js"></script>
+    </body>
+</html>
+    

@@ -1,0 +1,316 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for lib/memory-game-data.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">lib</a> memory-game-data.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>0/25</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/11</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/6</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>0/19</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
+ * 질문-대답 짝 찾기 놀이 — 폴백 페어 풀과 도우미
+ * AI가 페어 생성에 실패할 때 사용.
+ */
+&nbsp;
+export interface QAPair {
+  id: string;
+  question: string;
+  answer: string;
+}
+&nbsp;
+export const MEMORY_FALLBACK_PAIRS: ReadonlyArray&lt;{ question: string; answer: string }&gt; = <span class="cstat-no" title="statement not covered" >[</span>
+  { question: "하늘은 왜 파랄까?", answer: "햇빛이 공기에 부딪혀 파란빛이 흩어지기 때문이에요." },
+  { question: "비는 어떻게 만들어질까?", answer: "수증기가 차가운 곳에서 모여 물방울이 되면 비가 돼요." },
+  { question: "왜 잠을 자야 할까?", answer: "몸과 뇌가 쉬면서 자라기 위해 필요해요." },
+  { question: "지구는 어떻게 돌까?", answer: "지구는 태양 주위를 1년에 한 바퀴 돌아요." },
+  { question: "씨앗은 어떻게 자랄까?", answer: "물·햇빛·흙 속 양분으로 천천히 자라나요." },
+  { question: "왜 무지개가 생길까?", answer: "햇빛이 빗방울에 닿아 일곱 빛깔로 나뉘기 때문이에요." },
+  { question: "달은 왜 모양이 변할까?", answer: "지구 주위를 돌면서 햇빛 받는 면이 달라지기 때문이에요." },
+  { question: "왜 바다는 짤까?", answer: "땅에 있던 소금이 강물을 따라 바다로 모였기 때문이에요." },
+  { question: "벌은 왜 꽃에 갈까?", answer: "꽃의 꿀을 모아 벌집에 저장해서 먹기 때문이에요." },
+  { question: "북극은 왜 그렇게 추울까?", answer: "햇빛이 비스듬히 들어와 적게 데워지기 때문이에요." },
+  { question: "왜 손을 자주 씻어야 할까?", answer: "보이지 않는 균을 닦아 병을 막기 위해서예요." },
+  { question: "별은 왜 깜빡거릴까?", answer: "별빛이 지구 공기를 통과하면서 흔들리기 때문이에요." },
+  { question: "공룡은 왜 사라졌을까?", answer: "큰 운석이 지구에 떨어져 환경이 크게 바뀌었기 때문이에요." },
+  { question: "왜 바람이 불까?", answer: "공기가 따뜻한 곳에서 차가운 곳으로 움직이기 때문이에요." },
+  { question: "고양이는 왜 그르렁거릴까?", answer: "기분이 좋거나 안정될 때 내는 소리예요." },
+  { question: "물은 왜 얼면 부피가 커질까?", answer: "물 분자가 얼면서 더 큰 모양으로 배열되기 때문이에요." },
+  { question: "왜 책을 읽으면 좋을까?", answer: "새로운 생각을 배우고 상상력을 키울 수 있어요." },
+  { question: "사람은 왜 음식이 필요할까?", answer: "음식에서 힘과 영양을 얻어 자라기 때문이에요." },
+  { question: "왜 신호등은 빨간색일까?", answer: "빨간색이 멀리서도 잘 보여서 '멈춰'라는 뜻을 알리기 좋아요." },
+  { question: "왜 친구가 필요할까?", answer: "함께 놀고 도와주며 마음을 나눌 수 있어요." },
+];
+&nbsp;
+/** 카드 수 → 쌍 수 */
+export const MEMORY_DIFFICULTY = <span class="cstat-no" title="statement not covered" >{</span>
+  easy:   { cards: 12, pairs: 6,  label: "쉬움" },
+  normal: { cards: 20, pairs: 10, label: "보통" },
+  hard:   { cards: 30, pairs: 15, label: "어려움" },
+} as const;
+&nbsp;
+export type MemoryDifficulty = keyof typeof MEMORY_DIFFICULTY;
+&nbsp;
+export function <span class="fstat-no" title="function not covered" >shuffle&lt;T&gt;(a</span>: T[]): T[] {
+  const c = <span class="cstat-no" title="statement not covered" >[...a];</span>
+<span class="cstat-no" title="statement not covered" >  for (let i = <span class="cstat-no" title="statement not covered" >c.length - 1; i</span> &gt; 0; i--) {</span>
+    const j = <span class="cstat-no" title="statement not covered" >Math.floor(Math.random() * (i + 1));</span>
+<span class="cstat-no" title="statement not covered" >    [c[i], c[j]] = [c[j], c[i]];</span>
+  }
+<span class="cstat-no" title="statement not covered" >  return c;</span>
+}
+&nbsp;
+export function <span class="fstat-no" title="function not covered" >pickFallbackPairs(n</span>: number): QAPair[] {
+  const shuffled = <span class="cstat-no" title="statement not covered" >shuffle([...MEMORY_FALLBACK_PAIRS]);</span>
+<span class="cstat-no" title="statement not covered" >  return shuffled.slice(0, n).<span class="fstat-no" title="function not covered" >map((p</span>, idx) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+    id: `p${idx}`, question: p.question, answer: p.answer,
+  }));
+}
+&nbsp;
+export function <span class="fstat-no" title="function not covered" >parseAIPairs(t</span>ext: string, expected: number): QAPair[] | null {
+<span class="cstat-no" title="statement not covered" >  try {</span>
+    const match = <span class="cstat-no" title="statement not covered" >text.match(/\[[\s\S]*\]/);</span>
+<span class="cstat-no" title="statement not covered" >    if (!match) <span class="cstat-no" title="statement not covered" >return null;</span></span>
+    const arr = <span class="cstat-no" title="statement not covered" >JSON.parse(match[0]);</span>
+<span class="cstat-no" title="statement not covered" >    if (!Array.isArray(arr)) <span class="cstat-no" title="statement not covered" >return null;</span></span>
+    const valid = <span class="cstat-no" title="statement not covered" >arr.<span class="fstat-no" title="function not covered" >filter((x</span>) =&gt;</span>
+<span class="cstat-no" title="statement not covered" >      x &amp;&amp; typeof x.question === "string" &amp;&amp; typeof x.answer === "string"</span>
+      &amp;&amp; x.question.length &gt; 0 &amp;&amp; x.answer.length &gt; 0
+    );
+<span class="cstat-no" title="statement not covered" >    if (valid.length &lt; expected) <span class="cstat-no" title="statement not covered" >return null;</span></span>
+<span class="cstat-no" title="statement not covered" >    return valid.slice(0, expected).<span class="fstat-no" title="function not covered" >map((p</span>, idx) =&gt; (<span class="cstat-no" title="statement not covered" >{</span></span>
+      id: `p${idx}`, question: p.question.trim(), answer: p.answer.trim(),
+    }));
+  } catch {
+<span class="cstat-no" title="statement not covered" >    return null;</span>
+  }
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-07-07T14:22:02.083Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    
