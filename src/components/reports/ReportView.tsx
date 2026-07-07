@@ -59,7 +59,7 @@ export interface ReportViewProps {
   perStudent?: PerStudentRow[];
   sessions?: SessionMeta[];
   analyzeSession?: (sessionId: string) => Promise<SessionAnalysisResult | null>;
-  /** 세션 AI 분석 결과를 컴포넌트 remount(탭/뷰 전환)에도 유지하기 위한 캐시 키(예: "class:5|1", "student:abc"). */
+  /** 세션 분석 결과를 컴포넌트 remount(탭/뷰 전환)에도 유지하기 위한 캐시 키(예: "class:5|1", "student:abc"). */
   analysisCacheKey?: string;
   /** 분석/재분석 버튼 노출 여부. false면 저장된 결과만 보여준다(학생 본인 뷰=읽기 전용). 기본 true. */
   canAnalyze?: boolean;
@@ -159,7 +159,7 @@ export function ReportView({
   } as const;
   const tooltipText = dark ? "#e5e7eb" : "#111827";
 
-  // ── 수업세션별 AI 분석 (기간 필터 + 전체 분석) ──
+  // ── 수업 세션별 분석 (기간 필터 + 전체 분석) ──
   const allSessions = useMemo(() => sessions ?? [], [sessions]);
   // period="ALL"이면 전체, 그 외엔 특정 주/월 키. 상단 토글(range)과 함께 상단에서 선택한다.
   const [period, setPeriod] = useState<string>("ALL");
@@ -593,7 +593,7 @@ export function ReportView({
         </ResponsiveContainer>
       </div>
 
-      {/* 수업세션별 AI 분석 (기간 필터 + 전체 분석) */}
+      {/* 수업 세션별 분석 (기간 필터 + 전체 분석) */}
       {allSessions.length > 0 && analyzeSession && (
         <div className="rounded-xl border bg-card p-4">
           <p className="mb-1 text-sm font-bold text-foreground">{t("aiSessionTitle")}</p>
@@ -650,7 +650,7 @@ export function ReportView({
             />
           )}
 
-          {/* 수업세션별 개별 분석 목록(선택한 주/월의 세션만 표시) */}
+          {/* 수업 세션별 개별 분석 목록(선택한 주/월의 세션만 표시) */}
           {filteredSessions.length === 0 ? (
             <EmptyState icon="🗓️" title={t("noSessionsInPeriod")} />
           ) : (
@@ -753,7 +753,7 @@ export function ReportView({
                         </div>
                       ) : r ? (
                         <div className="space-y-2">
-                          {/* 세션 집계 배지 — 질문조회 탭 AI 분석과 동일한 형식 */}
+                          {/* 세션 집계 배지 — 질문조회 탭 분석과 동일한 형식 */}
                           {typeof rv?.totalQuestions === "number" && (
                             <div className="flex flex-wrap gap-2 text-xs">
                               <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: rv.totalQuestions ?? 0 })}</span>

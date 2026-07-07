@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ReportView, type PerStudentRow, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 import { ReportPrintDoc, type PrintReportItem } from "@/components/reports/ReportPrintDoc";
@@ -149,17 +150,18 @@ export function TeacherReportsView() {
 
   // 인쇄(현재 페이지에서 print-root만 출력) — 새 탭 없이
   const [printItems, setPrintItems] = useState<PrintReportItem[]>([]);
-  const [printTick, setPrintTick] = useState(0);
   const [printBusy, setPrintBusy] = useState(false);
 
-  useEffect(() => {
-    if (printTick === 0 || printItems.length === 0) return;
-    document.body.classList.add("print-doc-mode");
-    const cleanup = () => document.body.classList.remove("print-doc-mode");
-    window.addEventListener("afterprint", cleanup, { once: true });
-    const id = setTimeout(() => window.print(), 150);
-    return () => { clearTimeout(id); window.removeEventListener("afterprint", cleanup); };
-  }, [printTick, printItems]);
+  const stripPrintMetadata = (items: PrintReportItem[]): PrintReportItem[] =>
+    items.map((item) => ({
+      ...item,
+      sessions: item.sessions.map((session) => ({
+        ...session,
+        analysis: session.analysis
+          ? { ...session.analysis, analysisModel: undefined }
+          : session.analysis,
+      })),
+    }));
 
   const toItem = (r: StudentReport): PrintReportItem => ({
     name: r.student.name, grade: r.student.grade, className: r.student.className,
@@ -170,8 +172,22 @@ export function TeacherReportsView() {
   });
   const doPrint = (items: PrintReportItem[]) => {
     if (items.length === 0) return;
-    setPrintItems(items);
-    setPrintTick((n) => n + 1);
+    flushSync(() => setPrintItems(stripPrintMetadata(items)));
+    document.body.classList.add("print-doc-mode");
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      document.body.classList.remove("print-doc-mode");
+      window.removeEventListener("afterprint", cleanup);
+      window.removeEventListener("focus", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup, { once: true });
+    window.addEventListener("focus", cleanup, { once: true });
+    window.setTimeout(() => {
+      if (document.hasFocus()) cleanup();
+    }, 1000);
+    window.print();
   };
   // 포인트·순위: class-ranks(반 전원 포인트+우리반/교내/전체 석차) + class-leaderboard(교내·전체 반 순위)
   interface RankRow { id: string; totalPoints: number; classRank: number; schoolRank: number; allRank: number }

@@ -310,7 +310,7 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
               </>
             )}
 
-            {/* 세션별 AI 분석 — 피드백 박스 */}
+            {/* 세션별 분석 — 피드백 박스 */}
             <div className="rdoc-section-label">{t("docSessions")}</div>
             {analyzed.length === 0 ? (
               <p className="rdoc-empty">{t("docNoAnalysis")}</p>
