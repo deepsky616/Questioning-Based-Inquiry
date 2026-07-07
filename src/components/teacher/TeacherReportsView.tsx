@@ -155,7 +155,7 @@ export function TeacherReportsView() {
   const stripPrintMetadata = (items: PrintReportItem[]): PrintReportItem[] =>
     items.map((item) => ({
       ...item,
-      sessions: item.sessions.map((session) => ({
+      sessions: (item.sessions ?? []).map((session) => ({
         ...session,
         analysis: session.analysis
           ? { ...session.analysis, analysisModel: undefined }
@@ -172,8 +172,6 @@ export function TeacherReportsView() {
   });
   const doPrint = (items: PrintReportItem[]) => {
     if (items.length === 0) return;
-    flushSync(() => setPrintItems(stripPrintMetadata(items)));
-    document.body.classList.add("print-doc-mode");
     let cleaned = false;
     const cleanup = () => {
       if (cleaned) return;
@@ -182,12 +180,19 @@ export function TeacherReportsView() {
       window.removeEventListener("afterprint", cleanup);
       window.removeEventListener("focus", cleanup);
     };
-    window.addEventListener("afterprint", cleanup, { once: true });
-    window.addEventListener("focus", cleanup, { once: true });
-    window.setTimeout(() => {
-      if (document.hasFocus()) cleanup();
-    }, 1000);
-    window.print();
+    try {
+      flushSync(() => setPrintItems(stripPrintMetadata(items)));
+      document.body.classList.add("print-doc-mode");
+      window.addEventListener("afterprint", cleanup, { once: true });
+      window.addEventListener("focus", cleanup, { once: true });
+      window.setTimeout(() => {
+        if (document.hasFocus()) cleanup();
+      }, 1000);
+      window.print();
+    } catch (printError) {
+      cleanup();
+      console.error("report print failed", printError);
+    }
   };
 
   // 포인트·순위: class-ranks(반 전원 포인트+우리반/교내/전체 석차) + class-leaderboard(교내·전체 반 순위)

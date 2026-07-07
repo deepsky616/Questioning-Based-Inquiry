@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } fro
 import type { ReportTotals, SeriesPoint } from "@/lib/report-stats";
 import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import type { SessionAnalysisResult } from "@/components/reports/ReportView";
+import { printTextOf } from "@/lib/report-print-safe";
 
 // 인쇄 추세 꺾은선 시리즈(화면 리포트와 동일 색)
 const TREND_SERIES: { key: keyof SeriesPoint; color: string }[] = [
@@ -65,18 +66,21 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     { label: t("metric_commentsReceived"), v: totals.commentsReceived, color: "#8b5cf6" },
   ];
 
-  const blocksOf = (a: SessionAnalysisResult): [string, string | undefined][] => [
-    [t("secSummary"), a.summary],
-    [t("secBalance"), a.balanceInsights],
-    [t("secBest"), a.bestQuestion],
-    [t("secGrowth"), a.growthInsights],
-    [t("secRewrite"), a.rewriteExample],
-    [t("secEngagement"), a.engagementInsights],
-    [t("secComment"), a.commentInsights],
-    [t("secRelevance"), a.relevanceInsights],
-    [t("secNext"), a.nextQuestions],
-    [t("secSuggest"), a.insights],
-  ];
+  const blocksOf = (a: SessionAnalysisResult): [string, string | undefined][] => {
+    const source = a as Record<string, unknown>;
+    return [
+      [t("secSummary"), printTextOf(source.summary)],
+      [t("secBalance"), printTextOf(source.balanceInsights)],
+      [t("secBest"), printTextOf(source.bestQuestion)],
+      [t("secGrowth"), printTextOf(source.growthInsights)],
+      [t("secRewrite"), printTextOf(source.rewriteExample)],
+      [t("secEngagement"), printTextOf(source.engagementInsights)],
+      [t("secComment"), printTextOf(source.commentInsights)],
+      [t("secRelevance"), printTextOf(source.relevanceInsights)],
+      [t("secNext"), printTextOf(source.nextQuestions)],
+      [t("secSuggest"), printTextOf(source.insights)],
+    ];
+  };
 
   const analyzedSessions = (it: PrintReportItem) =>
     it.sessions.filter((s) => s.analysis && blocksOf(s.analysis).some(([, v]) => v && v.trim()));
