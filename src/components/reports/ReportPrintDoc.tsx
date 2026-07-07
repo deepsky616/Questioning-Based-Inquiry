@@ -86,6 +86,12 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
     it.sessions.filter((s) => s.analysis && blocksOf(s.analysis).some(([, v]) => v && v.trim()));
   const trendOf = (it: PrintReportItem): SeriesPoint[] => (it.monthly && it.monthly.length ? it.monthly : it.weekly ?? []);
   const pct = (v: number, total: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
+  const sectionTitle = (n: number, label: string) => (
+    <div className="rdoc-section-title">
+      <span>{n}</span>
+      <b>{label}</b>
+    </div>
+  );
   // 순위 KPI 셀: 값은 '3위'처럼 크게, 전체 수는 라벨에 단위와 함께('우리반 석차 · 4명')
   const rankCell = (rank: number | undefined, total: number | undefined, label: string, unit: "students" | "classes") => {
     if (rank == null) return null;
@@ -204,6 +210,15 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
         const cogTotal = cl.cognitive.factual + cl.cognitive.conceptual + cl.cognitive.controversial;
         const trend = trendOf(it);
         const analyzed = analyzedSessions(it);
+        const isClassReport = it.kind === "class";
+        const hasRanking = Boolean(it.ranking);
+        const hasRoster = isClassReport && Boolean(it.roster?.length);
+        let nextSectionNo = 2;
+        const rankingSectionNo = hasRanking ? nextSectionNo++ : null;
+        const rosterSectionNo = hasRoster ? nextSectionNo++ : null;
+        const classificationSectionNo = nextSectionNo++;
+        const trendSectionNo = nextSectionNo++;
+        const sessionSectionNo = nextSectionNo;
         return (
           <section key={idx} className="rdoc-page">
             <div className="rdoc-bar" />
@@ -213,8 +228,20 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
               <div className="rdoc-gen">{t("docGenerated", { date: today })}</div>
             </div>
 
+            <div className="rdoc-summary-callout">
+              <div className="rdoc-summary-h">{t("docOverviewTitle")}</div>
+              <div className="rdoc-summary-b">
+                {t("docOverviewBody", {
+                  questions: it.totals.questions,
+                  comments: it.totals.comments,
+                  responses: it.totals.likesReceived + it.totals.commentsReceived,
+                  analyzed: analyzed.length,
+                })}
+              </div>
+            </div>
+
             {/* 활동 요약 KPI */}
-            <div className="rdoc-section-label">{t("docSummary")}</div>
+            {sectionTitle(1, t("docSummary"))}
             <div className="rdoc-kpis">
               {kpis(it.totals).map((k) => (
                 <div className="rdoc-kpi" key={k.label}>
@@ -225,9 +252,9 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
             </div>
 
             {/* 포인트 · 순위 */}
-            {it.ranking && (
+            {it.ranking && rankingSectionNo && (
               <>
-                <div className="rdoc-section-label">{t("docRanking")}</div>
+                {sectionTitle(rankingSectionNo, t("docRanking"))}
                 <div className="rdoc-kpis">
                   {it.ranking.points != null && (
                     <div className="rdoc-kpi"><div className="rdoc-kpi-v" style={{ color: "#d97706" }}>{it.ranking.points}</div><div className="rdoc-kpi-l">{t("docPoints")}</div></div>
@@ -247,9 +274,9 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
               </>
             )}
 
-            {it.kind === "class" && it.roster && it.roster.length > 0 && (
+            {it.kind === "class" && it.roster && it.roster.length > 0 && rosterSectionNo && (
               <>
-                <div className="rdoc-section-label">{t("docClassRoster")}</div>
+                {sectionTitle(rosterSectionNo, t("docClassRoster"))}
                 <table className="rdoc-table">
                   <thead>
                     <tr>
@@ -272,7 +299,8 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
             )}
 
             {/* 질문 분류(영역·유형·개수·비율) */}
-            <div className="rdoc-section-label">{t("docClassification")}</div>
+            {sectionTitle(classificationSectionNo, t("docClassification"))}
+            <div className="rdoc-section-note">{t("docClassificationGuide")}</div>
             <div className="rdoc-charts-row">
               {renderDonut(t("docDomainClosure"), [
                 { name: tCls("closed.label"), value: cl.closure.closed, fill: "#3b82f6" },
@@ -309,7 +337,7 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
             {/* 추세 표 */}
             {trend.length > 0 && (
               <>
-                <div className="rdoc-section-label">{t("docTrendTitle")}</div>
+                {sectionTitle(trendSectionNo, t("docTrendTitle"))}
                 {renderTrendChart(trend)}
                 <table className="rdoc-table">
                   <thead>
@@ -353,9 +381,9 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
             )}
 
             {/* 세션별 분석 — 피드백 박스 */}
-            <div className="rdoc-section-label">{t("docSessions")}</div>
+            {sectionTitle(sessionSectionNo, t("docSessions"))}
             {analyzed.length === 0 ? (
-              <p className="rdoc-empty">{t("docNoAnalysis")}</p>
+              <p className="rdoc-empty">{t("docNoAnalysisHelp")}</p>
             ) : (
               analyzed.map((s) => (
                 <div key={s.id} className="rdoc-feedback">

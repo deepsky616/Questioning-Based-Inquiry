@@ -369,7 +369,14 @@
 .rdoc-title { font-size: 22px; font-weight: 800; color: #1f2937; margin-top: 2px; }
 .rdoc-accent { color: #6c5ce7; }
 .rdoc-gen { font-size: 10.5px; color: #9ca3af; margin-top: 4px; }
+.rdoc-summary-callout { border: 1px solid #d8d5f2; background: #fbfbfe; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
+.rdoc-summary-h { font-size: 13px; font-weight: 800; color: #4c3fd6; margin-bottom: 4px; }
+.rdoc-summary-b { font-size: 12px; line-height: 1.55; color: #374151; }
 .rdoc-section-label { font-size: 12px; color: #6b7280; font-weight: 600; margin: 14px 0 6px; }
+.rdoc-section-title { display: flex; align-items: center; gap: 7px; margin: 15px 0 7px; color: #1f2937; break-after: avoid; page-break-after: avoid; }
+.rdoc-section-title span { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 999px; background: #6c5ce7; color: #ffffff; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.rdoc-section-title b { font-size: 13px; font-weight: 800; }
+.rdoc-section-note { font-size: 11px; line-height: 1.45; color: #6b7280; margin: -2px 0 8px; }
 .rdoc-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
 .rdoc-kpi { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 4px; text-align: center; background: #fbfbfe; }
 .rdoc-kpi-v { font-size: 23px; font-weight: 800; line-height: 1.1; }
