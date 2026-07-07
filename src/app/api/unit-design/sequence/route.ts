@@ -12,8 +12,8 @@ import {
   buildSequencePrompt,
   fallbackSequenceQuestions,
   getUnitFlow,
+  normalizeSequencedQuestions,
   type SequenceInputQuestion,
-  type SequencedQuestion,
 } from "@/lib/unit-sequence";
 
 const sequenceSchema = z.object({
@@ -28,54 +28,6 @@ const sequenceSchema = z.object({
     .optional(),
 });
 
-export function normalizeSequencedQuestions(
-  value: unknown,
-  sourceQuestions: SequenceInputQuestion[],
-  mode: "merge" | "sort" = "sort",
-): SequencedQuestion[] {
-  if (!Array.isArray(value)) return [];
-  const sourceById = new Map(sourceQuestions.map((question) => [question.id, question]));
-
-  return value
-    .map((item, index) => {
-      if (!item || typeof item !== "object") return null;
-      const raw = item as Record<string, unknown>;
-      // 통합(merge) 모드에서는 새 통합 질문이므로 원본 id가 없으면 새 id를 부여한다
-      const id = typeof raw.id === "string" ? raw.id : (mode === "merge" ? `merged-${index + 1}` : sourceQuestions[index]?.id);
-      const source = id ? sourceById.get(id) : undefined;
-      const content = typeof raw.content === "string" ? raw.content : source?.content;
-      if (!id || !content) return null;
-
-      // 묶기 추적: AI가 돌려준 원본 질문 id들을 검증해 원본 내용으로 되매핑(검토 표시용)
-      const mergedFrom =
-        mode === "merge" && Array.isArray(raw.mergedFrom)
-          ? raw.mergedFrom
-              .map((mid) => (typeof mid === "string" ? sourceById.get(mid)?.content : undefined))
-              .filter((c): c is string => Boolean(c))
-          : undefined;
-
-      return {
-        id,
-        ...(mergedFrom && mergedFrom.length > 0 ? { mergedFrom } : {}),
-        type: typeof raw.type === "string" ? raw.type : source?.cognitive ?? "student",
-        content,
-        source: raw.source === "teacher" ? "teacher" : source?.source ?? "student",
-        contentGroup: typeof raw.contentGroup === "string" && raw.contentGroup.trim()
-          ? raw.contentGroup.trim()
-          : "공통 탐구 질문",
-        priority: Number.isFinite(Number(raw.priority)) ? Number(raw.priority) : index + 1,
-        lessonPhase: typeof raw.lessonPhase === "string" && raw.lessonPhase.trim()
-          ? raw.lessonPhase.trim()
-          : "탐구",
-        rationale: typeof raw.rationale === "string" && raw.rationale.trim()
-          ? raw.rationale.trim()
-          : "단원 설계 흐름에 맞춰 배치했습니다.",
-      } satisfies SequencedQuestion;
-    })
-    .filter((item): item is SequencedQuestion => item !== null)
-    .sort((a, b) => a.priority - b.priority)
-    .map((item, index) => ({ ...item, priority: index + 1 }));
-}
 
 export async function POST(req: Request) {
   const session = await auth();

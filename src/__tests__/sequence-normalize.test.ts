@@ -1,13 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
-// 라우트 모듈이 당기는 무거운 의존성 차단(순수 함수만 테스트)
-vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/db", () => ({ prisma: {} }));
-vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: vi.fn(() => null) }));
-vi.mock("@/lib/resolve-ai-config", () => ({ resolveUserAiConfig: vi.fn() }));
-vi.mock("@google/generative-ai", () => ({ GoogleGenerativeAI: class {} }));
-
-import { normalizeSequencedQuestions } from "@/app/api/unit-design/sequence/route";
+import { normalizeSequencedQuestions } from "@/lib/unit-sequence";
 import type { SequenceInputQuestion } from "@/lib/unit-sequence";
 
 const SOURCE: SequenceInputQuestion[] = [
