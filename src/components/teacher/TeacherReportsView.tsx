@@ -509,7 +509,7 @@ export function TeacherReportsView() {
               </div>
             </div>
             <div className="overflow-auto bg-muted/40 p-3 sm:p-5">
-              <div className="mx-auto w-fit min-w-[760px] bg-white p-6 shadow-sm">
+              <div className="report-preview-paper mx-auto w-fit min-w-[760px] p-6 shadow-sm">
                 <ReportPrintDoc items={previewItems} />
               </div>
             </div>

@@ -361,6 +361,8 @@
 /* ── 인쇄 전용 리포트 문서('채점 결과 리포트' 양식: 보라 타이틀 밴드 + 라벤더 표 + 피드백 박스) ── */
 /* 화면에선 숨기고, 'print-doc-mode'로 인쇄할 때만 이 문서만 보이게 한다(새 탭 없이 현재 페이지에서 인쇄). */
 .print-root { display: none; }
+.report-preview-paper { background: #ffffff !important; color: #1f2937 !important; color-scheme: light; border: 1px solid #e5e7eb; }
+.report-preview-paper .rdoc { background: #ffffff !important; color: #1f2937 !important; }
 .rdoc { color: #1f2937; font-size: 12px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .rdoc-corner { text-align: right; font-size: 10px; color: #9ca3af; margin-bottom: 4px; }
 .rdoc-bar { height: 6px; background: #6c5ce7; border-radius: 3px; }
