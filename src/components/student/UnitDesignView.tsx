@@ -165,6 +165,22 @@ export function UnitDesignView() {
   const activeSessions = sortedSessions.filter((s) => isSessionAvailable(s.date));
   const pastSessions = sortedSessions.filter((s) => !isSessionAvailable(s.date));
   const hasFilter = Boolean(filterDate || filterSubject || filterTopic || search.trim());
+  const selectedSessionIndex = sortedSessions.findIndex((session) => session.id === selectedSession?.id);
+  const fallbackSessionIndex = sessions.findIndex((session) => session.id === selectedSession?.id);
+  const selectedSessionPosition = selectedSessionIndex >= 0 ? selectedSessionIndex + 1 : Math.max(fallbackSessionIndex + 1, 1);
+  const selectedSessionTotal = sortedSessions.length > 0 ? sortedSessions.length : sessions.length;
+  const selectSession = (id: string, scrollToDetail = false) => {
+    setSelectedId(id);
+    if (!scrollToDetail || typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 1023px)").matches) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById("unit-design-detail-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+  const selectSessionByOffset = (offset: -1 | 1) => {
+    const next = sortedSessions[selectedSessionIndex + offset];
+    if (next) selectSession(next.id);
+  };
   const grouped = useMemo(
     () => groupSharedQuestions(selectedSession?.sharedQuestions ?? []).map(
       (g) => [g.group, g.questions] as [string, typeof g.questions],
@@ -200,7 +216,7 @@ export function UnitDesignView() {
         </Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-          <Card>
+          <Card id="unit-design-session-list" className="scroll-mt-20">
             <CardHeader className="pb-3 space-y-3">
               <div>
                 <CardTitle className="text-base">{t("listTitle")}</CardTitle>
@@ -268,7 +284,7 @@ export function UnitDesignView() {
                       <button
                         key={session.id}
                         type="button"
-                        onClick={() => setSelectedId(session.id)}
+                        onClick={() => selectSession(session.id, true)}
                         className={`w-full rounded-md border p-3 text-left transition-colors ${
                           selectedSession?.id === session.id ? "border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40" : "bg-card hover:bg-muted/40"
                         }`}
@@ -293,7 +309,51 @@ export function UnitDesignView() {
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
+          <div id="unit-design-detail-panel" className="space-y-6 scroll-mt-20">
+            {selectedSession && (
+              <div className="tablet-session-toolbar sticky top-3 z-10 rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur lg:static lg:shadow-none">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {buildSessionLabel(selectedSession.date, selectedSession.subject, selectedSession.topic)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {t("sessionPosition", {
+                        current: selectedSessionPosition,
+                        total: selectedSessionTotal,
+                      })}
+                      {" · "}
+                      {t("questionCount", { count: selectedSession.sharedQuestions?.length ?? 0 })}
+                      {selectedSession.teacher?.name ? t("teacherByline", { name: selectedSession.teacher.name }) : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href="#unit-design-session-list"
+                      className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                    >
+                      {t("backToList")}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => selectSessionByOffset(-1)}
+                      disabled={selectedSessionIndex <= 0}
+                      className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {t("prevSession")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => selectSessionByOffset(1)}
+                      disabled={selectedSessionIndex < 0 || selectedSessionIndex >= sortedSessions.length - 1}
+                      className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {t("nextSession")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* 참고자료(접기, 기본 닫힘) */}
             {selectedId && <SessionReferencePanel sessionId={selectedId} />}
             <Card>

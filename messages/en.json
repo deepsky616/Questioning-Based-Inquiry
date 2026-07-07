@@ -341,7 +341,11 @@
     "searchPlaceholder": "Search unit/topic",
     "listNoMatch": "No classes match the filters.",
     "sectionActive": "Ongoing",
-    "sectionPast": "Past"
+    "sectionPast": "Past",
+    "backToList": "Class list",
+    "prevSession": "Previous class",
+    "nextSession": "Next class",
+    "sessionPosition": "Class {current} of {total}"
   },
   "teacherQ": {
     "deleteDeployConfirm": "Delete the shared inquiry design for this session? Students' likes and comments will also be deleted.",
