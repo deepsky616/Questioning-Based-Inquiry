@@ -12,6 +12,7 @@ import { ACTIVITY_BONUS_TYPES } from "@/lib/activity-bonus-policy";
 import { buildSessionLabel } from "@/lib/sessions";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
+import { useTeacherSessions } from "@/lib/app-queries";
 
 interface SessionItem { id: string; date: string; subject: string; topic: string }
 interface PendingLog {
@@ -58,7 +59,7 @@ export function PointReviewView() {
   const t = useTranslations("pointReview");
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const { data: sessions = [] } = useTeacherSessions<SessionItem>();
   const [selectedSessionId, setSelectedSessionId] = useState<string>("all");
   const [pending, setPending] = useState<PendingLog[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -67,12 +68,6 @@ export function PointReviewView() {
   const [message, setMessage] = useState<string | null>(null);
   const [overrideEdit, setOverrideEdit] = useState<Record<string, number>>({});
   const focusStudentId = searchParams.get("studentId");
-
-  const loadSessions = useCallback(() => {
-    fetch("/api/sessions").then((r) => r.json()).then((d) => {
-      setSessions(Array.isArray(d) ? d : (d.sessions ?? []));
-    }).catch(() => {});
-  }, []);
 
   const loadPending = useCallback(() => {
     const url = selectedSessionId === "all"
@@ -84,7 +79,6 @@ export function PointReviewView() {
     }).catch(() => {});
   }, [selectedSessionId]);
 
-  useEffect(() => { loadSessions(); }, [loadSessions]);
   useEffect(() => { loadPending(); }, [loadPending]);
   useEffect(() => { setSelected(new Set()); }, [focusStudentId]);
 

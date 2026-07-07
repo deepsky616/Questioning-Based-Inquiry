@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
@@ -17,6 +17,7 @@ import {
 import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { getSessionUser } from "@/lib/auth-helpers";
+import { useStudentSessions } from "@/lib/app-queries";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
@@ -263,7 +264,10 @@ export function ExploreQuestionsView() {
   const t = useTranslations("explore");
   const ct = useContentTranslation();
   const queryClient = useQueryClient();
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const { data: session } = useSession();
+  const user = getSessionUser(session);
+  const { data: rawSessions = [] } = useStudentSessions<QuestionSession>({ userId: user.id });
+  const sessions = useMemo(() => sortSessionsDesc(rawSessions), [rawSessions]);
   const [selectedSessionId, setSelectedSessionId] = useState("all");
   const [search, setSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
@@ -292,13 +296,6 @@ export function ExploreQuestionsView() {
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
   });
-
-  useEffect(() => {
-    fetch("/api/sessions")
-      .then((r) => r.json())
-      .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
-      .catch(() => {});
-  }, []);
 
   const handleLikeChange = (questionId: string, newCount: number, myLike: boolean) => {
     // 좋아요는 즉시 캐시에 반영(다음 폴링에서 서버 값으로 확정)

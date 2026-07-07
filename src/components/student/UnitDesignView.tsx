@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { useSession } from "next-auth/react";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
@@ -14,6 +15,8 @@ import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel
 import { groupSharedQuestions } from "@/lib/shared-questions";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { getSessionUser } from "@/lib/auth-helpers";
+import { useStudentSessions } from "@/lib/app-queries";
 
 interface SharedQuestion {
   type: string;
@@ -90,6 +93,8 @@ export function UnitDesignView() {
   const tc = useTranslations("common");
   const tSess = useTranslations("sessions");
   const ct = useContentTranslation();
+  const { data: authSession } = useSession();
+  const user = getSessionUser(authSession);
   const TYPE_KEY: Record<string, string> = {
     factual: "typeFactual",
     conceptual: "typeConceptual",
@@ -107,20 +112,11 @@ export function UnitDesignView() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"desc" | "asc">("desc");
 
-  // 배포된 탐구 세션 목록은 react-query로 주기 폴링(12초)+포커스 재조회.
-  const { data: sessions = [], isLoading } = useQuery<QuestionSession[]>({
-    queryKey: ["unit-design-sessions"],
-    queryFn: async () => {
-      const r = await fetch("/api/sessions");
-      if (!r.ok) throw new Error("failed to load sessions");
-      const data = await r.json();
-      return sortSessionsAsc(Array.isArray(data) ? data : []).filter(
-        (session) => (session.sharedQuestions?.length ?? 0) > 0,
-      );
-    },
-    refetchInterval: 12000,
-    refetchOnWindowFocus: true,
-  });
+  const { data: rawSessions = [], isLoading } = useStudentSessions<QuestionSession>({ userId: user.id });
+  const sessions = useMemo(
+    () => sortSessionsAsc(rawSessions).filter((session) => (session.sharedQuestions?.length ?? 0) > 0),
+    [rawSessions],
+  );
 
   // 첫 세션 자동 선택
   useEffect(() => {

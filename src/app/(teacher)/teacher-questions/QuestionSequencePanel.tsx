@@ -13,6 +13,7 @@ import {
   type SessionTargetClass,
   type SessionTargetStudent,
 } from "@/lib/session-targeting";
+import { useTeacherStudents } from "@/lib/app-queries";
 import { formatDateTime } from "@/lib/datetime";
 import type { SequencedQuestion } from "@/lib/unit-sequence";
 
@@ -46,26 +47,21 @@ export function QuestionSequencePanel({
   });
 
   // 배포 대상 선택(수업세션 페이지와 동일 UI) — 기본값은 항상 전체 학생 모두 선택
-  const [students, setStudents] = useState<SessionTargetStudent[]>([]);
-  const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
+  const { data: targetData } = useTeacherStudents<SessionTargetStudent, SessionTargetClass>();
+  const students = useMemo(() => targetData?.students ?? [], [targetData]);
+  const teacherClasses = useMemo(() => targetData?.teacherClasses ?? [], [targetData]);
   const [targetClassValue, setTargetClassValue] = useState("all");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [targetDefaulted, setTargetDefaulted] = useState(false);
 
   useEffect(() => {
-    fetch("/api/teacher/students")
-      .then((r) => r.json())
-      .then((d) => {
-        const list: SessionTargetStudent[] = d.students ?? [];
-        const classes: SessionTargetClass[] = d.teacherClasses ?? [];
-        setStudents(list);
-        setTeacherClasses(classes);
-        // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
-        const defaults = defaultTargetSelection(list, classes);
-        setTargetClassValue(defaults.targetClassValue);
-        setSelectedStudentIds(defaults.selectedStudentIds);
-      })
-      .catch(() => {});
-  }, []);
+    if (targetDefaulted || !targetData) return;
+    // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
+    const defaults = defaultTargetSelection(targetData.students, targetData.teacherClasses);
+    setTargetClassValue(defaults.targetClassValue);
+    setSelectedStudentIds(defaults.selectedStudentIds);
+    setTargetDefaulted(true);
+  }, [targetData, targetDefaulted]);
 
   const targetClasses = useMemo(() => {
     if (teacherClasses.length > 0) return teacherClasses;

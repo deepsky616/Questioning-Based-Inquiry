@@ -20,6 +20,7 @@ import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
+import { useStudentSessions } from "@/lib/app-queries";
 import {
   CLOSURE_LABEL,
   CLOSURE_STYLE,
@@ -79,7 +80,8 @@ export function MyQuestionsView() {
   const [sortField, setSortField] = useState<SortField>("like");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [search, setSearch] = useState("");
-  const [sessions, setSessions] = useState<QuestionSession[]>([]);
+  const { data: rawSessions = [] } = useStudentSessions<QuestionSession>({ userId: user.id });
+  const sessions = useMemo(() => sortSessionsDesc(rawSessions), [rawSessions]);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
   // 내 질문 수정(반응이 달리기 전까지만) — 저장 시 자동 재분류
@@ -181,14 +183,6 @@ export function MyQuestionsView() {
     refetchInterval: 12000,
     refetchOnWindowFocus: true,
   });
-
-  useEffect(() => {
-    if (!user.id) return;
-    fetch("/api/sessions")
-      .then((r) => r.json())
-      .then((data: QuestionSession[]) => setSessions(sortSessionsDesc(data)))
-      .catch(() => {});
-  }, [user.id]);
 
   const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);

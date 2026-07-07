@@ -40,6 +40,7 @@ import {
   selectAllIndices,
   toggleSelectedIndex,
 } from "@/lib/inquiry-design-selection";
+import { useTeacherStudents } from "@/lib/app-queries";
 import { SavedDesignsTab } from "./SavedDesignsTab";
 import { todayStr, type InquiryQuestion, type SavedInquiryDesign } from "./types";
 
@@ -162,10 +163,12 @@ export default function CurriculumPage() {
   const [isRecommending, setIsRecommending] = useState(false);
   const [recommendMessage, setRecommendMessage] = useState("");
   // 마지막 단계에서 바로 세션을 만들기 위한 대상 선택 데이터(수업세션 페이지와 동일 UI)
-  const [students, setStudents] = useState<SessionTargetStudent[]>([]);
-  const [teacherClasses, setTeacherClasses] = useState<SessionTargetClass[]>([]);
+  const { data: targetData } = useTeacherStudents<SessionTargetStudent, SessionTargetClass>();
+  const students = useMemo(() => targetData?.students ?? [], [targetData]);
+  const teacherClasses = useMemo(() => targetData?.teacherClasses ?? [], [targetData]);
   const [targetClassValue, setTargetClassValue] = useState("all");
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [targetDefaulted, setTargetDefaulted] = useState(false);
 
   // 내용요소 선택 (새 기능: 핵심아이디어·지식이해·과정기능·가치태도 체크박스)
   const [selectedCoreIdeaLines, setSelectedCoreIdeaLines] = useState<string[]>([]);
@@ -213,22 +216,14 @@ export default function CurriculumPage() {
     [queryClient],
   );
 
-  // 대상 선택용 학생/학급 로드(마지막 단계 세션 만들기)
   useEffect(() => {
-    fetch("/api/teacher/students")
-      .then((r) => r.json())
-      .then((d) => {
-        const list = d.students ?? [];
-        const classes = d.teacherClasses ?? [];
-        setStudents(list);
-        setTeacherClasses(classes);
-        // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
-        const defaults = defaultTargetSelection(list, classes);
-        setTargetClassValue(defaults.targetClassValue);
-        setSelectedStudentIds(defaults.selectedStudentIds);
-      })
-      .catch(() => {});
-  }, []);
+    if (targetDefaulted || !targetData) return;
+    // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
+    const defaults = defaultTargetSelection(targetData.students, targetData.teacherClasses);
+    setTargetClassValue(defaults.targetClassValue);
+    setSelectedStudentIds(defaults.selectedStudentIds);
+    setTargetDefaulted(true);
+  }, [targetData, targetDefaulted]);
 
   const targetClasses = useMemo(() => {
     if (teacherClasses.length > 0) return teacherClasses;

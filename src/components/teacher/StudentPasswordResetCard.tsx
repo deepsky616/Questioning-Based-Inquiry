@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useTeacherStudents } from "@/lib/app-queries";
 
 interface StudentRow {
   id: string;
@@ -20,19 +21,13 @@ interface StudentRow {
 
 export function StudentPasswordResetCard({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useTranslations("account");
-  const [students, setStudents] = useState<StudentRow[]>([]);
+  const { data } = useTeacherStudents<StudentRow, { grade: string; className: string }>();
+  const students = useMemo(() => data?.students ?? [], [data]);
   const [classKey, setClassKey] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [newPassword, setNewPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  useEffect(() => {
-    fetch("/api/teacher/students")
-      .then((r) => r.json())
-      .then((d) => setStudents(Array.isArray(d.students) ? d.students : []))
-      .catch(() => {});
-  }, []);
 
   // 학급 옵션(학생 데이터에서 추출, 학년·반 순)
   const classOptions = useMemo(() => {

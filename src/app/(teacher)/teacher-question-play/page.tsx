@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import {
   Dialog,
@@ -20,6 +20,7 @@ import {
   AnyGame,
   GameVisibility,
 } from "@/lib/question-games-data";
+import { useTeacherStudents } from "@/lib/app-queries";
 
 type VisType = "all" | "classes" | "students" | "hidden";
 
@@ -53,8 +54,9 @@ export default function TeacherQuestionPlayPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState("all");
 
-  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
+  const { data: targetData } = useTeacherStudents<Student, TeacherClass>();
+  const teacherClasses = useMemo(() => targetData?.teacherClasses ?? [], [targetData]);
+  const students = useMemo(() => targetData?.students ?? [], [targetData]);
 
   // 참여 통계
   const [statsByGame, setStatsByGame] = useState<Record<string, GameStat>>({});
@@ -69,14 +71,11 @@ export default function TeacherQuestionPlayPage() {
     setIsLoading(true);
     Promise.all([
       fetch("/api/teacher/question-games").then((r) => r.json()),
-      fetch("/api/teacher/students").then((r) => r.json()),
       fetch("/api/teacher/question-games/stats").then((r) => r.json()),
     ])
-      .then(([gamesData, studentsData, statsData]) => {
+      .then(([gamesData, statsData]) => {
         setGames(gamesData.games ?? []);
         setVisibilityMap(gamesData.visibilityMap ?? {});
-        setTeacherClasses(studentsData.teacherClasses ?? []);
-        setStudents(studentsData.students ?? []);
         setStatsByGame(statsData.byGame ?? {});
       })
       .catch(() => {})
