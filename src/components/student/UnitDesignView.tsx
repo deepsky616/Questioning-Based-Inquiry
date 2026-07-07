@@ -395,10 +395,10 @@ export function UnitDesignView() {
                     type="button"
                     onClick={() => setGroupPanelOpen((open) => !open)}
                     aria-expanded={groupPanelOpen}
-                    className="flex items-center gap-1.5 text-left text-base font-semibold text-foreground hover:text-primary"
+                    className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-base font-semibold text-foreground transition-colors hover:bg-muted/50 hover:text-primary"
                   >
-                    <CollapseChevron open={groupPanelOpen} />
                     <span>{t("groupTitle")}</span>
+                    <CollapseChevron open={groupPanelOpen} className="shrink-0" />
                   </button>
                   <CardDescription>{t("groupDesc")}</CardDescription>
                 </CardHeader>

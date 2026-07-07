@@ -10,6 +10,7 @@ describe("내용별 묶음 접기 토글", () => {
     expect(teacherSource).toContain("toggleGroup");
     expect(teacherSource).toContain("aria-expanded={openGroups.has(s.id)}");
     expect(teacherSource).toContain("<CollapseChevron open={openGroups.has(s.id)}");
+    expect(teacherSource).toContain("className=\"mb-2 flex w-full items-center justify-between");
   });
 
   it("학생 내용별 묶음 패널은 자체 접기 상태와 접근성 속성을 가진다", () => {
@@ -17,5 +18,6 @@ describe("내용별 묶음 접기 토글", () => {
     expect(studentSource).toContain("setGroupPanelOpen");
     expect(studentSource).toContain("aria-expanded={groupPanelOpen}");
     expect(studentSource).toContain("<CollapseChevron open={groupPanelOpen}");
+    expect(studentSource).toContain("className=\"flex w-full items-center justify-between");
   });
 });

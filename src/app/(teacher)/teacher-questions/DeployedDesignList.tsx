@@ -248,11 +248,13 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                       type="button"
                       onClick={() => toggleGroup(s.id)}
                       aria-expanded={openGroups.has(s.id)}
-                      className="mb-2 flex w-full items-center gap-1.5 text-left text-sm font-semibold text-foreground hover:text-primary"
+                      className="mb-2 flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-sm font-semibold text-foreground transition-colors hover:bg-muted/50 hover:text-primary"
                     >
-                      <CollapseChevron open={openGroups.has(s.id)} />
-                      <span>{t("groupTitle")}</span>
-                      <span className="text-xs font-normal text-muted-foreground">{t("groupDesc")}</span>
+                      <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        <span>{t("groupTitle")}</span>
+                        <span className="text-xs font-normal text-muted-foreground">{t("groupDesc")}</span>
+                      </span>
+                      <CollapseChevron open={openGroups.has(s.id)} className="shrink-0" />
                     </button>
                     {openGroups.has(s.id) && (
                       <div className="grid gap-3 md:grid-cols-2">
