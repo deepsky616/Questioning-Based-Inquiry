@@ -203,6 +203,15 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
                 ))}
               </SelectContent>
             </Select>
+            {activeFlow && (
+              <div className="flow-help-inline mt-2 rounded-md border bg-background/75 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="font-semibold text-foreground">{activeFlow.title}</span>
+                  <span>{activeFlow.axis}</span>
+                </div>
+                <p className="mt-1">{activeFlow.description}</p>
+              </div>
+            )}
           </div>
 
           <div className="rounded-md border bg-muted/25 p-3">
@@ -228,19 +237,6 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
       </div>
 
       {isRunning && runningKind && <AiLoadingProcess kind={runningKind} />}
-
-      {/* 선택한 탐구 흐름 설명 (용어 이해 도움) */}
-      {(() => {
-        const f = activeFlow;
-        if (!f) return null;
-        return (
-          <div className="rounded-md border bg-muted/40 p-2.5 text-xs">
-            <span className="font-semibold text-foreground">📘 {f.title}</span>
-            <span className="text-muted-foreground"> · {f.axis}</span>
-            <p className="mt-1 leading-relaxed text-muted-foreground">{f.description}</p>
-          </div>
-        );
-      })()}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
