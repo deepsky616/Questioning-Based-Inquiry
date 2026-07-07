@@ -1145,6 +1145,8 @@
     "colLikes": "좋아요",
     "colComment": "댓글",
     "reanalyze": "🔄 다시 분석",
+    "reanalyzeRecommended": "다시 분석 권장",
+    "analysisRefreshRecommended": "새 활동 있음",
     "analyzeSessionBtn": "분석하기",
     "notAnalyzedYet": "아직 분석하지 않았습니다. 오른쪽의 ‘분석하기’ 버튼을 눌러 시작하세요.",
     "notAnalyzedYetReadonly": "아직 선생님이 이 세션을 분석하지 않았어요.",
@@ -1203,6 +1205,8 @@
     "statQuestions": "질문 {count}개",
     "statLikes": "좋아요 {count}개",
     "statComments": "댓글 {count}개",
+    "currentBasis": "현재 기준: 질문 {questions}개 · 좋아요 {likes}개 · 댓글 {comments}개",
+    "analysisStale": "분석 이후 질문 {questions}개 · 좋아요 {likes}개 · 댓글 {comments}개 추가",
     "analysisTime": "분석 일시 {time}",
     "analysisModel": "분석 모델 {model}"
   },

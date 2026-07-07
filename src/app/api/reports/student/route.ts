@@ -49,7 +49,22 @@ export async function GET(req: NextRequest) {
     select: { sessionId: true, result: true },
   });
   const analysisBySession = new Map(analyses.map((a) => [a.sessionId, a.result]));
-  const sessionsWithAnalysis = sessions.map((s) => ({ ...s, analysis: analysisBySession.get(s.id) ?? null }));
+  const sessionActivity = await Promise.all(
+    sessions.map(async (s) => {
+      const [currentQuestions, currentComments, currentLikes] = await Promise.all([
+        prisma.question.count({ where: { sessionId: s.id, authorId: targetId } }),
+        prisma.comment.count({ where: { authorId: targetId, question: { sessionId: s.id } } }),
+        prisma.questionLike.count({ where: { userId: targetId, question: { sessionId: s.id } } }),
+      ]);
+      return [s.id, { currentQuestions, currentComments, currentLikes }] as const;
+    }),
+  );
+  const activityBySession = new Map(sessionActivity);
+  const sessionsWithAnalysis = sessions.map((s) => ({
+    ...s,
+    ...(activityBySession.get(s.id) ?? {}),
+    analysis: analysisBySession.get(s.id) ?? null,
+  }));
 
   return NextResponse.json({
     scope: "student",

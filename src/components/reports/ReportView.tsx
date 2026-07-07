@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { formatDateTime } from "@/lib/datetime";
+import { getAnalysisFreshness } from "@/lib/report-analysis-freshness";
 
 export interface PerStudentRow {
   id: string;
@@ -26,7 +27,16 @@ export interface PerStudentRow {
   comments: number;
 }
 
-export interface SessionMeta { id: string; date: string; subject: string; topic: string; analysis?: SessionAnalysisResult | null }
+export interface SessionMeta {
+  id: string;
+  date: string;
+  subject: string;
+  topic: string;
+  analysis?: SessionAnalysisResult | null;
+  currentQuestions?: number;
+  currentComments?: number;
+  currentLikes?: number;
+}
 export interface SessionAnalysisResult {
   summary?: string;
   insights?: string;
@@ -659,6 +669,7 @@ export function ReportView({
               const r = res[s.id];
               // 번역 보기가 켜져 있으면 번역된 필드로 표시(없는 필드는 원문 유지)
               const rv = r && trShown[s.id] ? { ...r, ...trFields[s.id] } : r;
+              const freshness = r ? getAnalysisFreshness(s, r) : null;
               const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
               const blocks: [string, string | undefined][] = [
                 [t("secSummary"), rv?.summary],
@@ -678,6 +689,11 @@ export function ReportView({
                     <button onClick={() => toggleSession(s.id)} aria-expanded={!!open[s.id]} className="no-print flex min-w-0 flex-1 items-center gap-2 text-left">
                       <CollapseChevron open={!!open[s.id]} className="shrink-0" />
                       <span className="truncate text-sm font-medium text-foreground">{label}</span>
+                      {freshness?.hasNewActivity && (
+                        <span className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                          {t("analysisRefreshRecommended")}
+                        </span>
+                      )}
                     </button>
                     {editing === s.id ? (
                       <>
@@ -725,7 +741,11 @@ export function ReportView({
                                 : "border-indigo-300 text-indigo-600 hover:bg-indigo-50"
                             }`}
                           >
-                            {busy[s.id] ? t("analyzing") : r ? t("reanalyze") : t("analyzeSessionBtn")}
+                            {busy[s.id]
+                              ? t("analyzing")
+                              : r && freshness?.hasNewActivity
+                                ? t("reanalyzeRecommended")
+                                : r ? t("reanalyze") : t("analyzeSessionBtn")}
                           </button>
                         )}
                       </>
@@ -759,6 +779,18 @@ export function ReportView({
                               <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: rv.totalQuestions ?? 0 })}</span>
                               <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statLikes", { count: rv.totalLikes ?? 0 })}</span>
                               <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statComments", { count: rv.totalComments ?? 0 })}</span>
+                            </div>
+                          )}
+                          {freshness?.hasCurrentCounts && (
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              <span className="rounded-full bg-slate-50 px-2.5 py-1 text-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                {t("currentBasis", { questions: s.currentQuestions ?? 0, likes: s.currentLikes ?? 0, comments: s.currentComments ?? 0 })}
+                              </span>
+                              {freshness.hasNewActivity && (
+                                <span className="rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                                  {t("analysisStale", { questions: freshness.newQuestions, likes: freshness.newLikes, comments: freshness.newComments })}
+                                </span>
+                              )}
                             </div>
                           )}
                           {(rv?.analyzedAt || rv?.analysisModel) && (

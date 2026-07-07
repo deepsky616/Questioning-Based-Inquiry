@@ -81,7 +81,41 @@ export async function GET(req: NextRequest) {
     select: { sessionId: true, result: true },
   });
   const analysisBySession = new Map(analyses.map((a) => [a.sessionId, a.result]));
-  const sessionsWithAnalysis = sessions.map((s) => ({ ...s, analysis: analysisBySession.get(s.id) ?? null }));
+  const sessionActivity = await Promise.all(
+    sessions.map(async (s) => {
+      const sessionQuestions = await prisma.question.findMany({
+        where: {
+          sessionId: s.id,
+          OR: [
+            { authorId: { in: ids } },
+            { source: "TEACHER_SHARED" },
+          ],
+        },
+        select: {
+          id: true,
+          _count: { select: { likes: true } },
+        },
+      });
+      const questionIds = sessionQuestions.map((q) => q.id);
+      const currentComments = questionIds.length > 0
+        ? await prisma.comment.count({ where: { questionId: { in: questionIds }, authorId: { in: ids } } })
+        : 0;
+      return [
+        s.id,
+        {
+          currentQuestions: sessionQuestions.length,
+          currentLikes: sessionQuestions.reduce((sum, q) => sum + q._count.likes, 0),
+          currentComments,
+        },
+      ] as const;
+    }),
+  );
+  const activityBySession = new Map(sessionActivity);
+  const sessionsWithAnalysis = sessions.map((s) => ({
+    ...s,
+    ...(activityBySession.get(s.id) ?? {}),
+    analysis: analysisBySession.get(s.id) ?? null,
+  }));
 
   // 학생별 롤업(쓴 활동 기준)
   const perStudent = students.map((s) => ({

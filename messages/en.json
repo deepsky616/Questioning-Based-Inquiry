@@ -1145,6 +1145,8 @@
     "colLikes": "Likes",
     "colComment": "Comments",
     "reanalyze": "🔄 Re-analyze",
+    "reanalyzeRecommended": "Re-analysis recommended",
+    "analysisRefreshRecommended": "New activity",
     "analyzeSessionBtn": "Analyze",
     "notAnalyzedYet": "Not analyzed yet. Tap the “Analyze” button on the right to start.",
     "notAnalyzedYetReadonly": "Your teacher hasn’t analyzed this session yet.",
@@ -1203,6 +1205,8 @@
     "statQuestions": "{count} questions",
     "statLikes": "{count} likes",
     "statComments": "{count} comments",
+    "currentBasis": "Current: {questions} questions · {likes} likes · {comments} comments",
+    "analysisStale": "Since analysis: +{questions} questions · +{likes} likes · +{comments} comments",
     "analysisTime": "Analyzed {time}",
     "analysisModel": "Model {model}"
   },
