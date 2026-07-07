@@ -50,8 +50,23 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
   const [deletingDeployId, setDeletingDeployId] = useState<string | null>(null);
   // 배포 항목별 접기 토글(기본 닫힘)
   const [openDeploy, setOpenDeploy] = useState<Set<string>>(new Set());
-  const toggleDeploy = (id: string) =>
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const toggleDeploy = (id: string) => {
     setOpenDeploy((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setOpenGroups((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
+  const toggleGroup = (id: string) =>
+    setOpenGroups((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -229,37 +244,45 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                 if (grouped.length <= 1) return null;
                 return (
                   <div className="border-t px-3 pb-3 pt-2">
-                    <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
-                      <p className="text-sm font-semibold text-foreground">{t("groupTitle")}</p>
-                      <span className="text-xs text-muted-foreground">{t("groupDesc")}</span>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {grouped.map(({ group, questions }) => (
-                        <div key={group} className="rounded-lg border bg-white p-3 dark:bg-card">
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <h3 className="text-sm font-semibold text-foreground">{group}</h3>
-                            <span className="text-xs text-muted-foreground">{t("groupCount", { count: questions.length })}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(s.id)}
+                      aria-expanded={openGroups.has(s.id)}
+                      className="mb-2 flex w-full items-center gap-1.5 text-left text-sm font-semibold text-foreground hover:text-primary"
+                    >
+                      <CollapseChevron open={openGroups.has(s.id)} />
+                      <span>{t("groupTitle")}</span>
+                      <span className="text-xs font-normal text-muted-foreground">{t("groupDesc")}</span>
+                    </button>
+                    {openGroups.has(s.id) && (
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {grouped.map(({ group, questions }) => (
+                          <div key={group} className="rounded-lg border bg-white p-3 dark:bg-card">
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <h3 className="text-sm font-semibold text-foreground">{group}</h3>
+                              <span className="text-xs text-muted-foreground">{t("groupCount", { count: questions.length })}</span>
+                            </div>
+                            <ul className="space-y-1.5 text-xs text-muted-foreground">
+                              {questions.map((question, index) => (
+                                <li key={`${question.content}-${index}`}>
+                                  <p className="line-clamp-2 font-medium text-foreground/80">
+                                    {question.priority}. {question.content}
+                                  </p>
+                                  {/* 이 대표 질문에 묶인 학생 원본 질문들 */}
+                                  {(question.mergedFrom?.length ?? 0) > 1 && (
+                                    <ul className="mt-0.5 space-y-0.5 border-l-2 border-emerald-200 pl-2 dark:border-emerald-500/30">
+                                      {question.mergedFrom!.map((original, i) => (
+                                        <li key={`${original}-${i}`} className="break-words">· {original}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
-                          <ul className="space-y-1.5 text-xs text-muted-foreground">
-                            {questions.map((question, index) => (
-                              <li key={`${question.content}-${index}`}>
-                                <p className="line-clamp-2 font-medium text-foreground/80">
-                                  {question.priority}. {question.content}
-                                </p>
-                                {/* 이 대표 질문에 묶인 학생 원본 질문들 */}
-                                {(question.mergedFrom?.length ?? 0) > 1 && (
-                                  <ul className="mt-0.5 space-y-0.5 border-l-2 border-emerald-200 pl-2 dark:border-emerald-500/30">
-                                    {question.mergedFrom!.map((original, i) => (
-                                      <li key={`${original}-${i}`} className="break-words">· {original}</li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })()}

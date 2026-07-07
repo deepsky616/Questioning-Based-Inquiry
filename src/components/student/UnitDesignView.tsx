@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions, isSessionAvailable } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
+import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { groupSharedQuestions } from "@/lib/shared-questions";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -105,6 +106,7 @@ export function UnitDesignView() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [groupPanelOpen, setGroupPanelOpen] = useState(true);
   // 조회(필터)·검색·정렬 — 목록이 쌓일 때 대비
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
@@ -126,6 +128,7 @@ export function UnitDesignView() {
   // 세션 변경 시 펼침 상태 초기화
   useEffect(() => {
     setExpandedId(null);
+    setGroupPanelOpen(true);
   }, [selectedId]);
 
   // 선택 세션의 배포 질문(좋아요·댓글수)과 공개 설정도 주기 폴링(12초)+포커스 재조회.
@@ -388,38 +391,48 @@ export function UnitDesignView() {
             {grouped.length > 1 && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">{t("groupTitle")}</CardTitle>
+                  <button
+                    type="button"
+                    onClick={() => setGroupPanelOpen((open) => !open)}
+                    aria-expanded={groupPanelOpen}
+                    className="flex items-center gap-1.5 text-left text-base font-semibold text-foreground hover:text-primary"
+                  >
+                    <CollapseChevron open={groupPanelOpen} />
+                    <span>{t("groupTitle")}</span>
+                  </button>
                   <CardDescription>{t("groupDesc")}</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {grouped.map(([group, questions]) => (
-                      <div key={group} className="rounded-lg border bg-white p-3 dark:bg-card">
-                        <div className="mb-2 flex items-center justify-between gap-2">
-                          <h3 className="text-sm font-semibold text-foreground">{group}</h3>
-                          <span className="text-xs text-muted-foreground">{t("groupCount", { count: questions.length })}</span>
+                {groupPanelOpen && (
+                  <CardContent>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {grouped.map(([group, questions]) => (
+                        <div key={group} className="rounded-lg border bg-white p-3 dark:bg-card">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <h3 className="text-sm font-semibold text-foreground">{group}</h3>
+                            <span className="text-xs text-muted-foreground">{t("groupCount", { count: questions.length })}</span>
+                          </div>
+                          <ul className="space-y-1.5 text-xs text-muted-foreground">
+                            {questions.map((question, index) => (
+                              <li key={`${question.content}-${index}`}>
+                                <p className="line-clamp-2 font-medium text-foreground/80">
+                                  {question.priority}. {question.content}
+                                </p>
+                                {/* 이 대표 질문에 묶인 우리(학생들)의 원본 질문 */}
+                                {(question.mergedFrom?.length ?? 0) > 1 && (
+                                  <ul className="mt-0.5 space-y-0.5 border-l-2 border-emerald-200 pl-2 dark:border-emerald-500/30">
+                                    {question.mergedFrom!.map((original, i) => (
+                                      <li key={`${original}-${i}`} className="break-words">· {original}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                        <ul className="space-y-1.5 text-xs text-muted-foreground">
-                          {questions.map((question, index) => (
-                            <li key={`${question.content}-${index}`}>
-                              <p className="line-clamp-2 font-medium text-foreground/80">
-                                {question.priority}. {question.content}
-                              </p>
-                              {/* 이 대표 질문에 묶인 우리(학생들)의 원본 질문 */}
-                              {(question.mergedFrom?.length ?? 0) > 1 && (
-                                <ul className="mt-0.5 space-y-0.5 border-l-2 border-emerald-200 pl-2 dark:border-emerald-500/30">
-                                  {question.mergedFrom!.map((original, i) => (
-                                    <li key={`${original}-${i}`} className="break-words">· {original}</li>
-                                  ))}
-                                </ul>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
               </Card>
             )}
           </div>
