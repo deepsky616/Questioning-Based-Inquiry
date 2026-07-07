@@ -17,6 +17,7 @@ import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { filterSortSavedDesigns } from "@/lib/saved-designs";
+import { getSavedDesignTimeline, type SavedDesignTimelineKind } from "@/lib/saved-design-timeline";
 import { formatDateTime } from "@/lib/datetime";
 import {
   buildClassStudentTargetPayload,
@@ -74,6 +75,16 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     };
   };
   const needsRedeploy = (design: SavedInquiryDesign) => Boolean(design.lastDeployedAt) && isAfter(design.updatedAt, design.lastDeployedAt);
+  const timelineLabelKey: Record<SavedDesignTimelineKind, "savedPrimarySavedAt" | "savedPrimaryUpdatedAt" | "savedPrimaryDeployedAt"> = {
+    saved: "savedPrimarySavedAt",
+    updated: "savedPrimaryUpdatedAt",
+    deployed: "savedPrimaryDeployedAt",
+  };
+  const historyLabelKey: Record<SavedDesignTimelineKind, "savedCreatedAt" | "savedUpdatedAt" | "savedDeployedAt"> = {
+    saved: "savedCreatedAt",
+    updated: "savedUpdatedAt",
+    deployed: "savedDeployedAt",
+  };
 
   // 항목 접기(참고자료 미리보기) — 기본 접힘
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
@@ -371,6 +382,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
             {visibleSaved.map((d) => {
               const status = getDesignStatus(d);
               const redeployNeeded = needsRedeploy(d);
+              const timeline = getSavedDesignTimeline(d);
               return (
               <li key={d.id} className="p-3">
                 <div className="flex items-center justify-between gap-3">
@@ -390,13 +402,9 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                     <span className="text-xs text-muted-foreground">
                       {[d.sessionDate, d.subject, d.area].filter(Boolean).join(" · ")}
                     </span>
-                    {(d.createdAt || d.updatedAt) && (
+                    {timeline.primary && (
                       <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {[
-                          d.createdAt ? t("savedCreatedAt", { time: formatDateTime(d.createdAt) }) : "",
-                          d.updatedAt ? t("savedUpdatedAt", { time: formatDateTime(d.updatedAt) }) : "",
-                          d.lastDeployedAt ? t("savedDeployedAt", { time: formatDateTime(d.lastDeployedAt) }) : "",
-                        ].filter(Boolean).join(" · ")}
+                        {t(timelineLabelKey[timeline.primary.kind], { time: formatDateTime(timeline.primary.at) })}
                       </span>
                     )}
                   </button>
@@ -426,6 +434,17 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                     </button>
                   </div>
                 </div>
+
+                {selectedSavedId === d.id && timeline.history.length > 0 && (
+                  <div className="mt-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground/80">{t("savedTimelineLabel")}</span>
+                    <span className="ml-2">
+                      {timeline.history
+                        .map((item) => t(historyLabelKey[item.kind], { time: formatDateTime(item.at) }))
+                        .join(" · ")}
+                    </span>
+                  </div>
+                )}
 
                 {/* 인라인 편집: 제목 + 질문 수정/추가/삭제 */}
                 {editingDesignId === d.id && (
