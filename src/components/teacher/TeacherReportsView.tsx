@@ -96,6 +96,10 @@ export function TeacherReportsView() {
   const [selected, setSelected] = useState<string>(""); // "grade|className"
   const [view, setView] = useState<"class" | "student">("class");
   const [studentId, setStudentId] = useState<string>("");
+  const [printItems, setPrintItems] = useState<PrintReportItem[]>([]);
+  const [previewItems, setPreviewItems] = useState<PrintReportItem[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [printBusy, setPrintBusy] = useState(false);
 
   // 학급 목록(가벼움): 포커스 재조회만
   const { data: classes = [] } = useQuery<ClassItem[]>({
@@ -114,6 +118,14 @@ export function TeacherReportsView() {
   }, [classes, selected]);
   // 학급 변경 시 학생 선택 초기화
   useEffect(() => { setStudentId(""); }, [selected]);
+  useEffect(() => {
+    if (!previewOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewOpen]);
 
   // 학급 리포트(무거운 집계): 긴 폴링(60초)+포커스 재조회
   const classReportQuery = useQuery<ClassReport>({
@@ -149,9 +161,6 @@ export function TeacherReportsView() {
   const error = reportError instanceof Error ? reportError.message : null;
 
   // 인쇄(현재 페이지에서 print-root만 출력) — 새 탭 없이
-  const [printItems, setPrintItems] = useState<PrintReportItem[]>([]);
-  const [printBusy, setPrintBusy] = useState(false);
-
   const stripPrintMetadata = (items: PrintReportItem[]): PrintReportItem[] =>
     items.map((item) => ({
       ...item,
@@ -170,6 +179,12 @@ export function TeacherReportsView() {
     weekly: r.weekly, monthly: r.monthly,
     sessions: (r.sessions as PrintReportItem["sessions"]) ?? [],
   });
+  const showPrintPreview = (items: PrintReportItem[]) => {
+    const next = stripPrintMetadata(items);
+    setPreviewItems(next);
+    setPrintItems(next);
+    setPreviewOpen(true);
+  };
   const doPrint = (items: PrintReportItem[]) => {
     if (items.length === 0) return;
     let cleaned = false;
@@ -243,7 +258,7 @@ export function TeacherReportsView() {
     if (!report || printBusy) return;
     const klass = report.klass as { grade: string; className: string; school?: string | null };
     const rk = classRankingQuery.data ?? null;
-    doPrint([{
+    showPrintPreview([{
       kind: "class",
       name: t("gradeClass", { grade: klass.grade, className: klass.className }),
       grade: klass.grade,
@@ -290,7 +305,7 @@ export function TeacherReportsView() {
       const rk = grade && className ? await fetchRanking(grade, className) : null;
       const item = toItem(studentReport);
       if (rk) item.ranking = studentRanking(rk, studentId);
-      doPrint([item]);
+      showPrintPreview([item]);
     } finally {
       setPrintBusy(false);
     }
@@ -320,7 +335,7 @@ export function TeacherReportsView() {
         item.ranking = studentRanking(rk, ids[i]);
         items.push(item);
       });
-      doPrint(items);
+      showPrintPreview(items);
     } finally {
       setPrintBusy(false);
     }
@@ -464,6 +479,43 @@ export function TeacherReportsView() {
       <div className="print-root" aria-hidden>
         {printItems.length > 0 && <ReportPrintDoc items={printItems} />}
       </div>
+
+      {previewOpen && previewItems.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="report-print-preview-title"
+            className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-lg border bg-background shadow-xl"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+              <div>
+                <h2 id="report-print-preview-title" className="text-base font-bold text-foreground">{t("previewTitle")}</h2>
+                <p className="text-xs text-muted-foreground">{t("previewDesc", { count: previewItems.length })}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => doPrint(previewItems)}
+                  className="rounded-md border border-indigo-500 bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                >
+                  {t("previewPrint")}
+                </button>
+                <button
+                  onClick={() => setPreviewOpen(false)}
+                  className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"
+                >
+                  {t("previewClose")}
+                </button>
+              </div>
+            </div>
+            <div className="overflow-auto bg-muted/40 p-3 sm:p-5">
+              <div className="mx-auto w-fit min-w-[760px] bg-white p-6 shadow-sm">
+                <ReportPrintDoc items={previewItems} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
