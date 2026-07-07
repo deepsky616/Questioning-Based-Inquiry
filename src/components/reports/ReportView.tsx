@@ -15,6 +15,7 @@ import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
+import { formatDateTime } from "@/lib/datetime";
 
 export interface PerStudentRow {
   id: string;
@@ -43,6 +44,8 @@ export interface SessionAnalysisResult {
   totalQuestions?: number;
   totalComments?: number;
   totalLikes?: number;
+  analyzedAt?: string;
+  analysisModel?: string;
 }
 
 export interface ReportViewProps {
@@ -756,6 +759,20 @@ export function ReportView({
                               <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: rv.totalQuestions ?? 0 })}</span>
                               <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statLikes", { count: rv.totalLikes ?? 0 })}</span>
                               <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statComments", { count: rv.totalComments ?? 0 })}</span>
+                            </div>
+                          )}
+                          {(rv?.analyzedAt || rv?.analysisModel) && (
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              {rv.analyzedAt && (
+                                <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
+                                  {t("analysisTime", { time: formatDateTime(rv.analyzedAt) })}
+                                </span>
+                              )}
+                              {rv.analysisModel && (
+                                <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
+                                  {t("analysisModel", { model: rv.analysisModel })}
+                                </span>
+                              )}
                             </div>
                           )}
                           {blocks.filter(([, v]) => v).map(([h, v]) => (

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { SectionToggle } from "@/components/shared/SectionToggle";
+import { formatDateTime } from "@/lib/datetime";
 
 interface SessionAnalysis {
   summary: string;
@@ -21,6 +22,8 @@ interface SessionAnalysis {
   totalQuestions: number;
   totalComments?: number;
   totalLikes?: number;
+  analyzedAt?: string;
+  analysisModel?: string;
 }
 
 interface SessionAnalysisCardProps {
@@ -198,6 +201,16 @@ export function SessionAnalysisCard({ sessionId }: SessionAnalysisCardProps) {
                 <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statQuestions", { count: analysis.totalQuestions ?? 0 })}</span>
                 <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statLikes", { count: analysis.totalLikes ?? 0 })}</span>
                 <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{t("statComments", { count: analysis.totalComments ?? 0 })}</span>
+                {analysis.analyzedAt && (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
+                    {t("analysisTime", { time: formatDateTime(analysis.analyzedAt) })}
+                  </span>
+                )}
+                {analysis.analysisModel && (
+                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
+                    {t("analysisModel", { model: analysis.analysisModel })}
+                  </span>
+                )}
               </div>
               <div className="rounded-lg bg-muted p-4 text-sm leading-6 text-foreground">{analysis.summary}</div>
               <div className="flex flex-wrap gap-2">

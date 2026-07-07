@@ -412,6 +412,8 @@
     "statQuestions": "{count} questions",
     "statLikes": "{count} likes",
     "statComments": "{count} comments",
+    "analysisTime": "Analyzed {time}",
+    "analysisModel": "Model {model}",
     "balanceTitle": "⚖️ Question type balance",
     "bestTitle": "⭐ Best question",
     "insightsTitle": "Teaching takeaways",
@@ -1190,7 +1192,9 @@
     "docColRank": "Rank",
     "statQuestions": "{count} questions",
     "statLikes": "{count} likes",
-    "statComments": "{count} comments"
+    "statComments": "{count} comments",
+    "analysisTime": "Analyzed {time}",
+    "analysisModel": "Model {model}"
   },
   "seqEditor": {
     "sortFailed": "Failed to organize",

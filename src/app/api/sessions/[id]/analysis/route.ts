@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
-import { generateJson, AiKeyMissingError, AiBusyError } from "@/lib/ai";
+import { generateJsonWithMetadata, AiKeyMissingError, AiBusyError } from "@/lib/ai";
 import { getRequestLocale } from "@/lib/locale";
 
 // 저장된 학급 세션 분석 조회(AI 호출 없음) — 질문조회/대시보드가 공유한 결과를 불러온다.
@@ -102,7 +102,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   try {
     const prompt = buildSessionAnalysisPrompt(questions, questionSession.subject, questionSession.topic);
-    const parsed = await generateJson<{
+    const generated = await generateJsonWithMetadata<{
       summary: string;
       themes: string[];
       insights: string;
@@ -113,6 +113,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       bestQuestion?: string;
       nextQuestions?: string;
     }>({ userId: teacherId, prompt, req, localize: true, quality: true });
+    const parsed = generated.data;
+    const analyzedAt = new Date().toISOString();
 
     // 저장·반환 결과(테마·집계까지 포함해 질문조회/대시보드 어디서든 그대로 복원 가능)
     const stored = {
@@ -128,6 +130,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       totalQuestions: questions.length,
       totalComments,
       totalLikes,
+      analyzedAt,
+      analysisModel: generated.model,
     };
 
     // DB 영속화(베스트 에포트) — 질문조회·대시보드·다른 기기에서 마지막 분석 공유

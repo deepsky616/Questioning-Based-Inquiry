@@ -4,6 +4,7 @@ import { extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import { alternateModel, chooseModelAuto, chooseQualityModel } from "@/lib/api-config";
 import { AiBusyError, AiKeyMissingError, isTransientAiError } from "@/lib/ai-errors";
+import type { GeminiModel } from "@/lib/api-config";
 
 // 기존 import 경로 호환을 위해 재노출 (라우트들은 @/lib/ai에서 가져온다)
 export { AiBusyError, AiKeyMissingError, isTransientAiError };
@@ -28,6 +29,11 @@ export interface GenerateOptions {
   temperature?: number;
 }
 
+export interface GenerateTextResult {
+  text: string;
+  model: GeminiModel;
+}
+
 /** 분석·수업자료 생성 등 일관성이 중요한 작업의 기본 온도 */
 export const CONSISTENT_TEMPERATURE = 0.1;
 
@@ -38,7 +44,7 @@ export const CONSISTENT_TEMPERATURE = 0.1;
  * - 모델 혼잡(503/429)은 백오프 재시도 후 대체 모델(lite↔flash)로 자동 전환
  * - 키가 없으면 AiKeyMissingError, 대체 모델까지 혼잡하면 AiBusyError를 던진다
  */
-async function callGemini({ userId, prompt, req, localize, systemInstruction, quality, temperature }: GenerateOptions): Promise<string> {
+async function callGeminiWithMetadata({ userId, prompt, req, localize, systemInstruction, quality, temperature }: GenerateOptions): Promise<GenerateTextResult> {
   const cfg = await resolveUserAiConfig(userId);
   if (!cfg.apiKey) throw new AiKeyMissingError();
 
@@ -47,7 +53,7 @@ async function callGemini({ userId, prompt, req, localize, systemInstruction, qu
   const temp = temperature ?? (quality ? CONSISTENT_TEMPERATURE : undefined);
 
   const genAI = new GoogleGenerativeAI(cfg.apiKey);
-  const runWith = async (modelName: string, attempts: number): Promise<string> => {
+  const runWith = async (modelName: GeminiModel, attempts: number): Promise<GenerateTextResult> => {
     const model = genAI.getGenerativeModel({
       model: modelName,
       ...(systemInstruction ? { systemInstruction } : {}),
@@ -56,7 +62,7 @@ async function callGemini({ userId, prompt, req, localize, systemInstruction, qu
     for (let attempt = 1; ; attempt++) {
       try {
         const result = await model.generateContent(fullPrompt);
-        return result.response.text().trim();
+        return { text: result.response.text().trim(), model: modelName };
       } catch (err) {
         if (!isTransientAiError(err)) throw err;
         if (attempt >= attempts) throw new AiBusyError();
@@ -75,12 +81,25 @@ async function callGemini({ userId, prompt, req, localize, systemInstruction, qu
 }
 
 /** 자유 텍스트 응답을 반환한다. */
-export function generateText(opts: GenerateOptions): Promise<string> {
-  return callGemini(opts);
+export async function generateText(opts: GenerateOptions): Promise<string> {
+  const result = await callGeminiWithMetadata(opts);
+  return result.text;
 }
 
 /** JSON 응답을 공통 파서(extractJsonObject)로 파싱해 반환한다. */
 export async function generateJson<T = unknown>(opts: GenerateOptions): Promise<T> {
-  const text = await callGemini(opts);
-  return extractJsonObject(text) as T;
+  const result = await callGeminiWithMetadata(opts);
+  return extractJsonObject(result.text) as T;
+}
+
+/** JSON 응답과 실제 사용 모델을 함께 반환한다. */
+export async function generateJsonWithMetadata<T = unknown>(opts: GenerateOptions): Promise<{
+  data: T;
+  model: GeminiModel;
+}> {
+  const result = await callGeminiWithMetadata(opts);
+  return {
+    data: extractJsonObject(result.text) as T,
+    model: result.model,
+  };
 }

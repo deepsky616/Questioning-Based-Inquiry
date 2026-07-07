@@ -412,6 +412,8 @@
     "statQuestions": "질문 {count}개",
     "statLikes": "좋아요 {count}개",
     "statComments": "댓글 {count}개",
+    "analysisTime": "분석 일시 {time}",
+    "analysisModel": "분석 모델 {model}",
     "balanceTitle": "⚖️ 질문 유형 균형 진단",
     "bestTitle": "⭐ 베스트 질문",
     "insightsTitle": "교사 시사점",
@@ -1190,7 +1192,9 @@
     "docColRank": "순위",
     "statQuestions": "질문 {count}개",
     "statLikes": "좋아요 {count}개",
-    "statComments": "댓글 {count}개"
+    "statComments": "댓글 {count}개",
+    "analysisTime": "분석 일시 {time}",
+    "analysisModel": "분석 모델 {model}"
   },
   "seqEditor": {
     "sortFailed": "정리에 실패했습니다",

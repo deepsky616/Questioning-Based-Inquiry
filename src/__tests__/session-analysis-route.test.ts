@@ -130,6 +130,8 @@ describe("POST /api/sessions/[id]/analysis", () => {
     expect(body.totalComments).toBe(2);
     expect(body.commentInsights).toContain("학생 댓글");
     expect(body.engagementInsights).toContain("좋아요");
+    expect(body.analysisModel).toBe("gemini-2.5-flash");
+    expect(typeof body.analyzedAt).toBe("string");
   });
 
   it("다른 교사의 세션이면 403을 반환한다", async () => {

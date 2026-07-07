@@ -11,7 +11,7 @@ vi.mock("@google/generative-ai", () => ({
   },
 }));
 
-import { generateText, generateJson, AiKeyMissingError } from "@/lib/ai";
+import { generateText, generateJson, generateJsonWithMetadata, AiKeyMissingError } from "@/lib/ai";
 
 const reply = (text: string) => ({ response: { text: () => text } });
 const enReq = () => new Request("http://x", { headers: { cookie: "NEXT_LOCALE=en" } });
@@ -38,6 +38,15 @@ describe("lib/ai 서비스 계층", () => {
   it("generateJson은 공통 파서로 파싱(코드펜스 포함)", async () => {
     generateContent.mockResolvedValue(reply('```json\n{ "a": 1 }\n```'));
     expect(await generateJson({ userId: "u", prompt: "p" })).toEqual({ a: 1 });
+  });
+
+  it("generateJsonWithMetadata는 실제 사용 모델을 함께 반환", async () => {
+    aiState.model = "gemini-2.5-flash-lite";
+    generateContent.mockResolvedValue(reply('{ "a": 1 }'));
+
+    const result = await generateJsonWithMetadata<{ a: number }>({ userId: "u", prompt: "p", quality: true });
+
+    expect(result).toEqual({ data: { a: 1 }, model: "gemini-2.5-flash" });
   });
 
   it("localize+en이면 출력 언어 지시문이 프롬프트에 덧붙는다", async () => {

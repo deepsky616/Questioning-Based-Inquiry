@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { buildStudentSessionPrompt } from "@/lib/ai-prompts";
-import { generateJson } from "@/lib/ai";
+import { generateJsonWithMetadata } from "@/lib/ai";
 import { getRequestLocale } from "@/lib/locale";
 
 export interface StudentSessionAnalysisResult {
@@ -10,6 +10,8 @@ export interface StudentSessionAnalysisResult {
   relevanceInsights: string;
   growthInsights: string;
   rewriteExample: string;
+  analyzedAt?: string;
+  analysisModel?: string;
 }
 
 export interface StudentSessionTotals {
@@ -75,9 +77,11 @@ export async function runStudentSessionAnalysis(opts: {
     likesGiven,
     prior,
   });
-  const parsed = await generateJson<{
+  const generated = await generateJsonWithMetadata<{
     summary?: string; insights?: string; relevanceInsights?: string; growthInsights?: string; rewriteExample?: string;
   }>({ userId: studentId, prompt, req, localize: true, quality: true });
+  const parsed = generated.data;
+  const analyzedAt = new Date().toISOString();
 
   const result: StudentSessionAnalysisResult = {
     summary: parsed?.summary ?? "",
@@ -85,6 +89,8 @@ export async function runStudentSessionAnalysis(opts: {
     relevanceInsights: parsed?.relevanceInsights ?? "",
     growthInsights: parsed?.growthInsights ?? "",
     rewriteExample: parsed?.rewriteExample ?? "",
+    analyzedAt,
+    analysisModel: generated.model,
   };
 
   // DB 영속화(베스트 에포트)

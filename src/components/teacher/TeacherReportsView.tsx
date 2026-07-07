@@ -26,6 +26,11 @@ async function analyzeClassSession(sessionId: string, failMsg: string): Promise<
     summary: d.summary, insights: d.insights, commentInsights: d.commentInsights,
     engagementInsights: d.engagementInsights, relevanceInsights: d.relevanceInsights,
     balanceInsights: d.balanceInsights, bestQuestion: d.bestQuestion, nextQuestions: d.nextQuestions,
+    totalQuestions: d.totalQuestions,
+    totalComments: d.totalComments,
+    totalLikes: d.totalLikes,
+    analyzedAt: d.analyzedAt,
+    analysisModel: d.analysisModel,
   };
 }
 // 교사가 수정한 분석 결과 저장(학급/학생 공용)
@@ -68,7 +73,18 @@ function analyzeStudentSessionFor(studentId: string, failMsg: string) {
     });
     const d = await res.json();
     if (!res.ok) throw new Error(d.error || failMsg);
-    return { summary: d.summary, insights: d.insights, relevanceInsights: d.relevanceInsights, growthInsights: d.growthInsights, rewriteExample: d.rewriteExample };
+    return {
+      summary: d.summary,
+      insights: d.insights,
+      relevanceInsights: d.relevanceInsights,
+      growthInsights: d.growthInsights,
+      rewriteExample: d.rewriteExample,
+      totalQuestions: d.totals?.questions,
+      totalComments: d.totals?.comments,
+      totalLikes: d.totals?.likesGiven,
+      analyzedAt: d.analyzedAt,
+      analysisModel: d.analysisModel,
+    };
   };
 }
 

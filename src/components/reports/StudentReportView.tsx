@@ -17,7 +17,18 @@ async function analyzeStudentSession(sessionId: string, failMsg: string): Promis
   });
   const d = await res.json();
   if (!res.ok) throw new Error(d.error || failMsg);
-  return { summary: d.summary, insights: d.insights, relevanceInsights: d.relevanceInsights, growthInsights: d.growthInsights, rewriteExample: d.rewriteExample };
+  return {
+    summary: d.summary,
+    insights: d.insights,
+    relevanceInsights: d.relevanceInsights,
+    growthInsights: d.growthInsights,
+    rewriteExample: d.rewriteExample,
+    totalQuestions: d.totals?.questions,
+    totalComments: d.totals?.comments,
+    totalLikes: d.totals?.likesGiven,
+    analyzedAt: d.analyzedAt,
+    analysisModel: d.analysisModel,
+  };
 }
 
 /** 학생 본인 활동 리포트 본문 (대시보드 '상세 리포트' 탭에서 사용). */
