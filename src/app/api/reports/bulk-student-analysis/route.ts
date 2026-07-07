@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { AiKeyMissingError } from "@/lib/ai";
 import { runStudentSessionAnalysis } from "@/lib/student-session-analysis";
+import { requireTeacherSession } from "@/lib/session-helpers";
 
 // 한 번의 요청에서 실행할 최대 AI 분석 수(서버리스 타임아웃 회피). 클라이언트가 cursor로 반복 호출한다.
 const ANALYSES_PER_CALL = 3;
+
+const bodySchema = z.object({
+  grade: z.string().min(1),
+  className: z.string().min(1),
+  sessionIds: z.array(z.string().min(1)).min(1),
+  cursor: z.number().int().nonnegative().default(0),
+});
 
 /**
  * 교사용 일괄 학생 분석: 선택한 기간의 세션들 × 반 전체 학생을 나눠서 분석한다.
@@ -16,19 +25,13 @@ const ANALYSES_PER_CALL = 3;
  * POST body: { grade, className, sessionIds: string[], cursor: number }
  */
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const role = (session.user as { role?: string }).role;
-  const userId = (session.user as { id: string }).id;
-  if (role !== "TEACHER") return NextResponse.json({ error: "교사만 가능합니다" }, { status: 403 });
+  const authResult = requireTeacherSession(await auth());
+  if (!authResult.ok) return NextResponse.json({ error: authResult.message }, { status: authResult.status });
+  const userId = authResult.user.id;
 
-  const body = await req.json().catch(() => ({}));
-  const grade = typeof body.grade === "string" ? body.grade : "";
-  const className = typeof body.className === "string" ? body.className : "";
-  const sessionIdsRaw: string[] = Array.isArray(body.sessionIds) ? body.sessionIds.filter((s: unknown) => typeof s === "string") : [];
-  const cursor = Number.isInteger(body.cursor) && body.cursor >= 0 ? body.cursor : 0;
-  if (!grade || !className) return NextResponse.json({ error: "학급 정보가 필요합니다" }, { status: 400 });
-  if (sessionIdsRaw.length === 0) return NextResponse.json({ error: "분석할 세션이 없습니다" }, { status: 400 });
+  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "잘못된 요청입니다" }, { status: 400 });
+  const { grade, className, sessionIds: sessionIdsRaw, cursor } = parsed.data;
 
   const limited = checkRateLimit(`bulk-analysis:${userId}`, 120);
   if (limited) return limited;
