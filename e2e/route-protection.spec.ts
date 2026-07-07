@@ -13,8 +13,8 @@ test.describe("페이지 라우트 보호 (미인증 → /login)", () => {
     "/teacher-students",
     "/student-dashboard",
     "/student-ask",
-    "/student-explore",
-    "/student-history",
+    "/student-questions",
+    "/student-report",
   ];
 
   for (const path of protectedPages) {

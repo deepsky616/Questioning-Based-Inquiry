@@ -20,8 +20,10 @@ test.describe("로그인 페이지", () => {
 
   test("잘못된 자격증명으로 로그인 시 오류가 표시된다", async ({ page }) => {
     await page.goto("/login");
-    await page.getByLabel(/이메일/).fill("wrong@email.com");
-    await page.getByLabel(/비밀번호/).fill("wrongpassword");
+    await page.getByRole("tab", { name: /교사/ }).click();
+    // 비밀번호 보기 버튼(aria-label에 '비밀번호' 포함)과의 충돌을 피해 id로 지정
+    await page.locator("#t-email").fill("wrong@email.com");
+    await page.locator("#t-password").fill("wrongpassword");
     await page.getByRole("button", { name: /로그인/ }).click();
     await expect(
       page.getByText(/실패|오류|올바르지|잘못/i).first()
@@ -30,13 +32,15 @@ test.describe("로그인 페이지", () => {
 });
 
 test.describe("비밀번호 찾기 페이지", () => {
-  test("비밀번호 찾기 링크가 로그인 페이지에 있다", async ({ page }) => {
+  test("비밀번호 찾기 링크가 교사 로그인 탭에 있다", async ({ page }) => {
     await page.goto("/login");
+    await page.getByRole("tab", { name: /교사/ }).click();
     await expect(page.getByRole("link", { name: /비밀번호/i })).toBeVisible();
   });
 
   test("비밀번호 찾기 페이지로 이동된다", async ({ page }) => {
     await page.goto("/login");
+    await page.getByRole("tab", { name: /교사/ }).click();
     await page.getByRole("link", { name: /비밀번호/i }).click();
     await expect(page).toHaveURL(/forgot-password/);
   });

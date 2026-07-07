@@ -10,6 +10,8 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
+    // 앱 로케일이 Accept-Language를 따르므로 한국어 UI로 고정(스펙이 한글 텍스트를 단언)
+    locale: "ko-KR",
   },
   projects: [
     {
