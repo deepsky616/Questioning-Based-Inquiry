@@ -44,7 +44,7 @@ async function assertOwner(id: string, teacherId: string) {
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   if ((session.user as { role?: string }).role !== "TEACHER") {
     return NextResponse.json({ error: "교사만 사용할 수 있습니다" }, { status: 403 });
   }
@@ -103,7 +103,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
   const teacherId = (session.user as { id: string }).id;
   const { id } = params;

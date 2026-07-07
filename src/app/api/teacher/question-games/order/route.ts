@@ -8,7 +8,7 @@ const schema = z.object({ order: z.array(z.string().min(1)) });
 // 교사가 지정한 질문놀이 표시 순서를 저장한다(학생 목록에도 반영됨).
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   if ((session.user as { role?: string }).role !== "TEACHER") {
     return NextResponse.json({ error: "교사만 가능" }, { status: 403 });
   }

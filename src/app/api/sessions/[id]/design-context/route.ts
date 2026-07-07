@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 // 반환한다. 학생 질문하기의 참고 자료 패널에서 사용. (성취기준은 후속 단계에서 추가)
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const user = session.user as { id: string; role?: string; grade?: string; className?: string };
 
   const qs = await prisma.questionSession.findUnique({

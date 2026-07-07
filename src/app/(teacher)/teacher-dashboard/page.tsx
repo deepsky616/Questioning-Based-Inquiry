@@ -99,7 +99,7 @@ function TeacherDashboard() {
         params.append("className", className);
       }
       const r = await fetch(`/api/stats?${params}`);
-      if (!r.ok) throw new Error("failed to load stats");
+      if (!r.ok) throw new Error("통계를 불러오지 못했습니다");
       return r.json();
     },
     refetchInterval: 12000,

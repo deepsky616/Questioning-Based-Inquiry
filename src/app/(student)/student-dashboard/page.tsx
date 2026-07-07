@@ -82,7 +82,7 @@ function StudentDashboard() {
     queryKey: ["student-dashboard-questions", user.id],
     queryFn: async () => {
       const r = await fetch(`/api/questions?authorId=${user.id}`);
-      if (!r.ok) throw new Error("failed to load questions");
+      if (!r.ok) throw new Error("질문을 불러오지 못했습니다");
       return r.json();
     },
     enabled: Boolean(user.id),

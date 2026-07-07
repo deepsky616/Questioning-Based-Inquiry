@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 // 교사: 자기 담당 학생들의 포인트 조회
 export async function GET() {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 접근 가능" }, { status: 403 });
   const teacherId = (session.user as { id: string }).id;
@@ -15,7 +15,7 @@ export async function GET() {
     where: { id: teacherId },
     select: { school: true, teacherClasses: { select: { grade: true, className: true } } },
   });
-  if (!teacher) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!teacher) return NextResponse.json({ error: "사용자를 찾을 수 없습니다" }, { status: 404 });
   if (!teacher.school) return NextResponse.json({ students: [] });
 
   const teacherClasses = teacher.teacherClasses;
@@ -44,7 +44,7 @@ export async function GET() {
 // 교사: 포인트 수동 지급/회수
 export async function POST(req: NextRequest) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 가능" }, { status: 403 });
   const teacherId = (session.user as { id: string }).id;

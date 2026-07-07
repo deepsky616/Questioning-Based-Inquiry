@@ -108,7 +108,7 @@ export function TeacherReportsView() {
     queryKey: ["report-classes"],
     queryFn: async () => {
       const r = await fetch("/api/reports/class");
-      if (!r.ok) throw new Error("failed to load classes");
+      if (!r.ok) throw new Error("학급 목록을 불러오지 못했습니다");
       const d = await r.json();
       return Array.isArray(d.classes) ? d.classes : [];
     },

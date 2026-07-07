@@ -171,7 +171,7 @@ export default function CurriculumPage() {
     queryKey: ["unit-designs"],
     queryFn: async () => {
       const r = await fetch("/api/unit-design");
-      if (!r.ok) throw new Error("failed to load saved designs");
+      if (!r.ok) throw new Error("저장된 탐구 설계를 불러오지 못했습니다");
       const d = await r.json();
       return Array.isArray(d) ? d : [];
     },

@@ -7,7 +7,7 @@ import { summarizeStudentSessionActivity } from "@/lib/report-session-activity";
 // 학생 활동 리포트: 본인(학생) 또는 교사가 지정한 학생의 질문·좋아요·댓글(쓴 것+받은 것) 추세
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   const userId = (session.user as { id: string }).id;
 

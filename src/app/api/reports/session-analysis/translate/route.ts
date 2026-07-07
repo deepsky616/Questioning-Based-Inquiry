@@ -21,7 +21,7 @@ const bodySchema = z.object({
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const user = session.user as { id: string; role?: string };
   if (user.role !== "TEACHER") {
     return NextResponse.json({ error: "교사만 사용할 수 있습니다" }, { status: 403 });

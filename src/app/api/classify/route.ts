@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   // 인증: 로그인한 사용자만 분류 요청 가능 (서버 저장 Gemini 키 남용 방지)
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
 
   // 레이트 리밋: 사용자당 분당 20회 (Gemini 호출 비용 보호)

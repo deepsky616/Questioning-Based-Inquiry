@@ -14,7 +14,7 @@ const saveConfigSchema = z.object({
 // 교사: 본인 AI 설정 / 학생: 담당 교사의 설정 적용 여부만 확인
 export async function GET() {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   const userId = (session.user as { id: string }).id;
 
@@ -34,7 +34,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   const userId = (session.user as { id: string }).id;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 설정할 수 있습니다" }, { status: 403 });
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
 
 export async function DELETE() {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   const userId = (session.user as { id: string }).id;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 설정을 삭제할 수 있습니다" }, { status: 403 });

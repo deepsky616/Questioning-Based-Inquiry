@@ -18,7 +18,7 @@ interface GameStat {
 // 담당 학생들의 질문놀이 참여 데이터를 게임별로 집계(요약 + 학생별 상세)
 export async function GET() {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   if ((session.user as { role?: string }).role !== "TEACHER") {
     return NextResponse.json({ error: "교사만 가능" }, { status: 403 });
   }

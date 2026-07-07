@@ -6,7 +6,7 @@ import { sortTeacherClasses } from "@/lib/teacher";
 export async function GET() {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
   if (session.user.role !== "TEACHER") {
     return NextResponse.json({ error: "교사만 접근할 수 있습니다" }, { status: 403 });

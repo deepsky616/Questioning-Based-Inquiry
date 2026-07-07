@@ -109,7 +109,7 @@ export function RankingPanel({
       if (gradeParam) params.set("grade", gradeParam);
       if (classNameParam) params.set("className", classNameParam);
       const r = await fetch(`/api/points/leaderboard?${params}`);
-      if (!r.ok) throw new Error("failed to load leaderboard");
+      if (!r.ok) throw new Error("순위표를 불러오지 못했습니다");
       return r.json();
     },
     refetchInterval: 12000,
@@ -250,7 +250,7 @@ export function StudentRankPanel({
       if (gradeParam) params.set("grade", gradeParam);
       if (classNameParam) params.set("className", classNameParam);
       const r = await fetch(`/api/points/class-ranks?${params}`);
-      if (!r.ok) throw new Error("failed to load class ranks");
+      if (!r.ok) throw new Error("학급 순위를 불러오지 못했습니다");
       return r.json();
     },
     refetchInterval: 12000,
@@ -346,7 +346,7 @@ export function ClassRankingPanel({
       if (gradeParam) params.set("grade", gradeParam);
       if (classNameParam) params.set("className", classNameParam);
       const r = await fetch(`/api/points/class-leaderboard?${params}`);
-      if (!r.ok) throw new Error("failed to load class leaderboard");
+      if (!r.ok) throw new Error("학급 순위표를 불러오지 못했습니다");
       return r.json();
     },
     refetchInterval: 12000,

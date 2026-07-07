@@ -67,7 +67,7 @@ const PROMPTS: Record<string, (ctx: Record<string, string>) => string> = {
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
 
   const limited = checkRateLimit(`ai-play:${(session.user as { id: string }).id}`, 20);
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 
   const promptFn = PROMPTS[action];
   if (!promptFn) {
-    return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
+    return NextResponse.json({ error: `알 수 없는 동작입니다: ${action}` }, { status: 400 });
   }
 
   const userPrompt = promptFn(context);

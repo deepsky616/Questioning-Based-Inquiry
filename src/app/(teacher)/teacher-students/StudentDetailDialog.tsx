@@ -232,7 +232,7 @@ export function StudentDetailDialog({
     queryKey: ["student-stats", student.id],
     queryFn: async () => {
       const r = await fetch(`/api/teacher/students/${student.id}/stats`);
-      if (!r.ok) throw new Error("failed to load student stats");
+      if (!r.ok) throw new Error("학생 현황을 불러오지 못했습니다");
       return r.json();
     },
     refetchInterval: 12000,

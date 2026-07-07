@@ -10,14 +10,14 @@ import { prisma } from "@/lib/db";
  */
 export async function GET(req: NextRequest) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const userId = (session.user as { id: string }).id;
 
   const me = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, role: true, school: true, grade: true, className: true },
   });
-  if (!me) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (!me) return NextResponse.json({ error: "사용자를 찾을 수 없습니다" }, { status: 404 });
 
   const school = me.school;
   const grade = me.role === "TEACHER" ? req.nextUrl.searchParams.get("grade") : me.grade;

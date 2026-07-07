@@ -10,7 +10,7 @@ import { getRequestLocale } from "@/lib/locale";
 // 저장된 학급 세션 분석 조회(AI 호출 없음) — 질문조회/대시보드가 공유한 결과를 불러온다.
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   if ((session.user as { role?: string }).role !== "TEACHER") {
     return NextResponse.json({ error: "교사만 가능합니다" }, { status: 403 });
   }
@@ -27,7 +27,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
 
   const userRole = (session.user as { role?: string }).role;

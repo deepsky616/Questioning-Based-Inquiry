@@ -14,7 +14,7 @@ const schema = z.object({
 // 교사가 담당 학생(개별 또는 여러 명)의 로그인 비밀번호를 재설정한다.
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 가능" }, { status: 403 });
   const teacherId = (session.user as { id: string }).id;

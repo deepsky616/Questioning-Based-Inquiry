@@ -611,7 +611,7 @@ function SessionRow({
     queryKey: ["session-participation", session.id],
     queryFn: async () => {
       const res = await fetch(`/api/sessions/${session.id}/participation`);
-      if (!res.ok) throw new Error("failed to load session participation");
+      if (!res.ok) throw new Error("수업 참여 현황을 불러오지 못했습니다");
       return res.json();
     },
     enabled: showMissingStudents,

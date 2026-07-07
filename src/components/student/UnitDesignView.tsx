@@ -137,7 +137,7 @@ export function UnitDesignView() {
     queryKey: publishedKey,
     queryFn: async () => {
       const r = await fetch(`/api/sessions/${selectedId}/publish-questions`);
-      if (!r.ok) throw new Error("failed to load published questions");
+      if (!r.ok) throw new Error("배포된 질문을 불러오지 못했습니다");
       return r.json();
     },
     enabled: Boolean(selectedId),

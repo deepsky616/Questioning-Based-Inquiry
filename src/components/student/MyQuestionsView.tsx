@@ -164,7 +164,7 @@ export function MyQuestionsView() {
       const params = new URLSearchParams({ authorId: user.id });
       if (selectedSessionId !== "all") params.set("sessionId", selectedSessionId);
       const res = await fetch(`/api/questions?${params}`);
-      if (!res.ok) throw new Error("failed to load questions");
+      if (!res.ok) throw new Error("질문을 불러오지 못했습니다");
       return res.json();
     },
     enabled: Boolean(user.id),
@@ -176,7 +176,7 @@ export function MyQuestionsView() {
     queryFn: async () => {
       const params = new URLSearchParams({ authorId: user.id });
       const res = await fetch(`/api/questions?${params}`);
-      if (!res.ok) throw new Error("failed to load questions");
+      if (!res.ok) throw new Error("질문을 불러오지 못했습니다");
       return res.json();
     },
     enabled: Boolean(user.id),

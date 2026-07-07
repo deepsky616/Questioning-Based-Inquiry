@@ -290,7 +290,7 @@ export function ExploreQuestionsView() {
       const params = new URLSearchParams({ isPublic: "true" });
       if (selectedSessionId !== "all") params.set("sessionId", selectedSessionId);
       const res = await fetch(`/api/questions?${params}`);
-      if (!res.ok) throw new Error("failed to load questions");
+      if (!res.ok) throw new Error("질문을 불러오지 못했습니다");
       return res.json();
     },
     refetchInterval: 12000,

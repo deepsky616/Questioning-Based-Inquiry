@@ -25,14 +25,14 @@ export interface TeacherStudentListResponse<TStudent, TClass> {
 
 async function fetchSessions<TSession extends BasicSession>(): Promise<TSession[]> {
   const res = await fetch("/api/sessions");
-  if (!res.ok) throw new Error("failed to load sessions");
+  if (!res.ok) throw new Error("수업 세션을 불러오지 못했습니다");
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
 
 async function fetchTeacherStudents<TStudent, TClass>(): Promise<TeacherStudentListResponse<TStudent, TClass>> {
   const res = await fetch("/api/teacher/students");
-  if (!res.ok) throw new Error("failed to load students");
+  if (!res.ok) throw new Error("학생 목록을 불러오지 못했습니다");
   const data = await res.json();
   return {
     students: Array.isArray(data?.students) ? data.students : [],
