@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
-import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter } from "@/lib/questions";
+import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, QUESTION_LIST_MAX } from "@/lib/questions";
 import { isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { sendQuestionNotificationEmail } from "@/lib/email";
 import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
@@ -138,6 +138,8 @@ export async function GET(req: Request) {
       },
     },
     orderBy: { createdAt: "desc" },
+    // 최근 N건 기준 상한 — 이후의 좋아요·댓글·학생순 정렬도 이 범위 안에서 적용된다
+    take: QUESTION_LIST_MAX,
   });
 
   const enriched = questions.map((q) => {

@@ -1,3 +1,7 @@
+// 질문 목록 조회 상한 — 누적된 전체 조회가 무한정 커지지 않도록 최근 N건 기준으로 자른다.
+// 서버(take)와 클라이언트(잘림 안내 표시 기준)가 같은 값을 공유한다.
+export const QUESTION_LIST_MAX = 500;
+
 export interface CreateQuestionInput {
   content: string;
   context?: string;

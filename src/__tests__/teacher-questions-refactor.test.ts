@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 
 const pageSource = readFileSync("src/app/(teacher)/teacher-questions/page.tsx", "utf8");

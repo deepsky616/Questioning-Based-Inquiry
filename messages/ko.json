@@ -496,7 +496,8 @@
     "editedBadge": "수정됨",
     "regenerateBtn": "재생성",
     "regenerating": "재생성 중...",
-    "overLimitWarn": "150자를 넘었어요. 학생이 읽기 쉽게 줄여 주세요."
+    "overLimitWarn": "150자를 넘었어요. 학생이 읽기 쉽게 줄여 주세요.",
+    "listTruncated": "최근 {max}건까지만 표시하고 있어요. 날짜·교과·주제 필터로 범위를 좁혀보세요."
   },
   "sequencePanel": {
     "published": "학생에게 배포했습니다",

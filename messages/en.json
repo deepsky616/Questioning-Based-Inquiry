@@ -496,7 +496,8 @@
     "editedBadge": "Edited",
     "regenerateBtn": "Regenerate",
     "regenerating": "Regenerating...",
-    "overLimitWarn": "Over 150 characters — consider shortening for readability."
+    "overLimitWarn": "Over 150 characters — consider shortening for readability.",
+    "listTruncated": "Showing only the {max} most recent questions. Narrow the range with the date, subject, or topic filters."
   },
   "sequencePanel": {
     "published": "Shared with students",

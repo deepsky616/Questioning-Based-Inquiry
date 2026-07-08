@@ -21,6 +21,7 @@ import { summarizeQuestionTypes } from "@/lib/stats-calc";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { QuestionSortControl, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { matchesCognitiveCategory } from "@/lib/question-labels";
+import { QUESTION_LIST_MAX } from "@/lib/questions";
 import { getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions } from "@/lib/app-queries";
 import { APP_DATA_REFETCH_MS } from "@/lib/query-refresh";
@@ -565,6 +566,12 @@ export default function QuestionsPage() {
             })()}
           </CardContent>
         </Card>
+      )}
+
+      {questions.length >= QUESTION_LIST_MAX && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+          {t("listTruncated", { max: QUESTION_LIST_MAX })}
+        </p>
       )}
 
       <TeacherQuestionListPanel
