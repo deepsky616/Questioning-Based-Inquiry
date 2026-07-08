@@ -11,8 +11,6 @@ import { formatDateTime } from "@/lib/datetime";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -21,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -30,7 +27,9 @@ import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import { DeployedDesignList } from "./DeployedDesignList";
 import { ParticipationSection } from "./ParticipationSection";
 import { SessionAnalysisCard } from "./SessionAnalysisCard";
-import type { QuestionSession } from "./types";
+import { QuestionEditDialog } from "./QuestionEditDialog";
+import { AiAnswerPreviewDialog } from "./AiAnswerPreviewDialog";
+import type { QuestionSession, Question, BulkPreview } from "./types";
 import { PointReviewView } from "@/components/teacher/PointReviewView";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
@@ -41,7 +40,6 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
   matchesCognitiveCategory,
-  normalizeCognitiveType,
 } from "@/lib/question-labels";
 import { buildSessionLabel, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions } from "@/lib/app-queries";
@@ -51,25 +49,6 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useTranslations } from "next-intl";
-
-interface Question {
-  id: string;
-  content: string;
-  closure: string;
-  cognitive: string;
-  closureScore: number;
-  cognitiveScore: number;
-  sessionId: string | null;
-  session: { id: string; date: string; subject: string; topic: string } | null;
-  author: { id: string; name: string; className?: string; grade?: string; studentNumber?: string };
-  isPublic: boolean;
-  flagged?: boolean;
-  flagReason?: string;
-  createdAt: string;
-  comments?: Array<{ id: string; content: string; author: { id?: string; name: string }; createdAt: string; flagged?: boolean; flagReason?: string }>;
-  likeCount: number;
-  likedBy?: Array<{ id: string; name: string }>;
-}
 
 export default function QuestionsPage() {
   const tPages = useTranslations("pages");
@@ -84,12 +63,6 @@ export default function QuestionsPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
-  const [correctionClosure, setCorrectionClosure] = useState("");
-  const [correctionCognitive, setCorrectionCognitive] = useState("");
-  const [comment, setComment] = useState("");
-  const [correctionMsg, setCorrectionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [isSavingCorrection, setIsSavingCorrection] = useState(false);
-  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
 
@@ -97,13 +70,7 @@ export default function QuestionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // 미리보기 2단계 플로우
   const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
-  const [bulkPreviews, setBulkPreviews] = useState<Array<{
-    questionId: string;
-    questionContent: string;
-    authorName: string;
-    authorInfo: string;
-    answer: string;
-  }> | null>(null);
+  const [bulkPreviews, setBulkPreviews] = useState<BulkPreview[] | null>(null);
   const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
   const [isSendingPreviews, setIsSendingPreviews] = useState(false);
   // 전송 제외 학생 + 항목별 재생성 진행 상태
@@ -339,15 +306,7 @@ export default function QuestionsPage() {
         })
       );
       const previews = results
-        .filter(
-          (r): r is PromiseFulfilledResult<{
-            questionId: string;
-            questionContent: string;
-            authorName: string;
-            authorInfo: string;
-            answer: string;
-          }> => r.status === "fulfilled"
-        )
+        .filter((r): r is PromiseFulfilledResult<BulkPreview> => r.status === "fulfilled")
         .map((r) => r.value);
 
       if (previews.length === 0) {
@@ -437,37 +396,6 @@ export default function QuestionsPage() {
     }
   };
 
-  const handleSaveCorrection = async () => {
-    if (!selectedQuestion) return;
-    setIsSavingCorrection(true);
-    setCorrectionMsg(null);
-    try {
-      const patchRes = await fetch(`/api/questions/${selectedQuestion.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ closure: correctionClosure, cognitive: correctionCognitive }),
-      });
-      if (!patchRes.ok) throw new Error(t("classifyUpdateFailed"));
-
-      if (comment.trim()) {
-        const commentRes = await fetch(`/api/questions/${selectedQuestion.id}/comments`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: comment.trim() }),
-        });
-        if (!commentRes.ok) throw new Error(t("commentSaveFailed"));
-      }
-
-      setSelectedQuestion(null);
-      setComment("");
-      fetchQuestions(selectedSessionId);
-    } catch (err) {
-      setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : t("saveFailedMsg") });
-    } finally {
-      setIsSavingCorrection(false);
-    }
-  };
-
   const handleToggleQuestionPublic = async (question: Question) => {
     const nextPublic = !question.isPublic;
     setQuestions((prev) =>
@@ -539,14 +467,6 @@ export default function QuestionsPage() {
   const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
   const previewQuestions = selectedQuestions.slice(0, 3);
   const hiddenPreviewCount = Math.max(selectedQuestions.length - previewQuestions.length, 0);
-  const bulkPreviewTotal = bulkPreviews?.length ?? 0;
-  const bulkPreviewReady = bulkPreviews?.filter((preview) =>
-    (editedAnswers[preview.questionId] ?? preview.answer).trim().length > 0
-  ).length ?? 0;
-  const bulkPreviewOverLimit = bulkPreviews?.filter((preview) =>
-    (editedAnswers[preview.questionId] ?? preview.answer).length > 150
-  ).length ?? 0;
-
   const QuestionTable = ({ list }: { list: Question[] }) => {
     const allChecked = list.length > 0 && list.every((q) => selectedIds.has(q.id));
     return list.length === 0 ? (
@@ -647,11 +567,7 @@ export default function QuestionsPage() {
                 <div className="mt-3 flex justify-end gap-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedQuestion(q);
-                      setCorrectionClosure(q.closure);
-                      setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
-                    }}
+                    onClick={() => setSelectedQuestion(q)}
                     className="rounded-md border border-indigo-200 p-2 text-indigo-600 hover:bg-indigo-50"
                     title={tc("edit")}
                     aria-label={tc("edit")}
@@ -795,11 +711,7 @@ export default function QuestionsPage() {
                   <div className="flex gap-1 justify-center">
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedQuestion(q);
-                        setCorrectionClosure(q.closure);
-                        setCorrectionCognitive(normalizeCognitiveType(q.cognitive));
-                      }}
+                      onClick={() => setSelectedQuestion(q)}
                       className="rounded-md border border-indigo-200 p-1.5 text-indigo-600 hover:bg-indigo-50"
                       title={tc("edit")}
                       aria-label={tc("edit")}
@@ -1111,245 +1023,35 @@ export default function QuestionsPage() {
         </div>
       )}
 
-      {/* 수정 다이얼로그 */}
-      <Dialog open={!!selectedQuestion} onOpenChange={() => setSelectedQuestion(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{t("editDialogTitle")}</DialogTitle>
-          </DialogHeader>
-          {selectedQuestion && (
-            <div className="space-y-4">
-              <div className="p-4 bg-muted/40 rounded-lg">
-                <p className="font-medium">{t("questionContentLabel")}</p>
-                <p className="mt-1 text-foreground">{selectedQuestion.content}</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {t("authorPrefix")}
-                  {[
-                    selectedQuestion.author.grade && t("gradeLabel", { grade: selectedQuestion.author.grade }),
-                    selectedQuestion.author.className && t("classLabel", { className: selectedQuestion.author.className }),
-                    selectedQuestion.author.studentNumber && t("numberLabel", { studentNumber: selectedQuestion.author.studentNumber }),
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}{" "}
-                  <span className="font-medium text-foreground">{selectedQuestion.author.name}</span>
-                </p>
-                {selectedQuestion.session && (
-                  <p className="text-xs text-indigo-600 mt-1">
-                    {t("sessionPrefix")}{buildSessionLabel(selectedQuestion.session.date, selectedQuestion.session.subject, selectedQuestion.session.topic)}
-                  </p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>{tCls("closure")}</Label>
-                  <Select value={correctionClosure} onValueChange={setCorrectionClosure}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="closed">{t("closedOption")}</SelectItem>
-                      <SelectItem value="open">{t("openOption")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("cognitiveLevel")}</Label>
-                  <Select value={correctionCognitive} onValueChange={setCorrectionCognitive}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="factual">{t("factualOption")}</SelectItem>
-                      <SelectItem value="conceptual">{t("conceptualOption")}</SelectItem>
-                      <SelectItem value="controversial">{t("controversialOption")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>{t("commentOptional")}</Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={isGeneratingAi || !selectedQuestion}
-                    onClick={async () => {
-                      if (!selectedQuestion) return;
-                      setIsGeneratingAi(true);
-                      setCorrectionMsg(null);
-                      try {
-                        const res = await fetch(`/api/questions/${selectedQuestion.id}/ai-answer`, { method: "POST" });
-                        const data = await res.json();
-                        if (!res.ok) throw new Error(data.error);
-                        setComment(data.answer);
-                      } catch (err) {
-                        setCorrectionMsg({ type: "error", text: err instanceof Error ? err.message : t("aiAnswerFailedGen") });
-                      } finally {
-                        setIsGeneratingAi(false);
-                      }
-                    }}
-                    className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 text-xs h-7"
-                  >
-                    {isGeneratingAi ? t("aiGenerating") : t("aiGenerate")}
-                  </Button>
-                </div>
-                <Textarea
-                  placeholder={t("commentPlaceholder")}
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  rows={3}
-                />
-              </div>
-            </div>
-          )}
-          {correctionMsg && (
-            <p className={`text-sm ${correctionMsg.type === "error" ? "text-red-600" : "text-green-700"}`}>
-              {correctionMsg.text}
-            </p>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setSelectedQuestion(null); setCorrectionMsg(null); }}>{tc("cancel")}</Button>
-            <Button onClick={handleSaveCorrection} disabled={isSavingCorrection}>
-              {isSavingCorrection ? t("saving") : tc("save")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <QuestionEditDialog
+        question={selectedQuestion}
+        onClose={() => setSelectedQuestion(null)}
+        onSaved={() => fetchQuestions(selectedSessionId)}
+      />
 
-      {/* AI 답변 미리보기 Dialog */}
-      <Dialog open={!!bulkPreviews} onOpenChange={() => { if (!isSendingPreviews) { setBulkPreviews(null); setEditedAnswers({}); } }}>
-        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{t("previewDialogTitle")}</DialogTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {t("previewDialogDesc")}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
-                {t("previewReady", { ready: bulkPreviewReady, total: bulkPreviewTotal })}
-              </span>
-              <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                {t("previewPending", { total: bulkPreviewTotal })}
-              </span>
-              {bulkPreviewOverLimit > 0 && (
-                <span className="rounded-full bg-amber-50 dark:bg-amber-950/40 px-3 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
-                  {t("previewOverLimit", { count: bulkPreviewOverLimit })}
-                </span>
-              )}
-            </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
-            {bulkPreviews?.map((preview) => {
-              const answerText = editedAnswers[preview.questionId] ?? preview.answer;
-              const answerLength = answerText.length;
-              const initial = preview.authorName.trim().slice(0, 1) || "?";
-              const excluded = excludedIds.has(preview.questionId);
-              const edited = answerText !== preview.answer;
-              const regenerating = regeneratingId === preview.questionId;
-              const overLimit = answerLength > 150;
-
-              return (
-                <div
-                  key={preview.questionId}
-                  className={`overflow-hidden rounded-xl border bg-muted/40 transition-opacity ${excluded ? "opacity-50" : ""}`}
-                >
-                  <div className="border-b bg-card px-4 py-3">
-                    <div className="mb-2 flex items-center gap-3">
-                      {/* 전송 포함/제외 체크 */}
-                      <input
-                        type="checkbox"
-                        checked={!excluded}
-                        disabled={isSendingPreviews}
-                        aria-label={t("includeInSend")}
-                        title={t("includeInSend")}
-                        onChange={() =>
-                          setExcludedIds((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(preview.questionId)) next.delete(preview.questionId);
-                            else next.add(preview.questionId);
-                            return next;
-                          })
-                        }
-                        className="h-4 w-4 shrink-0 accent-indigo-600"
-                      />
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white shadow-sm">
-                        {initial}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-foreground">{preview.authorName}</p>
-                        {preview.authorInfo && (
-                          <p className="text-xs text-muted-foreground">{preview.authorInfo}</p>
-                        )}
-                      </div>
-                      {excluded && (
-                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                          {t("excludedBadge")}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm leading-relaxed text-foreground">{preview.questionContent}</p>
-                  </div>
-                  <div className="px-4 py-3">
-                    <div className="mb-1.5 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-semibold text-indigo-600">{t("aiGeneratedAnswer")}</p>
-                        {edited && (
-                          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
-                            {t("editedBadge")}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-medium ${overLimit ? "text-amber-700" : "text-muted-foreground"}`}>
-                          {t("charCount", { n: answerLength })}
-                        </span>
-                        {/* 이 답변만 AI 재생성 */}
-                        <button
-                          type="button"
-                          onClick={() => handleRegenerateAnswer(preview.questionId)}
-                          disabled={isSendingPreviews || Boolean(regeneratingId) || excluded}
-                          className="rounded-md border border-indigo-200 px-2 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
-                        >
-                          {regenerating ? t("regenerating") : `🔄 ${t("regenerateBtn")}`}
-                        </button>
-                      </div>
-                    </div>
-                    <Textarea
-                      value={answerText}
-                      onChange={(e) =>
-                        setEditedAnswers((prev) => ({ ...prev, [preview.questionId]: e.target.value }))
-                      }
-                      rows={3}
-                      className={`resize-none text-sm ${overLimit ? "border-amber-400 focus-visible:ring-amber-400" : ""}`}
-                      disabled={isSendingPreviews || excluded || regenerating}
-                    />
-                    {overLimit && (
-                      <p className="mt-1 text-xs text-amber-700">{t("overLimitWarn")}</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {bulkMsg?.type === "error" && (
-            <p className="text-sm text-red-600 mt-1">{bulkMsg.text}</p>
-          )}
-          <DialogFooter className="gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => { setBulkPreviews(null); setEditedAnswers({}); setExcludedIds(new Set()); setBulkMsg(null); }}
-              disabled={isSendingPreviews}
-            >
-              {tc("cancel")}
-            </Button>
-            <Button
-              onClick={handleConfirmBulkAi}
-              disabled={isSendingPreviews || (bulkPreviews?.filter((p) => !excludedIds.has(p.questionId)).length ?? 0) === 0}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-            >
-              {isSendingPreviews
-                ? t("sending")
-                : t("sendCount", { count: bulkPreviews?.filter((p) => !excludedIds.has(p.questionId)).length ?? 0 })}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AiAnswerPreviewDialog
+        previews={bulkPreviews}
+        editedAnswers={editedAnswers}
+        onEditAnswer={(questionId, text) =>
+          setEditedAnswers((prev) => ({ ...prev, [questionId]: text }))
+        }
+        excludedIds={excludedIds}
+        onToggleExclude={(questionId) =>
+          setExcludedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(questionId)) next.delete(questionId);
+            else next.add(questionId);
+            return next;
+          })
+        }
+        regeneratingId={regeneratingId}
+        onRegenerate={handleRegenerateAnswer}
+        isSending={isSendingPreviews}
+        errorText={bulkMsg?.type === "error" ? bulkMsg.text : null}
+        onConfirm={handleConfirmBulkAi}
+        onDismiss={() => { setBulkPreviews(null); setEditedAnswers({}); }}
+        onCancel={() => { setBulkPreviews(null); setEditedAnswers({}); setExcludedIds(new Set()); setBulkMsg(null); }}
+      />
 
       {/* AI 일괄 답변 패널 — 하단 가운데 떠 있는 컴팩트 액션 바(양옆 여백은 클릭 통과) */}
       {selectedIds.size > 0 && (

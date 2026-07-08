@@ -19,3 +19,32 @@ export interface QuestionSession {
   targetStudentIds?: string[] | null;
   sharedQuestions?: Array<{ type: string; content: string; contentGroup?: string; source?: "student" | "teacher"; priority?: number; mergedFrom?: string[]; publishedAt?: string }>;
 }
+
+// 질문 조회 탭의 질문 한 건 (페이지·다이얼로그 공유)
+export interface Question {
+  id: string;
+  content: string;
+  closure: string;
+  cognitive: string;
+  closureScore: number;
+  cognitiveScore: number;
+  sessionId: string | null;
+  session: { id: string; date: string; subject: string; topic: string } | null;
+  author: { id: string; name: string; className?: string; grade?: string; studentNumber?: string };
+  isPublic: boolean;
+  flagged?: boolean;
+  flagReason?: string;
+  createdAt: string;
+  comments?: Array<{ id: string; content: string; author: { id?: string; name: string }; createdAt: string; flagged?: boolean; flagReason?: string }>;
+  likeCount: number;
+  likedBy?: Array<{ id: string; name: string }>;
+}
+
+// AI 답변 미리보기 한 건 (전송 전 교사 확인 플로우)
+export interface BulkPreview {
+  questionId: string;
+  questionContent: string;
+  authorName: string;
+  authorInfo: string;
+  answer: string;
+}
