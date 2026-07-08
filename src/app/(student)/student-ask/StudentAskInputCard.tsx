@@ -48,8 +48,8 @@ export function StudentAskInputCard({
         <CardTitle>{t("inputHeader")}</CardTitle>
         <CardDescription>{t("inputDesc")}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-3 gap-2">
+      <CardContent className="student-ask-tablet-layout grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)] md:items-start">
+        <div className="grid grid-cols-3 gap-2 md:col-span-2">
           {flowSteps.map((item) => {
             const active = item.step === currentStep;
             const done = item.step < currentStep;
@@ -71,38 +71,43 @@ export function StudentAskInputCard({
           })}
         </div>
 
-        {sessionSelector}
-
-        {existingQuestion && !isCheckingExisting && (
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
-            {t("alreadyAsked")}: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? "..." : ""}&rdquo;</strong>
-            <br />
-            <span className="text-xs text-amber-600">{t("separateSaveNotice")}</span>
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <Label htmlFor="content">{t("questionLabel")}</Label>
-          <Textarea
-            ref={textareaRef}
-            id="content"
-            placeholder={t("questionPlaceholder")}
-            value={content}
-            maxLength={200}
-            onChange={(event) => onContentChange(event.target.value)}
-            rows={4}
-          />
-          <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
+        <div className="min-w-0">
+          {sessionSelector}
         </div>
 
-        <Button
-          onClick={onAnalyze}
-          disabled={isLoading || !canAsk || content.trim().length === 0}
-          variant="gradient"
-          className="h-11 w-full text-base font-semibold"
-        >
-          {isLoading ? t("analyzing") : t("analyze")}
-        </Button>
+        <div className="student-ask-question-panel space-y-4 rounded-xl border bg-background p-4 md:sticky md:top-4">
+          {existingQuestion && !isCheckingExisting && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
+              {t("alreadyAsked")}: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? "..." : ""}&rdquo;</strong>
+              <br />
+              <span className="text-xs text-amber-600">{t("separateSaveNotice")}</span>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="content">{t("questionLabel")}</Label>
+            <Textarea
+              ref={textareaRef}
+              id="content"
+              placeholder={t("questionPlaceholder")}
+              value={content}
+              maxLength={200}
+              onChange={(event) => onContentChange(event.target.value)}
+              rows={7}
+              className="min-h-[11rem] text-base leading-7"
+            />
+            <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
+          </div>
+
+          <Button
+            onClick={onAnalyze}
+            disabled={isLoading || !canAsk || content.trim().length === 0}
+            variant="gradient"
+            className="h-12 w-full text-base font-semibold"
+          >
+            {isLoading ? t("analyzing") : t("analyze")}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

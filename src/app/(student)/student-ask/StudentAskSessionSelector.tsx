@@ -94,10 +94,10 @@ export function StudentAskSessionSelector({
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="student-ask-filter-grid grid grid-cols-1 gap-2 sm:grid-cols-3">
           <select
             aria-label={t("filterByDate")}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             value={filterDate}
             onChange={(event) => onFilterDateChange(event.target.value)}
           >
@@ -108,7 +108,7 @@ export function StudentAskSessionSelector({
           </select>
           <select
             aria-label={t("filterBySubject")}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             value={filterSubject}
             onChange={(event) => onFilterSubjectChange(event.target.value)}
           >
@@ -119,7 +119,7 @@ export function StudentAskSessionSelector({
           </select>
           <select
             aria-label={t("filterByTopic")}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             value={filterTopic}
             onChange={(event) => onFilterTopicChange(event.target.value)}
           >
@@ -132,7 +132,7 @@ export function StudentAskSessionSelector({
 
         <select
           id="session"
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           value={selectedSessionId}
           onChange={(event) => onSelectSession(event.target.value)}
           disabled={filteredSessions.length === 0}
@@ -151,7 +151,7 @@ export function StudentAskSessionSelector({
 
         {filteredSessions.length > 0 && (
           <div className="space-y-2">
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-950/30">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-950/30">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">{t("sessionProgressTitle")}</p>
@@ -173,7 +173,7 @@ export function StudentAskSessionSelector({
               </div>
             </div>
 
-            <div className="grid max-h-[22rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+            <div className="student-ask-session-grid grid max-h-[24rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 md:max-h-[32rem]">
               {filteredSessions.map((session) => {
                 const active = selectedSessionId === session.id;
                 const isInquiry = isInquiryDesignSession(session);
@@ -184,7 +184,7 @@ export function StudentAskSessionSelector({
                     type="button"
                     aria-pressed={active}
                     onClick={() => onSelectSession(session.id)}
-                    className={`min-h-[104px] rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                    className={`min-h-[132px] rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                       active
                         ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
                         : "border-border bg-background hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
@@ -205,7 +205,7 @@ export function StudentAskSessionSelector({
                     </div>
                     <div className="mt-2 space-y-1">
                       <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
-                      <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
+                      <p className="line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
                         {session.topic.trim() || t("emptyTopic")}
                       </p>
                       <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
