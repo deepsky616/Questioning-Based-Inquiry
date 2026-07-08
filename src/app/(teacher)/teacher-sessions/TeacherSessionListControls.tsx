@@ -1,0 +1,109 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export type SessionListSort = "desc" | "asc" | "missingDesc";
+export type SessionParticipationFilter = "all" | "missing" | "completed";
+
+interface TeacherSessionListControlsProps {
+  filterOptions: {
+    dates: string[];
+    subjects: string[];
+    topics: string[];
+  };
+  filterDate: string;
+  filterSubject: string;
+  filterTopic: string;
+  participationFilter: SessionParticipationFilter;
+  sort: SessionListSort;
+  onFilterDate: (value: string) => void;
+  onFilterSubject: (value: string) => void;
+  onFilterTopic: (value: string) => void;
+  onParticipationFilter: (value: SessionParticipationFilter) => void;
+  onSort: (value: SessionListSort) => void;
+  onReset: () => void;
+}
+
+export function TeacherSessionListControls({
+  filterOptions,
+  filterDate,
+  filterSubject,
+  filterTopic,
+  participationFilter,
+  sort,
+  onFilterDate,
+  onFilterSubject,
+  onFilterTopic,
+  onParticipationFilter,
+  onSort,
+  onReset,
+}: TeacherSessionListControlsProps) {
+  const t = useTranslations("sessions");
+  const tc = useTranslations("common");
+  const hasFilter = Boolean(filterDate || filterSubject || filterTopic || participationFilter !== "all");
+
+  return (
+    <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-2">
+      <div className="teacher-sessions-filter-grid grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[auto_8rem_7rem_10rem_10rem_auto] lg:items-center">
+        <span className="text-xs font-medium text-muted-foreground sm:col-span-2 lg:col-span-1">{t("filterLabel")}</span>
+        <Select value={filterDate || "__all__"} onValueChange={(v) => onFilterDate(v === "__all__" ? "" : v)}>
+          <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">{t("allDates")}</SelectItem>
+            {filterOptions.dates.map((date) => <SelectItem key={date} value={date}>{date}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterSubject || "__all__"} onValueChange={(v) => onFilterSubject(v === "__all__" ? "" : v)}>
+          <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allSubjects")} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
+            {filterOptions.subjects.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterTopic || "__all__"} onValueChange={(v) => onFilterTopic(v === "__all__" ? "" : v)}>
+          <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allTopics")} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">{t("allTopics")}</SelectItem>
+            {filterOptions.topics.map((topic) => <SelectItem key={topic} value={topic}>{topic}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={participationFilter} onValueChange={(value) => onParticipationFilter(value as SessionParticipationFilter)}>
+          <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allParticipation")} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("allParticipation")}</SelectItem>
+            <SelectItem value="missing">{t("participationFilterMissing")}</SelectItem>
+            <SelectItem value="completed">{t("participationFilterCompleted")}</SelectItem>
+          </SelectContent>
+        </Select>
+        {hasFilter && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="h-10 px-1 text-left text-xs font-medium text-indigo-600 hover:text-indigo-800 sm:text-center"
+          >
+            {tc("reset")}
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 lg:ml-auto">
+        <span className="text-xs font-medium text-muted-foreground">{t("sortLabel")}</span>
+        <div className="flex h-9 overflow-hidden rounded-md border">
+          {(["desc", "asc", "missingDesc"] as const).map((value, index) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onSort(value)}
+              className={`px-3 text-xs font-medium transition-colors ${index > 0 ? "border-l" : ""} ${
+                sort === value ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {value === "desc" ? t("sortDesc") : value === "asc" ? t("sortAsc") : t("sortMissingDesc")}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

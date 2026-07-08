@@ -17,6 +17,8 @@ import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { formatDateTime } from "@/lib/datetime";
 import { getAnalysisFreshness } from "@/lib/report-analysis-freshness";
+import { ReportClassificationGuide } from "@/components/reports/ReportClassificationGuide";
+import { ReportSectionGrid, SummaryCard } from "@/components/reports/ReportSectionGrid";
 
 export interface PerStudentRow {
   id: string;
@@ -107,15 +109,6 @@ const COGNITIVE_TREND: { key: keyof SeriesPoint; labelKey: string; color: string
   { key: "conceptual", labelKey: "conceptual", color: "#a855f7" },
   { key: "controversial", labelKey: "controversial", color: "#f97316" },
 ];
-
-function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="rounded-xl border bg-card p-4 text-center">
-      <div className="text-3xl font-black" style={{ color }}>{value}</div>
-      <div className="mt-1 text-xs text-muted-foreground">{label}</div>
-    </div>
-  );
-}
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 function mondayOf(d: Date): Date {
@@ -480,7 +473,7 @@ export function ReportView({
         <SummaryCard label={t("metric_commentsReceived")} value={viewTotals.commentsReceived} color="#8b5cf6" />
       </div>
 
-      <div className="report-readable-grid grid gap-4 lg:grid-cols-2">
+      <ReportSectionGrid>
         {/* 참여 추세 */}
         <div className="rounded-xl border bg-card p-4">
           <p className="mb-3 text-sm font-bold text-foreground">{t("participationTrend", { period: range === "week" ? t("week") : t("month"), label: pLabel })}</p>
@@ -516,44 +509,10 @@ export function ReportView({
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </ReportSectionGrid>
 
       {/* 분류 안내 (분류 차트 공통 참조) — 색 점은 차트 색과 동일 */}
-      <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">📚 {tCls("guideTitle")}</p>
-        <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
-          <div>
-            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{tCls("category1")} · {tCls("category1Sub")}</p>
-            <ul className="space-y-1 text-xs text-foreground">
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#3b82f6" }} />
-                <span><b className="font-semibold">{tCls("closed.label")}</b> <span className="text-muted-foreground">{tCls("closed.desc")}</span></span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#10b981" }} />
-                <span><b className="font-semibold">{tCls("open.label")}</b> <span className="text-muted-foreground">{tCls("open.desc")}</span></span>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{tCls("category2")} · {tCls("category2Sub")}</p>
-            <ul className="space-y-1 text-xs text-foreground">
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#94a3b8" }} />
-                <span><b className="font-semibold">{tCls("factual.label")}</b> <span className="text-muted-foreground">{tCls("factual.desc")}</span></span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#a855f7" }} />
-                <span><b className="font-semibold">{tCls("conceptual.label")}</b> <span className="text-muted-foreground">{tCls("conceptual.desc")}</span></span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: "#f97316" }} />
-                <span><b className="font-semibold">{tCls("controversial.label")}</b> <span className="text-muted-foreground">{tCls("controversial.desc")}</span></span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      <ReportClassificationGuide />
 
       {/* 질문 분류 분포 */}
       <div className="rounded-xl border bg-card p-4">
@@ -571,7 +530,7 @@ export function ReportView({
         </ResponsiveContainer>
       </div>
 
-      <div className="report-readable-grid grid gap-4 lg:grid-cols-2">
+      <ReportSectionGrid>
         {/* 분류1 추세 (닫힌 질문/열린 질문 누적 막대) */}
         <div className="rounded-xl border bg-card p-4">
           <p className="mb-3 text-sm font-bold text-foreground">{t("closureTrend", { cat: tCls("category1"), period: range === "week" ? t("week") : t("month"), kinds: tCls("closure") })}</p>
@@ -605,7 +564,7 @@ export function ReportView({
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </ReportSectionGrid>
 
       {/* 수업 세션별 분석 (기간 필터 + 전체 분석) */}
       {allSessions.length > 0 && analyzeSession && (
