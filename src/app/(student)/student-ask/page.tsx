@@ -2,67 +2,20 @@
 
 import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { buildSessionLabel, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
-import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
+import { Card, CardContent } from "@/components/ui/card";
+import { getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
-import { COGNITIVE_LABEL } from "@/lib/question-labels";
 import { appNotificationQueryKeys } from "@/lib/app-notifications";
 import { useStudentSessions } from "@/lib/app-queries";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
-
-interface SharedQuestion {
-  type: string;
-  content: string;
-}
-
-interface QuestionSession {
-  id: string;
-  date: string;
-  subject: string;
-  topic: string;
-  teacher: { name: string };
-  sharedQuestions: SharedQuestion[];
-  unitDesignId?: string | null;
-  defaultQuestionPublic?: boolean;
-}
-
-interface StudentQuestion {
-  sessionId?: string | null;
-}
-
-interface DesignContext {
-  title: string;
-  subject: string;
-  gradeRange: string;
-  grade: string | null;
-  area: string;
-  coreIdea: string;
-  coreSentences: string[];
-  essentialQuestions: string[];
-  inquiryQuestions: { type: string; content: string }[];
-}
-
-interface ClassificationResult {
-  closure: string;
-  cognitive: string;
-  closureScore: number;
-  cognitiveScore: number;
-  reasoning: string;
-  feedback?: string;
-  improvedExample?: string;
-  inappropriate?: boolean;
-  inappropriateReason?: string;
-}
-
-const TYPE_LABEL = COGNITIVE_LABEL;
+import { StudentAskCompletionCard } from "./StudentAskCompletionCard";
+import { StudentAskInputCard } from "./StudentAskInputCard";
+import { StudentAskResultCard } from "./StudentAskResultCard";
+import { StudentAskSessionSelector } from "./StudentAskSessionSelector";
+import type { ClassificationResult, DesignContext, QuestionSession, StudentQuestion } from "./types";
 
 export default function AskPage() {
   return (
@@ -88,7 +41,6 @@ function AskPageFallback() {
 
 function AskContent() {
   const t = useTranslations("ask");
-  const tCls = useTranslations("classification");
   const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -233,10 +185,6 @@ function AskContent() {
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
-  const handleSessionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    selectSession(e.target.value);
-  };
-
   const showAllSessions = () => {
     setFilterDate("");
     setFilterSubject("");
@@ -371,11 +319,6 @@ function AskContent() {
     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   };
 
-  const getCognitiveLabel = (c: string) =>
-    (c === "factual" || c === "conceptual" || c === "controversial")
-      ? `${tCls(`${c}.label`)}`
-      : c;
-
   // issue #1: 로딩 중에는 아무것도 표시하지 않음
   if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) {
     return (
@@ -450,444 +393,64 @@ function AskContent() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("inputHeader")}</CardTitle>
-          <CardDescription>{t("inputDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            {flowSteps.map((item) => {
-              const active = item.step === currentStep;
-              const done = item.step < currentStep;
-              return (
-                <div
-                  key={item.step}
-                  className={`rounded-lg border px-3 py-2 text-center text-xs font-semibold ${
-                    active
-                      ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-200"
-                      : done
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200"
-                        : "border-border bg-muted/30 text-muted-foreground"
-                  }`}
-                >
-                  <span className="mr-1">{item.step}</span>
-                  {item.label}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 세션 선택 — 필수 */}
-          <div className="space-y-2">
-            <Label htmlFor="session">{t("sessionSelectLabel")} <span className="text-red-500">*</span></Label>
-
-            {/* 날짜·교과·주제로 좁혀서 찾기 (선택) */}
-            {taskScope && (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200">
-                <span>
-                  {taskScope === "today-unasked" && t("taskScopeTodayUnasked")}
-                  {taskScope === "future-unasked" && t("taskScopeFutureUnasked")}
-                  {taskScope === "past-unasked" && t("taskScopePastUnasked")}
-                  {taskScope === "shared" && t("taskScopeShared")}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-8 border-indigo-200 bg-white px-3 text-xs text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-100"
-                  onClick={showAllSessions}
-                >
-                  {t("showAllSessions")}
-                </Button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-3 gap-2">
-              <select
-                aria-label={t("filterByDate")}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-              >
-                <option value="">{t("allDates")}</option>
-                {filterOptions.dates.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-              <select
-                aria-label={t("filterBySubject")}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                value={filterSubject}
-                onChange={(e) => setFilterSubject(e.target.value)}
-              >
-                <option value="">{t("allSubjects")}</option>
-                {filterOptions.subjects.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <select
-                aria-label={t("filterByTopic")}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                value={filterTopic}
-                onChange={(e) => setFilterTopic(e.target.value)}
-              >
-                <option value="">{t("allTopics")}</option>
-                {filterOptions.topics.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-
-            <select
-              id="session"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={selectedSessionId}
-              onChange={handleSessionChange}
-              disabled={filteredSessions.length === 0}
-            >
-              {filteredSessions.length === 0 ? (
-                <option value="">{t("noMatchingSession")}</option>
-              ) : (
-                filteredSessions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {buildSessionLabel(s.date, s.subject, s.topic)}
-                    {isInquiryDesignSession(s) ? ` · ${t("inquiryClassTag")}` : ""}
-                  </option>
-                ))
-              )}
-            </select>
-
-            {filteredSessions.length > 0 && (
-              <div className="space-y-2">
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-950/30">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">
-                        {t("sessionProgressTitle")}
-                      </p>
-                      <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                        {t("sessionProgressSummary", sessionProgress)}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">
-                      {sessionProgress.percent}%
-                    </span>
-                  </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-white dark:bg-emerald-950">
-                    <div
-                      className="h-full rounded-full bg-emerald-500 transition-all"
-                      style={{ width: `${sessionProgress.percent}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid max-h-[22rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                  {filteredSessions.map((session) => {
-                    const active = selectedSessionId === session.id;
-                    const isInquiry = isInquiryDesignSession(session);
-                    const alreadyAskedInSession = questionSessionIds.has(session.id);
-                    return (
-                      <button
-                        key={session.id}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => selectSession(session.id)}
-                        className={`min-h-[104px] rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                          active
-                            ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
-                            : "border-border bg-background hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                            active
-                              ? "bg-white text-indigo-700 dark:bg-indigo-900 dark:text-indigo-100"
-                              : "bg-muted text-muted-foreground"
-                          }`}>
-                            {getSessionDateBadge(session.date)}
-                          </span>
-                          {active && (
-                            <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white">
-                              {t("selectedSessionBadge")}
-                            </span>
-                          )}
-                          {!active && alreadyAskedInSession && (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                              {t("completedSessionBadge")}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-2 space-y-1">
-                          <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
-                          <p className="line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground">
-                            {session.topic.trim() || t("emptyTopic")}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                            <span>{session.date}</span>
-                            <span>{session.teacher.name} {t("teacherSuffix")}</span>
-                            {isInquiry && (
-                              <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">
-                                {t("inquiryClassTag")}
-                              </span>
-                            )}
-                            {alreadyAskedInSession && (
-                              <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                                {t("completedSessionShort")}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {selectedSession && (
-              <div className="rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-3 space-y-1">
-                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">{t("currentSession")}</p>
-                <p className="text-sm font-medium text-blue-900">
-                  {selectedSession.subject}
-                  {selectedSession.topic.trim() && (
-                    <span className="text-blue-700"> · {selectedSession.topic.trim()}</span>
-                  )}
-                </p>
-                <p className="text-xs text-blue-600">
-                  {selectedSession.teacher.name} {t("teacherSuffix")} &nbsp;·&nbsp; {selectedSession.date}
-                </p>
-                {selectedSession.unitDesignId && (
-                  <div className="mt-2 rounded-md border border-indigo-200 bg-white px-3 py-2 text-xs text-indigo-700">
-                    {t("inquiryClassNotice")}
-                  </div>
-                )}
-                <p className="text-xs text-blue-500">
-                  {t("visibilityNotice", { visibility: selectedSession.defaultQuestionPublic ? t("public") : t("private") })}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* 탐구질문 수업 — 참고 자료(탐구설계 맥락) 접기 패널 */}
-          {isInquirySession && designContext && (
-            <div className="rounded-lg border-2 border-indigo-300 bg-indigo-50 p-4 dark:border-indigo-500/40 dark:bg-indigo-950/40">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
-                    {t("referenceTitle")}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-indigo-900 dark:text-indigo-100">
-                    {t("referenceGuideTitle")}
-                  </p>
-                  <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-200">
-                    {t("referenceGuideDesc")}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-8 border-indigo-200 bg-white px-3 text-xs text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-100"
-                  onClick={() => setShowRef((v) => !v)}
-                >
-                  {showRef ? t("hideReference") : t("showReference")}
-                  <CollapseChevron open={showRef} />
-                </Button>
-              </div>
-              {showRef && <DesignReferenceView data={designContext} className="mt-3" />}
-            </div>
-          )}
-
-          {/* 선생님의 탐구 질문 안내 패널 (issue #4: 런타임 안전 검증) */}
-          {selectedSession &&
-            Array.isArray(selectedSession.sharedQuestions) &&
-            selectedSession.sharedQuestions.filter((q) => q.content?.trim()).length > 0 && (
-              <div className="rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4 space-y-2">
-                <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">
-                  {t("teacherInquiryQuestions")}
-                </p>
-                <p className="text-xs text-indigo-500 mb-2">
-                  {t("inquiryHint")}
-                </p>
-                <ul className="space-y-1.5">
-                  {selectedSession.sharedQuestions
-                    .filter((q) => q.content?.trim())
-                    .map((q, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-indigo-800">
-                        <span className="shrink-0 mt-0.5 text-xs font-medium text-indigo-500">
-                          [{TYPE_LABEL[q.type] ?? q.type}]
-                        </span>
-                        <span>{q.content}</span>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            )}
-
-          {/* 이미 제출한 질문 배너 */}
-          {existingQuestion && !isCheckingExisting && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
-              {t("alreadyAsked")}: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? '...' : ''}&rdquo;</strong>
-              <br />
-              <span className="text-xs text-amber-600">{t("separateSaveNotice")}</span>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="content">{t("questionLabel")}</Label>
-            <Textarea
-              ref={textareaRef}
-              id="content"
-              placeholder={t("questionPlaceholder")}
-              value={content}
-              maxLength={200}
-              onChange={(e) => setContent(e.target.value)}
-              rows={4}
-            />
-            <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
-          </div>
-
-          <Button
-            onClick={handleClassify}
-            disabled={isLoading || !canAsk || content.trim().length === 0}
-            variant="gradient"
-            className="h-11 w-full text-base font-semibold"
-          >
-            {isLoading ? t("analyzing") : t("analyze")}
-          </Button>
-        </CardContent>
-      </Card>
+      <StudentAskInputCard
+        flowSteps={flowSteps}
+        currentStep={currentStep}
+        existingQuestion={existingQuestion}
+        isCheckingExisting={isCheckingExisting}
+        content={content}
+        textareaRef={textareaRef}
+        canAsk={canAsk}
+        isLoading={isLoading}
+        onContentChange={setContent}
+        onAnalyze={handleClassify}
+        sessionSelector={
+          <StudentAskSessionSelector
+            taskScope={taskScope}
+            filterOptions={filterOptions}
+            filterDate={filterDate}
+            filterSubject={filterSubject}
+            filterTopic={filterTopic}
+            filteredSessions={filteredSessions}
+            selectedSessionId={selectedSessionId}
+            selectedSession={selectedSession}
+            questionSessionIds={questionSessionIds}
+            sessionProgress={sessionProgress}
+            isInquirySession={isInquirySession}
+            designContext={designContext}
+            showReference={showRef}
+            onShowAllSessions={showAllSessions}
+            onFilterDateChange={setFilterDate}
+            onFilterSubjectChange={setFilterSubject}
+            onFilterTopicChange={setFilterTopic}
+            onSelectSession={selectSession}
+            getSessionDateBadge={getSessionDateBadge}
+            onToggleReference={() => setShowRef((value) => !value)}
+          />
+        }
+      />
 
       {result && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("resultHeader")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {result.inappropriate && (
-              <div className="p-4 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/40">
-                <p className="text-sm font-bold text-red-700">{t("inappropriateDetected")}</p>
-                <p className="text-sm text-red-600 mt-1">
-                  {result.inappropriateReason || t("inappropriateDefault")} {t("inappropriateAdvice")}
-                </p>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/40 rounded-lg">
-                <div className="text-sm text-muted-foreground">{t("closureLabel")}</div>
-                <div className="text-xl font-bold text-blue-700">
-                  {result.closure === "closed" ? t("closedResult") : t("openResult")}
-                </div>
-                <div className="text-sm text-blue-600 mt-0.5">
-                  {result.closure === "closed" ? t("closedHint") : t("openHint")}
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {t("confidence")}: {Math.round(result.closureScore * 100)}%
-                </div>
-              </div>
-              <div className="p-4 bg-purple-50 dark:bg-purple-950/40 rounded-lg">
-                <div className="text-sm text-muted-foreground">{t("cognitiveLevel")}</div>
-                <div className="text-xl font-bold text-purple-700">
-                  {COGNITIVE_LABEL[result.cognitive] ?? result.cognitive}
-                </div>
-                <div className="text-sm text-purple-600 mt-0.5">
-                  {result.cognitive === "factual" && t("factualHint")}
-                  {result.cognitive === "conceptual" && t("conceptualHint")}
-                  {result.cognitive === "controversial" && t("controversialHint")}
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {t("confidence")}: {Math.round(result.cognitiveScore * 100)}%
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 bg-muted/40 rounded-lg">
-              <div className="text-sm font-medium text-foreground">{t("reasoning")}</div>
-              <p className="text-muted-foreground mt-1">{result.reasoning}</p>
-            </div>
-
-            {result.feedback && (
-              <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg">
-                <div className="text-sm font-medium text-amber-800 mb-1">
-                  {t("feedbackTitle")}
-                </div>
-                <p className="text-amber-700">{result.feedback}</p>
-              </div>
-            )}
-
-            {result.improvedExample && result.improvedExample.trim() && (
-              <div className="p-4 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-500/30 rounded-lg">
-                <div className="text-sm font-medium text-green-800 mb-2">
-                  {t("improvedTitle")}
-                </div>
-                <p className="text-green-900 font-medium">&ldquo;{result.improvedExample}&rdquo;</p>
-                <p className="text-xs text-green-600 mt-1">{t("improveHint")}</p>
-              </div>
-            )}
-
-            <div className="p-4 border rounded-lg bg-muted/40 text-sm text-muted-foreground">
-              {t("visibilityByTeacher")}
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="h-11 flex-1"
-                disabled={isSaving}
-                onClick={() => {
-                  setResult(null);
-                  setContent("");
-                  setSaveComplete(false);
-                }}
-              >
-                {t("rewriteQuestion")}
-              </Button>
-              {!saveComplete && (
-                <Button onClick={handleSave} disabled={isSaving} variant="gradient" className="h-11 flex-1 text-base font-semibold">
-                  {isSaving ? t("saving") : t("saveQuestion")}
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <StudentAskResultCard
+          result={result}
+          saveComplete={saveComplete}
+          isSaving={isSaving}
+          onRewrite={() => {
+            setResult(null);
+            setContent("");
+            setSaveComplete(false);
+          }}
+          onSave={handleSave}
+        />
       )}
 
       {saveComplete && (
-        <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-950/30">
-          <CardHeader>
-            <CardTitle className="text-emerald-800 dark:text-emerald-100">{t("saveCompleteTitle")}</CardTitle>
-            <CardDescription className="text-emerald-700 dark:text-emerald-200">
-              {selectedSession
-                ? t("saveCompleteDescWithSession", { session: buildSessionLabel(selectedSession.date, selectedSession.subject, selectedSession.topic) })
-                : t("saveCompleteDesc")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-2 sm:grid-cols-3">
-            <Button
-              type="button"
-              variant="gradient"
-              className="h-11"
-              onClick={() => router.push("/student-questions")}
-            >
-              {t("viewMyQuestions")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-100"
-              onClick={writeAnotherInSameSession}
-            >
-              {t("writeMoreSameSession")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/40 dark:bg-emerald-950/30 dark:text-emerald-100"
-              onClick={chooseAnotherSession}
-            >
-              {t("chooseAnotherSession")}
-            </Button>
-          </CardContent>
-        </Card>
+        <StudentAskCompletionCard
+          selectedSession={selectedSession}
+          onViewMyQuestions={() => router.push("/student-questions")}
+          onWriteAnother={writeAnotherInSameSession}
+          onChooseAnotherSession={chooseAnotherSession}
+        />
       )}
     </div>
   );

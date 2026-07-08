@@ -2,25 +2,15 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { GripVertical, ChevronUp, ChevronDown } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
-import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
-import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import {
   buildClassStudentTargetPayload,
   defaultTargetSelection,
   type SessionTargetClass,
   type SessionTargetStudent,
 } from "@/lib/session-targeting";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import DatePicker from "@/components/shared/DatePicker";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
-import { formatDateTime } from "@/lib/datetime";
 import {
   extractUnitCode,
   filterAchievementsByUnitCodes,
@@ -39,6 +29,11 @@ import {
   toggleSelectedIndex,
 } from "@/lib/inquiry-design-selection";
 import { useTeacherStudents } from "@/lib/app-queries";
+import { CurriculumInquiryStep } from "./CurriculumInquiryStep";
+import { CurriculumKeywordStep } from "./CurriculumKeywordStep";
+import { CurriculumMainTabs, type CurriculumMainTab } from "./CurriculumMainTabs";
+import { CurriculumSelectableTextStep } from "./CurriculumSelectableTextStep";
+import { CurriculumStepProgress, type CurriculumStep } from "./CurriculumStepProgress";
 import { SavedDesignsTab } from "./SavedDesignsTab";
 import { Step1CurriculumExplorer } from "./Step1CurriculumExplorer";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
@@ -53,17 +48,7 @@ import {
 } from "./types";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
-type Step = 1 | 2 | 3 | 4 | 5;
 type LastDesignAction = { type: "saved" | "deployed"; at: string };
-
-const TYPE_COLOR: Record<string, string> = {
-  factual: "bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-500/30 text-blue-800 dark:text-blue-300",
-  conceptual: "bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-300",
-  controversial: "bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-500/30 text-orange-800 dark:text-orange-300",
-};
-
-
-
 
 // Codex(웹검색) 검증 완료 — 2022 개정 교육과정 문서 순서
 const AREA_ORDER: Record<string, string[]> = {
@@ -99,11 +84,8 @@ export default function CurriculumPage() {
   const tPages = useTranslations("pages");
   const t = useTranslations("curriculum");
   const tc = useTranslations("common");
-  const tCls = useTranslations("classification");
-  const tSess = useTranslations("sessions");
-  const stepLabel = (n: Step) => t(`step${n}`);
-  const typeLabel = (type: string) => `${tCls(`${type}.label`)}`;
-  const [step, setStep] = useState<Step>(1);
+  const stepLabel = (n: CurriculumStep) => t(`step${n}`);
+  const [step, setStep] = useState<CurriculumStep>(1);
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [saveTitle, setSaveTitle] = useState("");
@@ -112,7 +94,7 @@ export default function CurriculumPage() {
   const [lastDesignAction, setLastDesignAction] = useState<LastDesignAction | null>(null);
   const queryClient = useQueryClient();
   // 저장 목록(조회·정렬·인라인 편집)은 SavedDesignsTab이 자체 상태로 처리한다
-  const [mainTab, setMainTab] = useState<"create" | "saved">("create");
+  const [mainTab, setMainTab] = useState<CurriculumMainTab>("create");
   const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(true);
   const [sessionIsActive, setSessionIsActive] = useState(true);
   const [sessionLikesVisible, setSessionLikesVisible] = useState(true);
@@ -653,23 +635,7 @@ export default function CurriculumPage() {
     <div className="space-y-6 max-w-4xl mx-auto">
       <PageHeader title={tPages("teacherCurriculum.title")} description={tPages("teacherCurriculum.description")} />
 
-      {/* 탭: 탐구질문 만들기 / 저장된 탐구질문 */}
-      <div className="flex rounded-md border overflow-hidden w-fit">
-        <button
-          type="button"
-          onClick={() => setMainTab("create")}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${mainTab === "create" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-        >
-          {t("tabCreate")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setMainTab("saved")}
-          className={`px-4 py-2 text-sm font-medium border-l transition-colors ${mainTab === "saved" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-        >
-          {t("tabSaved")}{savedList.length > 0 ? ` (${savedList.length})` : ""}
-        </button>
-      </div>
+      <CurriculumMainTabs value={mainTab} savedCount={savedList.length} onChange={setMainTab} />
 
       {/* 저장 목록 — 조회·정렬·접기·인라인 편집·재배포·삭제 포함 */}
       {mainTab === "saved" && (
@@ -679,22 +645,7 @@ export default function CurriculumPage() {
       {/* 탐구질문 만들기 (단계 진행) */}
       {mainTab === "create" && (
       <>
-      <div className="flex gap-1">
-        {([1, 2, 3, 4, 5] as Step[]).map((s) => (
-          <div
-            key={s}
-            className={`flex-1 py-1.5 text-center text-xs font-medium rounded transition-colors ${
-              step === s
-                ? "bg-indigo-600 text-white"
-                : step > s
-                ? "bg-indigo-100 text-indigo-700"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {s}. {stepLabel(s)}
-          </div>
-        ))}
-      </div>
+      <CurriculumStepProgress step={step} getLabel={stepLabel} />
 
       {/* ── Step 1: 교육과정 탐색 ── */}
       <Step1CurriculumExplorer
@@ -724,361 +675,108 @@ export default function CurriculumPage() {
         loadingKeywords={loadingKeywords}
       />
 
-      {/* ── Step 2: 핵심어 선택 ── */}
-      {step >= 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("step2Title")}</CardTitle>
-            <CardDescription>{t("step2Desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {recommendedKeywords.map((kw) => (
-                <button
-                  key={kw}
-                  onClick={() => toggleKeyword(kw)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    selectedKeywords.includes(kw)
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-card text-muted-foreground border-input hover:border-indigo-400"
-                  }`}
-                >
-                  {kw}
-                </button>
-              ))}
-            </div>
+      <CurriculumKeywordStep
+        visible={step >= 2}
+        recommendedKeywords={recommendedKeywords}
+        selectedKeywords={selectedKeywords}
+        customKeyword={customKeyword}
+        loadingSentences={loadingSentences}
+        onToggleKeyword={toggleKeyword}
+        onCustomKeywordChange={setCustomKeyword}
+        onAddCustomKeyword={addCustomKeyword}
+        onGoNext={handleGoStep3}
+      />
 
-            <div className="flex gap-2">
-              <Input
-                placeholder={t("keywordPlaceholder")}
-                value={customKeyword}
-                onChange={(e) => setCustomKeyword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addCustomKeyword()}
-                className="max-w-xs"
-              />
-              <Button variant="outline" size="sm" onClick={addCustomKeyword}>{t("addBtn")}</Button>
-            </div>
+      <CurriculumSelectableTextStep
+        visible={step >= 3}
+        titleKey="step3Title"
+        descriptionKey="step3Desc"
+        selectedCount={selectedCoreSentences.length}
+        items={coreSentences}
+        selectedIndices={selectedCoreSentenceIndices}
+        itemPrefix="number"
+        selectAriaKey="selectSentenceAria"
+        loading={loadingQuestions}
+        loadingLabelKey="loadingQuestions"
+        nextLabelKey="nextQuestions"
+        loadingKind="unitDesignQuestions"
+        onSelectAll={() => setSelectedCoreSentenceIndices(selectAllIndices(coreSentences))}
+        onDeselectAll={() => setSelectedCoreSentenceIndices([])}
+        onToggle={(index) => setSelectedCoreSentenceIndices((prev) => toggleSelectedIndex(prev, index))}
+        onItemChange={(index, value) => {
+          const next = [...coreSentences];
+          next[index] = value;
+          setCoreSentences(next);
+        }}
+        onGoNext={handleGoStep4}
+      />
 
-            {selectedKeywords.length > 0 && (
-              <div className="rounded-md bg-indigo-50 dark:bg-indigo-950/40 px-4 py-2">
-                <span className="text-xs text-indigo-600 font-medium">{t("selectedKeywords")}</span>
-                <span className="text-sm text-indigo-800">{selectedKeywords.join(", ")}</span>
-              </div>
-            )}
+      <CurriculumSelectableTextStep
+        visible={step >= 4}
+        titleKey="step4Title"
+        descriptionKey="step4Desc"
+        selectedCount={selectedEssentialQuestions.length}
+        items={essentialQuestions}
+        selectedIndices={selectedEssentialQuestionIndices}
+        itemPrefix="question"
+        selectAriaKey="selectQuestionAria"
+        loading={loadingInquiry}
+        loadingLabelKey="loadingInquiry"
+        nextLabelKey="nextInquiry"
+        loadingKind="unitDesignInquiry"
+        onSelectAll={() => setSelectedEssentialQuestionIndices(selectAllIndices(essentialQuestions))}
+        onDeselectAll={() => setSelectedEssentialQuestionIndices([])}
+        onToggle={(index) => setSelectedEssentialQuestionIndices((prev) => toggleSelectedIndex(prev, index))}
+        onItemChange={(index, value) => {
+          const next = [...essentialQuestions];
+          next[index] = value;
+          setEssentialQuestions(next);
+        }}
+        onGoNext={handleGoStep5}
+      />
 
-            <Button
-              onClick={handleGoStep3}
-              disabled={loadingSentences || selectedKeywords.length === 0}
-              className="w-full"
-            >
-              {loadingSentences ? t("loadingSentences") : t("nextSentences")}
-            </Button>
-            {loadingSentences && (
-              <AiLoadingProcess kind="unitDesignSentences" />
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Step 3: 핵심 문장 ── */}
-      {step >= 3 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("step3Title")}</CardTitle>
-            <CardDescription>{t("step3Desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{t("selectedCount", { count: selectedCoreSentences.length })}</span>
-              <span className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCoreSentenceIndices(selectAllIndices(coreSentences))}
-                  className="text-indigo-600 hover:text-indigo-800 underline"
-                >
-                  {t("selectAll")}
-                </button>
-                <span className="text-muted-foreground">|</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCoreSentenceIndices([])}
-                  className="text-indigo-600 hover:text-indigo-800 underline"
-                >
-                  {t("deselectAll")}
-                </button>
-              </span>
-            </div>
-            {coreSentences.map((s, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <input
-                  type="checkbox"
-                  className="mt-2.5 h-4 w-4 shrink-0 accent-indigo-600"
-                  checked={selectedCoreSentenceIndices.includes(i)}
-                  onChange={() =>
-                    setSelectedCoreSentenceIndices((prev) => toggleSelectedIndex(prev, i))
-                  }
-                  aria-label={t("selectSentenceAria", { n: i + 1 })}
-                />
-                <span className="mt-2.5 text-xs font-bold text-indigo-500 shrink-0">{i + 1}</span>
-                <textarea
-                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-                  rows={2}
-                  value={s}
-                  onChange={(e) => {
-                    const next = [...coreSentences];
-                    next[i] = e.target.value;
-                    setCoreSentences(next);
-                  }}
-                />
-              </div>
-            ))}
-            <Button
-              onClick={handleGoStep4}
-              disabled={loadingQuestions || selectedCoreSentences.length === 0}
-              className="w-full"
-            >
-              {loadingQuestions ? t("loadingQuestions") : t("nextQuestions")}
-            </Button>
-            {loadingQuestions && (
-              <AiLoadingProcess kind="unitDesignQuestions" />
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Step 4: 핵심 질문 ── */}
-      {step >= 4 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("step4Title")}</CardTitle>
-            <CardDescription>{t("step4Desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{t("selectedCount", { count: selectedEssentialQuestions.length })}</span>
-              <span className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedEssentialQuestionIndices(selectAllIndices(essentialQuestions))}
-                  className="text-indigo-600 hover:text-indigo-800 underline"
-                >
-                  {t("selectAll")}
-                </button>
-                <span className="text-muted-foreground">|</span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedEssentialQuestionIndices([])}
-                  className="text-indigo-600 hover:text-indigo-800 underline"
-                >
-                  {t("deselectAll")}
-                </button>
-              </span>
-            </div>
-            {essentialQuestions.map((q, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <input
-                  type="checkbox"
-                  className="mt-2.5 h-4 w-4 shrink-0 accent-indigo-600"
-                  checked={selectedEssentialQuestionIndices.includes(i)}
-                  onChange={() =>
-                    setSelectedEssentialQuestionIndices((prev) => toggleSelectedIndex(prev, i))
-                  }
-                  aria-label={t("selectQuestionAria", { n: i + 1 })}
-                />
-                <span className="mt-2.5 text-xs font-bold text-indigo-500 shrink-0">Q{i + 1}</span>
-                <textarea
-                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
-                  rows={2}
-                  value={q}
-                  onChange={(e) => {
-                    const next = [...essentialQuestions];
-                    next[i] = e.target.value;
-                    setEssentialQuestions(next);
-                  }}
-                />
-              </div>
-            ))}
-            <Button
-              onClick={handleGoStep5}
-              disabled={loadingInquiry || selectedEssentialQuestions.length === 0}
-              className="w-full"
-            >
-              {loadingInquiry ? t("loadingInquiry") : t("nextInquiry")}
-            </Button>
-            {loadingInquiry && (
-              <AiLoadingProcess kind="unitDesignInquiry" />
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Step 5: 탐구 질문 ── */}
-      {step >= 5 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t("step5Title")}</CardTitle>
-            <CardDescription>{t("step5Desc")}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-xs text-muted-foreground">{t("selectedCount", { count: selectedInquiryQuestions.length })}</p>
-            {/* 평면 편집 리스트 — 드래그·↑↓ 순서 변경, 유형 변경, 내용 수정, 삭제, 추가 */}
-            <div className="space-y-2">
-              {inquiryQuestions.map((q, i) => (
-                <div
-                  key={i}
-                  draggable
-                  onDragStart={() => setDragInquiryIndex(i)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => handleInquiryDrop(i)}
-                  className={`flex flex-col gap-2 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-start ${TYPE_COLOR[q.type] ?? "bg-card"}`}
-                >
-                  <div className="flex shrink-0 items-center justify-between sm:mt-1 sm:flex-col">
-                    <GripVertical className="hidden h-4 w-4 cursor-grab text-muted-foreground sm:block" />
-                    <div className="flex sm:flex-col">
-                      <button type="button" onClick={() => moveInquiry(i, -1)} disabled={i === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30" aria-label={t("moveUp")}>
-                        <ChevronUp className="h-4 w-4" />
-                      </button>
-                      <button type="button" onClick={() => moveInquiry(i, 1)} disabled={i === inquiryQuestions.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30" aria-label={t("moveDown")}>
-                        <ChevronDown className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <select
-                    value={q.type}
-                    onChange={(e) => updateInquiry(i, { type: e.target.value as InquiryQuestion["type"] })}
-                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground sm:w-auto sm:shrink-0"
-                  >
-                    <option value="factual">{typeLabel("factual")}</option>
-                    <option value="conceptual">{typeLabel("conceptual")}</option>
-                    <option value="controversial">{typeLabel("controversial")}</option>
-                  </select>
-                  <textarea
-                    className="w-full flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-                    rows={2}
-                    value={q.content}
-                    onChange={(e) => updateInquiry(i, { content: e.target.value })}
-                  />
-                  <button type="button" onClick={() => removeInquiry(i)} className="self-end text-sm text-red-500 hover:text-red-700 sm:mt-1 sm:shrink-0 sm:self-auto" aria-label={tc("delete")}>
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <div className="flex items-center gap-2">
-                <select
-                  value={inquiryAddType}
-                  onChange={(e) => setInquiryAddType(e.target.value as InquiryQuestion["type"])}
-                  className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-                  aria-label={t("addQuestionType")}
-                >
-                  <option value="factual">{typeLabel("factual")}</option>
-                  <option value="conceptual">{typeLabel("conceptual")}</option>
-                  <option value="controversial">{typeLabel("controversial")}</option>
-                </select>
-                <Button variant="outline" size="sm" onClick={() => addInquiry(inquiryAddType)}>＋ {t("addQuestion")}</Button>
-              </div>
-            </div>
-
-            {/* 저장 — 날짜·학년·교과·주제 결정 후 저장 */}
-            <div className="border-t pt-4 space-y-3">
-              <p className="text-sm font-semibold text-foreground">{t("saveInfo")}</p>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.1fr_0.7fr_0.8fr_2.4fr]">
-                <div className="space-y-1">
-                  <Label>{t("date")}</Label>
-                  <DatePicker value={saveDate} onChange={setSaveDate} placeholder={t("pickSessionDate")} />
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("grade")}</Label>
-                  <select
-                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-                    value={saveGrade}
-                    onChange={(e) => setSaveGrade(e.target.value)}
-                  >
-                    <option value="">{t("selectGrade")}</option>
-                    {(curriculumData?.gradeRange.split("-") ?? []).map((g) => (
-                      <option key={g} value={g}>{t("gradeOption", { g })}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("subject")}</Label>
-                  <Input value={curriculumData?.subject ?? ""} disabled className="bg-muted" />
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("unitFieldLabel")}</Label>
-                  <Input
-                    placeholder={t("unitNamePlaceholder")}
-                    value={saveTitle}
-                    onChange={(e) => setSaveTitle(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* 대상 선택 + 공개 설정 (수업세션 페이지와 동일 구성) */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label>{t("selectTargetsLabel")}</Label>
-                  <SessionTargetSelector
-                    classes={targetClasses}
-                    students={students}
-                    targetClassValue={targetClassValue}
-                    selectedStudentIds={selectedStudentIds}
-                    onTargetClassChange={(v, ids) => { setTargetClassValue(v); setSelectedStudentIds(ids); }}
-                    onSelectedStudentIdsChange={setSelectedStudentIds}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("visibilitySettingsLabel")}</Label>
-                  <SessionVisibilitySettings
-                    value={{
-                      isActive: sessionIsActive,
-                      defaultQuestionPublic,
-                      likesVisibleToPeers: sessionLikesVisible,
-                      commentsVisibleToPeers: sessionCommentsVisible,
-                    }}
-                    onChange={(next) => {
-                      setSessionIsActive(next.isActive);
-                      setDefaultQuestionPublic(next.defaultQuestionPublic);
-                      setSessionLikesVisible(next.likesVisibleToPeers);
-                      setSessionCommentsVisible(next.commentsVisibleToPeers);
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* 세션 추가(탐구질문 수업) / 저장된 탐구질문 탭에 저장 */}
-              <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-                <Button
-                  onClick={() => handleSaveAndCreateSession("inquiry")}
-                  disabled={isSaving || !canSaveDesign}
-                  variant="gradient"
-                  className="h-11 flex-1 text-base font-semibold"
-                >
-                  ➕ {t("addSessionBtn")}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleSave}
-                  disabled={isSaving || !canSaveDesign}
-                  className="h-11 flex-1 text-base"
-                >
-                  💾 {t("saveOnly")}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">{t("addSessionHint")}</p>
-              {lastDesignAction && (
-                <p className="rounded-md border bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
-                  {t(
-                    lastDesignAction.type === "saved"
-                      ? "lastSavedAt"
-                      : "lastDeployedAt",
-                    { time: formatDateTime(lastDesignAction.at) },
-                  )}
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <CurriculumInquiryStep
+        visible={step >= 5}
+        inquiryQuestions={inquiryQuestions}
+        selectedInquiryCount={selectedInquiryQuestions.length}
+        dragInquiryIndex={dragInquiryIndex}
+        inquiryAddType={inquiryAddType}
+        saveDate={saveDate}
+        saveGrade={saveGrade}
+        saveTitle={saveTitle}
+        curriculumData={curriculumData}
+        students={students}
+        targetClasses={targetClasses}
+        targetClassValue={targetClassValue}
+        selectedStudentIds={selectedStudentIds}
+        sessionIsActive={sessionIsActive}
+        defaultQuestionPublic={defaultQuestionPublic}
+        sessionLikesVisible={sessionLikesVisible}
+        sessionCommentsVisible={sessionCommentsVisible}
+        isSaving={isSaving}
+        canSaveDesign={canSaveDesign}
+        lastDesignAction={lastDesignAction}
+        onSetDragInquiryIndex={setDragInquiryIndex}
+        onDropInquiry={handleInquiryDrop}
+        onMoveInquiry={moveInquiry}
+        onUpdateInquiry={updateInquiry}
+        onRemoveInquiry={removeInquiry}
+        onInquiryAddTypeChange={setInquiryAddType}
+        onAddInquiry={addInquiry}
+        onSaveDateChange={setSaveDate}
+        onSaveGradeChange={setSaveGrade}
+        onSaveTitleChange={setSaveTitle}
+        onTargetClassChange={(value, ids) => { setTargetClassValue(value); setSelectedStudentIds(ids); }}
+        onSelectedStudentIdsChange={setSelectedStudentIds}
+        onVisibilitySettingsChange={(next) => {
+          setSessionIsActive(next.isActive);
+          setDefaultQuestionPublic(next.defaultQuestionPublic);
+          setSessionLikesVisible(next.likesVisibleToPeers);
+          setSessionCommentsVisible(next.commentsVisibleToPeers);
+        }}
+        onSaveAndCreateSession={() => handleSaveAndCreateSession("inquiry")}
+        onSaveOnly={handleSave}
+      />
       </>
       )}
     </div>
