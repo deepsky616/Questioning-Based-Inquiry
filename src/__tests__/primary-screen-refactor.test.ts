@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 
 const curriculumPage = readFileSync("src/app/(teacher)/teacher-curriculum/page.tsx", "utf8");

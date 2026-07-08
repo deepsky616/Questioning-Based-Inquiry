@@ -12,6 +12,8 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+    // vitest globals(describe/it/expect) 타입 — import 없는 테스트 파일도 tsc가 통과하도록
+    "types": ["node", "vitest/globals"],
     "plugins": [
       {
         "name": "next"

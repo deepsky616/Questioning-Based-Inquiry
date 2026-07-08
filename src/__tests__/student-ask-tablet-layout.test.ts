@@ -1,3 +1,4 @@
+import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 const inputCardSource = readFileSync("src/app/(student)/student-ask/StudentAskInputCard.tsx", "utf8");
