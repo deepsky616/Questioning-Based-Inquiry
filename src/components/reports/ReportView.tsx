@@ -440,7 +440,7 @@ export function ReportView({
   return (
     <div className="report-print space-y-6">
       {/* 헤더 + 조작(인쇄 시 숨김) */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="report-readable-header flex flex-wrap items-end justify-between gap-3 rounded-xl border bg-card p-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">{title}</h2>
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
@@ -480,40 +480,42 @@ export function ReportView({
         <SummaryCard label={t("metric_commentsReceived")} value={viewTotals.commentsReceived} color="#8b5cf6" />
       </div>
 
-      {/* 참여 추세 */}
-      <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">{t("participationTrend", { period: range === "week" ? t("week") : t("month"), label: pLabel })}</p>
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-            <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-            <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-            <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {METRICS.map((m) => (
-              <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
-            ))}
-            {selectedPoint && <ReferenceLine x={selectedPoint.label} stroke="#6366f1" strokeDasharray="4 3" />}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      <div className="report-readable-grid grid gap-4 lg:grid-cols-2">
+        {/* 참여 추세 */}
+        <div className="rounded-xl border bg-card p-4">
+          <p className="mb-3 text-sm font-bold text-foreground">{t("participationTrend", { period: range === "week" ? t("week") : t("month"), label: pLabel })}</p>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+              <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
+              <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              {METRICS.map((m) => (
+                <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
+              ))}
+              {selectedPoint && <ReferenceLine x={selectedPoint.label} stroke="#6366f1" strokeDasharray="4 3" />}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
 
-      {/* 호응 추세 */}
-      <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">{t("receptionTrend", { period: range === "week" ? t("week") : t("month"), label: rLabel })}</p>
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-            <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-            <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-            <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {RECEIVED.map((m) => (
-              <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
-            ))}
-            {selectedPoint && <ReferenceLine x={selectedPoint.label} stroke="#6366f1" strokeDasharray="4 3" />}
-          </LineChart>
-        </ResponsiveContainer>
+        {/* 호응 추세 */}
+        <div className="rounded-xl border bg-card p-4">
+          <p className="mb-3 text-sm font-bold text-foreground">{t("receptionTrend", { period: range === "week" ? t("week") : t("month"), label: rLabel })}</p>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+              <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
+              <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              {RECEIVED.map((m) => (
+                <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
+              ))}
+              {selectedPoint && <ReferenceLine x={selectedPoint.label} stroke="#6366f1" strokeDasharray="4 3" />}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* 분류 안내 (분류 차트 공통 참조) — 색 점은 차트 색과 동일 */}
@@ -569,43 +571,45 @@ export function ReportView({
         </ResponsiveContainer>
       </div>
 
-      {/* 분류1 추세 (닫힌 질문/열린 질문 누적 막대) */}
-      <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">{t("closureTrend", { cat: tCls("category1"), period: range === "week" ? t("week") : t("month"), kinds: tCls("closure") })}</p>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-            <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-            <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-            <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {CLOSURE_TREND.map((m) => (
-              <Bar key={m.key} dataKey={m.key} name={tCls(`${m.labelKey}.label`)} stackId="closure" fill={m.color} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <div className="report-readable-grid grid gap-4 lg:grid-cols-2">
+        {/* 분류1 추세 (닫힌 질문/열린 질문 누적 막대) */}
+        <div className="rounded-xl border bg-card p-4">
+          <p className="mb-3 text-sm font-bold text-foreground">{t("closureTrend", { cat: tCls("category1"), period: range === "week" ? t("week") : t("month"), kinds: tCls("closure") })}</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+              <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
+              <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              {CLOSURE_TREND.map((m) => (
+                <Bar key={m.key} dataKey={m.key} name={tCls(`${m.labelKey}.label`)} stackId="closure" fill={m.color} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-      {/* 분류2 추세 (사실/개념/논쟁 누적 막대) */}
-      <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">{t("cognitiveTrend", { cat: tCls("category2"), period: range === "week" ? t("week") : t("month"), kinds: tCls("cognitive") })}</p>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-            <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-            <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-            <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {COGNITIVE_TREND.map((m) => (
-              <Bar key={m.key} dataKey={m.key} name={tCls(`${m.labelKey}.label`)} stackId="cognitive" fill={m.color} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
+        {/* 분류2 추세 (사실/개념/논쟁 누적 막대) */}
+        <div className="rounded-xl border bg-card p-4">
+          <p className="mb-3 text-sm font-bold text-foreground">{t("cognitiveTrend", { cat: tCls("category2"), period: range === "week" ? t("week") : t("month"), kinds: tCls("cognitive") })}</p>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+              <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
+              <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              {COGNITIVE_TREND.map((m) => (
+                <Bar key={m.key} dataKey={m.key} name={tCls(`${m.labelKey}.label`)} stackId="cognitive" fill={m.color} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* 수업 세션별 분석 (기간 필터 + 전체 분석) */}
       {allSessions.length > 0 && analyzeSession && (
-        <div className="rounded-xl border bg-card p-4">
+        <div className="report-analysis-panel rounded-xl border bg-card p-4">
           <p className="mb-1 text-sm font-bold text-foreground">{t("aiSessionTitle")}</p>
           <p className="mb-3 text-xs text-muted-foreground">
             {t("aiSessionDesc")}

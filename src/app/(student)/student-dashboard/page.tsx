@@ -228,21 +228,21 @@ function StudentDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">
+      <div className="space-y-1">
+        <h2 className="text-2xl font-bold leading-tight text-foreground md:text-3xl">
           {t("greeting", { name: user.name ?? "" })}
         </h2>
-        <p className="text-muted-foreground">{t("greetingSub")}</p>
+        <p className="text-sm leading-6 text-muted-foreground md:text-base">{t("greetingSub")}</p>
       </div>
 
       {/* 개요 / 상세 리포트 탭 */}
-      <div className="flex w-fit rounded-md border overflow-hidden">
+      <div className="flex w-full overflow-hidden rounded-md border sm:w-fit">
         {(["overview", "reports"] as const).map((v, i) => (
           <button
             key={v}
             type="button"
             onClick={() => setTab(v)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
+            className={`h-11 flex-1 px-4 text-sm font-medium transition-colors sm:flex-none ${i > 0 ? "border-l" : ""} ${
               tab === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
             }`}
           >
@@ -254,23 +254,22 @@ function StudentDashboard() {
       {tab === "reports" ? (
         <StudentReportView />
       ) : (
-      <>
-      {/* 포인트 카드 */}
-      <div
-        ref={pointsSectionRef}
-        className={`scroll-mt-24 rounded-2xl transition-shadow ${
-          highlightPoints ? "shadow-[0_0_0_3px_rgba(245,158,11,0.55)]" : ""
-        }`}
-      >
-        <PointsCard />
-      </div>
-
-      {isLoading ? (
-        <DashboardSkeleton />
-      ) : (
         <>
-      {/* 내가 할 일 */}
-      <Card>
+          <div className="student-dashboard-tablet-overview grid gap-4 xl:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.22fr)] xl:items-start">
+            {/* 포인트 카드 */}
+            <div
+              ref={pointsSectionRef}
+              className={`scroll-mt-24 rounded-2xl transition-shadow xl:sticky xl:top-4 ${
+                highlightPoints ? "shadow-[0_0_0_3px_rgba(245,158,11,0.55)]" : ""
+              }`}
+            >
+              <PointsCard />
+            </div>
+
+            {isLoading ? (
+              <DashboardSkeleton />
+            ) : (
+      <Card className="student-dashboard-task-panel">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
@@ -306,10 +305,10 @@ function StudentDashboard() {
                       key={item.id}
                       type="button"
                       onClick={async () => {
-                        await markNotificationRead(item.id);
+                      await markNotificationRead(item.id);
                         router.push(href);
                       }}
-                      className="rounded-md border border-indigo-200 bg-white px-3 py-2 text-left text-sm transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-background/80 dark:hover:bg-indigo-950/50"
+                      className="min-h-[92px] rounded-md border border-indigo-200 bg-white px-3 py-2 text-left text-sm transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-background/80 dark:hover:bg-indigo-950/50"
                     >
                       <p className="font-semibold text-foreground">{label}</p>
                       <p className="mt-1 text-xs font-semibold text-indigo-700 dark:text-indigo-200">{t("taskAsk")}</p>
@@ -319,7 +318,7 @@ function StudentDashboard() {
               </div>
             </div>
           )}
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="student-dashboard-task-grid grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {taskItems.map((item) => {
               const active = item.count > 0;
               const progressPercent = item.progress && item.progress.total > 0
@@ -339,7 +338,7 @@ function StudentDashboard() {
                   key={item.key}
                   type="button"
                   onClick={handleTaskClick}
-                  className={`rounded-lg border px-3 py-3 text-left transition-colors ${
+                  className={`min-h-[116px] rounded-lg border px-4 py-3 text-left transition-colors ${
                     active
                       ? item.activeClass
                       : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40"
@@ -383,9 +382,14 @@ function StudentDashboard() {
           </div>
         </CardContent>
       </Card>
+            )}
+          </div>
+
+      {!isLoading && (
+        <>
 
       {/* 총 질문 수 */}
-      <Card>
+      <Card className="md:rounded-lg">
         <CardContent className="pt-6">
           <p className="text-sm text-muted-foreground">{t("totalQuestions")}</p>
           <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
@@ -498,8 +502,8 @@ function StudentDashboard() {
           ) : (
             <div className="space-y-3">
               {questions.map((q) => (
-                <div key={q.id} className="p-4 bg-muted/40 rounded-lg">
-                  <p className="text-foreground line-clamp-1">{q.content}</p>
+                <div key={q.id} className="rounded-lg bg-muted/40 p-4">
+                  <p className="line-clamp-2 text-sm leading-6 text-foreground md:text-base">{q.content}</p>
                   <div className="flex gap-2 mt-2">
                     <span className={`text-xs px-2 py-1 rounded break-keep text-center ${CLOSURE_STYLE[q.closure]}`}>
                       {CLOSURE_LABEL[q.closure]}
@@ -514,7 +518,7 @@ function StudentDashboard() {
           )}
           <div className="mt-4">
             <Link href="/student-questions">
-              <Button variant="outline">{t("viewAll")}</Button>
+              <Button variant="outline" className="h-11 w-full sm:w-auto">{t("viewAll")}</Button>
             </Link>
           </div>
         </CardContent>

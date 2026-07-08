@@ -313,6 +313,12 @@ export default function TeacherSessionsPage() {
         : sortSessionsDesc(visibleSessions);
   const activeSessions = sortedSessions.filter((s) => isSessionAvailable(s.date));
   const pastSessions = sortedSessions.filter((s) => !isSessionAvailable(s.date));
+  const missingSessionCount = sortedSessions.filter((s) => (s.participation?.missing ?? 0) > 0).length;
+  const completedSessionCount = sortedSessions.filter((s) => {
+    const total = s.participation?.total ?? 0;
+    return total > 0 && (s.participation?.missing ?? 0) === 0;
+  }).length;
+  const totalMissingStudents = sortedSessions.reduce((sum, s) => sum + (s.participation?.missing ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -326,7 +332,7 @@ export default function TeacherSessionsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 날짜·교과·주제 (주제를 더 넓게) */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_2fr]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_2fr] lg:grid-cols-[1fr_1fr_2fr]">
             <div className="space-y-1">
               <Label>{t("date")}</Label>
               <DatePicker
@@ -426,37 +432,51 @@ export default function TeacherSessionsPage() {
       ) : sessions.length === 0 ? (
         <EmptyState icon="📅" title={t("emptyTitle")} description={t("emptyDesc")} />
       ) : (
-        <Card>
+        <Card className="teacher-sessions-desktop-management">
           <CardHeader className="pb-3 space-y-3">
             <CardTitle className="text-base">{t("listTitle")}</CardTitle>
+            <div className="teacher-sessions-summary-grid grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              {[
+                [t("upcomingSessions"), activeSessions.length],
+                [t("pastSessions"), pastSessions.length],
+                [t("participationFilterMissing"), missingSessionCount],
+                [t("participationFilterCompleted"), completedSessionCount],
+                [t("participationMissing", { missing: totalMissingStudents }), totalMissingStudents],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-lg border bg-muted/30 px-3 py-2">
+                  <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                  <p className="mt-0.5 text-xl font-bold text-foreground">{value}</p>
+                </div>
+              ))}
+            </div>
             {/* 조회(필터, 왼쪽) · 정렬(오른쪽) */}
             <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-2">
             {/* 필터 그룹 */}
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-              <span className="col-span-2 text-xs font-medium text-muted-foreground sm:col-span-1">{t("filterLabel")}</span>
+            <div className="teacher-sessions-filter-grid grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[auto_8rem_7rem_10rem_10rem_auto] lg:items-center">
+              <span className="text-xs font-medium text-muted-foreground sm:col-span-2 lg:col-span-1">{t("filterLabel")}</span>
               <Select value={listFilterDate || "__all__"} onValueChange={(v) => setListFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-32"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
+                <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("allDates")}</SelectItem>
                   {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={listFilterSubject || "__all__"} onValueChange={(v) => setListFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-28"><SelectValue placeholder={t("allSubjects")} /></SelectTrigger>
+                <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allSubjects")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
                   {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={listFilterTopic || "__all__"} onValueChange={(v) => setListFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-36"><SelectValue placeholder={t("allTopics")} /></SelectTrigger>
+                <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allTopics")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("allTopics")}</SelectItem>
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={listParticipationFilter} onValueChange={(value) => setListParticipationFilter(value as SessionParticipationFilter)}>
-                <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-36"><SelectValue placeholder={t("allParticipation")} /></SelectTrigger>
+                <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allParticipation")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("allParticipation")}</SelectItem>
                   <SelectItem value="missing">{t("participationFilterMissing")}</SelectItem>
@@ -472,7 +492,7 @@ export default function TeacherSessionsPage() {
                     setListFilterTopic("");
                     setListParticipationFilter("all");
                   }}
-                  className="h-9 px-1 text-left text-xs font-medium text-indigo-600 hover:text-indigo-800 sm:text-center"
+                  className="h-10 px-1 text-left text-xs font-medium text-indigo-600 hover:text-indigo-800 sm:text-center"
                 >
                   {tc("reset")}
                 </button>

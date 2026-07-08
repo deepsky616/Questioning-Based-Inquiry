@@ -240,16 +240,16 @@ export function MyQuestionsView() {
       <EmptyState icon="📝" title={t("empty")} description={t("emptyDesc")} />
     ) : (
       <>
-      <div className="space-y-3 lg:hidden">
+      <div className="student-questions-tablet-list space-y-3 xl:hidden">
         {list.map((q, i) => {
           const commentCount = commentCountOverride[q.id] ?? q.comments?.length ?? 0;
           const isExpanded = expandedQuestionId === q.id;
           const canEdit = (q.likeCount ?? 0) === 0 && commentCount === 0;
 
           return (
-            <div key={q.id} className="rounded-lg border bg-card p-3">
+            <div key={q.id} className="min-h-[148px] rounded-lg border bg-card p-4 md:p-5">
               <div className="flex items-start justify-between gap-3">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
                   {i + 1}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -260,23 +260,23 @@ export function MyQuestionsView() {
                         maxLength={200}
                         rows={4}
                         onChange={(e) => setEditContent(e.target.value)}
-                        className="text-sm"
+                        className="min-h-[7rem] text-base leading-7"
                         autoFocus
                       />
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <span className="text-xs text-muted-foreground">{editContent.length}/200 · {t("reclassifyNote")}</span>
                         <div className="flex justify-end gap-1.5">
-                          <Button size="sm" onClick={() => saveQuestionEdit(q.id)} disabled={isSavingEdit || !editContent.trim()}>
+                          <Button size="sm" className="h-10" onClick={() => saveQuestionEdit(q.id)} disabled={isSavingEdit || !editContent.trim()}>
                             {isSavingEdit ? t("savingEdit") : t("saveEdit")}
                           </Button>
-                          <Button size="sm" variant="outline" disabled={isSavingEdit} onClick={() => { setEditingQuestionId(null); setEditContent(""); }}>
+                          <Button size="sm" className="h-10" variant="outline" disabled={isSavingEdit} onClick={() => { setEditingQuestionId(null); setEditContent(""); }}>
                             {tEx("close")}
                           </Button>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <p className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
+                    <p className="whitespace-pre-wrap break-words text-base leading-7 text-foreground">{ct.text({ type: "QUESTION", id: q.id }, q.content)}</p>
                   )}
                   {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-1" />}
                 </div>
@@ -308,7 +308,7 @@ export function MyQuestionsView() {
                 <button
                   type="button"
                   onClick={() => toggleComments(q.id)}
-                  className="rounded-md bg-muted/40 px-2 py-2 text-center text-indigo-600"
+                  className="rounded-md bg-muted/40 px-2 py-2 text-center text-indigo-600 transition-colors hover:bg-muted"
                 >
                   <p className="text-[11px] text-muted-foreground">{t("colComments")}</p>
                   <p className="text-sm font-semibold">💬 {commentCount}</p>
@@ -322,7 +322,7 @@ export function MyQuestionsView() {
                       type="button"
                       onClick={() => { setEditingQuestionId(q.id); setEditContent(q.content); }}
                       disabled={editingQuestionId === q.id}
-                      className="rounded-md border border-indigo-200 p-2 text-indigo-600 hover:bg-indigo-50 disabled:opacity-40"
+                      className="flex h-10 w-10 items-center justify-center rounded-md border border-indigo-200 text-indigo-600 hover:bg-indigo-50 disabled:opacity-40"
                       title={t("editBtn")}
                       aria-label={t("editBtn")}
                     >
@@ -331,7 +331,7 @@ export function MyQuestionsView() {
                     <button
                       type="button"
                       onClick={() => deleteQuestion(q.id)}
-                      className="rounded-md border border-red-200 p-2 text-red-500 hover:bg-red-50"
+                      className="flex h-10 w-10 items-center justify-center rounded-md border border-red-200 text-red-500 hover:bg-red-50"
                       title={t("deleteBtn")}
                       aria-label={t("deleteBtn")}
                     >
@@ -364,7 +364,7 @@ export function MyQuestionsView() {
         })}
       </div>
 
-      <div className="hidden overflow-x-auto lg:block"><Table>
+      <div className="hidden overflow-x-auto xl:block"><Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-10">#</TableHead>
@@ -512,41 +512,41 @@ export function MyQuestionsView() {
       {/* 조회 방법: 날짜·교과·주제로 좁혀 세션 선택 (교사 페이지와 동일) */}
       <Card>
         <CardContent className="pt-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1 w-36">
+          <div className="my-questions-tablet-filters grid grid-cols-1 gap-3 md:grid-cols-[9rem_8rem_minmax(12rem,0.8fr)_minmax(18rem,1fr)] md:items-end">
+            <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">{tEx("date")}</label>
               <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={tEx("allDates")} /></SelectTrigger>
+                <SelectTrigger className="h-11 bg-background text-sm"><SelectValue placeholder={tEx("allDates")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{tEx("allDates")}</SelectItem>
                   {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1 w-32">
+            <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">{tEx("subject")}</label>
               <Select value={filterSubject || "__all__"} onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={tEx("all")} /></SelectTrigger>
+                <SelectTrigger className="h-11 bg-background text-sm"><SelectValue placeholder={tEx("all")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{tEx("allSubjects")}</SelectItem>
                   {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1 w-52">
+            <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">{tEx("topicFilterLabel")}</label>
               <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={tEx("all")} /></SelectTrigger>
+                <SelectTrigger className="h-11 bg-background text-sm"><SelectValue placeholder={tEx("all")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{tEx("allTopics")}</SelectItem>
                   {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1 min-w-0 flex-1">
+            <div className="flex min-w-0 flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">{tEx("classSession")}</label>
               <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                <SelectTrigger className="bg-background font-medium"><SelectValue placeholder={tEx("selectSession")} /></SelectTrigger>
+                <SelectTrigger className="h-11 bg-background font-medium"><SelectValue placeholder={tEx("selectSession")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{tEx("allSessions")}</SelectItem>
                   {filteredSessions.map((s) => (
@@ -609,8 +609,8 @@ export function MyQuestionsView() {
       {/* 전체 질문 목록 — 분류 필터(분류1/분류2) + 정렬(좋아요순·댓글순) */}
       <Card>
         <CardHeader className="pb-2 space-y-2">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex w-full flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
               <CardTitle className="text-base">
                 {tEx("listTitle")} <span className="text-sm font-normal text-muted-foreground">{tEx("countItems", { count: displayed.length })}</span>
               </CardTitle>
@@ -618,7 +618,7 @@ export function MyQuestionsView() {
                 placeholder={t("searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-8 text-sm w-56 bg-background"
+                className="h-10 w-full bg-background text-sm md:w-72"
               />
               <TranslateAllButton items={displayed.map((q) => ({ type: "QUESTION" as const, id: q.id }))} ct={ct} />
             </div>
