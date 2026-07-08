@@ -13,13 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
@@ -29,6 +22,8 @@ import { ParticipationSection } from "./ParticipationSection";
 import { SessionAnalysisCard } from "./SessionAnalysisCard";
 import { QuestionEditDialog } from "./QuestionEditDialog";
 import { AiAnswerPreviewDialog } from "./AiAnswerPreviewDialog";
+import { TeacherQuestionSessionSelector } from "./TeacherQuestionSessionSelector";
+import { TeacherQuestionTopTabs, type TeacherQuestionTopTab } from "./TeacherQuestionTopTabs";
 import type { QuestionSession, Question, BulkPreview } from "./types";
 import { PointReviewView } from "@/components/teacher/PointReviewView";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
@@ -67,14 +62,11 @@ export default function QuestionsPage() {
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
 
-  // 일괄 선택 상태
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  // 미리보기 2단계 플로우
   const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
   const [bulkPreviews, setBulkPreviews] = useState<BulkPreview[] | null>(null);
   const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
   const [isSendingPreviews, setIsSendingPreviews] = useState(false);
-  // 전송 제외 학생 + 항목별 재생성 진행 상태
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [bulkMsg, setBulkMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -84,24 +76,18 @@ export default function QuestionsPage() {
   const [selectedSessionId, setSelectedSessionId] = useState("");
 
 
-  // 날짜·교과·주제 필터 (세부 조회 모드용)
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
 
-  // 전체 질문 목록 정렬 (기본: 학생순 오름차순)
   const [sortField, setSortField] = useState<SortField>("student");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  // 질문/이름 검색
   const [search, setSearch] = useState("");
-  // 댓글 인라인 펼침 대상 + 작성 후 댓글수 갱신
   const [expandedCommentId, setExpandedCommentId] = useState<string | null>(null);
   const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
-  // 부적절 의심만 보기 필터
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
-  // 상단 탭: 질문 조회 / 탐구 설계 / AI 추천 포인트
-  const [topTab, setTopTab] = useState<"questions" | "design" | "review">("questions");
+  const [topTab, setTopTab] = useState<TeacherQuestionTopTab>("questions");
 
   // 알림에서 들어온 쿼리 처리(마운트 시 1회 읽어 Suspense 회피)
   //  - ?flagged=1: 부적절 의심 필터 켜기
@@ -756,92 +742,48 @@ export default function QuestionsPage() {
     <div className="space-y-6">
       <PageHeader title={tPages("teacherQuestions.title")} description={tPages("teacherQuestions.description")} />
 
-      <div className="flex rounded-md border overflow-hidden w-fit">
-        <button
-          type="button"
-          onClick={() => setTopTab("questions")}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${topTab === "questions" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-        >
-          {t("tabQuestions")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTopTab("design")}
-          className={`px-4 py-2 text-sm font-medium border-l transition-colors ${topTab === "design" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-        >
-          {t("tabDesign")}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTopTab("review")}
-          className={`px-4 py-2 text-sm font-medium border-l transition-colors ${topTab === "review" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-        >
-          {t("tabReview")}
-        </button>
-      </div>
+      <TeacherQuestionTopTabs
+        value={topTab}
+        onChange={setTopTab}
+        labels={{
+          questions: t("tabQuestions"),
+          design: t("tabDesign"),
+          review: t("tabReview"),
+        }}
+      />
 
       {topTab === "review" ? (
         <PointReviewView />
       ) : (
       <>
-      {/* 수업 세션 선택: 날짜·교과·주제로 좁혀서 단일 세션 선택 */}
-      {sessions.length === 0 ? (
-        <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          {t("noSessions")}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-border bg-muted/40 p-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1 w-36">
-              <label className="text-xs font-medium text-muted-foreground">{t("date")}</label>
-              <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">{t("allDates")}</SelectItem>
-                  {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1 w-32">
-              <label className="text-xs font-medium text-muted-foreground">{t("subject")}</label>
-              <Select value={filterSubject || "__all__"} onValueChange={(v) => setFilterSubject(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder={t("all")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
-                  {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1 w-52">
-              <label className="text-xs font-medium text-muted-foreground">{t("topicFilterLabel")}</label>
-              <Select value={filterTopic || "__all__"} onValueChange={(v) => setFilterTopic(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-card"><SelectValue placeholder={t("all")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">{t("allTopics")}</SelectItem>
-                  {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1 min-w-0 flex-1">
-              <label className="text-xs font-medium text-muted-foreground">{t("classSession")}</label>
-              {filteredSessions.length === 0 ? (
-                <div className="h-8 flex items-center text-sm text-muted-foreground">{t("noMatchingSession")}</div>
-              ) : (
-                <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                  <SelectTrigger className="bg-card font-medium"><SelectValue placeholder={t("selectSession")} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("allSessions")}</SelectItem>
-                    {filteredSessions.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">{t("filterHint")}</p>
-        </div>
-      )}
+      <TeacherQuestionSessionSelector
+        sessions={sessions}
+        filterOptions={filterOptions}
+        filteredSessions={filteredSessions}
+        selectedSessionId={selectedSessionId}
+        filterDate={filterDate}
+        filterSubject={filterSubject}
+        filterTopic={filterTopic}
+        onFilterDateChange={setFilterDate}
+        onFilterSubjectChange={setFilterSubject}
+        onFilterTopicChange={setFilterTopic}
+        onSessionChange={handleSessionChange}
+        labels={{
+          noSessions: t("noSessions"),
+          date: t("date"),
+          allDates: t("allDates"),
+          subject: t("subject"),
+          all: t("all"),
+          allSubjects: t("allSubjects"),
+          topicFilterLabel: t("topicFilterLabel"),
+          allTopics: t("allTopics"),
+          classSession: t("classSession"),
+          noMatchingSession: t("noMatchingSession"),
+          selectSession: t("selectSession"),
+          allSessions: t("allSessions"),
+          filterHint: t("filterHint"),
+        }}
+      />
 
       {topTab === "questions" && (
         <div className="space-y-6">
