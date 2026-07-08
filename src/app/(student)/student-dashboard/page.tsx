@@ -24,6 +24,7 @@ import {
   useAppNotifications,
 } from "@/lib/app-notifications";
 import { useStudentSessions } from "@/lib/app-queries";
+import { APP_DATA_REFETCH_MS, visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 interface Question {
   id: string;
@@ -86,7 +87,7 @@ function StudentDashboard() {
       return r.json();
     },
     enabled: Boolean(user.id),
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const { data: sessions = [] } = useStudentSessions<StudentSession>({ userId: user.id });
@@ -98,13 +99,13 @@ function StudentDashboard() {
       return r.json();
     },
     enabled: Boolean(user.id),
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const { notifications, markRead: markNotificationRead } = useAppNotifications({
     queryKey: appNotificationQueryKeys.student,
     enabled: Boolean(user.id),
-    refetchInterval: 12000,
+    refetchInterval: APP_DATA_REFETCH_MS,
   });
 
   const questions = allQuestions.slice(0, 5);

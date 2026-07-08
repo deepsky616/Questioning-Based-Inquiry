@@ -2,8 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { sortSessionsAsc } from "@/lib/sessions";
-
-export const APP_DATA_REFETCH_MS = 12000;
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 export const appQueryKeys = {
   teacherSessions: ["teacher-sessions"] as const,
@@ -44,7 +43,7 @@ export function useTeacherSessions<TSession extends BasicSession>() {
   return useQuery<TSession[]>({
     queryKey: appQueryKeys.teacherSessions,
     queryFn: async () => sortSessionsAsc(await fetchSessions<TSession>()),
-    refetchInterval: APP_DATA_REFETCH_MS,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
 }
@@ -60,7 +59,7 @@ export function useStudentSessions<TSession extends BasicSession>({
     queryKey: appQueryKeys.studentSessions(userId),
     queryFn: () => fetchSessions<TSession>(),
     enabled: enabled && Boolean(userId),
-    refetchInterval: APP_DATA_REFETCH_MS,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
 }
@@ -69,7 +68,7 @@ export function useTeacherStudents<TStudent, TClass>() {
   return useQuery<TeacherStudentListResponse<TStudent, TClass>>({
     queryKey: appQueryKeys.teacherStudents,
     queryFn: fetchTeacherStudents<TStudent, TClass>,
-    refetchInterval: APP_DATA_REFETCH_MS,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
 }

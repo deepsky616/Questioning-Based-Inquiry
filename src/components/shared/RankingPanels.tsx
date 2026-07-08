@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 type IndivScope = "class" | "school" | "all";
 type ClassScope = "school" | "all";
@@ -112,7 +113,7 @@ export function RankingPanel({
       if (!r.ok) throw new Error("순위표를 불러오지 못했습니다");
       return r.json();
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
 
@@ -253,7 +254,7 @@ export function StudentRankPanel({
       if (!r.ok) throw new Error("학급 순위를 불러오지 못했습니다");
       return r.json();
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
 
@@ -349,7 +350,7 @@ export function ClassRankingPanel({
       if (!r.ok) throw new Error("학급 순위표를 불러오지 못했습니다");
       return r.json();
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
 

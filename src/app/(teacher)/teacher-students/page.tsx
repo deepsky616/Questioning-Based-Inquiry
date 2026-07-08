@@ -19,6 +19,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { appQueryKeys, useTeacherStudents } from "@/lib/app-queries";
 import { StudentDetailDialog, StudentSessionProgress } from "./StudentDetailDialog";
 import type { Student, TeacherClass } from "./types";
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 /** ISO 날짜 → "오늘 / N일 전 / -" */
 function lastActiveLabel(iso?: string | null): { key: "today" | "yesterday" | "daysAgo" | "monthsAgo" | "yearsAgo"; v: Record<string, number> } | null {
@@ -84,7 +85,7 @@ export default function StudentsPage() {
       return r.json();
     },
     enabled: noQuestionsFilterOn,
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const activeStudentIdsForFilter = useMemo(

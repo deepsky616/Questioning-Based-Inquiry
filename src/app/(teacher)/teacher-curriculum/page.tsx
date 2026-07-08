@@ -41,6 +41,7 @@ import {
 import { useTeacherStudents } from "@/lib/app-queries";
 import { SavedDesignsTab } from "./SavedDesignsTab";
 import { Step1CurriculumExplorer } from "./Step1CurriculumExplorer";
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 import {
   KNOWLEDGE_ITEM_LIMIT,
   PROCESS_ITEM_LIMIT,
@@ -175,7 +176,7 @@ export default function CurriculumPage() {
       const d = await r.json();
       return Array.isArray(d) ? d : [];
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const fetchSaved = useCallback(

@@ -21,6 +21,7 @@ import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/Ranking
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useTranslations } from "next-intl";
 import { useTeacherStudents } from "@/lib/app-queries";
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 interface TeacherClass {
   grade: string;
@@ -102,7 +103,7 @@ function TeacherDashboard() {
       if (!r.ok) throw new Error("통계를 불러오지 못했습니다");
       return r.json();
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const { data: pendingPointCount = 0 } = useQuery<number>({
@@ -113,7 +114,7 @@ function TeacherDashboard() {
       const data = await r.json();
       return Number(data.count ?? 0);
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const { data: flaggedTotal = 0 } = useQuery<number>({
@@ -124,7 +125,7 @@ function TeacherDashboard() {
       const data = await r.json();
       return Number(data.total ?? 0);
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const { data: teacherStudentData } = useTeacherStudents<TeacherStudent, TeacherClass>();

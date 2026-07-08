@@ -8,8 +8,7 @@ import { NotificationBellMenu, type NotificationMenuItem } from "@/components/sh
 import { useTranslations } from "next-intl";
 import { formatShortDateTime } from "@/lib/datetime";
 import { appNotificationQueryKeys, useAppNotifications } from "@/lib/app-notifications";
-
-const POLL_MS = 25000;
+import { APP_NOTIFICATION_POLL_MS, visibleNotificationRefetchInterval } from "@/lib/query-refresh";
 
 interface FlaggedCount { total: number; questions: number; comments: number }
 
@@ -41,13 +40,13 @@ export function NotificationBell() {
   const { data: flagged } = useQuery({
     queryKey: ["flagged-count"],
     queryFn: fetchFlaggedCount,
-    refetchInterval: POLL_MS,
+    refetchInterval: visibleNotificationRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const { data: pending } = useQuery({
     queryKey: ["pending-review-count"],
     queryFn: fetchPendingCount,
-    refetchInterval: POLL_MS,
+    refetchInterval: visibleNotificationRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const {
@@ -57,7 +56,7 @@ export function NotificationBell() {
     markAllRead,
   } = useAppNotifications({
     queryKey: appNotificationQueryKeys.teacher,
-    refetchInterval: POLL_MS,
+    refetchInterval: APP_NOTIFICATION_POLL_MS,
   });
 
   const flaggedCount = flagged?.total ?? 0;

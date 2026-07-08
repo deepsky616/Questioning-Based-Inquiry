@@ -8,9 +8,7 @@ import { usePointBonusLabel } from "@/components/shared/use-point-label";
 import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/EmptyState";
-
-// 폴링 표준 12초로 통일(획득 직후 즉시성은 refetchOnWindowFocus가 담당)
-const POLL_MS = 12000;
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 interface PointLog {
   id: string;
@@ -69,7 +67,7 @@ export default function PointsCard() {
   const { data, isSuccess } = useQuery({
     queryKey: ["points-card"],
     queryFn: fetchPointsCard,
-    refetchInterval: POLL_MS,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const totalPoints = data?.totalPoints ?? 0;

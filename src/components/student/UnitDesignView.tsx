@@ -18,6 +18,7 @@ import { CommentThread } from "@/components/shared/CommentThread";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 interface SharedQuestion {
   type: string;
@@ -141,7 +142,7 @@ export function UnitDesignView() {
       return r.json();
     },
     enabled: Boolean(selectedId),
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const published: Published[] = useMemo(

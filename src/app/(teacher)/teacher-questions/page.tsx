@@ -43,6 +43,7 @@ import {
 } from "@/lib/question-labels";
 import { buildSessionLabel, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions } from "@/lib/app-queries";
+import { APP_DATA_REFETCH_MS } from "@/lib/query-refresh";
 import { SectionToggle } from "@/components/shared/SectionToggle";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -162,7 +163,7 @@ export default function QuestionsPage() {
         silent: true, // 백그라운드 재조회 — 로딩 표시로 화면이 깜빡이지 않게
       });
     };
-    const timer = window.setInterval(refetch, 12000);
+    const timer = window.setInterval(refetch, APP_DATA_REFETCH_MS);
     window.addEventListener("focus", refetch);
     return () => {
       window.clearInterval(timer);

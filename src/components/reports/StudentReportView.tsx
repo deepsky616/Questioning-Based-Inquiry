@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { ReportView, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 import { formatClock } from "@/lib/datetime";
+import { visibleReportRefetchInterval } from "@/lib/query-refresh";
 
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
   student: { name: string; grade?: string | null; className?: string | null; studentNumber?: string | null };
@@ -44,7 +45,7 @@ export function StudentReportView() {
       if (!r.ok) throw new Error((await r.json()).error || t("loadFailed"));
       return r.json();
     },
-    refetchInterval: 60000,
+    refetchInterval: visibleReportRefetchInterval,
     refetchOnWindowFocus: true,
   });
 

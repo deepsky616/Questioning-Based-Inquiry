@@ -37,6 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 interface QuestionSession {
   id: string;
@@ -168,7 +169,7 @@ export function MyQuestionsView() {
       return res.json();
     },
     enabled: Boolean(user.id),
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const { data: allSessionQuestions = [] } = useQuery<Question[]>({
@@ -180,7 +181,7 @@ export function MyQuestionsView() {
       return res.json();
     },
     enabled: Boolean(user.id),
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
 

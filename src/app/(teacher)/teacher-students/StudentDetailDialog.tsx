@@ -17,6 +17,7 @@ import { appQueryKeys } from "@/lib/app-queries";
 import Link from "next/link";
 import { buildTeacherClassLabel } from "@/lib/teacher";
 import type { Student } from "./types";
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 interface RawEvent { type: "question" | "comment" | "point"; createdAt: string; weight: number }
 interface PointLogItem { id: string; createdAt: string; points: number; gameId: string; bonusType: string; reason: string }
@@ -235,7 +236,7 @@ export function StudentDetailDialog({
       if (!r.ok) throw new Error("학생 현황을 불러오지 못했습니다");
       return r.json();
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const { data: pendingAiPoints = [] } = useQuery<PendingPointItem[]>({
@@ -247,7 +248,7 @@ export function StudentDetailDialog({
       const rows = Array.isArray(d.pending) ? d.pending : [];
       return rows.filter((p: PendingPointItem) => p.studentId === student.id);
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
 

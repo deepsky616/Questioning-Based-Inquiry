@@ -8,6 +8,7 @@ import { ReportView, type PerStudentRow, type ReportViewProps, type SessionMeta,
 import { ReportPrintDoc, type PrintReportItem } from "@/components/reports/ReportPrintDoc";
 import { useTranslations } from "next-intl";
 import { formatClock } from "@/lib/datetime";
+import { visibleReportRefetchInterval } from "@/lib/query-refresh";
 
 interface ClassItem { grade: string; className: string; studentCount: number }
 interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
@@ -139,7 +140,7 @@ export function TeacherReportsView() {
       return r.json();
     },
     enabled: Boolean(selected),
-    refetchInterval: 60000,
+    refetchInterval: visibleReportRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const report = classReportQuery.data ?? null;
@@ -153,7 +154,7 @@ export function TeacherReportsView() {
       return r.json();
     },
     enabled: view === "student" && Boolean(studentId),
-    refetchInterval: 60000,
+    refetchInterval: visibleReportRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const studentReport = studentReportQuery.data ?? null;

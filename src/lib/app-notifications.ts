@@ -1,8 +1,9 @@
 "use client";
 
 import { useQuery, useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
+import { APP_NOTIFICATION_POLL_MS, visibleRefetchInterval } from "@/lib/query-refresh";
 
-export const APP_NOTIFICATION_POLL_MS = 25000;
+export { APP_NOTIFICATION_POLL_MS };
 
 export const appNotificationQueryKeys = {
   student: ["student-notifications"] as const,
@@ -100,7 +101,7 @@ export function useAppNotifications({
     queryKey,
     queryFn: fetchAppNotifications,
     enabled,
-    refetchInterval,
+    refetchInterval: () => visibleRefetchInterval(refetchInterval),
     refetchOnWindowFocus: true,
   });
 

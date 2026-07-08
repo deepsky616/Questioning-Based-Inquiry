@@ -24,6 +24,7 @@ import { useContentTranslation } from "@/components/shared/use-content-translati
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { formatDateTime } from "@/lib/datetime";
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 interface QuestionSession {
   id: string;
@@ -293,7 +294,7 @@ export function ExploreQuestionsView() {
       if (!res.ok) throw new Error("질문을 불러오지 못했습니다");
       return res.json();
     },
-    refetchInterval: 12000,
+    refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
 
