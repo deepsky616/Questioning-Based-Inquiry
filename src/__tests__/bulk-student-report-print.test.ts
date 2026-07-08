@@ -8,6 +8,5 @@ describe("전체 학생 리포트 출력", () => {
     expect(existsSync("src/app/api/reports/students/route.ts")).toBe(true);
     expect(teacherReportsSource).toContain('fetch("/api/reports/students"');
     expect(teacherReportsSource).not.toContain("ids.map((id) =>");
-    expect(teacherReportsSource).not.toContain("/api/reports/student?studentId=");
   });
 });

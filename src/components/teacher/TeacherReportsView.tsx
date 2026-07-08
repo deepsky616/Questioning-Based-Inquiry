@@ -17,7 +17,7 @@ interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitl
   sessions?: SessionMeta[];
 }
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession" | "perStudent"> {
-  student: { name: string; grade?: string | null; className?: string | null; studentNumber?: string | null; school?: string | null };
+  student: { id?: string; name: string; grade?: string | null; className?: string | null; studentNumber?: string | null; school?: string | null };
   sessions?: SessionMeta[];
 }
 
@@ -338,22 +338,23 @@ export function TeacherReportsView() {
     setPrintBusy(true);
     try {
       const klass = report.klass as { grade: string; className: string };
-      const ids = (report.perStudent ?? []).map((s) => s.id);
-      const [results, rk] = await Promise.all([
-        Promise.all(
-          ids.map((id) =>
-            fetch(`/api/reports/student?studentId=${encodeURIComponent(id)}`)
-              .then((r) => (r.ok ? r.json() : null))
-              .catch(() => null),
-          ),
-        ),
+      const [data, rk] = await Promise.all([
+        fetch("/api/reports/students", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ grade: klass.grade, className: klass.className }),
+        }).then(async (r) => {
+          const d = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(d.error || t("loadFailed"));
+          return d as { reports?: StudentReport[] };
+        }),
         fetchRanking(klass.grade, klass.className),
       ]);
       const items: PrintReportItem[] = [];
-      results.forEach((d, i) => {
+      (data.reports ?? []).forEach((d) => {
         if (!d) return;
         const item = toItem(d as StudentReport);
-        item.ranking = studentRanking(rk, ids[i]);
+        if (d.student.id) item.ranking = studentRanking(rk, d.student.id);
         items.push(item);
       });
       showPrintPreview(items);
