@@ -14,6 +14,9 @@ const reportViewSections = readFileSync("src/components/reports/ReportViewSectio
 describe("core screen layout improvements", () => {
   it("keeps student dashboard and question views tablet-friendly", () => {
     expect(studentDashboard).toContain("student-dashboard-tablet-overview");
+    expect(studentDashboard).toContain("md:items-stretch");
+    expect(studentDashboard).toContain("student-dashboard-points-panel");
+    expect(studentDashboard).toContain("h-full");
     expect(studentDashboard).toContain("student-dashboard-task-grid");
     expect(studentDashboard).toContain("min-h-[116px]");
     expect(myQuestionsView).toContain("my-questions-tablet-filters");
