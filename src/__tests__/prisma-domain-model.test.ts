@@ -7,16 +7,16 @@ const dbCheckPath = "scripts/check-db-schema.mjs";
 const dbCheckScript = existsSync(dbCheckPath) ? readFileSync(dbCheckPath, "utf8") : "";
 
 describe("Prisma domain model hardening", () => {
-  it("uses Prisma enums for core role and status values instead of open strings", () => {
-    expect(schema).toContain("enum UserRole");
-    expect(schema).toContain("enum PointStatus");
-    expect(schema).toContain("enum SessionTargetType");
-    expect(schema).toContain("enum AnalysisScope");
+  it("keeps core role and status values aligned with the existing production text columns", () => {
+    expect(schema).not.toContain("enum UserRole");
+    expect(schema).not.toContain("enum PointStatus");
+    expect(schema).not.toContain("enum SessionTargetType");
+    expect(schema).not.toContain("enum AnalysisScope");
 
-    expect(schema).toMatch(/role\s+UserRole\s+@map\("role"\)/);
-    expect(schema).toMatch(/status\s+PointStatus\s+@default\(APPROVED\)\s+@map\("status"\)/);
-    expect(schema).toMatch(/targetType\s+SessionTargetType\s+@default\(ALL\)\s+@map\("target_type"\)/);
-    expect(schema).toMatch(/scope\s+AnalysisScope\s+@map\("scope"\)/);
+    expect(schema).toMatch(/role\s+String\s+@map\("role"\)/);
+    expect(schema).toMatch(/status\s+String\s+@default\("APPROVED"\)\s+@map\("status"\)/);
+    expect(schema).toMatch(/targetType\s+String\s+@default\("ALL"\)\s+@map\("target_type"\)/);
+    expect(schema).toMatch(/scope\s+String\s+@map\("scope"\)/);
   });
 
   it("stores live question game rooms in a dedicated model instead of SystemConfig", () => {
@@ -27,10 +27,12 @@ describe("Prisma domain model hardening", () => {
   it("provides an explicit deployment schema check for the new Prisma tables", () => {
     expect(packageJson.scripts?.["db:check"]).toBe("node scripts/check-db-schema.mjs");
     expect(existsSync(dbCheckPath)).toBe(true);
+    expect(dbCheckScript).toContain("app_notifications");
     expect(dbCheckScript).toContain("game_rooms");
     expect(dbCheckScript).toContain("question_game_customs");
     expect(dbCheckScript).toContain("question_game_visibilities");
     expect(dbCheckScript).toContain("question_game_orders");
+    expect(dbCheckScript).toContain("REQUIRED_TEXT_COLUMNS");
     expect(dbCheckScript).toContain("DATABASE_URL");
   });
 

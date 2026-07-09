@@ -1,17 +1,18 @@
 import { PrismaClient } from "@prisma/client";
 
 const REQUIRED_TABLES = [
+  "app_notifications",
   "game_rooms",
   "question_game_customs",
   "question_game_visibilities",
   "question_game_orders",
 ];
 
-const REQUIRED_ENUMS = [
-  "UserRole",
-  "PointStatus",
-  "SessionTargetType",
-  "AnalysisScope",
+const REQUIRED_TEXT_COLUMNS = [
+  ["users", "role"],
+  ["point_logs", "status"],
+  ["question_sessions", "target_type"],
+  ["session_analyses", "scope"],
 ];
 
 if (!process.env.DATABASE_URL) {
@@ -32,16 +33,16 @@ async function tableExists(tableName) {
   return rows.length > 0;
 }
 
-async function enumExists(enumName) {
+async function textColumnExists(tableName, columnName) {
   const rows = await prisma.$queryRaw`
-    SELECT t.typname
-    FROM pg_type t
-    JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE n.nspname = current_schema()
-      AND t.typname = ${enumName}
+    SELECT data_type
+    FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = ${tableName}
+      AND column_name = ${columnName}
     LIMIT 1
   `;
-  return rows.length > 0;
+  return rows[0]?.data_type === "text";
 }
 
 async function main() {
@@ -50,15 +51,15 @@ async function main() {
     if (!(await tableExists(table))) missingTables.push(table);
   }
 
-  const missingEnums = [];
-  for (const enumName of REQUIRED_ENUMS) {
-    if (!(await enumExists(enumName))) missingEnums.push(enumName);
+  const invalidTextColumns = [];
+  for (const [table, column] of REQUIRED_TEXT_COLUMNS) {
+    if (!(await textColumnExists(table, column))) invalidTextColumns.push(`${table}.${column}`);
   }
 
-  if (missingTables.length > 0 || missingEnums.length > 0) {
+  if (missingTables.length > 0 || invalidTextColumns.length > 0) {
     console.error("Database schema is not ready.");
     if (missingTables.length > 0) console.error(`Missing tables: ${missingTables.join(", ")}`);
-    if (missingEnums.length > 0) console.error(`Missing enums: ${missingEnums.join(", ")}`);
+    if (invalidTextColumns.length > 0) console.error(`Expected text columns: ${invalidTextColumns.join(", ")}`);
     console.error("Run npx prisma db push or your production migration process before deploying.");
     process.exit(1);
   }
