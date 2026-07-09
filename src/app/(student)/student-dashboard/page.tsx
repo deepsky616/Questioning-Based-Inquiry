@@ -259,11 +259,27 @@ function StudentDashboard() {
             {/* 포인트 카드 */}
             <div
               ref={pointsSectionRef}
-              className={`student-dashboard-points-panel scroll-mt-24 rounded-2xl transition-shadow md:h-full ${
+              className={`student-dashboard-points-panel flex scroll-mt-24 flex-col gap-4 rounded-2xl transition-shadow md:h-full ${
                 highlightPoints ? "shadow-[0_0_0_3px_rgba(245,158,11,0.55)]" : ""
               }`}
             >
-              <PointsCard />
+              <div className="min-h-0 flex-1">
+                <PointsCard />
+              </div>
+              <Card className="student-dashboard-question-summary border-indigo-100 bg-indigo-50/70 dark:border-indigo-500/30 dark:bg-indigo-950/20">
+                <CardContent className="flex items-center justify-between gap-3 p-4">
+                  <div>
+                    <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-200">{t("totalQuestions")}</p>
+                    <p className="mt-0.5 text-3xl font-black text-foreground">{isLoading ? "..." : stats.total}</p>
+                  </div>
+                  <Link
+                    href="/student-questions"
+                    className="rounded-md border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-background/70 dark:text-indigo-200 dark:hover:bg-indigo-950/50"
+                  >
+                    {t("viewAll")}
+                  </Link>
+                </CardContent>
+              </Card>
             </div>
 
             {isLoading ? (
@@ -387,15 +403,6 @@ function StudentDashboard() {
 
       {!isLoading && (
         <>
-
-      {/* 총 질문 수 */}
-      <Card className="md:rounded-lg">
-        <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">{t("totalQuestions")}</p>
-          <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
-        </CardContent>
-      </Card>
-
       {/* 분류 1 · 닫힌 질문 / 열린 질문 */}
       <Card>
         <CardHeader className="pb-3">
