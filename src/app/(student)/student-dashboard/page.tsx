@@ -255,11 +255,11 @@ function StudentDashboard() {
         <StudentReportView />
       ) : (
         <>
-          <div className="student-dashboard-tablet-overview grid gap-4 xl:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.22fr)] xl:items-start">
+          <div className="student-dashboard-tablet-overview grid gap-4 md:items-stretch xl:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.22fr)]">
             {/* 포인트 카드 */}
             <div
               ref={pointsSectionRef}
-              className={`scroll-mt-24 rounded-2xl transition-shadow xl:sticky xl:top-4 ${
+              className={`student-dashboard-points-panel scroll-mt-24 rounded-2xl transition-shadow md:h-full ${
                 highlightPoints ? "shadow-[0_0_0_3px_rgba(245,158,11,0.55)]" : ""
               }`}
             >
@@ -269,7 +269,7 @@ function StudentDashboard() {
             {isLoading ? (
               <DashboardSkeleton />
             ) : (
-      <Card className="student-dashboard-task-panel">
+      <Card className="student-dashboard-task-panel md:h-full">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>

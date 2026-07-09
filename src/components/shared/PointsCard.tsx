@@ -78,9 +78,9 @@ export default function PointsCard() {
   const rankText = (v: number | null) => (v != null ? t("rank", { v }) : "-");
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-3">
       {/* 내 포인트 + 순위 */}
-      <div className="rounded-2xl p-6 text-white relative overflow-hidden"
+      <div className="relative overflow-hidden rounded-2xl p-6 text-white md:h-full"
         style={{ background: "linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)" }}>
         <span className="absolute top-2 right-3 text-3xl opacity-20">⭐</span>
         <span className="absolute bottom-2 left-3 text-2xl opacity-20">✨</span>
@@ -101,7 +101,7 @@ export default function PointsCard() {
       </div>
 
       {/* 최근 받은 포인트 */}
-      <div className="md:col-span-2 rounded-2xl p-5 bg-card border border-border shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm md:col-span-2 md:h-full">
         <h3 className="font-black text-foreground text-sm mb-3">{t("recentTitle")}</h3>
         {recent.length === 0 ? (
           <EmptyState icon="⭐" title={t("emptyTitle")} description={t("emptyDesc")} />
