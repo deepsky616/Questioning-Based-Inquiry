@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 const studentDashboard = readFileSync("src/app/(student)/student-dashboard/page.tsx", "utf8");
+const teacherDashboard = readFileSync("src/app/(teacher)/teacher-dashboard/page.tsx", "utf8");
 const myQuestionsView = readFileSync("src/components/student/MyQuestionsView.tsx", "utf8");
 const teacherSessions = readFileSync("src/app/(teacher)/teacher-sessions/page.tsx", "utf8");
 const reportView = readFileSync("src/components/reports/ReportView.tsx", "utf8");
@@ -31,6 +32,14 @@ describe("core screen layout improvements", () => {
     expect(teacherSessionSummaryGrid).toContain("teacher-sessions-summary-grid");
     expect(teacherSessionListControls).toContain("teacher-sessions-filter-grid");
     expect(teacherSessionCreateCard).toContain("lg:grid-cols-[1fr_1fr_2fr]");
+  });
+
+  it("keeps teacher dashboard action tasks before summary stats", () => {
+    expect(teacherDashboard.indexOf("{/* 오늘 할 일 */")).toBeGreaterThan(-1);
+    expect(teacherDashboard.indexOf("{/* 총 질문 수 */")).toBeGreaterThan(-1);
+    expect(teacherDashboard.indexOf("{/* 오늘 할 일 */")).toBeLessThan(
+      teacherDashboard.indexOf("{/* 총 질문 수 */"),
+    );
   });
 
   it("keeps report sections grouped for readable preview and print", () => {
