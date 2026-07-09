@@ -26,6 +26,9 @@ npx prisma generate
 # Push database schema
 npx prisma db push
 
+# Check required deployment tables/enums
+npm run db:check
+
 # Run development server
 npm run dev
 ```
@@ -49,6 +52,7 @@ RESEND_FROM_EMAIL="Question Lab <noreply@your-domain.com>"
 2. Copy the pooled Postgres connection string from Supabase Database settings.
 3. Set it as `DATABASE_URL`.
 4. Run `npx prisma generate` and `npx prisma db push`.
+5. Run `npm run db:check` before deployment. If this fails, the live database is missing required tables or enums.
 
 ### Resend Free setup
 

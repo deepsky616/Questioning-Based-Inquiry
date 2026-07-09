@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { saveQuestionGameOrder } from "@/lib/question-game-settings-store";
 
 const schema = z.object({ order: z.array(z.string().min(1)) });
 
@@ -16,12 +16,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { order } = schema.parse(await req.json());
-    const key = `question_game_order_${teacherId}`;
-    await prisma.systemConfig.upsert({
-      where: { key },
-      update: { value: JSON.stringify(order) },
-      create: { key, value: JSON.stringify(order) },
-    });
+    await saveQuestionGameOrder(teacherId, order);
     return NextResponse.json({ ok: true });
   } catch (error) {
     if (error instanceof z.ZodError) {

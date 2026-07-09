@@ -241,6 +241,44 @@ model GameRoom {
   @@map("game_rooms")
 }
 
+model QuestionGameCustom {
+  id          String   @id @map("id")
+  teacherId   String   @map("teacher_id")
+  title       String   @map("title")
+  description String   @db.Text @map("description")
+  emoji       String   @map("emoji")
+  gradientCss String   @db.Text @map("gradient_css")
+  accentColor String   @default("#6366f1") @map("accent_color")
+  playerCount String   @default("제한없음") @map("player_count")
+  duration    String   @default("20분") @map("duration")
+  instructions Json    @default("[]") @map("instructions")
+  order       Int      @default(100) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([teacherId, order])
+  @@map("question_game_customs")
+}
+
+model QuestionGameVisibility {
+  teacherId  String   @map("teacher_id")
+  gameId     String   @map("game_id")
+  visibility Json     @map("visibility")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@id([teacherId, gameId])
+  @@index([teacherId])
+  @@map("question_game_visibilities")
+}
+
+model QuestionGameOrder {
+  teacherId String   @id @map("teacher_id")
+  gameIds   Json     @default("[]") @map("game_ids")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("question_game_orders")
+}
+
 // 2022 개정 교육과정 시드 데이터
 model CurriculumArea {
   id             String   @id @default(cuid())

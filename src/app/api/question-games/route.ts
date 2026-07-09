@@ -8,6 +8,7 @@ import {
   isGameVisibleToStudent,
   sortGamesByOrder,
 } from "@/lib/question-games-data";
+import { loadQuestionGameSettingsForTeachers } from "@/lib/question-game-settings-store";
 
 export async function GET() {
   const session = await auth();
@@ -37,36 +38,7 @@ export async function GET() {
     return NextResponse.json(BUILT_IN_GAMES);
   }
 
-  // 각 선생님의 visibility 설정 및 커스텀 게임 수집
-  const visibilityMap: Record<string, GameVisibility> = {};
-  const customGames: AnyGame[] = [];
-
-  for (const teacherId of teacherIds) {
-    const [visConfig, gamesConfig] = await Promise.all([
-      prisma.systemConfig.findUnique({
-        where: { key: `question_game_vis_${teacherId}` },
-      }),
-      prisma.systemConfig.findUnique({
-        where: { key: `question_game_custom_${teacherId}` },
-      }),
-    ]);
-
-    if (visConfig) {
-      try {
-        const vis = JSON.parse(visConfig.value) as Record<string, GameVisibility>;
-        Object.assign(visibilityMap, vis);
-      } catch {}
-    }
-
-    if (gamesConfig) {
-      try {
-        const games = JSON.parse(gamesConfig.value) as Omit<AnyGame, "isBuiltIn">[];
-        games.forEach((g) =>
-          customGames.push({ ...g, isBuiltIn: false, teacherId } as AnyGame)
-        );
-      } catch {}
-    }
-  }
+  const { customGames, visibilityMap, orderIds } = await loadQuestionGameSettingsForTeachers(teacherIds);
 
   // 가시성 필터링
   const allGames: AnyGame[] = [...BUILT_IN_GAMES, ...customGames];
@@ -80,13 +52,5 @@ export async function GET() {
   });
 
   // 담당 교사가 지정한 순서(첫 교사 기준) 적용
-  let orderIds: string[] | null = null;
-  for (const teacherId of teacherIds) {
-    const orderConfig = await prisma.systemConfig.findUnique({ where: { key: `question_game_order_${teacherId}` } });
-    if (orderConfig) {
-      try { orderIds = JSON.parse(orderConfig.value) as string[]; break; } catch {}
-    }
-  }
-
   return NextResponse.json(sortGamesByOrder(filtered, orderIds));
 }

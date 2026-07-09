@@ -37,3 +37,33 @@ jobs:
 
       - name: Unit tests (with coverage gate)
         run: npm test -- --coverage
+
+  e2e-tablet:
+    runs-on: ubuntu-latest
+    if: ${{ vars.RUN_E2E_TABLET == 'true' }}
+    env:
+      DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+      NEXTAUTH_SECRET: ${{ secrets.E2E_NEXTAUTH_SECRET }}
+      NEXTAUTH_URL: "http://localhost:3000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Check database schema
+        run: npm run db:check
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Tablet E2E
+        run: npm run test:e2e:tablet

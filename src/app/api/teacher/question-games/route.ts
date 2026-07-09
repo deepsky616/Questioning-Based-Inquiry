@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { BUILT_IN_GAMES, AnyGame, GameVisibility, sortGamesByOrder } from "@/lib/question-games-data";
-import { randomBytes } from "crypto";
+import { BUILT_IN_GAMES, sortGamesByOrder } from "@/lib/question-games-data";
+import { createQuestionGame, loadQuestionGameSettings } from "@/lib/question-game-settings-store";
 
 export async function GET() {
   const session = await auth();
@@ -15,29 +14,7 @@ export async function GET() {
   }
   const teacherId = (session.user as { id: string }).id;
 
-  const [visConfig, gamesConfig, orderConfig] = await Promise.all([
-    prisma.systemConfig.findUnique({ where: { key: `question_game_vis_${teacherId}` } }),
-    prisma.systemConfig.findUnique({ where: { key: `question_game_custom_${teacherId}` } }),
-    prisma.systemConfig.findUnique({ where: { key: `question_game_order_${teacherId}` } }),
-  ]);
-
-  const visibilityMap: Record<string, GameVisibility> = visConfig
-    ? (() => { try { return JSON.parse(visConfig.value); } catch { return {}; } })()
-    : {};
-
-  const customGames: AnyGame[] = gamesConfig
-    ? (() => {
-        try {
-          const games = JSON.parse(gamesConfig.value) as Omit<AnyGame, "isBuiltIn">[];
-          return games.map((g) => ({ ...g, isBuiltIn: false, teacherId } as AnyGame));
-        } catch {
-          return [];
-        }
-      })()
-    : [];
-
-  let orderIds: string[] | null = null;
-  if (orderConfig) { try { orderIds = JSON.parse(orderConfig.value) as string[]; } catch {} }
+  const { customGames, visibilityMap, orderIds } = await loadQuestionGameSettings(teacherId);
 
   const allGames = sortGamesByOrder([...BUILT_IN_GAMES, ...customGames], orderIds);
   return NextResponse.json({ games: allGames, visibilityMap });
@@ -61,16 +38,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "필수 항목이 누락되었습니다" }, { status: 400 });
   }
 
-  const gamesConfig = await prisma.systemConfig.findUnique({
-    where: { key: `question_game_custom_${teacherId}` },
-  });
-
-  const existing: Omit<AnyGame, "isBuiltIn" | "teacherId">[] = gamesConfig
-    ? (() => { try { return JSON.parse(gamesConfig.value); } catch { return []; } })()
-    : [];
-
-  const newGame = {
-    id: `custom-${randomBytes(4).toString("hex")}`,
+  const newGame = await createQuestionGame(teacherId, {
     title,
     description,
     emoji,
@@ -79,16 +47,7 @@ export async function POST(req: NextRequest) {
     playerCount: playerCount ?? "제한없음",
     duration: duration ?? "20분",
     instructions: instructions ?? [],
-    order: 100 + existing.length,
-  };
-
-  const updated = [...existing, newGame];
-
-  await prisma.systemConfig.upsert({
-    where: { key: `question_game_custom_${teacherId}` },
-    update: { value: JSON.stringify(updated) },
-    create: { key: `question_game_custom_${teacherId}`, value: JSON.stringify(updated) },
   });
 
-  return NextResponse.json({ game: { ...newGame, isBuiltIn: false, teacherId } }, { status: 201 });
+  return NextResponse.json({ game: newGame }, { status: 201 });
 }

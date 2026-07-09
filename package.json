@@ -11,9 +11,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:tablet": "playwright test --project=tablet",
     "test:e2e:ui": "playwright test --ui",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:check": "node scripts/check-db-schema.mjs",
     "db:studio": "prisma studio"
   },
   "dependencies": {
