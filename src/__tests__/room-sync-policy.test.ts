@@ -47,4 +47,9 @@ describe("room sync policy", () => {
     expect(roomCreateRouteSource).not.toContain("ROOM_KEY");
     expect(roomRouteSource).not.toContain("ROOM_KEY");
   });
+
+  it("uses a dedicated room model instead of overloading SystemConfig", () => {
+    expect(roomStoreSource).toContain("prisma.gameRoom");
+    expect(roomStoreSource).not.toContain("systemConfig");
+  });
 });
