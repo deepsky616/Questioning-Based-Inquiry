@@ -17,6 +17,13 @@ describe("core screen layout improvements", () => {
     expect(studentDashboard).toContain("student-dashboard-tablet-overview");
     expect(studentDashboard).toContain("md:items-stretch");
     expect(studentDashboard).toContain("student-dashboard-points-panel");
+    expect(studentDashboard).toContain("student-dashboard-question-summary");
+    expect(studentDashboard.indexOf("student-dashboard-points-panel")).toBeLessThan(
+      studentDashboard.indexOf("student-dashboard-task-panel"),
+    );
+    expect(studentDashboard.indexOf("student-dashboard-question-summary")).toBeLessThan(
+      studentDashboard.indexOf("student-dashboard-task-panel"),
+    );
     expect(studentDashboard).toContain("h-full");
     expect(studentDashboard).toContain("student-dashboard-task-grid");
     expect(studentDashboard).toContain("min-h-[116px]");
