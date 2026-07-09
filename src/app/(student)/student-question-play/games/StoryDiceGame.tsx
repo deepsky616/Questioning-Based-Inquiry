@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { GameHeader } from "./GameHeader";
 import { useAIPlay } from "./useAIPlay";
 import { useSingleAward, AwardBadge } from "./useSingleAward";
 import {
@@ -157,7 +158,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     const myAs = chain.filter((c) => c.type === "answer" && !c.isAI).length;
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <Header game={game} subtitle="이야기 완성!" onBack={onBack} />
+        <GameHeader game={game} subtitle="이야기 완성!" onBack={onBack} />
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-3">
           <div className="text-6xl">📖</div>
           <h2 className="text-2xl font-black text-gray-800">이야기 주사위 끝!</h2>
@@ -189,7 +190,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   if (phase === "loading" || !words) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <Header game={game} subtitle="주사위 단어 준비 중" onBack={onBack} />
+        <GameHeader game={game} subtitle="주사위 단어 준비 중" onBack={onBack} />
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center space-y-3">
           <div className="text-6xl animate-bounce">🎲</div>
           <p className="text-gray-500 text-sm">
@@ -215,7 +216,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
 
   return (
     <div className="max-w-lg mx-auto space-y-5">
-      <Header game={game} subtitle={isAI ? "🤖 AI와 함께 이야기를" : "이야기를 함께 만들어요"} onBack={onBack} />
+      <GameHeader game={game} subtitle={isAI ? "🤖 AI와 함께 이야기를" : "이야기를 함께 만들어요"} onBack={onBack} />
 
       {/* 단어 풀 */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
@@ -359,22 +360,6 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
           💡 혼자 모드에서는 본인이 술래와 친구 역할을 모두 해요
         </p>
       )}
-    </div>
-  );
-}
-
-function Header({ game, subtitle, onBack }: { game: BuiltInGame; subtitle: string; onBack: () => void }) {
-  return (
-    <div className="flex items-center gap-3">
-      <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">← 목록</button>
-      <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
-        style={{ background: game.gradientCss }}>
-        <span className="text-4xl">{game.emoji}</span>
-        <div>
-          <h1 className="text-xl font-black">{game.title}</h1>
-          <p className="text-white/80 text-sm">{subtitle}</p>
-        </div>
-      </div>
     </div>
   );
 }

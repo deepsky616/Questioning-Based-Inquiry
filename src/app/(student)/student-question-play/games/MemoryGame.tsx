@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { GameHeader } from "./GameHeader";
 import { useAIPlay } from "./useAIPlay";
 import { useSingleAward, AwardBadge } from "./useSingleAward";
 import { GameResultReview } from "./GameResultReview";
@@ -221,7 +222,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     const winners = sorted.filter(([, s]) => s === topScore && topScore > 0);
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <Header game={game} subtitle="완성!" onBack={onBack} />
+        <GameHeader game={game} subtitle="완성!" onBack={onBack} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 flex flex-col items-center gap-3">
           <div className="text-6xl">🏆</div>
           <h2 className="text-2xl font-black text-gray-800">짝 찾기 완성!</h2>
@@ -281,7 +282,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
   if (phase === "setup") {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <Header game={game} subtitle={
+        <GameHeader game={game} subtitle={
           isSolo ? "혼자 모드 — 자유롭게 진행"
           : isAI ? "AI와 함께 — 점수 경쟁"
           : `친구 모드 — ${playersList.length}명 차례 진행`
@@ -319,7 +320,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
   if (phase === "generating") {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <Header game={game} subtitle="카드 만드는 중" onBack={onBack} />
+        <GameHeader game={game} subtitle="카드 만드는 중" onBack={onBack} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
           <div className="text-6xl animate-bounce mb-3">🃏</div>
           <p className="text-gray-600 font-bold text-sm">
@@ -337,7 +338,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <Header game={game}
+      <GameHeader game={game}
         subtitle={hasOpponents
           ? `${currentPlayer}의 차례 · 남은 카드 ${remaining}장`
           : `남은 카드 ${remaining}장 · 시도 ${tries}번`}
@@ -474,21 +475,5 @@ function AutoFitText({ text, max = 20, min = 9 }: { text: string; max?: number; 
     <span ref={ref} className="block w-full font-semibold break-keep" style={{ lineHeight: 1.15 }}>
       {text}
     </span>
-  );
-}
-
-function Header({ game, subtitle, onBack }: { game: BuiltInGame; subtitle: string; onBack: () => void }) {
-  return (
-    <div className="flex items-center gap-3">
-      <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">← 목록</button>
-      <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
-        style={{ background: game.gradientCss }}>
-        <span className="text-4xl">{game.emoji}</span>
-        <div>
-          <h1 className="text-xl font-black">{game.title}</h1>
-          <p className="text-white/80 text-sm">{subtitle}</p>
-        </div>
-      </div>
-    </div>
   );
 }

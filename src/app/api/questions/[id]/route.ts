@@ -6,6 +6,11 @@ import { canPatchQuestion } from "@/lib/questions";
 import { normalizeContent } from "@/lib/content-normalize";
 import { checkProfanity } from "@/lib/profanity";
 import { cleanupQuestionTranslations } from "@/lib/translation-cleanup";
+import {
+  canTeacherManageQuestion,
+  getStudentQuestionDeleteBlockReason,
+  getStudentQuestionEditBlockReason,
+} from "@/lib/question-detail-service";
 import { z } from "zod";
 
 const patchQuestionSchema = z.object({
@@ -17,41 +22,6 @@ const patchQuestionSchema = z.object({
   isPublic: z.boolean().optional(),
   flagged: z.boolean().optional(),
 });
-
-async function canTeacherManageQuestion(teacherId: string, questionId: string) {
-  const teacher = await prisma.user.findUnique({
-    where: { id: teacherId },
-    select: {
-      school: true,
-      teacherClasses: { select: { grade: true, className: true } },
-    },
-  });
-  const question = await prisma.question.findUnique({
-    where: { id: questionId },
-    select: {
-      author: {
-        select: {
-          role: true,
-          school: true,
-          grade: true,
-          className: true,
-        },
-      },
-    },
-  });
-
-  if (!teacher || !question || question.author.role !== "STUDENT") return false;
-
-  if (teacher.teacherClasses.length > 0) {
-    return Boolean(teacher.school && teacher.school === question.author.school) && teacher.teacherClasses.some(
-      (teacherClass) =>
-        teacherClass.grade === question.author.grade &&
-        teacherClass.className === question.author.className,
-    );
-  }
-
-  return Boolean(teacher.school && teacher.school === question.author.school);
-}
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -138,18 +108,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     // 학생 본인 내용 수정: 반응(좋아요·댓글)이나 포인트가 붙기 전까지만 허용
     if (data.content !== undefined && userRole === "STUDENT") {
-      if (existing._count.likes > 0 || existing._count.comments > 0) {
-        return NextResponse.json(
-          { error: "좋아요나 댓글이 달린 질문은 수정할 수 없어요. 선생님께 요청해 주세요." },
-          { status: 403 },
-        );
-      }
-      const pointCount = await prisma.pointLog.count({ where: { relatedQuestionId: params.id } });
-      if (pointCount > 0) {
-        return NextResponse.json(
-          { error: "포인트가 지급된 질문은 수정할 수 없어요. 선생님께 요청해 주세요." },
-          { status: 403 },
-        );
+      const blockReason = await getStudentQuestionEditBlockReason(params.id, existing._count);
+      if (blockReason) {
+        return NextResponse.json({ error: blockReason }, { status: 403 });
       }
     }
 
@@ -217,16 +178,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
   // 학생 본인 삭제: 반응(좋아요·댓글)이나 포인트가 붙기 전까지만 허용(교사는 제한 없음)
   if (userRole === "STUDENT") {
-    const [likeCount, commentCount, pointCount] = await Promise.all([
-      prisma.questionLike.count({ where: { questionId: params.id } }),
-      prisma.comment.count({ where: { questionId: params.id } }),
-      prisma.pointLog.count({ where: { relatedQuestionId: params.id } }),
-    ]);
-    if (likeCount > 0 || commentCount > 0 || pointCount > 0) {
-      return NextResponse.json(
-        { error: "좋아요·댓글·포인트가 달린 질문은 삭제할 수 없어요. 선생님께 요청해 주세요." },
-        { status: 403 },
-      );
+    const blockReason = await getStudentQuestionDeleteBlockReason(params.id);
+    if (blockReason) {
+      return NextResponse.json({ error: blockReason }, { status: 403 });
     }
   }
 
