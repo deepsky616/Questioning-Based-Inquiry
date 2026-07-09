@@ -8,9 +8,13 @@ describe("core screen component split", () => {
   it("keeps teacher session list summary and controls in focused components", () => {
     expect(existsSync("src/app/(teacher)/teacher-sessions/TeacherSessionSummaryGrid.tsx")).toBe(true);
     expect(existsSync("src/app/(teacher)/teacher-sessions/TeacherSessionListControls.tsx")).toBe(true);
+    expect(existsSync("src/app/(teacher)/teacher-sessions/TeacherSessionCreateCard.tsx")).toBe(true);
+    expect(existsSync("src/app/(teacher)/teacher-sessions/TeacherSessionRow.tsx")).toBe(true);
     expect(teacherSessionsPage).toContain("TeacherSessionSummaryGrid");
     expect(teacherSessionsPage).toContain("TeacherSessionListControls");
-    expect(teacherSessionsPage.split("\n").length).toBeLessThan(850);
+    expect(teacherSessionsPage).toContain("TeacherSessionCreateCard");
+    expect(teacherSessionsPage).toContain("TeacherSessionRow");
+    expect(teacherSessionsPage.split("\n").length).toBeLessThan(430);
   });
 
   it("keeps report repeated layout grids in a shared component", () => {
