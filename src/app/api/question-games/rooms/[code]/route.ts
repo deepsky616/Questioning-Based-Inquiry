@@ -9,18 +9,24 @@ async function loadRoom(code: string): Promise<GameRoom | null> {
   const rec = await prisma.systemConfig.findUnique({ where: { key: ROOM_KEY(code) } });
   if (!rec) return null;
   try {
-    return JSON.parse(rec.value) as GameRoom;
+    const room = JSON.parse(rec.value) as GameRoom;
+    return { ...room, version: room.version ?? 1 };
   } catch {
     return null;
   }
 }
 
 async function saveRoom(room: GameRoom) {
+  room.version = (room.version ?? 1) + 1;
   room.updatedAt = Date.now();
   await prisma.systemConfig.update({
     where: { key: ROOM_KEY(room.code) },
     data: { value: JSON.stringify(room) },
   });
+}
+
+function isStaleAction(room: GameRoom, expectedVersion: unknown) {
+  return typeof expectedVersion === "number" && expectedVersion !== room.version;
 }
 
 // 방 상태 조회 (폴링)
@@ -58,6 +64,7 @@ export async function PATCH(
 
   const body = await req.json().catch(() => ({}));
   const action = body.action as string;
+  const expectedVersion = body.expectedVersion;
 
   switch (action) {
     case "join": {
@@ -96,6 +103,9 @@ export async function PATCH(
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 시작할 수 있어요" }, { status: 403 });
       }
+      if (isStaleAction(room, expectedVersion)) {
+        return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
+      }
       room.status = "playing";
       room.turnIndex = 0;
       room.chain = [];
@@ -105,6 +115,9 @@ export async function PATCH(
     }
 
     case "update-state": {
+      if (isStaleAction(room, expectedVersion)) {
+        return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
+      }
       // gameState 부분 병합 (참가자 누구나 자기 액션 반영 가능)
       const patch = (body.patch ?? {}) as Record<string, unknown>;
       room.gameState = { ...room.gameState, ...patch };
@@ -117,6 +130,9 @@ export async function PATCH(
     }
 
     case "set-state": {
+      if (isStaleAction(room, expectedVersion)) {
+        return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
+      }
       // gameState 전체 교체 (주로 방장이 초기화/리셋)
       room.gameState = (body.state ?? {}) as Record<string, unknown>;
       if (typeof body.turnIndex === "number") room.turnIndex = body.turnIndex;
@@ -125,6 +141,9 @@ export async function PATCH(
     }
 
     case "next-turn": {
+      if (isStaleAction(room, expectedVersion)) {
+        return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
+      }
       room.turnIndex = (room.turnIndex + 1) % room.players.length;
       await saveRoom(room);
       break;
@@ -134,12 +153,18 @@ export async function PATCH(
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 주제를 정할 수 있어요" }, { status: 403 });
       }
+      if (isStaleAction(room, expectedVersion)) {
+        return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
+      }
       room.topic = typeof body.topic === "string" ? body.topic : "";
       await saveRoom(room);
       break;
     }
 
     case "add-question": {
+      if (isStaleAction(room, expectedVersion)) {
+        return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
+      }
       const question = typeof body.question === "string" ? body.question.trim() : "";
       if (!question) {
         return NextResponse.json({ error: "질문이 비어있어요" }, { status: 400 });
@@ -164,6 +189,9 @@ export async function PATCH(
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 종료할 수 있어요" }, { status: 403 });
       }
+      if (isStaleAction(room, expectedVersion)) {
+        return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
+      }
       room.status = "ended";
       await saveRoom(room);
       break;
@@ -172,6 +200,9 @@ export async function PATCH(
     case "restart": {
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 다시 시작할 수 있어요" }, { status: 403 });
+      }
+      if (isStaleAction(room, expectedVersion)) {
+        return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       room.status = "waiting";
       room.chain = [];

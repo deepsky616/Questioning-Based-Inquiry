@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     chain: [],
     turnIndex: 0,
     gameState: {},
+    version: 1,
     createdAt: now,
     updatedAt: now,
   };

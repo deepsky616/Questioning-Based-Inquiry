@@ -1,13 +1,11 @@
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { fallbackClassification, parseClassificationResponse } from "@/lib/classify";
-import { chooseModelAuto, isAllowedGeminiModel, resolveApiKey, resolveGeminiModel } from "@/lib/api-config";
-import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
-import { getRequestLocale, languageDirective } from "@/lib/locale";
+import { isAllowedGeminiModel } from "@/lib/api-config";
+import { AiKeyMissingError, generateJsonWithMetadata } from "@/lib/ai";
 
 const classifySchema = z.object({
   apiKey: z.string().optional(),
@@ -66,42 +64,35 @@ export async function POST(req: Request) {
     );
   }
 
+  let fallbackContent = "";
   try {
     const body = await req.json();
     const { apiKey: requestApiKey, model: requestModel, content } = classifySchema.parse(body);
+    fallbackContent = content;
 
-    // 작업 사용자(학생→담당 교사, 교사→본인) 기준 AI 설정
-    const serverCfg = await resolveUserAiConfig(userId);
-    const apiKey = resolveApiKey(requestApiKey, serverCfg.apiKey ?? undefined);
-    const model = requestModel ? resolveGeminiModel(requestModel) : serverCfg.model;
-
-    // API 키가 없으면 키워드 기반 fallback 분류
-    if (!apiKey) {
-      return NextResponse.json(fallbackClassification(content));
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const fullPrompt = `${CLASSIFICATION_PROMPT}\n\n[분석할 질문]\n${content}${languageDirective(getRequestLocale(req))}`;
-
-    // 프롬프트 크기에 따라 모델 자동 선택(요청에서 모델을 명시하면 그대로 사용)
-    // 같은 질문 → 같은 분류가 나오도록 온도 0
-    const genModel = genAI.getGenerativeModel({
-      model: requestModel ? model : chooseModelAuto(model, fullPrompt.length),
-      generationConfig: { temperature: 0 },
+    const generated = await generateJsonWithMetadata<unknown>({
+      userId,
+      prompt: `${CLASSIFICATION_PROMPT}\n\n[분석할 질문]\n${content}`,
+      req,
+      localize: true,
+      quality: true,
+      temperature: 0,
+      apiKeyOverride: requestApiKey,
+      modelOverride: requestModel,
     });
 
-    const result = await genModel.generateContent(fullPrompt);
-    const text = result.response.text();
-
-    const parsed = parseClassificationResponse(text);
+    const parsed = parseClassificationResponse(JSON.stringify(generated.data));
     if (parsed) {
-      return NextResponse.json(parsed);
+      return NextResponse.json({ ...parsed, analysisModel: generated.model });
     }
 
     return NextResponse.json(fallbackClassification(content));
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
+    }
+    if (error instanceof AiKeyMissingError) {
+      return NextResponse.json(fallbackClassification(fallbackContent));
     }
 
     logger.error("Gemini classify error:", error);

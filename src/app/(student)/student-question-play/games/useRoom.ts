@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { GameRoom } from "@/lib/question-games-data";
-
-const POLL_INTERVAL = 2000;
+import { APP_ROOM_POLL_MS, visibleRefetchInterval } from "@/lib/query-refresh";
 
 interface UseRoomResult {
   room: GameRoom | null;
@@ -30,6 +29,7 @@ export function useRoom(): UseRoomResult {
     let cancelled = false;
 
     const poll = async () => {
+      if (visibleRefetchInterval(APP_ROOM_POLL_MS) === false) return;
       try {
         const res = await fetch(`/api/question-games/rooms/${activeCode}`);
         if (!res.ok) return;
@@ -39,10 +39,15 @@ export function useRoom(): UseRoomResult {
     };
 
     poll();
-    pollRef.current = setInterval(poll, POLL_INTERVAL);
+    pollRef.current = setInterval(poll, APP_ROOM_POLL_MS);
+    const onVisibilityChange = () => {
+      if (visibleRefetchInterval(APP_ROOM_POLL_MS) !== false) void poll();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
   }, [activeCode]);
@@ -100,10 +105,14 @@ export function useRoom(): UseRoomResult {
         const res = await fetch(`/api/question-games/rooms/${activeCode}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, ...extra }),
+          body: JSON.stringify({ action, expectedVersion: room?.version, ...extra }),
         });
         const data = await res.json();
-        if (!res.ok) { setError(data.error ?? "작업 실패"); return null; }
+        if (!res.ok) {
+          if (res.status === 409 && data.room) setRoom(data.room);
+          setError(data.error ?? "작업 실패");
+          return data.room ?? null;
+        }
         if (data.room) setRoom(data.room);
         return data.room;
       } catch {
@@ -113,7 +122,7 @@ export function useRoom(): UseRoomResult {
         setActionLoading(false);
       }
     },
-    [activeCode]
+    [activeCode, room?.version]
   );
 
   const leaveRoom = useCallback(async () => {

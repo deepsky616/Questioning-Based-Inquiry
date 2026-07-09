@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
-import { alternateModel, chooseModelAuto, chooseQualityModel } from "@/lib/api-config";
+import { alternateModel, chooseModelAuto, chooseQualityModel, resolveGeminiModel } from "@/lib/api-config";
 import { AiBusyError, AiKeyMissingError, isTransientAiError } from "@/lib/ai-errors";
 import type { GeminiModel } from "@/lib/api-config";
 
@@ -22,6 +22,10 @@ export interface GenerateOptions {
   systemInstruction?: string;
   /** true면 크기와 무관하게 품질 우선 모델(flash 이상)을 사용 — 분석·수업자료 생성 등 */
   quality?: boolean;
+  /** 특정 요청에서만 사용할 AI 키. 없으면 사용자/담당 교사 설정을 사용한다. */
+  apiKeyOverride?: string;
+  /** 특정 요청에서만 사용할 모델. 없으면 사용자/담당 교사 설정을 사용한다. */
+  modelOverride?: string;
   /**
    * 샘플링 온도(0~2). 미지정 시 quality 작업은 0.1(같은 입력 → 최대한 일관된 결과),
    * 그 외에는 모델 기본값을 쓴다. 다양성이 필요한 작업(질문 게임 등)은 명시적으로 높인다.
@@ -44,12 +48,25 @@ export const CONSISTENT_TEMPERATURE = 0.1;
  * - 모델 혼잡(503/429)은 백오프 재시도 후 대체 모델(lite↔flash)로 자동 전환
  * - 키가 없으면 AiKeyMissingError, 대체 모델까지 혼잡하면 AiBusyError를 던진다
  */
-async function callGeminiWithMetadata({ userId, prompt, req, localize, systemInstruction, quality, temperature }: GenerateOptions): Promise<GenerateTextResult> {
-  const cfg = await resolveUserAiConfig(userId);
+async function callGeminiWithMetadata({
+  userId,
+  prompt,
+  req,
+  localize,
+  systemInstruction,
+  quality,
+  temperature,
+  apiKeyOverride,
+  modelOverride,
+}: GenerateOptions): Promise<GenerateTextResult> {
+  const cfg = apiKeyOverride
+    ? { apiKey: apiKeyOverride, model: resolveGeminiModel(modelOverride) }
+    : await resolveUserAiConfig(userId);
   if (!cfg.apiKey) throw new AiKeyMissingError();
 
   const fullPrompt = localize && req ? prompt + languageDirective(getRequestLocale(req)) : prompt;
-  const primary = quality ? chooseQualityModel(cfg.model) : chooseModelAuto(cfg.model, fullPrompt.length);
+  const configuredModel = resolveGeminiModel(modelOverride ?? cfg.model);
+  const primary = quality ? chooseQualityModel(configuredModel) : chooseModelAuto(configuredModel, fullPrompt.length);
   const temp = temperature ?? (quality ? CONSISTENT_TEMPERATURE : undefined);
 
   const genAI = new GoogleGenerativeAI(cfg.apiKey);
