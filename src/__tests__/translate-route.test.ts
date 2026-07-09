@@ -99,7 +99,7 @@ describe("POST /api/translate", () => {
     const res = await POST(req("en", ITEM));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ translations: { "QUESTION:q1": "Why?" } });
-    expect(mTranslate).toHaveBeenCalledWith(["왜?"], "en", "k", "m");
+    expect(mTranslate).toHaveBeenCalledWith(["왜?"], "en", "u1", "k", "m");
     expect(tUpsert).toHaveBeenCalledTimes(1);
   });
 
@@ -112,7 +112,7 @@ describe("POST /api/translate", () => {
     mTranslate.mockResolvedValue(["new"]);
     const res = await POST(req("en", ITEM));
     expect(await res.json()).toEqual({ translations: { "QUESTION:q1": "new" } });
-    expect(mTranslate).toHaveBeenCalledWith(["수정된 원문"], "en", "k", "m");
+    expect(mTranslate).toHaveBeenCalledWith(["수정된 원문"], "en", "u1", "k", "m");
   });
 
   it("권한 없음(학생이 남의 비공개 질문 id로 직접 호출) → 번역 안 됨", async () => {

@@ -6,12 +6,12 @@
  *
  * 모든 단계에서 실패 시 구체적인 에러 메시지를 던집니다.
  */
-export function extractJsonObject(raw: string): unknown {
+function extractBalancedJson(raw: string, open: "{" | "[", close: "}" | "]", label: string): unknown {
   if (!raw) throw new Error("AI 응답이 비어있습니다");
   let text = raw.replace(/^```(?:json|JSON)?\s*/m, "").replace(/```\s*$/m, "").trim();
 
-  const start = text.indexOf("{");
-  if (start < 0) throw new Error("JSON 객체를 찾을 수 없습니다");
+  const start = text.indexOf(open);
+  if (start < 0) throw new Error(`${label}를 찾을 수 없습니다`);
 
   let depth = 0;
   let inStr = false;
@@ -23,13 +23,13 @@ export function extractJsonObject(raw: string): unknown {
     if (ch === "\\") { escape = true; continue; }
     if (ch === '"') { inStr = !inStr; continue; }
     if (inStr) continue;
-    if (ch === "{") depth++;
-    else if (ch === "}") {
+    if (ch === open) depth++;
+    else if (ch === close) {
       depth--;
       if (depth === 0) { end = i; break; }
     }
   }
-  if (end < 0) throw new Error("JSON 객체가 닫히지 않았습니다");
+  if (end < 0) throw new Error(`${label}가 닫히지 않았습니다`);
 
   const sliced = text.slice(start, end + 1);
   try {
@@ -38,4 +38,12 @@ export function extractJsonObject(raw: string): unknown {
     const msg = e instanceof Error ? e.message : String(e);
     throw new Error(`JSON 파싱 실패: ${msg}`);
   }
+}
+
+export function extractJsonObject(raw: string): unknown {
+  return extractBalancedJson(raw, "{", "}", "JSON 객체");
+}
+
+export function extractJsonArray(raw: string): unknown {
+  return extractBalancedJson(raw, "[", "]", "JSON 배열");
 }

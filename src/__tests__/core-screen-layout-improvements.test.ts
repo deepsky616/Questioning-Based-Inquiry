@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 const studentDashboard = readFileSync("src/app/(student)/student-dashboard/page.tsx", "utf8");
+const studentDashboardTasksCard = readFileSync("src/app/(student)/student-dashboard/StudentDashboardTasksCard.tsx", "utf8");
 const teacherDashboard = readFileSync("src/app/(teacher)/teacher-dashboard/page.tsx", "utf8");
 const myQuestionsView = readFileSync("src/components/student/MyQuestionsView.tsx", "utf8");
 const teacherSessions = readFileSync("src/app/(teacher)/teacher-sessions/page.tsx", "utf8");
@@ -19,14 +20,15 @@ describe("core screen layout improvements", () => {
     expect(studentDashboard).toContain("student-dashboard-points-panel");
     expect(studentDashboard).toContain("student-dashboard-question-summary");
     expect(studentDashboard.indexOf("student-dashboard-points-panel")).toBeLessThan(
-      studentDashboard.indexOf("student-dashboard-task-panel"),
+      studentDashboard.indexOf("<StudentDashboardTasksCard"),
     );
     expect(studentDashboard.indexOf("student-dashboard-question-summary")).toBeLessThan(
-      studentDashboard.indexOf("student-dashboard-task-panel"),
+      studentDashboard.indexOf("<StudentDashboardTasksCard"),
     );
     expect(studentDashboard).toContain("h-full");
-    expect(studentDashboard).toContain("student-dashboard-task-grid");
-    expect(studentDashboard).toContain("min-h-[116px]");
+    expect(studentDashboardTasksCard).toContain("student-dashboard-task-panel");
+    expect(studentDashboardTasksCard).toContain("student-dashboard-task-grid");
+    expect(studentDashboardTasksCard).toContain("min-h-[116px]");
     expect(myQuestionsView).toContain("my-questions-tablet-filters");
     expect(myQuestionsView).toContain("student-questions-tablet-list");
     expect(myQuestionsView).toContain("xl:hidden");

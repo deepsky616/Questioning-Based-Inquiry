@@ -1,17 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { contentHash, translateTexts } from "@/lib/translate";
 
-// Gemini SDK를 모킹해 translateTexts의 프롬프트→파싱 계약만 검증(실제 호출 없음)
-const generateContent = vi.fn();
-vi.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: class {
-    getGenerativeModel() {
-      return { generateContent };
-    }
-  },
+const mocks = vi.hoisted(() => ({
+  generateJsonArray: vi.fn(),
 }));
-
-const reply = (text: string) => ({ response: { text: () => text } });
+vi.mock("@/lib/ai", () => ({ generateJsonArray: mocks.generateJsonArray }));
 
 describe("contentHash", () => {
   it("같은 입력은 같은 해시를 낸다(결정적)", () => {
@@ -29,31 +22,39 @@ describe("contentHash", () => {
 });
 
 describe("translateTexts (Gemini 모킹)", () => {
-  beforeEach(() => generateContent.mockReset());
+  beforeEach(() => mocks.generateJsonArray.mockReset());
 
   it("빈 입력은 호출 없이 빈 배열", async () => {
-    expect(await translateTexts([], "en", "key", "m")).toEqual([]);
-    expect(generateContent).not.toHaveBeenCalled();
+    expect(await translateTexts([], "en", "u1", "key", "m")).toEqual([]);
+    expect(mocks.generateJsonArray).not.toHaveBeenCalled();
   });
 
   it("JSON 배열 응답을 순서대로 파싱한다", async () => {
-    generateContent.mockResolvedValue(reply('["Why is the sky blue?", "Good question!"]'));
-    const out = await translateTexts(["왜 하늘은 파랄까?", "좋은 질문!"], "en", "key", "m");
+    mocks.generateJsonArray.mockResolvedValue(["Why is the sky blue?", "Good question!"]);
+    const out = await translateTexts(["왜 하늘은 파랄까?", "좋은 질문!"], "en", "u1", "key", "m");
     expect(out).toEqual(["Why is the sky blue?", "Good question!"]);
   });
 
-  it("코드펜스/잡텍스트가 섞여도 배열을 추출한다", async () => {
-    generateContent.mockResolvedValue(reply('```json\n["A", "B"]\n```'));
-    expect(await translateTexts(["가", "나"], "en", "key", "m")).toEqual(["A", "B"]);
+  it("공통 AI 서비스에 키와 모델을 전달한다", async () => {
+    mocks.generateJsonArray.mockResolvedValue(["A", "B"]);
+    expect(await translateTexts(["가", "나"], "en", "u1", "key", "m")).toEqual(["A", "B"]);
+    expect(mocks.generateJsonArray).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u1",
+        apiKeyOverride: "key",
+        modelOverride: "m",
+        temperature: 0,
+      }),
+    );
   });
 
   it("개수가 안 맞으면 예외", async () => {
-    generateContent.mockResolvedValue(reply('["only one"]'));
-    await expect(translateTexts(["가", "나"], "en", "key", "m")).rejects.toThrow();
+    mocks.generateJsonArray.mockResolvedValue(["only one"]);
+    await expect(translateTexts(["가", "나"], "en", "u1", "key", "m")).rejects.toThrow();
   });
 
   it("배열이 아니면 예외", async () => {
-    generateContent.mockResolvedValue(reply("그냥 텍스트"));
-    await expect(translateTexts(["가"], "en", "key", "m")).rejects.toThrow();
+    mocks.generateJsonArray.mockResolvedValue({ text: "그냥 텍스트" });
+    await expect(translateTexts(["가"], "en", "u1", "key", "m")).rejects.toThrow();
   });
 });

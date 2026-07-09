@@ -1,12 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { GameRoom, RoomPlayer } from "@/lib/question-games-data";
 
-const ROOM_KEY_PREFIX = "game_room_";
-
-function roomKey(code: string) {
-  return `${ROOM_KEY_PREFIX}${code}`;
-}
-
 function gen4() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
@@ -16,10 +10,10 @@ export function isStaleRoomAction(room: GameRoom, expectedVersion: unknown) {
 }
 
 export async function loadGameRoom(code: string): Promise<GameRoom | null> {
-  const rec = await prisma.systemConfig.findUnique({ where: { key: roomKey(code) } });
+  const rec = await prisma.gameRoom.findUnique({ where: { code } });
   if (!rec) return null;
   try {
-    const room = JSON.parse(rec.value) as GameRoom;
+    const room = rec.data as unknown as GameRoom;
     return { ...room, version: room.version ?? 1 };
   } catch {
     return null;
@@ -29,14 +23,14 @@ export async function loadGameRoom(code: string): Promise<GameRoom | null> {
 export async function saveGameRoom(room: GameRoom) {
   room.version = (room.version ?? 1) + 1;
   room.updatedAt = Date.now();
-  await prisma.systemConfig.update({
-    where: { key: roomKey(room.code) },
-    data: { value: JSON.stringify(room) },
+  await prisma.gameRoom.update({
+    where: { code: room.code },
+    data: { data: room as unknown as object },
   });
 }
 
 export async function deleteGameRoom(code: string) {
-  await prisma.systemConfig.delete({ where: { key: roomKey(code) } }).catch(() => {});
+  await prisma.gameRoom.delete({ where: { code } }).catch(() => {});
 }
 
 export async function createGameRoom({
@@ -51,7 +45,7 @@ export async function createGameRoom({
   let code = "";
   for (let i = 0; i < 12; i++) {
     const candidate = gen4();
-    const existing = await prisma.systemConfig.findUnique({ where: { key: roomKey(candidate) } });
+    const existing = await prisma.gameRoom.findUnique({ where: { code: candidate } });
     if (!existing) {
       code = candidate;
       break;
@@ -76,10 +70,11 @@ export async function createGameRoom({
     updatedAt: now,
   };
 
-  await prisma.systemConfig.upsert({
-    where: { key: roomKey(code) },
-    update: { value: JSON.stringify(room) },
-    create: { key: roomKey(code), value: JSON.stringify(room) },
+  await prisma.gameRoom.create({
+    data: {
+      code,
+      data: room as unknown as object,
+    },
   });
 
   return room;

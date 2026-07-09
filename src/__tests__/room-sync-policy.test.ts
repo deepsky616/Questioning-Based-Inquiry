@@ -35,7 +35,6 @@ describe("room sync policy", () => {
     expect(roomStoreSource).toContain("saveGameRoom");
     expect(roomStoreSource).toContain("deleteGameRoom");
     expect(roomStoreSource).toContain("isStaleRoomAction");
-    expect(roomStoreSource).toContain("systemConfig");
 
     expect(roomCreateRouteSource).toContain("createGameRoom");
     expect(roomRouteSource).toContain("loadGameRoom");

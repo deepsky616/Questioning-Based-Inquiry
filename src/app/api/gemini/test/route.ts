@@ -1,12 +1,12 @@
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { isAllowedGeminiModel } from "@/lib/api-config";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { classifyGeminiError } from "@/lib/gemini-error";
+import { generateText } from "@/lib/ai";
 
 const testSchema = z.object({
   apiKey: z.string().optional(),
@@ -34,19 +34,21 @@ export async function POST(req: Request) {
     }
 
     // 입력한 키가 있으면 그 키로, 없으면 교사 본인이 저장한 키로 테스트
-    const savedCfg = trimmedApiKey ? null : await resolveUserAiConfig((session.user as { id: string }).id);
+    const userId = (session.user as { id: string }).id;
+    const savedCfg = trimmedApiKey ? null : await resolveUserAiConfig(userId);
     const resolvedApiKey = trimmedApiKey || savedCfg?.apiKey;
 
     if (!resolvedApiKey) {
       return NextResponse.json({ success: false, error: "API 키를 입력해 주세요" }, { status: 400 });
     }
 
-    const genAI = new GoogleGenerativeAI(resolvedApiKey);
-    const genModel = genAI.getGenerativeModel({ model });
-
-    const result = await genModel.generateContent(TEST_PROMPT);
-    const response = result.response;
-    const text = response.text();
+    const text = await generateText({
+      userId,
+      prompt: TEST_PROMPT,
+      apiKeyOverride: resolvedApiKey,
+      modelOverride: model,
+      temperature: 0,
+    });
 
     return NextResponse.json({
       success: true,

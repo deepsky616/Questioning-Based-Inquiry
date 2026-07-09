@@ -7,12 +7,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  STUDENT
+  TEACHER
+}
+
+enum PointStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+enum SessionTargetType {
+  ALL
+  CLASS
+  STUDENT
+  CUSTOM
+}
+
+enum AnalysisScope {
+  class
+  student
+}
+
 model User {
   id       String  @id @default(cuid())
   email    String? @unique @map("email")
   password String  @map("password")
   name     String  @map("name")
-  role     String  @map("role")
+  role     UserRole @map("role")
 
   grade         String? @map("grade")
   className     String? @map("class_name")
@@ -55,7 +78,7 @@ model PointLog {
   bonusType   String   @map("bonus_type")
   points      Int      @map("points")
   reason      String   @default("") @map("reason")
-  status      String   @default("APPROVED") @map("status") // APPROVED | PENDING | REJECTED
+  status      PointStatus @default(APPROVED) @map("status")
   sessionId   String?  @map("session_id_ref")
   relatedQuestionId String? @map("related_question_id")
   relatedCommentId  String? @map("related_comment_id")
@@ -126,7 +149,7 @@ model QuestionSession {
   date            String     @map("session_date")
   subject         String     @map("subject")
   topic           String     @default("") @map("topic")
-  targetType      String     @default("ALL") @map("target_type")
+  targetType      SessionTargetType @default(ALL) @map("target_type")
   targetGrade     String?    @map("target_grade")
   targetClassName String?    @map("target_class_name")
   targetStudentId String?    @map("target_student_id")
@@ -206,6 +229,16 @@ model SystemConfig {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_configs")
+}
+
+model GameRoom {
+  code      String   @id @map("code")
+  data      Json     @map("data")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([updatedAt])
+  @@map("game_rooms")
 }
 
 // 2022 개정 교육과정 시드 데이터
@@ -302,7 +335,7 @@ model Translation {
 model SessionAnalysis {
   id        String   @id @default(cuid())
   sessionId String   @map("session_id")
-  scope     String   @map("scope") // "class" | "student"
+  scope     AnalysisScope @map("scope")
   studentId String   @default("") @map("student_id") // student scope에서만 사용, class는 ""
   result    Json     @map("result") // SessionAnalysisResult 형태
   locale    String   @default("") @map("locale") // 생성 시 언어(참고용)

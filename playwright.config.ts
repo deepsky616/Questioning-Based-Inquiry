@@ -18,6 +18,10 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "tablet",
+      use: { ...devices["iPad Pro 11"], locale: "ko-KR" },
+    },
   ],
   webServer: {
     command: "npm run dev",

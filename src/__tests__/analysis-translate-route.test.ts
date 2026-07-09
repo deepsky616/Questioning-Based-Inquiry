@@ -102,7 +102,7 @@ describe("POST session-analysis translate", () => {
   it("빈 필드는 번역 대상에서 제외한다", async () => {
     const res = await POST(req("en", { ...BODY, fields: { summary: "요약", empty: "  " } }));
     const data = await res.json();
-    expect(mTranslate).toHaveBeenCalledWith(["요약"], "en", "k", "gemini-2.5-flash-lite");
+    expect(mTranslate).toHaveBeenCalledWith(["요약"], "en", "t1", "k", "gemini-2.5-flash-lite");
     expect(Object.keys(data.fields)).toEqual(["summary"]);
   });
 });

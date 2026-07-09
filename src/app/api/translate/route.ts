@@ -137,7 +137,7 @@ export async function POST(req: Request) {
 
   let translated: string[];
   try {
-    translated = await translateTexts(misses.map((m) => m.text), targetLocale, aiCfg.apiKey, aiCfg.model);
+    translated = await translateTexts(misses.map((m) => m.text), targetLocale, userId, aiCfg.apiKey, aiCfg.model);
   } catch (err) {
     logger.error("translate failed", err);
     return NextResponse.json({ error: "번역에 실패했어요. 잠시 후 다시 시도해주세요." }, { status: 502 });

@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
-import { extractJsonObject } from "@/lib/json-extract";
+import { extractJsonArray, extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import { alternateModel, chooseModelAuto, chooseQualityModel, resolveGeminiModel } from "@/lib/api-config";
 import { AiBusyError, AiKeyMissingError, isTransientAiError } from "@/lib/ai-errors";
@@ -107,6 +107,12 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
 export async function generateJson<T = unknown>(opts: GenerateOptions): Promise<T> {
   const result = await callGeminiWithMetadata(opts);
   return extractJsonObject(result.text) as T;
+}
+
+/** JSON 배열 응답을 공통 파서(extractJsonArray)로 파싱해 반환한다. */
+export async function generateJsonArray<T = unknown>(opts: GenerateOptions): Promise<T[]> {
+  const result = await callGeminiWithMetadata(opts);
+  return extractJsonArray(result.text) as T[];
 }
 
 /** JSON 응답과 실제 사용 모델을 함께 반환한다. */

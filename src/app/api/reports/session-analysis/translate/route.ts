@@ -78,7 +78,7 @@ export async function POST(req: Request) {
 
   let translated: string[];
   try {
-    translated = await translateTexts(entries.map(([, v]) => v), targetLocale, aiCfg.apiKey, aiCfg.model);
+    translated = await translateTexts(entries.map(([, v]) => v), targetLocale, user.id, aiCfg.apiKey, aiCfg.model);
   } catch (err) {
     logger.error("analysis translate failed", err);
     return NextResponse.json({ error: "번역에 실패했어요. 잠시 후 다시 시도해주세요." }, { status: 502 });
