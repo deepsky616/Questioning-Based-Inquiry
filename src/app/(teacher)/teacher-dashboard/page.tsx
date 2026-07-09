@@ -5,13 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TeacherReportsView } from "@/components/teacher/TeacherReportsView";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { TeacherDashboardFilters } from "./TeacherDashboardFilters";
+import { TeacherDashboardTabs } from "./TeacherDashboardTabs";
 import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -297,54 +292,32 @@ function TeacherDashboard() {
     <div className="space-y-6">
       <PageHeader title={tPages("teacherDashboard.title")} description={tPages("teacherDashboard.description")} />
 
-      {/* 개요 / 상세 리포트 탭 */}
-      <div className="flex w-fit rounded-md border overflow-hidden">
-        {(["overview", "reports"] as const).map((v, i) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => setTab(v)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-              tab === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {v === "overview" ? t("tabOverview") : t("tabReports")}
-          </button>
-        ))}
-      </div>
+      <TeacherDashboardTabs
+        value={tab}
+        onChange={setTab}
+        labels={{ overview: t("tabOverview"), reports: t("tabReports") }}
+      />
 
       {tab === "reports" ? (
         <TeacherReportsView />
       ) : (
       <>
-      {/* 필터 */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-full sm:w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="week">{t("periodWeek")}</SelectItem>
-            <SelectItem value="month">{t("periodMonth")}</SelectItem>
-            <SelectItem value="semester">{t("periodSemester")}</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* 담당 학급 드롭다운 — 동적으로 생성 */}
-        <Select value={selectedClass} onValueChange={setSelectedClass}>
-          <SelectTrigger className="w-full sm:w-[22rem] md:w-[28rem]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="w-[var(--radix-select-trigger-width)]">
-            <SelectItem value="all">{t("allClasses")}</SelectItem>
-            {teacherClasses.map((tc) => (
-              <SelectItem key={classKey(tc)} value={classKey(tc)}>
-                {stats?.school ? `${stats.school} ` : ""}{t("gradeClass", { grade: tc.grade, className: tc.className })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <TeacherDashboardFilters
+        period={period}
+        selectedClass={selectedClass}
+        teacherClasses={teacherClasses}
+        school={stats?.school}
+        onPeriodChange={setPeriod}
+        onSelectedClassChange={setSelectedClass}
+        classKey={classKey}
+        labels={{
+          periodWeek: t("periodWeek"),
+          periodMonth: t("periodMonth"),
+          periodSemester: t("periodSemester"),
+          allClasses: t("allClasses"),
+          gradeClass: (grade, className) => t("gradeClass", { grade, className }),
+        }}
+      />
 
       {isLoading ? (
         <DashboardSkeleton />

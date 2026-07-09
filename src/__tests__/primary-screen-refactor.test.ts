@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 
 const curriculumPage = readFileSync("src/app/(teacher)/teacher-curriculum/page.tsx", "utf8");
+const curriculumCreateFlow = readFileSync("src/app/(teacher)/teacher-curriculum/CurriculumCreateFlow.tsx", "utf8");
 const askPage = readFileSync("src/app/(student)/student-ask/page.tsx", "utf8");
 
 describe("primary teacher and student screen structure", () => {
@@ -16,9 +17,10 @@ describe("primary teacher and student screen structure", () => {
     });
 
     expect(curriculumPage).toContain("CurriculumMainTabs");
-    expect(curriculumPage).toContain("CurriculumStepProgress");
-    expect(curriculumPage).toContain("CurriculumKeywordStep");
-    expect(curriculumPage).toContain("CurriculumSelectableTextStep");
+    expect(curriculumPage).toContain("CurriculumCreateFlow");
+    expect(curriculumCreateFlow).toContain("CurriculumStepProgress");
+    expect(curriculumCreateFlow).toContain("CurriculumKeywordStep");
+    expect(curriculumCreateFlow).toContain("CurriculumSelectableTextStep");
     expect(curriculumPage.split("\n").length).toBeLessThan(850);
   });
 

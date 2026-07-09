@@ -3,8 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
 import { DeployedDesignList } from "./DeployedDesignList";
@@ -12,20 +10,19 @@ import { ParticipationSection } from "./ParticipationSection";
 import { SessionAnalysisCard } from "./SessionAnalysisCard";
 import { QuestionEditDialog } from "./QuestionEditDialog";
 import { AiAnswerPreviewDialog } from "./AiAnswerPreviewDialog";
+import { TeacherQuestionBulkActionBar } from "./TeacherQuestionBulkActionBar";
 import { TeacherQuestionListPanel } from "./TeacherQuestionListPanel";
 import { TeacherQuestionSessionSelector } from "./TeacherQuestionSessionSelector";
+import { TeacherQuestionStatsCard } from "./TeacherQuestionStatsCard";
 import { TeacherQuestionTopTabs, type TeacherQuestionTopTab } from "./TeacherQuestionTopTabs";
 import type { QuestionSession, Question, BulkPreview } from "./types";
 import { PointReviewView } from "@/components/teacher/PointReviewView";
-import { summarizeQuestionTypes } from "@/lib/stats-calc";
-import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
-import { QuestionSortControl, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
+import type { SortField, SortDir } from "@/components/shared/QuestionClassificationStats";
 import { matchesCognitiveCategory } from "@/lib/question-labels";
 import { QUESTION_LIST_MAX } from "@/lib/questions";
 import { getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions } from "@/lib/app-queries";
 import { APP_DATA_REFETCH_MS } from "@/lib/query-refresh";
-import { SectionToggle } from "@/components/shared/SectionToggle";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -46,7 +43,6 @@ export default function QuestionsPage() {
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
-
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
   const [bulkPreviews, setBulkPreviews] = useState<BulkPreview[] | null>(null);
@@ -59,7 +55,6 @@ export default function QuestionsPage() {
 
   const { data: sessions = [] } = useTeacherSessions<QuestionSession>();
   const [selectedSessionId, setSelectedSessionId] = useState("");
-
 
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
@@ -489,7 +484,6 @@ export default function QuestionsPage() {
 
       {topTab === "questions" && (
         <div className="space-y-6">
-
       {/* 학생 참여 현황 — 세션 변경 시 key로 상태 초기화 */}
       {currentSession && (
         <ParticipationSection key={`participation-${currentSession.id}`} sessionId={currentSession.id} sessionDate={currentSession.date} />
@@ -503,69 +497,27 @@ export default function QuestionsPage() {
 
       {/* 질문 분류 통계 현황 (비율 막대, 표시 전용) */}
       {hasQuestionList && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">
-              {t("statsTitle")} <span className="text-xs font-normal text-muted-foreground">{t("statsCountSuffix", { count: filtered.length })}</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const s = summarizeQuestionTypes(filtered);
-              const pct = (n: number) => (s.total ? Math.round((n / s.total) * 100) : 0);
-              const bar = (name: string, value: number, color: string, desc: string) => (
-                <div key={name} className="mb-2 w-full px-1.5">
-                  <div className="flex items-center gap-2 py-0.5">
-                    <span className="w-20 shrink-0 whitespace-nowrap text-center text-xs text-muted-foreground">{name}</span>
-                    <div className="flex-1 h-3.5 rounded bg-muted overflow-hidden">
-                      <div style={{ width: `${pct(value)}%`, background: color, height: "100%" }} />
-                    </div>
-                    <span className="w-16 shrink-0 text-right text-xs font-semibold text-foreground">{value} ({pct(value)}%)</span>
-                  </div>
-                  <p className="pl-[5.5rem] text-[11px] leading-tight text-muted-foreground">{desc}</p>
-                </div>
-              );
-              return (
-                <div className="grid md:grid-cols-2 gap-x-8 gap-y-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground font-semibold mb-2">{tCls("category1")} — {tCls("closure")}</p>
-                    <div className="flex items-center gap-3">
-                      <ClassificationDonut
-                        size={108}
-                        slices={[
-                          { name: tCls("closed.label"), value: s.closure.closed, fill: "#3b82f6" },
-                          { name: tCls("open.label"), value: s.closure.open, fill: "#10b981" },
-                        ]}
-                      />
-                      <div className="flex-1 min-w-0">
-                        {bar(tCls("closed.label"), s.closure.closed, "#3b82f6", tCls("closed.desc"))}
-                        {bar(tCls("open.label"), s.closure.open, "#10b981", tCls("open.desc"))}
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-semibold mb-2">{tCls("category2")} — {tCls("cognitive")}</p>
-                    <div className="flex items-center gap-3">
-                      <ClassificationDonut
-                        size={108}
-                        slices={[
-                          { name: tCls("factual.label"), value: s.cognitive.factual, fill: "#94a3b8" },
-                          { name: tCls("conceptual.label"), value: s.cognitive.conceptual, fill: "#a855f7" },
-                          { name: tCls("controversial.label"), value: s.cognitive.controversial, fill: "#f97316" },
-                        ]}
-                      />
-                      <div className="flex-1 min-w-0">
-                        {bar(tCls("factual.label"), s.cognitive.factual, "#94a3b8", tCls("factual.desc"))}
-                        {bar(tCls("conceptual.label"), s.cognitive.conceptual, "#a855f7", tCls("conceptual.desc"))}
-                        {bar(tCls("controversial.label"), s.cognitive.controversial, "#f97316", tCls("controversial.desc"))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
+        <TeacherQuestionStatsCard
+          questions={filtered}
+          labels={{
+            title: t("statsTitle"),
+            countSuffix: t("statsCountSuffix", { count: filtered.length }),
+            category1: tCls("category1"),
+            category2: tCls("category2"),
+            closure: tCls("closure"),
+            cognitive: tCls("cognitive"),
+            closedLabel: tCls("closed.label"),
+            closedDesc: tCls("closed.desc"),
+            openLabel: tCls("open.label"),
+            openDesc: tCls("open.desc"),
+            factualLabel: tCls("factual.label"),
+            factualDesc: tCls("factual.desc"),
+            conceptualLabel: tCls("conceptual.label"),
+            conceptualDesc: tCls("conceptual.desc"),
+            controversialLabel: tCls("controversial.label"),
+            controversialDesc: tCls("controversial.desc"),
+          }}
+        />
       )}
 
       {questions.length >= QUESTION_LIST_MAX && (
@@ -675,97 +627,30 @@ export default function QuestionsPage() {
         onCancel={() => { setBulkPreviews(null); setEditedAnswers({}); setExcludedIds(new Set()); setBulkMsg(null); }}
       />
 
-      {/* AI 일괄 답변 패널 — 하단 가운데 떠 있는 컴팩트 액션 바(양옆 여백은 클릭 통과) */}
-      {selectedIds.size > 0 && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 px-4">
-          <div className="pointer-events-auto mx-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-600 shadow-xl ring-1 ring-black/5">
-            <div className="space-y-2.5 p-3.5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex shrink-0 flex-col items-center leading-none">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-indigo-700 shadow-sm">
-                      {selectedIds.size}
-                    </span>
-                    <span className="mt-1 text-[10px] font-medium text-indigo-100">{t("bulkSelectedLabel")}</span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-white">{t("bulkPanelTitle")}</p>
-                    <p className="line-clamp-2 text-xs text-indigo-100">{t("bulkPanelDesc")}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={clearSelection}
-                  disabled={isGeneratingPreviews || isSendingPreviews || isBulkDeleting}
-                  className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-indigo-100 underline-offset-4 hover:bg-white/10 hover:text-white hover:underline disabled:opacity-40"
-                >
-                  {t("deselect")}
-                </button>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {previewQuestions.map((q) => (
-                  <span
-                    key={q.id}
-                    className="max-w-full truncate rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white ring-1 ring-white/20"
-                    title={`${q.author.name}: ${q.content}`}
-                  >
-                    {q.author.name}: {q.content.length > 24 ? `${q.content.slice(0, 24)}...` : q.content}
-                  </span>
-                ))}
-                {hiddenPreviewCount > 0 && (
-                  <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
-                    {t("plusCount", { count: hiddenPreviewCount })}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                  onClick={handlePreviewBulkAi}
-                  disabled={isGeneratingPreviews || isSendingPreviews || isBulkDeleting}
-                  className="h-10 flex-1 bg-white font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:bg-white/60 disabled:text-indigo-300"
-                >
-                  {isGeneratingPreviews ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
-                      </svg>
-                      {t("aiGeneratingBulk")}
-                    </span>
-                  ) : (
-                    t("aiPreviewBtn")
-                  )}
-                </Button>
-                <Button
-                  onClick={handleBulkDelete}
-                  disabled={isGeneratingPreviews || isSendingPreviews || isBulkDeleting}
-                  className="h-10 shrink-0 border border-white/30 bg-white/10 font-semibold text-white hover:bg-red-500 hover:border-red-500 disabled:opacity-40 sm:w-auto"
-                >
-                  {isBulkDeleting ? t("bulkDeleting") : t("bulkDeleteBtn")}
-                </Button>
-              </div>
-
-              {bulkMsg && (
-                <div
-                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
-                    bulkMsg.type === "success"
-                      ? "bg-white text-indigo-700"
-                      : "bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300"
-                  }`}
-                >
-                  {bulkMsg.type === "success" && (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
-                      ✓
-                    </span>
-                  )}
-                  <span className={showBulkSuccess ? "animate-pulse" : ""}>{bulkMsg.text}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <TeacherQuestionBulkActionBar
+        selectedCount={selectedIds.size}
+        previewQuestions={previewQuestions}
+        hiddenPreviewCount={hiddenPreviewCount}
+        isGeneratingPreviews={isGeneratingPreviews}
+        isSendingPreviews={isSendingPreviews}
+        isBulkDeleting={isBulkDeleting}
+        bulkMsg={bulkMsg}
+        showBulkSuccess={showBulkSuccess}
+        onClearSelection={clearSelection}
+        onPreviewBulkAi={handlePreviewBulkAi}
+        onBulkDelete={handleBulkDelete}
+        labels={{
+          selectedLabel: t("bulkSelectedLabel"),
+          title: t("bulkPanelTitle"),
+          description: t("bulkPanelDesc"),
+          deselect: t("deselect"),
+          plusCount: (count) => t("plusCount", { count }),
+          aiGenerating: t("aiGeneratingBulk"),
+          aiPreview: t("aiPreviewBtn"),
+          bulkDeleting: t("bulkDeleting"),
+          bulkDelete: t("bulkDeleteBtn"),
+        }}
+      />
       </>
       )}
     </div>

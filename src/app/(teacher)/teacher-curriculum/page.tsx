@@ -26,16 +26,12 @@ import {
 import {
   filterSelectedTexts,
   selectAllIndices,
-  toggleSelectedIndex,
 } from "@/lib/inquiry-design-selection";
 import { useTeacherStudents } from "@/lib/app-queries";
-import { CurriculumInquiryStep } from "./CurriculumInquiryStep";
-import { CurriculumKeywordStep } from "./CurriculumKeywordStep";
+import { CurriculumCreateFlow } from "./CurriculumCreateFlow";
 import { CurriculumMainTabs, type CurriculumMainTab } from "./CurriculumMainTabs";
-import { CurriculumSelectableTextStep } from "./CurriculumSelectableTextStep";
-import { CurriculumStepProgress, type CurriculumStep } from "./CurriculumStepProgress";
+import type { CurriculumStep } from "./CurriculumStepProgress";
 import { SavedDesignsTab } from "./SavedDesignsTab";
-import { Step1CurriculumExplorer } from "./Step1CurriculumExplorer";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 import {
   KNOWLEDGE_ITEM_LIMIT,
@@ -644,140 +640,32 @@ export default function CurriculumPage() {
 
       {/* 탐구질문 만들기 (단계 진행) */}
       {mainTab === "create" && (
-      <>
-      <CurriculumStepProgress step={step} getLabel={stepLabel} />
-
-      {/* ── Step 1: 교육과정 탐색 ── */}
-      <Step1CurriculumExplorer
-        selGrade={selGrade} setSelGrade={setSelGrade}
-        selSubject={selSubject} setSelSubject={setSelSubject}
-        selAreaId={selAreaId} setSelAreaId={setSelAreaId}
-        areas={areas}
-        curriculumData={curriculumData}
-        loadingCurriculum={loadingCurriculum}
-        loadAreaData={loadAreaData}
-        unitNameInput={unitNameInput} setUnitNameInput={setUnitNameInput}
-        unitMatches={unitMatches}
-        recommendUnit={recommendUnit}
-        recommendByUnitName={recommendByUnitName}
-        isRecommending={isRecommending}
-        recommendMessage={recommendMessage}
-        selectedUnitCodes={selectedUnitCodes} setSelectedUnitCodes={setSelectedUnitCodes}
-        selectedAchievementCodes={selectedAchievementCodes} setSelectedAchievementCodes={setSelectedAchievementCodes}
-        selectedCoreIdeaLines={selectedCoreIdeaLines} setSelectedCoreIdeaLines={setSelectedCoreIdeaLines}
-        selectedKnowledge={selectedKnowledge} setSelectedKnowledge={setSelectedKnowledge}
-        selectedProcess={selectedProcess} setSelectedProcess={setSelectedProcess}
-        selectedValue={selectedValue} setSelectedValue={setSelectedValue}
-        getFilteredAchievements={getFilteredAchievements}
-        getSelectedAchievements={getSelectedAchievements}
-        getFilteredAchievementGroups={getFilteredAchievementGroups}
-        handleGoStep2={handleGoStep2}
-        loadingKeywords={loadingKeywords}
-      />
-
-      <CurriculumKeywordStep
-        visible={step >= 2}
-        recommendedKeywords={recommendedKeywords}
-        selectedKeywords={selectedKeywords}
-        customKeyword={customKeyword}
-        loadingSentences={loadingSentences}
-        onToggleKeyword={toggleKeyword}
-        onCustomKeywordChange={setCustomKeyword}
-        onAddCustomKeyword={addCustomKeyword}
-        onGoNext={handleGoStep3}
-      />
-
-      <CurriculumSelectableTextStep
-        visible={step >= 3}
-        titleKey="step3Title"
-        descriptionKey="step3Desc"
-        selectedCount={selectedCoreSentences.length}
-        items={coreSentences}
-        selectedIndices={selectedCoreSentenceIndices}
-        itemPrefix="number"
-        selectAriaKey="selectSentenceAria"
-        loading={loadingQuestions}
-        loadingLabelKey="loadingQuestions"
-        nextLabelKey="nextQuestions"
-        loadingKind="unitDesignQuestions"
-        onSelectAll={() => setSelectedCoreSentenceIndices(selectAllIndices(coreSentences))}
-        onDeselectAll={() => setSelectedCoreSentenceIndices([])}
-        onToggle={(index) => setSelectedCoreSentenceIndices((prev) => toggleSelectedIndex(prev, index))}
-        onItemChange={(index, value) => {
-          const next = [...coreSentences];
-          next[index] = value;
-          setCoreSentences(next);
+      <CurriculumCreateFlow
+        {...{
+          step, stepLabel, selGrade, setSelGrade, selSubject, setSelSubject, selAreaId, setSelAreaId,
+          areas, curriculumData, loadingCurriculum, loadAreaData, unitNameInput, setUnitNameInput,
+          unitMatches, recommendUnit, recommendByUnitName, isRecommending, recommendMessage,
+          selectedUnitCodes, setSelectedUnitCodes, selectedAchievementCodes, setSelectedAchievementCodes,
+          selectedCoreIdeaLines, setSelectedCoreIdeaLines, selectedKnowledge, setSelectedKnowledge,
+          selectedProcess, setSelectedProcess, selectedValue, setSelectedValue, getFilteredAchievements,
+          getSelectedAchievements, getFilteredAchievementGroups, handleGoStep2, loadingKeywords,
+          recommendedKeywords, selectedKeywords, customKeyword, loadingSentences, toggleKeyword,
+          setCustomKeyword, addCustomKeyword, handleGoStep3, selectedCoreSentences, coreSentences,
+          selectedCoreSentenceIndices, setSelectedCoreSentenceIndices, setCoreSentences, loadingQuestions,
+          handleGoStep4, selectedEssentialQuestions, essentialQuestions, selectedEssentialQuestionIndices,
+          setSelectedEssentialQuestionIndices, setEssentialQuestions, loadingInquiry, handleGoStep5,
+          inquiryQuestions, dragInquiryIndex, inquiryAddType, saveDate, saveGrade, saveTitle, students,
+          targetClasses, targetClassValue, selectedStudentIds, sessionIsActive, defaultQuestionPublic,
+          sessionLikesVisible, sessionCommentsVisible, isSaving, canSaveDesign, lastDesignAction,
+          setDragInquiryIndex, handleInquiryDrop, moveInquiry, updateInquiry, removeInquiry,
+          setInquiryAddType, addInquiry, setSaveDate, setSaveGrade, setSaveTitle, setTargetClassValue,
+          setSelectedStudentIds, setSessionIsActive, setDefaultQuestionPublic, setSessionLikesVisible,
+          setSessionCommentsVisible,
         }}
-        onGoNext={handleGoStep4}
-      />
-
-      <CurriculumSelectableTextStep
-        visible={step >= 4}
-        titleKey="step4Title"
-        descriptionKey="step4Desc"
-        selectedCount={selectedEssentialQuestions.length}
-        items={essentialQuestions}
-        selectedIndices={selectedEssentialQuestionIndices}
-        itemPrefix="question"
-        selectAriaKey="selectQuestionAria"
-        loading={loadingInquiry}
-        loadingLabelKey="loadingInquiry"
-        nextLabelKey="nextInquiry"
-        loadingKind="unitDesignInquiry"
-        onSelectAll={() => setSelectedEssentialQuestionIndices(selectAllIndices(essentialQuestions))}
-        onDeselectAll={() => setSelectedEssentialQuestionIndices([])}
-        onToggle={(index) => setSelectedEssentialQuestionIndices((prev) => toggleSelectedIndex(prev, index))}
-        onItemChange={(index, value) => {
-          const next = [...essentialQuestions];
-          next[index] = value;
-          setEssentialQuestions(next);
-        }}
-        onGoNext={handleGoStep5}
-      />
-
-      <CurriculumInquiryStep
-        visible={step >= 5}
-        inquiryQuestions={inquiryQuestions}
         selectedInquiryCount={selectedInquiryQuestions.length}
-        dragInquiryIndex={dragInquiryIndex}
-        inquiryAddType={inquiryAddType}
-        saveDate={saveDate}
-        saveGrade={saveGrade}
-        saveTitle={saveTitle}
-        curriculumData={curriculumData}
-        students={students}
-        targetClasses={targetClasses}
-        targetClassValue={targetClassValue}
-        selectedStudentIds={selectedStudentIds}
-        sessionIsActive={sessionIsActive}
-        defaultQuestionPublic={defaultQuestionPublic}
-        sessionLikesVisible={sessionLikesVisible}
-        sessionCommentsVisible={sessionCommentsVisible}
-        isSaving={isSaving}
-        canSaveDesign={canSaveDesign}
-        lastDesignAction={lastDesignAction}
-        onSetDragInquiryIndex={setDragInquiryIndex}
-        onDropInquiry={handleInquiryDrop}
-        onMoveInquiry={moveInquiry}
-        onUpdateInquiry={updateInquiry}
-        onRemoveInquiry={removeInquiry}
-        onInquiryAddTypeChange={setInquiryAddType}
-        onAddInquiry={addInquiry}
-        onSaveDateChange={setSaveDate}
-        onSaveGradeChange={setSaveGrade}
-        onSaveTitleChange={setSaveTitle}
-        onTargetClassChange={(value, ids) => { setTargetClassValue(value); setSelectedStudentIds(ids); }}
-        onSelectedStudentIdsChange={setSelectedStudentIds}
-        onVisibilitySettingsChange={(next) => {
-          setSessionIsActive(next.isActive);
-          setDefaultQuestionPublic(next.defaultQuestionPublic);
-          setSessionLikesVisible(next.likesVisibleToPeers);
-          setSessionCommentsVisible(next.commentsVisibleToPeers);
-        }}
-        onSaveAndCreateSession={() => handleSaveAndCreateSession("inquiry")}
-        onSaveOnly={handleSave}
+        handleSaveAndCreateSession={() => handleSaveAndCreateSession("inquiry")}
+        handleSave={handleSave}
       />
-      </>
       )}
     </div>
   );

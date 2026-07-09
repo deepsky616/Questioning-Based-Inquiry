@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
 import { ReportView, type PerStudentRow, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 import { ReportPrintDoc, type PrintReportItem } from "@/components/reports/ReportPrintDoc";
+import { ReportPrintControls } from "@/components/teacher/ReportPrintControls";
 import { useTranslations } from "next-intl";
-import { formatClock } from "@/lib/datetime";
 import { visibleReportRefetchInterval } from "@/lib/query-refresh";
 
 interface ClassItem { grade: string; className: string; studentCount: number }
@@ -421,43 +420,28 @@ export function TeacherReportsView() {
               </select>
             )}
 
-            {/* 출력(인쇄) — 새 탭 없이 현재 페이지에서 인쇄.
-                학급 전체 탭: 학급 집계 분석 / 학생별 탭: 학생 개별·전체 학생 */}
-            <div className="ml-auto flex items-center gap-2">
-              <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
-                <span>{visibleUpdatedAt ? t("lastUpdated", { time: formatClock(new Date(visibleUpdatedAt)) }) : t("autoRefreshNote")}</span>
-                <button
-                  type="button"
-                  onClick={refreshVisibleReport}
-                  disabled={visibleRefreshing}
-                  className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${visibleRefreshing ? "animate-spin" : ""}`} />
-                  {visibleRefreshing ? t("refreshingReport") : t("refreshReport")}
-                </button>
-              </div>
-              {view === "class" && (
-                <button
-                  onClick={printClassReport}
-                  disabled={printBusy}
-                  className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
-                >{t("printClass")}</button>
-              )}
-              {view === "student" && studentId && studentReport && (
-                <button
-                  onClick={printOneStudent}
-                  disabled={printBusy}
-                  className="rounded-md border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-60"
-                >{printBusy ? t("loadingReport") : t("printIndividual")}</button>
-              )}
-              {view === "student" && (
-                <button
-                  onClick={printAllStudents}
-                  disabled={printBusy}
-                  className="rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-60"
-                >{printBusy ? t("loadingReport") : t("printAll")}</button>
-              )}
-            </div>
+            <ReportPrintControls
+              view={view}
+              studentId={studentId}
+              hasStudentReport={Boolean(studentReport)}
+              printBusy={printBusy}
+              visibleUpdatedAt={visibleUpdatedAt}
+              visibleRefreshing={visibleRefreshing}
+              onRefresh={refreshVisibleReport}
+              onPrintClass={printClassReport}
+              onPrintOneStudent={printOneStudent}
+              onPrintAllStudents={printAllStudents}
+              labels={{
+                lastUpdated: (time) => t("lastUpdated", { time }),
+                autoRefreshNote: t("autoRefreshNote"),
+                refreshingReport: t("refreshingReport"),
+                refreshReport: t("refreshReport"),
+                printClass: t("printClass"),
+                loadingReport: t("loadingReport"),
+                printIndividual: t("printIndividual"),
+                printAll: t("printAll"),
+              }}
+            />
           </div>
         )}
       </div>
