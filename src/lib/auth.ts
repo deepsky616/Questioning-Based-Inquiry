@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { buildLoginIdentity, isLoginAttemptAllowed } from "@/lib/login-guard";
 import type { UserRole } from "@/types/user";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -18,6 +19,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       authorize: async (credentials) => {
         if (!credentials?.password) return null;
+
+        // 계정 단위 시도 제한 — 비밀번호 무한 시도(브루트포스) 차단.
+        // DB 조회 전에 검사해 초과 시도는 비용 없이 거절한다.
+        const identity = buildLoginIdentity(credentials);
+        if (identity && !isLoginAttemptAllowed(identity)) return null;
 
         let user;
 
