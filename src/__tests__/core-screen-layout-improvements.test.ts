@@ -7,6 +7,7 @@ const teacherSessions = readFileSync("src/app/(teacher)/teacher-sessions/page.ts
 const reportView = readFileSync("src/components/reports/ReportView.tsx", "utf8");
 const teacherSessionSummaryGrid = readFileSync("src/app/(teacher)/teacher-sessions/TeacherSessionSummaryGrid.tsx", "utf8");
 const teacherSessionListControls = readFileSync("src/app/(teacher)/teacher-sessions/TeacherSessionListControls.tsx", "utf8");
+const teacherSessionCreateCard = readFileSync("src/app/(teacher)/teacher-sessions/TeacherSessionCreateCard.tsx", "utf8");
 const reportSectionGrid = readFileSync("src/components/reports/ReportSectionGrid.tsx", "utf8");
 const reportViewSections = readFileSync("src/components/reports/ReportViewSections.tsx", "utf8");
 
@@ -26,7 +27,7 @@ describe("core screen layout improvements", () => {
     expect(teacherSessions).toContain("TeacherSessionListControls");
     expect(teacherSessionSummaryGrid).toContain("teacher-sessions-summary-grid");
     expect(teacherSessionListControls).toContain("teacher-sessions-filter-grid");
-    expect(teacherSessions).toContain("lg:grid-cols-[1fr_1fr_2fr]");
+    expect(teacherSessionCreateCard).toContain("lg:grid-cols-[1fr_1fr_2fr]");
   });
 
   it("keeps report sections grouped for readable preview and print", () => {
