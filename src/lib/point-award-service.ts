@@ -1,8 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
-import { chooseModelAuto } from "@/lib/api-config";
+import { generateJson } from "@/lib/ai";
 import {
   BASE_POINTS,
   AI_BONUS_TYPES,
@@ -91,30 +89,14 @@ ${bonusList}
 }`;
 }
 
-function tryParseAI(text: string): AIVerdictResponse | null {
-  try {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    return JSON.parse(match[0]);
-  } catch {
-    return null;
-  }
-}
-
 async function callAI(req: AwardRequest, userId: string): Promise<AIVerdictResponse | null> {
-  const aiCfg = await resolveUserAiConfig(userId);
-  if (!aiCfg.apiKey) return null;
-
-  const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-  const prompt = buildPrompt(req);
-  const gemini = genAI.getGenerativeModel({
-    model: chooseModelAuto(aiCfg.model, prompt.length),
-    systemInstruction: AI_SYSTEM,
-    generationConfig: { temperature: 0 },
-  });
   try {
-    const result = await gemini.generateContent(prompt);
-    return tryParseAI(result.response.text());
+    return await generateJson<AIVerdictResponse>({
+      userId,
+      prompt: buildPrompt(req),
+      systemInstruction: AI_SYSTEM,
+      temperature: 0,
+    });
   } catch {
     return null;
   }

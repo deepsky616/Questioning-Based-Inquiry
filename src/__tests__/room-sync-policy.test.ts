@@ -7,6 +7,7 @@ const roomTypeSource = readFileSync("src/lib/question-games-data.ts", "utf8");
 const roomRouteSource = readFileSync("src/app/api/question-games/rooms/[code]/route.ts", "utf8");
 const roomCreateRouteSource = readFileSync("src/app/api/question-games/rooms/route.ts", "utf8");
 const roomStorePath = "src/lib/game-room-store.ts";
+const roomStoreSource = existsSync(roomStorePath) ? readFileSync(roomStorePath, "utf8") : "";
 
 describe("room sync policy", () => {
   it("keeps room polling interval in the shared refresh policy", () => {
@@ -19,16 +20,15 @@ describe("room sync policy", () => {
 
   it("uses room versions to detect stale tablet actions", () => {
     expect(roomTypeSource).toContain("version: number");
-    expect(roomCreateRouteSource).toContain("version: 1");
+    expect(roomStoreSource).toContain("version: 1");
     expect(roomRouteSource).toContain("expectedVersion");
     expect(roomRouteSource).toContain("status: 409");
-    expect(roomRouteSource).toContain("room.version");
+    expect(roomRouteSource).toContain("isStaleRoomAction");
     expect(useRoomSource).toContain("expectedVersion");
   });
 
   it("keeps room storage details behind a store service", () => {
     expect(existsSync(roomStorePath)).toBe(true);
-    const roomStoreSource = readFileSync(roomStorePath, "utf8");
 
     expect(roomStoreSource).toContain("createGameRoom");
     expect(roomStoreSource).toContain("loadGameRoom");

@@ -1,15 +1,13 @@
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildAnswerPrompt } from "@/lib/ai-prompts";
 import { validateBulkAiRequest } from "@/lib/questions";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
-import { chooseModelAuto } from "@/lib/api-config";
-import { getRequestLocale, languageDirective } from "@/lib/locale";
+import { generateText } from "@/lib/ai";
 
 const schema = z.object({
   questionIds: z.array(z.string()).min(1),
@@ -47,15 +45,14 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    const apiKey = aiCfg.apiKey;
 
     const questions = await prisma.question.findMany({
       where: { id: { in: questionIds } },
       select: { id: true, content: true, context: true, closure: true, cognitive: true },
     });
 
-    const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-
-    // 각 질문에 대해 AI 답변 동시 생성 (프롬프트 크기에 따라 모델 자동 선택)
+    // 각 질문에 대해 AI 답변 동시 생성 (통합 AI 호출 계층에서 모델 자동 선택·재시도)
     const aiResults = await Promise.allSettled(
       questions.map(async (q) => {
         const prompt = buildAnswerPrompt(
@@ -63,10 +60,16 @@ export async function POST(req: Request) {
           q.closure ?? undefined,
           q.cognitive ?? undefined,
           q.context ?? undefined
-        ) + languageDirective(getRequestLocale(req));
-        const model = genAI.getGenerativeModel({ model: chooseModelAuto(aiCfg.model, prompt.length) });
-        const result = await model.generateContent(prompt);
-        return { id: q.id, answer: result.response.text().trim() };
+        );
+        const answer = await generateText({
+          userId,
+          prompt,
+          req,
+          localize: true,
+          apiKeyOverride: apiKey,
+          modelOverride: aiCfg.model,
+        });
+        return { id: q.id, answer };
       })
     );
 

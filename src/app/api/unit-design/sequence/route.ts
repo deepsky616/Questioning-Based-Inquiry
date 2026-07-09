@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
-import { chooseQualityModel } from "@/lib/api-config";
 import { logger } from "@/lib/logger";
-import { getRequestLocale, languageDirective } from "@/lib/locale";
+import { generateJson } from "@/lib/ai";
 import {
   buildSequencePrompt,
   fallbackSequenceQuestions,
@@ -99,6 +97,7 @@ export async function POST(req: Request) {
     const aiCfg = await resolveUserAiConfig(user.id);
 
     if (aiCfg.apiKey) {
+      const apiKey = aiCfg.apiKey;
       try {
         const prompt = buildSequencePrompt({
           flowId: flow.id,
@@ -106,18 +105,17 @@ export async function POST(req: Request) {
           topic: questionSession.topic,
           questions,
           mode: data.mode,
-        }) + languageDirective(getRequestLocale(req));
-        const genAI = new GoogleGenerativeAI(aiCfg.apiKey);
-        // 묶기(merge)·흐름 정렬(sort) 모두 수업 순서를 결정하는 교육적 추론 작업이라
-        // 크기와 무관하게 품질 우선 모델(flash 이상) + 낮은 온도(같은 질문 → 같은 묶음·순서 유지)
-        const model = genAI.getGenerativeModel({
-          model: chooseQualityModel(aiCfg.model),
-          generationConfig: { temperature: 0.1 },
         });
-        const result = await model.generateContent(prompt);
-        const text = result.response.text();
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+        const parsed = await generateJson<{ sequencedQuestions?: unknown }>({
+          userId: user.id,
+          prompt,
+          req,
+          localize: true,
+          quality: true,
+          temperature: 0.1,
+          apiKeyOverride: apiKey,
+          modelOverride: aiCfg.model,
+        });
         const aiQuestions = normalizeSequencedQuestions(parsed?.sequencedQuestions, questions, data.mode);
         // 정렬 모드는 질문 수가 유지돼야 하지만, 통합 모드는 줄어들 수 있다
         const ok = data.mode === "merge"

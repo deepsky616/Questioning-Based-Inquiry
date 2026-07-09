@@ -1,33 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import type { GameRoom, RoomPlayer, RoomChainItem } from "@/lib/question-games-data";
-
-const ROOM_KEY = (code: string) => `game_room_${code}`;
-
-async function loadRoom(code: string): Promise<GameRoom | null> {
-  const rec = await prisma.systemConfig.findUnique({ where: { key: ROOM_KEY(code) } });
-  if (!rec) return null;
-  try {
-    const room = JSON.parse(rec.value) as GameRoom;
-    return { ...room, version: room.version ?? 1 };
-  } catch {
-    return null;
-  }
-}
-
-async function saveRoom(room: GameRoom) {
-  room.version = (room.version ?? 1) + 1;
-  room.updatedAt = Date.now();
-  await prisma.systemConfig.update({
-    where: { key: ROOM_KEY(room.code) },
-    data: { value: JSON.stringify(room) },
-  });
-}
-
-function isStaleAction(room: GameRoom, expectedVersion: unknown) {
-  return typeof expectedVersion === "number" && expectedVersion !== room.version;
-}
+import type { RoomPlayer, RoomChainItem } from "@/lib/question-games-data";
+import {
+  deleteGameRoom,
+  isStaleRoomAction,
+  loadGameRoom,
+  saveGameRoom,
+} from "@/lib/game-room-store";
 
 // 방 상태 조회 (폴링)
 export async function GET(
@@ -38,7 +17,7 @@ export async function GET(
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
-  const room = await loadRoom(params.code);
+  const room = await loadGameRoom(params.code);
   if (!room) {
     return NextResponse.json({ error: "방을 찾을 수 없습니다" }, { status: 404 });
   }
@@ -57,7 +36,7 @@ export async function PATCH(
   const userId = (session.user as { id: string }).id;
   const userName = (session.user as { name?: string }).name ?? "학생";
 
-  const room = await loadRoom(params.code);
+  const room = await loadGameRoom(params.code);
   if (!room) {
     return NextResponse.json({ error: "방을 찾을 수 없습니다" }, { status: 404 });
   }
@@ -77,7 +56,7 @@ export async function PATCH(
       if (!room.players.some((p) => p.id === userId)) {
         const player: RoomPlayer = { id: userId, name: userName, isHost: false, joinedAt: Date.now() };
         room.players.push(player);
-        await saveRoom(room);
+        await saveGameRoom(room);
       }
       break;
     }
@@ -87,7 +66,7 @@ export async function PATCH(
       room.players = room.players.filter((p) => p.id !== userId);
       if (room.players.length === 0) {
         // 모두 나가면 방 삭제
-        await prisma.systemConfig.delete({ where: { key: ROOM_KEY(room.code) } }).catch(() => {});
+        await deleteGameRoom(room.code);
         return NextResponse.json({ room: null, deleted: true });
       }
       // 방장이 나가면 다음 사람에게 위임
@@ -95,7 +74,7 @@ export async function PATCH(
         room.hostId = room.players[0].id;
         room.players[0].isHost = true;
       }
-      await saveRoom(room);
+      await saveGameRoom(room);
       break;
     }
 
@@ -103,19 +82,19 @@ export async function PATCH(
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 시작할 수 있어요" }, { status: 403 });
       }
-      if (isStaleAction(room, expectedVersion)) {
+      if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       room.status = "playing";
       room.turnIndex = 0;
       room.chain = [];
       room.gameState = {};
-      await saveRoom(room);
+      await saveGameRoom(room);
       break;
     }
 
     case "update-state": {
-      if (isStaleAction(room, expectedVersion)) {
+      if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       // gameState 부분 병합 (참가자 누구나 자기 액션 반영 가능)
@@ -125,27 +104,27 @@ export async function PATCH(
       if (typeof body.status === "string" && (body.status === "playing" || body.status === "ended")) {
         room.status = body.status;
       }
-      await saveRoom(room);
+      await saveGameRoom(room);
       break;
     }
 
     case "set-state": {
-      if (isStaleAction(room, expectedVersion)) {
+      if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       // gameState 전체 교체 (주로 방장이 초기화/리셋)
       room.gameState = (body.state ?? {}) as Record<string, unknown>;
       if (typeof body.turnIndex === "number") room.turnIndex = body.turnIndex;
-      await saveRoom(room);
+      await saveGameRoom(room);
       break;
     }
 
     case "next-turn": {
-      if (isStaleAction(room, expectedVersion)) {
+      if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       room.turnIndex = (room.turnIndex + 1) % room.players.length;
-      await saveRoom(room);
+      await saveGameRoom(room);
       break;
     }
 
@@ -153,16 +132,16 @@ export async function PATCH(
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 주제를 정할 수 있어요" }, { status: 403 });
       }
-      if (isStaleAction(room, expectedVersion)) {
+      if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       room.topic = typeof body.topic === "string" ? body.topic : "";
-      await saveRoom(room);
+      await saveGameRoom(room);
       break;
     }
 
     case "add-question": {
-      if (isStaleAction(room, expectedVersion)) {
+      if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       const question = typeof body.question === "string" ? body.question.trim() : "";
@@ -181,7 +160,7 @@ export async function PATCH(
       const item: RoomChainItem = { question, playerId: userId, playerName: userName };
       room.chain.push(item);
       room.turnIndex = (room.turnIndex + 1) % room.players.length;
-      await saveRoom(room);
+      await saveGameRoom(room);
       break;
     }
 
@@ -189,11 +168,11 @@ export async function PATCH(
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 종료할 수 있어요" }, { status: 403 });
       }
-      if (isStaleAction(room, expectedVersion)) {
+      if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       room.status = "ended";
-      await saveRoom(room);
+      await saveGameRoom(room);
       break;
     }
 
@@ -201,7 +180,7 @@ export async function PATCH(
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 다시 시작할 수 있어요" }, { status: 403 });
       }
-      if (isStaleAction(room, expectedVersion)) {
+      if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       room.status = "waiting";
@@ -209,7 +188,7 @@ export async function PATCH(
       room.turnIndex = 0;
       room.topic = "";
       room.gameState = {};
-      await saveRoom(room);
+      await saveGameRoom(room);
       break;
     }
 
