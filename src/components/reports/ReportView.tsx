@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  ResponsiveContainer, LineChart, Line, BarChart, Bar, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
+  ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -18,7 +17,12 @@ import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { formatDateTime } from "@/lib/datetime";
 import { getAnalysisFreshness } from "@/lib/report-analysis-freshness";
 import { ReportClassificationGuide } from "@/components/reports/ReportClassificationGuide";
-import { ReportSectionGrid, SummaryCard } from "@/components/reports/ReportSectionGrid";
+import { SummaryCard } from "@/components/reports/ReportSectionGrid";
+import {
+  ReportClassificationTrendGrid,
+  ReportHeaderControls,
+  ReportTrendGrid,
+} from "@/components/reports/ReportViewSections";
 
 export interface PerStudentRow {
   id: string;
@@ -432,37 +436,18 @@ export function ReportView({
 
   return (
     <div className="report-print space-y-6">
-      {/* 헤더 + 조작(인쇄 시 숨김) */}
-      <div className="report-readable-header flex flex-wrap items-end justify-between gap-3 rounded-xl border bg-card p-4">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">{title}</h2>
-          {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
-          <p className="mt-0.5 text-xs text-muted-foreground">{t("basisNote", { date: new Date().toLocaleDateString(locale) })}</p>
-        </div>
-        <div className="no-print flex flex-wrap items-center gap-2">
-          <div className="flex rounded-md border overflow-hidden">
-            <button
-              onClick={() => setRange("week")}
-              className={`px-3 py-1.5 text-xs font-medium ${range === "week" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-            >{t("week")}</button>
-            <button
-              onClick={() => setRange("month")}
-              className={`px-3 py-1.5 text-xs font-medium border-l ${range === "month" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"}`}
-            >{t("month")}</button>
-          </div>
-          {/* 특정 주/월 선택 — 차트·요약·세션이 이 선택을 함께 따른다 */}
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value)}
-            className="rounded-md border bg-background px-2 py-1.5 text-xs text-foreground"
-          >
-            {periods.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-          </select>
-          {showPrintButton && (
-            <Button size="sm" onClick={() => window.print()} className="font-semibold">{t("print")}</Button>
-          )}
-        </div>
-      </div>
+      <ReportHeaderControls
+        title={title}
+        subtitle={subtitle}
+        basisNote={t("basisNote", { date: new Date().toLocaleDateString(locale) })}
+        range={range}
+        period={period}
+        periods={periods}
+        showPrintButton={showPrintButton}
+        labels={{ week: t("week"), month: t("month"), print: t("print") }}
+        onRangeChange={setRange}
+        onPeriodChange={setPeriod}
+      />
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -473,43 +458,18 @@ export function ReportView({
         <SummaryCard label={t("metric_commentsReceived")} value={viewTotals.commentsReceived} color="#8b5cf6" />
       </div>
 
-      <ReportSectionGrid>
-        {/* 참여 추세 */}
-        <div className="rounded-xl border bg-card p-4">
-          <p className="mb-3 text-sm font-bold text-foreground">{t("participationTrend", { period: range === "week" ? t("week") : t("month"), label: pLabel })}</p>
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-              <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-              <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              {METRICS.map((m) => (
-                <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
-              ))}
-              {selectedPoint && <ReferenceLine x={selectedPoint.label} stroke="#6366f1" strokeDasharray="4 3" />}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* 호응 추세 */}
-        <div className="rounded-xl border bg-card p-4">
-          <p className="mb-3 text-sm font-bold text-foreground">{t("receptionTrend", { period: range === "week" ? t("week") : t("month"), label: rLabel })}</p>
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-              <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-              <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              {RECEIVED.map((m) => (
-                <Line key={m.key} type="monotone" dataKey={m.key} name={metricName(m.key)} stroke={m.color} strokeWidth={2} dot={{ r: 2 }} />
-              ))}
-              {selectedPoint && <ReferenceLine x={selectedPoint.label} stroke="#6366f1" strokeDasharray="4 3" />}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </ReportSectionGrid>
+      <ReportTrendGrid
+        series={series}
+        selectedPoint={selectedPoint}
+        participationTitle={t("participationTrend", { period: range === "week" ? t("week") : t("month"), label: pLabel })}
+        receptionTitle={t("receptionTrend", { period: range === "week" ? t("week") : t("month"), label: rLabel })}
+        metrics={METRICS}
+        receivedMetrics={RECEIVED}
+        metricName={metricName}
+        chart={chart}
+        tooltipStyle={tooltipStyle}
+        tooltipText={tooltipText}
+      />
 
       {/* 분류 안내 (분류 차트 공통 참조) — 색 점은 차트 색과 동일 */}
       <ReportClassificationGuide />
@@ -530,41 +490,17 @@ export function ReportView({
         </ResponsiveContainer>
       </div>
 
-      <ReportSectionGrid>
-        {/* 분류1 추세 (닫힌 질문/열린 질문 누적 막대) */}
-        <div className="rounded-xl border bg-card p-4">
-          <p className="mb-3 text-sm font-bold text-foreground">{t("closureTrend", { cat: tCls("category1"), period: range === "week" ? t("week") : t("month"), kinds: tCls("closure") })}</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-              <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-              <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              {CLOSURE_TREND.map((m) => (
-                <Bar key={m.key} dataKey={m.key} name={tCls(`${m.labelKey}.label`)} stackId="closure" fill={m.color} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* 분류2 추세 (사실/개념/논쟁 누적 막대) */}
-        <div className="rounded-xl border bg-card p-4">
-          <p className="mb-3 text-sm font-bold text-foreground">{t("cognitiveTrend", { cat: tCls("category2"), period: range === "week" ? t("week") : t("month"), kinds: tCls("cognitive") })}</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={series} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-              <XAxis dataKey="label" stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-              <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-              <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
-              {COGNITIVE_TREND.map((m) => (
-                <Bar key={m.key} dataKey={m.key} name={tCls(`${m.labelKey}.label`)} stackId="cognitive" fill={m.color} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ReportSectionGrid>
+      <ReportClassificationTrendGrid
+        series={series}
+        closureTitle={t("closureTrend", { cat: tCls("category1"), period: range === "week" ? t("week") : t("month"), kinds: tCls("closure") })}
+        cognitiveTitle={t("cognitiveTrend", { cat: tCls("category2"), period: range === "week" ? t("week") : t("month"), kinds: tCls("cognitive") })}
+        closureTrend={CLOSURE_TREND}
+        cognitiveTrend={COGNITIVE_TREND}
+        classificationLabel={(labelKey) => tCls(`${labelKey}.label`)}
+        chart={chart}
+        tooltipStyle={tooltipStyle}
+        tooltipText={tooltipText}
+      />
 
       {/* 수업 세션별 분석 (기간 필터 + 전체 분석) */}
       {allSessions.length > 0 && analyzeSession && (

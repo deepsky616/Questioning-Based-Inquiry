@@ -8,6 +8,7 @@ const reportView = readFileSync("src/components/reports/ReportView.tsx", "utf8")
 const teacherSessionSummaryGrid = readFileSync("src/app/(teacher)/teacher-sessions/TeacherSessionSummaryGrid.tsx", "utf8");
 const teacherSessionListControls = readFileSync("src/app/(teacher)/teacher-sessions/TeacherSessionListControls.tsx", "utf8");
 const reportSectionGrid = readFileSync("src/components/reports/ReportSectionGrid.tsx", "utf8");
+const reportViewSections = readFileSync("src/components/reports/ReportViewSections.tsx", "utf8");
 
 describe("core screen layout improvements", () => {
   it("keeps student dashboard and question views tablet-friendly", () => {
@@ -29,10 +30,11 @@ describe("core screen layout improvements", () => {
   });
 
   it("keeps report sections grouped for readable preview and print", () => {
-    expect(reportView).toContain("report-readable-header");
-    expect(reportView).toContain("ReportSectionGrid");
+    expect(reportView).toContain("ReportHeaderControls");
+    expect(reportViewSections).toContain("report-readable-header");
+    expect(reportViewSections).toContain("report-readable-grid");
     expect(reportSectionGrid).toContain("report-readable-grid");
     expect(reportView).toContain("report-analysis-panel");
-    expect(reportSectionGrid).toContain("lg:grid-cols-2");
+    expect(reportViewSections).toContain("lg:grid-cols-2");
   });
 });
