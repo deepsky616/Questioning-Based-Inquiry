@@ -325,24 +325,6 @@ function TeacherDashboard() {
         <div className="text-center py-16 text-muted-foreground">{t("statsLoadError")}</div>
       ) : (
         <>
-          {/* 총 질문 수 */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">{t("totalQuestions")}</p>
-                  <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
-                </div>
-                <div className="text-xs text-muted-foreground text-right">
-                  {period === "week" && t("periodWeekBasis")}
-                  {period === "month" && t("periodMonthBasis")}
-                  {period === "semester" && t("periodSemesterBasis")}
-                  {dashboardScopeLabel ? ` · ${dashboardScopeLabel}` : ""}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* 오늘 할 일 */}
           <Card>
             <CardHeader className="pb-3">
@@ -396,6 +378,24 @@ function TeacherDashboard() {
                     </button>
                   );
                 })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 총 질문 수 */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">{t("totalQuestions")}</p>
+                  <p className="text-4xl font-bold mt-0.5">{stats.total}</p>
+                </div>
+                <div className="text-xs text-muted-foreground text-right">
+                  {period === "week" && t("periodWeekBasis")}
+                  {period === "month" && t("periodMonthBasis")}
+                  {period === "semester" && t("periodSemesterBasis")}
+                  {dashboardScopeLabel ? ` · ${dashboardScopeLabel}` : ""}
+                </div>
               </div>
             </CardContent>
           </Card>
