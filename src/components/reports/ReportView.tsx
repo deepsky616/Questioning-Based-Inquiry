@@ -2,10 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
-} from "recharts";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useTheme } from "@/components/shared/theme-provider";
 import { useTranslations, useLocale } from "next-intl";
@@ -19,8 +15,13 @@ import { getAnalysisFreshness } from "@/lib/report-analysis-freshness";
 import { ReportClassificationGuide } from "@/components/reports/ReportClassificationGuide";
 import { SummaryCard } from "@/components/reports/ReportSectionGrid";
 import {
+  getReportEditFieldKeys,
+  REPORT_EDIT_FIELD_LABEL_KEYS,
+  ReportClassificationDistributionChart,
   ReportClassificationTrendGrid,
   ReportHeaderControls,
+  ReportSessionAnalysisToolbar,
+  ReportStudentActivityTable,
   ReportTrendGrid,
 } from "@/components/reports/ReportViewSections";
 
@@ -165,7 +166,6 @@ export function ReportView({
     fontSize: 12,
   } as const;
   const tooltipText = dark ? "#e5e7eb" : "#111827";
-
   // ── 수업 세션별 분석 (기간 필터 + 전체 분석) ──
   const allSessions = useMemo(() => sessions ?? [], [sessions]);
   // period="ALL"이면 전체, 그 외엔 특정 주/월 키. 상단 토글(range)과 함께 상단에서 선택한다.
@@ -229,24 +229,8 @@ export function ReportView({
       setTrBusy((p) => ({ ...p, [id]: false }));
     }
   };
-  const editFields: { key: keyof SessionAnalysisResult; label: string }[] = scope === "class"
-    ? [
-        { key: "summary", label: t("secSummary") },
-        { key: "balanceInsights", label: t("secBalance") },
-        { key: "bestQuestion", label: t("secBest") },
-        { key: "engagementInsights", label: t("secEngagement") },
-        { key: "commentInsights", label: t("secComment") },
-        { key: "relevanceInsights", label: t("secRelevance") },
-        { key: "nextQuestions", label: t("secNext") },
-        { key: "insights", label: t("secSuggest") },
-      ]
-    : [
-        { key: "summary", label: t("secSummary") },
-        { key: "growthInsights", label: t("secGrowth") },
-        { key: "rewriteExample", label: t("secRewrite") },
-        { key: "relevanceInsights", label: t("secRelevance") },
-        { key: "insights", label: t("secSuggest") },
-      ];
+  const editFields: { key: keyof SessionAnalysisResult; label: string }[] = getReportEditFieldKeys(scope)
+    .map((key) => ({ key, label: t(REPORT_EDIT_FIELD_LABEL_KEYS[key]) }));
   const startEdit = (id: string) => { setOpen((o) => ({ ...o, [id]: true })); setEditing(id); setEditDraft({ ...res[id] }); };
   const cancelEdit = () => { setEditing(null); setEditDraft({}); };
   const saveEdit = async (id: string) => {
@@ -474,21 +458,15 @@ export function ReportView({
       {/* 분류 안내 (분류 차트 공통 참조) — 색 점은 차트 색과 동일 */}
       <ReportClassificationGuide />
 
-      {/* 질문 분류 분포 */}
-      <div className="rounded-xl border bg-card p-4">
-        <p className="mb-3 text-sm font-bold text-foreground">{t("distTitle", { count: viewClassification.total })}</p>
-        <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={classData} margin={{ top: 5, right: 10, bottom: 16, left: -20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-            <XAxis dataKey="name" stroke={chart.grid} interval={0} tick={renderClassTick} />
-            <YAxis allowDecimals={false} stroke={chart.grid} tick={{ fontSize: 11, fill: chart.tick }} />
-            <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: tooltipText }} itemStyle={{ color: tooltipText }} cursor={{ fill: chart.grid, opacity: 0.25 }} />
-            <Bar dataKey="value" name={t("questionCountName")} radius={[4, 4, 0, 0]}>
-              {classData.map((d, i) => <Cell key={i} fill={d.fill} />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <ReportClassificationDistributionChart
+        title={t("distTitle", { count: viewClassification.total })}
+        data={classData}
+        chart={chart}
+        tooltipStyle={tooltipStyle}
+        tooltipText={tooltipText}
+        questionCountName={t("questionCountName")}
+        renderTick={renderClassTick}
+      />
 
       <ReportClassificationTrendGrid
         series={series}
@@ -505,59 +483,35 @@ export function ReportView({
       {/* 수업 세션별 분석 (기간 필터 + 전체 분석) */}
       {allSessions.length > 0 && analyzeSession && (
         <div className="report-analysis-panel rounded-xl border bg-card p-4">
-          <p className="mb-1 text-sm font-bold text-foreground">{t("aiSessionTitle")}</p>
-          <p className="mb-3 text-xs text-muted-foreground">
-            {t("aiSessionDesc")}
-          </p>
-
-          {/* 기간 선택은 상단으로 통합됨. 여기선 상단에서 고른 기간에 대한 분석만 실행 */}
-          <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
-            <span className="text-xs font-semibold text-foreground">{t("analyzeAll")}</span>
-            {canAnalyze && (
-              <Button size="sm" disabled={analyzingAll || filteredSessions.length === 0} onClick={analyzeAll} className="font-semibold">
-                {analyzingAll ? t("analyzing") : t(scope === "student" ? "analyzeAllStudentBtn" : "analyzeAllBtn", { count: filteredSessions.length })}
-              </Button>
-            )}
-            {canAnalyze && bulkAnalyze && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={bulk.running || bulkPeriodCount === 0}
-                  onClick={runBulkAnalyze}
-                  className="font-semibold"
-                  title={t("bulkAnalyzeHint")}
-                >
-                  {bulk.running
-                    ? t("bulkRunning", { processed: bulk.processed, total: bulk.total })
-                    : t("bulkAnalyzeBtn")}
-                </Button>
-                {bulk.running && (
-                  <button onClick={() => { bulkStop.current = true; }} className="text-xs font-medium text-red-600 hover:text-red-800">
-                    {t("bulkStop")}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-          {canAnalyze && bulkAnalyze && bulk.note && !bulk.running && (
-            <p className="no-print -mt-1 text-xs text-muted-foreground">{bulk.note}</p>
-          )}
-          {analyzingAll && (
-            <AiLoadingProcess
-              kind="sessionAnalysis"
-              detail={t("analyzeAllRunning", { processed: sessionBatch.processed, total: sessionBatch.total })}
-              className="no-print mb-3"
-            />
-          )}
-          {bulk.running && (
-            <AiLoadingProcess
-              kind="bulkSessionAnalysis"
-              compact
-              detail={t("bulkRunning", { processed: bulk.processed, total: bulk.total })}
-              className="no-print mb-3"
-            />
-          )}
+          <ReportSessionAnalysisToolbar
+            title={t("aiSessionTitle")}
+            description={t("aiSessionDesc")}
+            analyzeAllLabel={t("analyzeAll")}
+            canAnalyze={canAnalyze}
+            analyzingAll={analyzingAll}
+            filteredSessionCount={filteredSessions.length}
+            scope={scope}
+            bulkEnabled={Boolean(bulkAnalyze)}
+            bulkRunning={bulk.running}
+            bulkPeriodCount={bulkPeriodCount}
+            bulkProcessed={bulk.processed}
+            bulkTotal={bulk.total}
+            bulkNote={bulk.note}
+            sessionBatch={sessionBatch}
+            labels={{
+              analyzing: t("analyzing"),
+              analyzeAllStudent: (count) => t("analyzeAllStudentBtn", { count }),
+              analyzeAllClass: (count) => t("analyzeAllBtn", { count }),
+              bulkAnalyze: t("bulkAnalyzeBtn"),
+              bulkHint: t("bulkAnalyzeHint"),
+              bulkRunning: (processed, total) => t("bulkRunning", { processed, total }),
+              bulkStop: t("bulkStop"),
+              analyzeAllRunning: (processed, total) => t("analyzeAllRunning", { processed, total }),
+            }}
+            onAnalyzeAll={analyzeAll}
+            onBulkAnalyze={runBulkAnalyze}
+            onBulkStop={() => { bulkStop.current = true; }}
+          />
 
           {/* 수업 세션별 개별 분석 목록(선택한 주/월의 세션만 표시) */}
           {filteredSessions.length === 0 ? (
@@ -726,35 +680,18 @@ export function ReportView({
         </div>
       )}
 
-      {/* 학생별 표(교사용) */}
       {scope === "class" && perStudent && perStudent.length > 0 && (
-        <div className="rounded-xl border bg-card p-4">
-          <p className="mb-3 text-sm font-bold text-foreground">{t("studentActivity", { count: perStudent.length })}</p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-2 py-2 text-left">{t("colNo")}</th>
-                  <th className="px-2 py-2 text-left">{t("colName")}</th>
-                  <th className="px-2 py-2 text-right">{t("colQuestion")}</th>
-                  <th className="px-2 py-2 text-right">{t("colLikes")}</th>
-                  <th className="px-2 py-2 text-right">{t("colComment")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {perStudent.map((s) => (
-                  <tr key={s.id}>
-                    <td className="px-2 py-2 text-muted-foreground">{s.studentNumber || "-"}</td>
-                    <td className="px-2 py-2 font-medium text-foreground">{s.name}</td>
-                    <td className="px-2 py-2 text-right font-semibold text-indigo-600 dark:text-indigo-400">{s.questions}</td>
-                    <td className="px-2 py-2 text-right font-semibold text-rose-500 dark:text-rose-400">{s.likesGiven}</td>
-                    <td className="px-2 py-2 text-right font-semibold text-emerald-600 dark:text-emerald-400">{s.comments}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <ReportStudentActivityTable
+          title={t("studentActivity", { count: perStudent.length })}
+          rows={perStudent}
+          labels={{
+            no: t("colNo"),
+            name: t("colName"),
+            question: t("colQuestion"),
+            likes: t("colLikes"),
+            comment: t("colComment"),
+          }}
+        />
       )}
     </div>
   );

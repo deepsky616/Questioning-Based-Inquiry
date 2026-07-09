@@ -1457,6 +1457,8 @@
     "deleting": "삭제 중...",
     "deleteBtn": "삭제",
     "intro": "작성한 질문을 조회하고, 분류·세션별로 확인하거나 삭제할 수 있어요 · 총 {count}개",
+    "summaryTotal": "전체 질문",
+    "summaryShown": "현재 표시",
     "sessionProgressTitle": "수업별 질문 작성 현황",
     "sessionProgressSummary": "현재 조회 범위의 수업 {total}개 중 {completed}개 작성 완료, {remaining}개 남음",
     "remainingSessionLabel": "아직 작성하지 않은 수업",

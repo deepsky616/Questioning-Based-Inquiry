@@ -18,6 +18,7 @@ import { CommentThread } from "@/components/shared/CommentThread";
 import { formatDateTime } from "@/lib/datetime";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { StudentMyQuestionsSummary } from "@/components/student/StudentMyQuestionsSummary";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
@@ -229,6 +230,11 @@ export function MyQuestionsView() {
   const sortKey = (q: Question) => (sortField === "like" ? q.likeCount ?? 0 : q.commentCount ?? 0);
   const displayed = [...classified].sort((a, b) =>
     sortDir === "desc" ? sortKey(b) - sortKey(a) : sortKey(a) - sortKey(b)
+  );
+  const summaryLikes = filtered.reduce((sum, question) => sum + (question.likeCount ?? 0), 0);
+  const summaryComments = filtered.reduce(
+    (sum, question) => sum + (commentCountOverride[question.id] ?? question.commentCount ?? question.comments?.length ?? 0),
+    0,
   );
 
   const toggleComments = (questionId: string) => {
@@ -599,6 +605,22 @@ export function MyQuestionsView() {
           </CardContent>
         </Card>
       )}
+
+      <StudentMyQuestionsSummary
+        className="my-questions-tablet-overview md:grid-cols-4 min-h-[96px] md:[&>*:last-child]:hidden"
+        totalQuestions={questions.length}
+        shownQuestions={displayed.length}
+        totalLikes={summaryLikes}
+        totalComments={summaryComments}
+        sessionPercent={sessionProgress.percent}
+        labels={{
+          total: t("summaryTotal"),
+          shown: t("summaryShown"),
+          likes: t("colLikes"),
+          comments: t("colComments"),
+          progress: t("sessionProgressTitle"),
+        }}
+      />
 
       {/* 탐구질문 수업 세션 선택 시 참고자료(접기, 기본 닫힘) */}
       {selectedSessionId !== "all" && <SessionReferencePanel sessionId={selectedSessionId} />}

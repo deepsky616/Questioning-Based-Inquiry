@@ -1457,6 +1457,8 @@
     "deleting": "Deleting...",
     "deleteBtn": "Delete",
     "intro": "Review your questions, check them by type/session, or delete them · {count} total",
+    "summaryTotal": "Total questions",
+    "summaryShown": "Currently shown",
     "sessionProgressTitle": "Question progress by class",
     "sessionProgressSummary": "{completed} of {total} classes completed, {remaining} remaining in the current view",
     "remainingSessionLabel": "Classes still needing a question",
