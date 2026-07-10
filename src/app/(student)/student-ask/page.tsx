@@ -170,7 +170,7 @@ function AskContent() {
       subject: filterSubject || undefined,
       topic: filterTopic || undefined,
     }).filter(
-      (s) => !searchQuery || s.topic.toLowerCase().includes(searchQuery) || s.subject.toLowerCase().includes(searchQuery) || s.date.includes(searchQuery),
+      (s) => !searchQuery || s.topic.toLowerCase().includes(searchQuery) || s.subject.toLowerCase().includes(searchQuery),
     ),
     [filterDate, filterSubject, filterTopic, scopedSessions, searchQuery],
   );

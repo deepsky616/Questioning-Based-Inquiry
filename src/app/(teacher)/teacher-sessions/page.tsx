@@ -55,7 +55,7 @@ export default function TeacherSessionsPage() {
   const [listFilterSubject, setListFilterSubject] = useState("");
   const [listFilterTopic, setListFilterTopic] = useState("");
   const [listSearch, setListSearch] = useState("");
-  // 지난 세션 월 그룹 펼침 상태 — 기본값은 전부 접힘
+  // 지난 세션 월 그룹 펼침 상태 — null이면 기본값(가장 최근 달만 펼침)
   const [expandedPastMonths, setExpandedPastMonths] = useState<Set<string> | null>(null);
   const [listParticipationFilter, setListParticipationFilter] = useState<SessionParticipationFilter>("all");
   const [listSort, setListSort] = useState<SessionListSort>("desc");
@@ -245,7 +245,7 @@ export default function TeacherSessionsPage() {
   const searchQuery = listSearch.trim().toLowerCase();
   const searchedSessions = searchQuery
     ? baseVisibleSessions.filter(
-        (s) => s.topic.toLowerCase().includes(searchQuery) || s.subject.toLowerCase().includes(searchQuery) || s.date.includes(searchQuery),
+        (s) => s.topic.toLowerCase().includes(searchQuery) || s.subject.toLowerCase().includes(searchQuery),
       )
     : baseVisibleSessions;
   const visibleSessions = searchedSessions.filter((item) => {
@@ -384,9 +384,9 @@ export default function TeacherSessionsPage() {
                   collapsible
                   forceOpen={Boolean(searchQuery || listFilterDate || listFilterSubject || listFilterTopic)}
                   expandedKeys={expandedPastMonths}
-                  onToggleGroup={(key) =>
+                  onToggleGroup={(key, defaultExpanded) =>
                     setExpandedPastMonths((prev) => {
-                      const next = new Set(prev ?? []);
+                      const next = new Set(prev ?? defaultExpanded);
                       if (next.has(key)) next.delete(key);
                       else next.add(key);
                       return next;

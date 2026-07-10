@@ -22,9 +22,9 @@ interface TeacherSessionMonthListProps extends RowHandlers {
   collapsible?: boolean;
   /** 검색·필터 중에는 결과가 가려지지 않게 모두 펼친다 */
   forceOpen?: boolean;
-  /** 펼침 상태(null이면 기본값: 전부 접힘) */
+  /** 펼침 상태(null이면 기본값: 첫 그룹만 펼침) */
   expandedKeys?: Set<string> | null;
-  onToggleGroup?: (key: string) => void;
+  onToggleGroup?: (key: string, defaultExpanded: string[]) => void;
 }
 
 export function TeacherSessionMonthList({
@@ -35,12 +35,13 @@ export function TeacherSessionMonthList({
   onToggleGroup,
   ...rowHandlers
 }: TeacherSessionMonthListProps) {
+  const defaultExpanded = groups.slice(0, 1).map((g) => g.key);
 
   return (
     <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-      {groups.map((group) => {
+      {groups.map((group, index) => {
         const open =
-          !collapsible || forceOpen || (expandedKeys?.has(group.key) ?? false);
+          !collapsible || forceOpen || (expandedKeys ? expandedKeys.has(group.key) : index === 0);
         const header = (
           <>
             {group.label} <span className="font-normal">({group.sessions.length})</span>
@@ -51,7 +52,7 @@ export function TeacherSessionMonthList({
             {collapsible ? (
               <button
                 type="button"
-                onClick={() => onToggleGroup?.(group.key)}
+                onClick={() => onToggleGroup?.(group.key, defaultExpanded)}
                 aria-expanded={open}
                 className="flex w-full items-center gap-2 bg-muted/40 px-4 py-2 text-left text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/70"
               >
