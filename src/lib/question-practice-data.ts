@@ -159,10 +159,29 @@ export const PRACTICE_CREATE_TOPICS: PracticeCreateTopic[] = [
 
 // ── 공통 헬퍼 ────────────────────────────────────────────────────
 
-/** 이전 문항을 피해서 무작위로 하나 뽑는다(은행 크기가 1이면 그대로). */
-export function pickRandomItem<T extends { id: string }>(bank: readonly T[], excludeId?: string): T {
-  const pool = bank.length > 1 && excludeId ? bank.filter((x) => x.id !== excludeId) : bank;
-  return pool[Math.floor(Math.random() * pool.length)];
+/**
+ * 셔플백 방식 출제 — 은행의 모든 문항을 한 번씩 다 내기 전에는 같은 문항이
+ * 다시 나오지 않는다. 소진되면 다시 채우되, 직전 문항이 곧바로 반복되지 않게 한다.
+ */
+export interface DeckDraw<T> {
+  item: T;
+  /** 이번 사이클에서 아직 나오지 않은 문항 id 목록 */
+  remaining: string[];
+}
+
+export function drawFromDeck<T extends { id: string }>(
+  bank: readonly T[],
+  remaining: string[],
+  lastId?: string,
+): DeckDraw<T> {
+  let pool = remaining.filter((id) => bank.some((b) => b.id === id));
+  if (pool.length === 0) {
+    pool = bank.map((b) => b.id);
+    if (pool.length > 1 && lastId) pool = pool.filter((id) => id !== lastId);
+  }
+  const pickedId = pool[Math.floor(Math.random() * pool.length)];
+  const item = bank.find((b) => b.id === pickedId)!;
+  return { item, remaining: pool.filter((id) => id !== pickedId) };
 }
 
 /**

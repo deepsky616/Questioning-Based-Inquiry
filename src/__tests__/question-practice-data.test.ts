@@ -3,7 +3,7 @@ import {
   PRACTICE_QUIZ_BANK,
   PRACTICE_TRANSFORM_BANK,
   PRACTICE_CREATE_TOPICS,
-  pickRandomItem,
+  drawFromDeck,
   isTargetAchieved,
 } from "@/lib/question-practice-data";
 
@@ -46,17 +46,30 @@ describe("질문 연습 문항 은행 — 데이터 유효성", () => {
   });
 });
 
-describe("pickRandomItem — 직전 문항 제외 뽑기", () => {
-  it("excludeId를 피해서 뽑는다", () => {
+describe("drawFromDeck — 셔플백 출제 (한 바퀴 안에 중복 없음)", () => {
+  it("은행을 전부 소진할 때까지 같은 문항이 다시 나오지 않는다", () => {
+    const seen = new Set<string>();
+    let draw = drawFromDeck(PRACTICE_QUIZ_BANK, []);
+    seen.add(draw.item.id);
+    for (let i = 1; i < PRACTICE_QUIZ_BANK.length; i++) {
+      draw = drawFromDeck(PRACTICE_QUIZ_BANK, draw.remaining, draw.item.id);
+      expect(seen.has(draw.item.id)).toBe(false);
+      seen.add(draw.item.id);
+    }
+    expect(seen.size).toBe(PRACTICE_QUIZ_BANK.length);
+    expect(draw.remaining).toHaveLength(0);
+  });
+
+  it("소진 후 다시 채울 때 직전 문항이 곧바로 반복되지 않는다", () => {
     for (let i = 0; i < 30; i++) {
-      const picked = pickRandomItem(PRACTICE_QUIZ_BANK, "q01");
-      expect(picked.id).not.toBe("q01");
+      const next = drawFromDeck(PRACTICE_QUIZ_BANK, [], "q01");
+      expect(next.item.id).not.toBe("q01");
     }
   });
 
   it("은행 크기가 1이면 같은 항목이라도 반환한다", () => {
     const single = [{ id: "only" }];
-    expect(pickRandomItem(single, "only").id).toBe("only");
+    expect(drawFromDeck(single, [], "only").item.id).toBe("only");
   });
 });
 

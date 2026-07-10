@@ -16,13 +16,10 @@ import {
   PRACTICE_QUIZ_BANK,
   PRACTICE_TRANSFORM_BANK,
   PRACTICE_CREATE_TOPICS,
-  pickRandomItem,
+  drawFromDeck,
   type Closure,
   type Cognitive,
   type TransformTarget,
-  type PracticeQuizItem,
-  type PracticeTransformItem,
-  type PracticeCreateTopic,
 } from "@/lib/question-practice-data";
 
 const MAX_QUESTION_LENGTH = 200;
@@ -65,14 +62,16 @@ export default function StudentPracticePage() {
 
   // ── 모드 1: 분류 연습 ──
   const [quizMode, setQuizMode] = useState<QuizMode>("closure");
-  const [quizItem, setQuizItem] = useState<PracticeQuizItem>(() => pickRandomItem(PRACTICE_QUIZ_BANK));
+  // 셔플백 출제 — 은행을 한 바퀴 다 돌기 전에는 같은 문항이 다시 나오지 않는다
+  const [quizDeck, setQuizDeck] = useState(() => drawFromDeck(PRACTICE_QUIZ_BANK, []));
+  const quizItem = quizDeck.item;
   const [quizAnswer, setQuizAnswer] = useState<string | null>(null);
   const [quizStats, setQuizStats] = useState({ correct: 0, total: 0 });
 
   const quizCorrectValue = quizMode === "closure" ? quizItem.closure : quizItem.cognitive;
   const [quizAward, setQuizAward] = useState<AwardInfo | null>(null);
   const nextQuiz = () => {
-    setQuizItem(pickRandomItem(PRACTICE_QUIZ_BANK, quizItem.id));
+    setQuizDeck((d) => drawFromDeck(PRACTICE_QUIZ_BANK, d.remaining, d.item.id));
     setQuizAnswer(null);
     setQuizAward(null);
   };
@@ -132,19 +131,21 @@ export default function StudentPracticePage() {
   };
 
   // ── 모드 2: 질문 바꾸기 ──
-  const [transformItem, setTransformItem] = useState<PracticeTransformItem>(() => pickRandomItem(PRACTICE_TRANSFORM_BANK));
+  const [transformDeck, setTransformDeck] = useState(() => drawFromDeck(PRACTICE_TRANSFORM_BANK, []));
+  const transformItem = transformDeck.item;
   const [showHint, setShowHint] = useState(false);
   const nextTransform = () => {
-    setTransformItem(pickRandomItem(PRACTICE_TRANSFORM_BANK, transformItem.id));
+    setTransformDeck((d) => drawFromDeck(PRACTICE_TRANSFORM_BANK, d.remaining, d.item.id));
     setShowHint(false);
     resetCheck();
   };
 
   // ── 모드 3: 질문 만들기 ──
-  const [createTopic, setCreateTopic] = useState<PracticeCreateTopic>(() => pickRandomItem(PRACTICE_CREATE_TOPICS));
+  const [createDeck, setCreateDeck] = useState(() => drawFromDeck(PRACTICE_CREATE_TOPICS, []));
+  const createTopic = createDeck.item;
   const [createTarget, setCreateTarget] = useState<TransformTarget>("conceptual");
   const nextCreateTopic = () => {
-    setCreateTopic(pickRandomItem(PRACTICE_CREATE_TOPICS, createTopic.id));
+    setCreateDeck((d) => drawFromDeck(PRACTICE_CREATE_TOPICS, d.remaining, d.item.id));
     resetCheck();
   };
 
@@ -230,7 +231,8 @@ export default function StudentPracticePage() {
       {/* 유형 알아보기 — 문서 기반 정의·예시 요약 */}
       <Card>
         <CardContent className="pt-6">
-          <SectionToggle icon="📚" title={t("learnTitle")} open={showLearn} onToggle={() => setShowLearn((v) => !v)} />
+          {/* w-full — 글씨뿐 아니라 행 전체 어디를 눌러도 접고 펼쳐진다 */}
+          <SectionToggle icon="📚" title={t("learnTitle")} open={showLearn} onToggle={() => setShowLearn((v) => !v)} className="w-full" />
           {showLearn && (
             <div className="mt-4 space-y-4 text-sm">
               <div className="grid gap-3 sm:grid-cols-2">
