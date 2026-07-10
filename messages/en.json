@@ -394,6 +394,8 @@
     "allSessions": "All class sessions",
     "noMatchingSession": "No matching class sessions",
     "filterHint": "💡 Whether you narrow by date/subject/topic or pick a class session directly, the results are the same.",
+    "designFilterHint": "💡 Narrow class sessions by date, subject, or topic, then choose the session you want to use for inquiry design.",
+    "designSessionHint": "Choose a class session to build a question-centered inquiry design from that session's student questions.",
     "noQuestions": "No matching questions",
     "colStudent": "Student",
     "colContent": "Question",

@@ -15,6 +15,11 @@ describe("teacher questions page structure", () => {
     expect(pageSource).not.toContain("const QuestionTable =");
   });
 
+  it("shows inquiry design guidance in the shared session selector", () => {
+    expect(pageSource).toContain('topTab === "design" ? t("designFilterHint") : t("filterHint")');
+    expect(pageSource).toContain('topTab === "design" ? t("designSessionHint") : undefined');
+  });
+
   it("keeps the main page below the large component threshold", () => {
     expect(pageSource.split("\n").length).toBeLessThan(850);
   });

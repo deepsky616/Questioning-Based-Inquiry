@@ -42,6 +42,7 @@ interface TeacherQuestionSessionSelectorProps {
     selectSession: string;
     allSessions: string;
     filterHint: string;
+    sessionHint?: string;
   };
 }
 
@@ -152,6 +153,11 @@ export function TeacherQuestionSessionSelector({
         </div>
       </div>
       <p className="text-xs text-muted-foreground mt-2">{labels.filterHint}</p>
+      {labels.sessionHint && (
+        <p className="mt-2 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-700 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200">
+          {labels.sessionHint}
+        </p>
+      )}
     </div>
   );
 }

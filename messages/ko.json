@@ -394,6 +394,8 @@
     "allSessions": "전체 수업 세션",
     "noMatchingSession": "조건에 맞는 수업 세션이 없습니다",
     "filterHint": "💡 날짜·교과·주제로 좁혀도, 직접 수업 세션을 골라도 결과는 같습니다.",
+    "designFilterHint": "💡 날짜·교과·주제로 수업세션을 좁힌 뒤, 탐구설계에 사용할 수업세션을 선택하세요.",
+    "designSessionHint": "수업세션을 선택하면 해당 세션의 학생 질문을 바탕으로 질문 중심 탐구설계를 만들 수 있습니다.",
     "noQuestions": "해당하는 질문이 없습니다",
     "colStudent": "학생",
     "colContent": "질문 내용",

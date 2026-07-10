@@ -478,7 +478,8 @@ export default function QuestionsPage() {
           noMatchingSession: t("noMatchingSession"),
           selectSession: t("selectSession"),
           allSessions: t("allSessions"),
-          filterHint: t("filterHint"),
+          filterHint: topTab === "design" ? t("designFilterHint") : t("filterHint"),
+          sessionHint: topTab === "design" ? t("designSessionHint") : undefined,
         }}
       />
 
