@@ -73,5 +73,5 @@ export function languageName(locale: string): string {
 export function languageDirective(locale: string): string {
   if (!locale || locale === DEFAULT_LOCALE) return "";
   const name = languageName(locale);
-  return `\n\n[OUTPUT LANGUAGE] Write ALL human-readable text in your response (explanations, feedback, questions, summaries, examples, titles) in ${name}. Keep JSON keys, field names, and fixed category codes such as "closed", "open", "factual", "conceptual", "controversial", "DUPLICATE_FLAGGED" exactly as given — never translate those. If the user's content is in another language, still write your explanations in ${name}.`;
+  return `\n\n[OUTPUT LANGUAGE] Write ALL human-readable text in your response (explanations, feedback, questions, summaries, examples, titles) in ${name}. Keep JSON keys, field names, and fixed category codes such as "closed", "open", "factual", "conceptual", "controversial", "DUPLICATE_FLAGGED", "LOW_EFFORT_FLAGGED" exactly as given — never translate those. If the user's content is in another language, still write your explanations in ${name}.`;
 }

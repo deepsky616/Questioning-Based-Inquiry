@@ -136,11 +136,13 @@ ${cBlock || "(없음)"}
 - DEEP_QUESTION (5점): 사실 너머 추론·논쟁·창의
 - APT_ANSWER (2점): 원 질문에 정확히 응답
 - INSIGHTFUL_ANSWER (5점): 새 관점·근거 제시
+- LOW_EFFORT_FLAGGED (0점, 경고): 무의미한 글자 나열, 주제와 무관한 장난, 성의 없는 한두 단어 작성물 — 지도가 필요한 항목 표시
 
 [규칙]
 - 각 학생당 최대 ${MAX_ACTIVITY_BONUS_PER_STUDENT}점 (합산 상한)
 - 같은 학생 안에서 의미가 거의 같은 작성물이 있으면 DUPLICATE_FLAGGED로 표시 (점수 0)
 - 다른 학생을 그대로 베낀 경우도 DUPLICATE_FLAGGED
+- 불성실이 명백한 작성물만 LOW_EFFORT_FLAGGED — 짧아도 주제에 맞는 진지한 시도면 표시하지 말 것
 - 받을 자격이 명확한 항목만 보너스 부여
 - reason에는 Q:/C: id를 절대 쓰지 말 것 — 다른 작성물을 지칭할 땐 그 내용을 20자 이내로 인용
 

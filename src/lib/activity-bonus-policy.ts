@@ -5,6 +5,7 @@ export const ACTIVITY_BONUS_TYPES = {
   APT_ANSWER:            { key: "APT_ANSWER",            label: "적절한 답변",     points: 2, emoji: "🤝" },
   INSIGHTFUL_ANSWER:     { key: "INSIGHTFUL_ANSWER",     label: "통찰 있는 답변",   points: 5, emoji: "✨" },
   DUPLICATE_FLAGGED:     { key: "DUPLICATE_FLAGGED",     label: "중복 가능성",     points: 0, emoji: "⚠️" },
+  LOW_EFFORT_FLAGGED:    { key: "LOW_EFFORT_FLAGGED",    label: "불성실 의심",     points: 0, emoji: "🚧" },
 } as const;
 
 export type ActivityBonusKey = keyof typeof ACTIVITY_BONUS_TYPES;

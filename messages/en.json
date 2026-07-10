@@ -544,8 +544,8 @@
     "analyzing": "Analyzing with AI...",
     "runAnalyze": "🤖 Run AI scoring",
     "refresh": "Refresh",
-    "duplicateTitle": "⚠️ Possible duplicates ({count})",
-    "duplicateDesc": "This student wrote content nearly identical to another. Review for possible copying or duplication.",
+    "duplicateTitle": "⚠️ Needs review — duplicates & low effort ({count})",
+    "duplicateDesc": "Nearly identical writing (possible copying) and low-effort submissions. Guide the student, then decide.",
     "recommendedTitle": "Recommended bonuses · {count} total",
     "deselectAll": "Deselect all",
     "selectAll": "Select all",
@@ -561,7 +561,11 @@
     "noContent": "(no content)",
     "overridePlaceholder": "Adjust: {points}",
     "overrideApprove": "Adjust & approve",
-    "approve": "Approve"
+    "approve": "Approve",
+    "groupJustAnalyzed": "Just analyzed",
+    "groupPendingCount": "{count} pending",
+    "noSessionGroup": "No session",
+    "optionPendingCount": " ({count} pending)"
   },
   "appShell": {
     "errorTitle": "Something went wrong",
@@ -1646,7 +1650,8 @@
     "review_DEEP_QUESTION": "In-depth question",
     "review_APT_ANSWER": "Apt answer",
     "review_INSIGHTFUL_ANSWER": "Insightful answer",
-    "review_DUPLICATE_FLAGGED": "Possible duplicate"
+    "review_DUPLICATE_FLAGGED": "Possible duplicate",
+    "review_LOW_EFFORT_FLAGGED": "🚧 Low effort?"
   },
   "designRef": {
     "coreIdea": "Core idea",

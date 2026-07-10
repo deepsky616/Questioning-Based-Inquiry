@@ -544,8 +544,8 @@
     "analyzing": "AI 분석 중...",
     "runAnalyze": "🤖 AI 채점 실행",
     "refresh": "새로고침",
-    "duplicateTitle": "⚠️ 중복 가능성 ({count})",
-    "duplicateDesc": "학생이 다른 작성물과 거의 동일한 내용을 작성했어요. 베끼기 또는 중복일 가능성을 검토하세요.",
+    "duplicateTitle": "⚠️ 확인 필요 — 중복·불성실 의심 ({count}건)",
+    "duplicateDesc": "의미가 거의 같은 작성물(베끼기 가능성)과 성의 없는 작성물이에요. 지도 후 승인 여부를 결정하세요.",
     "recommendedTitle": "추천 보너스 · 총 {count}개",
     "deselectAll": "선택 해제",
     "selectAll": "전체 선택",
@@ -561,7 +561,11 @@
     "noContent": "(내용 없음)",
     "overridePlaceholder": "수정: {points}",
     "overrideApprove": "수정 후 승인",
-    "approve": "승인"
+    "approve": "승인",
+    "groupJustAnalyzed": "방금 분석",
+    "groupPendingCount": "대기 {count}건",
+    "noSessionGroup": "세션 정보 없음",
+    "optionPendingCount": " (대기 {count}건)"
   },
   "appShell": {
     "errorTitle": "문제가 발생했어요",
@@ -1646,7 +1650,8 @@
     "review_DEEP_QUESTION": "깊이 있는 질문",
     "review_APT_ANSWER": "적절한 답변",
     "review_INSIGHTFUL_ANSWER": "통찰 있는 답변",
-    "review_DUPLICATE_FLAGGED": "중복 가능성"
+    "review_DUPLICATE_FLAGGED": "중복 가능성",
+    "review_LOW_EFFORT_FLAGGED": "🚧 불성실 의심"
   },
   "designRef": {
     "coreIdea": "핵심 아이디어",

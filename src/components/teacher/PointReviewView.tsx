@@ -49,7 +49,8 @@ function bonusLabel(bt: string): { labelKey: string | null; raw: string; emoji: 
       labelKey: `review_${stripped}`,
       raw: bt,
       emoji: def.emoji,
-      color: stripped === "DUPLICATE_FLAGGED" ? "#ef4444" : "#6366f1",
+      // 경고성 판정(중복·불성실)은 빨간색으로 구분
+      color: stripped.endsWith("_FLAGGED") ? "#ef4444" : "#6366f1",
     };
   }
   return { labelKey: null, raw: bt, emoji: "🎯", color: "#6366f1" };
@@ -61,6 +62,7 @@ export function PointReviewView() {
   const queryClient = useQueryClient();
   const { data: sessions = [] } = useTeacherSessions<SessionItem>();
   const [selectedSessionId, setSelectedSessionId] = useState<string>("all");
+  const [lastAnalyzedSessionId, setLastAnalyzedSessionId] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingLog[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -69,15 +71,14 @@ export function PointReviewView() {
   const [overrideEdit, setOverrideEdit] = useState<Record<string, number>>({});
   const focusStudentId = searchParams.get("studentId");
 
+  // 항상 전체를 받아 클라이언트에서 필터한다 — 세션을 바꿔도 다른 세션의 대기
+  // 항목이 "사라진" 것처럼 보이지 않고, 세션 선택지에 대기 건수도 보여줄 수 있다.
   const loadPending = useCallback(() => {
-    const url = selectedSessionId === "all"
-      ? "/api/teacher/points/pending"
-      : `/api/teacher/points/pending?sessionId=${selectedSessionId}`;
-    fetch(url).then((r) => r.json()).then((d) => {
+    fetch("/api/teacher/points/pending").then((r) => r.json()).then((d) => {
       setPending(d.pending ?? []);
       setSelected(new Set());
     }).catch(() => {});
-  }, [selectedSessionId]);
+  }, []);
 
   useEffect(() => { loadPending(); }, [loadPending]);
   useEffect(() => { setSelected(new Set()); }, [focusStudentId]);
@@ -109,6 +110,9 @@ export function PointReviewView() {
         } else {
           setMessage(t("analyzeDone", { created: data.createdPending ?? 0, questions: data.questionCount ?? 0, comments: data.commentCount ?? 0 }));
         }
+        // 분석 후 전체 보기로 전환 — 기존 세션들의 대기 항목과 새 결과가 함께 보인다
+        setLastAnalyzedSessionId(selectedSessionId);
+        setSelectedSessionId("all");
         loadPending();
       } else {
         setMessage(data.error || t("analyzeFailed"));
@@ -148,9 +152,46 @@ export function PointReviewView() {
     } catch {} finally { setBusy(false); }
   }
 
-  const duplicateRows = pending.filter((p) => p.bonusType.includes("DUPLICATE"));
-  const normalRows = pending.filter((p) => !p.bonusType.includes("DUPLICATE"));
-  const focusedPending = focusStudentId ? pending.filter((p) => p.studentId === focusStudentId) : pending;
+  // 세션 필터는 클라이언트에서 — 다른 세션의 대기 항목은 숨겨질 뿐 사라지지 않는다
+  const visiblePending = selectedSessionId === "all"
+    ? pending
+    : pending.filter((p) => p.sessionId === selectedSessionId);
+  const pendingCountBySession = pending.reduce<Record<string, number>>((acc, p) => {
+    const key = p.sessionId ?? "none";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  // 세션별 그룹 — 방금 분석한 세션 먼저, 나머지는 세션 날짜 내림차순
+  const sessionLabelOf = (sessionId: string | null) => {
+    if (!sessionId) return t("noSessionGroup");
+    const s = sessions.find((x) => x.id === sessionId);
+    return s ? buildSessionLabel(s.date, s.subject, s.topic) : t("noSessionGroup");
+  };
+  const groupBySession = (rows: PendingLog[]) => {
+    const map = new Map<string, PendingLog[]>();
+    rows.forEach((p) => {
+      const key = p.sessionId ?? "none";
+      map.set(key, [...(map.get(key) ?? []), p]);
+    });
+    const dateOf = (key: string) => sessions.find((x) => x.id === key)?.date ?? "";
+    return Array.from(map.entries())
+      .sort(([a], [b]) => {
+        if (a === lastAnalyzedSessionId) return -1;
+        if (b === lastAnalyzedSessionId) return 1;
+        return dateOf(b).localeCompare(dateOf(a));
+      })
+      .map(([key, groupRows]) => ({
+        key,
+        label: sessionLabelOf(key === "none" ? null : key),
+        justAnalyzed: key === lastAnalyzedSessionId,
+        rows: groupRows,
+      }));
+  };
+
+  const duplicateRows = visiblePending.filter((p) => p.bonusType.includes("FLAGGED"));
+  const normalRows = visiblePending.filter((p) => !p.bonusType.includes("FLAGGED"));
+  const focusedPending = focusStudentId ? visiblePending.filter((p) => p.studentId === focusStudentId) : visiblePending;
   const displayedDuplicateRows = focusStudentId ? duplicateRows.filter((p) => p.studentId === focusStudentId) : duplicateRows;
   const displayedNormalRows = focusStudentId ? normalRows.filter((p) => p.studentId === focusStudentId) : normalRows;
   const displayedNormalIds = displayedNormalRows.map((p) => p.id);
@@ -191,6 +232,7 @@ export function PointReviewView() {
             {sessions.map((s) => (
               <option key={s.id} value={s.id}>
                 {buildSessionLabel(s.date, s.subject, s.topic)}
+                {pendingCountBySession[s.id] ? t("optionPendingCount", { count: pendingCountBySession[s.id] }) : ""}
               </option>
             ))}
           </select>
@@ -223,15 +265,30 @@ export function PointReviewView() {
               {t("duplicateDesc")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {displayedDuplicateRows.map((p) => (
-              <PendingRow key={p.id} p={p} selected={selected.has(p.id)}
-                onToggle={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
-                onDecideOne={(d) => decide(d, [p.id])}
-                onOverride={(pts) => decideWithOverride(p.id, pts)}
-                override={overrideEdit[p.id]}
-                setOverride={(v) => setOverrideEdit((s) => ({ ...s, [p.id]: v }))}
-              />
+          <CardContent className="space-y-4">
+            {groupBySession(displayedDuplicateRows).map((group) => (
+              <div key={group.key} className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2 border-b pb-1.5">
+                  <p className="text-sm font-semibold text-foreground">{group.label}</p>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    {t("groupPendingCount", { count: group.rows.length })}
+                  </span>
+                  {group.justAnalyzed && (
+                    <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                      {t("groupJustAnalyzed")}
+                    </span>
+                  )}
+                </div>
+                {group.rows.map((p) => (
+                  <PendingRow key={p.id} p={p} selected={selected.has(p.id)}
+                    onToggle={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
+                    onDecideOne={(d) => decide(d, [p.id])}
+                    onOverride={(pts) => decideWithOverride(p.id, pts)}
+                    override={overrideEdit[p.id]}
+                    setOverride={(v) => setOverrideEdit((s) => ({ ...s, [p.id]: v }))}
+                  />
+                ))}
+              </div>
             ))}
           </CardContent>
         </Card>
@@ -258,17 +315,32 @@ export function PointReviewView() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-4">
           {displayedNormalRows.length === 0 ? (
             <EmptyState icon="✅" title={t("noPending")} />
-          ) : displayedNormalRows.map((p) => (
-            <PendingRow key={p.id} p={p} selected={selected.has(p.id)}
-              onToggle={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
-              onDecideOne={(d) => decide(d, [p.id])}
-              onOverride={(pts) => decideWithOverride(p.id, pts)}
-              override={overrideEdit[p.id]}
-              setOverride={(v) => setOverrideEdit((s) => ({ ...s, [p.id]: v }))}
-            />
+          ) : groupBySession(displayedNormalRows).map((group) => (
+            <div key={group.key} className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2 border-b pb-1.5">
+                <p className="text-sm font-semibold text-foreground">{group.label}</p>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {t("groupPendingCount", { count: group.rows.length })}
+                </span>
+                {group.justAnalyzed && (
+                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300">
+                    {t("groupJustAnalyzed")}
+                  </span>
+                )}
+              </div>
+              {group.rows.map((p) => (
+                <PendingRow key={p.id} p={p} selected={selected.has(p.id)}
+                  onToggle={() => setSelected((s) => { const n = new Set(s); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; })}
+                  onDecideOne={(d) => decide(d, [p.id])}
+                  onOverride={(pts) => decideWithOverride(p.id, pts)}
+                  override={overrideEdit[p.id]}
+                  setOverride={(v) => setOverrideEdit((s) => ({ ...s, [p.id]: v }))}
+                />
+              ))}
+            </div>
           ))}
         </CardContent>
       </Card>
@@ -289,7 +361,8 @@ function PendingRow({
   const t = useTranslations("pointReview");
   const tL = useTranslations("pointLabel");
   const b = bonusLabel(p.bonusType);
-  const isDup = p.bonusType.includes("DUPLICATE");
+  // 경고성 판정(중복·불성실)은 0점이라 점수 표기·점수 수정 입력을 숨긴다
+  const isDup = p.bonusType.includes("FLAGGED");
   const content = p.commentContent || p.questionContent;
   const targetLabel = p.relatedQuestionId ? t("targetQuestion") : t("targetAnswer");
   return (
