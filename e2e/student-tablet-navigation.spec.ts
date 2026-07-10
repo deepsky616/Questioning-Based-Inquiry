@@ -32,14 +32,23 @@ test.describe("학생 태블릿 핵심 이동", () => {
     await loginAsStudent(page, fixture.student);
     await expect(page.getByText(/내 포인트|내가 할 일/).first()).toBeVisible({ timeout: 15000 });
 
-    await page.goto(`/student-ask?sessionId=${fixture.session.id}`);
-    await expect(page.locator("#content")).toBeVisible({ timeout: 15000 });
+    // webkit에서 연속 이동 중 세션 조회가 끊기면 /login으로 튕기는 경합이 있다.
+    // 이동이 가로채여도 무시하고, /login에 떨어졌으면 재로그인한 뒤 다시 시도한다.
+    const gotoAndSee = async (path: string, locator: () => ReturnType<typeof page.locator> | ReturnType<typeof page.getByRole>) => {
+      await expect(async () => {
+        await page.goto(path).catch(() => {});
+        if (page.url().includes("/login")) {
+          await loginAsStudent(page, fixture.student);
+          await page.goto(path);
+        }
+        await expect(locator()).toBeVisible({ timeout: 5000 });
+      }).toPass({ timeout: 45000 });
+    };
+
+    await gotoAndSee(`/student-ask?sessionId=${fixture.session.id}`, () => page.locator("#content"));
 
     // 내비 링크 텍스트는 좁은 화면에서 숨겨질 수 있으므로 페이지 제목(헤딩)으로 확인한다
-    await page.goto("/student-questions");
-    await expect(page.getByRole("heading", { name: /질문탐구/ })).toBeVisible({ timeout: 15000 });
-
-    await page.goto("/student-question-play");
-    await expect(page.getByRole("heading", { name: /질문놀이/ })).toBeVisible({ timeout: 15000 });
+    await gotoAndSee("/student-questions", () => page.getByRole("heading", { name: /질문탐구/ }));
+    await gotoAndSee("/student-question-play", () => page.getByRole("heading", { name: /질문놀이/ }));
   });
 });

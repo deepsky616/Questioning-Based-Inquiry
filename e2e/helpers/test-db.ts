@@ -61,20 +61,54 @@ function loadDatabaseUrl(): string {
 }
 
 function client(): PrismaClient {
-  return new PrismaClient({ datasources: { db: { url: loadDatabaseUrl() } } });
+  // 헬퍼는 순차 쿼리만 하므로 연결 1개면 충분 — 공유 풀(세션 모드 상한 15)을 아낀다
+  const url = new URL(loadDatabaseUrl());
+  url.searchParams.set("connection_limit", "1");
+  url.searchParams.set("pool_timeout", "30");
+  return new PrismaClient({ datasources: { db: { url: url.toString() } } });
 }
 
-/** 테스트 교사 비밀번호를 이번 실행용 랜덤 값으로 설정하고 그 값을 반환한다. */
+/**
+ * 테스트 교사 계정 보장 — 외부 정리로 사라졌으면 재생성한다.
+ * 여러 스펙×프로젝트의 beforeAll이 동시에 부르므로 생성 경합(P2002)은 재조회로 흡수한다.
+ */
+async function ensureTestTeacher(
+  prisma: PrismaClient,
+  passwordHash: string,
+): Promise<{ id: string; school: string | null }> {
+  try {
+    return await prisma.user.upsert({
+      where: { email: TEST_TEACHER_EMAIL },
+      create: {
+        email: TEST_TEACHER_EMAIL,
+        password: passwordHash,
+        name: "E2E교사",
+        role: "TEACHER",
+        school: "E2E테스트초",
+      },
+      update: {},
+      select: { id: true, school: true },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const teacher = await prisma.user.findFirst({
+        where: { email: TEST_TEACHER_EMAIL },
+        select: { id: true, school: true },
+      });
+      if (teacher) return teacher;
+    }
+    throw error;
+  }
+}
+
+/** 테스트 교사 계정을 보장하고(없으면 생성) 이번 실행용 랜덤 비밀번호를 설정해 반환한다. */
 export async function prepareTestTeacher(): Promise<string> {
   const prisma = client();
   try {
     const password = `E2e!${randomBytes(9).toString("hex")}`;
-    const teacher = await prisma.user.findFirst({ where: { email: TEST_TEACHER_EMAIL } });
-    if (!teacher) throw new Error(`test teacher missing: ${TEST_TEACHER_EMAIL}`);
-    await prisma.user.update({
-      where: { id: teacher.id },
-      data: { password: await bcrypt.hash(password, 12) },
-    });
+    const hashed = await bcrypt.hash(password, 12);
+    const teacher = await ensureTestTeacher(prisma, hashed);
+    await prisma.user.update({ where: { id: teacher.id }, data: { password: hashed } });
     return password;
   } finally {
     await prisma.$disconnect();
@@ -179,11 +213,8 @@ export async function prepareStudentAskFlow(key = "default"): Promise<StudentAsk
   try {
     await cleanupStudentAskFlowWithClient(prisma, key);
 
-    const teacher = await prisma.user.findFirst({
-      where: { email: TEST_TEACHER_EMAIL },
-      select: { id: true, school: true },
-    });
-    if (!teacher) throw new Error(`test teacher missing: ${TEST_TEACHER_EMAIL}`);
+    // 교사 계정 보장 — 사라졌으면 로그인 불가능한 랜덤 비밀번호로 재생성(경합 안전)
+    const teacher = await ensureTestTeacher(prisma, await bcrypt.hash(randomBytes(24).toString("hex"), 12));
 
     const school = teacher.school?.trim() || "E2E테스트초";
     const grade = "4";

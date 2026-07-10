@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { buildSessionLabel, buildSessionContextHint, isSessionAvailable, sortSessionsDesc, isInquiryDesignSession } from "@/lib/sessions";
+import {
+  buildSessionLabel,
+  buildSessionContextHint,
+  isSessionAvailable,
+  sortSessionsAsc,
+  sortSessionsDesc,
+  isInquiryDesignSession,
+} from "@/lib/sessions";
 
 describe("isInquiryDesignSession", () => {
   it("unitDesignId가 있고 배포 질문이 없으면 탐구질문 수업이다", () => {
@@ -83,5 +90,27 @@ describe("sortSessionsDesc", () => {
     ];
     const sorted = sortSessionsDesc(sessions);
     expect(sorted.map((s) => s.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("같은 날짜에서는 생성 시각이 최신인 세션을 먼저 둔다", () => {
+    const sessions = [
+      { id: "a", date: "2026-04-25", createdAt: "2026-04-25T09:00:00.000Z", subject: "과학", topic: "" },
+      { id: "b", date: "2026-04-25", createdAt: "2026-04-25T10:00:00.000Z", subject: "수학", topic: "" },
+      { id: "c", date: "2026-04-24", createdAt: "2026-04-24T11:00:00.000Z", subject: "국어", topic: "" },
+    ];
+    const sorted = sortSessionsDesc(sessions);
+    expect(sorted.map((s) => s.id)).toEqual(["b", "a", "c"]);
+  });
+});
+
+describe("sortSessionsAsc", () => {
+  it("오래된순에서는 같은 날짜의 생성 시각도 오래된 순서로 둔다", () => {
+    const sessions = [
+      { id: "a", date: "2026-04-25", createdAt: "2026-04-25T10:00:00.000Z", subject: "과학", topic: "" },
+      { id: "b", date: "2026-04-25", createdAt: "2026-04-25T09:00:00.000Z", subject: "수학", topic: "" },
+      { id: "c", date: "2026-04-26", createdAt: "2026-04-26T11:00:00.000Z", subject: "국어", topic: "" },
+    ];
+    const sorted = sortSessionsAsc(sessions);
+    expect(sorted.map((s) => s.id)).toEqual(["b", "a", "c"]);
   });
 });

@@ -117,7 +117,7 @@ export function UnitDesignView() {
 
   const { data: rawSessions = [], isLoading } = useStudentSessions<QuestionSession>({ userId: user.id });
   const sessions = useMemo(
-    () => sortSessionsAsc(rawSessions).filter((session) => (session.sharedQuestions?.length ?? 0) > 0),
+    () => sortSessionsDesc(rawSessions).filter((session) => (session.sharedQuestions?.length ?? 0) > 0),
     [rawSessions],
   );
 

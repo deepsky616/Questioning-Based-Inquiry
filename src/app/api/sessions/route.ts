@@ -60,7 +60,7 @@ export async function GET() {
     const [sessions, teacher] = await Promise.all([
       prisma.questionSession.findMany({
         where: { teacherId: user.id },
-        orderBy: { date: "asc" },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         include: { teacher: { select: { name: true } } },
       }),
       prisma.user.findUnique({
@@ -152,7 +152,7 @@ export async function GET() {
         { targetType: "CUSTOM", targetStudentIds: { array_contains: user.id } },
       ],
     },
-    orderBy: { date: "asc" },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     include: { teacher: { select: { name: true } } },
   });
   return NextResponse.json(sessions);

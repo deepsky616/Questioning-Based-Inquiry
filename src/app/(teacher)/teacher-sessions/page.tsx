@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { isSessionAvailable, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { isSessionAvailable, sortSessionsAsc, sortSessionsDesc, compareSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions, useTeacherStudents } from "@/lib/app-queries";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
@@ -114,7 +114,7 @@ export default function TeacherSessionsPage() {
       });
       if (!res.ok) throw new Error();
       const created: QuestionSession = await res.json();
-      setSessions((prev) => sortSessionsAsc([created, ...prev]));
+      setSessions((prev) => sortSessionsDesc([created, ...prev]));
       setSessForm((prev) => ({
         targetClassValue: prev.targetClassValue,
         selectedStudentIds: prev.selectedStudentIds,
@@ -253,7 +253,7 @@ export default function TeacherSessionsPage() {
         ? [...visibleSessions].sort((a, b) => {
             const missingDiff = (b.participation?.missing ?? 0) - (a.participation?.missing ?? 0);
             if (missingDiff !== 0) return missingDiff;
-            return b.date.localeCompare(a.date);
+            return compareSessionsDesc(a, b);
           })
         : sortSessionsDesc(visibleSessions);
   const activeSessions = sortedSessions.filter((s) => isSessionAvailable(s.date));

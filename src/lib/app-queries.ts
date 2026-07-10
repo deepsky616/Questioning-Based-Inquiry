@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { sortSessionsAsc } from "@/lib/sessions";
+import { sortSessionsDesc } from "@/lib/sessions";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 export const appQueryKeys = {
@@ -13,6 +13,7 @@ export const appQueryKeys = {
 export interface BasicSession {
   id: string;
   date: string;
+  createdAt?: string | Date | null;
   subject: string;
   topic: string;
 }
@@ -42,7 +43,7 @@ async function fetchTeacherStudents<TStudent, TClass>(): Promise<TeacherStudentL
 export function useTeacherSessions<TSession extends BasicSession>() {
   return useQuery<TSession[]>({
     queryKey: appQueryKeys.teacherSessions,
-    queryFn: async () => sortSessionsAsc(await fetchSessions<TSession>()),
+    queryFn: async () => sortSessionsDesc(await fetchSessions<TSession>()),
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
@@ -57,7 +58,7 @@ export function useStudentSessions<TSession extends BasicSession>({
 }) {
   return useQuery<TSession[]>({
     queryKey: appQueryKeys.studentSessions(userId),
-    queryFn: () => fetchSessions<TSession>(),
+    queryFn: async () => sortSessionsDesc(await fetchSessions<TSession>()),
     enabled: enabled && Boolean(userId),
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,

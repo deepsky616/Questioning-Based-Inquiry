@@ -30,12 +30,35 @@ export function isSessionAvailable(sessionDate: string, now: Date = new Date()):
   return sessionDate >= today;
 }
 
-export function sortSessionsDesc<T extends { date: string }>(sessions: T[]): T[] {
-  return [...sessions].sort((a, b) => b.date.localeCompare(a.date));
+type SortableSession = {
+  date: string;
+  createdAt?: string | Date | null;
+};
+
+function createdAtValue(value: string | Date | null | undefined): number {
+  if (!value) return 0;
+  const time = value instanceof Date ? value.getTime() : new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
-export function sortSessionsAsc<T extends { date: string }>(sessions: T[]): T[] {
-  return [...sessions].sort((a, b) => a.date.localeCompare(b.date));
+export function compareSessionsDesc<T extends SortableSession>(a: T, b: T): number {
+  const dateDiff = b.date.localeCompare(a.date);
+  if (dateDiff !== 0) return dateDiff;
+  return createdAtValue(b.createdAt) - createdAtValue(a.createdAt);
+}
+
+export function compareSessionsAsc<T extends SortableSession>(a: T, b: T): number {
+  const dateDiff = a.date.localeCompare(b.date);
+  if (dateDiff !== 0) return dateDiff;
+  return createdAtValue(a.createdAt) - createdAtValue(b.createdAt);
+}
+
+export function sortSessionsDesc<T extends SortableSession>(sessions: T[]): T[] {
+  return [...sessions].sort(compareSessionsDesc);
+}
+
+export function sortSessionsAsc<T extends SortableSession>(sessions: T[]): T[] {
+  return [...sessions].sort(compareSessionsAsc);
 }
 
 // 세션 선택 시 질문 맥락 자동완성용 힌트 문자열 생성
