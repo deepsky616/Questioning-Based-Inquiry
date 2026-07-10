@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { auth } from "@/lib/auth-edge";
 import { NextResponse } from "next/server";
 import { isPublicRoute, canAccess, getRedirectPath } from "@/lib/route-access";
 import type { UserRole } from "@/types/user";
