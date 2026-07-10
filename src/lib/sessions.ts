@@ -104,10 +104,14 @@ function buildSessionMonthLabel(monthKey: string): string {
   return `${year}년 ${parseInt(month, 10)}월`;
 }
 
-export function groupSessionsByMonth<T extends SortableSession>(sessions: T[]): SessionMonthGroup<T>[] {
+export function groupSessionsByMonth<T extends SortableSession>(
+  sessions: T[],
+  direction: "desc" | "asc" = "desc",
+): SessionMonthGroup<T>[] {
   const grouped = new Map<string, T[]>();
+  const sorted = direction === "asc" ? sortSessionsAsc(sessions) : sortSessionsDesc(sessions);
 
-  for (const session of sortSessionsDesc(sessions)) {
+  for (const session of sorted) {
     const monthKey = getSessionMonthKey(session.date) ?? UNKNOWN_SESSION_MONTH_KEY;
     const group = grouped.get(monthKey) ?? [];
     group.push(session);
@@ -151,8 +155,10 @@ export function getSessionFilterOptions<T extends SessionLike>(sessions: T[]): {
 } {
   const uniqSorted = (values: string[]) =>
     Array.from(new Set(values.map((v) => v.trim()).filter(Boolean))).sort();
+  const uniqDatesDesc = (values: string[]) =>
+    Array.from(new Set(values.map((v) => v.trim()).filter(isValidSessionDateString))).sort((a, b) => b.localeCompare(a));
   return {
-    dates: uniqSorted(sessions.map((s) => s.date).filter(isValidSessionDateString)),
+    dates: uniqDatesDesc(sessions.map((s) => s.date)),
     subjects: uniqSorted(sessions.map((s) => s.subject)),
     topics: uniqSorted(sessions.map((s) => s.topic)),
   };

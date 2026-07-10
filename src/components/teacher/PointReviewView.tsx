@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ACTIVITY_BONUS_TYPES } from "@/lib/activity-bonus-policy";
-import { buildSessionLabel } from "@/lib/sessions";
+import { buildSessionLabel, groupSessionsByMonth } from "@/lib/sessions";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { useTeacherSessions } from "@/lib/app-queries";
@@ -161,6 +161,7 @@ export function PointReviewView() {
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
+  const sessionMonthGroups = groupSessionsByMonth(sessions);
 
   // 세션별 그룹 — 방금 분석한 세션 먼저, 나머지는 세션 날짜 내림차순
   const sessionLabelOf = (sessionId: string | null) => {
@@ -229,11 +230,15 @@ export function PointReviewView() {
           <select className="border rounded-md px-3 py-2 text-sm bg-card w-full"
             value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)}>
             <option value="all">{t("allPendingOnly")}</option>
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {buildSessionLabel(s.date, s.subject, s.topic)}
-                {pendingCountBySession[s.id] ? t("optionPendingCount", { count: pendingCountBySession[s.id] }) : ""}
-              </option>
+            {sessionMonthGroups.map((group) => (
+              <optgroup key={group.key} label={`${group.label} (${group.sessions.length})`}>
+                {group.sessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {buildSessionLabel(s.date, s.subject, s.topic)}
+                    {pendingCountBySession[s.id] ? t("optionPendingCount", { count: pendingCountBySession[s.id] }) : ""}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           <div className="flex gap-2">

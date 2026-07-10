@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { formatDateTime } from "@/lib/datetime";
+import { groupSessionsByMonth } from "@/lib/sessions";
 import { getAnalysisFreshness } from "@/lib/report-analysis-freshness";
 import { ReportClassificationGuide } from "@/components/reports/ReportClassificationGuide";
 import { SummaryCard } from "@/components/reports/ReportSectionGrid";
@@ -267,9 +268,9 @@ export function ReportView({
     if (period !== "ALL" && !periods.some(([k]) => k === period)) setPeriod("ALL");
   }, [periods, period]);
 
-  // 현재 선택이 '전체'면 모든 세션, 아니면 그 기간 세션만
   const inPeriod = (date: string) => period === "ALL" || sessionPeriod(date, range, locale, t("other"), t("weekSuffix")).key === period;
   const filteredSessions = allSessions.filter((s) => inPeriod(s.date));
+  const filteredSessionMonthGroups = groupSessionsByMonth(filteredSessions);
   // 일괄 분석 대상(학급 전체 세션 풀이 있으면 그것을 현재 기간으로 추림) 수
   const bulkPeriodCount = (bulkSessions ?? allSessions).filter((s) => inPeriod(s.date)).length;
 
@@ -517,27 +518,22 @@ export function ReportView({
           {filteredSessions.length === 0 ? (
             <EmptyState icon="🗓️" title={t("noSessionsInPeriod")} />
           ) : (
-          <div className="space-y-2">
-            {filteredSessions.map((s) => {
-              const r = res[s.id];
-              // 번역 보기가 켜져 있으면 번역된 필드로 표시(없는 필드는 원문 유지)
-              const rv = r && trShown[s.id] ? { ...r, ...trFields[s.id] } : r;
-              const freshness = r ? getAnalysisFreshness(s, r) : null;
-              const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
-              const blocks: [string, string | undefined][] = [
-                [t("secSummary"), rv?.summary],
-                [t("secBalance"), rv?.balanceInsights],
-                [t("secBest"), rv?.bestQuestion],
-                [t("secGrowth"), rv?.growthInsights],
-                [t("secRewrite"), rv?.rewriteExample],
-                [t("secEngagement"), rv?.engagementInsights],
-                [t("secComment"), rv?.commentInsights],
-                [t("secRelevance"), rv?.relevanceInsights],
-                [t("secNext"), rv?.nextQuestions],
-                [t("secSuggest"), rv?.insights],
-              ];
-              return (
-                <div key={s.id} className="rounded-lg border bg-background">
+          <div className="space-y-4">
+            {filteredSessionMonthGroups.map((group) => (
+              <section key={group.key} className="space-y-2">
+                <p className="border-b pb-1 text-xs font-semibold text-muted-foreground">{group.label} <span className="font-normal">({group.sessions.length})</span></p>
+                {group.sessions.map((s) => {
+                  const r = res[s.id];
+                  const rv = r && trShown[s.id] ? { ...r, ...trFields[s.id] } : r;
+                  const freshness = r ? getAnalysisFreshness(s, r) : null;
+                  const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
+                  const blocks: [string, string | undefined][] = [
+                    [t("secSummary"), rv?.summary], [t("secBalance"), rv?.balanceInsights], [t("secBest"), rv?.bestQuestion],
+                    [t("secGrowth"), rv?.growthInsights], [t("secRewrite"), rv?.rewriteExample], [t("secEngagement"), rv?.engagementInsights],
+                    [t("secComment"), rv?.commentInsights], [t("secRelevance"), rv?.relevanceInsights], [t("secNext"), rv?.nextQuestions], [t("secSuggest"), rv?.insights],
+                  ];
+                  return (
+                    <div key={s.id} className="rounded-lg border bg-background">
                   <div className="flex items-center gap-2 px-3 py-2">
                     <button onClick={() => toggleSession(s.id)} aria-expanded={!!open[s.id]} className="no-print flex min-w-0 flex-1 items-center gap-2 text-left">
                       <CollapseChevron open={!!open[s.id]} className="shrink-0" />
@@ -672,9 +668,11 @@ export function ReportView({
                       )}
                     </div>
                   )}
-                </div>
-              );
-            })}
+                    </div>
+                  );
+                })}
+              </section>
+            ))}
           </div>
           )}
         </div>

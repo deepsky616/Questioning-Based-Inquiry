@@ -14,11 +14,11 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
@@ -318,6 +318,7 @@ export function ExploreQuestionsView() {
     subject: filterSubject || undefined,
     topic: filterTopic || undefined,
   }).filter((s) => !s.unitDesignId || isInquiryDesignSession(s));
+  const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
 
   // 필터로 선택 세션이 목록 밖이 되면 전체로 보정
   useEffect(() => {
@@ -414,8 +415,13 @@ export function ExploreQuestionsView() {
                 <SelectTrigger className="bg-background font-medium"><SelectValue placeholder={t("selectSession")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t("allSessions")}</SelectItem>
-                  {filteredSessions.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
+                  {sessionMonthGroups.map((group) => (
+                    <SelectGroup key={group.key}>
+                      <SelectLabel>{group.label} ({group.sessions.length})</SelectLabel>
+                      {group.sessions.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { isSessionAvailable, sortSessionsAsc, sortSessionsDesc, compareSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
+import { isSessionAvailable, sortSessionsAsc, sortSessionsDesc, compareSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionsByMonth } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions, useTeacherStudents } from "@/lib/app-queries";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
@@ -258,6 +258,9 @@ export default function TeacherSessionsPage() {
         : sortSessionsDesc(visibleSessions);
   const activeSessions = sortedSessions.filter((s) => isSessionAvailable(s.date));
   const pastSessions = sortedSessions.filter((s) => !isSessionAvailable(s.date));
+  const listMonthDirection = listSort === "asc" ? "asc" : "desc";
+  const activeSessionMonthGroups = groupSessionsByMonth(activeSessions, listMonthDirection);
+  const pastSessionMonthGroups = groupSessionsByMonth(pastSessions, listMonthDirection);
   const missingSessionCount = sortedSessions.filter((s) => (s.participation?.missing ?? 0) > 0).length;
   const completedSessionCount = sortedSessions.filter((s) => {
     const total = s.participation?.total ?? 0;
@@ -337,17 +340,24 @@ export default function TeacherSessionsPage() {
                   </div>
                 </div>
                 <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-                  {activeSessions.map((s) => (
-                    <TeacherSessionRow
-                      key={s.id}
-                      session={s}
-                      onDelete={handleDelete}
-                      onToggleActive={handleToggleActive}
-                      onTogglePublic={handleTogglePublic}
-                      onToggleLikes={handleToggleLikes}
-                      onToggleCommentsVisible={handleToggleCommentsVisible}
-                      onEditSave={handleEditSave}
-                    />
+                  {activeSessionMonthGroups.map((group) => (
+                    <section key={group.key} className="divide-y divide-border">
+                      <div className="bg-muted/40 px-4 py-2 text-xs font-semibold text-muted-foreground">
+                        {group.label} <span className="font-normal">({group.sessions.length})</span>
+                      </div>
+                      {group.sessions.map((s) => (
+                        <TeacherSessionRow
+                          key={s.id}
+                          session={s}
+                          onDelete={handleDelete}
+                          onToggleActive={handleToggleActive}
+                          onTogglePublic={handleTogglePublic}
+                          onToggleLikes={handleToggleLikes}
+                          onToggleCommentsVisible={handleToggleCommentsVisible}
+                          onEditSave={handleEditSave}
+                        />
+                      ))}
+                    </section>
                   ))}
                 </div>
               </section>
@@ -370,17 +380,24 @@ export default function TeacherSessionsPage() {
                   </div>
                 </div>
                 <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-                  {pastSessions.map((s) => (
-                    <TeacherSessionRow
-                      key={s.id}
-                      session={s}
-                      onDelete={handleDelete}
-                      onToggleActive={handleToggleActive}
-                      onTogglePublic={handleTogglePublic}
-                      onToggleLikes={handleToggleLikes}
-                      onToggleCommentsVisible={handleToggleCommentsVisible}
-                      onEditSave={handleEditSave}
-                    />
+                  {pastSessionMonthGroups.map((group) => (
+                    <section key={group.key} className="divide-y divide-border">
+                      <div className="bg-muted/40 px-4 py-2 text-xs font-semibold text-muted-foreground">
+                        {group.label} <span className="font-normal">({group.sessions.length})</span>
+                      </div>
+                      {group.sessions.map((s) => (
+                        <TeacherSessionRow
+                          key={s.id}
+                          session={s}
+                          onDelete={handleDelete}
+                          onToggleActive={handleToggleActive}
+                          onTogglePublic={handleTogglePublic}
+                          onToggleLikes={handleToggleLikes}
+                          onToggleCommentsVisible={handleToggleCommentsVisible}
+                          onEditSave={handleEditSave}
+                        />
+                      ))}
+                    </section>
                   ))}
                 </div>
               </section>

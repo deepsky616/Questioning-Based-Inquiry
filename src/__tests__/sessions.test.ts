@@ -81,13 +81,13 @@ describe("isSessionAvailable", () => {
 });
 
 describe("getSessionFilterOptions", () => {
-  it("필터 날짜 옵션에는 유효한 수업 날짜만 포함한다", () => {
+  it("필터 날짜 옵션에는 유효한 수업 날짜만 최신순으로 포함한다", () => {
     const options = getSessionFilterOptions([
       { date: "2026-04-25", subject: "과학", topic: "" },
       { date: "2026-04-31", subject: "수학", topic: "" },
       { date: "2026-05-01", subject: "국어", topic: "" },
     ]);
-    expect(options.dates).toEqual(["2026-04-25", "2026-05-01"]);
+    expect(options.dates).toEqual(["2026-05-01", "2026-04-25"]);
   });
 });
 
@@ -165,6 +165,17 @@ describe("groupSessionsByMonth", () => {
     expect(groups.map((group) => group.key)).toEqual(["2026-07", "unknown"]);
     expect(groups[1].label).toBe("날짜 미정");
     expect(groups[1].sessions.map((session) => session.id)).toEqual(["b"]);
+  });
+
+  it("오래된순 그룹이 필요하면 월과 세션을 오래된순으로 묶는다", () => {
+    const groups = groupSessionsByMonth([
+      { id: "a", date: "2026-07-02", createdAt: "2026-07-02T10:00:00.000Z", subject: "과학", topic: "" },
+      { id: "b", date: "2026-06-30", createdAt: "2026-06-30T09:00:00.000Z", subject: "수학", topic: "" },
+      { id: "c", date: "2026-07-02", createdAt: "2026-07-02T09:00:00.000Z", subject: "국어", topic: "" },
+    ], "asc");
+
+    expect(groups.map((group) => group.key)).toEqual(["2026-06", "2026-07"]);
+    expect(groups[1].sessions.map((session) => session.id)).toEqual(["c", "a"]);
   });
 });
 

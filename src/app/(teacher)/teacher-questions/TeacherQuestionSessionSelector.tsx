@@ -3,11 +3,13 @@
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { buildSessionLabel } from "@/lib/sessions";
+import { buildSessionLabel, groupSessionsByMonth } from "@/lib/sessions";
 import type { QuestionSession } from "./types";
 
 interface SessionFilterOptions {
@@ -59,6 +61,8 @@ export function TeacherQuestionSessionSelector({
   onSessionChange,
   labels,
 }: TeacherQuestionSessionSelectorProps) {
+  const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
+
   if (sessions.length === 0) {
     return (
       <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
@@ -132,10 +136,15 @@ export function TeacherQuestionSessionSelector({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{labels.allSessions}</SelectItem>
-                {filteredSessions.map((session) => (
-                  <SelectItem key={session.id} value={session.id}>
-                    {buildSessionLabel(session.date, session.subject, session.topic)}
-                  </SelectItem>
+                {sessionMonthGroups.map((group) => (
+                  <SelectGroup key={group.key}>
+                    <SelectLabel>{group.label} ({group.sessions.length})</SelectLabel>
+                    {group.sessions.map((session) => (
+                      <SelectItem key={session.id} value={session.id}>
+                        {buildSessionLabel(session.date, session.subject, session.topic)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>

@@ -19,7 +19,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StudentMyQuestionsSummary } from "@/components/student/StudentMyQuestionsSummary";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
 import {
@@ -28,7 +28,7 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import {
   Table,
@@ -200,6 +200,7 @@ export function MyQuestionsView() {
     subject: filterSubject || undefined,
     topic: filterTopic || undefined,
   });
+  const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
   const allQuestionSessionIds = useMemo(
     () => new Set(allSessionQuestions.map((q) => q.session?.id).filter((id): id is string => Boolean(id))),
     [allSessionQuestions],
@@ -555,8 +556,13 @@ export function MyQuestionsView() {
                 <SelectTrigger className="h-11 bg-background font-medium"><SelectValue placeholder={tEx("selectSession")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{tEx("allSessions")}</SelectItem>
-                  {filteredSessions.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
+                  {sessionMonthGroups.map((group) => (
+                    <SelectGroup key={group.key}>
+                      <SelectLabel>{group.label} ({group.sessions.length})</SelectLabel>
+                      {group.sessions.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>

@@ -9,9 +9,9 @@ const sessions = [
 ];
 
 describe("getSessionFilterOptions", () => {
-  it("날짜/교과/주제의 고유값을 정렬해 반환한다", () => {
+  it("날짜는 최신순, 교과/주제는 가나다순으로 고유값을 반환한다", () => {
     const opts = getSessionFilterOptions(sessions);
-    expect(opts.dates).toEqual(["2026-06-01", "2026-06-02", "2026-06-03"]);
+    expect(opts.dates).toEqual(["2026-06-03", "2026-06-02", "2026-06-01"]);
     expect(opts.subjects).toEqual(["과학", "사회"]);
     expect(opts.topics).toEqual(["광합성", "에너지"]);
   });

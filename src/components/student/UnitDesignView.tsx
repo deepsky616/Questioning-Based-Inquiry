@@ -10,7 +10,7 @@ import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions, isSessionAvailable } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionsByMonth, isSessionAvailable } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { groupSharedQuestions } from "@/lib/shared-questions";
@@ -165,6 +165,8 @@ export function UnitDesignView() {
   const sortedSessions = sort === "asc" ? sortSessionsAsc(filteredSessions) : sortSessionsDesc(filteredSessions);
   const activeSessions = sortedSessions.filter((s) => isSessionAvailable(s.date));
   const pastSessions = sortedSessions.filter((s) => !isSessionAvailable(s.date));
+  const activeSessionMonthGroups = groupSessionsByMonth(activeSessions, sort);
+  const pastSessionMonthGroups = groupSessionsByMonth(pastSessions, sort);
   const hasFilter = Boolean(filterDate || filterSubject || filterTopic || search.trim());
   const selectedSessionIndex = sortedSessions.findIndex((session) => session.id === selectedSession?.id);
   const fallbackSessionIndex = sessions.findIndex((session) => session.id === selectedSession?.id);
@@ -276,33 +278,40 @@ export function UnitDesignView() {
                 <p className="py-6 text-center text-sm text-muted-foreground">{t("listNoMatch")}</p>
               ) : (
                 ([
-                  [t("sectionActive"), activeSessions],
-                  [t("sectionPast"), pastSessions],
-                ] as const).map(([label, group]) => group.length === 0 ? null : (
+                  [t("sectionActive"), activeSessions, activeSessionMonthGroups],
+                  [t("sectionPast"), pastSessions, pastSessionMonthGroups],
+                ] as const).map(([label, group, monthGroups]) => group.length === 0 ? null : (
                   <section key={label} className="space-y-2">
                     <p className="text-xs font-semibold text-muted-foreground">{label} <span className="font-normal">({group.length})</span></p>
-                    {group.map((session) => (
-                      <button
-                        key={session.id}
-                        type="button"
-                        onClick={() => selectSession(session.id, true)}
-                        className={`w-full rounded-md border p-3 text-left transition-colors ${
-                          selectedSession?.id === session.id ? "border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40" : "bg-card hover:bg-muted/40"
-                        }`}
-                      >
-                        <div className="flex items-start gap-2">
-                          <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground">
-                              {buildSessionLabel(session.date, session.subject, session.topic)}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {t("questionCount", { count: session.sharedQuestions?.length ?? 0 })}
-                              {session.teacher?.name ? t("teacherByline", { name: session.teacher.name }) : ""}
-                            </p>
-                          </div>
-                        </div>
-                      </button>
+                    {monthGroups.map((monthGroup) => (
+                      <div key={monthGroup.key} className="space-y-1.5">
+                        <p className="border-b pb-1 text-[11px] font-semibold text-muted-foreground">
+                          {monthGroup.label} <span className="font-normal">({monthGroup.sessions.length})</span>
+                        </p>
+                        {monthGroup.sessions.map((session) => (
+                          <button
+                            key={session.id}
+                            type="button"
+                            onClick={() => selectSession(session.id, true)}
+                            className={`w-full rounded-md border p-3 text-left transition-colors ${
+                              selectedSession?.id === session.id ? "border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40" : "bg-card hover:bg-muted/40"
+                            }`}
+                          >
+                            <div className="flex items-start gap-2">
+                              <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground">
+                                  {buildSessionLabel(session.date, session.subject, session.topic)}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {t("questionCount", { count: session.sharedQuestions?.length ?? 0 })}
+                                  {session.teacher?.name ? t("teacherByline", { name: session.teacher.name }) : ""}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     ))}
                   </section>
                 ))

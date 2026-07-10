@@ -18,6 +18,7 @@ import {
   buildSessionLabel,
   filterSessions,
   getSessionFilterOptions,
+  groupSessionsByMonth,
   sortSessionsAsc,
   sortSessionsDesc,
 } from "@/lib/sessions";
@@ -106,6 +107,7 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
     topic: deployFilterTopic || undefined,
   });
   const deployed = deploySort === "asc" ? sortSessionsAsc(deployFiltered) : sortSessionsDesc(deployFiltered);
+  const deployedMonthGroups = groupSessionsByMonth(deployed, deploySort);
   const hasDeployFilter = Boolean(deployFilterDate || deployFilterSubject || deployFilterTopic);
   const getPublishedAt = (session: QuestionSession) =>
     session.sharedQuestions?.find((q) => q.publishedAt)?.publishedAt ?? session.createdAt;
@@ -175,12 +177,17 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
       <p className="mt-3 text-sm text-muted-foreground">
         {t("deployedDesc")}
       </p>
-      <div className="mt-3 space-y-2">
-        {deployed.map((s) => {
-          const isEditing = editDeploySessionId === s.id;
-          const publishedAt = getPublishedAt(s);
-          return (
-            <div key={s.id} className="rounded-lg border bg-background">
+      <div className="mt-3 space-y-4">
+        {deployedMonthGroups.map((group) => (
+          <section key={group.key} className="space-y-2">
+            <p className="border-b pb-1 text-xs font-semibold text-muted-foreground">
+              {group.label} <span className="font-normal">({group.sessions.length})</span>
+            </p>
+            {group.sessions.map((s) => {
+              const isEditing = editDeploySessionId === s.id;
+              const publishedAt = getPublishedAt(s);
+              return (
+                <div key={s.id} className="rounded-lg border bg-background">
               <div className="flex flex-wrap items-center justify-between gap-2 p-3">
                 <button type="button" onClick={() => toggleDeploy(s.id)} aria-expanded={openDeploy.has(s.id)} className="min-w-0 flex-1 text-left">
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
@@ -317,9 +324,11 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                   />
                 </div>
               )}
-            </div>
-          );
-        })}
+                </div>
+              );
+            })}
+          </section>
+        ))}
       </div>
     </div>
   );
