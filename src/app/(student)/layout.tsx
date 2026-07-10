@@ -15,6 +15,7 @@ const STUDENT_PAGES = [
   { href: "/student-dashboard", key: "dashboard" },
   { href: "/student-ask", key: "ask" },
   { href: "/student-questions", key: "explore" },
+  { href: "/student-practice", key: "practice" },
   { href: "/student-question-play", key: "questionPlay" },
   { href: "/student-settings", key: "settings" },
 ] as const;
