@@ -268,11 +268,11 @@ function StudentDashboard() {
         <StudentReportView />
       ) : (
         <>
-          <div className="student-dashboard-tablet-overview grid gap-4 md:items-stretch xl:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.22fr)]">
+          <div className="student-dashboard-tablet-overview">
             {/* 포인트 카드 */}
             <div
               ref={pointsSectionRef}
-              className={`student-dashboard-points-panel flex scroll-mt-24 flex-col gap-4 rounded-2xl transition-shadow md:h-full ${
+              className={`student-dashboard-points-panel flex scroll-mt-24 flex-col gap-4 rounded-2xl transition-shadow ${
                 highlightPoints ? "shadow-[0_0_0_3px_rgba(245,158,11,0.55)]" : ""
               }`}
             >
@@ -294,23 +294,21 @@ function StudentDashboard() {
                 </CardContent>
               </Card>
             </div>
-
-            {isLoading ? (
-              <DashboardSkeleton />
-            ) : (
-              <StudentDashboardTasksCard
-                hasStudentTasks={hasStudentTasks}
-                visibleTeacherRequests={visibleTeacherRequests}
-                teacherRequestCount={teacherRequestNotifications.length}
-                taskItems={taskItems}
-                onTeacherRequestClick={openTeacherRequest}
-                onTaskClick={openTask}
-              />
-            )}
           </div>
+
+      {isLoading && <DashboardSkeleton />}
 
       {!isLoading && (
         <>
+      <StudentDashboardTasksCard
+        hasStudentTasks={hasStudentTasks}
+        visibleTeacherRequests={visibleTeacherRequests}
+        teacherRequestCount={teacherRequestNotifications.length}
+        taskItems={taskItems}
+        onTeacherRequestClick={openTeacherRequest}
+        onTaskClick={openTask}
+      />
+
       {/* 분류 1 · 닫힌 질문 / 열린 질문 */}
       <Card>
         <CardHeader className="pb-3">

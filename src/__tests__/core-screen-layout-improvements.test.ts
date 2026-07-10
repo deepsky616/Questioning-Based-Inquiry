@@ -17,7 +17,6 @@ const reportViewSections = readFileSync("src/components/reports/ReportViewSectio
 describe("core screen layout improvements", () => {
   it("keeps student dashboard and question views tablet-friendly", () => {
     expect(studentDashboard).toContain("student-dashboard-tablet-overview");
-    expect(studentDashboard).toContain("md:items-stretch");
     expect(studentDashboard).toContain("student-dashboard-points-panel");
     expect(studentDashboard).toContain("student-dashboard-question-summary");
     expect(studentDashboard.indexOf("student-dashboard-points-panel")).toBeLessThan(
@@ -26,7 +25,9 @@ describe("core screen layout improvements", () => {
     expect(studentDashboard.indexOf("student-dashboard-question-summary")).toBeLessThan(
       studentDashboard.indexOf("<StudentDashboardTasksCard"),
     );
-    expect(studentDashboard).toContain("h-full");
+    expect(studentDashboard.indexOf("<StudentDashboardTasksCard")).toBeLessThan(
+      studentDashboard.indexOf("{/* 분류 1"),
+    );
     expect(studentDashboardTasksCard).toContain("student-dashboard-task-panel");
     expect(studentDashboardTasksCard).toContain("student-dashboard-task-grid");
     expect(studentDashboardTasksCard).toContain("min-h-[116px]");
