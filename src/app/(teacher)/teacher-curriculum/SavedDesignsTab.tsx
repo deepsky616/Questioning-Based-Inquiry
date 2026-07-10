@@ -18,6 +18,7 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { filterSortSavedDesigns } from "@/lib/saved-designs";
 import { getSavedDesignTimeline, type SavedDesignTimelineKind } from "@/lib/saved-design-timeline";
+import { groupSessionDatesByMonth } from "@/lib/sessions";
 import { formatDateTime } from "@/lib/datetime";
 import {
   buildClassStudentTargetPayload,
@@ -125,6 +126,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     areas: uniq(savedList.map((d) => d.area)),
     units: uniq(savedList.map((d) => d.title)),
   };
+  const savedDateMonthGroups = groupSessionDatesByMonth(savedFilterOptions.dates);
   const hasSavedFilter = Boolean(savedFilterDate || savedFilterGrade || savedFilterSubject || savedFilterArea || savedFilterUnit);
   const visibleSaved = filterSortSavedDesigns(
     savedList,
@@ -326,8 +328,20 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
             {/* 조회(필터) */}
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">{tSess("filterLabel")}</span>
+              <select
+                aria-label={t("date")}
+                value={savedFilterDate}
+                onChange={(e) => setSavedFilterDate(e.target.value)}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+              >
+                <option value="">{t("savedFilterAllDates")}</option>
+                {savedDateMonthGroups.map((group) => (
+                  <optgroup key={group.key} label={group.label}>
+                    {group.dates.map((date) => <option key={date} value={date}>{date}</option>)}
+                  </optgroup>
+                ))}
+              </select>
               {([
-                [savedFilterDate, setSavedFilterDate, savedFilterOptions.dates, t("savedFilterAllDates")],
                 [savedFilterGrade, setSavedFilterGrade, savedFilterOptions.grades, t("savedFilterAllGrades")],
                 [savedFilterSubject, setSavedFilterSubject, savedFilterOptions.subjects, t("savedFilterAllSubjects")],
                 [savedFilterArea, setSavedFilterArea, savedFilterOptions.areas, t("savedFilterAllAreas")],

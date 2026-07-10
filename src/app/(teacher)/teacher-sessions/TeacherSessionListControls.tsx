@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { groupSessionDatesByMonth } from "@/lib/sessions";
 
 export type SessionListSort = "desc" | "asc" | "missingDesc";
@@ -62,18 +62,19 @@ export function TeacherSessionListControls({
           aria-label={t("searchPlaceholder")}
           className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
-        <Select value={filterDate || "__all__"} onValueChange={(v) => onFilterDate(v === "__all__" ? "" : v)}>
-          <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">{t("allDates")}</SelectItem>
-            {dateMonthGroups.map((group) => (
-              <SelectGroup key={group.key}>
-                <SelectLabel>{group.label}</SelectLabel>
-                {group.dates.map((date) => <SelectItem key={date} value={date}>{date}</SelectItem>)}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
+        <select
+          aria-label={t("allDates")}
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          value={filterDate}
+          onChange={(event) => onFilterDate(event.target.value)}
+        >
+          <option value="">{t("allDates")}</option>
+          {dateMonthGroups.map((group) => (
+            <optgroup key={group.key} label={group.label}>
+              {group.dates.map((date) => <option key={date} value={date}>{date}</option>)}
+            </optgroup>
+          ))}
+        </select>
         <Select value={filterSubject || "__all__"} onValueChange={(v) => onFilterSubject(v === "__all__" ? "" : v)}>
           <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allSubjects")} /></SelectTrigger>
           <SelectContent>

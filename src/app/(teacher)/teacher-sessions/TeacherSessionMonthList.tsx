@@ -1,7 +1,7 @@
 "use client";
 
 // 월별 그룹 세션 목록 — 진행 중(항상 펼침)과 지난 세션(접이식) 공용.
-// 세션이 쌓여도 목록이 길어지지 않게 지난 세션은 기본으로 가장 최근 달만 펼친다.
+// 세션이 쌓여도 목록이 길어지지 않게 지난 세션은 기본으로 모든 월을 접는다.
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import type { SessionMonthGroup } from "@/lib/sessions";
 import { TeacherSessionRow } from "./TeacherSessionRow";
@@ -22,7 +22,7 @@ interface TeacherSessionMonthListProps extends RowHandlers {
   collapsible?: boolean;
   /** 검색·필터 중에는 결과가 가려지지 않게 모두 펼친다 */
   forceOpen?: boolean;
-  /** 펼침 상태(null이면 기본값: 첫 그룹만 펼침) */
+  /** 펼침 상태(null이면 기본값: 모두 접힘) */
   expandedKeys?: Set<string> | null;
   onToggleGroup?: (key: string, defaultExpanded: string[]) => void;
 }
@@ -35,13 +35,13 @@ export function TeacherSessionMonthList({
   onToggleGroup,
   ...rowHandlers
 }: TeacherSessionMonthListProps) {
-  const defaultExpanded = groups.slice(0, 1).map((g) => g.key);
+  const defaultExpanded: string[] = [];
 
   return (
     <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-      {groups.map((group, index) => {
+      {groups.map((group) => {
         const open =
-          !collapsible || forceOpen || (expandedKeys ? expandedKeys.has(group.key) : index === 0);
+          !collapsible || forceOpen || (expandedKeys ? expandedKeys.has(group.key) : false);
         const header = (
           <>
             {group.label} <span className="font-normal">({group.sessions.length})</span>
