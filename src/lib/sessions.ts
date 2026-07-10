@@ -1,6 +1,29 @@
+const SESSION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isValidSessionDateString(value: string): boolean {
+  if (!SESSION_DATE_RE.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+export function normalizeSessionDate(value: string | null | undefined): string | null {
+  const date = value?.trim();
+  if (!date) return null;
+  return isValidSessionDateString(date) ? date : null;
+}
+
+function sessionDateSortKey(value: string): string {
+  return isValidSessionDateString(value) ? value : "";
+}
+
 function formatDateKr(dateStr: string): string {
+  if (!isValidSessionDateString(dateStr)) return dateStr;
   const [year, month, day] = dateStr.split("-");
-  if (!year || !month || !day) return dateStr;
   return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
 }
 
@@ -23,6 +46,7 @@ export function buildSessionLabel(date: string, subject: string, topic: string):
 }
 
 export function isSessionAvailable(sessionDate: string, now: Date = new Date()): boolean {
+  if (!isValidSessionDateString(sessionDate)) return false;
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
@@ -42,13 +66,13 @@ function createdAtValue(value: string | Date | null | undefined): number {
 }
 
 export function compareSessionsDesc<T extends SortableSession>(a: T, b: T): number {
-  const dateDiff = b.date.localeCompare(a.date);
+  const dateDiff = sessionDateSortKey(b.date).localeCompare(sessionDateSortKey(a.date));
   if (dateDiff !== 0) return dateDiff;
   return createdAtValue(b.createdAt) - createdAtValue(a.createdAt);
 }
 
 export function compareSessionsAsc<T extends SortableSession>(a: T, b: T): number {
-  const dateDiff = a.date.localeCompare(b.date);
+  const dateDiff = sessionDateSortKey(a.date).localeCompare(sessionDateSortKey(b.date));
   if (dateDiff !== 0) return dateDiff;
   return createdAtValue(a.createdAt) - createdAtValue(b.createdAt);
 }
@@ -92,7 +116,7 @@ export function getSessionFilterOptions<T extends SessionLike>(sessions: T[]): {
   const uniqSorted = (values: string[]) =>
     Array.from(new Set(values.map((v) => v.trim()).filter(Boolean))).sort();
   return {
-    dates: uniqSorted(sessions.map((s) => s.date)),
+    dates: uniqSorted(sessions.map((s) => s.date).filter(isValidSessionDateString)),
     subjects: uniqSorted(sessions.map((s) => s.subject)),
     topics: uniqSorted(sessions.map((s) => s.topic)),
   };
@@ -100,9 +124,10 @@ export function getSessionFilterOptions<T extends SessionLike>(sessions: T[]): {
 
 /** 날짜/교과/주제 필터로 세션을 거른다(빈 필터는 무시). */
 export function filterSessions<T extends SessionLike>(sessions: T[], filter: SessionFilter): T[] {
+  const date = normalizeSessionDate(filter.date);
   return sessions.filter(
     (s) =>
-      (!filter.date || s.date === filter.date) &&
+      (!date || s.date === date) &&
       (!filter.subject || s.subject === filter.subject) &&
       (!filter.topic || s.topic === filter.topic),
   );

@@ -6,7 +6,27 @@ import {
   sortSessionsAsc,
   sortSessionsDesc,
   isInquiryDesignSession,
+  isValidSessionDateString,
+  normalizeSessionDate,
+  getSessionFilterOptions,
 } from "@/lib/sessions";
+
+describe("session date validation", () => {
+  it("정확한 날짜 형식만 유효하게 본다", () => {
+    expect(isValidSessionDateString("2026-02-28")).toBe(true);
+    expect(isValidSessionDateString("2026-2-28")).toBe(false);
+    expect(isValidSessionDateString("2026-02-30")).toBe(false);
+    expect(isValidSessionDateString("2026-13-01")).toBe(false);
+    expect(isValidSessionDateString("")).toBe(false);
+  });
+
+  it("날짜를 정규화할 때 공백은 제거하고 잘못된 값은 null로 반환한다", () => {
+    expect(normalizeSessionDate(" 2026-04-25 ")).toBe("2026-04-25");
+    expect(normalizeSessionDate("2026-04-31")).toBeNull();
+    expect(normalizeSessionDate("   ")).toBeNull();
+    expect(normalizeSessionDate(null)).toBeNull();
+  });
+});
 
 describe("isInquiryDesignSession", () => {
   it("unitDesignId가 있고 배포 질문이 없으면 탐구질문 수업이다", () => {
@@ -52,6 +72,21 @@ describe("isSessionAvailable", () => {
 
   it("지난 세션은 사용 불가하다", () => {
     expect(isSessionAvailable("2026-04-24", new Date("2026-04-25T00:00:00"))).toBe(false);
+  });
+
+  it("잘못된 날짜 세션은 사용 불가로 본다", () => {
+    expect(isSessionAvailable("2026-04-31", new Date("2026-04-25T00:00:00"))).toBe(false);
+  });
+});
+
+describe("getSessionFilterOptions", () => {
+  it("필터 날짜 옵션에는 유효한 수업 날짜만 포함한다", () => {
+    const options = getSessionFilterOptions([
+      { date: "2026-04-25", subject: "과학", topic: "" },
+      { date: "2026-04-31", subject: "수학", topic: "" },
+      { date: "2026-05-01", subject: "국어", topic: "" },
+    ]);
+    expect(options.dates).toEqual(["2026-04-25", "2026-05-01"]);
   });
 });
 

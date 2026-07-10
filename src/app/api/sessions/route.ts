@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireTeacherSession } from "@/lib/session-helpers";
+import { isValidSessionDateString } from "@/lib/sessions";
 import { z } from "zod";
 
+const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
+
 const createSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: sessionDateSchema,
   subject: z.string().min(1),
   topic: z.string().default(""),
   targetType: z.enum(["ALL", "CLASS", "STUDENT", "CUSTOM"]).optional().default("ALL"),

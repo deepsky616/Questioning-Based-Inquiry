@@ -3,10 +3,13 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireTeacherSession } from "@/lib/session-helpers";
+import { isValidSessionDateString } from "@/lib/sessions";
 import { z } from "zod";
 
+const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
+
 const updateSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  date: sessionDateSchema.optional(),
   subject: z.string().min(1).optional(),
   topic: z.string().optional(),
   targetType: z.enum(["ALL", "CLASS", "STUDENT", "CUSTOM"]).optional(),
@@ -50,7 +53,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     };
     const updated = await prisma.questionSession.update({ where: { id }, data: updateData });
     return NextResponse.json(updated);
-  } catch {
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
+    }
     return NextResponse.json({ error: "서버 오류" }, { status: 500 });
   }
 }

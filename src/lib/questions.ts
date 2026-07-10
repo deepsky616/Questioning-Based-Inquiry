@@ -1,3 +1,5 @@
+import { normalizeSessionDate } from "@/lib/sessions";
+
 // 질문 목록 조회 상한 — 누적된 전체 조회가 무한정 커지지 않도록 최근 N건 기준으로 자른다.
 // 서버(take)와 클라이언트(잘림 안내 표시 기준)가 같은 값을 공유한다.
 export const QUESTION_LIST_MAX = 500;
@@ -47,7 +49,8 @@ export function buildSessionWhereFilter(params: {
   topic: string | null;
 }): SessionWhereFilter | undefined {
   const filter: SessionWhereFilter = {};
-  if (params.date?.trim()) filter.date = params.date.trim();
+  const date = normalizeSessionDate(params.date);
+  if (date) filter.date = date;
   if (params.subject?.trim()) filter.subject = { contains: params.subject.trim(), mode: "insensitive" };
   if (params.topic?.trim()) filter.topic = { contains: params.topic.trim(), mode: "insensitive" };
   return Object.keys(filter).length > 0 ? filter : undefined;

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { isValidSessionDateString } from "@/lib/sessions";
 import { z } from "zod";
+
+const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
 
 const inquiryQuestionSchema = z.object({
   type: z.string(),
@@ -26,7 +29,7 @@ const updateSchema = z.object({
   essentialQuestions: z.array(z.string()).optional(),
   inquiryQuestions: z.array(inquiryQuestionSchema).optional(),
   grade: z.string().nullable().optional(),
-  sessionDate: z.string().nullable().optional(),
+  sessionDate: sessionDateSchema.nullable().optional(),
   isActive: z.boolean().optional(),
   defaultQuestionPublic: z.boolean().optional(),
   likesVisibleToPeers: z.boolean().optional(),

@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { isValidSessionDateString } from "@/lib/sessions";
+
+const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
 
 const inquiryQuestionSchema = z.object({
   type: z.string(),
@@ -10,7 +13,7 @@ const inquiryQuestionSchema = z.object({
 }).passthrough();
 
 const createSessionSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  date: sessionDateSchema,
   topic: z.string().min(1).optional(),
   targetType: z.enum(["ALL", "CLASS", "STUDENT", "CUSTOM"]).optional().default("ALL"),
   targetGrade: z.string().nullable().optional(),

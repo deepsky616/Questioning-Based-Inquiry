@@ -329,4 +329,14 @@ describe("buildSessionWhereFilter", () => {
     const f = buildSessionWhereFilter({ date: "", subject: "", topic: "" });
     expect(f).toBeUndefined();
   });
+
+  it("잘못된 날짜는 세션 날짜 필터로 사용하지 않는다", () => {
+    const f = buildSessionWhereFilter({ date: "2024-02-30", subject: null, topic: null });
+    expect(f).toBeUndefined();
+  });
+
+  it("잘못된 날짜가 있어도 다른 필터는 유지한다", () => {
+    const f = buildSessionWhereFilter({ date: "2024-02-30", subject: "과학", topic: null });
+    expect(f).toEqual({ subject: { contains: "과학", mode: "insensitive" } });
+  });
 });
