@@ -1,14 +1,6 @@
-import { useTranslations } from "next-intl";
+import { RouteLoading } from "@/components/shared/RouteLoading";
 
-// 라우트 전환 중 기본 로딩 표시
+// 라우트 전환 중 기본 로딩 표시 (그룹 밖 라우트용 — 그룹 내 이동은 각 그룹의 loading.tsx가 담당)
 export default function Loading() {
-  const t = useTranslations("appShell");
-  return (
-    <div className="min-h-[50vh] flex items-center justify-center bg-background">
-      <div className="flex items-center gap-3 text-muted-foreground">
-        <span className="h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-primary" />
-        <span className="text-sm">{t("loading")}</span>
-      </div>
-    </div>
-  );
+  return <RouteLoading />;
 }
