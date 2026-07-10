@@ -9,7 +9,10 @@ describe("student ask tablet layout", () => {
     expect(inputCardSource).toContain("student-ask-tablet-layout");
     expect(inputCardSource).toContain("student-ask-question-panel");
     expect(inputCardSource).toContain("md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]");
-    expect(inputCardSource).toContain("md:sticky");
+    expect(inputCardSource).toContain("md:items-start");
+    expect(inputCardSource).toContain("h-fit");
+    expect(inputCardSource).toContain("md:min-h-[16rem]");
+    expect(inputCardSource).not.toContain("md:sticky");
   });
 
   it("keeps session controls touch-friendly on tablets", () => {

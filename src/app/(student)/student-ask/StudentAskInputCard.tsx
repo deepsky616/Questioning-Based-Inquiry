@@ -75,7 +75,7 @@ export function StudentAskInputCard({
           {sessionSelector}
         </div>
 
-        <div className="student-ask-question-panel space-y-4 rounded-xl border bg-background p-4 md:sticky md:top-4">
+        <div className="student-ask-question-panel h-fit space-y-4 rounded-xl border bg-background p-4 md:self-start">
           {existingQuestion && !isCheckingExisting && (
             <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
               {t("alreadyAsked")}: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? "..." : ""}&rdquo;</strong>
@@ -94,7 +94,7 @@ export function StudentAskInputCard({
               maxLength={200}
               onChange={(event) => onContentChange(event.target.value)}
               rows={7}
-              className="min-h-[11rem] text-base leading-7"
+              className="min-h-[12rem] text-base leading-7 md:min-h-[16rem]"
             />
             <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
           </div>
