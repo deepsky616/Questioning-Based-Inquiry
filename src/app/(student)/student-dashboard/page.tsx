@@ -279,6 +279,16 @@ function StudentDashboard() {
               <div className="min-h-0 flex-1">
                 <PointsCard />
               </div>
+              {!isLoading && (
+                <StudentDashboardTasksCard
+                  hasStudentTasks={hasStudentTasks}
+                  visibleTeacherRequests={visibleTeacherRequests}
+                  teacherRequestCount={teacherRequestNotifications.length}
+                  taskItems={taskItems}
+                  onTeacherRequestClick={openTeacherRequest}
+                  onTaskClick={openTask}
+                />
+              )}
               <Card className="student-dashboard-question-summary border-indigo-100 bg-indigo-50/70 dark:border-indigo-500/30 dark:bg-indigo-950/20">
                 <CardContent className="flex items-center justify-between gap-3 p-4">
                   <div>
@@ -300,15 +310,6 @@ function StudentDashboard() {
 
       {!isLoading && (
         <>
-      <StudentDashboardTasksCard
-        hasStudentTasks={hasStudentTasks}
-        visibleTeacherRequests={visibleTeacherRequests}
-        teacherRequestCount={teacherRequestNotifications.length}
-        taskItems={taskItems}
-        onTeacherRequestClick={openTeacherRequest}
-        onTaskClick={openTask}
-      />
-
       {/* 분류 1 · 닫힌 질문 / 열린 질문 */}
       <Card>
         <CardHeader className="pb-3">

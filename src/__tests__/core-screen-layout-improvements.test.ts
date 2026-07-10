@@ -22,10 +22,10 @@ describe("core screen layout improvements", () => {
     expect(studentDashboard.indexOf("student-dashboard-points-panel")).toBeLessThan(
       studentDashboard.indexOf("<StudentDashboardTasksCard"),
     );
-    expect(studentDashboard.indexOf("student-dashboard-question-summary")).toBeLessThan(
-      studentDashboard.indexOf("<StudentDashboardTasksCard"),
-    );
     expect(studentDashboard.indexOf("<StudentDashboardTasksCard")).toBeLessThan(
+      studentDashboard.indexOf("student-dashboard-question-summary"),
+    );
+    expect(studentDashboard.indexOf("student-dashboard-question-summary")).toBeLessThan(
       studentDashboard.indexOf("{/* 분류 1"),
     );
     expect(studentDashboardTasksCard).toContain("student-dashboard-task-panel");
