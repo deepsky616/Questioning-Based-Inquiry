@@ -26,6 +26,8 @@ describe("session monthly lookup surfaces", () => {
     for (const source of [studentMonthlyLookup]) {
       expect(source).toContain("groupSessionsByMonth");
       expect(source).toContain("sessionMonthGroups.map");
+      expect(source).toContain("<select");
+      expect(source).toContain("<optgroup");
     }
   });
 

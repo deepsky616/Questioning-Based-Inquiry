@@ -411,15 +411,15 @@ export function ExploreQuestionsView() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex w-full min-w-0 flex-col gap-1">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">{t("classSession")}</label>
               <StudentMonthlySessionLookup
                 sessions={filteredSessions}
                 selectedSessionId={selectedSessionId}
                 onSelectSession={handleSessionChange}
+                className="flex h-8 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 labels={{
                   allSessions: t("allSessions"),
-                  selected: tAsk("selectedSessionBadge"),
                   inquiryClass: tAsk("inquiryClassTag"),
                   noMatchingSession: t("emptyNone"),
                 }}
