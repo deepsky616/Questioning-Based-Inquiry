@@ -29,18 +29,19 @@ describe("student ask tablet layout", () => {
     expect(inputCardSource).not.toContain("md:sticky");
   });
 
-  it("keeps the textarea and helper at content size, distributing leftover space", () => {
-    // 질문은 최대 200자 — 어떤 요소든 남는 공간을 혼자 흡수하면 어색하게 거대해진다.
-    // 입력창 6줄 고정 + 도우미도 내용 크기 고정, 잔여 공간은 mt-auto 버튼 위 여백으로 분산.
-    expect(inputCardSource).toContain("md:items-stretch");
-    expect(inputCardSource).not.toContain("h-fit");
+  it("keeps the question panel content-sized with a fixed button position", () => {
+    // 오른쪽 질문 패널은 세션 수와 무관하게 크기·버튼 위치가 고정이다.
+    // 남는 공간을 패널 안 요소가 흡수하면(flex-1/stretch/mt-auto) 어색해지는 문제가
+    // 세 차례 반복됐다 — 여백은 패널 테두리 밖 페이지 배경으로만 남긴다.
+    expect(inputCardSource).toContain("md:items-start");
+    expect(inputCardSource).not.toContain("md:items-stretch");
     expect(inputCardSource).toContain("flex flex-col gap-4");
     expect(inputCardSource).toContain('rows={6}');
     expect(inputCardSource).toContain("min-h-[10rem] resize-none");
     expect(inputCardSource).not.toContain("flex-1");
+    expect(inputCardSource).not.toContain("mt-auto");
     expect(inputCardSource).toContain("student-ask-question-helper flex flex-col");
     expect(inputCardSource).toContain('href="/student-practice"');
-    expect(inputCardSource).toContain("mt-auto h-12 w-full");
   });
 
   it("keeps session badges while visually separating selection and writing panels", () => {

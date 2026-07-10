@@ -52,8 +52,9 @@ export function StudentAskInputCard({
         <CardTitle>{t("inputHeader")}</CardTitle>
         <CardDescription>{t("inputDesc")}</CardDescription>
       </CardHeader>
-      {/* items-stretch — 왼쪽(세션 목록)과 오른쪽(질문 입력)의 높이를 항상 맞춘다 */}
-      <CardContent className="student-ask-tablet-layout grid gap-4 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:items-stretch">
+      {/* items-start — 오른쪽 질문 패널은 세션 수와 무관하게 콘텐츠 크기·버튼 위치 고정.
+          남는 공간은 패널 테두리 밖 페이지 배경으로만 남아 어색하지 않다. */}
+      <CardContent className="student-ask-tablet-layout grid gap-4 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:items-start">
         <div className="grid grid-cols-3 gap-2 md:col-span-2">
           {flowSteps.map((item) => {
             const active = item.step === currentStep;
@@ -145,7 +146,7 @@ export function StudentAskInputCard({
             onClick={onAnalyze}
             disabled={isLoading || !canAsk || content.trim().length === 0}
             variant="gradient"
-            className="mt-auto h-12 w-full text-base font-semibold"
+            className="h-12 w-full text-base font-semibold"
           >
             {isLoading ? t("analyzing") : t("analyze")}
           </Button>
