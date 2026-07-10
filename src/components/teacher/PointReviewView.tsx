@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -8,8 +8,21 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ACTIVITY_BONUS_TYPES } from "@/lib/activity-bonus-policy";
-import { buildSessionLabel, groupSessionsByMonth } from "@/lib/sessions";
+import {
+  buildSessionLabel,
+  filterSessions,
+  getSessionFilterOptions,
+  groupSessionDatesByMonth,
+  groupSessionsByMonth,
+} from "@/lib/sessions";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { useTeacherSessions } from "@/lib/app-queries";
@@ -71,6 +84,10 @@ export function PointReviewView() {
   const [aiLoading, setAiLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [overrideEdit, setOverrideEdit] = useState<Record<string, number>>({});
+  const [reviewFilterDate, setReviewFilterDate] = useState("");
+  const [reviewFilterSubject, setReviewFilterSubject] = useState("");
+  const [reviewFilterTopic, setReviewFilterTopic] = useState("");
+  const [reviewSelectedSessionId, setReviewSelectedSessionId] = useState("all");
   const focusStudentId = searchParams.get("studentId");
 
   // 항상 전체를 받아 클라이언트에서 필터한다 — 세션을 바꿔도 다른 세션의 대기
@@ -169,15 +186,41 @@ export function PointReviewView() {
     } catch {} finally { setBusy(false); }
   }
 
-  // 세션 필터는 클라이언트에서 — 다른 세션의 대기 항목은 숨겨질 뿐 사라지지 않는다
-  const visiblePending = selectedAnalysisSessionIds.size === 0
-    ? pending
-    : pending.filter((p) => p.sessionId && selectedAnalysisSessionIds.has(p.sessionId));
   const pendingCountBySession = pending.reduce<Record<string, number>>((acc, p) => {
     const key = p.sessionId ?? "none";
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
+  const sessionById = useMemo(() => new Map(sessions.map((session) => [session.id, session])), [sessions]);
+  const pendingSessionIds = useMemo(
+    () => new Set(pending.map((p) => p.sessionId).filter((id): id is string => Boolean(id))),
+    [pending],
+  );
+  const pendingSessions = useMemo(
+    () => sessions.filter((session) => pendingSessionIds.has(session.id)),
+    [pendingSessionIds, sessions],
+  );
+  const reviewDateOptions = getSessionFilterOptions(pendingSessions).dates;
+  const reviewDateMonthGroups = groupSessionDatesByMonth(reviewDateOptions);
+  const reviewSubjectBase = filterSessions(pendingSessions, { date: reviewFilterDate || undefined });
+  const reviewSubjectOptions = getSessionFilterOptions(reviewSubjectBase).subjects;
+  const reviewTopicBase = filterSessions(reviewSubjectBase, { subject: reviewFilterSubject || undefined });
+  const reviewTopicOptions = getSessionFilterOptions(reviewTopicBase).topics;
+  const reviewFilteredSessions = filterSessions(reviewTopicBase, { topic: reviewFilterTopic || undefined });
+  const reviewSessionMonthGroups = groupSessionsByMonth(reviewFilteredSessions);
+  const hasReviewFilter = Boolean(reviewFilterDate || reviewFilterSubject || reviewFilterTopic || reviewSelectedSessionId !== "all");
+  const visiblePending = pending.filter((p) => {
+    if (reviewSelectedSessionId !== "all") return p.sessionId === reviewSelectedSessionId;
+    if (!reviewFilterDate && !reviewFilterSubject && !reviewFilterTopic) return true;
+    if (!p.sessionId) return false;
+    const session = sessionById.get(p.sessionId);
+    if (!session) return false;
+    return (
+      (!reviewFilterDate || session.date === reviewFilterDate) &&
+      (!reviewFilterSubject || session.subject === reviewFilterSubject) &&
+      (!reviewFilterTopic || session.topic === reviewFilterTopic)
+    );
+  });
   const sessionMonthGroups = groupSessionsByMonth(sessions);
 
   // 세션별 그룹 — 방금 분석한 세션 먼저, 나머지는 세션 날짜 내림차순
@@ -278,6 +321,40 @@ export function PointReviewView() {
     });
   }
 
+  function resetReviewFilter() {
+    setReviewFilterDate("");
+    setReviewFilterSubject("");
+    setReviewFilterTopic("");
+    setReviewSelectedSessionId("all");
+  }
+
+  useEffect(() => {
+    if (reviewFilterSubject && !reviewSubjectOptions.includes(reviewFilterSubject)) {
+      setReviewFilterSubject("");
+      setReviewFilterTopic("");
+      setReviewSelectedSessionId("all");
+      return;
+    }
+    if (reviewFilterTopic && !reviewTopicOptions.includes(reviewFilterTopic)) {
+      setReviewFilterTopic("");
+      setReviewSelectedSessionId("all");
+      return;
+    }
+    if (
+      reviewSelectedSessionId !== "all" &&
+      !reviewFilteredSessions.some((session) => session.id === reviewSelectedSessionId)
+    ) {
+      setReviewSelectedSessionId("all");
+    }
+  }, [
+    reviewFilterSubject,
+    reviewFilterTopic,
+    reviewFilteredSessions,
+    reviewSelectedSessionId,
+    reviewSubjectOptions,
+    reviewTopicOptions,
+  ]);
+
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
@@ -308,12 +385,8 @@ export function PointReviewView() {
                   : "border-border bg-card hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
               }`}
             >
-              <span className="font-medium">{t("allPendingOnly")}</span>
-              {pending.length > 0 && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
-                  {t("groupPendingCount", { count: pending.length })}
-                </span>
-              )}
+              <span className="font-medium">{t("noAnalysisSelection")}</span>
+              <span className="text-xs text-muted-foreground">{t("analysisLimit", { max: MAX_ANALYZE_SESSIONS })}</span>
             </button>
 
             <div className="max-h-[18rem] space-y-3 overflow-y-auto pr-1">
@@ -395,6 +468,130 @@ export function PointReviewView() {
             <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl px-3 py-2 text-sm">
               {message}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t("resultFilterTitle")}</CardTitle>
+          <CardDescription>{t("resultFilterDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {pendingSessions.length === 0 ? (
+            <EmptyState icon="✅" title={t("noPending")} />
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 lg:flex lg:flex-wrap lg:items-end">
+                <div className="col-span-2 flex flex-col gap-1 sm:col-span-1 lg:w-36">
+                  <label className="text-xs font-medium text-muted-foreground">{t("filterDate")}</label>
+                  <select
+                    aria-label={t("filterDate")}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={reviewFilterDate}
+                    onChange={(event) => {
+                      setReviewFilterDate(event.target.value);
+                      setReviewFilterSubject("");
+                      setReviewFilterTopic("");
+                      setReviewSelectedSessionId("all");
+                    }}
+                  >
+                    <option value="">{t("allDates")}</option>
+                    {reviewDateMonthGroups.map((group) => (
+                      <optgroup key={group.key} label={group.label}>
+                        {group.dates.map((date) => (
+                          <option key={date} value={date}>{date}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1 lg:w-32">
+                  <label className="text-xs font-medium text-muted-foreground">{t("filterSubject")}</label>
+                  <Select
+                    value={reviewFilterSubject || "__all__"}
+                    onValueChange={(value) => {
+                      setReviewFilterSubject(value === "__all__" ? "" : value);
+                      setReviewFilterTopic("");
+                      setReviewSelectedSessionId("all");
+                    }}
+                  >
+                    <SelectTrigger className="h-9 bg-background text-sm">
+                      <SelectValue placeholder={t("allSubjects")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
+                      {reviewSubjectOptions.map((subject) => (
+                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex flex-col gap-1 lg:w-44">
+                  <label className="text-xs font-medium text-muted-foreground">{t("filterTopic")}</label>
+                  <Select
+                    value={reviewFilterTopic || "__all__"}
+                    onValueChange={(value) => {
+                      setReviewFilterTopic(value === "__all__" ? "" : value);
+                      setReviewSelectedSessionId("all");
+                    }}
+                  >
+                    <SelectTrigger className="h-9 bg-background text-sm">
+                      <SelectValue placeholder={t("allTopics")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">{t("allTopics")}</SelectItem>
+                      {reviewTopicOptions.map((topic) => (
+                        <SelectItem key={topic} value={topic}>{topic}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="col-span-2 flex min-w-0 flex-col gap-1 lg:flex-1">
+                  <label className="text-xs font-medium text-muted-foreground">{t("filterSession")}</label>
+                  <select
+                    aria-label={t("filterSession")}
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    value={reviewSelectedSessionId}
+                    onChange={(event) => setReviewSelectedSessionId(event.target.value)}
+                    disabled={reviewFilteredSessions.length === 0}
+                  >
+                    {reviewFilteredSessions.length === 0 ? (
+                      <option value="all">{t("noMatchingSession")}</option>
+                    ) : (
+                      <>
+                        <option value="all">{t("allSessions")}</option>
+                        {reviewSessionMonthGroups.map((group) => (
+                          <optgroup key={group.key} label={`${group.label} (${group.sessions.length})`}>
+                            {group.sessions.map((session) => (
+                              <option key={session.id} value={session.id}>
+                                {buildSessionLabel(session.date, session.subject, session.topic)}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                {hasReviewFilter && (
+                  <button
+                    type="button"
+                    onClick={resetReviewFilter}
+                    className="col-span-2 h-9 text-left text-xs font-medium text-indigo-600 hover:text-indigo-800 lg:col-span-1"
+                  >
+                    {t("resetFilter")}
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("resultFilterHint", { sessions: pendingSessions.length, count: visiblePending.length })}
+              </p>
+            </>
           )}
         </CardContent>
       </Card>

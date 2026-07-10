@@ -27,4 +27,14 @@ describe("point review bulk actions", () => {
     expect(pointReviewView).toContain('t("analyzeDoneMulti"');
     expect(pointReviewView).toContain('body: JSON.stringify({ sessionId })');
   });
+
+  it("filters point review results only by sessions with pending approvals", () => {
+    expect(pointReviewView).toContain("pendingSessionIds");
+    expect(pointReviewView).toContain("pendingSessions");
+    expect(pointReviewView).toContain("reviewDateMonthGroups");
+    expect(pointReviewView).toContain("reviewSessionMonthGroups");
+    expect(pointReviewView).toContain("reviewSelectedSessionId");
+    expect(pointReviewView).toContain('t("resultFilterTitle"');
+    expect(pointReviewView).toContain('t("resultFilterHint"');
+  });
 });
