@@ -195,17 +195,29 @@ export function PointReviewView() {
   const focusedPending = focusStudentId ? visiblePending.filter((p) => p.studentId === focusStudentId) : visiblePending;
   const displayedDuplicateRows = focusStudentId ? duplicateRows.filter((p) => p.studentId === focusStudentId) : duplicateRows;
   const displayedNormalRows = focusStudentId ? normalRows.filter((p) => p.studentId === focusStudentId) : normalRows;
+  const displayedDuplicateIds = displayedDuplicateRows.map((p) => p.id);
   const displayedNormalIds = displayedNormalRows.map((p) => p.id);
+  const selectedDuplicateIds = displayedDuplicateIds.filter((id) => selected.has(id));
+  const selectedNormalIds = displayedNormalIds.filter((id) => selected.has(id));
+  const allDisplayedDuplicateSelected = displayedDuplicateIds.length > 0 && displayedDuplicateIds.every((id) => selected.has(id));
   const allDisplayedNormalSelected = displayedNormalIds.length > 0 && displayedNormalIds.every((id) => selected.has(id));
   const focusStudentName = focusedPending[0]?.studentName;
 
-  function toggleAll() {
+  function toggleIds(ids: string[], allSelected: boolean) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allDisplayedNormalSelected) displayedNormalIds.forEach((id) => next.delete(id));
-      else displayedNormalIds.forEach((id) => next.add(id));
+      if (allSelected) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
       return next;
     });
+  }
+
+  function toggleAllDuplicates() {
+    toggleIds(displayedDuplicateIds, allDisplayedDuplicateSelected);
+  }
+
+  function toggleAllNormal() {
+    toggleIds(displayedNormalIds, allDisplayedNormalSelected);
   }
 
   return (
@@ -307,12 +319,30 @@ export function PointReviewView() {
       {displayedDuplicateRows.length > 0 && (
         <Card className="border-red-200">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2 text-red-700">
-              {t("duplicateTitle", { count: displayedDuplicateRows.length })}
-            </CardTitle>
-            <CardDescription className="text-red-600 text-xs">
-              {t("duplicateDesc")}
-            </CardDescription>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-base flex items-center gap-2 text-red-700">
+                  {t("duplicateTitle", { count: displayedDuplicateRows.length })}
+                </CardTitle>
+                <CardDescription className="text-red-600 text-xs">
+                  {t("duplicateDesc")}
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={toggleAllDuplicates} disabled={displayedDuplicateRows.length === 0}>
+                  {allDisplayedDuplicateSelected ? t("deselectAll") : t("selectAll")}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => decide("APPROVE", selectedDuplicateIds)}
+                  disabled={selectedDuplicateIds.length === 0 || busy}>
+                  {t("approveSelected", { count: selectedDuplicateIds.length })}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => decide("REJECT", selectedDuplicateIds)}
+                  disabled={selectedDuplicateIds.length === 0 || busy}
+                  className="text-red-500 border-red-200 hover:bg-red-50">
+                  {t("reject")}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {groupBySession(displayedDuplicateRows).map((group) => (
@@ -349,15 +379,15 @@ export function PointReviewView() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">{t("recommendedTitle", { count: displayedNormalRows.length })}</CardTitle>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={toggleAll} disabled={displayedNormalRows.length === 0}>
+              <Button size="sm" variant="outline" onClick={toggleAllNormal} disabled={displayedNormalRows.length === 0}>
                 {allDisplayedNormalSelected ? t("deselectAll") : t("selectAll")}
               </Button>
-              <Button size="sm" onClick={() => decide("APPROVE")}
-                disabled={selected.size === 0 || busy}>
-                {t("approveSelected", { count: selected.size })}
+              <Button size="sm" onClick={() => decide("APPROVE", selectedNormalIds)}
+                disabled={selectedNormalIds.length === 0 || busy}>
+                {t("approveSelected", { count: selectedNormalIds.length })}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => decide("REJECT")}
-                disabled={selected.size === 0 || busy}
+              <Button size="sm" variant="outline" onClick={() => decide("REJECT", selectedNormalIds)}
+                disabled={selectedNormalIds.length === 0 || busy}
                 className="text-red-500 border-red-200 hover:bg-red-50">
                 {t("reject")}
               </Button>
