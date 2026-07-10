@@ -13,7 +13,12 @@ describe("core screen component split", () => {
     expect(teacherSessionsPage).toContain("TeacherSessionSummaryGrid");
     expect(teacherSessionsPage).toContain("TeacherSessionListControls");
     expect(teacherSessionsPage).toContain("TeacherSessionCreateCard");
-    expect(teacherSessionsPage).toContain("TeacherSessionRow");
+    // 세션 행 렌더링은 월 그룹 목록(TeacherSessionMonthList)이 담당하고,
+    // 그 안에서 TeacherSessionRow를 사용한다(지난 세션 월별 접기 도입 시 이동).
+    expect(teacherSessionsPage).toContain("TeacherSessionMonthList");
+    expect(
+      readFileSync("src/app/(teacher)/teacher-sessions/TeacherSessionMonthList.tsx", "utf8"),
+    ).toContain("TeacherSessionRow");
     expect(teacherSessionsPage.split("\n").length).toBeLessThan(430);
   });
 

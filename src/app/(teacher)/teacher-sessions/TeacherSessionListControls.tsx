@@ -15,11 +15,13 @@ interface TeacherSessionListControlsProps {
   filterDate: string;
   filterSubject: string;
   filterTopic: string;
+  search: string;
   participationFilter: SessionParticipationFilter;
   sort: SessionListSort;
   onFilterDate: (value: string) => void;
   onFilterSubject: (value: string) => void;
   onFilterTopic: (value: string) => void;
+  onSearch: (value: string) => void;
   onParticipationFilter: (value: SessionParticipationFilter) => void;
   onSort: (value: SessionListSort) => void;
   onReset: () => void;
@@ -30,23 +32,34 @@ export function TeacherSessionListControls({
   filterDate,
   filterSubject,
   filterTopic,
+  search,
   participationFilter,
   sort,
   onFilterDate,
   onFilterSubject,
   onFilterTopic,
+  onSearch,
   onParticipationFilter,
   onSort,
   onReset,
 }: TeacherSessionListControlsProps) {
   const t = useTranslations("sessions");
   const tc = useTranslations("common");
-  const hasFilter = Boolean(filterDate || filterSubject || filterTopic || participationFilter !== "all");
+  const hasFilter = Boolean(filterDate || filterSubject || filterTopic || search || participationFilter !== "all");
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-2">
-      <div className="teacher-sessions-filter-grid grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[auto_8rem_7rem_10rem_10rem_auto] lg:items-center">
+      <div className="teacher-sessions-filter-grid grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[auto_11rem_8rem_7rem_10rem_10rem_auto] lg:items-center">
         <span className="text-xs font-medium text-muted-foreground sm:col-span-2 lg:col-span-1">{t("filterLabel")}</span>
+        {/* 세션이 쌓이면 select만으로 찾기 어렵다 — 주제·교과 텍스트 검색 */}
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => onSearch(e.target.value)}
+          placeholder={t("searchPlaceholder")}
+          aria-label={t("searchPlaceholder")}
+          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
         <Select value={filterDate || "__all__"} onValueChange={(v) => onFilterDate(v === "__all__" ? "" : v)}>
           <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
           <SelectContent>

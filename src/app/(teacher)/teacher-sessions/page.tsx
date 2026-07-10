@@ -13,7 +13,7 @@ import { useTranslations } from "next-intl";
 import { TeacherSessionListControls, type SessionListSort, type SessionParticipationFilter } from "./TeacherSessionListControls";
 import { TeacherSessionSummaryGrid } from "./TeacherSessionSummaryGrid";
 import { TeacherSessionCreateCard } from "./TeacherSessionCreateCard";
-import { TeacherSessionRow } from "./TeacherSessionRow";
+import { TeacherSessionMonthList } from "./TeacherSessionMonthList";
 import type { QuestionSession, TeacherSessionForm } from "./types";
 import {
   defaultTargetSelection,
@@ -54,6 +54,9 @@ export default function TeacherSessionsPage() {
   const [listFilterDate, setListFilterDate] = useState("");
   const [listFilterSubject, setListFilterSubject] = useState("");
   const [listFilterTopic, setListFilterTopic] = useState("");
+  const [listSearch, setListSearch] = useState("");
+  // 지난 세션 월 그룹 펼침 상태 — null이면 기본값(가장 최근 달만 펼침)
+  const [expandedPastMonths, setExpandedPastMonths] = useState<Set<string> | null>(null);
   const [listParticipationFilter, setListParticipationFilter] = useState<SessionParticipationFilter>("all");
   const [listSort, setListSort] = useState<SessionListSort>("desc");
   const [targetDefaulted, setTargetDefaulted] = useState(false);
@@ -239,7 +242,13 @@ export default function TeacherSessionsPage() {
     subject: listFilterSubject || undefined,
     topic: listFilterTopic || undefined,
   });
-  const visibleSessions = baseVisibleSessions.filter((item) => {
+  const searchQuery = listSearch.trim().toLowerCase();
+  const searchedSessions = searchQuery
+    ? baseVisibleSessions.filter(
+        (s) => s.topic.toLowerCase().includes(searchQuery) || s.subject.toLowerCase().includes(searchQuery),
+      )
+    : baseVisibleSessions;
+  const visibleSessions = searchedSessions.filter((item) => {
     const missing = item.participation?.missing ?? 0;
     const total = item.participation?.total ?? 0;
     if (listParticipationFilter === "missing") return missing > 0;
@@ -303,17 +312,20 @@ export default function TeacherSessionsPage() {
               filterDate={listFilterDate}
               filterSubject={listFilterSubject}
               filterTopic={listFilterTopic}
+              search={listSearch}
               participationFilter={listParticipationFilter}
               sort={listSort}
               onFilterDate={setListFilterDate}
               onFilterSubject={setListFilterSubject}
               onFilterTopic={setListFilterTopic}
+              onSearch={setListSearch}
               onParticipationFilter={setListParticipationFilter}
               onSort={setListSort}
               onReset={() => {
                 setListFilterDate("");
                 setListFilterSubject("");
                 setListFilterTopic("");
+                setListSearch("");
                 setListParticipationFilter("all");
               }}
             />
@@ -339,27 +351,15 @@ export default function TeacherSessionsPage() {
                     <span className="w-24 text-center">{t("colManage")}</span>
                   </div>
                 </div>
-                <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-                  {activeSessionMonthGroups.map((group) => (
-                    <section key={group.key} className="divide-y divide-border">
-                      <div className="bg-muted/40 px-4 py-2 text-xs font-semibold text-muted-foreground">
-                        {group.label} <span className="font-normal">({group.sessions.length})</span>
-                      </div>
-                      {group.sessions.map((s) => (
-                        <TeacherSessionRow
-                          key={s.id}
-                          session={s}
-                          onDelete={handleDelete}
-                          onToggleActive={handleToggleActive}
-                          onTogglePublic={handleTogglePublic}
-                          onToggleLikes={handleToggleLikes}
-                          onToggleCommentsVisible={handleToggleCommentsVisible}
-                          onEditSave={handleEditSave}
-                        />
-                      ))}
-                    </section>
-                  ))}
-                </div>
+                <TeacherSessionMonthList
+                  groups={activeSessionMonthGroups}
+                  onDelete={handleDelete}
+                  onToggleActive={handleToggleActive}
+                  onTogglePublic={handleTogglePublic}
+                  onToggleLikes={handleToggleLikes}
+                  onToggleCommentsVisible={handleToggleCommentsVisible}
+                  onEditSave={handleEditSave}
+                />
               </section>
             )}
 
@@ -379,27 +379,26 @@ export default function TeacherSessionsPage() {
                     <span className="w-24 text-center">{t("colManage")}</span>
                   </div>
                 </div>
-                <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-                  {pastSessionMonthGroups.map((group) => (
-                    <section key={group.key} className="divide-y divide-border">
-                      <div className="bg-muted/40 px-4 py-2 text-xs font-semibold text-muted-foreground">
-                        {group.label} <span className="font-normal">({group.sessions.length})</span>
-                      </div>
-                      {group.sessions.map((s) => (
-                        <TeacherSessionRow
-                          key={s.id}
-                          session={s}
-                          onDelete={handleDelete}
-                          onToggleActive={handleToggleActive}
-                          onTogglePublic={handleTogglePublic}
-                          onToggleLikes={handleToggleLikes}
-                          onToggleCommentsVisible={handleToggleCommentsVisible}
-                          onEditSave={handleEditSave}
-                        />
-                      ))}
-                    </section>
-                  ))}
-                </div>
+                <TeacherSessionMonthList
+                  groups={pastSessionMonthGroups}
+                  collapsible
+                  forceOpen={Boolean(searchQuery || listFilterDate || listFilterSubject || listFilterTopic)}
+                  expandedKeys={expandedPastMonths}
+                  onToggleGroup={(key, defaultExpanded) =>
+                    setExpandedPastMonths((prev) => {
+                      const next = new Set(prev ?? defaultExpanded);
+                      if (next.has(key)) next.delete(key);
+                      else next.add(key);
+                      return next;
+                    })
+                  }
+                  onDelete={handleDelete}
+                  onToggleActive={handleToggleActive}
+                  onTogglePublic={handleTogglePublic}
+                  onToggleLikes={handleToggleLikes}
+                  onToggleCommentsVisible={handleToggleCommentsVisible}
+                  onEditSave={handleEditSave}
+                />
               </section>
             )}
           </CardContent>

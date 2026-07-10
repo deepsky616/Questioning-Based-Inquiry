@@ -960,7 +960,8 @@
     "pickDate": "날짜 선택",
     "inquiryEditNote": "🧩 탐구질문 수업은 날짜·주제만 수정할 수 있어요(교과 고정).",
     "areaLabel": "영역",
-    "unitLabel": "단원"
+    "unitLabel": "단원",
+    "searchPlaceholder": "주제·교과 검색"
   },
   "settings": {
     "apiKeyRequired": "API 키를 입력해 주세요 (10자 이상)",

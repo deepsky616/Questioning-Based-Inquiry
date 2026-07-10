@@ -960,7 +960,8 @@
     "pickDate": "Pick a date",
     "inquiryEditNote": "🧩 Inquiry lessons let you edit only the date·topic (subject is fixed).",
     "areaLabel": "Area",
-    "unitLabel": "Unit"
+    "unitLabel": "Unit",
+    "searchPlaceholder": "Search topic or subject"
   },
   "settings": {
     "apiKeyRequired": "Please enter an API key (10+ characters)",
