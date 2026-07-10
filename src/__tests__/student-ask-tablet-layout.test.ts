@@ -4,10 +4,15 @@ import { readFileSync } from "node:fs";
 const inputCardSource = readFileSync("src/app/(student)/student-ask/StudentAskInputCard.tsx", "utf8");
 const sessionSelectorSource = readFileSync("src/app/(student)/student-ask/StudentAskSessionSelector.tsx", "utf8");
 const askPageSource = readFileSync("src/app/(student)/student-ask/page.tsx", "utf8");
+const dashboardPageSource = readFileSync("src/app/(student)/student-dashboard/page.tsx", "utf8");
+const practicePageSource = readFileSync("src/app/(student)/student-practice/page.tsx", "utf8");
 
 describe("student ask tablet layout", () => {
-  it("uses the same broad page width as practice on tablet and desktop", () => {
-    expect(askPageSource).toContain("max-w-6xl mx-auto space-y-6");
+  it("uses the same broad page width as dashboard and practice on tablet and desktop", () => {
+    expect(dashboardPageSource).toContain('className="space-y-6"');
+    expect(practicePageSource).toContain('className="space-y-6"');
+    expect(askPageSource).toContain('className="space-y-6"');
+    expect(askPageSource).not.toContain("max-w-6xl mx-auto space-y-6");
     expect(askPageSource).not.toContain("max-w-3xl mx-auto space-y-6");
   });
 

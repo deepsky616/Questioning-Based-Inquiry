@@ -28,7 +28,7 @@ export default function AskPage() {
 function AskPageFallback() {
   const t = useTranslations("ask");
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
       </div>
@@ -322,7 +322,7 @@ function AskContent() {
   // issue #1: 로딩 중에는 아무것도 표시하지 않음
   if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) {
     return (
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         </div>
@@ -336,7 +336,7 @@ function AskContent() {
   // issue #1 & #2: 네트워크 오류
   if (sessionsError) {
     return (
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         </div>
@@ -352,7 +352,7 @@ function AskContent() {
   // issue #1 & #2: 세션 없음 — 폼 차단
   if (sessions.length === 0) {
     return (
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         </div>
@@ -369,7 +369,7 @@ function AskContent() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
         <p className="text-muted-foreground">{t("subtitle")}</p>
