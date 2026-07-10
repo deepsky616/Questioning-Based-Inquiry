@@ -15,7 +15,13 @@ export async function GET() {
       select: { totalPoints: true },
     }),
     prisma.pointLog.findMany({
-      where: { studentId: userId },
+      // 학생에게는 확정된 지급 내역만 — 대기(PENDING)·거부(REJECTED) 항목과
+      // 0점 경고(중복·불성실 FLAGGED)는 교사 검토용이라 노출하지 않는다(낙인 방지)
+      where: {
+        studentId: userId,
+        status: "APPROVED",
+        NOT: { bonusType: { contains: "FLAGGED" } },
+      },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
