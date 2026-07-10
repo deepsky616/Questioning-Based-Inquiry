@@ -63,6 +63,7 @@ describe("student ask staged layout", () => {
     expect(sessionSelectorSource).toContain("inquiryClassTag");
     expect(sessionSelectorSource).toContain("student-ask-filter-grid");
     expect(sessionSelectorSource).toContain("groupSessionsByMonth");
+    expect(sessionSelectorSource).toContain("<optgroup");
     expect(sessionSelectorSource).toContain("student-ask-month-section");
     expect(sessionSelectorSource).toContain("student-ask-month-grid");
     expect(sessionSelectorSource).toContain("student-ask-session-grid");

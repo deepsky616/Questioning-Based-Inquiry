@@ -127,11 +127,15 @@ export function StudentAskSessionSelector({
           {filteredSessions.length === 0 ? (
             <option value="">{t("noMatchingSession")}</option>
           ) : (
-            filteredSessions.map((session) => (
-              <option key={session.id} value={session.id}>
-                {buildSessionLabel(session.date, session.subject, session.topic)}
-                {isInquiryDesignSession(session) ? ` · ${t("inquiryClassTag")}` : ""}
-              </option>
+            sessionMonthGroups.map((group) => (
+              <optgroup key={group.key} label={`${group.label} (${group.sessions.length}개)`}>
+                {group.sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {buildSessionLabel(session.date, session.subject, session.topic)}
+                    {isInquiryDesignSession(session) ? ` · ${t("inquiryClassTag")}` : ""}
+                  </option>
+                ))}
+              </optgroup>
             ))
           )}
         </select>
