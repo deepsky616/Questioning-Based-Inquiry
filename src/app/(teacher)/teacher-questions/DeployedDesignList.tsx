@@ -7,7 +7,9 @@ import { useTranslations } from "next-intl";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -18,6 +20,7 @@ import {
   buildSessionLabel,
   filterSessions,
   getSessionFilterOptions,
+  groupSessionDatesByMonth,
   groupSessionsByMonth,
   sortSessionsAsc,
   sortSessionsDesc,
@@ -101,6 +104,7 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
   const deployedAll = sessions.filter((s) => (s.sharedQuestions?.length ?? 0) > 0);
   if (deployedAll.length === 0) return null;
   const deployOptions = getSessionFilterOptions(deployedAll);
+  const deployDateMonthGroups = groupSessionDatesByMonth(deployOptions.dates);
   const deployFiltered = filterSessions(deployedAll, {
     date: deployFilterDate || undefined,
     subject: deployFilterSubject || undefined,
@@ -128,7 +132,12 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
               <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-32"><SelectValue placeholder={tSess("allDates")} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__all__">{tSess("allDates")}</SelectItem>
-                {deployOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                {deployDateMonthGroups.map((group) => (
+                  <SelectGroup key={group.key}>
+                    <SelectLabel>{group.label}</SelectLabel>
+                    {group.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectGroup>
+                ))}
               </SelectContent>
             </Select>
             <Select value={deployFilterSubject || "__all__"} onValueChange={(v) => setDeployFilterSubject(v === "__all__" ? "" : v)}>

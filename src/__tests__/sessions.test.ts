@@ -9,6 +9,7 @@ import {
   isValidSessionDateString,
   normalizeSessionDate,
   getSessionFilterOptions,
+  groupSessionDatesByMonth,
   groupSessionsByMonth,
 } from "@/lib/sessions";
 
@@ -176,6 +177,16 @@ describe("groupSessionsByMonth", () => {
 
     expect(groups.map((group) => group.key)).toEqual(["2026-06", "2026-07"]);
     expect(groups[1].sessions.map((session) => session.id)).toEqual(["c", "a"]);
+  });
+});
+
+describe("groupSessionDatesByMonth", () => {
+  it("날짜 조회 옵션을 최신 월부터 묶고 같은 월 안에서도 최신 날짜를 먼저 둔다", () => {
+    const groups = groupSessionDatesByMonth(["2026-06-01", "2026-07-02", "2026-07-01", "bad"]);
+
+    expect(groups.map((group) => group.key)).toEqual(["2026-07", "2026-06"]);
+    expect(groups[0].label).toBe("2026년 7월");
+    expect(groups[0].dates).toEqual(["2026-07-02", "2026-07-01"]);
   });
 });
 

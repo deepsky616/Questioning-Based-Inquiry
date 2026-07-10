@@ -93,6 +93,12 @@ export interface SessionMonthGroup<T extends SortableSession> {
   sessions: T[];
 }
 
+export interface SessionDateMonthGroup {
+  key: string;
+  label: string;
+  dates: string[];
+}
+
 function getSessionMonthKey(dateStr: string): string | null {
   if (!isValidSessionDateString(dateStr)) return null;
   return dateStr.slice(0, 7);
@@ -122,6 +128,28 @@ export function groupSessionsByMonth<T extends SortableSession>(
     key,
     label: buildSessionMonthLabel(key),
     sessions: groupSessions,
+  }));
+}
+
+export function groupSessionDatesByMonth(
+  dates: string[],
+  direction: "desc" | "asc" = "desc",
+): SessionDateMonthGroup[] {
+  const sortedDates = Array.from(new Set(dates.map((date) => date.trim()).filter(isValidSessionDateString)))
+    .sort((a, b) => direction === "asc" ? a.localeCompare(b) : b.localeCompare(a));
+  const grouped = new Map<string, string[]>();
+
+  for (const date of sortedDates) {
+    const monthKey = getSessionMonthKey(date) ?? UNKNOWN_SESSION_MONTH_KEY;
+    const group = grouped.get(monthKey) ?? [];
+    group.push(date);
+    grouped.set(monthKey, group);
+  }
+
+  return Array.from(grouped, ([key, groupDates]) => ({
+    key,
+    label: buildSessionMonthLabel(key),
+    dates: groupDates,
   }));
 }
 

@@ -28,7 +28,7 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionDatesByMonth, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import {
   Table,
@@ -195,6 +195,7 @@ export function MyQuestionsView() {
   // 학생이 직접 질문을 작성하므로 내 질문 조회에 노출한다.
   const browsableSessions = sessions.filter((s) => !s.unitDesignId || isInquiryDesignSession(s));
   const filterOptions = getSessionFilterOptions(browsableSessions);
+  const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   const filteredSessions = filterSessions(browsableSessions, {
     date: filterDate || undefined,
     subject: filterSubject || undefined,
@@ -526,7 +527,12 @@ export function MyQuestionsView() {
                 <SelectTrigger className="h-11 bg-background text-sm"><SelectValue placeholder={tEx("allDates")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{tEx("allDates")}</SelectItem>
-                  {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  {dateMonthGroups.map((group) => (
+                    <SelectGroup key={group.key}>
+                      <SelectLabel>{group.label}</SelectLabel>
+                      {group.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectGroup>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

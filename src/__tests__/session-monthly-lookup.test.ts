@@ -19,6 +19,12 @@ describe("session monthly lookup surfaces", () => {
     }
   });
 
+  it("groups the date lookup filters in the main session lookup tabs by month", () => {
+    for (const source of [teacherQuestionSelector, deployedDesignList, studentExplore, studentMyQuestions]) {
+      expect(source).toContain("groupSessionDatesByMonth");
+    }
+  });
+
   it("groups the point review analysis session dropdown by month", () => {
     expect(pointReviewView).toContain("groupSessionsByMonth");
     expect(pointReviewView).toContain("<optgroup");

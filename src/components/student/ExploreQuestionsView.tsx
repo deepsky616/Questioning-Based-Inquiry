@@ -14,7 +14,7 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionDatesByMonth, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
@@ -311,6 +311,7 @@ export function ExploreQuestionsView() {
 
   // 날짜·교과·주제로 세션 목록을 좁힌다(세션을 고르는 보조 필터, 교사 페이지와 동일)
   const filterOptions = getSessionFilterOptions(sessions);
+  const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   // 질문 배포 세션(unitDesignId + 배포 질문)만 제외. 탐구질문 수업 세션(배포 질문 없음)은
   // 학생이 직접 질문을 작성하므로 전체 질문탐구에 노출한다.
   const filteredSessions = filterSessions(sessions, {
@@ -385,7 +386,12 @@ export function ExploreQuestionsView() {
                 <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("allDates")}</SelectItem>
-                  {filterOptions.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  {dateMonthGroups.map((group) => (
+                    <SelectGroup key={group.key}>
+                      <SelectLabel>{group.label}</SelectLabel>
+                      {group.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectGroup>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
