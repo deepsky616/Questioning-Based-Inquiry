@@ -5,6 +5,10 @@ const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as { script
 const dbCheckScript = readFileSync("scripts/check-db-schema.mjs", "utf8");
 const diffGuardPath = "scripts/check-prisma-diff.mjs";
 const diffGuardScript = existsSync(diffGuardPath) ? readFileSync(diffGuardPath, "utf8") : "";
+const vercelConfigPath = "vercel.json";
+const vercelConfig = existsSync(vercelConfigPath)
+  ? JSON.parse(readFileSync(vercelConfigPath, "utf8")) as { buildCommand?: string }
+  : null;
 
 describe("Prisma deployment guards", () => {
   it("runs schema guards before the production build", () => {
@@ -12,6 +16,7 @@ describe("Prisma deployment guards", () => {
     expect(packageJson.scripts?.build).toBe(
       "npm run db:diff:check && npm run db:check && prisma generate && next build",
     );
+    expect(vercelConfig?.buildCommand).toBe("npm run build");
   });
 
   it("checks every core table used by teacher and student pages", () => {
