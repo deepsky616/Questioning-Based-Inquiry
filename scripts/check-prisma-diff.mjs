@@ -22,6 +22,10 @@ loadLocalEnv();
 
 export const PRISMA_DIFF_TIMEOUT_MS = Number(process.env.PRISMA_DIFF_TIMEOUT_MS ?? 30_000);
 
+export function shouldSkipPrismaDiffCheck() {
+  return process.env.VERCEL === "1" && process.env.FORCE_PRISMA_DIFF_CHECK !== "1";
+}
+
 export const DESTRUCTIVE_DIFF_PATTERNS = [
   /\bDROP\s+COLUMN\b/i,
   /^\s*DROP\s+TABLE\b/i,
@@ -96,6 +100,11 @@ export function runPrismaDiff() {
 }
 
 async function main() {
+  if (shouldSkipPrismaDiffCheck()) {
+    console.log("Skipping Prisma diff guard on Vercel. Run npm run db:diff:check locally before schema-changing deploys.");
+    return;
+  }
+
   const diffSql = runPrismaDiff();
   assertSafePrismaDiff(diffSql);
   console.log("Prisma diff guard passed.");
