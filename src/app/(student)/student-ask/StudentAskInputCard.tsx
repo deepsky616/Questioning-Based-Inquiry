@@ -96,17 +96,36 @@ export function StudentAskInputCard({
               </div>
             )}
 
+            {/* 현재 세션 하이라이트 바 — 선택 그리드가 스크롤로 안 보일 때 유일한 맥락 표시라
+                또렷하게, 단 예전 정보 카드만큼 부풀리지는 않는다(중복 재발 방지).
+                밝은 테마: indigo-50 배경 + 흰 칩 / 어두운 테마: indigo-950 배경 + indigo-900 칩 */}
+            {selectedSession && (
+              <div className="student-ask-current-session flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 dark:border-indigo-500/40 dark:bg-indigo-950/40">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-300/80">
+                  {t("currentSession")}
+                </span>
+                <span className="text-sm font-bold text-indigo-950 dark:text-indigo-50">
+                  {selectedSession.subject}
+                  {selectedSession.topic.trim() && (
+                    <span className="font-semibold text-indigo-700 dark:text-indigo-200"> · {selectedSession.topic.trim()}</span>
+                  )}
+                </span>
+                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-700 shadow-sm dark:bg-indigo-900 dark:text-indigo-100">
+                  📅 {selectedSession.date}
+                </span>
+                {selectedSession.unitDesignId && (
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-700 shadow-sm dark:bg-indigo-900 dark:text-indigo-100">
+                    🔍 {t("inquiryClassTag")}
+                  </span>
+                )}
+                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-700 shadow-sm dark:bg-indigo-900 dark:text-indigo-100">
+                  {selectedSession.defaultQuestionPublic ? `🌐 ${t("public")}` : `🔒 ${t("private")}`}
+                </span>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2">
               <Label htmlFor="content">{t("questionLabel")}</Label>
-              {/* 선택된 세션 맥락 한 줄 — 선택 그리드 하이라이트와 중복되던 정보 카드를 대체 */}
-              {selectedSession && (
-                <p className="text-xs text-indigo-700 dark:text-indigo-300">
-                  {t("currentSession")}: <span className="font-semibold">{selectedSession.subject}</span>
-                  {selectedSession.topic.trim() && <> · {selectedSession.topic.trim()}</>}
-                  {" · "}
-                  {t("visibilityNotice", { visibility: selectedSession.defaultQuestionPublic ? t("public") : t("private") })}
-                </p>
-              )}
               {/* 질문은 최대 200자 — 입력창은 6줄 고정 */}
               <Textarea
                 ref={textareaRef}

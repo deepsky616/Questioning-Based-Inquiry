@@ -31,10 +31,17 @@ describe("student ask staged layout", () => {
     expect(inputCardSource).not.toContain("items-stretch");
   });
 
-  it("shows the selected session once (inline context line, no duplicate card)", () => {
-    // 선택 그리드 하이라이트가 이미 세션을 보여준다 — 작성 패널에는 한 줄 맥락만 둔다
+  it("shows the selected session once as a highlighted bar (no duplicate card)", () => {
+    // 선택 그리드가 스크롤로 안 보일 때 작성 패널의 하이라이트 바가 유일한 맥락 표시다.
+    // 교과·주제 + 날짜·탐구질문 수업·공개 여부 칩, 밝은/어두운 테마 색 모두 지정.
+    expect(inputCardSource).toContain("student-ask-current-session");
     expect(inputCardSource).toContain('t("currentSession")');
-    expect(inputCardSource).toContain("visibilityNotice");
+    expect(inputCardSource).toContain("selectedSession.date");
+    expect(inputCardSource).toContain('t("inquiryClassTag")');
+    expect(inputCardSource).toContain("defaultQuestionPublic");
+    expect(inputCardSource).toContain("bg-indigo-50");
+    expect(inputCardSource).toContain("dark:bg-indigo-950/40");
+    expect(inputCardSource).toContain("dark:bg-indigo-900");
     expect(sessionSelectorSource).not.toContain("currentSession");
   });
 
