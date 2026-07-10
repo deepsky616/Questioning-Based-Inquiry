@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
@@ -76,6 +76,13 @@ export function StudentAskSessionSelector({
   // 드롭다운(선택 상자)용 — 전체를 월 그룹으로
   const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
   const [expandedPastMonths, setExpandedPastMonths] = useState<Set<string>>(new Set());
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  // 선택이 바뀌면(드롭다운 선택 포함) 해당 카드가 보이도록 스크롤
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const el = gridRef.current?.querySelector(`[data-session-id="${selectedSessionId}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [selectedSessionId]);
 
   return (
     <>
@@ -208,6 +215,7 @@ export function StudentAskSessionSelector({
                   <button
                     key={session.id}
                     type="button"
+                    data-session-id={session.id}
                     aria-pressed={active}
                     onClick={() => onSelectSession(session.id)}
                     className={`min-h-[132px] rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
@@ -245,7 +253,7 @@ export function StudentAskSessionSelector({
                 );
               };
               return (
-                <div className="student-ask-session-grid max-h-[24rem] space-y-4 overflow-y-auto pr-1">
+                <div ref={gridRef} className="student-ask-session-grid max-h-[24rem] space-y-4 overflow-y-auto pr-1">
                   {/* 오늘·예정 세션 — 학생의 주 용무라 항상 펼침(가까운 날짜부터) */}
                   {upcomingMonthGroups.map((group) => (
                     <section key={group.key} className="student-ask-month-section space-y-2">
@@ -261,7 +269,9 @@ export function StudentAskSessionSelector({
 
                   {/* 지난 세션 — 월별 접기(기본 전부 접힘), 검색·필터 중에는 자동 펼침 */}
                   {pastMonthGroups.map((group) => {
-                    const open = filtersActive || expandedPastMonths.has(group.key);
+                    const containsSelected = group.sessions.some((s) => s.id === selectedSessionId);
+                    // 드롭다운으로 지난 세션을 선택하면 그 카드가 보이도록 해당 그룹을 자동 펼침
+                    const open = filtersActive || containsSelected || expandedPastMonths.has(group.key);
                     return (
                       <section key={group.key} className="student-ask-past-section space-y-2">
                         <button

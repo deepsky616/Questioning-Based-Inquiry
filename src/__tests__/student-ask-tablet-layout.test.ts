@@ -79,7 +79,10 @@ describe("student ask staged layout", () => {
     expect(sessionSelectorSource).toContain("upcomingMonthGroups");
     expect(sessionSelectorSource).toContain("student-ask-past-section");
     expect(sessionSelectorSource).toContain("expandedPastMonths");
-    expect(sessionSelectorSource).toContain("filtersActive || expandedPastMonths.has(group.key)");
+    expect(sessionSelectorSource).toContain("filtersActive || containsSelected || expandedPastMonths.has(group.key)");
+    // 드롭다운으로 지난 세션을 선택해도 카드가 보이도록 그룹 자동 펼침 + 스크롤
+    expect(sessionSelectorSource).toContain("data-session-id");
+    expect(sessionSelectorSource).toContain("scrollIntoView");
     expect(sessionSelectorSource).toContain("CollapseChevron");
     expect(sessionSelectorSource).toContain('type="search"');
   });
