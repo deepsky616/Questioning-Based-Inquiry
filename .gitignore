@@ -23,3 +23,7 @@ build/
 coverage/
 *.tsbuildinfo
 .vercel
+
+# E2E 실행 산출물
+playwright-report/
+test-results/
