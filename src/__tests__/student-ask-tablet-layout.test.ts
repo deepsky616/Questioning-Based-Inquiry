@@ -72,4 +72,15 @@ describe("student ask staged layout", () => {
     expect(sessionSelectorSource).toContain("h-11");
     expect(sessionSelectorSource).toContain("h-12");
   });
+
+  it("keeps today/upcoming always visible and past months collapsed with search", () => {
+    // 학생의 주 용무는 오늘·예정 수업 — 지난 세션은 월별 접기(기본 접힘,
+    // 검색·필터 중 자동 펼침)로 카드가 쌓여도 소음이 되지 않게 한다.
+    expect(sessionSelectorSource).toContain("upcomingMonthGroups");
+    expect(sessionSelectorSource).toContain("student-ask-past-section");
+    expect(sessionSelectorSource).toContain("expandedPastMonths");
+    expect(sessionSelectorSource).toContain("filtersActive || expandedPastMonths.has(group.key)");
+    expect(sessionSelectorSource).toContain("CollapseChevron");
+    expect(sessionSelectorSource).toContain('type="search"');
+  });
 });

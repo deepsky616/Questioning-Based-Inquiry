@@ -81,6 +81,7 @@ function AskContent() {
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     fetch("/api/config")
@@ -162,13 +163,16 @@ function AskContent() {
 
   // 날짜/교과/주제 필터로 좁힌 세션 목록
   const filterOptions = useMemo(() => getSessionFilterOptions(scopedSessions), [scopedSessions]);
+  const searchQuery = searchTerm.trim().toLowerCase();
   const filteredSessions = useMemo(
     () => filterSessions(scopedSessions, {
       date: filterDate || undefined,
       subject: filterSubject || undefined,
       topic: filterTopic || undefined,
-    }),
-    [filterDate, filterSubject, filterTopic, scopedSessions],
+    }).filter(
+      (s) => !searchQuery || s.topic.toLowerCase().includes(searchQuery) || s.subject.toLowerCase().includes(searchQuery),
+    ),
+    [filterDate, filterSubject, filterTopic, scopedSessions, searchQuery],
   );
   const sessionProgress = useMemo(() => {
     const total = filteredSessions.length;
@@ -409,6 +413,10 @@ function AskContent() {
             selectedSessionId={selectedSessionId}
             questionSessionIds={questionSessionIds}
             sessionProgress={sessionProgress}
+            search={searchTerm}
+            onSearch={setSearchTerm}
+            todayStr={todayStr}
+            filtersActive={Boolean(searchQuery || filterDate || filterSubject || filterTopic)}
             onShowAllSessions={showAllSessions}
             onFilterDateChange={setFilterDate}
             onFilterSubjectChange={setFilterSubject}

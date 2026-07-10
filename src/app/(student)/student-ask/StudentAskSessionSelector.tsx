@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { buildSessionLabel, groupSessionDatesByMonth, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
 import { useTranslations } from "next-intl";
 import type { AskTaskScope, QuestionSession } from "./types";
@@ -29,6 +31,12 @@ interface StudentAskSessionSelectorProps {
   selectedSessionId: string;
   questionSessionIds: Set<string>;
   sessionProgress: SessionProgress;
+  search: string;
+  onSearch: (value: string) => void;
+  /** 오늘 날짜(YYYY-MM-DD) — 오늘·예정과 지난 세션을 나누는 기준 */
+  todayStr: string;
+  /** 검색·필터 사용 중이면 지난 세션 그룹을 자동으로 펼친다 */
+  filtersActive: boolean;
   onShowAllSessions: () => void;
   onFilterDateChange: (value: string) => void;
   onFilterSubjectChange: (value: string) => void;
@@ -47,6 +55,10 @@ export function StudentAskSessionSelector({
   selectedSessionId,
   questionSessionIds,
   sessionProgress,
+  search,
+  onSearch,
+  todayStr,
+  filtersActive,
   onShowAllSessions,
   onFilterDateChange,
   onFilterSubjectChange,
@@ -56,7 +68,14 @@ export function StudentAskSessionSelector({
 }: StudentAskSessionSelectorProps) {
   const t = useTranslations("ask");
   const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
+  // 학생의 용무는 대부분 오늘·예정 수업 — 지난 세션은 월별로 접어 소음을 줄인다
+  const upcomingSessions = filteredSessions.filter((s) => s.date >= todayStr);
+  const pastSessions = filteredSessions.filter((s) => s.date < todayStr);
+  const upcomingMonthGroups = groupSessionsByMonth(upcomingSessions, "asc");
+  const pastMonthGroups = groupSessionsByMonth(pastSessions);
+  // 드롭다운(선택 상자)용 — 전체를 월 그룹으로
   const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
+  const [expandedPastMonths, setExpandedPastMonths] = useState<Set<string>>(new Set());
 
   return (
     <>
@@ -81,6 +100,16 @@ export function StudentAskSessionSelector({
             </Button>
           </div>
         )}
+
+        {/* 세션이 쌓이면 select만으로 찾기 어렵다 — 주제·교과 텍스트 검색 */}
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => onSearch(event.target.value)}
+          placeholder={t("searchPlaceholder")}
+          aria-label={t("searchPlaceholder")}
+          className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
 
         <div className="student-ask-filter-grid grid grid-cols-1 gap-2 sm:grid-cols-3">
           <select
@@ -170,62 +199,101 @@ export function StudentAskSessionSelector({
             </div>
 
             {/* 목록 상한을 오른쪽 패널(입력창+도우미) 높이 수준으로 — 좌우 불균형의 원천 축소 */}
-            <div className="student-ask-session-grid max-h-[24rem] space-y-4 overflow-y-auto pr-1">
-              {sessionMonthGroups.map((group) => (
-                <section key={group.key} className="student-ask-month-section space-y-2">
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 py-2 text-xs font-semibold text-muted-foreground backdrop-blur">
-                    <span>{group.label}</span>
-                    <span>{group.sessions.length}개</span>
-                  </div>
-                  <div className="student-ask-month-grid grid gap-2 sm:grid-cols-2">
-                    {group.sessions.map((session) => {
-                      const active = selectedSessionId === session.id;
-                      const isInquiry = isInquiryDesignSession(session);
-                      const alreadyAskedInSession = questionSessionIds.has(session.id);
-                      return (
+            {(() => {
+              const renderSessionCard = (session: QuestionSession) => {
+                const active = selectedSessionId === session.id;
+                const isInquiry = isInquiryDesignSession(session);
+                const alreadyAskedInSession = questionSessionIds.has(session.id);
+                return (
+                  <button
+                    key={session.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => onSelectSession(session.id)}
+                    className={`min-h-[132px] rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                      active
+                        ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
+                        : "border-border bg-background hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        active ? "bg-white text-indigo-700 dark:bg-indigo-900 dark:text-indigo-100" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {getSessionDateBadge(session.date)}
+                      </span>
+                      {active && <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white">{t("selectedSessionBadge")}</span>}
+                      {!active && alreadyAskedInSession && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                          {t("completedSessionBadge")}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
+                      <p className="line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
+                        {session.topic.trim() || t("emptyTopic")}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span>{session.date}</span>
+                        <span>{session.teacher.name} {t("teacherSuffix")}</span>
+                        {isInquiry && <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">{t("inquiryClassTag")}</span>}
+                        {alreadyAskedInSession && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">{t("completedSessionShort")}</span>}
+                      </div>
+                    </div>
+                  </button>
+                );
+              };
+              return (
+                <div className="student-ask-session-grid max-h-[24rem] space-y-4 overflow-y-auto pr-1">
+                  {/* 오늘·예정 세션 — 학생의 주 용무라 항상 펼침(가까운 날짜부터) */}
+                  {upcomingMonthGroups.map((group) => (
+                    <section key={group.key} className="student-ask-month-section space-y-2">
+                      <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 py-2 text-xs font-semibold text-muted-foreground backdrop-blur">
+                        <span>{t("upcomingSessionsLabel")} · {group.label}</span>
+                        <span>{group.sessions.length}개</span>
+                      </div>
+                      <div className="student-ask-month-grid grid gap-2 sm:grid-cols-2">
+                        {group.sessions.map(renderSessionCard)}
+                      </div>
+                    </section>
+                  ))}
+
+                  {/* 지난 세션 — 월별 접기(기본 전부 접힘), 검색·필터 중에는 자동 펼침 */}
+                  {pastMonthGroups.map((group) => {
+                    const open = filtersActive || expandedPastMonths.has(group.key);
+                    return (
+                      <section key={group.key} className="student-ask-past-section space-y-2">
                         <button
-                          key={session.id}
                           type="button"
-                          aria-pressed={active}
-                          onClick={() => onSelectSession(session.id)}
-                          className={`min-h-[132px] rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                            active
-                              ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
-                              : "border-border bg-background hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
-                          }`}
+                          aria-expanded={open}
+                          onClick={() =>
+                            setExpandedPastMonths((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(group.key)) next.delete(group.key);
+                              else next.add(group.key);
+                              return next;
+                            })
+                          }
+                          className="sticky top-0 z-10 flex w-full items-center justify-between border-b bg-background/95 py-2 text-left text-xs font-semibold text-muted-foreground backdrop-blur transition-colors hover:text-foreground"
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                              active ? "bg-white text-indigo-700 dark:bg-indigo-900 dark:text-indigo-100" : "bg-muted text-muted-foreground"
-                            }`}>
-                              {getSessionDateBadge(session.date)}
-                            </span>
-                            {active && <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white">{t("selectedSessionBadge")}</span>}
-                            {!active && alreadyAskedInSession && (
-                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                                {t("completedSessionBadge")}
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-2 space-y-1">
-                            <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
-                            <p className="line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
-                              {session.topic.trim() || t("emptyTopic")}
-                            </p>
-                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                              <span>{session.date}</span>
-                              <span>{session.teacher.name} {t("teacherSuffix")}</span>
-                              {isInquiry && <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">{t("inquiryClassTag")}</span>}
-                              {alreadyAskedInSession && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">{t("completedSessionShort")}</span>}
-                            </div>
-                          </div>
+                          <span className="flex items-center gap-1.5">
+                            <CollapseChevron open={open} />
+                            {t("pastSessionsLabel")} · {group.label}
+                          </span>
+                          <span>{group.sessions.length}개</span>
                         </button>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-            </div>
+                        {open && (
+                          <div className="student-ask-month-grid grid gap-2 sm:grid-cols-2">
+                            {group.sessions.map(renderSessionCard)}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 

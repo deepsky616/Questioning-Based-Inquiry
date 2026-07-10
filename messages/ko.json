@@ -269,7 +269,10 @@
     "helperTipClosed": "답이 하나로 정해진 질문은 '왜?', '어떻게?', '만약 ~라면?'으로 바꾸면 생각이 넓어져요.",
     "helperTipStage": "사실을 확인하는 질문 → 관계·이유를 찾는 질문 → 서로 생각이 갈리는 질문 순서로 깊어져요.",
     "helperExample": "예) \"주인공 이름은 뭐야?\" → \"주인공의 행동이 어떤 결과를 가져올까?\"",
-    "helperPracticeLink": "질문연습에서 연습하기"
+    "helperPracticeLink": "질문연습에서 연습하기",
+    "searchPlaceholder": "주제·교과 검색",
+    "upcomingSessionsLabel": "오늘·예정",
+    "pastSessionsLabel": "지난 세션"
   },
   "comment": {
     "loading": "댓글 불러오는 중...",
