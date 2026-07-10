@@ -6,7 +6,7 @@ import { generateJson } from "@/lib/ai";
 import { AiBusyError, AiKeyMissingError } from "@/lib/ai-errors";
 import {
   ACTIVITY_BONUS_TYPES, VALID_ACTIVITY_BONUS,
-  MAX_ACTIVITY_BONUS_PER_STUDENT,
+  MAX_ACTIVITY_BONUS_PER_STUDENT, humanizeBonusReason,
 } from "@/lib/activity-bonus-policy";
 import { normalizeContent } from "@/lib/content-normalize";
 import { Prisma } from "@prisma/client";
@@ -142,6 +142,7 @@ ${cBlock || "(없음)"}
 - 같은 학생 안에서 의미가 거의 같은 작성물이 있으면 DUPLICATE_FLAGGED로 표시 (점수 0)
 - 다른 학생을 그대로 베낀 경우도 DUPLICATE_FLAGGED
 - 받을 자격이 명확한 항목만 보너스 부여
+- reason에는 Q:/C: id를 절대 쓰지 말 것 — 다른 작성물을 지칭할 땐 그 내용을 20자 이내로 인용
 
 [응답 형식 — JSON만, 다른 텍스트 금지]
 {
@@ -190,6 +191,17 @@ ${cBlock || "(없음)"}
     perStudentSum[b.studentId] += def.points;
     allCandidates.push(b);
   }
+
+  // 근거 문장의 내부 id를 내용 인용으로 치환 — AI가 프롬프트의 [Q:id]/[C:id]를
+  // 그대로 근거에 옮겨 쓰면 교사에게 무의미한 문자열이 노출된다(프롬프트 지시의 2차 방어)
+  const contentById = new Map<string, string>();
+  questions.forEach((q) => {
+    contentById.set(q.id, q.content);
+    q.comments.forEach((c) => contentById.set(c.id, c.content));
+  });
+  allCandidates.forEach((b) => {
+    b.reason = humanizeBonusReason(b.reason, contentById);
+  });
 
   // 3) 모두 PENDING으로 저장 (totalPoints 반영 안 함)
   const created: Array<{ id: string }> = [];
