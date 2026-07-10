@@ -1698,6 +1698,9 @@
     "aiJudged": "AI 판정: {closure} · {cognitive}",
     "aiReasonLabel": "판정 근거",
     "aiExampleLabel": "이렇게 바꿔 볼까요",
-    "aiError": "확인에 실패했어요. 잠시 후 다시 시도해 주세요."
+    "aiError": "확인에 실패했어요. 잠시 후 다시 시도해 주세요.",
+    "pointsEarned": "+{points}P 획득!",
+    "alreadyAwarded": "오늘 이미 포인트를 받은 문제예요",
+    "dailyCapReached": "오늘의 연습 포인트를 모두 모았어요 (내일 다시 도전!)"
   }
 }

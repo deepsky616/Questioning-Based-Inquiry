@@ -1,0 +1,151 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
+vi.mock("@/lib/ai", () => ({
+  AiKeyMissingError: class AiKeyMissingError extends Error {},
+  generateJsonWithMetadata: vi.fn(),
+}));
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    pointLog: { aggregate: vi.fn(), create: vi.fn() },
+    user: { update: vi.fn() },
+    $transaction: vi.fn(),
+  },
+}));
+
+import { Prisma } from "@prisma/client";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { generateJsonWithMetadata } from "@/lib/ai";
+import { __resetRateLimit } from "@/lib/rate-limit";
+import { PRACTICE_DAILY_CAP, PRACTICE_POINTS } from "@/lib/practice-points";
+import { POST } from "@/app/api/points/practice/route";
+
+const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
+const mAggregate = prisma.pointLog.aggregate as unknown as ReturnType<typeof vi.fn>;
+const mTx = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
+const mGen = generateJsonWithMetadata as unknown as ReturnType<typeof vi.fn>;
+
+const req = (body: unknown) =>
+  new Request("http://localhost/api/points/practice", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+// 은행 실제 문항: q01(닫힌·사실적), t01(target open), c01(주제)
+const QUIZ_OK = { mode: "quiz", itemId: "q01", quizType: "closure", answer: "closed" };
+
+const aiClassification = (closure: string, cognitive: string) => ({
+  data: {
+    closure,
+    cognitive,
+    closureScore: 0.3,
+    cognitiveScore: 0.8,
+    reasoning: "테스트 근거",
+    feedback: "잘했어요",
+    improvedExample: "",
+    inappropriate: false,
+    inappropriateReason: "",
+  },
+  model: "gemini-2.5-flash",
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  __resetRateLimit();
+  mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
+  mAggregate.mockResolvedValue({ _sum: { points: 0 } });
+  mTx.mockResolvedValue([]);
+  mGen.mockResolvedValue(aiClassification("open", "conceptual"));
+});
+
+describe("연습 포인트 — 분류 퀴즈", () => {
+  it("서버가 은행으로 재검증해 정답이면 지급한다", async () => {
+    const res = await POST(req(QUIZ_OK));
+    const data = await res.json();
+    expect(data.correct).toBe(true);
+    expect(data.awarded).toBe(PRACTICE_POINTS.QUIZ_CORRECT);
+    expect(mTx).toHaveBeenCalledTimes(1);
+  });
+
+  it("클라이언트가 정답이라고 주장해도 은행과 다르면 지급하지 않는다", async () => {
+    const res = await POST(req({ ...QUIZ_OK, answer: "open" }));
+    const data = await res.json();
+    expect(data.correct).toBe(false);
+    expect(data.awarded).toBe(0);
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("존재하지 않는 문항은 400", async () => {
+    expect((await POST(req({ ...QUIZ_OK, itemId: "없는문항" }))).status).toBe(400);
+  });
+
+  it("같은 문항 재도전은 unique 충돌(P2002)로 재지급되지 않는다", async () => {
+    mTx.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "5" }),
+    );
+    const data = await (await POST(req(QUIZ_OK))).json();
+    expect(data.awarded).toBe(0);
+    expect(data.alreadyAwarded).toBe(true);
+  });
+
+  it("하루 상한에 도달하면 지급하지 않는다", async () => {
+    mAggregate.mockResolvedValue({ _sum: { points: PRACTICE_DAILY_CAP } });
+    const data = await (await POST(req(QUIZ_OK))).json();
+    expect(data.awarded).toBe(0);
+    expect(data.capped).toBe(true);
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("교사 계정은 판정만 받고 지급은 없다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
+    const data = await (await POST(req(QUIZ_OK))).json();
+    expect(data.correct).toBe(true);
+    expect(data.awarded).toBe(0);
+    expect(mTx).not.toHaveBeenCalled();
+  });
+});
+
+describe("연습 포인트 — 질문 바꾸기·만들기 (서버 AI 판정)", () => {
+  it("목표 유형 달성 시 지급하고 분류 결과를 돌려준다", async () => {
+    const res = await POST(req({ mode: "transform", itemId: "t01", content: "주인공의 행동이 어떤 결과를 가져올까요?" }));
+    const data = await res.json();
+    expect(data.achieved).toBe(true);
+    expect(data.awarded).toBe(PRACTICE_POINTS.TARGET_ACHIEVED);
+    expect(data.classification.closure).toBe("open");
+  });
+
+  it("목표 미달성이면 지급 없이 분류·피드백만 돌려준다", async () => {
+    mGen.mockResolvedValue(aiClassification("closed", "factual"));
+    const data = await (await POST(req({ mode: "transform", itemId: "t01", content: "주인공 이름이 뭐야?" }))).json();
+    expect(data.achieved).toBe(false);
+    expect(data.awarded).toBe(0);
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("부적절 판정이면 목표 유형이어도 지급하지 않는다", async () => {
+    mGen.mockResolvedValue({
+      ...aiClassification("open", "controversial"),
+      data: { ...aiClassification("open", "controversial").data, inappropriate: true, inappropriateReason: "비속어" },
+    });
+    const data = await (await POST(req({ mode: "create", topicId: "c01", target: "controversial", content: "나쁜 질문" }))).json();
+    expect(data.achieved).toBe(false);
+    expect(data.awarded).toBe(0);
+  });
+
+  it("만들기: 논쟁적 목표에 개념적 질문이면 미달성이다", async () => {
+    mGen.mockResolvedValue(aiClassification("open", "conceptual"));
+    const data = await (await POST(req({ mode: "create", topicId: "c01", target: "controversial", content: "문화유산은 무엇을 보여줄까?" }))).json();
+    expect(data.achieved).toBe(false);
+    expect(data.awarded).toBe(0);
+  });
+
+  it("비로그인은 401, 형식 오류는 400", async () => {
+    mAuth.mockResolvedValue(null);
+    expect((await POST(req(QUIZ_OK))).status).toBe(401);
+
+    mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
+    expect((await POST(req({ mode: "quiz" }))).status).toBe(400);
+  });
+});

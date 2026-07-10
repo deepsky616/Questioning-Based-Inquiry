@@ -11,10 +11,12 @@ const vercelConfig = existsSync(vercelConfigPath)
   : null;
 
 describe("Prisma deployment guards", () => {
-  it("runs schema guards before the production build", () => {
+  it("runs schema guards after prisma generate and before the production build", () => {
     expect(packageJson.scripts?.["db:diff:check"]).toBe("node scripts/check-prisma-diff.mjs");
+    // generate가 가드보다 먼저여야 한다 — db:check가 PrismaClient를 쓰므로
+    // Vercel(의존성 캐시)에서는 generate 전에 실행되면 초기화 에러로 빌드가 죽는다
     expect(packageJson.scripts?.build).toBe(
-      "npm run db:diff:check && npm run db:check && prisma generate && next build",
+      "prisma generate && npm run db:diff:check && npm run db:check && next build",
     );
     expect(vercelConfig?.buildCommand).toBe("npm run build");
   });

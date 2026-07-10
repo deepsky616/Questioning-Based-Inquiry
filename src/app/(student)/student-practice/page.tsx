@@ -17,7 +17,6 @@ import {
   PRACTICE_TRANSFORM_BANK,
   PRACTICE_CREATE_TOPICS,
   pickRandomItem,
-  isTargetAchieved,
   type Closure,
   type Cognitive,
   type TransformTarget,
@@ -34,6 +33,18 @@ interface ClassifyResult {
   reasoning?: string;
   feedback?: string;
   improvedExample?: string;
+}
+
+// /api/points/practice 응답 — 판정·지급 모두 서버가 결정한다
+interface AwardInfo {
+  awarded: number;
+  capped?: boolean;
+  alreadyAwarded?: boolean;
+}
+
+interface PracticeCheckResponse extends AwardInfo {
+  classification: ClassifyResult;
+  achieved: boolean;
 }
 
 type QuizMode = "closure" | "cognitive";
@@ -59,20 +70,33 @@ export default function StudentPracticePage() {
   const [quizStats, setQuizStats] = useState({ correct: 0, total: 0 });
 
   const quizCorrectValue = quizMode === "closure" ? quizItem.closure : quizItem.cognitive;
+  const [quizAward, setQuizAward] = useState<AwardInfo | null>(null);
   const nextQuiz = () => {
     setQuizItem(pickRandomItem(PRACTICE_QUIZ_BANK, quizItem.id));
     setQuizAnswer(null);
+    setQuizAward(null);
   };
   const answerQuiz = (value: string) => {
     if (quizAnswer) return;
     setQuizAnswer(value);
-    setQuizStats((s) => ({ correct: s.correct + (value === quizCorrectValue ? 1 : 0), total: s.total + 1 }));
+    const correct = value === quizCorrectValue;
+    setQuizStats((s) => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
+    if (!correct) return;
+    // 포인트는 서버가 문항 은행으로 재검증한 뒤 지급한다(하루 상한·문항당 1회)
+    fetch("/api/points/practice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "quiz", itemId: quizItem.id, quizType: quizMode, answer: value }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setQuizAward(data); })
+      .catch(() => {});
   };
 
-  // ── 모드 2·3 공용: AI 판정 ──
+  // ── 모드 2·3 공용: AI 판정 + 포인트 ──
   const [input, setInput] = useState("");
   const [isChecking, setIsChecking] = useState(false);
-  const [checkResult, setCheckResult] = useState<ClassifyResult | null>(null);
+  const [checkResult, setCheckResult] = useState<PracticeCheckResponse | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
 
   const resetCheck = () => {
@@ -81,17 +105,21 @@ export default function StudentPracticePage() {
     setCheckError(null);
   };
 
-  const runClassify = async () => {
+  const runCheck = async () => {
     const content = input.trim();
     if (!content || isChecking) return;
     setIsChecking(true);
     setCheckError(null);
     setCheckResult(null);
+    const payload =
+      tab === "transform"
+        ? { mode: "transform", itemId: transformItem.id, content }
+        : { mode: "create", topicId: createTopic.id, target: createTarget, content };
     try {
-      const res = await fetch("/api/classify", {
+      const res = await fetch("/api/points/practice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("aiError"));
@@ -121,7 +149,7 @@ export default function StudentPracticePage() {
   };
 
   const activeTarget: TransformTarget = tab === "transform" ? transformItem.target : createTarget;
-  const achieved = checkResult ? isTargetAchieved(activeTarget, checkResult) : false;
+  const achieved = checkResult?.achieved ?? false;
 
   const switchTab = (next: PracticeTab) => {
     setTab(next);
@@ -129,26 +157,47 @@ export default function StudentPracticePage() {
     setShowHint(false);
   };
 
+  // 지급 결과 배지 (퀴즈·바꾸기·만들기 공용)
+  const renderAwardBadge = (award: AwardInfo | null) => {
+    if (!award) return null;
+    if (award.awarded > 0) {
+      return (
+        <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-bold text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-300">
+          {t("pointsEarned", { points: award.awarded })}
+        </span>
+      );
+    }
+    if (award.alreadyAwarded) {
+      return <span className="text-xs text-muted-foreground">{t("alreadyAwarded")}</span>;
+    }
+    if (award.capped) {
+      return <span className="text-xs text-muted-foreground">{t("dailyCapReached")}</span>;
+    }
+    return null;
+  };
+
   // AI 판정 결과 카드 (바꾸기·만들기 공용)
   const renderCheckResult = () => {
     if (!checkResult) return null;
+    const cls = checkResult.classification;
     return (
       <div className={`rounded-lg border p-4 space-y-2 ${achieved ? "border-green-300 bg-green-50 dark:border-green-900 dark:bg-green-950/30" : "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"}`}>
-        <p className={`font-semibold ${achieved ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"}`}>
+        <p className={`flex flex-wrap items-center gap-2 font-semibold ${achieved ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"}`}>
           {achieved ? t("achieved", { type: typeLabel(activeTarget) }) : t("notAchieved", { type: typeLabel(activeTarget) })}
+          {renderAwardBadge(checkResult)}
         </p>
         <p className="text-sm text-foreground">
-          {t("aiJudged", { closure: tCls(`${checkResult.closure}.label`), cognitive: tCls(`${checkResult.cognitive}.label`) })}
+          {t("aiJudged", { closure: tCls(`${cls.closure}.label`), cognitive: tCls(`${cls.cognitive}.label`) })}
         </p>
-        {checkResult.reasoning && (
+        {cls.reasoning && (
           <p className="text-sm text-muted-foreground">
-            <span className="font-medium">{t("aiReasonLabel")}:</span> {checkResult.reasoning}
+            <span className="font-medium">{t("aiReasonLabel")}:</span> {cls.reasoning}
           </p>
         )}
-        {checkResult.feedback && <p className="text-sm text-muted-foreground">{checkResult.feedback}</p>}
-        {!achieved && checkResult.improvedExample && (
+        {cls.feedback && <p className="text-sm text-muted-foreground">{cls.feedback}</p>}
+        {!achieved && cls.improvedExample && (
           <p className="text-sm text-indigo-700 dark:text-indigo-300">
-            <span className="font-medium">{t("aiExampleLabel")}:</span> {checkResult.improvedExample}
+            <span className="font-medium">{t("aiExampleLabel")}:</span> {cls.improvedExample}
           </p>
         )}
       </div>
@@ -165,7 +214,7 @@ export default function StudentPracticePage() {
       />
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs text-muted-foreground">{input.length}/{MAX_QUESTION_LENGTH}</span>
-        <Button onClick={runClassify} disabled={isChecking || !input.trim()} variant="gradient" className="h-11 px-6">
+        <Button onClick={runCheck} disabled={isChecking || !input.trim()} variant="gradient" className="h-11 px-6">
           {isChecking ? t("checking") : t("checkBtn")}
         </Button>
       </div>
@@ -293,8 +342,9 @@ export default function StudentPracticePage() {
 
             {quizAnswer && (
               <div className={`rounded-lg border p-4 space-y-1.5 ${quizAnswer === quizCorrectValue ? "border-green-300 bg-green-50 dark:border-green-900 dark:bg-green-950/30" : "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"}`}>
-                <p className={`font-semibold ${quizAnswer === quizCorrectValue ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"}`}>
+                <p className={`flex flex-wrap items-center gap-2 font-semibold ${quizAnswer === quizCorrectValue ? "text-green-700 dark:text-green-300" : "text-amber-700 dark:text-amber-300"}`}>
                   {quizAnswer === quizCorrectValue ? t("quizCorrect") : t("quizWrong", { answer: tCls(`${quizCorrectValue}.label`) })}
+                  {quizAnswer === quizCorrectValue && renderAwardBadge(quizAward)}
                 </p>
                 <p className="text-sm text-muted-foreground">
                   <span className="font-medium">{t("quizWhy")}:</span> {quizItem.explanation}
