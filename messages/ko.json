@@ -530,6 +530,8 @@
   "pointReview": {
     "selectSessionFirst": "분석할 세션을 선택해주세요",
     "analyzeDone": "🤖 AI 분석 완료: {created}개 후보 생성 (질문 {questions} · 답변 {comments})",
+    "analyzeDoneMulti": "🤖 {sessions}개 수업세션 분석 완료: {created}개 후보 생성 (질문 {questions} · 답변 {comments})",
+    "analyzePartialDone": "🤖 {sessions}개 중 {failed}개 수업세션은 완료하지 못했습니다. 생성 {created}개 (질문 {questions} · 답변 {comments})",
     "analyzeFailed": "분석 실패",
     "aiErrorMissingKey": "Gemini API 키가 없어 AI 추천 분석을 실행하지 못했습니다. 교사 설정에서 API 키를 등록해 주세요.",
     "aiErrorBusy": "Gemini 모델이 혼잡해 AI 추천 분석을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.",
@@ -544,7 +546,12 @@
     "overrideApproved": "점수 {points}점으로 수정 후 승인",
     "intro": "학생의 질문·답변을 AI가 채점한 후보를 확인하고 승인하세요. 최종 결정은 선생님께 있어요.",
     "selectTitle": "분석할 수업세션 선택",
-    "selectDesc": "세션을 고르고 [AI 채점] 버튼을 누르면 학생 활동을 분석합니다.",
+    "selectDesc": "최대 5개 수업세션을 선택해 AI 채점을 실행합니다. 월별 선택으로 필요한 범위만 나눠 분석하세요.",
+    "selectTooMany": "한 번에 최대 {max}개 수업세션까지 분석할 수 있습니다.",
+    "selectedForAnalysis": "분석 대상 {count}/{max}개 선택됨",
+    "clearSelection": "선택 해제",
+    "selectMonth": "월 선택",
+    "deselectMonth": "월 해제",
     "allPendingOnly": "전체 (대기 중인 후보만 표시)",
     "analyzing": "AI 분석 중...",
     "runAnalyze": "🤖 AI 채점 실행",
@@ -570,7 +577,9 @@
     "groupJustAnalyzed": "방금 분석",
     "groupPendingCount": "대기 {count}건",
     "noSessionGroup": "세션 정보 없음",
-    "optionPendingCount": " (대기 {count}건)"
+    "optionPendingCount": " (대기 {count}건)",
+    "flaggedZeroPoints": "0점 · 경고",
+    "overridePlaceholderFlagged": "구제 점수"
   },
   "appShell": {
     "errorTitle": "문제가 발생했어요",

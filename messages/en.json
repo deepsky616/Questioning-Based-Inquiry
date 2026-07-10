@@ -530,6 +530,8 @@
   "pointReview": {
     "selectSessionFirst": "Please select a session to analyze",
     "analyzeDone": "🤖 AI analysis done: {created} candidates created ({questions} questions · {comments} answers)",
+    "analyzeDoneMulti": "🤖 Analyzed {sessions} sessions: {created} candidates created ({questions} questions · {comments} answers)",
+    "analyzePartialDone": "🤖 {failed} of {sessions} sessions could not finish. Created {created} candidates ({questions} questions · {comments} answers)",
     "analyzeFailed": "Analysis failed",
     "aiErrorMissingKey": "AI scoring could not run because the Gemini API key is missing. Add an API key in teacher settings.",
     "aiErrorBusy": "The Gemini model is busy, so AI scoring could not finish. Please try again shortly.",
@@ -544,7 +546,12 @@
     "overrideApproved": "Approved with adjusted score of {points} pts",
     "intro": "Review the candidates AI scored from student questions/answers and approve them. The final decision is yours.",
     "selectTitle": "Select a class session to analyze",
-    "selectDesc": "Pick a session and press [Run AI scoring] to analyze student activity.",
+    "selectDesc": "Select up to 5 class sessions and run AI scoring. Use monthly selection to analyze only the range you need.",
+    "selectTooMany": "You can analyze up to {max} class sessions at once.",
+    "selectedForAnalysis": "{count}/{max} sessions selected for analysis",
+    "clearSelection": "Clear selection",
+    "selectMonth": "Select month",
+    "deselectMonth": "Clear month",
     "allPendingOnly": "All (show pending candidates only)",
     "analyzing": "Analyzing with AI...",
     "runAnalyze": "🤖 Run AI scoring",
@@ -570,7 +577,9 @@
     "groupJustAnalyzed": "Just analyzed",
     "groupPendingCount": "{count} pending",
     "noSessionGroup": "No session",
-    "optionPendingCount": " ({count} pending)"
+    "optionPendingCount": " ({count} pending)",
+    "flaggedZeroPoints": "0P · warning",
+    "overridePlaceholderFlagged": "Rescue points"
   },
   "appShell": {
     "errorTitle": "Something went wrong",

@@ -17,4 +17,14 @@ describe("point review bulk actions", () => {
     expect(pointReviewView).toContain('decide("APPROVE", selectedNormalIds)');
     expect(pointReviewView).toContain('decide("REJECT", selectedNormalIds)');
   });
+
+  it("supports bounded multi-session AI analysis with monthly selection", () => {
+    expect(pointReviewView).toContain("MAX_ANALYZE_SESSIONS = 5");
+    expect(pointReviewView).toContain("selectedAnalysisSessionIds");
+    expect(pointReviewView).toContain("toggleMonthSessions");
+    expect(pointReviewView).toContain('t("selectTooMany"');
+    expect(pointReviewView).toContain('t("selectedForAnalysis"');
+    expect(pointReviewView).toContain('t("analyzeDoneMulti"');
+    expect(pointReviewView).toContain('body: JSON.stringify({ sessionId })');
+  });
 });

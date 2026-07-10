@@ -14,6 +14,8 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { useTeacherSessions } from "@/lib/app-queries";
 
+const MAX_ANALYZE_SESSIONS = 5;
+
 interface SessionItem { id: string; date: string; subject: string; topic: string }
 interface PendingLog {
   id: string; studentId: string; studentName: string;
@@ -61,8 +63,8 @@ export function PointReviewView() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { data: sessions = [] } = useTeacherSessions<SessionItem>();
-  const [selectedSessionId, setSelectedSessionId] = useState<string>("all");
-  const [lastAnalyzedSessionId, setLastAnalyzedSessionId] = useState<string | null>(null);
+  const [selectedAnalysisSessionIds, setSelectedAnalysisSessionIds] = useState<Set<string>>(new Set());
+  const [lastAnalyzedSessionIds, setLastAnalyzedSessionIds] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<PendingLog[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -84,39 +86,54 @@ export function PointReviewView() {
   useEffect(() => { setSelected(new Set()); }, [focusStudentId]);
 
   async function runAnalyze() {
-    if (selectedSessionId === "all") {
+    const sessionIds = Array.from(selectedAnalysisSessionIds);
+    if (sessionIds.length === 0) {
       setMessage(t("selectSessionFirst"));
+      return;
+    }
+    if (sessionIds.length > MAX_ANALYZE_SESSIONS) {
+      setMessage(t("selectTooMany", { max: MAX_ANALYZE_SESSIONS }));
       return;
     }
     setBusy(true); setAiLoading(true); setMessage(null);
     try {
-      const res = await fetch("/api/teacher/points/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: selectedSessionId }),
-      });
-      const data = await res.json() as AnalyzeResponse;
-      if (res.ok) {
-        if (data.aiStatus === "failed") {
-          const fallback = data.fallbackUsed ? ` ${t("fallbackUsed")}` : "";
-          const key = data.aiErrorType === "missing_key"
-            ? "aiErrorMissingKey"
-            : data.aiErrorType === "busy"
-            ? "aiErrorBusy"
-            : data.aiErrorType === "invalid_response"
-            ? "aiErrorInvalidResponse"
-            : "aiErrorUnknown";
-          setMessage(`${t(key)}${fallback}`);
-        } else {
-          setMessage(t("analyzeDone", { created: data.createdPending ?? 0, questions: data.questionCount ?? 0, comments: data.commentCount ?? 0 }));
+      const results: AnalyzeResponse[] = [];
+      for (const sessionId of sessionIds) {
+        const res = await fetch("/api/teacher/points/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+        });
+        const data = await res.json() as AnalyzeResponse;
+        if (!res.ok) {
+          setMessage(data.error || t("analyzeFailed"));
+          return;
         }
-        // 분석 후 전체 보기로 전환 — 기존 세션들의 대기 항목과 새 결과가 함께 보인다
-        setLastAnalyzedSessionId(selectedSessionId);
-        setSelectedSessionId("all");
-        loadPending();
-      } else {
-        setMessage(data.error || t("analyzeFailed"));
+        results.push(data);
       }
+      const failed = results.filter((data) => data.aiStatus === "failed");
+      const created = results.reduce((sum, data) => sum + (data.createdPending ?? 0), 0);
+      const questions = results.reduce((sum, data) => sum + (data.questionCount ?? 0), 0);
+      const comments = results.reduce((sum, data) => sum + (data.commentCount ?? 0), 0);
+      if (failed.length === results.length && failed[0]) {
+        const fallback = results.some((data) => data.fallbackUsed) ? ` ${t("fallbackUsed")}` : "";
+        const key = failed[0].aiErrorType === "missing_key"
+          ? "aiErrorMissingKey"
+          : failed[0].aiErrorType === "busy"
+          ? "aiErrorBusy"
+          : failed[0].aiErrorType === "invalid_response"
+          ? "aiErrorInvalidResponse"
+          : "aiErrorUnknown";
+        setMessage(`${t(key)}${fallback}`);
+      } else if (failed.length > 0) {
+        setMessage(t("analyzePartialDone", { sessions: sessionIds.length, failed: failed.length, created, questions, comments }));
+      } else {
+        setMessage(t("analyzeDoneMulti", { sessions: sessionIds.length, created, questions, comments }));
+      }
+      // 분석 후 전체 보기로 전환 — 기존 세션들의 대기 항목과 새 결과가 함께 보인다
+      setLastAnalyzedSessionIds(new Set(sessionIds));
+      setSelectedAnalysisSessionIds(new Set());
+      loadPending();
     } catch { setMessage(t("networkError")); }
     finally { setBusy(false); setAiLoading(false); }
   }
@@ -153,9 +170,9 @@ export function PointReviewView() {
   }
 
   // 세션 필터는 클라이언트에서 — 다른 세션의 대기 항목은 숨겨질 뿐 사라지지 않는다
-  const visiblePending = selectedSessionId === "all"
+  const visiblePending = selectedAnalysisSessionIds.size === 0
     ? pending
-    : pending.filter((p) => p.sessionId === selectedSessionId);
+    : pending.filter((p) => p.sessionId && selectedAnalysisSessionIds.has(p.sessionId));
   const pendingCountBySession = pending.reduce<Record<string, number>>((acc, p) => {
     const key = p.sessionId ?? "none";
     acc[key] = (acc[key] ?? 0) + 1;
@@ -178,14 +195,14 @@ export function PointReviewView() {
     const dateOf = (key: string) => sessions.find((x) => x.id === key)?.date ?? "";
     return Array.from(map.entries())
       .sort(([a], [b]) => {
-        if (a === lastAnalyzedSessionId) return -1;
-        if (b === lastAnalyzedSessionId) return 1;
+        if (lastAnalyzedSessionIds.has(a) && !lastAnalyzedSessionIds.has(b)) return -1;
+        if (lastAnalyzedSessionIds.has(b) && !lastAnalyzedSessionIds.has(a)) return 1;
         return dateOf(b).localeCompare(dateOf(a));
       })
       .map(([key, groupRows]) => ({
         key,
         label: sessionLabelOf(key === "none" ? null : key),
-        justAnalyzed: key === lastAnalyzedSessionId,
+        justAnalyzed: lastAnalyzedSessionIds.has(key),
         rows: groupRows,
       }));
   };
@@ -220,6 +237,47 @@ export function PointReviewView() {
     toggleIds(displayedNormalIds, allDisplayedNormalSelected);
   }
 
+  function clearAnalysisSelection() {
+    setSelectedAnalysisSessionIds(new Set());
+  }
+
+  function toggleAnalysisSession(sessionId: string) {
+    setMessage(null);
+    setSelectedAnalysisSessionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+        return next;
+      }
+      if (next.size >= MAX_ANALYZE_SESSIONS) {
+        setMessage(t("selectTooMany", { max: MAX_ANALYZE_SESSIONS }));
+        return next;
+      }
+      next.add(sessionId);
+      return next;
+    });
+  }
+
+  function toggleMonthSessions(sessionIds: string[]) {
+    setMessage(null);
+    setSelectedAnalysisSessionIds((prev) => {
+      const next = new Set(prev);
+      const allSelected = sessionIds.every((id) => next.has(id));
+      if (allSelected) {
+        sessionIds.forEach((id) => next.delete(id));
+        return next;
+      }
+      for (const id of sessionIds) {
+        if (next.size >= MAX_ANALYZE_SESSIONS) {
+          setMessage(t("selectTooMany", { max: MAX_ANALYZE_SESSIONS }));
+          break;
+        }
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
@@ -242,10 +300,10 @@ export function PointReviewView() {
           <div className="space-y-3">
             <button
               type="button"
-              aria-pressed={selectedSessionId === "all"}
-              onClick={() => setSelectedSessionId("all")}
+              aria-pressed={selectedAnalysisSessionIds.size === 0}
+              onClick={clearAnalysisSelection}
               className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                selectedSessionId === "all"
+                selectedAnalysisSessionIds.size === 0
                   ? "border-indigo-300 bg-indigo-50 text-indigo-950 dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
                   : "border-border bg-card hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
               }`}
@@ -263,26 +321,44 @@ export function PointReviewView() {
                 <section key={group.key} className="space-y-1.5">
                   <div className="flex items-center justify-between border-b pb-1 text-xs font-semibold text-muted-foreground">
                     <span>{group.label}</span>
-                    <span>{group.sessions.length}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{group.sessions.length}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleMonthSessions(group.sessions.map((session) => session.id))}
+                        className="rounded border border-border px-2 py-0.5 text-[11px] font-medium text-foreground hover:bg-muted"
+                      >
+                        {group.sessions.every((session) => selectedAnalysisSessionIds.has(session.id)) ? t("deselectMonth") : t("selectMonth")}
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     {group.sessions.map((session) => {
                       const count = pendingCountBySession[session.id] ?? 0;
-                      const active = selectedSessionId === session.id;
+                      const active = selectedAnalysisSessionIds.has(session.id);
                       return (
                         <button
                           key={session.id}
                           type="button"
                           aria-pressed={active}
-                          onClick={() => setSelectedSessionId(session.id)}
+                          onClick={() => toggleAnalysisSession(session.id)}
                           className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                             active
                               ? "border-indigo-300 bg-indigo-50 text-indigo-950 dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
                               : "border-border bg-card hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
                           }`}
                         >
-                          <span className="min-w-0 flex-1 truncate font-medium">
-                            {buildSessionLabel(session.date, session.subject, session.topic)}
+                          <span className="flex min-w-0 flex-1 items-center gap-2">
+                            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+                              active
+                                ? "border-indigo-500 bg-indigo-500 text-white"
+                                : "border-muted-foreground/40 bg-background"
+                            }`}>
+                              {active ? "✓" : ""}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate font-medium">
+                              {buildSessionLabel(session.date, session.subject, session.topic)}
+                            </span>
                           </span>
                           {count > 0 && (
                             <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
@@ -297,10 +373,18 @@ export function PointReviewView() {
               ))}
             </div>
           </div>
+          {selectedAnalysisSessionIds.size > 0 && (
+            <div className="flex items-center justify-between rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-200">
+              <span>{t("selectedForAnalysis", { count: selectedAnalysisSessionIds.size, max: MAX_ANALYZE_SESSIONS })}</span>
+              <button type="button" onClick={clearAnalysisSelection} className="font-semibold underline-offset-2 hover:underline">
+                {t("clearSelection")}
+              </button>
+            </div>
+          )}
           <div className="flex gap-2">
             <Button
               onClick={runAnalyze}
-              disabled={busy || selectedSessionId === "all"}
+              disabled={busy || selectedAnalysisSessionIds.size === 0 || selectedAnalysisSessionIds.size > MAX_ANALYZE_SESSIONS}
               className="flex-1">
               {aiLoading ? t("analyzing") : t("runAnalyze")}
             </Button>
@@ -440,7 +524,7 @@ function PendingRow({
   const t = useTranslations("pointReview");
   const tL = useTranslations("pointLabel");
   const b = bonusLabel(p.bonusType);
-  // 경고성 판정(중복·불성실)은 0점이라 점수 표기·점수 수정 입력을 숨긴다
+  // 경고성 판정(중복·불성실): 0점임을 배지로 명시하고, 오탐 구제를 위해 점수 수정은 허용한다
   const isDup = p.bonusType.includes("FLAGGED");
   const content = p.commentContent || p.questionContent;
   const targetLabel = p.relatedQuestionId ? t("targetQuestion") : t("targetAnswer");
@@ -462,6 +546,11 @@ function PendingRow({
               {b.emoji} {b.labelKey ? tL(b.labelKey) : b.raw}
               {!isDup && <span className="ml-1">{t("pointsSuffix", { points: p.points })}</span>}
             </span>
+            {isDup && (
+              <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full border border-red-200 bg-red-50 text-red-600 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-300">
+                {t("flaggedZeroPoints")}
+              </span>
+            )}
             {p.relatedQuestionId && p.questionLikeCount != null && (
               <span className="text-xs font-medium text-rose-500">❤️ {p.questionLikeCount}</span>
             )}
@@ -489,22 +578,20 @@ function PendingRow({
         </div>
       </div>
       <div className="flex items-center gap-2 pl-7">
-        {!isDup && (
-          <>
-            <Input
-              type="number"
-              value={override ?? ""}
-              onChange={(e) => setOverride(parseInt(e.target.value) || 0)}
-              placeholder={t("overridePlaceholder", { points: p.points })}
-              className="h-7 w-24 text-xs"
-            />
-            <Button size="sm" variant="outline" className="h-7 text-xs"
-              disabled={!override}
-              onClick={() => onOverride(override!)}>
-              {t("overrideApprove")}
-            </Button>
-          </>
-        )}
+        {/* 경고 행에도 점수 수정 개방 — AI 오탐일 때 점수를 주며 구제(0 이상만) */}
+        <Input
+          type="number"
+          min={0}
+          value={override ?? ""}
+          onChange={(e) => setOverride(Math.max(0, parseInt(e.target.value) || 0))}
+          placeholder={isDup ? t("overridePlaceholderFlagged") : t("overridePlaceholder", { points: p.points })}
+          className="h-7 w-24 text-xs"
+        />
+        <Button size="sm" variant="outline" className="h-7 text-xs"
+          disabled={!override}
+          onClick={() => onOverride(override!)}>
+          {t("overrideApprove")}
+        </Button>
         <Button size="sm" className="h-7 text-xs" onClick={() => onDecideOne("APPROVE")}>
           {t("approve")}
         </Button>
