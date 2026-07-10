@@ -26,7 +26,8 @@ export async function loginAsStudent(page: Page, student: StudentAskFlowFixture[
   await page.locator("#s-password").fill(student.password);
   await page.getByRole("button", { name: "학생 로그인" }).click();
   await page.waitForURL("**/student-dashboard", { timeout: 20_000 });
-  // 로그인 직후 잔여 내비게이션(router.push/refresh 중복)이 남아 다음 goto를
-  // 가로채는 webkit 경합이 있다 — 대시보드가 완전히 정착할 때까지 기다린다.
-  await page.waitForLoadState("networkidle").catch(() => {});
+  // 로그인 직후 대시보드로 가는 지연된 중복 내비게이션(router.push/refresh)이
+  // 다음 goto를 가로채는 webkit 경합이 있다. dev 서버는 HMR 소켓 때문에
+  // networkidle이 오지 않으므로, 잔여 내비게이션이 소진되도록 잠시 정착을 기다린다.
+  await page.waitForTimeout(1_500);
 }
