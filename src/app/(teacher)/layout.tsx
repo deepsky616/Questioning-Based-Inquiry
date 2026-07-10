@@ -16,6 +16,7 @@ const TEACHER_PAGES = [
   { href: "/teacher-curriculum", key: "curriculum" },
   { href: "/teacher-sessions", key: "sessions" },
   { href: "/teacher-questions", key: "questions" },
+  { href: "/teacher-practice", key: "practice" },
   { href: "/teacher-question-play", key: "questionPlay" },
   { href: "/teacher-students", key: "students" },
   { href: "/teacher-settings", key: "settings" },
