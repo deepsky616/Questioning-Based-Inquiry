@@ -12,6 +12,7 @@ describe("Prisma domain model hardening", () => {
     expect(schema).not.toContain("enum PointStatus");
     expect(schema).not.toContain("enum SessionTargetType");
     expect(schema).not.toContain("enum AnalysisScope");
+    expect(existsSync("scripts/fix-role-enum.mjs")).toBe(false);
 
     expect(schema).toMatch(/role\s+String\s+@map\("role"\)/);
     expect(schema).toMatch(/status\s+String\s+@default\("APPROVED"\)\s+@map\("status"\)/);

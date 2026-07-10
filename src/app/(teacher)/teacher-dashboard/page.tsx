@@ -7,13 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TeacherReportsView } from "@/components/teacher/TeacherReportsView";
 import { TeacherDashboardFilters } from "./TeacherDashboardFilters";
 import { TeacherDashboardTabs } from "./TeacherDashboardTabs";
+import { TeacherStudentStatsCard } from "./TeacherStudentStatsCard";
+import { TeacherTodayTasksCard, type TeacherTaskItem } from "./TeacherTodayTasksCard";
 import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
-import { EmptyState } from "@/components/shared/EmptyState";
 import { useTranslations } from "next-intl";
 import { useTeacherStudents } from "@/lib/app-queries";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
@@ -144,56 +144,8 @@ function TeacherDashboard() {
     setClassDefaulted(true);
   }, [stats, selectedClass, classDefaulted]);
 
-  // 추세 배지 — 아이콘+짧은 단어로 뜻이 바로 읽히게, 정확한 수치·설명은 툴팁으로
-  const getTrendBadge = (trend: number | null) => {
-    if (trend === null)
-      return (
-        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-600 dark:bg-blue-950/40" title={t("trendNewTitle")}>
-          🆕 {t("trendBadgeNew")}
-        </span>
-      );
-    if (trend > 0)
-      return (
-        <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-bold text-green-600 dark:bg-green-950/40" title={`${t("trendUpTitle")} (+${trend}%)`}>
-          ▲ {t("trendBadgeUp")}
-        </span>
-      );
-    if (trend < 0)
-      return (
-        <span className="rounded-full bg-orange-50 px-2 py-0.5 text-xs font-bold text-orange-600 dark:bg-orange-950/40" title={`${t("trendDownTitle")} (-${Math.abs(trend)}%)`}>
-          ▼ {t("trendBadgeDown")}
-        </span>
-      );
-    return (
-      <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-bold text-muted-foreground" title={t("trendFlatTitle")}>
-        — {t("trendBadgeFlat")}
-      </span>
-    );
-  };
-
-  // 미니 스파크라인 — 기간 6버킷의 질문 수를 작은 막대로(활동 리듬을 한눈에)
-  const Sparkline = ({ data }: { data?: number[] }) => {
-    if (!data || data.length === 0) return null;
-    const max = Math.max(...data, 1);
-    return (
-      <span
-        className="inline-flex h-5 items-end gap-[2px]"
-        title={t("sparklineTooltip", { counts: data.join(" · ") })}
-      >
-        {data.map((v, i) => (
-          <span
-            key={i}
-            className={`w-[7px] rounded-sm ${v > 0 ? "bg-indigo-400" : "bg-muted"}`}
-            style={{ height: v > 0 ? `${Math.max(20, (v / max) * 100)}%` : "3px" }}
-          />
-        ))}
-      </span>
-    );
-  };
-
   // 추세 열 정렬: 기본(번호순) ↔ 감소 학생 우선(지도가 필요한 학생 찾기)
   const [trendSortOn, setTrendSortOn] = useState(false);
-  const trendRank = (trend: number | null) => (trend === null ? 3 : trend < 0 ? 0 : trend === 0 ? 1 : 2);
   const focusStudentStats = () => {
     studentStatsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     setHighlightStudentStats(true);
@@ -239,7 +191,7 @@ function TeacherDashboard() {
     const [grade, className] = selectedClass.split("|");
     return `${stats.school ? `${stats.school} ` : ""}${t("gradeClass", { grade, className })}`;
   })();
-  const taskItems = [
+  const taskItems: TeacherTaskItem[] = [
     {
       key: "points",
       title: t("taskPointsTitle"),
@@ -287,6 +239,14 @@ function TeacherDashboard() {
     },
   ];
   const hasOpenTasks = taskItems.some((item) => item.count > 0);
+  const handleTaskClick = (item: TeacherTaskItem) => {
+    if (item.key === "declining") {
+      setTrendSortOn(true);
+      focusStudentStats();
+      return;
+    }
+    if (item.href) router.push(item.href);
+  };
 
   return (
     <div className="space-y-6">
@@ -326,61 +286,16 @@ function TeacherDashboard() {
       ) : (
         <>
           {/* 오늘 할 일 */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <CardTitle className="text-base">{t("todayTasksTitle")}</CardTitle>
-                  <p className="mt-1 text-xs text-muted-foreground">{t("todayTasksDesc")}</p>
-                </div>
-                {!hasOpenTasks && (
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200">
-                    {t("taskDone")}
-                  </span>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2 md:grid-cols-2">
-                {taskItems.map((item) => {
-                  const active = item.count > 0;
-                  const handleTaskClick = () => {
-                    if (item.key === "declining") {
-                      setTrendSortOn(true);
-                      focusStudentStats();
-                      return;
-                    }
-                    if (item.href) router.push(item.href);
-                  };
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={handleTaskClick}
-                      className={`rounded-lg border px-3 py-3 text-left transition-colors ${
-                        active
-                          ? item.activeClass
-                          : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                          <p className="mt-0.5 text-xs leading-5">{item.description}</p>
-                        </div>
-                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-bold ${
-                          active ? "bg-white/80 text-foreground dark:bg-background/70" : "bg-background text-muted-foreground"
-                        }`}>
-                          {item.count}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs font-semibold">{item.action}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+          <TeacherTodayTasksCard
+            taskItems={taskItems}
+            hasOpenTasks={hasOpenTasks}
+            onTaskClick={handleTaskClick}
+            labels={{
+              title: t("todayTasksTitle"),
+              description: t("todayTasksDesc"),
+              done: t("taskDone"),
+            }}
+          />
 
           {/* 총 질문 수 */}
           <Card>
@@ -494,148 +409,13 @@ function TeacherDashboard() {
             </CardContent>
           </Card>
 
-          {/* 학생별 통계 */}
-          <Card
+          <TeacherStudentStatsCard
             ref={studentStatsRef}
-            className={`scroll-mt-24 transition-shadow ${
-              highlightStudentStats ? "shadow-[0_0_0_3px_rgba(249,115,22,0.5)]" : ""
-            }`}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <CardTitle className="text-base">{t("studentStats")}</CardTitle>
-                {/* 무엇을 하는지 라벨로 보이는 정렬 토글 */}
-                <button
-                  type="button"
-                  onClick={() => setTrendSortOn((v) => !v)}
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                    trendSortOn
-                      ? "border-orange-400 bg-orange-500 text-white"
-                      : "border-border bg-background text-muted-foreground hover:bg-muted"
-                  }`}
-                  title={t("trendSortTitle")}
-                >
-                  ▼ {t("trendSortLabel")}
-                </button>
-              </div>
-              {/* 추세 읽는 법 — 이미지만 보고도 이해되도록 한 줄 범례 */}
-              <p className="text-xs text-muted-foreground">{t("trendLegend")}</p>
-            </CardHeader>
-            <CardContent>
-              {stats.byStudent.length === 0 ? (
-                <EmptyState icon="📊" title={t("noData")} />
-              ) : (
-                <>
-                <div className="space-y-2 lg:hidden">
-                  {(trendSortOn
-                    ? [...stats.byStudent].sort((a, b) => trendRank(a.trend) - trendRank(b.trend) || (a.trend ?? 0) - (b.trend ?? 0))
-                    : stats.byStudent
-                  ).map((s) => (
-                    <div key={s.studentId} className="rounded-lg border bg-card p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-foreground">{s.name}</p>
-                          {(s.grade || s.className || s.studentNumber) && (
-                            <p className="text-xs text-muted-foreground">
-                              {[
-                                s.grade && t("gradeLabel", { grade: s.grade }),
-                                s.className && t("classLabel", { className: s.className }),
-                                s.studentNumber && t("numberLabel", { n: s.studentNumber }),
-                              ].filter(Boolean).join(" ")}
-                            </p>
-                          )}
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="text-[11px] text-muted-foreground">{t("colTotal")}</p>
-                          <p className="text-xl font-bold text-foreground">{s.total}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        <div className="rounded-md bg-blue-50 px-2 py-2 text-center dark:bg-blue-950/30">
-                          <p className="text-[11px] text-blue-600">{tCls("closed.label")}</p>
-                          <p className="text-sm font-semibold text-blue-600">{s.distribution.closed}</p>
-                        </div>
-                        <div className="rounded-md bg-green-50 px-2 py-2 text-center dark:bg-green-950/30">
-                          <p className="text-[11px] text-green-600">{tCls("open.label")}</p>
-                          <p className="text-sm font-semibold text-green-600">{s.distribution.open}</p>
-                        </div>
-                        <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
-                          <p className="text-[11px] text-muted-foreground">{tCls("factual.label")}</p>
-                          <p className="text-sm font-semibold text-foreground">{s.cognitiveDistribution.factual}</p>
-                        </div>
-                        <div className="rounded-md bg-purple-50 px-2 py-2 text-center dark:bg-purple-950/30">
-                          <p className="text-[11px] text-purple-600">{tCls("conceptual.label")}</p>
-                          <p className="text-sm font-semibold text-purple-600">{s.cognitiveDistribution.conceptual}</p>
-                        </div>
-                        <div className="rounded-md bg-orange-50 px-2 py-2 text-center dark:bg-orange-950/30">
-                          <p className="text-[11px] text-orange-600">{tCls("controversial.label")}</p>
-                          <p className="text-sm font-semibold text-orange-600">{s.cognitiveDistribution.controversial}</p>
-                        </div>
-                        <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
-                          <p className="text-[11px] text-muted-foreground">{t("colTrend")}</p>
-                          <span className="inline-flex items-center justify-center gap-1.5">
-                            <Sparkline data={s.sparkline} />
-                            {getTrendBadge(s.trend)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="hidden overflow-x-auto lg:block"><Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("colStudent")}</TableHead>
-                      <TableHead className="text-center w-12">{t("colTotal")}</TableHead>
-                      <TableHead className="text-center whitespace-nowrap px-3 text-blue-600">{tCls("closed.label")}</TableHead>
-                      <TableHead className="text-center whitespace-nowrap px-3 text-green-600">{tCls("open.label")}</TableHead>
-                      <TableHead className="text-center whitespace-nowrap px-3 text-muted-foreground">{tCls("factual.label")}</TableHead>
-                      <TableHead className="text-center whitespace-nowrap px-3 text-purple-600">{tCls("conceptual.label")}</TableHead>
-                      <TableHead className="text-center whitespace-nowrap px-3 text-orange-600">{tCls("controversial.label")}</TableHead>
-                      <TableHead className="text-center w-36 whitespace-nowrap" title={t("colTrendTitle")}>
-                        {t("colTrend")}
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(trendSortOn
-                      ? [...stats.byStudent].sort((a, b) => trendRank(a.trend) - trendRank(b.trend) || (a.trend ?? 0) - (b.trend ?? 0))
-                      : stats.byStudent
-                    ).map((s) => (
-                      <TableRow key={s.studentId}>
-                        <TableCell>
-                          <div className="font-medium">{s.name}</div>
-                          {(s.grade || s.className || s.studentNumber) && (
-                            <div className="text-xs text-muted-foreground">
-                              {[
-                                s.grade && t("gradeLabel", { grade: s.grade }),
-                                s.className && t("classLabel", { className: s.className }),
-                                s.studentNumber && t("numberLabel", { n: s.studentNumber }),
-                              ].filter(Boolean).join(" ")}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center font-bold">{s.total}</TableCell>
-                        <TableCell className="text-center text-blue-600">{s.distribution.closed}</TableCell>
-                        <TableCell className="text-center text-green-600">{s.distribution.open}</TableCell>
-                        <TableCell className="text-center text-muted-foreground">{s.cognitiveDistribution.factual}</TableCell>
-                        <TableCell className="text-center text-purple-600">{s.cognitiveDistribution.conceptual}</TableCell>
-                        <TableCell className="text-center text-orange-600">{s.cognitiveDistribution.controversial}</TableCell>
-                        <TableCell className="text-center whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5">
-                            <Sparkline data={s.sparkline} />
-                            {getTrendBadge(s.trend)}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table></div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+            students={stats.byStudent}
+            trendSortOn={trendSortOn}
+            highlight={highlightStudentStats}
+            onTrendSortToggle={() => setTrendSortOn((v) => !v)}
+          />
 
           {/* 순위 (개인: 우리반/교내/전체 · 반: 교내/전체)
               · 특정 학급: 해당 학급 학생 순위
