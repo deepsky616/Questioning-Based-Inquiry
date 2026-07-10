@@ -264,7 +264,12 @@
     "referenceGuideTitle": "질문을 쓰기 전에 참고 자료를 확인하세요",
     "referenceGuideDesc": "선생님이 만든 탐구설계 내용을 보고 나만의 질문을 만들 수 있습니다.",
     "showReference": "참고 자료 보기",
-    "hideReference": "참고 자료 접기"
+    "hideReference": "참고 자료 접기",
+    "helperTitle": "좋은 질문 도우미",
+    "helperTipClosed": "답이 하나로 정해진 질문은 '왜?', '어떻게?', '만약 ~라면?'으로 바꾸면 생각이 넓어져요.",
+    "helperTipStage": "사실을 확인하는 질문 → 관계·이유를 찾는 질문 → 서로 생각이 갈리는 질문 순서로 깊어져요.",
+    "helperExample": "예) \"주인공 이름은 뭐야?\" → \"주인공의 행동이 어떤 결과를 가져올까?\"",
+    "helperPracticeLink": "질문연습에서 연습하기"
   },
   "comment": {
     "loading": "댓글 불러오는 중...",

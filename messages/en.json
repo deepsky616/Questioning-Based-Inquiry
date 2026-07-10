@@ -264,7 +264,12 @@
     "referenceGuideTitle": "Check the reference material before writing",
     "referenceGuideDesc": "Use your teacher's inquiry design to create your own question.",
     "showReference": "Show reference",
-    "hideReference": "Hide reference"
+    "hideReference": "Hide reference",
+    "helperTitle": "Good question helper",
+    "helperTipClosed": "Turn single-answer questions into 'why?', 'how?', or 'what if?' to open up thinking.",
+    "helperTipStage": "Questions deepen from checking facts → finding relationships and reasons → weighing different views.",
+    "helperExample": "e.g. \"What is the hero's name?\" → \"What will the hero's choice lead to?\"",
+    "helperPracticeLink": "Practice in Question Practice"
   },
   "comment": {
     "loading": "Loading comments...",

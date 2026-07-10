@@ -26,18 +26,20 @@ describe("student ask tablet layout", () => {
     expect(inputCardSource).toContain("student-ask-session-panel");
     expect(inputCardSource).toContain("student-ask-question-panel");
     expect(inputCardSource).toContain("md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]");
-    expect(inputCardSource).toContain("md:min-h-[16rem]");
     expect(inputCardSource).not.toContain("md:sticky");
   });
 
-  it("stretches the question panel to match the session list height (no bottom gap)", () => {
-    // 오른쪽 패널이 h-fit이면 왼쪽 세션 목록보다 짧아져 아래 여백이 생긴다.
-    // 컬럼을 stretch하고 입력창(flex-1)이 남는 공간을 흡수하게 유지한다.
+  it("keeps the textarea at a comfortable fixed size and fills leftover space with the helper", () => {
+    // 질문은 최대 200자 — 입력창이 남는 공간을 전부 흡수하면 어색하게 거대해진다.
+    // 입력창은 6줄 고정, 남는 세로 공간은 '좋은 질문 도우미'가 흡수해 여백도 막는다.
     expect(inputCardSource).toContain("md:items-stretch");
     expect(inputCardSource).not.toContain("h-fit");
     expect(inputCardSource).toContain("flex flex-col gap-4");
-    expect(inputCardSource).toContain("flex flex-1 flex-col");
-    expect(inputCardSource).toContain("min-h-[12rem] flex-1");
+    expect(inputCardSource).toContain('rows={6}');
+    expect(inputCardSource).toContain("min-h-[10rem] resize-none");
+    expect(inputCardSource).not.toContain("min-h-[10rem] resize-none text-base leading-7 flex-1");
+    expect(inputCardSource).toContain("student-ask-question-helper flex min-h-0 flex-1");
+    expect(inputCardSource).toContain('href="/student-practice"');
   });
 
   it("keeps session badges while visually separating selection and writing panels", () => {

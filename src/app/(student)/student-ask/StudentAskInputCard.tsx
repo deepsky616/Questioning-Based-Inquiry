@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode, RefObject } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -113,8 +114,9 @@ export function StudentAskInputCard({
             </div>
           )}
 
-          <div className="flex flex-1 flex-col gap-2">
+          <div className="flex flex-col gap-2">
             <Label htmlFor="content">{t("questionLabel")}</Label>
+            {/* 질문은 최대 200자 — 입력창은 6줄 고정, 남는 공간은 아래 도우미가 흡수한다 */}
             <Textarea
               ref={textareaRef}
               id="content"
@@ -122,10 +124,21 @@ export function StudentAskInputCard({
               value={content}
               maxLength={200}
               onChange={(event) => onContentChange(event.target.value)}
-              rows={7}
-              className="min-h-[12rem] flex-1 text-base leading-7 md:min-h-[16rem]"
+              rows={6}
+              className="min-h-[10rem] resize-none text-base leading-7"
             />
             <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
+          </div>
+
+          {/* 좋은 질문 도우미 — 세션 목록이 길 때 생기는 빈 공간을 학습 힌트로 채운다 */}
+          <div className="student-ask-question-helper flex min-h-0 flex-1 flex-col justify-center gap-1.5 overflow-y-auto rounded-lg border border-dashed border-indigo-200 bg-indigo-50/40 p-3 text-xs text-muted-foreground dark:border-indigo-500/30 dark:bg-indigo-950/20">
+            <p className="text-sm font-semibold text-foreground">💡 {t("helperTitle")}</p>
+            <p>{t("helperTipClosed")}</p>
+            <p>{t("helperTipStage")}</p>
+            <p className="italic">{t("helperExample")}</p>
+            <Link href="/student-practice" className="mt-1 font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300">
+              {t("helperPracticeLink")} →
+            </Link>
           </div>
 
           <Button
