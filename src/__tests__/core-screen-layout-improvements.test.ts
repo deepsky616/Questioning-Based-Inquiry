@@ -32,6 +32,8 @@ describe("core screen layout improvements", () => {
     expect(myQuestionsView).toContain("my-questions-tablet-filters");
     expect(myQuestionsView).toContain("student-questions-tablet-list");
     expect(myQuestionsView).toContain("xl:hidden");
+    expect(myQuestionsView).toContain("flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:flex-wrap md:items-center");
+    expect(myQuestionsView).toContain('<div className="shrink-0">');
   });
 
   it("keeps teacher session management optimized for desktop scanning", () => {

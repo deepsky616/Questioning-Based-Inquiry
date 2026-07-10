@@ -632,7 +632,7 @@ export function MyQuestionsView() {
       <Card>
         <CardHeader className="pb-2 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex w-full flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
+            <div className="flex min-w-0 flex-1 flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
               <CardTitle className="text-base">
                 {tEx("listTitle")} <span className="text-sm font-normal text-muted-foreground">{tEx("countItems", { count: displayed.length })}</span>
               </CardTitle>
@@ -644,12 +644,14 @@ export function MyQuestionsView() {
               />
               <TranslateAllButton items={displayed.map((q) => ({ type: "QUESTION" as const, id: q.id }))} ct={ct} />
             </div>
-            <QuestionSortControl
-              field={sortField}
-              dir={sortDir}
-              showStudent={false}
-              onChange={(f, d) => { setSortField(f); setSortDir(d); }}
-            />
+            <div className="shrink-0">
+              <QuestionSortControl
+                field={sortField}
+                dir={sortDir}
+                showStudent={false}
+                onChange={(f, d) => { setSortField(f); setSortDir(d); }}
+              />
+            </div>
           </div>
           <ClassificationChips
             filterClosure={filterClosure}
