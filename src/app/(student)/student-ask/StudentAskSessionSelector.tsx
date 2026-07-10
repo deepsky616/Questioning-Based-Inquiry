@@ -1,13 +1,10 @@
 "use client";
 
-import { CollapseChevron } from "@/components/shared/SectionToggle";
-import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { buildSessionLabel, isInquiryDesignSession } from "@/lib/sessions";
-import { COGNITIVE_LABEL } from "@/lib/question-labels";
 import { useTranslations } from "next-intl";
-import type { AskTaskScope, DesignContext, QuestionSession } from "./types";
+import type { AskTaskScope, QuestionSession } from "./types";
 
 interface FilterOptions {
   dates: string[];
@@ -30,19 +27,14 @@ interface StudentAskSessionSelectorProps {
   filterTopic: string;
   filteredSessions: QuestionSession[];
   selectedSessionId: string;
-  selectedSession: QuestionSession | null;
   questionSessionIds: Set<string>;
   sessionProgress: SessionProgress;
-  isInquirySession: boolean;
-  designContext: DesignContext | null;
-  showReference: boolean;
   onShowAllSessions: () => void;
   onFilterDateChange: (value: string) => void;
   onFilterSubjectChange: (value: string) => void;
   onFilterTopicChange: (value: string) => void;
   onSelectSession: (id: string) => void;
   getSessionDateBadge: (date: string) => string;
-  onToggleReference: () => void;
 }
 
 export function StudentAskSessionSelector({
@@ -53,22 +45,16 @@ export function StudentAskSessionSelector({
   filterTopic,
   filteredSessions,
   selectedSessionId,
-  selectedSession,
   questionSessionIds,
   sessionProgress,
-  isInquirySession,
-  designContext,
-  showReference,
   onShowAllSessions,
   onFilterDateChange,
   onFilterSubjectChange,
   onFilterTopicChange,
   onSelectSession,
   getSessionDateBadge,
-  onToggleReference,
 }: StudentAskSessionSelectorProps) {
   const t = useTranslations("ask");
-  const typeLabel = COGNITIVE_LABEL;
 
   return (
     <>
@@ -223,70 +209,9 @@ export function StudentAskSessionSelector({
           </div>
         )}
 
-        {selectedSession && (
-          <div className="rounded-lg border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-950/40 p-3 space-y-1">
-            <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">{t("currentSession")}</p>
-            <p className="text-sm font-medium text-blue-900">
-              {selectedSession.subject}
-              {selectedSession.topic.trim() && <span className="text-blue-700"> · {selectedSession.topic.trim()}</span>}
-            </p>
-            <p className="text-xs text-blue-600">
-              {selectedSession.teacher.name} {t("teacherSuffix")} &nbsp;·&nbsp; {selectedSession.date}
-            </p>
-            {selectedSession.unitDesignId && (
-              <div className="mt-2 rounded-md border border-indigo-200 bg-white px-3 py-2 text-xs text-indigo-700">
-                {t("inquiryClassNotice")}
-              </div>
-            )}
-            <p className="text-xs text-blue-500">
-              {t("visibilityNotice", { visibility: selectedSession.defaultQuestionPublic ? t("public") : t("private") })}
-            </p>
-          </div>
-        )}
       </div>
-
-      {isInquirySession && designContext && (
-        <div className="rounded-lg border-2 border-indigo-300 bg-indigo-50 p-4 dark:border-indigo-500/40 dark:bg-indigo-950/40">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">{t("referenceTitle")}</p>
-              <p className="mt-1 text-sm font-semibold text-indigo-900 dark:text-indigo-100">{t("referenceGuideTitle")}</p>
-              <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-200">{t("referenceGuideDesc")}</p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-8 border-indigo-200 bg-white px-3 text-xs text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/40 dark:bg-indigo-950/40 dark:text-indigo-100"
-              onClick={onToggleReference}
-            >
-              {showReference ? t("hideReference") : t("showReference")}
-              <CollapseChevron open={showReference} />
-            </Button>
-          </div>
-          {showReference && <DesignReferenceView data={designContext} className="mt-3" />}
-        </div>
-      )}
-
-      {selectedSession &&
-        Array.isArray(selectedSession.sharedQuestions) &&
-        selectedSession.sharedQuestions.filter((question) => question.content?.trim()).length > 0 && (
-          <div className="rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4 space-y-2">
-            <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">{t("teacherInquiryQuestions")}</p>
-            <p className="text-xs text-indigo-500 mb-2">{t("inquiryHint")}</p>
-            <ul className="space-y-1.5">
-              {selectedSession.sharedQuestions
-                .filter((question) => question.content?.trim())
-                .map((question, index) => (
-                  <li key={index} className="flex items-start gap-2 text-sm text-indigo-800">
-                    <span className="shrink-0 mt-0.5 text-xs font-medium text-indigo-500">
-                      [{typeLabel[question.type] ?? question.type}]
-                    </span>
-                    <span>{question.content}</span>
-                  </li>
-                ))}
-            </ul>
-          </div>
-        )}
+      {/* 선택된 세션 상세·참고자료·교사 탐구질문은 StudentAskReferencePanel(작성 패널 옆)로 이동 —
+          세션 카드 하이라이트와 중복되던 '현재 세션' 표시를 없애고 참고자료의 발견성을 높였다 */}
     </>
   );
 }

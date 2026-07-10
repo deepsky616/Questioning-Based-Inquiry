@@ -14,6 +14,7 @@ import { useTranslations } from "next-intl";
 import { StudentAskCompletionCard } from "./StudentAskCompletionCard";
 import { StudentAskInputCard } from "./StudentAskInputCard";
 import { StudentAskResultCard } from "./StudentAskResultCard";
+import { StudentAskReferencePanel } from "./StudentAskReferencePanel";
 import { StudentAskSessionSelector } from "./StudentAskSessionSelector";
 import type { ClassificationResult, DesignContext, QuestionSession, StudentQuestion } from "./types";
 
@@ -406,18 +407,22 @@ function AskContent() {
             filterTopic={filterTopic}
             filteredSessions={filteredSessions}
             selectedSessionId={selectedSessionId}
-            selectedSession={selectedSession}
             questionSessionIds={questionSessionIds}
             sessionProgress={sessionProgress}
-            isInquirySession={isInquirySession}
-            designContext={designContext}
-            showReference={showRef}
             onShowAllSessions={showAllSessions}
             onFilterDateChange={setFilterDate}
             onFilterSubjectChange={setFilterSubject}
             onFilterTopicChange={setFilterTopic}
             onSelectSession={selectSession}
             getSessionDateBadge={getSessionDateBadge}
+          />
+        }
+        referencePanel={
+          <StudentAskReferencePanel
+            selectedSession={selectedSession}
+            isInquirySession={isInquirySession}
+            designContext={designContext}
+            showReference={showRef}
             onToggleReference={() => setShowRef((value) => !value)}
           />
         }
