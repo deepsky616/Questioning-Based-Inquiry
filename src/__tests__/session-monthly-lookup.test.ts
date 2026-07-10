@@ -57,7 +57,10 @@ describe("session monthly lookup surfaces", () => {
 
   it("groups the point review analysis session dropdown by month", () => {
     expect(pointReviewView).toContain("groupSessionsByMonth");
-    expect(pointReviewView).toContain("<optgroup");
+    expect(pointReviewView).toContain("sessionMonthGroups.map");
+    expect(pointReviewView).toContain("pendingCountBySession");
+    expect(pointReviewView).toContain('t("groupPendingCount"');
+    expect(pointReviewView).toContain("bg-amber-100");
   });
 
   it("groups session list surfaces by month", () => {

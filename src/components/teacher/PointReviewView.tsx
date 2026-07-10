@@ -227,20 +227,64 @@ export function PointReviewView() {
           <CardDescription>{t("selectDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <select className="border rounded-md px-3 py-2 text-sm bg-card w-full"
-            value={selectedSessionId} onChange={(e) => setSelectedSessionId(e.target.value)}>
-            <option value="all">{t("allPendingOnly")}</option>
-            {sessionMonthGroups.map((group) => (
-              <optgroup key={group.key} label={`${group.label} (${group.sessions.length})`}>
-                {group.sessions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {buildSessionLabel(s.date, s.subject, s.topic)}
-                    {pendingCountBySession[s.id] ? t("optionPendingCount", { count: pendingCountBySession[s.id] }) : ""}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          <div className="space-y-3">
+            <button
+              type="button"
+              aria-pressed={selectedSessionId === "all"}
+              onClick={() => setSelectedSessionId("all")}
+              className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                selectedSessionId === "all"
+                  ? "border-indigo-300 bg-indigo-50 text-indigo-950 dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
+                  : "border-border bg-card hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
+              }`}
+            >
+              <span className="font-medium">{t("allPendingOnly")}</span>
+              {pending.length > 0 && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
+                  {t("groupPendingCount", { count: pending.length })}
+                </span>
+              )}
+            </button>
+
+            <div className="max-h-[18rem] space-y-3 overflow-y-auto pr-1">
+              {sessionMonthGroups.map((group) => (
+                <section key={group.key} className="space-y-1.5">
+                  <div className="flex items-center justify-between border-b pb-1 text-xs font-semibold text-muted-foreground">
+                    <span>{group.label}</span>
+                    <span>{group.sessions.length}</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {group.sessions.map((session) => {
+                      const count = pendingCountBySession[session.id] ?? 0;
+                      const active = selectedSessionId === session.id;
+                      return (
+                        <button
+                          key={session.id}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => setSelectedSessionId(session.id)}
+                          className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                            active
+                              ? "border-indigo-300 bg-indigo-50 text-indigo-950 dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
+                              : "border-border bg-card hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
+                          }`}
+                        >
+                          <span className="min-w-0 flex-1 truncate font-medium">
+                            {buildSessionLabel(session.date, session.subject, session.topic)}
+                          </span>
+                          {count > 0 && (
+                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-200">
+                              {t("groupPendingCount", { count })}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>
           <div className="flex gap-2">
             <Button
               onClick={runAnalyze}
