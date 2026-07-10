@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { MAX_ACTIVITY_BONUS_PER_STUDENT } from "@/lib/activity-bonus-policy";
 
 // PENDING 보너스 일괄 승인/거부/수정
 // body: { ids: string[], decision: 'APPROVE' | 'REJECT', overridePoints?: number }
@@ -17,6 +18,16 @@ export async function POST(req: NextRequest) {
   const overridePoints = typeof body.overridePoints === "number" ? body.overridePoints : null;
   if (ids.length === 0 || !decision) {
     return NextResponse.json({ error: "ids와 decision 필요" }, { status: 400 });
+  }
+  // 수정 점수 범위 검증 — 음수(감점)와 상한 초과를 서버에서 차단한다
+  if (
+    overridePoints != null &&
+    (!Number.isInteger(overridePoints) || overridePoints < 0 || overridePoints > MAX_ACTIVITY_BONUS_PER_STUDENT)
+  ) {
+    return NextResponse.json(
+      { error: `수정 점수는 0~${MAX_ACTIVITY_BONUS_PER_STUDENT} 사이의 정수여야 합니다` },
+      { status: 400 },
+    );
   }
 
   // 교사 권한 검증: 자기 담당 세션의 보너스만
