@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { buildSessionLabel, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
+import { buildSessionLabel, groupSessionDatesByMonth, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
 import { useTranslations } from "next-intl";
 import type { AskTaskScope, QuestionSession } from "./types";
 
@@ -55,6 +55,7 @@ export function StudentAskSessionSelector({
   getSessionDateBadge,
 }: StudentAskSessionSelectorProps) {
   const t = useTranslations("ask");
+  const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
 
   return (
@@ -89,8 +90,12 @@ export function StudentAskSessionSelector({
             onChange={(event) => onFilterDateChange(event.target.value)}
           >
             <option value="">{t("allDates")}</option>
-            {filterOptions.dates.map((date) => (
-              <option key={date} value={date}>{date}</option>
+            {dateMonthGroups.map((group) => (
+              <optgroup key={group.key} label={group.label}>
+                {group.dates.map((date) => (
+                  <option key={date} value={date}>{date}</option>
+                ))}
+              </optgroup>
             ))}
           </select>
           <select

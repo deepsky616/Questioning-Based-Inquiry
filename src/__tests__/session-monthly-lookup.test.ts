@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 const teacherQuestionSelector = readFileSync("src/app/(teacher)/teacher-questions/TeacherQuestionSessionSelector.tsx", "utf8");
+const teacherSessionListControls = readFileSync("src/app/(teacher)/teacher-sessions/TeacherSessionListControls.tsx", "utf8");
 const teacherSessionsPage = readFileSync("src/app/(teacher)/teacher-sessions/page.tsx", "utf8");
 const deployedDesignList = readFileSync("src/app/(teacher)/teacher-questions/DeployedDesignList.tsx", "utf8");
 const pointReviewView = readFileSync("src/components/teacher/PointReviewView.tsx", "utf8");
 const reportView = readFileSync("src/components/reports/ReportView.tsx", "utf8");
+const studentAskSelector = readFileSync("src/app/(student)/student-ask/StudentAskSessionSelector.tsx", "utf8");
 const studentExplore = readFileSync("src/components/student/ExploreQuestionsView.tsx", "utf8");
 const studentMyQuestions = readFileSync("src/components/student/MyQuestionsView.tsx", "utf8");
 const studentUnitDesign = readFileSync("src/components/student/UnitDesignView.tsx", "utf8");
@@ -20,7 +22,15 @@ describe("session monthly lookup surfaces", () => {
   });
 
   it("groups the date lookup filters in the main session lookup tabs by month", () => {
-    for (const source of [teacherQuestionSelector, deployedDesignList, studentExplore, studentMyQuestions]) {
+    for (const source of [
+      teacherQuestionSelector,
+      teacherSessionListControls,
+      deployedDesignList,
+      studentAskSelector,
+      studentExplore,
+      studentMyQuestions,
+      studentUnitDesign,
+    ]) {
       expect(source).toContain("groupSessionDatesByMonth");
     }
   });

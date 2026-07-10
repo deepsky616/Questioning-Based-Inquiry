@@ -1,7 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { groupSessionDatesByMonth } from "@/lib/sessions";
 
 export type SessionListSort = "desc" | "asc" | "missingDesc";
 export type SessionParticipationFilter = "all" | "missing" | "completed";
@@ -46,6 +47,7 @@ export function TeacherSessionListControls({
   const t = useTranslations("sessions");
   const tc = useTranslations("common");
   const hasFilter = Boolean(filterDate || filterSubject || filterTopic || search || participationFilter !== "all");
+  const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-2">
@@ -64,7 +66,12 @@ export function TeacherSessionListControls({
           <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">{t("allDates")}</SelectItem>
-            {filterOptions.dates.map((date) => <SelectItem key={date} value={date}>{date}</SelectItem>)}
+            {dateMonthGroups.map((group) => (
+              <SelectGroup key={group.key}>
+                <SelectLabel>{group.label}</SelectLabel>
+                {group.dates.map((date) => <SelectItem key={date} value={date}>{date}</SelectItem>)}
+              </SelectGroup>
+            ))}
           </SelectContent>
         </Select>
         <Select value={filterSubject || "__all__"} onValueChange={(v) => onFilterSubject(v === "__all__" ? "" : v)}>

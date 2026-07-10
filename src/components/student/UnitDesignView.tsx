@@ -10,7 +10,7 @@ import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { CalendarDays } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionsByMonth, isSessionAvailable } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionDatesByMonth, groupSessionsByMonth, isSessionAvailable } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { groupSharedQuestions } from "@/lib/shared-questions";
@@ -156,6 +156,7 @@ export function UnitDesignView() {
 
   // 조회(필터)·검색·정렬 적용 + 진행 중/지난 수업 구분
   const filterOptions = getSessionFilterOptions(sessions);
+  const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   const searchLc = search.trim().toLowerCase();
   const filteredSessions = filterSessions(sessions, {
     date: filterDate || undefined,
@@ -234,8 +235,19 @@ export function UnitDesignView() {
                   className="h-8 text-sm"
                 />
                 <div className="flex flex-wrap items-center gap-1.5">
+                  <select
+                    value={filterDate}
+                    onChange={(e) => setFilterDate(e.target.value)}
+                    className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                  >
+                    <option value="">{tSess("allDates")}</option>
+                    {dateMonthGroups.map((group) => (
+                      <optgroup key={group.key} label={group.label}>
+                        {group.dates.map((date) => <option key={date} value={date}>{date}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
                   {([
-                    [filterDate, setFilterDate, filterOptions.dates, tSess("allDates")],
                     [filterSubject, setFilterSubject, filterOptions.subjects, tSess("allSubjects")],
                     [filterTopic, setFilterTopic, filterOptions.topics, tSess("allTopics")],
                   ] as const).map(([value, setter, options, allLabel], i) => (
