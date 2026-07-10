@@ -13,8 +13,9 @@ describe("student ask tablet layout", () => {
 
   it("uses a two-column tablet layout for session selection and question writing", () => {
     expect(inputCardSource).toContain("student-ask-tablet-layout");
+    expect(inputCardSource).toContain("student-ask-session-panel");
     expect(inputCardSource).toContain("student-ask-question-panel");
-    expect(inputCardSource).toContain("md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]");
+    expect(inputCardSource).toContain("md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]");
     expect(inputCardSource).toContain("md:min-h-[16rem]");
     expect(inputCardSource).not.toContain("md:sticky");
   });
@@ -27,6 +28,15 @@ describe("student ask tablet layout", () => {
     expect(inputCardSource).toContain("flex flex-col gap-4");
     expect(inputCardSource).toContain("flex flex-1 flex-col");
     expect(inputCardSource).toContain("min-h-[12rem] flex-1");
+  });
+
+  it("keeps session badges while visually separating selection and writing panels", () => {
+    expect(inputCardSource).toContain("student-ask-session-panel min-w-0 rounded-xl border bg-muted/30 p-4");
+    expect(inputCardSource).toContain("border border-indigo-200 bg-card p-4 shadow-sm");
+    expect(inputCardSource).toContain("selectedSession.unitDesignId");
+    expect(sessionSelectorSource).toContain("getSessionDateBadge(session.date)");
+    expect(sessionSelectorSource).toContain("completedSessionBadge");
+    expect(sessionSelectorSource).toContain("inquiryClassTag");
   });
 
   it("keeps session controls touch-friendly on tablets", () => {

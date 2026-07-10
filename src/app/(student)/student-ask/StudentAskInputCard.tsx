@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { QuestionSession } from "./types";
 
 interface FlowStep {
   step: number;
@@ -15,6 +16,7 @@ interface FlowStep {
 
 interface StudentAskInputCardProps {
   sessionSelector: ReactNode;
+  selectedSession: QuestionSession | null;
   flowSteps: FlowStep[];
   currentStep: number;
   existingQuestion: { id: string; content: string } | null;
@@ -29,6 +31,7 @@ interface StudentAskInputCardProps {
 
 export function StudentAskInputCard({
   sessionSelector,
+  selectedSession,
   flowSteps,
   currentStep,
   existingQuestion,
@@ -49,7 +52,7 @@ export function StudentAskInputCard({
         <CardDescription>{t("inputDesc")}</CardDescription>
       </CardHeader>
       {/* items-stretch — 왼쪽(세션 목록)과 오른쪽(질문 입력)의 높이를 항상 맞춘다 */}
-      <CardContent className="student-ask-tablet-layout grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)] md:items-stretch">
+      <CardContent className="student-ask-tablet-layout grid gap-4 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] md:items-stretch">
         <div className="grid grid-cols-3 gap-2 md:col-span-2">
           {flowSteps.map((item) => {
             const active = item.step === currentStep;
@@ -72,12 +75,36 @@ export function StudentAskInputCard({
           })}
         </div>
 
-        <div className="min-w-0">
+        <div className="student-ask-session-panel min-w-0 rounded-xl border bg-muted/30 p-4">
           {sessionSelector}
         </div>
 
         {/* flex-col — 남는 세로 공간을 질문 입력창이 흡수해 아래 여백이 생기지 않는다 */}
-        <div className="student-ask-question-panel flex flex-col gap-4 rounded-xl border bg-background p-4">
+        <div className="student-ask-question-panel flex flex-col gap-4 rounded-xl border border-indigo-200 bg-card p-4 shadow-sm dark:border-indigo-500/30">
+          {selectedSession && (
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/70 px-3 py-2 text-sm dark:border-indigo-500/30 dark:bg-indigo-950/25">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+                  {t("currentSession")}
+                </p>
+                {selectedSession.unitDesignId && (
+                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">
+                    {t("inquiryClassTag")}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 font-semibold text-indigo-950 dark:text-indigo-100">
+                {selectedSession.subject}
+                {selectedSession.topic.trim() && (
+                  <span className="font-medium text-indigo-700 dark:text-indigo-200"> · {selectedSession.topic.trim()}</span>
+                )}
+              </p>
+              <p className="mt-0.5 text-xs text-indigo-700 dark:text-indigo-200">
+                {selectedSession.teacher.name} {t("teacherSuffix")} · {selectedSession.date}
+              </p>
+            </div>
+          )}
+
           {existingQuestion && !isCheckingExisting && (
             <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
               {t("alreadyAsked")}: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? "..." : ""}&rdquo;</strong>

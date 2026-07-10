@@ -396,6 +396,7 @@ function AskContent() {
       <StudentAskInputCard
         flowSteps={flowSteps}
         currentStep={currentStep}
+        selectedSession={selectedSession}
         existingQuestion={existingQuestion}
         isCheckingExisting={isCheckingExisting}
         content={content}
