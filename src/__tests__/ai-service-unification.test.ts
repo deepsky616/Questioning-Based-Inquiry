@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 const bulkAiAnswersRoute = readFileSync("src/app/api/questions/bulk-ai-answers/route.ts", "utf8");
 const unitSequenceRoute = readFileSync("src/app/api/unit-design/sequence/route.ts", "utf8");
@@ -42,13 +42,18 @@ describe("AI service unification", () => {
   });
 
   it("does not leave direct Gemini SDK imports outside the shared AI service", () => {
-    const matches = execSync("rg -l '@google/generative-ai|new GoogleGenerativeAI|generateContent' src/app src/components src/lib", {
-      encoding: "utf8",
-    })
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
+    // rg 등 외부 도구 없이(CI 러너에 없음) Node로 직접 순회한다
+    const pattern = /@google\/generative-ai|new GoogleGenerativeAI|generateContent/;
+    const matches: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (/\.(ts|tsx)$/.test(entry.name) && pattern.test(readFileSync(path, "utf8"))) matches.push(path);
+      }
+    };
+    for (const dir of ["src/app", "src/components", "src/lib"]) walk(dir);
 
-    expect(matches).toEqual(["src/lib/ai.ts"]);
+    expect(matches.sort()).toEqual(["src/lib/ai.ts"]);
   });
 });
