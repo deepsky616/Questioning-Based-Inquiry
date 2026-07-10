@@ -62,6 +62,9 @@ describe("student ask staged layout", () => {
     expect(sessionSelectorSource).toContain("completedSessionBadge");
     expect(sessionSelectorSource).toContain("inquiryClassTag");
     expect(sessionSelectorSource).toContain("student-ask-filter-grid");
+    expect(sessionSelectorSource).toContain("groupSessionsByMonth");
+    expect(sessionSelectorSource).toContain("student-ask-month-section");
+    expect(sessionSelectorSource).toContain("student-ask-month-grid");
     expect(sessionSelectorSource).toContain("student-ask-session-grid");
     expect(sessionSelectorSource).toContain("min-h-[132px]");
     expect(sessionSelectorSource).toContain("max-h-[24rem]");

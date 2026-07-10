@@ -1,4 +1,6 @@
 const SESSION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UNKNOWN_SESSION_MONTH_KEY = "unknown";
+const UNKNOWN_SESSION_MONTH_LABEL = "날짜 미정";
 
 export function isValidSessionDateString(value: string): boolean {
   if (!SESSION_DATE_RE.test(value)) return false;
@@ -54,7 +56,7 @@ export function isSessionAvailable(sessionDate: string, now: Date = new Date()):
   return sessionDate >= today;
 }
 
-type SortableSession = {
+export type SortableSession = {
   date: string;
   createdAt?: string | Date | null;
 };
@@ -83,6 +85,40 @@ export function sortSessionsDesc<T extends SortableSession>(sessions: T[]): T[] 
 
 export function sortSessionsAsc<T extends SortableSession>(sessions: T[]): T[] {
   return [...sessions].sort(compareSessionsAsc);
+}
+
+export interface SessionMonthGroup<T extends SortableSession> {
+  key: string;
+  label: string;
+  sessions: T[];
+}
+
+function getSessionMonthKey(dateStr: string): string | null {
+  if (!isValidSessionDateString(dateStr)) return null;
+  return dateStr.slice(0, 7);
+}
+
+function buildSessionMonthLabel(monthKey: string): string {
+  if (monthKey === UNKNOWN_SESSION_MONTH_KEY) return UNKNOWN_SESSION_MONTH_LABEL;
+  const [year, month] = monthKey.split("-");
+  return `${year}년 ${parseInt(month, 10)}월`;
+}
+
+export function groupSessionsByMonth<T extends SortableSession>(sessions: T[]): SessionMonthGroup<T>[] {
+  const grouped = new Map<string, T[]>();
+
+  for (const session of sortSessionsDesc(sessions)) {
+    const monthKey = getSessionMonthKey(session.date) ?? UNKNOWN_SESSION_MONTH_KEY;
+    const group = grouped.get(monthKey) ?? [];
+    group.push(session);
+    grouped.set(monthKey, group);
+  }
+
+  return Array.from(grouped, ([key, groupSessions]) => ({
+    key,
+    label: buildSessionMonthLabel(key),
+    sessions: groupSessions,
+  }));
 }
 
 // 세션 선택 시 질문 맥락 자동완성용 힌트 문자열 생성

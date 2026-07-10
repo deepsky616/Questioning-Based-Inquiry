@@ -9,6 +9,7 @@ import {
   isValidSessionDateString,
   normalizeSessionDate,
   getSessionFilterOptions,
+  groupSessionsByMonth,
 } from "@/lib/sessions";
 
 describe("session date validation", () => {
@@ -135,6 +136,35 @@ describe("sortSessionsDesc", () => {
     ];
     const sorted = sortSessionsDesc(sessions);
     expect(sorted.map((s) => s.id)).toEqual(["b", "a", "c"]);
+  });
+});
+
+describe("groupSessionsByMonth", () => {
+  it("수업세션을 최신 월부터 묶고 같은 월 안에서도 최신 세션을 먼저 둔다", () => {
+    const sessions = [
+      { id: "a", date: "2026-07-02", createdAt: "2026-07-02T09:00:00.000Z", subject: "과학", topic: "" },
+      { id: "b", date: "2026-06-30", createdAt: "2026-06-30T09:00:00.000Z", subject: "수학", topic: "" },
+      { id: "c", date: "2026-07-02", createdAt: "2026-07-02T10:00:00.000Z", subject: "국어", topic: "" },
+      { id: "d", date: "2026-05-15", createdAt: "2026-05-15T09:00:00.000Z", subject: "사회", topic: "" },
+    ];
+
+    const groups = groupSessionsByMonth(sessions);
+
+    expect(groups.map((group) => group.key)).toEqual(["2026-07", "2026-06", "2026-05"]);
+    expect(groups.map((group) => group.label)).toEqual(["2026년 7월", "2026년 6월", "2026년 5월"]);
+    expect(groups[0].sessions.map((session) => session.id)).toEqual(["c", "a"]);
+    expect(groups[1].sessions.map((session) => session.id)).toEqual(["b"]);
+  });
+
+  it("날짜가 잘못된 수업세션도 날짜 미정 그룹에 보존한다", () => {
+    const groups = groupSessionsByMonth([
+      { id: "a", date: "2026-07-02", subject: "과학", topic: "" },
+      { id: "b", date: "2026-07-40", subject: "수학", topic: "" },
+    ]);
+
+    expect(groups.map((group) => group.key)).toEqual(["2026-07", "unknown"]);
+    expect(groups[1].label).toBe("날짜 미정");
+    expect(groups[1].sessions.map((session) => session.id)).toEqual(["b"]);
   });
 });
 

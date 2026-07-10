@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { buildSessionLabel, isInquiryDesignSession } from "@/lib/sessions";
+import { buildSessionLabel, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
 import { useTranslations } from "next-intl";
 import type { AskTaskScope, QuestionSession } from "./types";
 
@@ -55,6 +55,7 @@ export function StudentAskSessionSelector({
   getSessionDateBadge,
 }: StudentAskSessionSelectorProps) {
   const t = useTranslations("ask");
+  const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
 
   return (
     <>
@@ -160,51 +161,61 @@ export function StudentAskSessionSelector({
             </div>
 
             {/* 목록 상한을 오른쪽 패널(입력창+도우미) 높이 수준으로 — 좌우 불균형의 원천 축소 */}
-            <div className="student-ask-session-grid grid max-h-[24rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-              {filteredSessions.map((session) => {
-                const active = selectedSessionId === session.id;
-                const isInquiry = isInquiryDesignSession(session);
-                const alreadyAskedInSession = questionSessionIds.has(session.id);
-                return (
-                  <button
-                    key={session.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => onSelectSession(session.id)}
-                    className={`min-h-[132px] rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                      active
-                        ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
-                        : "border-border bg-background hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        active ? "bg-white text-indigo-700 dark:bg-indigo-900 dark:text-indigo-100" : "bg-muted text-muted-foreground"
-                      }`}>
-                        {getSessionDateBadge(session.date)}
-                      </span>
-                      {active && <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white">{t("selectedSessionBadge")}</span>}
-                      {!active && alreadyAskedInSession && (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
-                          {t("completedSessionBadge")}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
-                      <p className="line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
-                        {session.topic.trim() || t("emptyTopic")}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <span>{session.date}</span>
-                        <span>{session.teacher.name} {t("teacherSuffix")}</span>
-                        {isInquiry && <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">{t("inquiryClassTag")}</span>}
-                        {alreadyAskedInSession && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">{t("completedSessionShort")}</span>}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="student-ask-session-grid max-h-[24rem] space-y-4 overflow-y-auto pr-1">
+              {sessionMonthGroups.map((group) => (
+                <section key={group.key} className="student-ask-month-section space-y-2">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 py-2 text-xs font-semibold text-muted-foreground backdrop-blur">
+                    <span>{group.label}</span>
+                    <span>{group.sessions.length}개</span>
+                  </div>
+                  <div className="student-ask-month-grid grid gap-2 sm:grid-cols-2">
+                    {group.sessions.map((session) => {
+                      const active = selectedSessionId === session.id;
+                      const isInquiry = isInquiryDesignSession(session);
+                      const alreadyAskedInSession = questionSessionIds.has(session.id);
+                      return (
+                        <button
+                          key={session.id}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() => onSelectSession(session.id)}
+                          className={`min-h-[132px] rounded-lg border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                            active
+                              ? "border-indigo-300 bg-indigo-50 text-indigo-950 shadow-sm dark:border-indigo-500/50 dark:bg-indigo-950/40 dark:text-indigo-100"
+                              : "border-border bg-background hover:border-indigo-200 hover:bg-indigo-50/60 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-950/20"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              active ? "bg-white text-indigo-700 dark:bg-indigo-900 dark:text-indigo-100" : "bg-muted text-muted-foreground"
+                            }`}>
+                              {getSessionDateBadge(session.date)}
+                            </span>
+                            {active && <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white">{t("selectedSessionBadge")}</span>}
+                            {!active && alreadyAskedInSession && (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">
+                                {t("completedSessionBadge")}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-2 space-y-1">
+                            <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
+                            <p className="line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
+                              {session.topic.trim() || t("emptyTopic")}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <span>{session.date}</span>
+                              <span>{session.teacher.name} {t("teacherSuffix")}</span>
+                              {isInquiry && <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200">{t("inquiryClassTag")}</span>}
+                              {alreadyAskedInSession && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200">{t("completedSessionShort")}</span>}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           </div>
         )}
