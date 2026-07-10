@@ -14,6 +14,7 @@ import {
   prepareStudentAskFlow,
   type StudentAskFlowFixture,
 } from "./helpers/test-db";
+import { loginAsStudent } from "./helpers/login";
 
 async function stubQuestionClassification(page: Page) {
   await page.route("**/api/config", async (route) => {
@@ -38,26 +39,20 @@ test.describe("학생 질문 작성 흐름", () => {
 
   let fixture: StudentAskFlowFixture;
 
-  test.beforeAll(async () => {
-    fixture = await prepareStudentAskFlow();
+  // 스펙×프로젝트별로 학생·세션을 분리해 병렬 실행 경합을 막는다
+  test.beforeAll(async ({}, testInfo) => {
+    fixture = await prepareStudentAskFlow(`ask-${testInfo.project.name}`);
   });
 
-  test.afterAll(async () => {
-    await cleanupStudentAskFlow();
+  test.afterAll(async ({}, testInfo) => {
+    await cleanupStudentAskFlow(`ask-${testInfo.project.name}`);
   });
 
   test("태블릿에서 질문을 분석하고 저장한 뒤 내 질문에서 확인한다", async ({ page }) => {
     await page.setViewportSize({ width: 820, height: 1180 });
     await stubQuestionClassification(page);
 
-    await page.goto("/login");
-    await page.locator("#s-school").fill(fixture.student.school);
-    await page.locator("#s-grade").fill(fixture.student.grade);
-    await page.locator("#s-class").fill(fixture.student.className);
-    await page.locator("#s-number").fill(fixture.student.studentNumber);
-    await page.locator("#s-password").fill(fixture.student.password);
-    await page.getByRole("button", { name: "학생 로그인" }).click();
-    await page.waitForURL("**/student-dashboard", { timeout: 15000 });
+    await loginAsStudent(page, fixture.student);
 
     await page.goto(`/student-ask?sessionId=${fixture.session.id}`);
     await expect(page.getByRole("button", { name: new RegExp(fixture.session.topic) })).toBeVisible({

@@ -10,9 +10,32 @@ import { Prisma, PrismaClient } from "@prisma/client";
 
 export const TEST_TEACHER_EMAIL = "hermes.test.20260529@example.com";
 export const E2E_TITLE_PREFIX = "E2E-마법사-";
-export const TEST_STUDENT_EMAIL = "e2e.student.ask@example.com";
 export const E2E_SESSION_TOPIC_PREFIX = "E2E-질문작성-";
 export const E2E_QUESTION_CONTENT_PREFIX = "E2E-학생질문-";
+
+// 같은 스펙이 chromium·tablet 두 프로젝트에서 병렬 실행되므로,
+// 학생 계정·번호·세션을 프로젝트 키별로 분리해 경합(unique email,
+// 동일 학교·학년·반·번호 로그인 충돌)을 원천적으로 막는다.
+const STUDENT_EMAIL_BASE = "e2e.student.ask";
+// 스펙×프로젝트 조합마다 번호를 달리한다(로그인이 학교·학년·반·번호로 계정을 찾으므로)
+const STUDENT_NUMBER_BY_KEY: Record<string, string> = {
+  "ask-chromium": "71",
+  "ask-tablet": "72",
+  "nav-chromium": "73",
+  "nav-tablet": "74",
+};
+
+function studentEmailFor(key: string): string {
+  return `${STUDENT_EMAIL_BASE}.${key}@example.com`;
+}
+
+function studentNumberFor(key: string): string {
+  return STUDENT_NUMBER_BY_KEY[key] ?? "79";
+}
+
+function sessionTopicPrefixFor(key: string): string {
+  return `${E2E_SESSION_TOPIC_PREFIX}${key}-`;
+}
 
 export interface StudentAskFlowFixture {
   student: {
@@ -102,12 +125,13 @@ async function ignoreMissingTable(action: () => Promise<unknown>): Promise<void>
   }
 }
 
-async function cleanupStudentAskFlowWithClient(prisma: PrismaClient): Promise<void> {
+async function cleanupStudentAskFlowWithClient(prisma: PrismaClient, key: string): Promise<void> {
   const teacher = await prisma.user.findFirst({ where: { email: TEST_TEACHER_EMAIL }, select: { id: true } });
-  const student = await prisma.user.findFirst({ where: { email: TEST_STUDENT_EMAIL }, select: { id: true } });
+  const student = await prisma.user.findFirst({ where: { email: studentEmailFor(key) }, select: { id: true } });
+  // 키가 붙은 자기 세션만 지운다 — 병렬로 도는 다른 프로젝트의 픽스처를 건드리지 않기 위함
   const sessions = await prisma.questionSession.findMany({
     where: {
-      topic: { startsWith: E2E_SESSION_TOPIC_PREFIX },
+      topic: { startsWith: sessionTopicPrefixFor(key) },
       ...(teacher ? { teacherId: teacher.id } : {}),
     },
     select: { id: true },
@@ -149,11 +173,11 @@ async function cleanupStudentAskFlowWithClient(prisma: PrismaClient): Promise<vo
   }
 }
 
-/** 학생 질문 작성 e2e용 학생·담당학급·수업세션을 준비한다. */
-export async function prepareStudentAskFlow(): Promise<StudentAskFlowFixture> {
+/** 학생 질문 작성 e2e용 학생·담당학급·수업세션을 프로젝트 키별로 준비한다. */
+export async function prepareStudentAskFlow(key = "default"): Promise<StudentAskFlowFixture> {
   const prisma = client();
   try {
-    await cleanupStudentAskFlowWithClient(prisma);
+    await cleanupStudentAskFlowWithClient(prisma, key);
 
     const teacher = await prisma.user.findFirst({
       where: { email: TEST_TEACHER_EMAIL },
@@ -164,7 +188,8 @@ export async function prepareStudentAskFlow(): Promise<StudentAskFlowFixture> {
     const school = teacher.school?.trim() || "E2E테스트초";
     const grade = "4";
     const className = "4";
-    const studentNumber = "7";
+    // 학생 로그인이 학교·학년·반·번호로 계정을 찾으므로 프로젝트별로 번호를 달리한다
+    const studentNumber = studentNumberFor(key);
     const password = `E2e!${randomBytes(9).toString("hex")}`;
 
     const existingClass = await prisma.teacherClass.findFirst({
@@ -172,16 +197,25 @@ export async function prepareStudentAskFlow(): Promise<StudentAskFlowFixture> {
       select: { id: true },
     });
     if (!existingClass) {
-      await prisma.teacherClass.create({
-        data: { teacherId: teacher.id, grade, className },
-      });
+      try {
+        await prisma.teacherClass.create({
+          data: { teacherId: teacher.id, grade, className },
+        });
+      } catch (error) {
+        // 병렬 프로젝트가 먼저 만든 경우(unique 충돌)는 무시
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error;
+      }
     }
 
-    const student = await prisma.user.create({
-      data: {
-        email: TEST_STUDENT_EMAIL,
-        password: await bcrypt.hash(password, 12),
-        name: "E2E학생",
+    // upsert — 비정상 종료로 남은 계정이 있어도 준비가 실패하지 않게 한다
+    const email = studentEmailFor(key);
+    const hashed = await bcrypt.hash(password, 12);
+    const student = await prisma.user.upsert({
+      where: { email },
+      create: {
+        email,
+        password: hashed,
+        name: `E2E학생-${key}`,
         role: "STUDENT",
         school,
         grade,
@@ -189,6 +223,7 @@ export async function prepareStudentAskFlow(): Promise<StudentAskFlowFixture> {
         studentNumber,
         totalPoints: 0,
       },
+      update: { password: hashed, school, grade, className, studentNumber },
       select: { id: true },
     });
 
@@ -196,7 +231,7 @@ export async function prepareStudentAskFlow(): Promise<StudentAskFlowFixture> {
       data: {
         date: todayDateString(),
         subject: "과학",
-        topic: `${E2E_SESSION_TOPIC_PREFIX}${Date.now()}`,
+        topic: `${sessionTopicPrefixFor(key)}${Date.now()}`,
         teacherId: teacher.id,
         targetType: "CLASS",
         targetGrade: grade,
@@ -220,11 +255,11 @@ export async function prepareStudentAskFlow(): Promise<StudentAskFlowFixture> {
   }
 }
 
-/** 학생 질문 작성 e2e가 만든 데이터만 접두사 기준으로 삭제한다. */
-export async function cleanupStudentAskFlow(): Promise<void> {
+/** 학생 질문 작성 e2e가 만든 데이터만 프로젝트 키·접두사 기준으로 삭제한다. */
+export async function cleanupStudentAskFlow(key = "default"): Promise<void> {
   const prisma = client();
   try {
-    await cleanupStudentAskFlowWithClient(prisma);
+    await cleanupStudentAskFlowWithClient(prisma, key);
   } finally {
     await prisma.$disconnect();
   }
