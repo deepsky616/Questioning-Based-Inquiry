@@ -130,8 +130,8 @@ export function StudentAskInputCard({
             <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
           </div>
 
-          {/* 좋은 질문 도우미 — 세션 목록이 길 때 생기는 빈 공간을 학습 힌트로 채운다 */}
-          <div className="student-ask-question-helper flex min-h-0 flex-1 flex-col justify-center gap-1.5 overflow-y-auto rounded-lg border border-dashed border-indigo-200 bg-indigo-50/40 p-3 text-xs text-muted-foreground dark:border-indigo-500/30 dark:bg-indigo-950/20">
+          {/* 좋은 질문 도우미 — 내용 크기만큼만 차지한다(남는 공간은 버튼 위 여백으로 분산) */}
+          <div className="student-ask-question-helper flex flex-col gap-1.5 rounded-lg border border-dashed border-indigo-200 bg-indigo-50/40 p-3 text-xs text-muted-foreground dark:border-indigo-500/30 dark:bg-indigo-950/20">
             <p className="text-sm font-semibold text-foreground">💡 {t("helperTitle")}</p>
             <p>{t("helperTipClosed")}</p>
             <p>{t("helperTipStage")}</p>
@@ -145,7 +145,7 @@ export function StudentAskInputCard({
             onClick={onAnalyze}
             disabled={isLoading || !canAsk || content.trim().length === 0}
             variant="gradient"
-            className="h-12 w-full text-base font-semibold"
+            className="mt-auto h-12 w-full text-base font-semibold"
           >
             {isLoading ? t("analyzing") : t("analyze")}
           </Button>

@@ -173,7 +173,8 @@ export function StudentAskSessionSelector({
               </div>
             </div>
 
-            <div className="student-ask-session-grid grid max-h-[24rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 md:max-h-[32rem]">
+            {/* 목록 상한을 오른쪽 패널(입력창+도우미) 높이 수준으로 — 좌우 불균형의 원천 축소 */}
+            <div className="student-ask-session-grid grid max-h-[24rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
               {filteredSessions.map((session) => {
                 const active = selectedSessionId === session.id;
                 const isInquiry = isInquiryDesignSession(session);

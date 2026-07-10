@@ -29,17 +29,18 @@ describe("student ask tablet layout", () => {
     expect(inputCardSource).not.toContain("md:sticky");
   });
 
-  it("keeps the textarea at a comfortable fixed size and fills leftover space with the helper", () => {
-    // 질문은 최대 200자 — 입력창이 남는 공간을 전부 흡수하면 어색하게 거대해진다.
-    // 입력창은 6줄 고정, 남는 세로 공간은 '좋은 질문 도우미'가 흡수해 여백도 막는다.
+  it("keeps the textarea and helper at content size, distributing leftover space", () => {
+    // 질문은 최대 200자 — 어떤 요소든 남는 공간을 혼자 흡수하면 어색하게 거대해진다.
+    // 입력창 6줄 고정 + 도우미도 내용 크기 고정, 잔여 공간은 mt-auto 버튼 위 여백으로 분산.
     expect(inputCardSource).toContain("md:items-stretch");
     expect(inputCardSource).not.toContain("h-fit");
     expect(inputCardSource).toContain("flex flex-col gap-4");
     expect(inputCardSource).toContain('rows={6}');
     expect(inputCardSource).toContain("min-h-[10rem] resize-none");
-    expect(inputCardSource).not.toContain("min-h-[10rem] resize-none text-base leading-7 flex-1");
-    expect(inputCardSource).toContain("student-ask-question-helper flex min-h-0 flex-1");
+    expect(inputCardSource).not.toContain("flex-1");
+    expect(inputCardSource).toContain("student-ask-question-helper flex flex-col");
     expect(inputCardSource).toContain('href="/student-practice"');
+    expect(inputCardSource).toContain("mt-auto h-12 w-full");
   });
 
   it("keeps session badges while visually separating selection and writing panels", () => {
@@ -55,7 +56,9 @@ describe("student ask tablet layout", () => {
     expect(sessionSelectorSource).toContain("student-ask-filter-grid");
     expect(sessionSelectorSource).toContain("student-ask-session-grid");
     expect(sessionSelectorSource).toContain("min-h-[132px]");
-    expect(sessionSelectorSource).toContain("md:max-h-[32rem]");
+    // 목록 상한을 오른쪽 패널 높이 수준으로 유지 — 좌우 불균형의 원천 축소
+    expect(sessionSelectorSource).toContain("max-h-[24rem]");
+    expect(sessionSelectorSource).not.toContain("md:max-h-[32rem]");
     expect(sessionSelectorSource).toContain("h-11");
     expect(sessionSelectorSource).toContain("h-12");
   });
