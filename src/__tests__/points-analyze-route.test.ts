@@ -233,7 +233,18 @@ describe("POST /api/teacher/points/analyze", () => {
   });
 
   it("이미 정규화된 동일 내용은 중복 후보로 함께 저장한다", async () => {
-    mGenerateJson.mockResolvedValue({ bonuses: [], summary: "중복 검토" });
+    mGenerateJson.mockResolvedValue({
+      bonuses: [
+        {
+          studentId: "student-2",
+          targetId: "q2",
+          targetType: "question",
+          bonusType: "DEEP_QUESTION",
+          reason: "깊이 있는 질문입니다.",
+        },
+      ],
+      summary: "중복 검토",
+    });
     questionMany.mockResolvedValue([
       {
         id: "q1",
@@ -258,6 +269,7 @@ describe("POST /api/teacher/points/analyze", () => {
 
     expect(res.status).toBe(200);
     expect(pointCreate).toHaveBeenCalledTimes(1);
+    expect(pointCreate.mock.calls.map((call) => call[0].data.bonusType)).not.toContain("AI_DEEP_QUESTION");
     expect(pointCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         studentId: "student-2",
@@ -270,5 +282,53 @@ describe("POST /api/teacher/points/analyze", () => {
     });
     expect(body.createdPending).toBe(1);
     expect(body.fallbackUsed).toBe(true);
+  });
+
+  it("확인 필요로 분류된 작성물은 추천 보너스와 중복 저장하지 않는다", async () => {
+    mGenerateJson.mockResolvedValue({
+      bonuses: [
+        {
+          studentId: "student-1",
+          targetId: "q1",
+          targetType: "question",
+          bonusType: "DEEP_QUESTION",
+          reason: "깊이 있는 질문입니다.",
+        },
+        {
+          studentId: "student-1",
+          targetId: "q1",
+          targetType: "question",
+          bonusType: "DUPLICATE_FLAGGED",
+          reason: "DUPLICATE_FLAGGED로 판단했습니다.",
+        },
+        {
+          studentId: "student-2",
+          targetId: "c1",
+          targetType: "comment",
+          bonusType: "APT_ANSWER",
+          reason: "질문에 맞는 답변입니다.",
+        },
+      ],
+      summary: "DUPLICATE_FLAGGED 항목은 확인이 필요합니다.",
+    });
+
+    const res = await POST(req({ sessionId: "session-1" }));
+    const body = await res.json();
+    const createdTypes = pointCreate.mock.calls.map((call) => call[0].data.bonusType);
+
+    expect(res.status).toBe(200);
+    expect(createdTypes).toEqual(["AI_DUPLICATE_FLAGGED", "AI_APT_ANSWER"]);
+    expect(createdTypes).not.toContain("AI_DEEP_QUESTION");
+    expect(pointCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        bonusType: "AI_DUPLICATE_FLAGGED",
+        points: 0,
+        reason: "중복 가능성으로 판단했습니다.",
+        aiAnalysis: "중복 가능성 항목은 확인이 필요합니다.",
+      }),
+      select: { id: true },
+    });
+    expect(body.createdPending).toBe(2);
+    expect(body.summary).toBe("중복 가능성 항목은 확인이 필요합니다.");
   });
 });

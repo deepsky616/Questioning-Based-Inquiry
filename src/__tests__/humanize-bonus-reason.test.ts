@@ -31,4 +31,15 @@ describe("humanizeBonusReason — 근거 문장의 내부 id를 내용 인용으
     const reason = "주제와 직접 관련된 좋은 질문입니다.";
     expect(humanizeBonusReason(reason, contentById)).toBe(reason);
   });
+
+  it("근거에 남은 보너스 코드명을 표시 라벨로 바꾼다", () => {
+    const out = humanizeBonusReason(
+      "DUPLICATE_FLAGGED로 판단했고 AI_LOW_EFFORT_FLAGGED도 검토가 필요합니다.",
+      contentById,
+    );
+
+    expect(out).toBe("중복 가능성으로 판단했고 불성실 의심도 검토가 필요합니다.");
+    expect(out).not.toContain("DUPLICATE_FLAGGED");
+    expect(out).not.toContain("LOW_EFFORT_FLAGGED");
+  });
 });

@@ -12,6 +12,18 @@ export type ActivityBonusKey = keyof typeof ACTIVITY_BONUS_TYPES;
 export const VALID_ACTIVITY_BONUS = Object.keys(ACTIVITY_BONUS_TYPES) as ActivityBonusKey[];
 export const MAX_ACTIVITY_BONUS_PER_STUDENT = 15;
 
+export function replaceActivityBonusCodes(text: string): string {
+  let out = text;
+  Object.entries(ACTIVITY_BONUS_TYPES).forEach(([code, def]) => {
+    out = out.split(`AI_${code}`).join(def.label);
+    out = out.split(code).join(def.label);
+  });
+  out = out
+    .split("중복 가능성로").join("중복 가능성으로")
+    .split("불성실 의심로").join("불성실 의심으로");
+  return out;
+}
+
 /**
  * AI 근거 문장의 내부 id를 사람이 읽을 인용문으로 치환한다.
  * 분석 프롬프트가 질문·답변을 [Q:id]/[C:id] 형식으로 전달하므로 AI가 근거에서
@@ -29,5 +41,5 @@ export function humanizeBonusReason(
     const quote = `“${trimmed.length > 30 ? `${trimmed.slice(0, 30)}…` : trimmed}”`;
     out = out.split(id).join(quote);
   });
-  return out;
+  return replaceActivityBonusCodes(out);
 }

@@ -6,7 +6,7 @@ import { generateJson } from "@/lib/ai";
 import { AiBusyError, AiKeyMissingError } from "@/lib/ai-errors";
 import {
   ACTIVITY_BONUS_TYPES, VALID_ACTIVITY_BONUS,
-  MAX_ACTIVITY_BONUS_PER_STUDENT, humanizeBonusReason,
+  MAX_ACTIVITY_BONUS_PER_STUDENT, humanizeBonusReason, replaceActivityBonusCodes,
 } from "@/lib/activity-bonus-policy";
 import { normalizeContent } from "@/lib/content-normalize";
 import { Prisma } from "@prisma/client";
@@ -166,11 +166,22 @@ ${cBlock || "(없음)"}
     }
   }
 
+  const targetKeyOf = (b: Pick<AIBonusItem, "targetId" | "targetType">) => `${b.targetType}:${b.targetId}`;
+  const isFlaggedBonus = (bonusType: string) => bonusType.endsWith("_FLAGGED");
+
   // 결합 + 검증 + 클램프
   const allCandidates: AIBonusItem[] = [];
   const seenKeys = new Set<string>(); // studentId+targetId+bonusType
   const perStudentSum: Record<string, number> = {};
   validIds.forEach((id) => { perStudentSum[id] = 0; });
+  const validAiBonuses = (aiResp?.bonuses ?? []).filter((b) =>
+    validIds.includes(b.studentId) &&
+    VALID_ACTIVITY_BONUS.includes(b.bonusType as keyof typeof ACTIVITY_BONUS_TYPES)
+  );
+  const flaggedTargetKeys = new Set<string>([
+    ...duplicateCandidates.map(targetKeyOf),
+    ...validAiBonuses.filter((b) => isFlaggedBonus(b.bonusType)).map(targetKeyOf),
+  ]);
 
   // 1) 사전 감지된 중복(점수 0)
   duplicateCandidates.forEach((b) => {
@@ -181,12 +192,12 @@ ${cBlock || "(없음)"}
   });
 
   // 2) AI 보너스
-  for (const b of aiResp?.bonuses ?? []) {
-    if (!validIds.includes(b.studentId)) continue;
-    if (!VALID_ACTIVITY_BONUS.includes(b.bonusType as keyof typeof ACTIVITY_BONUS_TYPES)) continue;
+  for (const b of validAiBonuses) {
     const def = ACTIVITY_BONUS_TYPES[b.bonusType as keyof typeof ACTIVITY_BONUS_TYPES];
     const key = `${b.studentId}:${b.targetId}:${b.bonusType}`;
     if (seenKeys.has(key)) continue;
+    // 확인 필요로 분류된 작성물은 추천 보너스 후보와 동시에 저장하지 않는다.
+    if (!isFlaggedBonus(b.bonusType) && flaggedTargetKeys.has(targetKeyOf(b))) continue;
     // 상한 검사
     if (def.points > 0 && perStudentSum[b.studentId] + def.points > MAX_ACTIVITY_BONUS_PER_STUDENT) continue;
     seenKeys.add(key);
@@ -204,6 +215,7 @@ ${cBlock || "(없음)"}
   allCandidates.forEach((b) => {
     b.reason = humanizeBonusReason(b.reason, contentById);
   });
+  const readableSummary = aiResp?.summary ? replaceActivityBonusCodes(aiResp.summary) : null;
 
   // 3) 모두 PENDING으로 저장 (totalPoints 반영 안 함)
   const created: Array<{ id: string }> = [];
@@ -218,7 +230,7 @@ ${cBlock || "(없음)"}
       reason: b.reason,
       status: "PENDING",
       sessionId,
-      aiAnalysis: aiResp?.summary ?? null,
+      aiAnalysis: readableSummary,
     };
     if (b.targetType === "question") data.relatedQuestionId = b.targetId;
     if (b.targetType === "comment") data.relatedCommentId = b.targetId;
@@ -254,7 +266,7 @@ ${cBlock || "(없음)"}
     questionCount: questions.length,
     commentCount: questions.reduce((a, q) => a + q.comments.length, 0),
     createdPending: created.length,
-    summary: aiResp?.summary ?? null,
+    summary: readableSummary,
     aiStatus,
     aiErrorType,
     fallbackUsed: duplicateCandidates.length > 0,
