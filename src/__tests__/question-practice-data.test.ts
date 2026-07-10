@@ -23,12 +23,14 @@ describe("질문 연습 문항 은행 — 데이터 유효성", () => {
       byClosure[q.closure]++;
       expect(q.explanation.length).toBeGreaterThan(10);
     }
-    // 세 유형 모두 5문항 이상 — 한 유형만 연습되는 편향 방지
-    expect(byCognitive.factual).toBeGreaterThanOrEqual(5);
-    expect(byCognitive.conceptual).toBeGreaterThanOrEqual(5);
-    expect(byCognitive.controversial).toBeGreaterThanOrEqual(5);
-    expect(byClosure.closed).toBeGreaterThanOrEqual(5);
-    expect(byClosure.open).toBeGreaterThanOrEqual(5);
+    // 세 유형 모두 충분히 — 한 유형만 연습되는 편향 방지 (확장 은행 기준)
+    expect(byCognitive.factual).toBeGreaterThanOrEqual(15);
+    expect(byCognitive.conceptual).toBeGreaterThanOrEqual(15);
+    expect(byCognitive.controversial).toBeGreaterThanOrEqual(15);
+    expect(byClosure.closed).toBeGreaterThanOrEqual(15);
+    expect(byClosure.open).toBeGreaterThanOrEqual(15);
+    // 셔플백 한 바퀴가 충분히 길도록 전체 규모도 지킨다
+    expect(PRACTICE_QUIZ_BANK.length).toBeGreaterThanOrEqual(60);
   });
 
   it("문항·예시는 classify API 상한(200자) 안이다", () => {

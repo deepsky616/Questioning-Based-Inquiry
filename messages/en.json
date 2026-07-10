@@ -1701,6 +1701,11 @@
     "aiError": "Check failed. Please try again shortly.",
     "pointsEarned": "+{points}P earned!",
     "alreadyAwarded": "Points already earned for this one today",
-    "dailyCapReached": "You've collected all of today's practice points — try again tomorrow!"
+    "dailyCapReached": "You've collected all of today's practice points — try again tomorrow!",
+    "aiNewProblem": "🎲 New AI problem",
+    "aiNewTopic": "🎲 New AI topic",
+    "aiGenerating": "AI is creating...",
+    "aiGeneratedBadge": "AI-made",
+    "generateFailed": "AI couldn't create a problem. Try again shortly or practice with the built-in ones."
   }
 }

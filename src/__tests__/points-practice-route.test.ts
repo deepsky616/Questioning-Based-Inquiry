@@ -149,3 +149,41 @@ describe("연습 포인트 — 질문 바꾸기·만들기 (서버 AI 판정)", 
     expect((await POST(req({ mode: "quiz" }))).status).toBe(400);
   });
 });
+
+describe("연습 포인트 — AI 실시간 출제 문항", () => {
+  const mCreate = prisma.pointLog.create as unknown as ReturnType<typeof vi.fn>;
+
+  it("transform-ai: 목표 달성 시 원문 해시 기반 키로 지급한다", async () => {
+    mTx.mockImplementation(async (ops: unknown[]) => ops);
+    const res = await POST(req({
+      mode: "transform-ai",
+      source: "우리나라의 수도는 어디인가요?",
+      target: "open",
+      content: "수도가 서울이 아니었다면 우리 생활은 어떻게 달라졌을까요?",
+    }));
+    const data = await res.json();
+    expect(data.achieved).toBe(true);
+    expect(data.awarded).toBe(PRACTICE_POINTS.TARGET_ACHIEVED);
+    const roomCode = mCreate.mock.calls[0][0].data.roomCode as string;
+    expect(roomCode).toMatch(/^transform:ai-[0-9a-f]{16}:\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("create-ai: 같은 제시문·목표는 같은 중복 방지 키를 갖는다(하루 1회)", async () => {
+    mTx.mockImplementation(async (ops: unknown[]) => ops);
+    const body = {
+      mode: "create-ai",
+      passage: "우리 동네 시장에는 오래된 가게가 많아요. 최근 큰 마트가 생기면서 시장을 찾는 사람이 줄었어요.",
+      target: "conceptual",
+      content: "마트가 생긴 것과 시장 손님이 줄어든 것은 어떤 관계가 있을까요?",
+    };
+    await POST(req(body));
+    const first = mCreate.mock.calls[0][0].data.roomCode;
+    mCreate.mockClear();
+    await POST(req(body));
+    expect(mCreate.mock.calls[0][0].data.roomCode).toBe(first);
+  });
+
+  it("transform-ai: 원문 누락 등 형식 오류는 400", async () => {
+    expect((await POST(req({ mode: "transform-ai", target: "open", content: "질문" }))).status).toBe(400);
+  });
+});

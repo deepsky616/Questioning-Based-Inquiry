@@ -1701,6 +1701,11 @@
     "aiError": "확인에 실패했어요. 잠시 후 다시 시도해 주세요.",
     "pointsEarned": "+{points}P 획득!",
     "alreadyAwarded": "오늘 이미 포인트를 받은 문제예요",
-    "dailyCapReached": "오늘의 연습 포인트를 모두 모았어요 (내일 다시 도전!)"
+    "dailyCapReached": "오늘의 연습 포인트를 모두 모았어요 (내일 다시 도전!)",
+    "aiNewProblem": "🎲 AI 새 문제",
+    "aiNewTopic": "🎲 AI 새 주제",
+    "aiGenerating": "AI가 만드는 중...",
+    "aiGeneratedBadge": "AI 출제",
+    "generateFailed": "AI 출제에 실패했어요. 잠시 후 다시 시도하거나 기본 문제로 연습해 주세요."
   }
 }

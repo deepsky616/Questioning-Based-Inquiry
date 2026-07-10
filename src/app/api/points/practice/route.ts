@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
@@ -48,7 +49,25 @@ const bodySchema = z.discriminatedUnion("mode", [
     target: z.enum(["open", "conceptual", "controversial"]),
     content: z.string().min(1).max(200),
   }),
+  // AI 실시간 출제 문항 — 은행에 없으므로 원문을 받아 해시로 중복 지급을 막는다
+  z.object({
+    mode: z.literal("transform-ai"),
+    source: z.string().min(5).max(200),
+    target: z.enum(["open", "conceptual", "controversial"]),
+    content: z.string().min(1).max(200),
+  }),
+  z.object({
+    mode: z.literal("create-ai"),
+    passage: z.string().min(30).max(400),
+    target: z.enum(["open", "conceptual", "controversial"]),
+    content: z.string().min(1).max(200),
+  }),
 ]);
+
+/** AI 출제 문항의 중복 지급 방지용 원문 해시(짧게 잘라 roomCode에 담는다) */
+function contentHash(text: string): string {
+  return createHash("sha256").update(text.trim()).digest("hex").slice(0, 16);
+}
 
 interface AwardOutcome {
   awarded: number;
@@ -179,21 +198,41 @@ export async function POST(req: Request) {
       return NextResponse.json({ classification, achieved, ...award });
     }
 
-    const topic = PRACTICE_CREATE_TOPICS.find((t) => t.id === body.topicId);
-    if (!topic) {
-      return NextResponse.json({ error: "존재하지 않는 주제입니다" }, { status: 400 });
+    if (body.mode === "create") {
+      const topic = PRACTICE_CREATE_TOPICS.find((t) => t.id === body.topicId);
+      if (!topic) {
+        return NextResponse.json({ error: "존재하지 않는 주제입니다" }, { status: 400 });
+      }
+      const classification = await classifyContent(userId, req, body.content);
+      const achieved = isTargetAchieved(body.target, classification) && !classification.inappropriate;
+      if (!achieved || !isStudent) {
+        return NextResponse.json({ classification, achieved, ...NO_AWARD });
+      }
+      const award = await awardPracticePoints(
+        userId,
+        "PRACTICE_CREATE",
+        buildPracticeDedupeKey("create", `${topic.id}:${body.target}`),
+        PRACTICE_POINTS.TARGET_ACHIEVED,
+        `질문 연습: 질문 만들기 성공 (${topic.id}/${body.target})`,
+      );
+      return NextResponse.json({ classification, achieved, ...award });
     }
+
+    // AI 실시간 출제 문항(transform-ai / create-ai) — 하루 상한과 원문 해시로 남용을 막는다
     const classification = await classifyContent(userId, req, body.content);
     const achieved = isTargetAchieved(body.target, classification) && !classification.inappropriate;
     if (!achieved || !isStudent) {
       return NextResponse.json({ classification, achieved, ...NO_AWARD });
     }
+    const isTransformAi = body.mode === "transform-ai";
     const award = await awardPracticePoints(
       userId,
-      "PRACTICE_CREATE",
-      buildPracticeDedupeKey("create", `${topic.id}:${body.target}`),
+      isTransformAi ? "PRACTICE_TRANSFORM" : "PRACTICE_CREATE",
+      isTransformAi
+        ? buildPracticeDedupeKey("transform", `ai-${contentHash(body.source)}`)
+        : buildPracticeDedupeKey("create", `ai-${contentHash(body.passage)}:${body.target}`),
       PRACTICE_POINTS.TARGET_ACHIEVED,
-      `질문 연습: 질문 만들기 성공 (${topic.id}/${body.target})`,
+      isTransformAi ? "질문 연습: 질문 바꾸기 성공 (AI 출제)" : "질문 연습: 질문 만들기 성공 (AI 출제)",
     );
     return NextResponse.json({ classification, achieved, ...award });
   } catch (error) {

@@ -104,16 +104,74 @@ export default function StudentPracticePage() {
     setCheckError(null);
   };
 
+  // ── 모드 2: 질문 바꾸기 ──
+  const [transformDeck, setTransformDeck] = useState(() => drawFromDeck(PRACTICE_TRANSFORM_BANK, []));
+  // AI가 실시간 출제한 문제(있으면 은행 문항 대신 사용, 실패 시 은행이 폴백)
+  const [aiTransform, setAiTransform] = useState<{ source: string; target: TransformTarget; hint: string; example: string } | null>(null);
+  const transformItem = aiTransform ?? transformDeck.item;
+  const [showHint, setShowHint] = useState(false);
+  const nextTransform = () => {
+    setAiTransform(null);
+    setTransformDeck((d) => drawFromDeck(PRACTICE_TRANSFORM_BANK, d.remaining, d.item.id));
+    setShowHint(false);
+    resetCheck();
+  };
+
+  // ── 모드 3: 질문 만들기 ──
+  const [createDeck, setCreateDeck] = useState(() => drawFromDeck(PRACTICE_CREATE_TOPICS, []));
+  const [aiTopic, setAiTopic] = useState<{ title: string; passage: string } | null>(null);
+  const createTopic = aiTopic ?? createDeck.item;
+  const [createTarget, setCreateTarget] = useState<TransformTarget>("conceptual");
+  const nextCreateTopic = () => {
+    setAiTopic(null);
+    setCreateDeck((d) => drawFromDeck(PRACTICE_CREATE_TOPICS, d.remaining, d.item.id));
+    resetCheck();
+  };
+
+  // ── AI 실시간 출제 ──
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const generateAiProblem = async (mode: "transform" | "create") => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setGenError(null);
+    try {
+      const res = await fetch("/api/practice/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t("generateFailed"));
+      if (mode === "transform") {
+        setAiTransform(data);
+        setShowHint(false);
+      } else {
+        setAiTopic(data);
+      }
+      resetCheck();
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : t("generateFailed"));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const runCheck = async () => {
     const content = input.trim();
     if (!content || isChecking) return;
     setIsChecking(true);
     setCheckError(null);
     setCheckResult(null);
+    // AI 출제 문항은 은행에 없으므로 원문(source/passage)을 함께 보내 서버가 판정·지급한다
     const payload =
       tab === "transform"
-        ? { mode: "transform", itemId: transformItem.id, content }
-        : { mode: "create", topicId: createTopic.id, target: createTarget, content };
+        ? aiTransform
+          ? { mode: "transform-ai", source: aiTransform.source, target: aiTransform.target, content }
+          : { mode: "transform", itemId: transformDeck.item.id, content }
+        : aiTopic
+          ? { mode: "create-ai", passage: aiTopic.passage, target: createTarget, content }
+          : { mode: "create", topicId: createDeck.item.id, target: createTarget, content };
     try {
       const res = await fetch("/api/points/practice", {
         method: "POST",
@@ -130,25 +188,6 @@ export default function StudentPracticePage() {
     }
   };
 
-  // ── 모드 2: 질문 바꾸기 ──
-  const [transformDeck, setTransformDeck] = useState(() => drawFromDeck(PRACTICE_TRANSFORM_BANK, []));
-  const transformItem = transformDeck.item;
-  const [showHint, setShowHint] = useState(false);
-  const nextTransform = () => {
-    setTransformDeck((d) => drawFromDeck(PRACTICE_TRANSFORM_BANK, d.remaining, d.item.id));
-    setShowHint(false);
-    resetCheck();
-  };
-
-  // ── 모드 3: 질문 만들기 ──
-  const [createDeck, setCreateDeck] = useState(() => drawFromDeck(PRACTICE_CREATE_TOPICS, []));
-  const createTopic = createDeck.item;
-  const [createTarget, setCreateTarget] = useState<TransformTarget>("conceptual");
-  const nextCreateTopic = () => {
-    setCreateDeck((d) => drawFromDeck(PRACTICE_CREATE_TOPICS, d.remaining, d.item.id));
-    resetCheck();
-  };
-
   const activeTarget: TransformTarget = tab === "transform" ? transformItem.target : createTarget;
   const achieved = checkResult?.achieved ?? false;
 
@@ -156,6 +195,7 @@ export default function StudentPracticePage() {
     setTab(next);
     resetCheck();
     setShowHint(false);
+    setGenError(null);
   };
 
   // 지급 결과 배지 (퀴즈·바꾸기·만들기 공용)
@@ -368,7 +408,14 @@ export default function StudentPracticePage() {
           <CardContent className="pt-6 space-y-4">
             <p className="text-sm text-muted-foreground">{t("transformIntro")}</p>
             <div className="rounded-xl bg-muted/40 p-5 space-y-2">
-              <p className="text-xs text-muted-foreground">{t("transformSourceLabel")}</p>
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                {t("transformSourceLabel")}
+                {aiTransform && (
+                  <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+                    {t("aiGeneratedBadge")}
+                  </span>
+                )}
+              </p>
               <p className="text-lg font-medium text-foreground">{transformItem.source}</p>
               <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
                 {t("transformTarget", { type: typeLabel(transformItem.target) })}
@@ -384,7 +431,11 @@ export default function StudentPracticePage() {
                 {showHint ? t("hideHint") : t("showHint")}
               </button>
               <Button variant="outline" size="sm" onClick={nextTransform}>{t("newProblem")}</Button>
+              <Button variant="outline" size="sm" onClick={() => generateAiProblem("transform")} disabled={isGenerating}>
+                {isGenerating ? t("aiGenerating") : t("aiNewProblem")}
+              </Button>
             </div>
+            {genError && <p className="text-sm text-red-600">{genError}</p>}
             {showHint && <p className="rounded-md bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 text-sm text-indigo-700 dark:text-indigo-300">💡 {transformItem.hint}</p>}
 
             {renderInputArea(t("transformPlaceholder"))}
@@ -404,12 +455,25 @@ export default function StudentPracticePage() {
           <CardContent className="pt-6 space-y-4">
             <p className="text-sm text-muted-foreground">{t("createIntro")}</p>
             <div className="rounded-xl bg-muted/40 p-5 space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="font-semibold text-foreground">📖 {createTopic.title}</p>
-                <Button variant="outline" size="sm" onClick={nextCreateTopic}>{t("newTopic")}</Button>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="flex items-center gap-2 font-semibold text-foreground">
+                  📖 {createTopic.title}
+                  {aiTopic && (
+                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">
+                      {t("aiGeneratedBadge")}
+                    </span>
+                  )}
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={nextCreateTopic}>{t("newTopic")}</Button>
+                  <Button variant="outline" size="sm" onClick={() => generateAiProblem("create")} disabled={isGenerating}>
+                    {isGenerating ? t("aiGenerating") : t("aiNewTopic")}
+                  </Button>
+                </div>
               </div>
               <p className="text-sm leading-relaxed text-foreground">{createTopic.passage}</p>
             </div>
+            {genError && <p className="text-sm text-red-600">{genError}</p>}
 
             <div>
               <p className="text-sm font-medium mb-2">{t("createTargetLabel")}</p>
