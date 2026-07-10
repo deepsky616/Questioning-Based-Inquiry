@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const studentDashboard = readFileSync("src/app/(student)/student-dashboard/page.tsx", "utf8");
 const studentDashboardTasksCard = readFileSync("src/app/(student)/student-dashboard/StudentDashboardTasksCard.tsx", "utf8");
 const teacherDashboard = readFileSync("src/app/(teacher)/teacher-dashboard/page.tsx", "utf8");
+const teacherCurriculum = readFileSync("src/app/(teacher)/teacher-curriculum/page.tsx", "utf8");
 const myQuestionsView = readFileSync("src/components/student/MyQuestionsView.tsx", "utf8");
 const teacherSessions = readFileSync("src/app/(teacher)/teacher-sessions/page.tsx", "utf8");
 const reportView = readFileSync("src/components/reports/ReportView.tsx", "utf8");
@@ -51,6 +52,12 @@ describe("core screen layout improvements", () => {
     expect(teacherDashboard.indexOf("{/* 오늘 할 일 */")).toBeLessThan(
       teacherDashboard.indexOf("{/* 총 질문 수 */"),
     );
+  });
+
+  it("keeps teacher curriculum page width aligned with dashboard", () => {
+    expect(teacherDashboard).toContain('className="space-y-6"');
+    expect(teacherCurriculum).toContain('className="space-y-6"');
+    expect(teacherCurriculum).not.toContain("max-w-4xl mx-auto");
   });
 
   it("keeps report sections grouped for readable preview and print", () => {

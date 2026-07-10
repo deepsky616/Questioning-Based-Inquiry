@@ -628,7 +628,7 @@ export default function CurriculumPage() {
 
   // ── 렌더 ──────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6">
       <PageHeader title={tPages("teacherCurriculum.title")} description={tPages("teacherCurriculum.description")} />
 
       <CurriculumMainTabs value={mainTab} savedCount={savedList.length} onChange={setMainTab} />
