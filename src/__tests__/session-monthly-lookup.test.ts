@@ -16,8 +16,10 @@ const studentMonthlyLookup = readFileSync("src/components/student/StudentMonthly
 describe("session monthly lookup surfaces", () => {
   it("groups teacher and student session selectors by month", () => {
     expect(teacherQuestionSelector).toContain("groupSessionsByMonth");
-    expect(teacherQuestionSelector).toContain("SelectGroup");
-    expect(teacherQuestionSelector).toContain("SelectLabel");
+    expect(teacherQuestionSelector).toContain("<select");
+    expect(teacherQuestionSelector).toContain("<optgroup");
+    expect(deployedDesignList).toContain("deploySessionMonthGroups");
+    expect(deployedDesignList).toContain("<optgroup");
 
     for (const source of [studentExplore, studentMyQuestions]) {
       expect(source).toContain("StudentMonthlySessionLookup");

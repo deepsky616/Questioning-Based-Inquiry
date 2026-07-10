@@ -1,15 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pencil, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -80,6 +78,7 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
   const [deployFilterDate, setDeployFilterDate] = useState("");
   const [deployFilterSubject, setDeployFilterSubject] = useState("");
   const [deployFilterTopic, setDeployFilterTopic] = useState("");
+  const [deploySelectedSessionId, setDeploySelectedSessionId] = useState("all");
   const [deploySort, setDeploySort] = useState<"desc" | "asc">("desc");
 
   const handleDeleteDeploy = async (sessionId: string) => {
@@ -102,19 +101,31 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
   };
 
   const deployedAll = sessions.filter((s) => (s.sharedQuestions?.length ?? 0) > 0);
-  if (deployedAll.length === 0) return null;
   const deployOptions = getSessionFilterOptions(deployedAll);
   const deployDateMonthGroups = groupSessionDatesByMonth(deployOptions.dates);
-  const deployFiltered = filterSessions(deployedAll, {
+  const deployFilteredByControls = filterSessions(deployedAll, {
     date: deployFilterDate || undefined,
     subject: deployFilterSubject || undefined,
     topic: deployFilterTopic || undefined,
   });
+  const deploySessionMonthGroups = groupSessionsByMonth(deployFilteredByControls, deploySort);
+  const deployFiltered = deploySelectedSessionId === "all"
+    ? deployFilteredByControls
+    : deployFilteredByControls.filter((session) => session.id === deploySelectedSessionId);
   const deployed = deploySort === "asc" ? sortSessionsAsc(deployFiltered) : sortSessionsDesc(deployFiltered);
   const deployedMonthGroups = groupSessionsByMonth(deployed, deploySort);
-  const hasDeployFilter = Boolean(deployFilterDate || deployFilterSubject || deployFilterTopic);
+  const hasDeployFilter = Boolean(deployFilterDate || deployFilterSubject || deployFilterTopic || deploySelectedSessionId !== "all");
   const getPublishedAt = (session: QuestionSession) =>
     session.sharedQuestions?.find((q) => q.publishedAt)?.publishedAt ?? session.createdAt;
+
+  useEffect(() => {
+    if (deploySelectedSessionId === "all") return;
+    if (!deployFilteredByControls.some((session) => session.id === deploySelectedSessionId)) {
+      setDeploySelectedSessionId("all");
+    }
+  }, [deployFilterDate, deployFilterSubject, deployFilterTopic, deployFilteredByControls, deploySelectedSessionId]);
+
+  if (deployedAll.length === 0) return null;
 
   return (
     <div className="rounded-xl border bg-card p-4">
@@ -128,18 +139,21 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
         <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-2">
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <span className="col-span-2 text-xs font-medium text-muted-foreground sm:col-span-1">{tSess("filterLabel")}</span>
-            <Select value={deployFilterDate || "__all__"} onValueChange={(v) => setDeployFilterDate(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-32"><SelectValue placeholder={tSess("allDates")} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">{tSess("allDates")}</SelectItem>
-                {deployDateMonthGroups.map((group) => (
-                  <SelectGroup key={group.key}>
-                    <SelectLabel>{group.label}</SelectLabel>
-                    {group.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              aria-label={t("date")}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-32"
+              value={deployFilterDate}
+              onChange={(event) => setDeployFilterDate(event.target.value)}
+            >
+              <option value="">{tSess("allDates")}</option>
+              {deployDateMonthGroups.map((group) => (
+                <optgroup key={group.key} label={group.label}>
+                  {group.dates.map((date) => (
+                    <option key={date} value={date}>{date}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
             <Select value={deployFilterSubject || "__all__"} onValueChange={(v) => setDeployFilterSubject(v === "__all__" ? "" : v)}>
               <SelectTrigger className="h-9 w-full bg-background text-sm sm:w-28"><SelectValue placeholder={tSess("allSubjects")} /></SelectTrigger>
               <SelectContent>
@@ -154,10 +168,39 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                 {deployOptions.topics.map((tp) => <SelectItem key={tp} value={tp}>{tp}</SelectItem>)}
               </SelectContent>
             </Select>
+            <select
+              aria-label={t("classSession")}
+              className="col-span-2 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:col-span-1 sm:w-56"
+              value={deploySelectedSessionId}
+              onChange={(event) => setDeploySelectedSessionId(event.target.value)}
+              disabled={deployFilteredByControls.length === 0}
+            >
+              {deployFilteredByControls.length === 0 ? (
+                <option value="all">{t("noMatchingSession")}</option>
+              ) : (
+                <>
+                  <option value="all">{t("allSessions")}</option>
+                  {deploySessionMonthGroups.map((group) => (
+                    <optgroup key={group.key} label={`${group.label} (${group.sessions.length})`}>
+                      {group.sessions.map((session) => (
+                        <option key={session.id} value={session.id}>
+                          {buildSessionLabel(session.date, session.subject, session.topic)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </>
+              )}
+            </select>
             {hasDeployFilter && (
               <button
                 type="button"
-                onClick={() => { setDeployFilterDate(""); setDeployFilterSubject(""); setDeployFilterTopic(""); }}
+                onClick={() => {
+                  setDeployFilterDate("");
+                  setDeployFilterSubject("");
+                  setDeployFilterTopic("");
+                  setDeploySelectedSessionId("all");
+                }}
                 className="h-9 px-1 text-left text-xs font-medium text-indigo-600 hover:text-indigo-800 sm:text-center"
               >
                 {tc("reset")}

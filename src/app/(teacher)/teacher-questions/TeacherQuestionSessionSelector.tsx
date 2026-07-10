@@ -3,9 +3,7 @@
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -77,24 +75,21 @@ export function TeacherQuestionSessionSelector({
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1 w-36">
           <label className="text-xs font-medium text-muted-foreground">{labels.date}</label>
-          <Select value={filterDate || "__all__"} onValueChange={(value) => onFilterDateChange(value === "__all__" ? "" : value)}>
-            <SelectTrigger className="h-8 text-sm bg-card">
-              <SelectValue placeholder={labels.allDates} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">{labels.allDates}</SelectItem>
-              {dateMonthGroups.map((group) => (
-                <SelectGroup key={group.key}>
-                  <SelectLabel>{group.label}</SelectLabel>
-                  {group.dates.map((date) => (
-                    <SelectItem key={date} value={date}>
-                      {date}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
+          <select
+            aria-label={labels.date}
+            className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-36"
+            value={filterDate}
+            onChange={(event) => onFilterDateChange(event.target.value)}
+          >
+            <option value="">{labels.allDates}</option>
+            {dateMonthGroups.map((group) => (
+              <optgroup key={group.key} label={group.label}>
+                {group.dates.map((date) => (
+                  <option key={date} value={date}>{date}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
         </div>
 
         <div className="flex flex-col gap-1 w-32">
@@ -136,24 +131,23 @@ export function TeacherQuestionSessionSelector({
           {filteredSessions.length === 0 ? (
             <div className="h-8 flex items-center text-sm text-muted-foreground">{labels.noMatchingSession}</div>
           ) : (
-            <Select value={selectedSessionId} onValueChange={onSessionChange}>
-              <SelectTrigger className="bg-card font-medium">
-                <SelectValue placeholder={labels.selectSession} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{labels.allSessions}</SelectItem>
-                {sessionMonthGroups.map((group) => (
-                  <SelectGroup key={group.key}>
-                    <SelectLabel>{group.label} ({group.sessions.length})</SelectLabel>
-                    {group.sessions.map((session) => (
-                      <SelectItem key={session.id} value={session.id}>
-                        {buildSessionLabel(session.date, session.subject, session.topic)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              aria-label={labels.classSession}
+              className="flex h-8 w-full rounded-md border border-input bg-card px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={selectedSessionId}
+              onChange={(event) => onSessionChange(event.target.value)}
+            >
+              <option value="all">{labels.allSessions}</option>
+              {sessionMonthGroups.map((group) => (
+                <optgroup key={group.key} label={`${group.label} (${group.sessions.length})`}>
+                  {group.sessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {buildSessionLabel(session.date, session.subject, session.topic)}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           )}
         </div>
       </div>
