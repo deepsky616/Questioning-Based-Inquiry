@@ -19,7 +19,7 @@ import { formatDateTime } from "@/lib/datetime";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StudentMyQuestionsSummary } from "@/components/student/StudentMyQuestionsSummary";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
 import {
@@ -28,8 +28,9 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionDatesByMonth, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
+import { StudentMonthlyDateSelect, StudentMonthlySessionLookup } from "@/components/student/StudentMonthlySessionLookup";
 import {
   Table,
   TableBody,
@@ -74,6 +75,7 @@ interface Comment {
 export function MyQuestionsView() {
   const t = useTranslations("myQuestions");
   const tEx = useTranslations("explore");
+  const tAsk = useTranslations("ask");
   const ct = useContentTranslation();
   const { data: session } = useSession();
   const user = getSessionUser(session);
@@ -195,13 +197,11 @@ export function MyQuestionsView() {
   // 학생이 직접 질문을 작성하므로 내 질문 조회에 노출한다.
   const browsableSessions = sessions.filter((s) => !s.unitDesignId || isInquiryDesignSession(s));
   const filterOptions = getSessionFilterOptions(browsableSessions);
-  const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   const filteredSessions = filterSessions(browsableSessions, {
     date: filterDate || undefined,
     subject: filterSubject || undefined,
     topic: filterTopic || undefined,
   });
-  const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
   const allQuestionSessionIds = useMemo(
     () => new Set(allSessionQuestions.map((q) => q.session?.id).filter((id): id is string => Boolean(id))),
     [allSessionQuestions],
@@ -520,21 +520,16 @@ export function MyQuestionsView() {
       {/* 조회 방법: 날짜·교과·주제로 좁혀 세션 선택 (교사 페이지와 동일) */}
       <Card>
         <CardContent className="pt-4">
-          <div className="my-questions-tablet-filters grid grid-cols-1 gap-3 md:grid-cols-[9rem_8rem_minmax(12rem,0.8fr)_minmax(18rem,1fr)] md:items-end">
+          <div className="my-questions-tablet-filters grid grid-cols-1 gap-3 md:grid-cols-[9rem_8rem_minmax(12rem,1fr)] md:items-end">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">{tEx("date")}</label>
-              <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-11 bg-background text-sm"><SelectValue placeholder={tEx("allDates")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">{tEx("allDates")}</SelectItem>
-                  {dateMonthGroups.map((group) => (
-                    <SelectGroup key={group.key}>
-                      <SelectLabel>{group.label}</SelectLabel>
-                      {group.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+              <StudentMonthlyDateSelect
+                dates={filterOptions.dates}
+                value={filterDate}
+                onChange={setFilterDate}
+                allLabel={tEx("allDates")}
+                ariaLabel={tEx("date")}
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">{tEx("subject")}</label>
@@ -556,22 +551,21 @@ export function MyQuestionsView() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex min-w-0 flex-col gap-1">
+            <div className="flex min-w-0 flex-col gap-1 md:col-span-3">
               <label className="text-xs font-medium text-muted-foreground">{tEx("classSession")}</label>
-              <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                <SelectTrigger className="h-11 bg-background font-medium"><SelectValue placeholder={tEx("selectSession")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{tEx("allSessions")}</SelectItem>
-                  {sessionMonthGroups.map((group) => (
-                    <SelectGroup key={group.key}>
-                      <SelectLabel>{group.label} ({group.sessions.length})</SelectLabel>
-                      {group.sessions.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+              <StudentMonthlySessionLookup
+                sessions={filteredSessions}
+                selectedSessionId={selectedSessionId}
+                completedSessionIds={allQuestionSessionIds}
+                onSelectSession={handleSessionChange}
+                labels={{
+                  allSessions: tEx("allSessions"),
+                  selected: tAsk("selectedSessionBadge"),
+                  completed: tAsk("completedSessionBadge"),
+                  inquiryClass: tAsk("inquiryClassTag"),
+                  noMatchingSession: tEx("emptyNone"),
+                }}
+              />
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-2">{tEx("filterHint")}</p>

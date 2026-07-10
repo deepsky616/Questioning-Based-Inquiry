@@ -14,11 +14,12 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionDatesByMonth, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
+import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { StudentMonthlyDateSelect, StudentMonthlySessionLookup } from "@/components/student/StudentMonthlySessionLookup";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
@@ -263,6 +264,7 @@ function QuestionCard({
 
 export function ExploreQuestionsView() {
   const t = useTranslations("explore");
+  const tAsk = useTranslations("ask");
   const ct = useContentTranslation();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
@@ -311,7 +313,6 @@ export function ExploreQuestionsView() {
 
   // 날짜·교과·주제로 세션 목록을 좁힌다(세션을 고르는 보조 필터, 교사 페이지와 동일)
   const filterOptions = getSessionFilterOptions(sessions);
-  const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   // 질문 배포 세션(unitDesignId + 배포 질문)만 제외. 탐구질문 수업 세션(배포 질문 없음)은
   // 학생이 직접 질문을 작성하므로 전체 질문탐구에 노출한다.
   const filteredSessions = filterSessions(sessions, {
@@ -319,7 +320,6 @@ export function ExploreQuestionsView() {
     subject: filterSubject || undefined,
     topic: filterTopic || undefined,
   }).filter((s) => !s.unitDesignId || isInquiryDesignSession(s));
-  const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
 
   // 필터로 선택 세션이 목록 밖이 되면 전체로 보정
   useEffect(() => {
@@ -382,18 +382,14 @@ export function ExploreQuestionsView() {
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1 w-36">
               <label className="text-xs font-medium text-muted-foreground">{t("date")}</label>
-              <Select value={filterDate || "__all__"} onValueChange={(v) => setFilterDate(v === "__all__" ? "" : v)}>
-                <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={t("allDates")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">{t("allDates")}</SelectItem>
-                  {dateMonthGroups.map((group) => (
-                    <SelectGroup key={group.key}>
-                      <SelectLabel>{group.label}</SelectLabel>
-                      {group.dates.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+              <StudentMonthlyDateSelect
+                dates={filterOptions.dates}
+                value={filterDate}
+                onChange={setFilterDate}
+                allLabel={t("allDates")}
+                ariaLabel={t("date")}
+                className="flex h-8 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
             </div>
             <div className="flex flex-col gap-1 w-32">
               <label className="text-xs font-medium text-muted-foreground">{t("subject")}</label>
@@ -415,22 +411,19 @@ export function ExploreQuestionsView() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1 min-w-0 flex-1">
+            <div className="flex w-full min-w-0 flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">{t("classSession")}</label>
-              <Select value={selectedSessionId} onValueChange={handleSessionChange}>
-                <SelectTrigger className="bg-background font-medium"><SelectValue placeholder={t("selectSession")} /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("allSessions")}</SelectItem>
-                  {sessionMonthGroups.map((group) => (
-                    <SelectGroup key={group.key}>
-                      <SelectLabel>{group.label} ({group.sessions.length})</SelectLabel>
-                      {group.sessions.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{buildSessionLabel(s.date, s.subject, s.topic)}</SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+              <StudentMonthlySessionLookup
+                sessions={filteredSessions}
+                selectedSessionId={selectedSessionId}
+                onSelectSession={handleSessionChange}
+                labels={{
+                  allSessions: t("allSessions"),
+                  selected: tAsk("selectedSessionBadge"),
+                  inquiryClass: tAsk("inquiryClassTag"),
+                  noMatchingSession: t("emptyNone"),
+                }}
+              />
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-2">{t("filterHint")}</p>

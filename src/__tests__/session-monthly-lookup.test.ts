@@ -11,13 +11,21 @@ const studentAskSelector = readFileSync("src/app/(student)/student-ask/StudentAs
 const studentExplore = readFileSync("src/components/student/ExploreQuestionsView.tsx", "utf8");
 const studentMyQuestions = readFileSync("src/components/student/MyQuestionsView.tsx", "utf8");
 const studentUnitDesign = readFileSync("src/components/student/UnitDesignView.tsx", "utf8");
+const studentMonthlyLookup = readFileSync("src/components/student/StudentMonthlySessionLookup.tsx", "utf8");
 
 describe("session monthly lookup surfaces", () => {
   it("groups teacher and student session selectors by month", () => {
-    for (const source of [teacherQuestionSelector, studentExplore, studentMyQuestions]) {
+    expect(teacherQuestionSelector).toContain("groupSessionsByMonth");
+    expect(teacherQuestionSelector).toContain("SelectGroup");
+    expect(teacherQuestionSelector).toContain("SelectLabel");
+
+    for (const source of [studentExplore, studentMyQuestions]) {
+      expect(source).toContain("StudentMonthlySessionLookup");
+    }
+
+    for (const source of [studentMonthlyLookup]) {
       expect(source).toContain("groupSessionsByMonth");
-      expect(source).toContain("SelectGroup");
-      expect(source).toContain("SelectLabel");
+      expect(source).toContain("sessionMonthGroups.map");
     }
   });
 
@@ -27,12 +35,14 @@ describe("session monthly lookup surfaces", () => {
       teacherSessionListControls,
       deployedDesignList,
       studentAskSelector,
-      studentExplore,
-      studentMyQuestions,
       studentUnitDesign,
     ]) {
       expect(source).toContain("groupSessionDatesByMonth");
     }
+    for (const source of [studentExplore, studentMyQuestions]) {
+      expect(source).toContain("StudentMonthlyDateSelect");
+    }
+    expect(studentMonthlyLookup).toContain("<optgroup");
   });
 
   it("groups the point review analysis session dropdown by month", () => {
