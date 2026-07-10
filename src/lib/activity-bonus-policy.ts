@@ -12,6 +12,10 @@ export type ActivityBonusKey = keyof typeof ACTIVITY_BONUS_TYPES;
 export const VALID_ACTIVITY_BONUS = Object.keys(ACTIVITY_BONUS_TYPES) as ActivityBonusKey[];
 export const MAX_ACTIVITY_BONUS_PER_STUDENT = 15;
 
+// 경고(중복·불성실) 행을 구제 승인할 때 전환되는 중립 유형 —
+// 경고 이력으로 집계되지 않고 학생 내역에 정상 지급으로 표시된다.
+export const TEACHER_ADJUSTED_BONUS = "TEACHER_ADJUSTED";
+
 export function replaceActivityBonusCodes(text: string): string {
   let out = text;
   Object.entries(ACTIVITY_BONUS_TYPES).forEach(([code, def]) => {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { MAX_ACTIVITY_BONUS_PER_STUDENT } from "@/lib/activity-bonus-policy";
+import { MAX_ACTIVITY_BONUS_PER_STUDENT, TEACHER_ADJUSTED_BONUS } from "@/lib/activity-bonus-policy";
 
 // PENDING 보너스 일괄 승인/거부/수정
 // body: { ids: string[], decision: 'APPROVE' | 'REJECT', overridePoints?: number }
@@ -68,6 +68,11 @@ export async function POST(req: NextRequest) {
             decidedById: teacherId,
             decidedAt: now,
             ...(overridePoints != null ? { points: overridePoints } : {}),
+            // 경고(FLAGGED) 행의 구제 승인: 유형을 교사 보정으로 전환 —
+            // 경고 이력으로 집계되지 않고 학생 내역에 정상 지급으로 보인다
+            ...(overridePoints != null && l.bonusType.includes("FLAGGED")
+              ? { bonusType: TEACHER_ADJUSTED_BONUS }
+              : {}),
           },
         })
       ),

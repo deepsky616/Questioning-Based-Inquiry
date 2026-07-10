@@ -32,7 +32,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
   mLogs.mockResolvedValue([
-    { id: "log1", studentId: "s1", sessionId: "sess1", points: 0, student: { id: "s1" } },
+    { id: "log1", studentId: "s1", sessionId: "sess1", points: 0, bonusType: "AI_DUPLICATE_FLAGGED", student: { id: "s1" } },
   ]);
   mSessions.mockResolvedValue([{ id: "sess1" }]);
   mTx.mockResolvedValue([]);
@@ -57,5 +57,25 @@ describe("포인트 승인 — 수정 점수 범위 검증", () => {
     const res = await POST(req({ ids: ["log1"], decision: "APPROVE", overridePoints: 3 }));
     expect(res.status).toBe(200);
     expect(mTx).toHaveBeenCalledTimes(1);
+  });
+
+  it("경고(FLAGGED) 행을 구제 승인하면 유형이 교사 보정으로 전환된다", async () => {
+    mLogs.mockResolvedValue([
+      { id: "log1", studentId: "s1", sessionId: "sess1", points: 0, bonusType: "AI_DUPLICATE_FLAGGED", student: { id: "s1" } },
+    ]);
+    await POST(req({ ids: ["log1"], decision: "APPROVE", overridePoints: 3 }));
+    const update = (prisma.pointLog.update as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(update.data.bonusType).toBe("TEACHER_ADJUSTED");
+    expect(update.data.points).toBe(3);
+  });
+
+  it("일반 보너스 행의 수정 승인은 유형을 바꾸지 않는다", async () => {
+    mLogs.mockResolvedValue([
+      { id: "log1", studentId: "s1", sessionId: "sess1", points: 3, bonusType: "AI_DEEP_QUESTION", student: { id: "s1" } },
+    ]);
+    await POST(req({ ids: ["log1"], decision: "APPROVE", overridePoints: 4 }));
+    const update = (prisma.pointLog.update as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(update.data.bonusType).toBeUndefined();
+    expect(update.data.points).toBe(4);
   });
 });

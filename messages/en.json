@@ -1681,7 +1681,8 @@
     "review_APT_ANSWER": "Apt answer",
     "review_INSIGHTFUL_ANSWER": "Insightful answer",
     "review_DUPLICATE_FLAGGED": "Possible duplicate",
-    "review_LOW_EFFORT_FLAGGED": "🚧 Low effort?"
+    "review_LOW_EFFORT_FLAGGED": "🚧 Low effort?",
+    "act_TEACHER_ADJUSTED": "Teacher-approved bonus"
   },
   "designRef": {
     "coreIdea": "Core idea",

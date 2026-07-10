@@ -1681,7 +1681,8 @@
     "review_APT_ANSWER": "적절한 답변",
     "review_INSIGHTFUL_ANSWER": "통찰 있는 답변",
     "review_DUPLICATE_FLAGGED": "중복 가능성",
-    "review_LOW_EFFORT_FLAGGED": "🚧 불성실 의심"
+    "review_LOW_EFFORT_FLAGGED": "🚧 불성실 의심",
+    "act_TEACHER_ADJUSTED": "교사 인정 보너스"
   },
   "designRef": {
     "coreIdea": "핵심 아이디어",

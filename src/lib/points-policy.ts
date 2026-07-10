@@ -110,6 +110,7 @@ const ACTIVITY_EMOJI: Record<string, string> = {
   COMPLETION: "✅",
   WINNER: "👑",
   TEACHER_GRANT: "🎁",
+  TEACHER_ADJUSTED: "🧑‍🏫",
   TEACHER_REVOKE: "↩️",
 };
 
