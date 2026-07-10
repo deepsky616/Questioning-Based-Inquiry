@@ -48,7 +48,8 @@ export function StudentAskInputCard({
         <CardTitle>{t("inputHeader")}</CardTitle>
         <CardDescription>{t("inputDesc")}</CardDescription>
       </CardHeader>
-      <CardContent className="student-ask-tablet-layout grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)] md:items-start">
+      {/* items-stretch — 왼쪽(세션 목록)과 오른쪽(질문 입력)의 높이를 항상 맞춘다 */}
+      <CardContent className="student-ask-tablet-layout grid gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)] md:items-stretch">
         <div className="grid grid-cols-3 gap-2 md:col-span-2">
           {flowSteps.map((item) => {
             const active = item.step === currentStep;
@@ -75,7 +76,8 @@ export function StudentAskInputCard({
           {sessionSelector}
         </div>
 
-        <div className="student-ask-question-panel h-fit space-y-4 rounded-xl border bg-background p-4 md:self-start">
+        {/* flex-col — 남는 세로 공간을 질문 입력창이 흡수해 아래 여백이 생기지 않는다 */}
+        <div className="student-ask-question-panel flex flex-col gap-4 rounded-xl border bg-background p-4">
           {existingQuestion && !isCheckingExisting && (
             <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-amber-800 dark:text-amber-300">
               {t("alreadyAsked")}: <strong>&ldquo;{existingQuestion.content.slice(0, 50)}{existingQuestion.content.length > 50 ? "..." : ""}&rdquo;</strong>
@@ -84,7 +86,7 @@ export function StudentAskInputCard({
             </div>
           )}
 
-          <div className="space-y-2">
+          <div className="flex flex-1 flex-col gap-2">
             <Label htmlFor="content">{t("questionLabel")}</Label>
             <Textarea
               ref={textareaRef}
@@ -94,7 +96,7 @@ export function StudentAskInputCard({
               maxLength={200}
               onChange={(event) => onContentChange(event.target.value)}
               rows={7}
-              className="min-h-[12rem] text-base leading-7 md:min-h-[16rem]"
+              className="min-h-[12rem] flex-1 text-base leading-7 md:min-h-[16rem]"
             />
             <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
           </div>
