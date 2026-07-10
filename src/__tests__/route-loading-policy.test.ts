@@ -17,4 +17,12 @@ describe("route loading policy", () => {
       expect(readFileSync(path, "utf8")).toContain("RouteLoading");
     }
   });
+
+  it("reserves scrollbar space so filter clicks do not shift the layout", () => {
+    // 스크롤바 토글로 화면이 좌우로 밀리던 문제(필터·조회 클릭 시 이동감)의 재발 방지.
+    // 스크롤 잠금 라이브러리의 이중 보정 무효화도 함께 유지돼야 한다.
+    const css = readFileSync("src/app/globals.css", "utf8");
+    expect(css).toContain("scrollbar-gutter: stable");
+    expect(css).toContain("body[data-scroll-locked]");
+  });
 });

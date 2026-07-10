@@ -430,3 +430,20 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* 세로 스크롤바가 생기고 사라질 때 화면 전체가 좌우로 밀리는 레이아웃 시프트 방지.
+   필터·조회 클릭으로 목록 높이가 바뀌면 스크롤바가 토글되며 ~15px씩 움직이던 문제 —
+   스크롤바 공간을 항상 예약해 콘텐츠 폭을 일정하게 유지한다. */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* 다이얼로그 등이 스크롤을 잠글 때 react-remove-scroll이 body에 스크롤바 폭만큼
+   여백을 강제 추가하는데, 위에서 공간을 이미 예약했으므로 이중 보정이 되어
+   다이얼로그가 열릴 때마다 화면이 밀린다. gutter 지원 브라우저에서만 보정을 무효화. */
+@supports (scrollbar-gutter: stable) {
+  html body[data-scroll-locked] {
+    margin-right: 0 !important;
+    padding-right: 0 !important;
+  }
+}
