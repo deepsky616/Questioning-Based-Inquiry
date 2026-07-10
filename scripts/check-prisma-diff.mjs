@@ -20,6 +20,8 @@ function loadLocalEnv() {
 
 loadLocalEnv();
 
+export const PRISMA_DIFF_TIMEOUT_MS = Number(process.env.PRISMA_DIFF_TIMEOUT_MS ?? 30_000);
+
 export const DESTRUCTIVE_DIFF_PATTERNS = [
   /\bDROP\s+COLUMN\b/i,
   /^\s*DROP\s+TABLE\b/i,
@@ -72,8 +74,13 @@ export function runPrismaDiff() {
       encoding: "utf8",
       env: process.env,
       shell: process.platform === "win32",
+      timeout: PRISMA_DIFF_TIMEOUT_MS,
     },
   );
+
+  if (result.error && result.error.message.includes("ETIMEDOUT")) {
+    throw new Error(`Prisma diff check timed out after ${PRISMA_DIFF_TIMEOUT_MS}ms.`);
+  }
 
   if (result.status !== 0) {
     throw new Error(

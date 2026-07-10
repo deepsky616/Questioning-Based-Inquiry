@@ -50,6 +50,12 @@ describe("Prisma deployment guards", () => {
     expect(diffGuardScript).toContain(".env.local");
   });
 
+  it("limits Prisma diff runtime so Vercel builds cannot hang indefinitely", () => {
+    expect(diffGuardScript).toContain("PRISMA_DIFF_TIMEOUT_MS");
+    expect(diffGuardScript).toContain("timeout: PRISMA_DIFF_TIMEOUT_MS");
+    expect(diffGuardScript).toContain("Prisma diff check timed out");
+  });
+
   it("fails deployment when Prisma diff contains destructive operations", async () => {
     expect(existsSync(diffGuardPath)).toBe(true);
     const { findDestructivePrismaDiffLines } = await import("../../scripts/check-prisma-diff.mjs");
