@@ -16,6 +16,11 @@ describe("student ask tablet layout", () => {
     expect(askPageSource).not.toContain("max-w-3xl mx-auto space-y-6");
   });
 
+  it("does not show an AI-enabled status panel above the asking form", () => {
+    expect(askPageSource).not.toContain('t("aiActive")');
+    expect(askPageSource).not.toContain("border-green-200");
+  });
+
   it("uses a two-column tablet layout for session selection and question writing", () => {
     expect(inputCardSource).toContain("student-ask-tablet-layout");
     expect(inputCardSource).toContain("student-ask-session-panel");

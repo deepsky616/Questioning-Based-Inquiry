@@ -385,14 +385,6 @@ function AskContent() {
         </Card>
       )}
 
-      {aiConfigured === true && (
-        <Card className="border-green-200 dark:border-green-500/30 bg-green-50 dark:bg-green-950/40">
-          <CardContent className="p-4">
-            <p className="text-green-800 text-sm">{t("aiActive")}</p>
-          </CardContent>
-        </Card>
-      )}
-
       <StudentAskInputCard
         flowSteps={flowSteps}
         currentStep={currentStep}
