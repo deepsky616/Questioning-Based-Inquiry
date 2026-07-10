@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as { scripts?: Record<string, string> };
 const dbCheckScript = readFileSync("scripts/check-db-schema.mjs", "utf8");
 const diffGuardPath = "scripts/check-prisma-diff.mjs";
+const diffGuardScript = existsSync(diffGuardPath) ? readFileSync(diffGuardPath, "utf8") : "";
 
 describe("Prisma deployment guards", () => {
   it("runs schema guards before the production build", () => {
@@ -35,6 +36,13 @@ describe("Prisma deployment guards", () => {
     ].forEach((tableName) => {
       expect(dbCheckScript).toContain(`"${tableName}"`);
     });
+  });
+
+  it("loads local env files so guarded builds work outside Vercel", () => {
+    expect(dbCheckScript).toContain("loadLocalEnv");
+    expect(dbCheckScript).toContain(".env.local");
+    expect(diffGuardScript).toContain("loadLocalEnv");
+    expect(diffGuardScript).toContain(".env.local");
   });
 
   it("fails deployment when Prisma diff contains destructive operations", async () => {

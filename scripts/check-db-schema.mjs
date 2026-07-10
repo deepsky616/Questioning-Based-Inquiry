@@ -1,11 +1,41 @@
+import { existsSync, readFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 
+function loadLocalEnv() {
+  for (const fileName of [".env.local", ".env"]) {
+    if (!existsSync(fileName)) continue;
+    const lines = readFileSync(fileName, "utf8").split(/\r?\n/);
+    for (const line of lines) {
+      const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (!match) continue;
+      const [, key, rawValue] = match;
+      if (process.env[key] !== undefined) continue;
+      const value = rawValue.trim().replace(/^(['"])(.*)\1$/, "$2");
+      process.env[key] = value;
+    }
+  }
+}
+
+loadLocalEnv();
+
 const REQUIRED_TABLES = [
+  "users",
+  "teacher_classes",
+  "password_reset_tokens",
+  "question_sessions",
+  "questions",
+  "comments",
+  "question_likes",
+  "point_logs",
   "app_notifications",
   "game_rooms",
   "question_game_customs",
   "question_game_visibilities",
   "question_game_orders",
+  "curriculum_areas",
+  "unit_designs",
+  "translations",
+  "session_analyses",
 ];
 
 const REQUIRED_TEXT_COLUMNS = [
