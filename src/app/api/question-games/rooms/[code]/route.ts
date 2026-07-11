@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import type { RoomPlayer, RoomChainItem } from "@/lib/question-games-data";
+import type {
+  GameRoom,
+  RoomChainItem,
+  RoomPlayer,
+} from "@/lib/question-games-data";
 import {
   deleteGameRoom,
   isStaleRoomAction,
@@ -9,6 +13,130 @@ import {
 } from "@/lib/game-room-store";
 
 type Params = { params: Promise<{ code: string }> };
+
+const ROOM_CONFLICT_MESSAGE =
+  "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.";
+const MEMBERSHIP_WRITE_ATTEMPTS = 3;
+
+function roomConflict(room: GameRoom) {
+  return NextResponse.json(
+    { error: ROOM_CONFLICT_MESSAGE, room },
+    { status: 409 },
+  );
+}
+
+function roomMissing() {
+  return NextResponse.json(
+    { error: "방을 찾을 수 없습니다" },
+    { status: 404 },
+  );
+}
+
+function roomDeleted() {
+  return NextResponse.json({ room: null, deleted: true });
+}
+
+type PersistResult =
+  | { ok: true; room: GameRoom }
+  | { ok: false; response: NextResponse };
+
+async function persistRoom(room: GameRoom): Promise<PersistResult> {
+  const result = await saveGameRoom(room);
+  if (result.kind === "saved") return { ok: true, room: result.room };
+  if (result.kind === "conflict") {
+    return { ok: false, response: roomConflict(result.room) };
+  }
+  return { ok: false, response: roomMissing() };
+}
+
+async function joinRoom(
+  initialRoom: GameRoom,
+  userId: string,
+  userName: string,
+) {
+  let room = initialRoom;
+  const player: RoomPlayer = {
+    id: userId,
+    name: userName,
+    isHost: false,
+    joinedAt: Date.now(),
+  };
+
+  for (let attempt = 0; attempt < MEMBERSHIP_WRITE_ATTEMPTS; attempt++) {
+    if (room.players.some((item) => item.id === userId)) {
+      return NextResponse.json({ room });
+    }
+    if (room.status !== "waiting") {
+      return NextResponse.json(
+        { error: "이미 시작된 방이에요" },
+        { status: 400 },
+      );
+    }
+    if (room.players.length >= 8) {
+      return NextResponse.json(
+        { error: "방이 가득 찼어요 (최대 8명)" },
+        { status: 400 },
+      );
+    }
+
+    const result = await saveGameRoom({
+      ...room,
+      players: [...room.players, player],
+    });
+    if (result.kind === "saved") {
+      return NextResponse.json({ room: result.room });
+    }
+    if (result.kind === "missing") return roomMissing();
+    room = result.room;
+  }
+
+  if (room.players.some((item) => item.id === userId)) {
+    return NextResponse.json({ room });
+  }
+  return roomConflict(room);
+}
+
+async function leaveRoom(initialRoom: GameRoom, userId: string) {
+  let room = initialRoom;
+
+  for (let attempt = 0; attempt < MEMBERSHIP_WRITE_ATTEMPTS; attempt++) {
+    if (!room.players.some((item) => item.id === userId)) {
+      return NextResponse.json({ room });
+    }
+
+    const wasHost = room.hostId === userId;
+    const players = room.players
+      .filter((item) => item.id !== userId)
+      .map((item, index) =>
+        wasHost ? { ...item, isHost: index === 0 } : item,
+      );
+
+    if (players.length === 0) {
+      const result = await deleteGameRoom(room);
+      if (result.kind === "deleted" || result.kind === "missing") {
+        return roomDeleted();
+      }
+      room = result.room;
+      continue;
+    }
+
+    const result = await saveGameRoom({
+      ...room,
+      players,
+      hostId: wasHost ? players[0].id : room.hostId,
+    });
+    if (result.kind === "saved") {
+      return NextResponse.json({ room: result.room });
+    }
+    if (result.kind === "missing") return roomDeleted();
+    room = result.room;
+  }
+
+  if (!room.players.some((item) => item.id === userId)) {
+    return NextResponse.json({ room });
+  }
+  return roomConflict(room);
+}
 
 // 방 상태 조회 (폴링)
 export async function GET(
@@ -40,48 +168,19 @@ export async function PATCH(
   const userId = (session.user as { id: string }).id;
   const userName = (session.user as { name?: string }).name ?? "학생";
 
-  const room = await loadGameRoom(code);
-  if (!room) {
-    return NextResponse.json({ error: "방을 찾을 수 없습니다" }, { status: 404 });
-  }
-
   const body = await req.json().catch(() => ({}));
   const action = body.action as string;
   const expectedVersion = body.expectedVersion;
 
+  let room = await loadGameRoom(code);
+  if (!room) {
+    return action === "leave" ? roomDeleted() : roomMissing();
+  }
+
+  if (action === "join") return joinRoom(room, userId, userName);
+  if (action === "leave") return leaveRoom(room, userId);
+
   switch (action) {
-    case "join": {
-      if (room.status !== "waiting") {
-        return NextResponse.json({ error: "이미 시작된 방이에요" }, { status: 400 });
-      }
-      if (room.players.length >= 8) {
-        return NextResponse.json({ error: "방이 가득 찼어요 (최대 8명)" }, { status: 400 });
-      }
-      if (!room.players.some((p) => p.id === userId)) {
-        const player: RoomPlayer = { id: userId, name: userName, isHost: false, joinedAt: Date.now() };
-        room.players.push(player);
-        await saveGameRoom(room);
-      }
-      break;
-    }
-
-    case "leave": {
-      const wasHost = room.hostId === userId;
-      room.players = room.players.filter((p) => p.id !== userId);
-      if (room.players.length === 0) {
-        // 모두 나가면 방 삭제
-        await deleteGameRoom(room);
-        return NextResponse.json({ room: null, deleted: true });
-      }
-      // 방장이 나가면 다음 사람에게 위임
-      if (wasHost) {
-        room.hostId = room.players[0].id;
-        room.players[0].isHost = true;
-      }
-      await saveGameRoom(room);
-      break;
-    }
-
     case "start": {
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 시작할 수 있어요" }, { status: 403 });
@@ -93,7 +192,9 @@ export async function PATCH(
       room.turnIndex = 0;
       room.chain = [];
       room.gameState = {};
-      await saveGameRoom(room);
+      const persisted = await persistRoom(room);
+      if (!persisted.ok) return persisted.response;
+      room = persisted.room;
       break;
     }
 
@@ -108,7 +209,9 @@ export async function PATCH(
       if (typeof body.status === "string" && (body.status === "playing" || body.status === "ended")) {
         room.status = body.status;
       }
-      await saveGameRoom(room);
+      const persisted = await persistRoom(room);
+      if (!persisted.ok) return persisted.response;
+      room = persisted.room;
       break;
     }
 
@@ -119,7 +222,9 @@ export async function PATCH(
       // gameState 전체 교체 (주로 방장이 초기화/리셋)
       room.gameState = (body.state ?? {}) as Record<string, unknown>;
       if (typeof body.turnIndex === "number") room.turnIndex = body.turnIndex;
-      await saveGameRoom(room);
+      const persisted = await persistRoom(room);
+      if (!persisted.ok) return persisted.response;
+      room = persisted.room;
       break;
     }
 
@@ -128,7 +233,9 @@ export async function PATCH(
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       room.turnIndex = (room.turnIndex + 1) % room.players.length;
-      await saveGameRoom(room);
+      const persisted = await persistRoom(room);
+      if (!persisted.ok) return persisted.response;
+      room = persisted.room;
       break;
     }
 
@@ -140,7 +247,9 @@ export async function PATCH(
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       room.topic = typeof body.topic === "string" ? body.topic : "";
-      await saveGameRoom(room);
+      const persisted = await persistRoom(room);
+      if (!persisted.ok) return persisted.response;
+      room = persisted.room;
       break;
     }
 
@@ -164,7 +273,9 @@ export async function PATCH(
       const item: RoomChainItem = { question, playerId: userId, playerName: userName };
       room.chain.push(item);
       room.turnIndex = (room.turnIndex + 1) % room.players.length;
-      await saveGameRoom(room);
+      const persisted = await persistRoom(room);
+      if (!persisted.ok) return persisted.response;
+      room = persisted.room;
       break;
     }
 
@@ -176,7 +287,9 @@ export async function PATCH(
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
       room.status = "ended";
-      await saveGameRoom(room);
+      const persisted = await persistRoom(room);
+      if (!persisted.ok) return persisted.response;
+      room = persisted.room;
       break;
     }
 
@@ -192,7 +305,9 @@ export async function PATCH(
       room.turnIndex = 0;
       room.topic = "";
       room.gameState = {};
-      await saveGameRoom(room);
+      const persisted = await persistRoom(room);
+      if (!persisted.ok) return persisted.response;
+      room = persisted.room;
       break;
     }
 
