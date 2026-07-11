@@ -114,40 +114,48 @@ export async function createGameRoom({
   hostId: string;
   hostName: string;
 }): Promise<GameRoom | null> {
-  let code = "";
-  for (let i = 0; i < 12; i++) {
-    const candidate = gen4();
-    const existing = await prisma.gameRoom.findUnique({ where: { code: candidate } });
-    if (!existing) {
-      code = candidate;
-      break;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const code = gen4();
+    const now = Date.now();
+    const host: RoomPlayer = {
+      id: hostId,
+      name: hostName,
+      isHost: true,
+      joinedAt: now,
+    };
+    const room: GameRoom = {
+      code,
+      gameId,
+      hostId,
+      status: "waiting",
+      players: [host],
+      topic: "",
+      chain: [],
+      turnIndex: 0,
+      gameState: {},
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      await prisma.gameRoom.create({
+        data: {
+          code,
+          data: room as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return room;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        continue;
+      }
+      throw error;
     }
   }
-  if (!code) return null;
 
-  const now = Date.now();
-  const host: RoomPlayer = { id: hostId, name: hostName, isHost: true, joinedAt: now };
-  const room: GameRoom = {
-    code,
-    gameId,
-    hostId,
-    status: "waiting",
-    players: [host],
-    topic: "",
-    chain: [],
-    turnIndex: 0,
-    gameState: {},
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await prisma.gameRoom.create({
-    data: {
-      code,
-      data: room as unknown as object,
-    },
-  });
-
-  return room;
+  return null;
 }

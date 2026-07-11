@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameRoom } from "@/lib/question-games-data";
 
@@ -13,7 +14,11 @@ const prismaMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-import { deleteGameRoom, saveGameRoom } from "@/lib/game-room-store";
+import {
+  createGameRoom,
+  deleteGameRoom,
+  saveGameRoom,
+} from "@/lib/game-room-store";
 
 function makeRoom(version = 1): GameRoom {
   return {
@@ -162,5 +167,43 @@ describe("deleteGameRoom", () => {
     expect(sql).toContain('DELETE FROM "game_rooms"');
     expect(sql).toContain("-> 'version' IS NULL");
     expect(sql).toContain("= 'null'::jsonb");
+  });
+});
+
+describe("createGameRoom", () => {
+  it("P2002 코드 겹침이면 다음 후보로 생성한다", async () => {
+    const collision = new Prisma.PrismaClientKnownRequestError("dup", {
+      code: "P2002",
+      clientVersion: "5",
+    });
+    vi.spyOn(Math, "random")
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.111);
+    prismaMock.gameRoom.create
+      .mockRejectedValueOnce(collision)
+      .mockResolvedValueOnce({});
+
+    const room = await createGameRoom({
+      gameId: "question-chain",
+      hostId: "host",
+      hostName: "방장",
+    });
+
+    expect(room?.code).toBe("1999");
+    expect(prismaMock.gameRoom.create).toHaveBeenCalledTimes(2);
+    expect(prismaMock.gameRoom.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("P2002가 아닌 생성 오류는 숨기지 않는다", async () => {
+    const error = new Error("database unavailable");
+    prismaMock.gameRoom.create.mockRejectedValue(error);
+
+    await expect(
+      createGameRoom({
+        gameId: "question-chain",
+        hostId: "host",
+        hostName: "방장",
+      }),
+    ).rejects.toBe(error);
   });
 });
