@@ -70,7 +70,7 @@ export async function PATCH(
       room.players = room.players.filter((p) => p.id !== userId);
       if (room.players.length === 0) {
         // 모두 나가면 방 삭제
-        await deleteGameRoom(room.code);
+        await deleteGameRoom(room);
         return NextResponse.json({ room: null, deleted: true });
       }
       // 방장이 나가면 다음 사람에게 위임

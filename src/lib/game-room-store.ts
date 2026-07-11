@@ -1,5 +1,16 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { GameRoom, RoomPlayer } from "@/lib/question-games-data";
+
+export type GameRoomWriteResult =
+  | { kind: "saved"; room: GameRoom }
+  | { kind: "conflict"; room: GameRoom }
+  | { kind: "missing"; room: null };
+
+export type GameRoomDeleteResult =
+  | { kind: "deleted"; room: null }
+  | { kind: "conflict"; room: GameRoom }
+  | { kind: "missing"; room: null };
 
 function gen4() {
   return String(Math.floor(1000 + Math.random() * 9000));
@@ -20,17 +31,78 @@ export async function loadGameRoom(code: string): Promise<GameRoom | null> {
   }
 }
 
-export async function saveGameRoom(room: GameRoom) {
-  room.version = (room.version ?? 1) + 1;
-  room.updatedAt = Date.now();
-  await prisma.gameRoom.update({
-    where: { code: room.code },
-    data: { data: room as unknown as object },
+export async function saveGameRoom(
+  room: GameRoom,
+): Promise<GameRoomWriteResult> {
+  const expectedVersion = room.version ?? 1;
+  const now = Date.now();
+  const nextRoom: GameRoom = {
+    ...room,
+    version: expectedVersion + 1,
+    updatedAt: now,
+  };
+
+  const updated = await prisma.gameRoom.updateMany({
+    where: {
+      code: room.code,
+      data: { path: ["version"], equals: expectedVersion },
+    },
+    data: {
+      data: nextRoom as unknown as Prisma.InputJsonValue,
+      updatedAt: new Date(now),
+    },
   });
+
+  let count = updated.count;
+  if (count === 0 && expectedVersion === 1) {
+    count = await prisma.$executeRaw`
+      UPDATE "game_rooms"
+      SET
+        "data" = ${JSON.stringify(nextRoom)}::jsonb,
+        "updated_at" = ${new Date(now)}
+      WHERE "code" = ${room.code}
+        AND (
+          "data" -> 'version' IS NULL
+          OR "data" -> 'version' = 'null'::jsonb
+        )
+    `;
+  }
+
+  if (count === 1) return { kind: "saved", room: nextRoom };
+  const current = await loadGameRoom(room.code);
+  return current
+    ? { kind: "conflict", room: current }
+    : { kind: "missing", room: null };
 }
 
-export async function deleteGameRoom(code: string) {
-  await prisma.gameRoom.delete({ where: { code } }).catch(() => {});
+export async function deleteGameRoom(
+  room: Pick<GameRoom, "code" | "version">,
+): Promise<GameRoomDeleteResult> {
+  const expectedVersion = room.version ?? 1;
+  const deleted = await prisma.gameRoom.deleteMany({
+    where: {
+      code: room.code,
+      data: { path: ["version"], equals: expectedVersion },
+    },
+  });
+
+  let count = deleted.count;
+  if (count === 0 && expectedVersion === 1) {
+    count = await prisma.$executeRaw`
+      DELETE FROM "game_rooms"
+      WHERE "code" = ${room.code}
+        AND (
+          "data" -> 'version' IS NULL
+          OR "data" -> 'version' = 'null'::jsonb
+        )
+    `;
+  }
+
+  if (count === 1) return { kind: "deleted", room: null };
+  const current = await loadGameRoom(room.code);
+  return current
+    ? { kind: "conflict", room: current }
+    : { kind: "missing", room: null };
 }
 
 export async function createGameRoom({
