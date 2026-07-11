@@ -38,6 +38,13 @@ jobs:
       - name: Unit tests (with coverage gate)
         run: npm test -- --coverage
 
+      # 빌드에서만 잡히는 오류(라우트 export 규칙, 정적 생성, 서버/클라이언트 경계)를
+      # 배포 전에 차단 — tsc·lint·테스트 전부 녹색인데 Vercel 빌드만 실패했던 사고의 재발 방지.
+      # npm run build가 아닌 npx next build인 이유: DB 가드 스크립트는 실제 DB가 필요해
+      # Vercel에서 실행되고, 여기서는 더미 env로 빌드 형상만 검증한다.
+      - name: Production build (route-shape gate)
+        run: npx next build
+
   e2e-tablet:
     runs-on: ubuntu-latest
     if: ${{ vars.RUN_E2E_TABLET == 'true' }}
