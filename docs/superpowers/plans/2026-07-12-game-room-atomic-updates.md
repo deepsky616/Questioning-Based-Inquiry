@@ -40,7 +40,7 @@
 
 ---
 
-### 작업 1: 저장과 삭제를 버전 조건으로 바꾸기
+### Task 1: 저장과 삭제를 버전 조건으로 바꾸기
 
 **파일:**
 - 수정: `src/lib/game-room-store.ts`
@@ -340,7 +340,7 @@ git commit -m "fix: make game room writes atomic"
 
 ---
 
-### 작업 2: 방 코드 겹침을 생성 재시도로 처리하기
+### Task 2: 방 코드 겹침을 생성 재시도로 처리하기
 
 **파일:**
 - 수정: `src/lib/game-room-store.ts`
@@ -486,7 +486,7 @@ git commit -m "fix: retry game room code collisions"
 
 ---
 
-### 작업 3: 경로에서 충돌과 참가자 재시도를 처리하기
+### Task 3: 경로에서 충돌과 참가자 재시도를 처리하기
 
 **파일:**
 - 수정: `src/app/api/question-games/rooms/[code]/route.ts`
@@ -927,7 +927,7 @@ git commit -m "fix: resolve concurrent room actions"
 
 ---
 
-### 작업 4: 나가기 성공을 확인한 뒤 화면 닫기
+### Task 4: 나가기 성공을 확인한 뒤 화면 닫기
 
 **파일:**
 - 수정: `src/app/(student)/student-question-play/games/useRoom.ts`
@@ -1147,7 +1147,7 @@ git commit -m "fix: preserve room state when leave fails"
 
 ---
 
-### 작업 5: 전체 검증, 최종 검토, 푸시
+### Task 5: 전체 검증, 최종 검토, 푸시
 
 **파일:**
 - 검토: 이번 구현에서 바뀐 모든 파일
