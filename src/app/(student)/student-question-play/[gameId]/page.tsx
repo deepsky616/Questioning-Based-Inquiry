@@ -136,40 +136,55 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
 
   /* ═══ 방(멀티) 진행 중 ═══ */
   if (room) {
+    const roomErrorAlert = roomError ? (
+      <div role="alert" className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-sm">
+        ❌ {roomError}
+      </div>
+    ) : null;
+
     // 대기실
     if (room.status === "waiting") {
       return (
-        <RoomLobby
-          game={game}
-          room={room}
-          myId={myId}
-          actionLoading={actionLoading}
-          onStart={() => sendAction("start")}
-          onLeave={handleLeaveRoom}
-        />
+        <>
+          {roomErrorAlert}
+          <RoomLobby
+            game={game}
+            room={room}
+            myId={myId}
+            actionLoading={actionLoading}
+            onStart={() => sendAction("start")}
+            onLeave={handleLeaveRoom}
+          />
+        </>
       );
     }
     // 게임 진행 / 종료 — 멀티 동기화 컴포넌트
     const RoomComponent = ROOM_GAME_MAP[gameId];
     if (RoomComponent) {
       return (
-        <RoomComponent
-          game={game}
-          room={room}
-          myId={myId}
-          actionLoading={actionLoading}
-          onAction={sendAction}
-          onLeave={handleLeaveRoom}
-        />
+        <>
+          {roomErrorAlert}
+          <RoomComponent
+            game={game}
+            room={room}
+            myId={myId}
+            actionLoading={actionLoading}
+            onAction={sendAction}
+            onLeave={handleLeaveRoom}
+          />
+        </>
       );
     }
     // 멀티 미지원 게임(미스터리 박스): 방 참가자 명단으로 로컬 진행
     return (
-      <GameComponent
-        game={game}
-        onBack={handleLeaveRoom}
-        config={{ mode: "friend", players: room.players.map((p) => p.name) }}
-      />
+      <>
+        {roomErrorAlert}
+        <GameComponent
+          game={game}
+          onBack={handleLeaveRoom}
+          config={{ mode: "friend", players: room.players.map((p) => p.name) }}
+        />
+      </>
     );
   }
 

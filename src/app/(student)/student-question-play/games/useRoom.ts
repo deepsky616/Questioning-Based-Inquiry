@@ -19,9 +19,11 @@ export function useRoom(): UseRoomResult {
   const [actionLoading, setActionLoading] = useState(false);
   const [activeCode, setActiveCode] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollGenerationRef = useRef(0);
 
   // 폴링: activeCode가 있으면 2초마다 방 상태 갱신
   useEffect(() => {
+    const generation = ++pollGenerationRef.current;
     if (!activeCode) {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       return;
@@ -34,7 +36,9 @@ export function useRoom(): UseRoomResult {
         const res = await fetch(`/api/question-games/rooms/${activeCode}`);
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled && data.room) setRoom(data.room);
+        if (!cancelled && generation === pollGenerationRef.current && data.room) {
+          setRoom(data.room);
+        }
       } catch {}
     };
 
@@ -139,6 +143,7 @@ export function useRoom(): UseRoomResult {
         setError(data.error ?? "나가기 실패");
         return false;
       }
+      pollGenerationRef.current += 1;
       setActiveCode(null);
       setRoom(null);
       setError(null);

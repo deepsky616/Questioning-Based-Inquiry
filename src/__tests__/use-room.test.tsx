@@ -74,6 +74,49 @@ describe("useRoom leaveRoom", () => {
     unmount();
   });
 
+  it("나가기 성공 뒤 늦은 폴링이 방을 되살리지 않는다", async () => {
+    const staleRoom = makeRoom(2);
+    let resolvePoll!: (response: Response) => void;
+    const pendingPoll = new Promise<Response>((resolve) => {
+      resolvePoll = resolve;
+    });
+    fetchMock.mockImplementation(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      if (body?.action === "join") {
+        return jsonResponse({ room: makeRoom() });
+      }
+      if (body?.action === "leave") {
+        return jsonResponse({ room: null, deleted: true });
+      }
+      return pendingPoll;
+    });
+
+    const { result, unmount } = renderHook(() => useRoom());
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    let left = false;
+    await act(async () => {
+      const leavePromise = result.current.leaveRoom();
+      const pollAfterLeave = leavePromise.then((didLeave) => {
+        left = didLeave;
+        resolvePoll(jsonResponse({ room: staleRoom }));
+      });
+      await Promise.all([leavePromise, pollAfterLeave, pendingPoll]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(left).toBe(true);
+    expect(result.current.room).toBeNull();
+    unmount();
+  });
+
   it("409이면 최신 방을 반영하고 방을 유지한다", async () => {
     const latest = makeRoom(2);
     pollRoom = latest;
@@ -93,6 +136,51 @@ describe("useRoom leaveRoom", () => {
 
     expect(left).toBe(false);
     expect(result.current.room).toEqual(latest);
+    expect(result.current.error).toContain("방 상태가 바뀌었어요");
+    unmount();
+  });
+
+  it("409 나가기 실패 뒤에도 진행 중 폴링의 더 최신 방을 반영한다", async () => {
+    const conflictRoom = makeRoom(2);
+    const polledRoom = makeRoom(3);
+    let resolvePoll!: (response: Response) => void;
+    const pendingPoll = new Promise<Response>((resolve) => {
+      resolvePoll = resolve;
+    });
+    fetchMock.mockImplementation(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      if (body?.action === "join") {
+        return jsonResponse({ room: makeRoom() });
+      }
+      if (body?.action === "leave") {
+        return jsonResponse({
+          error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.",
+          room: conflictRoom,
+        }, 409);
+      }
+      return pendingPoll;
+    });
+
+    const { result, unmount } = renderHook(() => useRoom());
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    let left = true;
+    await act(async () => {
+      left = await result.current.leaveRoom();
+      resolvePoll(jsonResponse({ room: polledRoom }));
+      await pendingPoll;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(left).toBe(false);
+    expect(result.current.room).toEqual(polledRoom);
     expect(result.current.error).toContain("방 상태가 바뀌었어요");
     unmount();
   });

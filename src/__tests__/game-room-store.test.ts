@@ -206,4 +206,21 @@ describe("createGameRoom", () => {
       }),
     ).rejects.toBe(error);
   });
+
+  it("P2002 코드 겹침이 열두 번이면 null을 반환한다", async () => {
+    const collision = new Prisma.PrismaClientKnownRequestError("dup", {
+      code: "P2002",
+      clientVersion: "5",
+    });
+    prismaMock.gameRoom.create.mockRejectedValue(collision);
+
+    await expect(
+      createGameRoom({
+        gameId: "question-chain",
+        hostId: "host",
+        hostName: "방장",
+      }),
+    ).resolves.toBeNull();
+    expect(prismaMock.gameRoom.create).toHaveBeenCalledTimes(12);
+  });
 });

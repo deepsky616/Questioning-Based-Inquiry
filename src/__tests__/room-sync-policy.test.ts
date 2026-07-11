@@ -58,4 +58,15 @@ describe("room sync policy", () => {
     const page = readFileSync(roomPagePath, "utf8");
     expect(page).toContain("if (!(await leaveRoom())) return;");
   });
+
+  it("열린 방의 모든 화면에 방 오류 알림을 연결한다", () => {
+    const page = readFileSync(roomPagePath, "utf8");
+    expect(page).toMatch(
+      /const roomErrorAlert = roomError \? \([\s\S]*?role="alert"[\s\S]*?\{roomError\}[\s\S]*?\) : null;/,
+    );
+    expect(page.match(/\{roomErrorAlert\}/g)).toHaveLength(3);
+    expect(page).toMatch(/\{roomErrorAlert\}\s*<RoomLobby/);
+    expect(page).toMatch(/\{roomErrorAlert\}\s*<RoomComponent/);
+    expect(page).toMatch(/\{roomErrorAlert\}\s*<GameComponent/);
+  });
 });
