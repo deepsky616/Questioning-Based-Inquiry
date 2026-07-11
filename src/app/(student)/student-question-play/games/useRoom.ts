@@ -9,7 +9,7 @@ interface UseRoomResult {
   createRoom: (gameId: string) => Promise<GameRoom | null>;
   joinRoom: (code: string) => Promise<GameRoom | null>;
   sendAction: (action: string, extra?: Record<string, unknown>) => Promise<GameRoom | null>;
-  leaveRoom: () => Promise<void>;
+  leaveRoom: () => Promise<boolean>;
   setActiveCode: (code: string | null) => void;
 }
 
@@ -125,17 +125,28 @@ export function useRoom(): UseRoomResult {
     [activeCode, room?.version]
   );
 
-  const leaveRoom = useCallback(async () => {
-    if (!activeCode) return;
+  const leaveRoom = useCallback(async (): Promise<boolean> => {
+    if (!activeCode) return true;
     try {
-      await fetch(`/api/question-games/rooms/${activeCode}`, {
+      const res = await fetch(`/api/question-games/rooms/${activeCode}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "leave" }),
       });
-    } catch {}
-    setActiveCode(null);
-    setRoom(null);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 409 && data.room) setRoom(data.room);
+        setError(data.error ?? "나가기 실패");
+        return false;
+      }
+      setActiveCode(null);
+      setRoom(null);
+      setError(null);
+      return true;
+    } catch {
+      setError("네트워크 오류");
+      return false;
+    }
   }, [activeCode]);
 
   return { room, error, actionLoading, createRoom, joinRoom, sendAction, leaveRoom, setActiveCode };

@@ -8,6 +8,8 @@ const roomRouteSource = readFileSync("src/app/api/question-games/rooms/[code]/ro
 const roomCreateRouteSource = readFileSync("src/app/api/question-games/rooms/route.ts", "utf8");
 const roomStorePath = "src/lib/game-room-store.ts";
 const roomStoreSource = existsSync(roomStorePath) ? readFileSync(roomStorePath, "utf8") : "";
+const roomPagePath =
+  "src/app/(student)/student-question-play/[gameId]/page.tsx";
 
 describe("room sync policy", () => {
   it("keeps room polling interval in the shared refresh policy", () => {
@@ -50,5 +52,10 @@ describe("room sync policy", () => {
   it("uses a dedicated room model instead of overloading SystemConfig", () => {
     expect(roomStoreSource).toContain("prisma.gameRoom");
     expect(roomStoreSource).not.toContain("systemConfig");
+  });
+
+  it("나가기 성공일 때만 방 선택 화면으로 이동한다", () => {
+    const page = readFileSync(roomPagePath, "utf8");
+    expect(page).toContain("if (!(await leaveRoom())) return;");
   });
 });

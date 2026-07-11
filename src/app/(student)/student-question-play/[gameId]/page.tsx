@@ -115,7 +115,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
   }
 
   async function handleLeaveRoom() {
-    await leaveRoom();
+    if (!(await leaveRoom())) return;
     setRoomStep("choice");
     setJoinCode("");
   }
