@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const nextConfig = readFileSync("next.config.js", "utf8");
+const ciSource = readFileSync(".github/workflows/ci.yml", "utf8");
 
 describe("Next.js 16 실행 기반", () => {
   it("지원 버전과 Node.js 하한을 정확히 고정한다", () => {
@@ -39,5 +40,9 @@ describe("Next.js 16 실행 기반", () => {
   it("middleware 대신 proxy 규약을 사용한다", () => {
     expect(existsSync("src/proxy.ts")).toBe(true);
     expect(existsSync("src/middleware.ts")).toBe(false);
+  });
+
+  it("CI 형식 검사 전에 Next.js 생성 경로 형식을 만든다", () => {
+    expect(ciSource).toContain("run: npx next typegen && npx tsc --noEmit");
   });
 });

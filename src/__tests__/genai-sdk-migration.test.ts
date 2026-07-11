@@ -18,4 +18,9 @@ describe("구글 생성형 인공지능 도구 경계", () => {
     expect(aiSource).not.toContain(oldPackage);
     expect(translateSource).not.toContain(oldPackage);
   });
+
+  it("번역 스크립트가 지원되는 플래시 모델을 사용한다", () => {
+    expect(translateSource).toContain('model: "gemini-3.5-flash"');
+    expect(translateSource).not.toContain("gemini-2.0-flash");
+  });
 });
