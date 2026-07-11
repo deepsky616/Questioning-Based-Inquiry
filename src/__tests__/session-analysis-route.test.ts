@@ -13,14 +13,10 @@ vi.mock("@/lib/db", () => ({
     systemConfig: { findUnique: vi.fn() },
   },
 }));
-vi.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: vi.fn().mockImplementation(function () {
-    return {
-      getGenerativeModel: vi.fn().mockReturnValue({
-        generateContent: mockGenerateContent,
-      }),
-    };
-  }),
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: class {
+    models = { generateContent: mockGenerateContent };
+  },
 }));
 
 import { auth } from "@/lib/auth";
@@ -97,23 +93,20 @@ describe("POST /api/sessions/[id]/analysis", () => {
       .mockResolvedValueOnce({ value: "test-api-key" })
       .mockResolvedValueOnce({ value: "gemini-2.5-flash" });
     mockGenerateContent.mockResolvedValue({
-      response: {
-        text: () =>
-          JSON.stringify({
-            summary: "질문과 댓글이 광합성의 장소와 에너지 전환에 집중되어 있습니다.",
-            themes: ["광합성", "엽록체"],
-            insights: "다음 수업에서 근거를 확장하면 좋습니다.",
-            commentInsights: "학생 댓글은 사실 확인에서 개념 연결로 이동하고 있습니다.",
-            engagementInsights: "배포 질문에 좋아요가 몰렸고 참여가 활발합니다.",
-          }),
-      },
+      text: JSON.stringify({
+        summary: "질문과 댓글이 광합성의 장소와 에너지 전환에 집중되어 있습니다.",
+        themes: ["광합성", "엽록체"],
+        insights: "다음 수업에서 근거를 확장하면 좋습니다.",
+        commentInsights: "학생 댓글은 사실 확인에서 개념 연결로 이동하고 있습니다.",
+        engagementInsights: "배포 질문에 좋아요가 몰렸고 참여가 활발합니다.",
+      }),
     });
 
     const res = await POST(new Request("http://localhost/api/sessions/session-1/analysis"), {
       params: Promise.resolve({ id: "session-1" }),
     });
     const body = await res.json();
-    const prompt = mockGenerateContent.mock.calls[0][0] as string;
+    const prompt = mockGenerateContent.mock.calls[0][0].contents as string;
 
     expect(res.status).toBe(200);
     expect(prompt).toContain("[댓글 1 · 학생 · 학생1] 엽록체에서 일어나요.");

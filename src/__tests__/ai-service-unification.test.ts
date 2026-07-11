@@ -14,6 +14,8 @@ describe("AI service unification", () => {
     expect(bulkAiAnswersRoute).toContain("generateText");
     expect(bulkAiAnswersRoute).not.toContain("@google/generative-ai");
     expect(bulkAiAnswersRoute).not.toContain("new GoogleGenerativeAI");
+    expect(bulkAiAnswersRoute).not.toContain("@google/genai");
+    expect(bulkAiAnswersRoute).not.toContain("new GoogleGenAI");
   });
 
   it("keeps unit sequence generation on the shared AI service", () => {
@@ -21,6 +23,8 @@ describe("AI service unification", () => {
     expect(unitSequenceRoute).toContain("quality: true");
     expect(unitSequenceRoute).not.toContain("@google/generative-ai");
     expect(unitSequenceRoute).not.toContain("new GoogleGenerativeAI");
+    expect(unitSequenceRoute).not.toContain("@google/genai");
+    expect(unitSequenceRoute).not.toContain("new GoogleGenAI");
   });
 
   it("keeps point award analysis on the shared AI service", () => {
@@ -28,6 +32,8 @@ describe("AI service unification", () => {
     expect(pointAwardService).toContain("systemInstruction: AI_SYSTEM");
     expect(pointAwardService).not.toContain("@google/generative-ai");
     expect(pointAwardService).not.toContain("new GoogleGenerativeAI");
+    expect(pointAwardService).not.toContain("@google/genai");
+    expect(pointAwardService).not.toContain("new GoogleGenAI");
   });
 
   it("keeps translation and Gemini connection tests on the shared AI service", () => {
@@ -35,15 +41,19 @@ describe("AI service unification", () => {
     expect(translateService).toContain("generateJsonArray");
     expect(translateService).not.toContain("@google/generative-ai");
     expect(translateService).not.toContain("new GoogleGenerativeAI");
+    expect(translateService).not.toContain("@google/genai");
+    expect(translateService).not.toContain("new GoogleGenAI");
 
     expect(geminiTestRoute).toContain("generateText");
     expect(geminiTestRoute).not.toContain("@google/generative-ai");
     expect(geminiTestRoute).not.toContain("new GoogleGenerativeAI");
+    expect(geminiTestRoute).not.toContain("@google/genai");
+    expect(geminiTestRoute).not.toContain("new GoogleGenAI");
   });
 
   it("does not leave direct Gemini SDK imports outside the shared AI service", () => {
     // rg 등 외부 도구 없이(CI 러너에 없음) Node로 직접 순회한다
-    const pattern = /@google\/generative-ai|new GoogleGenerativeAI|generateContent/;
+    const pattern = /@google\/(?:generative-ai|genai)|new Google(?:GenerativeAI|GenAI)|generateContent/;
     const matches: string[] = [];
     const walk = (dir: string) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {

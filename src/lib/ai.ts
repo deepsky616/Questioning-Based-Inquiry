@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { extractJsonArray, extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
@@ -69,17 +69,20 @@ async function callGeminiWithMetadata({
   const primary = quality ? chooseQualityModel(configuredModel) : chooseModelAuto(configuredModel, fullPrompt.length);
   const temp = temperature ?? (quality ? CONSISTENT_TEMPERATURE : undefined);
 
-  const genAI = new GoogleGenerativeAI(cfg.apiKey);
+  const genAI = new GoogleGenAI({ apiKey: cfg.apiKey });
   const runWith = async (modelName: GeminiModel, attempts: number): Promise<GenerateTextResult> => {
-    const model = genAI.getGenerativeModel({
-      model: modelName,
-      ...(systemInstruction ? { systemInstruction } : {}),
-      ...(temp != null ? { generationConfig: { temperature: temp } } : {}),
-    });
     for (let attempt = 1; ; attempt++) {
       try {
-        const result = await model.generateContent(fullPrompt);
-        return { text: result.response.text().trim(), model: modelName };
+        const config = {
+          ...(systemInstruction ? { systemInstruction } : {}),
+          ...(temp != null ? { temperature: temp } : {}),
+        };
+        const response = await genAI.models.generateContent({
+          model: modelName,
+          contents: fullPrompt,
+          ...(Object.keys(config).length > 0 ? { config } : {}),
+        });
+        return { text: (response.text ?? "").trim(), model: modelName };
       } catch (err) {
         if (!isTransientAiError(err)) throw err;
         if (attempt >= attempts) throw new AiBusyError();

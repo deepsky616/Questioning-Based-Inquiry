@@ -10,5 +10,7 @@ describe("classify route AI service integration", () => {
     expect(routeSource).toContain("quality: true");
     expect(routeSource).not.toContain("@google/generative-ai");
     expect(routeSource).not.toContain("new GoogleGenerativeAI");
+    expect(routeSource).not.toContain("@google/genai");
+    expect(routeSource).not.toContain("new GoogleGenAI");
   });
 });

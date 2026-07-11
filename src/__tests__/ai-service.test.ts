@@ -1,24 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const generateContent = vi.hoisted(() => vi.fn());
-const getGenerativeModel = vi.hoisted(() => vi.fn(() => ({ generateContent })));
+const constructorCall = vi.hoisted(() => vi.fn());
 const aiState = vi.hoisted(() => ({ apiKey: "k" as string | null, model: "gemini-2.5-flash" }));
 
 vi.mock("@/lib/resolve-ai-config", () => ({ resolveUserAiConfig: vi.fn(async () => ({ ...aiState })) }));
-vi.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: class {
-    getGenerativeModel = getGenerativeModel;
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: class {
+    models = { generateContent };
+    constructor(options: { apiKey: string }) {
+      constructorCall(options);
+    }
   },
 }));
 
 import { generateText, generateJson, generateJsonWithMetadata, AiKeyMissingError } from "@/lib/ai";
 
-const reply = (text: string) => ({ response: { text: () => text } });
+const reply = (text: string) => ({ text });
 const enReq = () => new Request("http://x", { headers: { cookie: "NEXT_LOCALE=en" } });
 
 beforeEach(() => {
   generateContent.mockReset();
-  getGenerativeModel.mockClear();
+  constructorCall.mockClear();
   aiState.apiKey = "k";
   aiState.model = "gemini-2.5-flash";
 });
@@ -52,7 +55,7 @@ describe("lib/ai 서비스 계층", () => {
   it("localize+en이면 출력 언어 지시문이 프롬프트에 덧붙는다", async () => {
     generateContent.mockResolvedValue(reply("{}"));
     await generateJson({ userId: "u", prompt: "ASK", req: enReq(), localize: true });
-    const sent = generateContent.mock.calls[0][0] as string;
+    const sent = generateContent.mock.calls[0][0].contents as string;
     expect(sent.startsWith("ASK")).toBe(true);
     expect(sent).toContain("English");
   });
@@ -60,7 +63,7 @@ describe("lib/ai 서비스 계층", () => {
   it("localize 없으면 프롬프트 그대로", async () => {
     generateContent.mockResolvedValue(reply("{}"));
     await generateJson({ userId: "u", prompt: "ASK" });
-    expect(generateContent.mock.calls[0][0]).toBe("ASK");
+    expect(generateContent.mock.calls[0][0].contents).toBe("ASK");
   });
 
   it("quality 작업은 flash-lite 설정이어도 gemini-2.5-flash와 낮은 온도로 호출", async () => {
@@ -69,9 +72,28 @@ describe("lib/ai 서비스 계층", () => {
 
     await generateJson({ userId: "u", prompt: "ASK", quality: true });
 
-    expect(getGenerativeModel).toHaveBeenCalledWith({
+    expect(constructorCall).toHaveBeenCalledWith({ apiKey: "k" });
+    expect(generateContent).toHaveBeenCalledWith({
       model: "gemini-2.5-flash",
-      generationConfig: { temperature: 0.1 },
+      contents: "ASK",
+      config: { temperature: 0.1 },
+    });
+  });
+
+  it("system instruction과 온도를 요청 config로 전달", async () => {
+    generateContent.mockResolvedValue(reply("{}"));
+
+    await generateText({
+      userId: "u",
+      prompt: "ASK",
+      systemInstruction: "SYSTEM",
+      temperature: 0.4,
+    });
+
+    expect(generateContent).toHaveBeenCalledWith({
+      model: "gemini-2.5-flash-lite",
+      contents: "ASK",
+      config: { systemInstruction: "SYSTEM", temperature: 0.4 },
     });
   });
 
@@ -81,9 +103,10 @@ describe("lib/ai 서비스 계층", () => {
 
     await generateJson({ userId: "u", prompt: "ASK", quality: true });
 
-    expect(getGenerativeModel).toHaveBeenCalledWith({
+    expect(generateContent).toHaveBeenCalledWith({
       model: "gemini-2.5-pro",
-      generationConfig: { temperature: 0.1 },
+      contents: "ASK",
+      config: { temperature: 0.1 },
     });
   });
 });

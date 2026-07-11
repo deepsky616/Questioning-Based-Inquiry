@@ -14,7 +14,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MSG_DIR = path.join(ROOT, "messages");
@@ -38,8 +38,7 @@ if (targets.length === 0) {
     .map((f) => f.replace(".json", ""));
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const genAI = new GoogleGenAI({ apiKey });
 
 // 평탄화(키 경로) ↔ 복원 유틸
 const flatten = (obj, prefix = "", out = {}) => {
@@ -83,8 +82,11 @@ Rules: keep every KEY exactly the same; keep {placeholders} like {n}, {name} int
 JSON:
 ${JSON.stringify(todo, null, 2)}`;
 
-  const res = await model.generateContent(prompt);
-  const text = res.response.text();
+  const res = await genAI.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: prompt,
+  });
+  const text = res.text ?? "";
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) { console.error(`${lang}: 응답 파싱 실패`); continue; }
   const translated = JSON.parse(match[0]);

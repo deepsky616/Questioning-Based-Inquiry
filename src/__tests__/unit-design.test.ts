@@ -18,14 +18,10 @@ vi.mock("@/lib/db", () => ({
     question: { create: vi.fn() },
   },
 }));
-vi.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: vi.fn().mockImplementation(function () {
-    return {
-      getGenerativeModel: vi.fn().mockReturnValue({
-        generateContent: mockGenerateContent,
-      }),
-    };
-  }),
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: class {
+    models = { generateContent: mockGenerateContent };
+  },
 }));
 
 import { auth } from "@/lib/auth";
@@ -386,7 +382,7 @@ const PROMPT_BASE = {
 };
 
 function setAiResponse(text: string) {
-  mockGenerateContent.mockResolvedValue({ response: { text: () => text } });
+  mockGenerateContent.mockResolvedValue({ text });
 }
 
 describe("POST /api/unit-design/generate — AI 생성", () => {
@@ -423,7 +419,9 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     const res = await generatePOST(makeRequest({ ...GENERATE_BASE, step: "keywords" }));
     expect(res.status).toBe(200);
     const body = await res.json();
+    const prompt = mockGenerateContent.mock.calls[0][0].contents as string;
     expect(body.keywords).toEqual(["광합성", "엽록체", "에너지 전환"]);
+    expect(prompt).toContain("광합성");
   });
 
   it("sentences 단계: AI 응답에서 핵심 문장 배열을 반환한다", async () => {

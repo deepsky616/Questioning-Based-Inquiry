@@ -18,6 +18,12 @@ export class AiBusyError extends Error {
 
 /** 일시 오류(모델 혼잡·레이트 리밋) 판별 — 재시도 대상 */
 export function isTransientAiError(err: unknown): boolean {
+  const status =
+    typeof err === "object" && err !== null && "status" in err
+      ? (err as { status?: unknown }).status
+      : undefined;
+  if (status === 429 || status === 503) return true;
+
   const msg = err instanceof Error ? err.message : String(err);
   return /\b(503|429)\b|Service Unavailable|high demand|overloaded|Resource has been exhausted|Too Many Requests/i.test(msg);
 }
