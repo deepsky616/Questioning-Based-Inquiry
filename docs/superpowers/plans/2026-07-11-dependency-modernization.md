@@ -20,7 +20,7 @@
 
 ---
 
-### 작업 1: Next.js 16 실행 기반 갱신
+### Task 1: Next.js 16 실행 기반 갱신
 
 **파일:**
 
@@ -304,7 +304,7 @@ git commit -m "chore: upgrade to Next.js 16"
 
 ---
 
-### 작업 2: 구글 생성형 인공지능 도구 교체
+### Task 2: 구글 생성형 인공지능 도구 교체
 
 **파일:**
 
@@ -570,7 +570,7 @@ git commit -m "chore: migrate to Google GenAI SDK"
 
 ---
 
-### 작업 3: 통합 검증, 미리 보기, 푸시
+### Task 3: 통합 검증, 미리 보기, 푸시
 
 **파일:**
 
