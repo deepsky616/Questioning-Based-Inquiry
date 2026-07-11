@@ -62,6 +62,9 @@ jobs:
       - name: Check database schema
         run: npm run db:check
 
+      - name: Check database access security
+        run: npm run db:security:check
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 

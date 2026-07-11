@@ -36,6 +36,7 @@ const REQUIRED_TABLES = [
   "unit_designs",
   "translations",
   "session_analyses",
+  "system_configs",
 ];
 
 const REQUIRED_TEXT_COLUMNS = [

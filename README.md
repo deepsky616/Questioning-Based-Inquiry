@@ -29,6 +29,12 @@ npx prisma db push
 # Check required deployment tables/enums
 npm run db:check
 
+# Revoke direct Data API access and enable RLS
+npm run db:security:apply
+
+# Verify effective database privileges and RLS
+npm run db:security:check
+
 # Run development server
 npm run dev
 ```
@@ -52,7 +58,33 @@ RESEND_FROM_EMAIL="Question Lab <noreply@your-domain.com>"
 2. Copy the pooled Postgres connection string from Supabase Database settings.
 3. Set it as `DATABASE_URL`.
 4. Run `npx prisma generate` and `npx prisma db push`.
-5. Run `npm run db:check` before deployment. If this fails, the live database is missing required tables or enums.
+5. Run `npm run db:security:apply` after the initial push and after adding tables.
+6. Run `npm run db:check` and `npm run db:security:check` before deployment.
+
+### Supabase Data API security
+
+This application accesses Postgres only from server code through Prisma. It does not use the Supabase client, REST, GraphQL, Realtime, or browser-side Supabase keys.
+
+`npm run db:security:apply` performs one transaction that:
+
+- revokes current table, sequence, and routine access from `PUBLIC`, `anon`, and `authenticated`
+- revokes the same default privileges for future objects created by `postgres`
+- removes the default `PUBLIC EXECUTE` privilege for future routines
+- enables row level security on every current table without adding public policies
+
+The command does not insert, update, or delete rows. The Prisma connection remains usable because it runs as the table owner with row level security bypass capability. The `service_role` grants are intentionally left unchanged for server administration and must never be exposed to a browser.
+
+For defense in depth, turn off the Data API in the Supabase dashboard from the project's Data API settings. This is required because the `supabase_admin` default privileges cannot be changed by the application's `postgres` connection. See the [Supabase Data API security guide](https://supabase.com/docs/guides/api/securing-your-api).
+
+The production build runs `db:security:check` and fails if public roles regain effective access, unsafe default grants return, or any public table has row level security disabled.
+
+Emergency rollback restores the access state that existed before this hardening and therefore reopens the Data API. Run it only while handling a confirmed outage:
+
+The rollback is pinned to the original 18-table schema and refuses automatic rollback after the public schema changes. Review a rollback manually if tables, sequences, or routines have changed.
+
+```bash
+CONFIRM_DB_SECURITY_ROLLBACK=restore-public-data-api-access npm run db:security:rollback
+```
 
 ### Resend Free setup
 

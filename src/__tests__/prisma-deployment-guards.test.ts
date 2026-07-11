@@ -16,7 +16,7 @@ describe("Prisma deployment guards", () => {
     // generate가 가드보다 먼저여야 한다 — db:check가 PrismaClient를 쓰므로
     // Vercel(의존성 캐시)에서는 generate 전에 실행되면 초기화 에러로 빌드가 죽는다
     expect(packageJson.scripts?.build).toBe(
-      "prisma generate && npm run db:diff:check && npm run db:check && next build",
+      "prisma generate && npm run db:diff:check && npm run db:check && npm run db:security:check && next build",
     );
     expect(vercelConfig?.buildCommand).toBe("npm run build");
   });
@@ -40,6 +40,7 @@ describe("Prisma deployment guards", () => {
       "unit_designs",
       "translations",
       "session_analyses",
+      "system_configs",
     ].forEach((tableName) => {
       expect(dbCheckScript).toContain(`"${tableName}"`);
     });
