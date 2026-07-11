@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+type Params = { params: Promise<{ id: string }> };
+
 // "탐구질문 수업" 세션이 참조하는 탐구설계 맥락(핵심아이디어·핵심어·핵심문장·핵심질문·탐구질문)을
 // 반환한다. 학생 질문하기의 참고 자료 패널에서 사용. (성취기준은 후속 단계에서 추가)
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: Params) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const user = session.user as { id: string; role?: string; grade?: string; className?: string };
 
   const qs = await prisma.questionSession.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: {
       unitDesignId: true, date: true, teacherId: true,
       targetType: true, targetGrade: true, targetClassName: true, targetStudentId: true, targetStudentIds: true,

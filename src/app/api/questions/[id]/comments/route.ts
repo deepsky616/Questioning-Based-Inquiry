@@ -7,7 +7,10 @@ import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize"
 import { checkProfanity } from "@/lib/profanity";
 import { Prisma } from "@prisma/client";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+type Params = { params: Promise<{ id: string }> };
+
+export async function GET(_req: Request, { params }: Params) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -28,7 +31,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       },
     }),
     prisma.question.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         author: { select: { id: true, role: true, school: true, grade: true, className: true } },
         session: { select: { id: true, isActive: true, commentsVisibleToPeers: true } },
@@ -45,7 +48,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   const peersVisible = question.session?.commentsVisibleToPeers ?? false;
   const comments = await prisma.comment.findMany({
-    where: { questionId: params.id },
+    where: { questionId: id },
     include: { author: { select: { id: true, name: true, role: true } } },
     orderBy: { createdAt: "asc" },
   });
@@ -66,7 +69,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   );
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: Params) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -97,7 +101,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         },
       }),
       prisma.question.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: {
           author: { select: { role: true, school: true, grade: true, className: true } },
           session: { select: { isActive: true } },
@@ -121,7 +125,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (userRole === "STUDENT" && normalized.length > 0) {
       const existing = await prisma.comment.findFirst({
         where: {
-          questionId: params.id,
+          questionId: id,
           authorId: userId,
           normalizedContent: normalized,
         },
@@ -141,7 +145,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         content: content.trim(),
         normalizedContent: normalized,
         authorId: userId,
-        questionId: params.id,
+        questionId: id,
         flagged,
         flagReason: reason,
       } as Prisma.CommentUncheckedCreateInput,

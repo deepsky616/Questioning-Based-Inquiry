@@ -29,7 +29,7 @@ const DESIGN_ROW = {
 };
 
 const req = new Request("http://localhost/api/sessions/s1/design-context");
-const ctx = { params: { id: "s1" } };
+const ctx = { params: Promise.resolve({ id: "s1" }) };
 
 beforeEach(() => {
   vi.clearAllMocks();

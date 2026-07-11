@@ -6,7 +6,10 @@ import { prisma } from "@/lib/db";
 import { buildAnswerPrompt } from "@/lib/ai-prompts";
 import { generateText, AiKeyMissingError } from "@/lib/ai";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+type Params = { params: Promise<{ id: string }> };
+
+export async function POST(req: Request, { params }: Params) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -20,7 +23,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const limited = checkRateLimit(`ai-answer:${(session.user as { id: string }).id}`, 20);
   if (limited) return limited;
 
-  const question = await prisma.question.findUnique({ where: { id: params.id } });
+  const question = await prisma.question.findUnique({ where: { id } });
   if (!question) {
     return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
   }

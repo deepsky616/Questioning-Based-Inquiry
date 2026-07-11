@@ -18,8 +18,7 @@ function resolveLocale(cookieLocale: string | undefined, acceptLanguage: string 
 
 // 라우팅 없는 next-intl 설정: 쿠키(NEXT_LOCALE) → Accept-Language → ko 순으로 언어 결정
 export default getRequestConfig(async () => {
-  const cookieStore = cookies();
-  const headerStore = headers();
+  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
   const locale = resolveLocale(
     cookieStore.get("NEXT_LOCALE")?.value,
     headerStore.get("accept-language"),

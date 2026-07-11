@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { use, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { BUILT_IN_GAMES, type BuiltInGame } from "@/lib/question-games-data";
@@ -30,8 +30,8 @@ const GAME_MAP: Record<string, GameComponent> = {
 };
 
 // 교사 체험(미리보기): 솔로 모드로 놀이를 직접 해본다. 포인트·기록은 서버에서 차단된다.
-export default function TeacherGamePreview({ params }: { params: { gameId: string } }) {
-  const { gameId } = params;
+export default function TeacherGamePreview({ params }: { params: Promise<{ gameId: string }> }) {
+  const { gameId } = use(params);
   const router = useRouter();
   const t = useTranslations("gamePreview");
 

@@ -34,7 +34,7 @@ function delReq(body: unknown) {
     body: JSON.stringify(body),
   });
 }
-const ctx = { params: { id: "s1" } };
+const ctx = { params: Promise.resolve({ id: "s1" }) };
 
 beforeEach(() => {
   vi.clearAllMocks();

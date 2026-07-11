@@ -7,10 +7,13 @@ import {
   updateQuestionGame,
 } from "@/lib/question-game-settings-store";
 
+type Params = { params: Promise<{ id: string }> };
+
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: Params,
 ) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -20,7 +23,7 @@ export async function PATCH(
     return NextResponse.json({ error: "교사만 접근할 수 있습니다" }, { status: 403 });
   }
   const teacherId = (session.user as { id: string }).id;
-  const gameId = params.id;
+  const gameId = id;
 
   const body = await req.json();
 
@@ -42,8 +45,9 @@ export async function PATCH(
 
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: Params,
 ) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -53,7 +57,7 @@ export async function DELETE(
     return NextResponse.json({ error: "교사만 접근할 수 있습니다" }, { status: 403 });
   }
   const teacherId = (session.user as { id: string }).id;
-  const gameId = params.id;
+  const gameId = id;
 
   const deleted = await deleteQuestionGame(teacherId, gameId);
   if (!deleted) {

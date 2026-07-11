@@ -4,17 +4,19 @@ import { prisma } from "@/lib/db";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
 
 interface RawEvent { type: "question" | "comment" | "point"; createdAt: string; weight: number; meta?: Record<string, unknown> }
+type Params = { params: Promise<{ id: string }> };
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: Params,
 ) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const role = (session.user as { role?: string }).role;
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 접근 가능" }, { status: 403 });
 
-  const studentId = params.id;
+  const studentId = id;
 
   // 교사 권한 검증: 자기 학교/학급 학생인지 확인
   const [teacher, student] = await Promise.all([

@@ -24,7 +24,7 @@ interface StudentAskInputCardProps {
   existingQuestion: { id: string; content: string } | null;
   isCheckingExisting: boolean;
   content: string;
-  textareaRef: RefObject<HTMLTextAreaElement>;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
   canAsk: boolean;
   isLoading: boolean;
   onContentChange: (value: string) => void;

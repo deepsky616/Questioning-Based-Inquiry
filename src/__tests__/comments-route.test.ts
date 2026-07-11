@@ -74,7 +74,9 @@ describe("GET /api/questions/[id]/comments", () => {
       session: { isActive: true, commentsVisibleToPeers: true },
     });
 
-    const res = await getComments(new Request("http://localhost/api/test"), { params: { id: "q1" } });
+    const res = await getComments(new Request("http://localhost/api/test"), {
+      params: Promise.resolve({ id: "q1" }),
+    });
 
     expect(res.status).toBe(403);
     expect(commentMany).not.toHaveBeenCalled();
@@ -96,7 +98,9 @@ describe("GET /api/questions/[id]/comments", () => {
       { id: "c-other", content: "남의 댓글", author: { id: "s3", name: "친구", role: "STUDENT" } },
     ]);
 
-    const res = await getComments(new Request("http://localhost/api/test"), { params: { id: "q1" } });
+    const res = await getComments(new Request("http://localhost/api/test"), {
+      params: Promise.resolve({ id: "q1" }),
+    });
     const data = await res.json();
 
     expect(res.status).toBe(200);
@@ -116,7 +120,9 @@ describe("POST /api/questions/[id]/comments", () => {
       session: { isActive: true },
     });
 
-    const res = await postComment(req({ content: "좋은 질문이에요" }), { params: { id: "q1" } });
+    const res = await postComment(req({ content: "좋은 질문이에요" }), {
+      params: Promise.resolve({ id: "q1" }),
+    });
 
     expect(res.status).toBe(403);
     expect(commentCreate).not.toHaveBeenCalled();
@@ -133,7 +139,9 @@ describe("POST /api/questions/[id]/comments", () => {
       session: { isActive: true },
     });
 
-    const res = await postComment(req({ content: "선생님 답변" }), { params: { id: "q1" } });
+    const res = await postComment(req({ content: "선생님 답변" }), {
+      params: Promise.resolve({ id: "q1" }),
+    });
 
     expect(res.status).toBe(200);
     expect(commentCreate).toHaveBeenCalledTimes(1);
@@ -150,7 +158,9 @@ describe("PATCH /api/questions/[id]/comments/[commentId]", () => {
       question: { isPublic: true, authorId: "s2", author: studentAuthor },
     });
 
-    const res = await patchComment(req({ content: "  수정한 댓글  " }), { params: { id: "q1", commentId: "c1" } });
+    const res = await patchComment(req({ content: "  수정한 댓글  " }), {
+      params: Promise.resolve({ id: "q1", commentId: "c1" }),
+    });
 
     expect(res.status).toBe(200);
     expect(commentUpdate).toHaveBeenCalledWith(expect.objectContaining({
@@ -174,7 +184,9 @@ describe("PATCH /api/questions/[id]/comments/[commentId]", () => {
       question: { isPublic: true, authorId: "s1", author: studentAuthor },
     });
 
-    const res = await patchComment(req({ flagged: false }), { params: { id: "q1", commentId: "c1" } });
+    const res = await patchComment(req({ flagged: false }), {
+      params: Promise.resolve({ id: "q1", commentId: "c1" }),
+    });
 
     expect(res.status).toBe(403);
     expect(commentUpdate).not.toHaveBeenCalled();
@@ -191,7 +203,9 @@ describe("DELETE /api/questions/[id]/comments/[commentId]", () => {
       question: { isPublic: true, authorId: "s1", author: studentAuthor },
     });
 
-    const res = await deleteComment(new Request("http://localhost/api/test"), { params: { id: "q1", commentId: "c1" } });
+    const res = await deleteComment(new Request("http://localhost/api/test"), {
+      params: Promise.resolve({ id: "q1", commentId: "c1" }),
+    });
 
     expect(res.status).toBe(403);
     expect(commentDelete).not.toHaveBeenCalled();
@@ -206,7 +220,9 @@ describe("DELETE /api/questions/[id]/comments/[commentId]", () => {
       question: { isPublic: true, authorId: "s2", author: studentAuthor },
     });
 
-    const res = await deleteComment(new Request("http://localhost/api/test"), { params: { id: "q1", commentId: "c1" } });
+    const res = await deleteComment(new Request("http://localhost/api/test"), {
+      params: Promise.resolve({ id: "q1", commentId: "c1" }),
+    });
 
     expect(res.status).toBe(404);
     expect(commentDelete).not.toHaveBeenCalled();

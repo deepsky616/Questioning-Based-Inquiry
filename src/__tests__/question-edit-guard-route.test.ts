@@ -31,7 +31,7 @@ const patchReq = (body: unknown) =>
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-const ctx = { params: { id: "q1" } };
+const ctx = { params: Promise.resolve({ id: "q1" }) };
 
 // 반응 없는 학생 본인 질문
 const cleanQuestion = (overrides = {}) => ({

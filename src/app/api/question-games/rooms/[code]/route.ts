@@ -8,16 +8,19 @@ import {
   saveGameRoom,
 } from "@/lib/game-room-store";
 
+type Params = { params: Promise<{ code: string }> };
+
 // 방 상태 조회 (폴링)
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { code: string } }
+  { params }: Params,
 ) {
+  const { code } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
-  const room = await loadGameRoom(params.code);
+  const room = await loadGameRoom(code);
   if (!room) {
     return NextResponse.json({ error: "방을 찾을 수 없습니다" }, { status: 404 });
   }
@@ -27,8 +30,9 @@ export async function GET(
 // 방 액션 (참가/시작/주제설정/질문추가/종료/나가기)
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { code: string } }
+  { params }: Params,
 ) {
+  const { code } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -36,7 +40,7 @@ export async function PATCH(
   const userId = (session.user as { id: string }).id;
   const userName = (session.user as { name?: string }).name ?? "학생";
 
-  const room = await loadGameRoom(params.code);
+  const room = await loadGameRoom(code);
   if (!room) {
     return NextResponse.json({ error: "방을 찾을 수 없습니다" }, { status: 404 });
   }

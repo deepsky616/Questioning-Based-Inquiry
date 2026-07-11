@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { isValidSessionDateString } from "@/lib/sessions";
 import { z } from "zod";
 
+type Params = { params: Promise<{ id: string }> };
+
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
 
 const inquiryQuestionSchema = z.object({
@@ -45,7 +47,7 @@ async function assertOwner(id: string, teacherId: string) {
   return rows[0]?.teacher_id === teacherId;
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   if ((session.user as { role?: string }).role !== "TEACHER") {
@@ -54,7 +56,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   try {
     const teacherId = (session.user as { id: string }).id;
-    const { id } = params;
+    const { id } = await params;
     if (!(await assertOwner(id, teacherId))) {
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
@@ -104,12 +106,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: Params) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 
   const teacherId = (session.user as { id: string }).id;
-  const { id } = params;
+  const { id } = await params;
 
   if (!(await assertOwner(id, teacherId))) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });

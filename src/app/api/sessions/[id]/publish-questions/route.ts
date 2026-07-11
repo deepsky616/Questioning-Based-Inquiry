@@ -7,6 +7,8 @@ import {
   PublishQuestionsError,
 } from "@/lib/publish-questions-service";
 
+type Params = { params: Promise<{ id: string }> };
+
 function unauthorized() {
   return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
 }
@@ -30,24 +32,26 @@ function serviceError(error: unknown) {
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: Params,
 ) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) return unauthorized();
-  const data = await getPublishedQuestions(params.id, (session.user as { id: string }).id);
+  const data = await getPublishedQuestions(id, (session.user as { id: string }).id);
   return NextResponse.json(data);
 }
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: Params,
 ) {
+  const { id } = await params;
   const session = await auth();
   const blocked = teacherOnly(session);
   if (blocked) return blocked;
   try {
     const body = await req.json().catch(() => ({}));
-    const result = await publishQuestionsToSession(params.id, (session!.user as { id: string }).id, body);
+    const result = await publishQuestionsToSession(id, (session!.user as { id: string }).id, body);
     return NextResponse.json(result);
   } catch (error) {
     return serviceError(error);
@@ -56,14 +60,15 @@ export async function POST(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: Params,
 ) {
+  const { id } = await params;
   const session = await auth();
   const blocked = teacherOnly(session);
   if (blocked) return blocked;
   try {
     const body = await req.json().catch(() => ({}));
-    const result = await deletePublishedQuestions(params.id, (session!.user as { id: string }).id, body);
+    const result = await deletePublishedQuestions(id, (session!.user as { id: string }).id, body);
     return NextResponse.json(result);
   } catch (error) {
     return serviceError(error);

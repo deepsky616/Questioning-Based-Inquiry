@@ -7,24 +7,28 @@ import { buildSessionAnalysisPrompt } from "@/lib/ai-prompts";
 import { generateJsonWithMetadata, AiKeyMissingError, AiBusyError } from "@/lib/ai";
 import { getRequestLocale } from "@/lib/locale";
 
+type Params = { params: Promise<{ id: string }> };
+
 // 저장된 학급 세션 분석 조회(AI 호출 없음) — 질문조회/대시보드가 공유한 결과를 불러온다.
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: Params) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   if ((session.user as { role?: string }).role !== "TEACHER") {
     return NextResponse.json({ error: "교사만 가능합니다" }, { status: 403 });
   }
   const teacherId = (session.user as { id: string }).id;
-  const owned = await prisma.questionSession.findUnique({ where: { id: params.id }, select: { teacherId: true } });
+  const owned = await prisma.questionSession.findUnique({ where: { id }, select: { teacherId: true } });
   if (!owned || owned.teacherId !== teacherId) return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   const row = await prisma.sessionAnalysis.findUnique({
-    where: { sessionId_scope_studentId: { sessionId: params.id, scope: "class", studentId: "" } },
+    where: { sessionId_scope_studentId: { sessionId: id, scope: "class", studentId: "" } },
     select: { result: true },
   });
   return NextResponse.json({ analysis: row?.result ?? null });
 }
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: Params) {
+  const { id } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -39,7 +43,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   if (limited) return limited;
 
   const questionSession = await prisma.questionSession.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       questions: {
         select: {
@@ -137,8 +141,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     // DB 영속화(베스트 에포트) — 질문조회·대시보드·다른 기기에서 마지막 분석 공유
     try {
       await prisma.sessionAnalysis.upsert({
-        where: { sessionId_scope_studentId: { sessionId: params.id, scope: "class", studentId: "" } },
-        create: { sessionId: params.id, scope: "class", studentId: "", result: stored, locale: getRequestLocale(req) },
+        where: { sessionId_scope_studentId: { sessionId: id, scope: "class", studentId: "" } },
+        create: { sessionId: id, scope: "class", studentId: "", result: stored, locale: getRequestLocale(req) },
         update: { result: stored, locale: getRequestLocale(req) },
       });
     } catch (e) {

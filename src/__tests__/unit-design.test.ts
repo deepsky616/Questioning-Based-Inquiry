@@ -54,10 +54,10 @@ function makeRequest(body?: unknown, method = "POST"): Request {
   });
 }
 
-function makeDeleteRequest(id: string): [Request, { params: { id: string } }] {
+function makeDeleteRequest(id: string): [Request, { params: Promise<{ id: string }> }] {
   return [
     new Request(`http://localhost/api/unit-design/${id}`, { method: "DELETE" }),
-    { params: { id } },
+    { params: Promise.resolve({ id }) },
   ];
 }
 

@@ -213,7 +213,6 @@ function AskContent() {
     if (!filteredSessions.some((s) => s.id === selectedSessionId)) {
       selectSession(filteredSessions[0].id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterDate, filterSubject, filterTopic, sessionsLoaded, questionsLoaded, needsQuestionScope, filteredSessions, selectedSessionId]);
 
   useEffect(() => {

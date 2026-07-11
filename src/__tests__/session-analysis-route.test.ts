@@ -110,7 +110,7 @@ describe("POST /api/sessions/[id]/analysis", () => {
     });
 
     const res = await POST(new Request("http://localhost/api/sessions/session-1/analysis"), {
-      params: { id: "session-1" },
+      params: Promise.resolve({ id: "session-1" }),
     });
     const body = await res.json();
     const prompt = mockGenerateContent.mock.calls[0][0] as string;
@@ -145,7 +145,7 @@ describe("POST /api/sessions/[id]/analysis", () => {
     });
 
     const res = await POST(new Request("http://localhost/api/sessions/session-1/analysis"), {
-      params: { id: "session-1" },
+      params: Promise.resolve({ id: "session-1" }),
     });
 
     expect(res.status).toBe(403);

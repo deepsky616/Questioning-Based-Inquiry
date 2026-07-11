@@ -12,6 +12,8 @@ const patchSchema = z.object({
   content: z.string().min(1).max(300).optional(),
 });
 
+type Params = { params: Promise<{ id: string; commentId: string }> };
+
 async function getViewer(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
@@ -33,8 +35,9 @@ async function getViewer(userId: string) {
  */
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string; commentId: string } },
+  { params }: Params,
 ) {
+  const { id, commentId } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -48,7 +51,7 @@ export async function PATCH(
   const [viewer, existing] = await Promise.all([
     getViewer(userId),
     prisma.comment.findUnique({
-      where: { id: params.commentId },
+      where: { id: commentId },
       select: {
         authorId: true,
         questionId: true,
@@ -65,7 +68,7 @@ export async function PATCH(
   if (!existing) {
     return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
   }
-  if (existing.questionId !== params.id) {
+  if (existing.questionId !== id) {
     return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
   }
 
@@ -93,13 +96,13 @@ export async function PATCH(
   }
 
   const comment = await prisma.comment.update({
-    where: { id: params.commentId },
+    where: { id: commentId },
     data: updateData,
     include: { author: { select: { id: true, name: true } } },
   });
 
   if (data.content !== undefined) {
-    await cleanupCommentTranslations([params.commentId]);
+    await cleanupCommentTranslations([commentId]);
   }
 
   return NextResponse.json(comment);
@@ -108,8 +111,9 @@ export async function PATCH(
 /** 댓글 삭제 (작성자 본인 또는 교사). */
 export async function DELETE(
   _req: Request,
-  { params }: { params: { id: string; commentId: string } },
+  { params }: Params,
 ) {
+  const { id, commentId } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -120,7 +124,7 @@ export async function DELETE(
   const [viewer, comment] = await Promise.all([
     getViewer(userId),
     prisma.comment.findUnique({
-      where: { id: params.commentId },
+      where: { id: commentId },
       select: {
         authorId: true,
         questionId: true,
@@ -137,14 +141,14 @@ export async function DELETE(
   if (!comment) {
     return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
   }
-  if (comment.questionId !== params.id) {
+  if (comment.questionId !== id) {
     return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
   }
   if (comment.authorId !== userId && (role !== "TEACHER" || !canModerateQuestion(viewer, comment.question))) {
     return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
   }
 
-  await prisma.comment.delete({ where: { id: params.commentId } });
-  await cleanupCommentTranslations([params.commentId]);
+  await prisma.comment.delete({ where: { id: commentId } });
+  await cleanupCommentTranslations([commentId]);
   return NextResponse.json({ ok: true });
 }
