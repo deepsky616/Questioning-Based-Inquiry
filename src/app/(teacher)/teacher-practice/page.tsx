@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { QuestionPracticeView } from "@/components/shared/QuestionPracticeView";
+import { PracticeBankManager, type PracticeDraft } from "@/components/teacher/PracticeBankManager";
 import { useToast } from "@/components/ui/use-toast";
 import {
   PRACTICE_QUIZ_BANK,
@@ -44,6 +45,10 @@ export default function TeacherPracticePage() {
   const [tab, setTab] = useState<TeacherPracticeTab>("try");
 
   // ── 탭 2: 문항 은행 필터 ──
+  // 내장 문항 "복사해서 편집" — 사본 초안을 내 문항 폼으로 넘긴다(원본은 보존)
+  const [prefill, setPrefill] = useState<{ key: number; draft: PracticeDraft } | null>(null);
+  const copyToEdit = (draft: PracticeDraft) =>
+    setPrefill((p) => ({ key: (p?.key ?? 0) + 1, draft }));
   const [filterCognitive, setFilterCognitive] = useState<"all" | Cognitive>("all");
   const [filterClosure, setFilterClosure] = useState<"all" | Closure>("all");
   const filteredQuiz = PRACTICE_QUIZ_BANK.filter(
@@ -134,9 +139,11 @@ export default function TeacherPracticePage() {
         </div>
       )}
 
-      {/* 탭 2: 문항 은행 열람 — 정답·해설이 보이므로 교사 전용 */}
+      {/* 탭 2: 문항 은행 — 내 문항 관리(추가·수정) + 내장 문항 열람·복사 (정답·해설이 보이므로 교사 전용) */}
       {tab === "bank" && (
         <div className="space-y-6">
+          <PracticeBankManager prefill={prefill} />
+
           <Card>
             <CardContent className="pt-6 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -170,9 +177,18 @@ export default function TeacherPracticePage() {
                         </TableCell>
                         <TableCell className="hidden align-top text-sm text-muted-foreground md:table-cell">{q.explanation}</TableCell>
                         <TableCell className="align-top">
-                          <Button variant="outline" size="sm" onClick={() => copyText(q.content)}>
-                            {t("copy")}
-                          </Button>
+                          <div className="flex flex-col gap-1.5">
+                            <Button variant="outline" size="sm" onClick={() => copyText(q.content)}>
+                              {t("copy")}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => copyToEdit({ mode: "quiz", content: q.content, closure: q.closure, cognitive: q.cognitive, explanation: q.explanation })}
+                            >
+                              {t("copyToEditBtn")}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -190,7 +206,16 @@ export default function TeacherPracticePage() {
                   <div key={item.id} className="rounded-lg border p-3 text-sm space-y-1">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium">{item.source}</p>
-                      <Button variant="outline" size="sm" onClick={() => copyText(item.source)}>{t("copy")}</Button>
+                      <div className="flex shrink-0 gap-1.5">
+                        <Button variant="outline" size="sm" onClick={() => copyText(item.source)}>{t("copy")}</Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToEdit({ mode: "transform", source: item.source, target: item.target, hint: item.hint, example: item.example })}
+                        >
+                          {t("copyToEditBtn")}
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-indigo-700 dark:text-indigo-300">
                       {t("transformTarget", { type: item.target === "open" ? tCls("open.label") : item.target === "conceptual" ? tCls("conceptual.label") : tCls("controversial.label") })}
@@ -211,7 +236,16 @@ export default function TeacherPracticePage() {
                   <div key={topic.id} className="rounded-lg border p-3 text-sm space-y-1">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium">📖 {topic.title}</p>
-                      <Button variant="outline" size="sm" onClick={() => copyText(topic.passage)}>{t("copy")}</Button>
+                      <div className="flex shrink-0 gap-1.5">
+                        <Button variant="outline" size="sm" onClick={() => copyText(topic.passage)}>{t("copy")}</Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToEdit({ mode: "create", title: topic.title, passage: topic.passage })}
+                        >
+                          {t("copyToEditBtn")}
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs leading-relaxed text-muted-foreground">{topic.passage}</p>
                   </div>

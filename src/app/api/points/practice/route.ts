@@ -26,6 +26,7 @@ import {
   practiceDayStartUtc,
   clampToDailyCap,
 } from "@/lib/practice-points";
+import { rowsToBank, type MergedCustomBank } from "@/lib/practice-custom";
 
 // 질문 연습 판정 + 포인트 지급.
 // 채점을 서버가 다시 수행하므로 클라이언트 값은 신뢰하지 않는다.
@@ -67,6 +68,16 @@ const bodySchema = z.discriminatedUnion("mode", [
 /** AI 출제 문항의 중복 지급 방지용 원문 해시(짧게 잘라 roomCode에 담는다) */
 function contentHash(text: string): string {
   return createHash("sha256").update(text.trim()).digest("hex").slice(0, 16);
+}
+
+/** 내장 은행에 없는 문항 id는 교사 커스텀 문항에서 찾는다 */
+async function findCustomBankEntry<M extends keyof MergedCustomBank>(
+  id: string,
+  mode: M,
+): Promise<MergedCustomBank[M][number] | null> {
+  const row = await prisma.practiceCustomItem.findFirst({ where: { id, mode, isActive: true } });
+  if (!row) return null;
+  return (rowsToBank([row])[mode][0] ?? null) as MergedCustomBank[M][number] | null;
 }
 
 interface AwardOutcome {
@@ -160,7 +171,9 @@ export async function POST(req: Request) {
     const body = bodySchema.parse(await req.json());
 
     if (body.mode === "quiz") {
-      const item = PRACTICE_QUIZ_BANK.find((q) => q.id === body.itemId);
+      const item =
+        PRACTICE_QUIZ_BANK.find((q) => q.id === body.itemId) ??
+        (await findCustomBankEntry(body.itemId, "quiz"));
       if (!item) {
         return NextResponse.json({ error: "존재하지 않는 문항입니다" }, { status: 400 });
       }
@@ -179,7 +192,9 @@ export async function POST(req: Request) {
     }
 
     if (body.mode === "transform") {
-      const item = PRACTICE_TRANSFORM_BANK.find((t) => t.id === body.itemId);
+      const item =
+        PRACTICE_TRANSFORM_BANK.find((t) => t.id === body.itemId) ??
+        (await findCustomBankEntry(body.itemId, "transform"));
       if (!item) {
         return NextResponse.json({ error: "존재하지 않는 문항입니다" }, { status: 400 });
       }
@@ -199,7 +214,9 @@ export async function POST(req: Request) {
     }
 
     if (body.mode === "create") {
-      const topic = PRACTICE_CREATE_TOPICS.find((t) => t.id === body.topicId);
+      const topic =
+        PRACTICE_CREATE_TOPICS.find((t) => t.id === body.topicId) ??
+        (await findCustomBankEntry(body.topicId, "create"));
       if (!topic) {
         return NextResponse.json({ error: "존재하지 않는 주제입니다" }, { status: 400 });
       }

@@ -3,12 +3,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/ai", () => ({
   AiKeyMissingError: class AiKeyMissingError extends Error {},
+  AiQuotaError: class AiQuotaError extends Error {},
   generateJsonWithMetadata: vi.fn(),
 }));
 vi.mock("@/lib/db", () => ({
   prisma: {
     pointLog: { aggregate: vi.fn(), create: vi.fn() },
     user: { update: vi.fn() },
+    practiceCustomItem: { findFirst: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -25,6 +27,7 @@ const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mAggregate = prisma.pointLog.aggregate as unknown as ReturnType<typeof vi.fn>;
 const mTx = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
 const mGen = generateJsonWithMetadata as unknown as ReturnType<typeof vi.fn>;
+const mCustomFind = prisma.practiceCustomItem.findFirst as unknown as ReturnType<typeof vi.fn>;
 
 const req = (body: unknown) =>
   new Request("http://localhost/api/points/practice", {
@@ -58,6 +61,7 @@ beforeEach(() => {
   mAggregate.mockResolvedValue({ _sum: { points: 0 } });
   mTx.mockResolvedValue([]);
   mGen.mockResolvedValue(aiClassification("open", "conceptual"));
+  mCustomFind.mockResolvedValue(null);
 });
 
 describe("연습 포인트 — 분류 퀴즈", () => {
@@ -147,6 +151,51 @@ describe("연습 포인트 — 질문 바꾸기·만들기 (서버 AI 판정)", 
 
     mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
     expect((await POST(req({ mode: "quiz" }))).status).toBe(400);
+  });
+});
+
+describe("연습 포인트 — 교사 커스텀 문항", () => {
+  const CUSTOM_QUIZ_ROW = {
+    id: "cust1",
+    mode: "quiz",
+    content: "우리 반 규칙은 왜 필요할까요?",
+    closure: "open",
+    cognitive: "conceptual",
+    explanation: "정답이 하나가 아니고 관계를 생각하는 질문이에요.",
+    source: null, target: null, hint: null, example: null, title: null, passage: null,
+  };
+
+  it("내장 은행에 없는 문항 id는 커스텀 문항에서 찾아 채점·지급한다", async () => {
+    mCustomFind.mockResolvedValue(CUSTOM_QUIZ_ROW);
+    const data = await (await POST(req({ mode: "quiz", itemId: "cust1", quizType: "closure", answer: "open" }))).json();
+    expect(mCustomFind).toHaveBeenCalledWith({ where: { id: "cust1", mode: "quiz", isActive: true } });
+    expect(data.correct).toBe(true);
+    expect(data.awarded).toBe(PRACTICE_POINTS.QUIZ_CORRECT);
+  });
+
+  it("커스텀 문항 오답은 지급하지 않는다", async () => {
+    mCustomFind.mockResolvedValue(CUSTOM_QUIZ_ROW);
+    const data = await (await POST(req({ mode: "quiz", itemId: "cust1", quizType: "closure", answer: "closed" }))).json();
+    expect(data.correct).toBe(false);
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("비활성·미존재 커스텀 문항은 400", async () => {
+    mCustomFind.mockResolvedValue(null);
+    expect((await POST(req({ mode: "quiz", itemId: "cust-none", quizType: "closure", answer: "open" }))).status).toBe(400);
+  });
+
+  it("커스텀 바꾸기 문항은 DB의 목표 유형으로 판정한다", async () => {
+    mCustomFind.mockResolvedValue({
+      ...CUSTOM_QUIZ_ROW,
+      id: "cust2", mode: "transform", content: null, closure: null, cognitive: null, explanation: null,
+      source: "우리 반 규칙은 몇 개인가요?", target: "controversial",
+      hint: "찬반이 갈리는 상황을 만들어 보세요.", example: "규칙이 많은 반과 적은 반, 어느 쪽이 좋을까요?",
+    });
+    mGen.mockResolvedValue(aiClassification("open", "controversial"));
+    const data = await (await POST(req({ mode: "transform", itemId: "cust2", content: "규칙을 학생이 정해야 할까요?" }))).json();
+    expect(data.achieved).toBe(true);
+    expect(data.awarded).toBe(PRACTICE_POINTS.TARGET_ACHIEVED);
   });
 });
 

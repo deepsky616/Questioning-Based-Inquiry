@@ -7,7 +7,8 @@
 // 근거: 교육부 「질문기반 탐구수업」·「학생 질문 중심의 교과 수업 모델」
 //  - 분류는 정답 맞히기가 아니라 근거를 생각하는 활동 → 모든 문항에 해설 제공
 //  - 닫힌→열린, 사실적→개념적→논쟁적 전환·생성 연습 → AI 분류로 즉시 피드백
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,17 @@ import {
   type Closure,
   type Cognitive,
   type TransformTarget,
+  type PracticeQuizItem,
+  type PracticeTransformItem,
+  type PracticeCreateTopic,
 } from "@/lib/question-practice-data";
+
+// /api/practice/bank 응답 — 담당 교사가 만든 커스텀 문항(내장 은행에 병합)
+interface CustomBank {
+  quiz: PracticeQuizItem[];
+  transform: PracticeTransformItem[];
+  create: PracticeCreateTopic[];
+}
 
 const MAX_QUESTION_LENGTH = 200;
 
@@ -61,6 +72,45 @@ export function QuestionPracticeView() {
   const typeLabel = (target: TransformTarget) =>
     target === "open" ? tCls("open.label") : target === "conceptual" ? tCls("conceptual.label") : tCls("controversial.label");
 
+  // ── 교사 커스텀 문항 병합 — 담당 교사가 저장하면 내장 은행에 합쳐져 출제된다 ──
+  const { data: customBank } = useQuery<CustomBank>({
+    queryKey: ["practice-custom-bank"],
+    queryFn: async () => {
+      const r = await fetch("/api/practice/bank");
+      if (!r.ok) throw new Error("failed");
+      return r.json();
+    },
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const quizBank = useMemo(
+    () => (customBank?.quiz?.length ? [...PRACTICE_QUIZ_BANK, ...customBank.quiz] : PRACTICE_QUIZ_BANK),
+    [customBank],
+  );
+  const transformBank = useMemo(
+    () => (customBank?.transform?.length ? [...PRACTICE_TRANSFORM_BANK, ...customBank.transform] : PRACTICE_TRANSFORM_BANK),
+    [customBank],
+  );
+  const createBank = useMemo(
+    () => (customBank?.create?.length ? [...PRACTICE_CREATE_TOPICS, ...customBank.create] : PRACTICE_CREATE_TOPICS),
+    [customBank],
+  );
+  const customIds = useMemo(
+    () =>
+      new Set(
+        [...(customBank?.quiz ?? []), ...(customBank?.transform ?? []), ...(customBank?.create ?? [])].map((i) => i.id),
+      ),
+    [customBank],
+  );
+
+  // "교사 출제" 배지 — 커스텀 문항임을 표시
+  const renderCustomBadge = (id: string) =>
+    customIds.has(id) ? (
+      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+        {t("teacherItemBadge")}
+      </span>
+    ) : null;
+
   // ── 모드 1: 분류 연습 ──
   const [quizMode, setQuizMode] = useState<QuizMode>("closure");
   // 셔플백 출제 — 은행을 한 바퀴 다 돌기 전에는 같은 문항이 다시 나오지 않는다
@@ -72,7 +122,7 @@ export function QuestionPracticeView() {
   const quizCorrectValue = quizMode === "closure" ? quizItem.closure : quizItem.cognitive;
   const [quizAward, setQuizAward] = useState<AwardInfo | null>(null);
   const nextQuiz = () => {
-    setQuizDeck((d) => drawFromDeck(PRACTICE_QUIZ_BANK, d.remaining, d.item.id));
+    setQuizDeck((d) => drawFromDeck(quizBank, d.remaining, d.item.id));
     setQuizAnswer(null);
     setQuizAward(null);
   };
@@ -113,7 +163,7 @@ export function QuestionPracticeView() {
   const [showHint, setShowHint] = useState(false);
   const nextTransform = () => {
     setAiTransform(null);
-    setTransformDeck((d) => drawFromDeck(PRACTICE_TRANSFORM_BANK, d.remaining, d.item.id));
+    setTransformDeck((d) => drawFromDeck(transformBank, d.remaining, d.item.id));
     setShowHint(false);
     resetCheck();
   };
@@ -125,9 +175,26 @@ export function QuestionPracticeView() {
   const [createTarget, setCreateTarget] = useState<TransformTarget>("conceptual");
   const nextCreateTopic = () => {
     setAiTopic(null);
-    setCreateDeck((d) => drawFromDeck(PRACTICE_CREATE_TOPICS, d.remaining, d.item.id));
+    setCreateDeck((d) => drawFromDeck(createBank, d.remaining, d.item.id));
     resetCheck();
   };
+
+  // 커스텀 문항이 도착하면 진행 중인 셔플백에 즉시 합류시킨다
+  // (다음 사이클까지 기다리면 "저장했는데 안 나온다"는 혼란이 생긴다)
+  const customApplied = useRef(false);
+  useEffect(() => {
+    if (!customBank || customApplied.current) return;
+    customApplied.current = true;
+    if (customBank.quiz?.length) {
+      setQuizDeck((d) => ({ ...d, remaining: [...d.remaining, ...customBank.quiz.map((i) => i.id)] }));
+    }
+    if (customBank.transform?.length) {
+      setTransformDeck((d) => ({ ...d, remaining: [...d.remaining, ...customBank.transform.map((i) => i.id)] }));
+    }
+    if (customBank.create?.length) {
+      setCreateDeck((d) => ({ ...d, remaining: [...d.remaining, ...customBank.create.map((i) => i.id)] }));
+    }
+  }, [customBank]);
 
   // ── AI 실시간 출제 ──
   const [isGenerating, setIsGenerating] = useState(false);
@@ -354,7 +421,10 @@ export function QuestionPracticeView() {
             </div>
 
             <div className="rounded-xl bg-muted/40 p-5">
-              <p className="text-xs text-muted-foreground mb-1">{t("quizPrompt")}</p>
+              <p className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+                {t("quizPrompt")}
+                {renderCustomBadge(quizItem.id)}
+              </p>
               <p className="text-lg font-medium text-foreground">{quizItem.content}</p>
             </div>
 
@@ -414,6 +484,7 @@ export function QuestionPracticeView() {
                     {t("aiGeneratedBadge")}
                   </span>
                 )}
+                {!aiTransform && renderCustomBadge(transformDeck.item.id)}
               </p>
               <p className="text-lg font-medium text-foreground">{transformItem.source}</p>
               <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300">
@@ -462,6 +533,7 @@ export function QuestionPracticeView() {
                       {t("aiGeneratedBadge")}
                     </span>
                   )}
+                  {!aiTopic && renderCustomBadge(createDeck.item.id)}
                 </p>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={nextCreateTopic}>{t("newTopic")}</Button>
