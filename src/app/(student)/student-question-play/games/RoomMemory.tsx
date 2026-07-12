@@ -7,7 +7,7 @@ import RoomResult from "./RoomResult";
 import { useAIPlay } from "./useAIPlay";
 import {
   MEMORY_DIFFICULTY, MemoryDifficulty, QAPair,
-  pickFallbackPairs, parseAIPairs, shuffle,
+  pickFallbackPairs, parseAIPairs, resolveMemoryRollRoundId, shuffle,
 } from "@/lib/memory-game-data";
 import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
@@ -24,6 +24,7 @@ interface MemoryState {
   qCards: MemoryCard[];      // 셔플된 질문 카드 (위치 = 인덱스)
   aCards: MemoryCard[];      // 셔플된 대답 카드
   diceRolls: Record<string, number>; // 학생별 주사위
+  rollRoundId?: string;
   turnOrder: string[];       // 순서 결정 후 학생 id 배열
   currentTurnIdx: number;
   takenIds: string[];        // 획득된 카드 id (qCards/aCards 양쪽)
@@ -72,71 +73,77 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
   async function startGame(difficulty: MemoryDifficulty) {
     if (aiGenRef.current) return;
     aiGenRef.current = true;
-    const cfg = MEMORY_DIFFICULTY[difficulty];
-    await onAction("update-state", { patch: { phase: "generating", difficulty } });
+    try {
+      const generating = await onAction("update-state", {
+        patch: { phase: "generating", difficulty },
+      });
+      if (!generating.ok) return;
 
-    const res = await ask({ action: "memory:pairs", context: { count: String(cfg.pairs) } });
-    let pairs: QAPair[] | null = null;
-    if (res?.text) pairs = parseAIPairs(res.text, cfg.pairs);
-    if (!pairs) pairs = pickFallbackPairs(cfg.pairs);
+      const cfg = MEMORY_DIFFICULTY[difficulty];
+      const response = await ask({
+        action: "memory:pairs",
+        context: { count: String(cfg.pairs) },
+      });
+      const pairs = response?.text
+        ? parseAIPairs(response.text, cfg.pairs) ?? pickFallbackPairs(cfg.pairs)
+        : pickFallbackPairs(cfg.pairs);
 
-    // 질문/대답 카드 생성 + 셔플
-    const qCards: MemoryCard[] = pairs.map((p, i) => ({ id: `q-${i}`, pairId: p.id, type: "q" }));
-    const aCards: MemoryCard[] = pairs.map((p, i) => ({ id: `a-${i}`, pairId: p.id, type: "a" }));
-    const shuffledQ = shuffle(qCards);
-    const shuffledA = shuffle(aCards);
+      // 질문/대답 카드 생성 + 셔플
+      const qCards: MemoryCard[] = pairs.map((p, i) => ({ id: `q-${i}`, pairId: p.id, type: "q" }));
+      const aCards: MemoryCard[] = pairs.map((p, i) => ({ id: `a-${i}`, pairId: p.id, type: "a" }));
 
-    await onAction("update-state", {
-      patch: {
-        phase: "rolling",
-        pairs, qCards: shuffledQ, aCards: shuffledA,
-        diceRolls: {}, turnOrder: [],
-        currentTurnIdx: 0, takenIds: [], revealedIds: [],
-        scores: Object.fromEntries(room.players.map((p) => [p.id, 0])),
-      },
-    });
-    aiGenRef.current = false;
+      await onAction("update-state", {
+        patch: {
+          phase: "rolling",
+          rollRoundId: crypto.randomUUID(),
+          pairs,
+          qCards: shuffle(qCards),
+          aCards: shuffle(aCards),
+          diceRolls: {}, turnOrder: [],
+          currentTurnIdx: 0, takenIds: [], revealedIds: [],
+          scores: Object.fromEntries(
+            generating.room.players.map((p) => [p.id, 0]),
+          ),
+        },
+      });
+    } finally {
+      aiGenRef.current = false;
+    }
   }
 
   /* ── 학생: 주사위 굴림 ── */
+  async function persistRoll(final: number) {
+    const roundId = resolveMemoryRollRoundId(room, state.rollRoundId);
+    if (!roundId) {
+      setRolling(false);
+      setDiceLocal(null);
+      return;
+    }
+
+    const result = await onAction("memory-roll", {
+      roll: final,
+      rollRoundId: roundId,
+    });
+    setRolling(false);
+    if (!result.ok) setDiceLocal(null);
+  }
+
   async function rollDice() {
     if (rolling || diceLocal != null) return;
     setRolling(true);
     // 1초 애니메이션
     let count = 0;
     const iv = setInterval(() => {
-      setDiceLocal(Math.ceil(Math.random() * 6));
+      setDiceLocal(Math.floor(Math.random() * 6) + 1);
       count++;
       if (count >= 12) {
         clearInterval(iv);
-        const final = Math.ceil(Math.random() * 6);
+        const final = Math.floor(Math.random() * 6) + 1;
         setDiceLocal(final);
-        setRolling(false);
-        // 동기화: 본인 주사위 결과 기록
-        onAction("update-state", {
-          patch: { diceRolls: { ...state.diceRolls, [myId]: final } },
-        });
+        void persistRoll(final);
       }
     }, 80);
   }
-
-  /* ── 모든 학생이 주사위 굴리면 자동으로 순서 결정 (방장 클라이언트가 처리) ── */
-  useEffect(() => {
-    if (!isHost || !hasState || state.phase !== "rolling") return;
-    const rolled = Object.keys(state.diceRolls ?? {});
-    if (rolled.length !== room.players.length) return;
-    // 큰 숫자부터 정렬 (동점은 player joinedAt 순)
-    const sorted = [...room.players]
-      .map((p) => ({ id: p.id, roll: state.diceRolls[p.id] ?? 0, joinedAt: p.joinedAt }))
-      .sort((a, b) => b.roll - a.roll || a.joinedAt - b.joinedAt);
-    onAction("update-state", {
-      patch: {
-        phase: "play",
-        turnOrder: sorted.map((s) => s.id),
-        currentTurnIdx: 0,
-      },
-    });
-  }, [isHost, hasState, state?.phase, state?.diceRolls, room.players, onAction]);
 
   /* ── 카드 뒤집기 ── */
   async function flipCard(card: MemoryCard) {
