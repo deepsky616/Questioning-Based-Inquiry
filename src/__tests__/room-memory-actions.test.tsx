@@ -5,11 +5,11 @@ import {
   act,
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import RoomMemory from "@/app/(student)/student-question-play/games/RoomMemory";
 import {
   BUILT_IN_GAMES,
@@ -214,8 +214,9 @@ describe("메모리 카드 생성", () => {
       patch: { phase: "generating", difficulty: "easy" },
     });
     expect(aiMocks.ask).toHaveBeenCalledWith({
-      action: "memory:pairs",
+      action: "memory:pairs-bilingual",
       context: { count: "6" },
+      locale: "ko",
     });
     expect(onAction).toHaveBeenNthCalledWith(
       2,

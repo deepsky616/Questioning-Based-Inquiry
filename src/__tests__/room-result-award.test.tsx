@@ -5,11 +5,11 @@ import {
   act,
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import RoomResult from "@/app/(student)/student-question-play/games/RoomResult";
 import {
   BUILT_IN_GAMES,

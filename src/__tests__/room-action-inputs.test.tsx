@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import RoomDice from "@/app/(student)/student-question-play/games/RoomDice";
 import RoomKaba from "@/app/(student)/student-question-play/games/RoomKaba";
 import RoomLadder from "@/app/(student)/student-question-play/games/RoomLadder";
@@ -98,7 +99,7 @@ const flowCases = [
   {
     name: "이야기",
     myId: "user-1",
-    placeholder: "단어를 모두 사용해 짧은 이야기를 한 문장으로 만들어보세요...",
+    placeholder: "✏️ 세 단어로 이야기 한 문장을 만들어보세요!",
     buttonName: "이야기 시작! →",
     input: "토끼가 학교에서 책을 발견했다.",
     state: {
@@ -113,7 +114,7 @@ const flowCases = [
   {
     name: "질문",
     myId: "user-2",
-    placeholder: "이야기/앞 대답에 어울리는 질문을 만들어보세요...",
+    placeholder: "이야기에 어울리는 질문을 만들어보세요...",
     buttonName: "질문 제출 →",
     input: "토끼는 왜 책을 집었나요?",
     state: {
@@ -133,7 +134,7 @@ const flowCases = [
   {
     name: "대답",
     myId: "user-1",
-    placeholder: "학생의 질문에 어울리는 대답을 한 문장으로 해보세요...",
+    placeholder: "질문에 어울리는 짧은 대답을 한 문장으로 해보세요...",
     buttonName: "대답 제출 →",
     input: "친구에게 읽어 주려고 집었어요.",
     state: {
@@ -209,7 +210,7 @@ describe("게임 방 입력", () => {
     );
 
     await expectFailureThenSuccess(
-      screen.getByPlaceholderText(/첫 질문/) as HTMLTextAreaElement,
+      screen.getByPlaceholderText(/첫 번째 질문/) as HTMLTextAreaElement,
       screen.getByRole("button", { name: /질문 연결/ }),
       onAction,
       "우주는 얼마나 넓은가요?",
