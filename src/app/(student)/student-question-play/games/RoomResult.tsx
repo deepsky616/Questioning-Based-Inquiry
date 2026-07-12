@@ -167,7 +167,7 @@ export default function RoomResult({
         });
       }
     }
-  }, [onAction]);
+  }, [onAction, text.shareFailed]);
 
   const requestAward = useCallback(async () => {
     const awardRoom = { code: room.code, createdAt: room.createdAt };
@@ -238,7 +238,7 @@ export default function RoomResult({
         );
       }
     }
-  }, [game.id, questions, room.code, room.createdAt, room.topic, scores, shareAward, topScore]);
+  }, [game.id, questions, room.code, room.createdAt, room.topic, scores, shareAward, text.awardFailed, text.awardRequestFailed, topScore]);
 
   // 방장 자동 지급 (방 수명마다 1회)
   useEffect(() => {
