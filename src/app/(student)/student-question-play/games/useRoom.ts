@@ -18,12 +18,18 @@ export function useRoom(): UseRoomResult {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeCode, setActiveCodeState] = useState<string | null>(null);
+  const [roomGeneration, setRoomGeneration] = useState(0);
   const roomRef = useRef<GameRoom | null>(null);
   const activeCodeRef = useRef<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const roomGenerationRef = useRef(0);
   const connectIntentRef = useRef(0);
   const pendingActionCountRef = useRef(0);
+
+  const advanceRoomGeneration = useCallback(() => {
+    roomGenerationRef.current += 1;
+    setRoomGeneration(roomGenerationRef.current);
+  }, []);
 
   const isCurrentRequest = useCallback((code: string, generation: number) => {
     return activeCodeRef.current === code &&
@@ -44,13 +50,13 @@ export function useRoom(): UseRoomResult {
   }, []);
 
   const replaceRoom = useCallback((nextRoom: GameRoom) => {
-    roomGenerationRef.current += 1;
+    advanceRoomGeneration();
     activeCodeRef.current = nextRoom.code;
     roomRef.current = nextRoom;
     setActiveCodeState(nextRoom.code);
     setRoom(nextRoom);
     return nextRoom;
-  }, []);
+  }, [advanceRoomGeneration]);
 
   const applyRoom = useCallback((nextRoom: GameRoom) => {
     const current = roomRef.current;
@@ -66,13 +72,13 @@ export function useRoom(): UseRoomResult {
   }, []);
 
   const clearRoom = useCallback(() => {
-    roomGenerationRef.current += 1;
+    advanceRoomGeneration();
     connectIntentRef.current += 1;
     activeCodeRef.current = null;
     roomRef.current = null;
     setActiveCodeState(null);
     setRoom(null);
-  }, []);
+  }, [advanceRoomGeneration]);
 
   const setActiveCode = useCallback((code: string | null) => {
     if (activeCodeRef.current === code) return;
@@ -80,13 +86,13 @@ export function useRoom(): UseRoomResult {
       clearRoom();
       return;
     }
-    roomGenerationRef.current += 1;
+    advanceRoomGeneration();
     connectIntentRef.current += 1;
     activeCodeRef.current = code;
     roomRef.current = null;
     setActiveCodeState(code);
     setRoom(null);
-  }, [clearRoom]);
+  }, [advanceRoomGeneration, clearRoom]);
 
   // 폴링: activeCode가 있으면 2초마다 방 상태 갱신
   useEffect(() => {
@@ -129,7 +135,7 @@ export function useRoom(): UseRoomResult {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
-  }, [activeCode, applyRoom, clearRoom, isCurrentRequest]);
+  }, [activeCode, applyRoom, clearRoom, isCurrentRequest, roomGeneration]);
 
   const createRoom = useCallback(async (gameId: string): Promise<GameRoom | null> => {
     const intent = ++connectIntentRef.current;

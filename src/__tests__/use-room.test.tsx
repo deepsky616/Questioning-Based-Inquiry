@@ -338,6 +338,45 @@ describe("useRoom request ordering", () => {
     unmount();
   });
 
+  it("같은 방 재참가 성공 뒤 새 폴링의 더 높은 버전을 반영한다", async () => {
+    const delayedOldPoll = deferred<Response>();
+    let joinCount = 0;
+    let pollCount = 0;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") {
+        joinCount += 1;
+        return jsonResponse({ room: makeRoom(joinCount) });
+      }
+      pollCount += 1;
+      if (pollCount === 1) return delayedOldPoll.promise;
+      return jsonResponse({ room: makeRoom(3) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(pollCount).toBe(1));
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(result.current.room?.version).toBe(3));
+    expect(pollCount).toBe(2);
+
+    await act(async () => {
+      delayedOldPoll.resolve(jsonResponse({ room: makeRoom(4) }));
+      await delayedOldPoll.promise;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.room?.version).toBe(3);
+    unmount();
+  });
+
   it("다른 방 연결 뒤 이전 방 PATCH 응답은 superseded를 반환한다", async () => {
     const delayedAction = deferred<Response>();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
