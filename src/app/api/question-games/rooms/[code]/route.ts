@@ -11,6 +11,10 @@ import {
   loadGameRoom,
   saveGameRoom,
 } from "@/lib/game-room-store";
+import {
+  recordMemoryRoll,
+  settleMemoryRollingRoom,
+} from "@/lib/memory-room-roll";
 
 type Params = { params: Promise<{ code: string }> };
 
@@ -47,6 +51,50 @@ async function persistRoom(room: GameRoom): Promise<PersistResult> {
     return { ok: false, response: roomConflict(result.room) };
   }
   return { ok: false, response: roomMissing() };
+}
+
+async function handleMemoryRoll(
+  room: GameRoom,
+  userId: string,
+  body: Record<string, unknown>,
+) {
+  try {
+    const result = await recordMemoryRoll({
+      initialRoom: room,
+      userId,
+      roll: body.roll,
+      rollRoundId: body.rollRoundId,
+    });
+    if (result.kind === "saved" || result.kind === "replayed") {
+      return NextResponse.json({
+        room: result.room,
+        result: { roll: result.roll, replayed: result.replayed },
+      });
+    }
+    if (result.kind === "invalid") {
+      return NextResponse.json(
+        { error: "잘못된 주사위 요청입니다" },
+        { status: 400 },
+      );
+    }
+    if (result.kind === "forbidden") {
+      return NextResponse.json(
+        { error: "방 참가자만 굴릴 수 있어요" },
+        { status: 403 },
+      );
+    }
+    if (result.kind === "missing") return roomMissing();
+    if (result.kind === "conflict") return roomConflict(result.room);
+    return NextResponse.json(
+      { error: "메모리 게임 상태를 처리할 수 없습니다" },
+      { status: 500 },
+    );
+  } catch {
+    return NextResponse.json(
+      { error: "주사위 결과 저장에 실패했습니다" },
+      { status: 500 },
+    );
+  }
 }
 
 async function joinRoom(
@@ -100,31 +148,35 @@ async function leaveRoom(initialRoom: GameRoom, userId: string) {
   let room = initialRoom;
 
   for (let attempt = 0; attempt < MEMBERSHIP_WRITE_ATTEMPTS; attempt++) {
+    let candidate: GameRoom;
     if (!room.players.some((item) => item.id === userId)) {
-      return NextResponse.json({ room });
-    }
+      candidate = settleMemoryRollingRoom(room);
+      if (candidate === room) return NextResponse.json({ room });
+    } else {
+      const wasHost = room.hostId === userId;
+      const players = room.players
+        .filter((item) => item.id !== userId)
+        .map((item, index) =>
+          wasHost ? { ...item, isHost: index === 0 } : item,
+        );
 
-    const wasHost = room.hostId === userId;
-    const players = room.players
-      .filter((item) => item.id !== userId)
-      .map((item, index) =>
-        wasHost ? { ...item, isHost: index === 0 } : item,
-      );
-
-    if (players.length === 0) {
-      const result = await deleteGameRoom(room);
-      if (result.kind === "deleted" || result.kind === "missing") {
-        return roomDeleted();
+      if (players.length === 0) {
+        const result = await deleteGameRoom(room);
+        if (result.kind === "deleted" || result.kind === "missing") {
+          return roomDeleted();
+        }
+        room = result.room;
+        continue;
       }
-      room = result.room;
-      continue;
+
+      candidate = settleMemoryRollingRoom({
+        ...room,
+        players,
+        hostId: wasHost ? players[0].id : room.hostId,
+      });
     }
 
-    const result = await saveGameRoom({
-      ...room,
-      players,
-      hostId: wasHost ? players[0].id : room.hostId,
-    });
+    const result = await saveGameRoom(candidate);
     if (result.kind === "saved") {
       return NextResponse.json({ room: result.room });
     }
@@ -133,7 +185,8 @@ async function leaveRoom(initialRoom: GameRoom, userId: string) {
   }
 
   if (!room.players.some((item) => item.id === userId)) {
-    return NextResponse.json({ room });
+    const candidate = settleMemoryRollingRoom(room);
+    if (candidate === room) return NextResponse.json({ room });
   }
   return roomConflict(room);
 }
@@ -179,6 +232,7 @@ export async function PATCH(
 
   if (action === "join") return joinRoom(room, userId, userName);
   if (action === "leave") return leaveRoom(room, userId);
+  if (action === "memory-roll") return handleMemoryRoll(room, userId, body);
 
   switch (action) {
     case "start": {
