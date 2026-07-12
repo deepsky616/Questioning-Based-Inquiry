@@ -120,10 +120,10 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
     const entry: ChainItem = {
       type: "story", text: trimmed, playerId: myId, playerName: tagger?.name ?? "술래",
     };
-    await onAction("update-state", {
+    const result = await onAction("update-state", {
       patch: { phase: "qa", chain: [entry] },
     });
-    setInput("");
+    if (result.ok) setInput("");
   }
 
   async function submitQuestion() {
@@ -132,10 +132,10 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
     const entry: ChainItem = {
       type: "question", text: trimmed, playerId: myId, playerName: currentQuestioner.name,
     };
-    await onAction("update-state", {
+    const result = await onAction("update-state", {
       patch: { chain: [...(state.chain ?? []), entry] },
     });
-    setInput("");
+    if (result.ok) setInput("");
   }
 
   async function submitAnswer() {
@@ -144,14 +144,14 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
     const entry: ChainItem = {
       type: "answer", text: trimmed, playerId: myId, playerName: tagger?.name ?? "술래",
     };
-    await onAction("update-state", {
+    const result = await onAction("update-state", {
       patch: {
         chain: [...(state.chain ?? []), entry],
         // 다음 질문자로 인덱스 전진
         nextQuestionerIdx: ((state.nextQuestionerIdx ?? 0) + 1) % Math.max(nonTaggers.length, 1),
       },
     });
-    setInput("");
+    if (result.ok) setInput("");
   }
 
   /* ── 결과 화면 ── */

@@ -168,6 +168,45 @@ describe("useRoom sendAction", () => {
     unmount();
   });
 
+  it("높은 성공 응답 뒤 늦은 낮은 409는 현재 방과 오류를 바꾸지 않는다", async () => {
+    const delayedConflict = deferred<Response>();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom(1) });
+      if (!init?.method) return jsonResponse({ room: makeRoom(1) });
+      if (body?.action === "slow") return delayedConflict.promise;
+      return jsonResponse({ room: makeRoom(3) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(result.current.room?.version).toBe(1));
+
+    let conflictResult;
+    await act(async () => {
+      const conflictPromise = result.current.sendAction("slow");
+      await result.current.sendAction("fast");
+      delayedConflict.resolve(jsonResponse({
+        error: "stale conflict",
+        room: makeRoom(2),
+      }, 409));
+      conflictResult = await conflictPromise;
+    });
+
+    expect(result.current.room?.version).toBe(3);
+    expect(result.current.error).toBeNull();
+    expect(conflictResult).toMatchObject({
+      ok: false,
+      status: 409,
+      reason: "conflict",
+      room: { version: 3 },
+    });
+    unmount();
+  });
+
   it("network: 연결 오류면 현재 방을 담은 실패 결과를 반환한다", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = requestBody(init);
@@ -333,6 +372,41 @@ describe("useRoom leaveRoom", () => {
     expect(left).toBe(false);
     expect(result.current.room).toEqual(latest);
     expect(result.current.error).toContain("방 상태가 바뀌었어요");
+    unmount();
+  });
+
+  it("높은 동작 성공 뒤 늦은 낮은 409 나가기는 현재 방과 오류를 바꾸지 않는다", async () => {
+    const delayedLeave = deferred<Response>();
+    fetchMock.mockImplementation(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom(1) });
+      if (body?.action === "leave") return delayedLeave.promise;
+      if (!init?.method) return jsonResponse({ room: makeRoom(1) });
+      return jsonResponse({ room: makeRoom(3) });
+    });
+
+    const { result, unmount } = renderHook(() => useRoom());
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+
+    let left = true;
+    await act(async () => {
+      const leavePromise = result.current.leaveRoom();
+      await result.current.sendAction("start");
+      delayedLeave.resolve(jsonResponse({
+        error: "stale leave conflict",
+        room: makeRoom(2),
+      }, 409));
+      left = await leavePromise;
+    });
+
+    expect(left).toBe(false);
+    expect(result.current.room?.version).toBe(3);
+    expect(result.current.error).toBeNull();
     unmount();
   });
 

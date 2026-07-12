@@ -31,15 +31,17 @@ export function useRoom(): UseRoomResult {
     return nextRoom;
   }, []);
 
-  const applyRoom = useCallback((nextRoom: GameRoom): GameRoom | null => {
+  const applyRoom = useCallback((nextRoom: GameRoom) => {
     const current = roomRef.current;
-    if (activeCodeRef.current !== nextRoom.code) return current;
+    if (activeCodeRef.current !== nextRoom.code) {
+      return { room: current, applied: false };
+    }
     if (current?.code === nextRoom.code && nextRoom.version < current.version) {
-      return current;
+      return { room: current, applied: false };
     }
     roomRef.current = nextRoom;
     setRoom(nextRoom);
-    return nextRoom;
+    return { room: nextRoom, applied: true };
   }, []);
 
   const setActiveCode = useCallback((code: string | null) => {
@@ -142,9 +144,11 @@ export function useRoom(): UseRoomResult {
         });
         const data = await res.json();
         if (res.status === 409) {
-          const applied = data.room ? applyRoom(data.room) : roomRef.current;
-          setError(data.error ?? "작업 실패");
-          return { ok: false, room: applied, status: 409, reason: "conflict" };
+          const outcome = data.room
+            ? applyRoom(data.room)
+            : { room: roomRef.current, applied: true };
+          if (outcome.applied) setError(data.error ?? "작업 실패");
+          return { ok: false, room: outcome.room, status: 409, reason: "conflict" };
         }
         if (res.status === 404) {
           return { ok: false, room: null, status: 404, reason: "missing" };
@@ -158,7 +162,7 @@ export function useRoom(): UseRoomResult {
             reason: "rejected",
           };
         }
-        return { ok: true, room: applyRoom(data.room) ?? data.room };
+        return { ok: true, room: applyRoom(data.room).room ?? data.room };
       } catch {
         setError("네트워크 오류");
         return {
@@ -185,8 +189,12 @@ export function useRoom(): UseRoomResult {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 409 && data.room) applyRoom(data.room);
-        setError(data.error ?? "나가기 실패");
+        const outcome = res.status === 409 && data.room
+          ? applyRoom(data.room)
+          : null;
+        if (!outcome || outcome.applied) {
+          setError(data.error ?? "나가기 실패");
+        }
         return false;
       }
       pollGenerationRef.current += 1;
