@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,11 +34,20 @@ export function QuestionDetectiveSlides() {
   const [index, setIndex] = useState(0);
   const [checkIndex, setCheckIndex] = useState(0);
   const [selectedType, setSelectedType] = useState<Cognitive | null>(null);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const pendingTabFocus = useRef<number | null>(null);
   const slide = QUESTION_LEARNING_SLIDES[index];
   const total = QUESTION_LEARNING_SLIDES.length;
   const panelId = "question-learning-panel";
   const activeTabId = `question-learning-tab-${index}`;
   const progress = t("slideProgress", { current: index + 1, total });
+
+  useEffect(() => {
+    if (pendingTabFocus.current !== index) return;
+
+    tabRefs.current[index]?.focus();
+    pendingTabFocus.current = null;
+  }, [index]);
 
   const typeLabel = (type: Cognitive) => tClassification(`${type}.label`);
 
@@ -52,6 +61,8 @@ export function QuestionDetectiveSlides() {
   };
 
   const handleStageKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+
     let nextIndex: number | null = null;
 
     if (event.key === "ArrowLeft") nextIndex = index - 1;
@@ -63,6 +74,29 @@ export function QuestionDetectiveSlides() {
       event.preventDefault();
       goTo(nextIndex);
     }
+  };
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tabIndex: number) => {
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowLeft") nextIndex = tabIndex - 1;
+    if (event.key === "ArrowRight") nextIndex = tabIndex + 1;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = total - 1;
+
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const boundedIndex = Math.min(total - 1, Math.max(0, nextIndex));
+
+    if (boundedIndex === index) {
+      event.currentTarget.focus();
+      return;
+    }
+
+    pendingTabFocus.current = boundedIndex;
+    goTo(boundedIndex);
   };
 
   return (
@@ -131,7 +165,11 @@ export function QuestionDetectiveSlides() {
                   aria-controls={panelId}
                   aria-label={t("slideProgress", { current: tabIndex + 1, total })}
                   tabIndex={tabIndex === index ? 0 : -1}
+                  ref={(element) => {
+                    tabRefs.current[tabIndex] = element;
+                  }}
                   onClick={() => goTo(tabIndex)}
+                  onKeyDown={(event) => handleTabKeyDown(event, tabIndex)}
                   className={cn(
                     "h-11 w-11 shrink-0 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none xl:flex",
                     showOnCompactScreen ? "flex" : "hidden",

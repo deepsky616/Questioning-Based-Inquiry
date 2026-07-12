@@ -179,7 +179,7 @@ function WhyQuestionsSlide() {
           </p>
         </div>
 
-        <div className="space-y-3" aria-label="좋은 질문이 하는 일">
+        <div className="space-y-3">
           {[
             { text: "모르는 것을 정확히 발견해요", color: "border-sky-400 bg-sky-50 dark:bg-sky-950/30" },
             { text: "흩어진 사실의 관계를 찾아요", color: "border-emerald-400 bg-emerald-50 dark:bg-emerald-950/30" },
@@ -544,7 +544,7 @@ function ComparisonSlide({ typeLabel }: { typeLabel: (type: Cognitive) => string
         </table>
       </div>
 
-      <div className="space-y-3 md:hidden" aria-label="질문 유형 세로 비교 자료">
+      <div className="space-y-3 md:hidden">
         {QUESTION_TRIO_TABLE.map((row) => (
           <article key={row.typeKey} className={cn("rounded-lg border-l-4 bg-muted/20 p-4", TYPE_STYLE[row.typeKey].border)}>
             <QuestionTypeLabel type={row.typeKey} label={typeLabel(row.typeKey)} />
@@ -552,6 +552,10 @@ function ComparisonSlide({ typeLabel }: { typeLabel: (type: Cognitive) => string
               <div>
                 <dt className="font-bold text-foreground">질문의 도구</dt>
                 <dd className="text-muted-foreground">{row.tools}</dd>
+              </div>
+              <div>
+                <dt className="font-bold text-foreground">탐구 목적</dt>
+                <dd className="text-muted-foreground">{row.purpose}</dd>
               </div>
               <div>
                 <dt className="font-bold text-foreground">환경 주제 예시</dt>
@@ -587,6 +591,7 @@ function CheckSlide({
   const check = QUESTION_LEARNING_CHECKS[checkIndex];
   const isLastCheck = checkIndex === QUESTION_LEARNING_CHECKS.length - 1;
   const choices: Cognitive[] = ["factual", "conceptual", "controversial"];
+  const promptId = `question-learning-check-prompt-${check.id}`;
 
   return (
     <div className="flex h-full w-full flex-col justify-center gap-5 p-5 sm:p-8">
@@ -603,10 +608,12 @@ function CheckSlide({
       </div>
 
       <div className="rounded-lg border bg-muted/20 p-5 text-center">
-        <p className="text-lg font-bold leading-relaxed text-foreground">{check.prompt}</p>
+        <p id={promptId} className="text-lg font-bold leading-relaxed text-foreground">
+          {check.prompt}
+        </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3" role="group" aria-label="질문 유형 선택">
+      <div className="grid gap-3 sm:grid-cols-3" role="group" aria-labelledby={promptId}>
         {choices.map((type) => {
           const style = TYPE_STYLE[type];
           const Icon = style.Icon;

@@ -12,6 +12,7 @@ const teacherLearningPath = "src/app/(teacher)/teacher-question-learning/page.ts
 const experience = existsSync(experiencePath) ? readFileSync(experiencePath, "utf8") : "";
 const studentLearning = existsSync(studentLearningPath) ? readFileSync(studentLearningPath, "utf8") : "";
 const teacherLearning = existsSync(teacherLearningPath) ? readFileSync(teacherLearningPath, "utf8") : "";
+const slideContent = readFileSync("src/components/shared/QuestionLearningSlideContent.tsx", "utf8");
 
 describe("질문 학습과 질문 연습의 구성 경계", () => {
   it("공용 연습 보기는 전체 학습과 역할별 경로를 알지 않는다", () => {
@@ -38,5 +39,11 @@ describe("질문 학습과 질문 연습의 구성 경계", () => {
     expect(experience).toContain("QuestionDetectiveSlides");
     expect(studentLearning).toContain("QuestionLearningExperience");
     expect(teacherLearning).toContain("QuestionLearningExperience");
+  });
+
+  it("학습 본문의 접근성 이름을 고정된 한국어 문구로 덮어쓰지 않는다", () => {
+    expect(slideContent).not.toContain('aria-label="좋은 질문이 하는 일"');
+    expect(slideContent).not.toContain('aria-label="질문 유형 세로 비교 자료"');
+    expect(slideContent).not.toContain('aria-label="질문 유형 선택"');
   });
 });

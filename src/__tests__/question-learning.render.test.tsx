@@ -99,12 +99,57 @@ describe("질문학습 슬라이드", () => {
     expect(screen.getByText("1 / 14")).toBeInTheDocument();
   });
 
+  it("진행 탭 키 이동은 활성 장과 실제 초점을 함께 옮긴다", () => {
+    renderWithIntl(<QuestionLearning.QuestionDetectiveSlides />);
+
+    const thirdTab = screen.getByRole("tab", { name: "3 / 14" });
+    thirdTab.focus();
+    fireEvent.keyDown(thirdTab, { key: "ArrowRight" });
+
+    const fourthTab = screen.getByRole("tab", { name: "4 / 14" });
+    expect(screen.getByText("4 / 14")).toBeInTheDocument();
+    expect(document.activeElement).toBe(fourthTab);
+
+    fireEvent.keyDown(fourthTab, { key: "End" });
+    const lastTab = screen.getByRole("tab", { name: "14 / 14" });
+    expect(document.activeElement).toBe(lastTab);
+
+    fireEvent.keyDown(lastTab, { key: "Home" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "1 / 14" }));
+  });
+
+  it("하위 확인 조작의 이동 키는 현재 장을 바꾸지 않는다", () => {
+    renderWithIntl(<QuestionLearning.QuestionDetectiveSlides />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "13 / 14" }));
+    const factualChoice = screen.getByRole("button", { name: "사실적 질문" });
+    fireEvent.keyDown(factualChoice, { key: "ArrowRight" });
+    expect(screen.getByText("13 / 14")).toBeInTheDocument();
+
+    fireEvent.click(factualChoice);
+    const nextCheck = screen.getByRole("button", { name: messages.questionLearning.checkNext });
+    fireEvent.keyDown(nextCheck, { key: "End" });
+    expect(screen.getByText("13 / 14")).toBeInTheDocument();
+  });
+
+  it("작은 화면 비교 자료에도 세 유형의 탐구 목적을 모두 표시한다", () => {
+    renderWithIntl(<QuestionLearning.QuestionDetectiveSlides />);
+    fireEvent.click(screen.getByRole("tab", { name: "12 / 14" }));
+
+    for (const purpose of ["지식 쌓기 (재료 준비)", "이해 넓히기 (연결하기)", "판단하기 (선택하기)"]) {
+      expect(screen.getAllByText(purpose)).toHaveLength(2);
+    }
+  });
+
   it("선택 즉시 지역 상태로 채점하고 풀이를 보여 주며 통신하지 않는다", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     renderWithIntl(<QuestionLearning.QuestionDetectiveSlides />);
 
     fireEvent.click(screen.getByRole("tab", { name: "13 / 14" }));
+    expect(
+      screen.getByRole("group", { name: "우리 반에서 오늘 출석한 학생은 몇 명인가요?" }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "사실적 질문" }));
 
     expect(
