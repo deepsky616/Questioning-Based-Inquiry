@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const layoutSource = readFileSync("src/app/(student)/layout.tsx", "utf8");
 
 describe("student navigation order", () => {
-  it("places practice after question exploration in the student learning flow", () => {
+  it("places practice immediately before asking in the student learning flow", () => {
     const practiceIndex = layoutSource.indexOf('{ href: "/student-practice", key: "practice" }');
     const askIndex = layoutSource.indexOf('{ href: "/student-ask", key: "ask" }');
     const exploreIndex = layoutSource.indexOf('{ href: "/student-questions", key: "explore" }');
@@ -14,8 +14,8 @@ describe("student navigation order", () => {
     expect(askIndex).toBeGreaterThan(-1);
     expect(exploreIndex).toBeGreaterThan(-1);
     expect(playIndex).toBeGreaterThan(-1);
+    expect(practiceIndex).toBeLessThan(askIndex);
     expect(askIndex).toBeLessThan(exploreIndex);
-    expect(exploreIndex).toBeLessThan(practiceIndex);
-    expect(practiceIndex).toBeLessThan(playIndex);
+    expect(exploreIndex).toBeLessThan(playIndex);
   });
 });
