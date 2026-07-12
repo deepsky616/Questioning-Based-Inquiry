@@ -79,7 +79,7 @@ export default function RoomResult({
       .then((r) => r.json())
       .then((data: AwardResponse) => {
         setLocalAward(data);
-        onAction("update-state", { patch: { awardResult: data } });
+        void onAction("update-state", { patch: { awardResult: data } });
       })
       .catch(() => {})
       .finally(() => setAwarding(false));
@@ -248,7 +248,7 @@ export default function RoomResult({
       {isHost ? (
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
-          onClick={() => onAction("restart")}>
+          onClick={() => void onAction("restart")}>
           🔄 대기실로 돌아가기
         </Button>
       ) : (
