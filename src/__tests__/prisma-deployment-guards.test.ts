@@ -66,6 +66,16 @@ describe("Prisma deployment guards", () => {
     expect(diffGuardScript).toContain("Skipping Prisma diff guard on Vercel");
   });
 
+  it("keeps a migration baseline so schema history and drift detection work", () => {
+    // 2026-07 프로덕션에서 db push 드리프트로 2만 2천 건의 런타임 오류가 발생했다
+    // (app_notifications 테이블·enum 부재). 스키마 변경은 migrate dev로 이력을 남긴다.
+    expect(existsSync("prisma/migrations/migration_lock.toml")).toBe(true);
+    expect(existsSync("prisma/migrations/20260712000000_init/migration.sql")).toBe(true);
+    expect(readFileSync("prisma/migrations/20260712000000_init/migration.sql", "utf8")).toContain('CREATE TABLE "users"');
+    expect(packageJson.scripts?.["db:migrate"]).toContain("migrate dev");
+    expect(packageJson.scripts?.["db:migrate:deploy"]).toContain("migrate deploy");
+  });
+
   it("fails deployment when Prisma diff contains destructive operations", async () => {
     expect(existsSync(diffGuardPath)).toBe(true);
     const { findDestructivePrismaDiffLines } = await import("../../scripts/check-prisma-diff.mjs");
