@@ -74,6 +74,63 @@ export interface GameRoom {
   updatedAt: number;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNonNegativeNumber(value) && Number.isInteger(value);
+}
+
+function isRoomPlayer(value: unknown): value is RoomPlayer {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value.id) &&
+    typeof value.name === "string" &&
+    typeof value.isHost === "boolean" &&
+    isNonNegativeNumber(value.joinedAt)
+  );
+}
+
+function isRoomChainItem(value: unknown): value is RoomChainItem {
+  return (
+    isRecord(value) &&
+    typeof value.question === "string" &&
+    isNonEmptyString(value.playerId) &&
+    typeof value.playerName === "string"
+  );
+}
+
+export function isGameRoom(value: unknown): value is GameRoom {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value.code) &&
+    isNonEmptyString(value.gameId) &&
+    isNonEmptyString(value.hostId) &&
+    (value.status === "waiting" ||
+      value.status === "playing" ||
+      value.status === "ended") &&
+    Array.isArray(value.players) &&
+    value.players.every(isRoomPlayer) &&
+    typeof value.topic === "string" &&
+    Array.isArray(value.chain) &&
+    value.chain.every(isRoomChainItem) &&
+    isNonNegativeInteger(value.turnIndex) &&
+    isRecord(value.gameState) &&
+    isNonNegativeInteger(value.version) &&
+    isNonNegativeNumber(value.createdAt) &&
+    isNonNegativeNumber(value.updatedAt)
+  );
+}
+
 export type RoomActionResult =
   | { ok: true; room: GameRoom }
   | {

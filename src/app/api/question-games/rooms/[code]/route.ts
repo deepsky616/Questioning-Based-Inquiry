@@ -22,6 +22,10 @@ const ROOM_CONFLICT_MESSAGE =
   "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.";
 const MEMBERSHIP_WRITE_ATTEMPTS = 3;
 
+function isRequestBody(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function roomConflict(room: GameRoom) {
   return NextResponse.json(
     { error: ROOM_CONFLICT_MESSAGE, room },
@@ -221,8 +225,9 @@ export async function PATCH(
   const userId = (session.user as { id: string }).id;
   const userName = (session.user as { name?: string }).name ?? "학생";
 
-  const body = await req.json().catch(() => ({}));
-  const action = body.action as string;
+  const parsedBody: unknown = await req.json().catch(() => null);
+  const body = isRequestBody(parsedBody) ? parsedBody : {};
+  const action = typeof body.action === "string" ? body.action : "";
   const expectedVersion = body.expectedVersion;
 
   let room = await loadGameRoom(code);
@@ -231,6 +236,12 @@ export async function PATCH(
   }
 
   if (action === "join") return joinRoom(room, userId, userName);
+  if (
+    body.expectedCreatedAt !== undefined &&
+    body.expectedCreatedAt !== room.createdAt
+  ) {
+    return roomConflict(room);
+  }
   if (action === "leave") return leaveRoom(room, userId);
   if (action === "memory-roll") return handleMemoryRoll(room, userId, body);
 

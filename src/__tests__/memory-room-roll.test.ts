@@ -386,4 +386,31 @@ describe("settleMemoryRollingRoom", () => {
 
     expect(settleMemoryRollingRoom(room)).toBe(room);
   });
+
+  it("놀이 중 참가자가 나가도 남은 현재 차례 사용자를 유지한다", () => {
+    const room = makeMemoryRoom({
+      phase: "play",
+      players: [
+        { id: "host", name: "방장", isHost: true, joinedAt: 1 },
+        { id: "current", name: "현재 학생", isHost: false, joinedAt: 3 },
+      ],
+      diceRolls: { gone: 6, host: 5, current: 4 },
+    });
+    room.gameState = {
+      ...room.gameState,
+      turnOrder: ["gone", "host", "current"],
+      currentTurnIdx: 2,
+      revealedIds: ["q-1"],
+    };
+
+    const settled = settleMemoryRollingRoom(room);
+
+    expect(settled.gameState).toMatchObject({
+      phase: "play",
+      diceRolls: { host: 5, current: 4 },
+      turnOrder: ["host", "current"],
+      currentTurnIdx: 1,
+      revealedIds: ["q-1"],
+    });
+  });
 });

@@ -69,6 +69,33 @@ beforeEach(() => {
     .mockImplementation((room: GameRoom) => room);
 });
 
+describe("방 생성 시각 경계", () => {
+  it.each([
+    ["start", {}],
+    ["leave", {}],
+    ["memory-roll", { roll: 5, rollRoundId: "round-1" }],
+  ])(
+    "%s의 다른 expectedCreatedAt은 저장 전에 409를 반환한다",
+    async (action, extra) => {
+      const room = makeRoom({ createdAt: 2, updatedAt: 2 });
+      mocks.loadGameRoom.mockResolvedValue(room);
+
+      const response = await patch({
+        action,
+        expectedCreatedAt: 1,
+        expectedVersion: 1,
+        ...extra,
+      });
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({ room });
+      expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+      expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
+      expect(mocks.recordMemoryRoll).not.toHaveBeenCalled();
+    },
+  );
+});
+
 describe("일반 게임 동작 충돌", () => {
   const cases: Array<[string, Record<string, unknown>]> = [
     ["start", {}],
@@ -546,6 +573,68 @@ it("메모리 나가기 저장 충돌 뒤 최신 방에서 완료 판정을 다�
   );
 });
 
+it("마지막 주사위가 놀이 단계로 바뀐 뒤 나가기 재시도는 실제 정리 함수로 다음 차례를 맞춘다", async () => {
+  const { settleMemoryRollingRoom: actualSettleMemoryRoom } =
+    await vi.importActual<typeof import("@/lib/memory-room-roll")>(
+      "@/lib/memory-room-roll",
+    );
+  const current = makeRoom({
+    gameId: "memory",
+    players: [
+      { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      { id: "next", name: "다음 학생", isHost: false, joinedAt: 2 },
+      { id: "later", name: "나중 학생", isHost: false, joinedAt: 3 },
+    ],
+    gameState: {
+      phase: "rolling",
+      diceRolls: { "user-1": 6, next: 5 },
+      rollRoundId: "round-1",
+      turnOrder: [],
+      currentTurnIdx: 0,
+      revealedIds: [],
+    },
+  });
+  const latest = makeRoom({
+    gameId: "memory",
+    version: 2,
+    players: current.players,
+    gameState: {
+      phase: "play",
+      diceRolls: { "user-1": 6, next: 5, later: 4 },
+      rollRoundId: "round-1",
+      turnOrder: ["user-1", "next", "later"],
+      currentTurnIdx: 0,
+      revealedIds: ["q-1"],
+      lastReveal: {
+        result: "miss",
+        at: 10,
+        turnPlayerId: "user-1",
+      },
+    },
+  });
+  mocks.loadGameRoom.mockResolvedValue(current);
+  mocks.settleMemoryRollingRoom.mockImplementation(actualSettleMemoryRoom);
+  mocks.saveGameRoom
+    .mockResolvedValueOnce({ kind: "conflict", room: latest })
+    .mockImplementationOnce(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: 3 },
+    }));
+
+  const response = await patch({ action: "leave" });
+  const retried = mocks.saveGameRoom.mock.calls[1][0] as GameRoom;
+
+  expect(response.status).toBe(200);
+  expect(retried.players.map((player) => player.id)).toEqual(["next", "later"]);
+  expect(retried.gameState).toMatchObject({
+    phase: "play",
+    turnOrder: ["next", "later"],
+    currentTurnIdx: 0,
+    revealedIds: [],
+  });
+  expect(retried.gameState).not.toHaveProperty("lastReveal");
+});
+
 it("이미 나간 사용자도 메모리 완료 후보가 생기면 저장한다", async () => {
   const room = makeRoom({
     gameId: "memory",
@@ -668,6 +757,64 @@ it("마지막 참가자 삭제 충돌 뒤 최신 방에서 나가기를 다시 �
     expect.objectContaining({ id: "other", isHost: true }),
   ]);
 });
+
+it.each([
+  ["굴리지 않았으면", { "user-1": 6 }, "rolling", []],
+  ["이미 결과가 있으면", { "user-1": 6, other: 4 }, "play", ["other"]],
+] as const)(
+  "마지막 참가자 삭제 충돌 뒤 새 참가자가 %s 실제 정리 결과를 저장한다",
+  async (_condition, diceRolls, expectedPhase, expectedOrder) => {
+    const { settleMemoryRollingRoom: actualSettleMemoryRoom } =
+      await vi.importActual<typeof import("@/lib/memory-room-roll")>(
+        "@/lib/memory-room-roll",
+      );
+    const current = makeRoom({
+      gameId: "memory",
+      gameState: {
+        phase: "rolling",
+        diceRolls: { "user-1": 6 },
+        rollRoundId: "round-1",
+        turnOrder: [],
+        currentTurnIdx: 0,
+      },
+    });
+    const latest = makeRoom({
+      gameId: "memory",
+      version: 2,
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+        { id: "other", name: "새 학생", isHost: false, joinedAt: 2 },
+      ],
+      gameState: {
+        phase: "rolling",
+        diceRolls,
+        rollRoundId: "round-1",
+        turnOrder: [],
+        currentTurnIdx: 0,
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(current);
+    mocks.settleMemoryRollingRoom.mockImplementation(actualSettleMemoryRoom);
+    mocks.deleteGameRoom.mockResolvedValueOnce({
+      kind: "conflict",
+      room: latest,
+    });
+    mocks.saveGameRoom.mockImplementationOnce(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: 3 },
+    }));
+
+    const response = await patch({ action: "leave" });
+    const candidate = mocks.saveGameRoom.mock.calls[0][0] as GameRoom;
+
+    expect(response.status).toBe(200);
+    expect(candidate.players.map((player) => player.id)).toEqual(["other"]);
+    expect(candidate.gameState).toMatchObject({
+      phase: expectedPhase,
+      turnOrder: expectedOrder,
+    });
+  },
+);
 
 it("이미 나간 사용자는 저장하지 않고 성공한다", async () => {
   const room = makeRoom({

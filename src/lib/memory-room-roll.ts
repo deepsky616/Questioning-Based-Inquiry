@@ -36,24 +36,45 @@ function isDiceRollMap(value: unknown): value is Record<string, number> {
     typeof value === "object" &&
     value !== null &&
     !Array.isArray(value) &&
-    Object.values(value).every(
-      (roll) => Number.isInteger(roll) && roll >= 1 && roll <= 6,
-    )
+    Object.values(value).every(isDiceRoll)
   );
+}
+
+function isDiceRoll(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 6
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function sameStringArray(left: string[], right: string[]) {
+  return left.length === right.length &&
+    left.every((item, index) => item === right[index]);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 export function settleMemoryRollingRoom(room: GameRoom): GameRoom {
   const state = room.gameState;
   if (
     room.gameId !== "memory" ||
-    state.phase !== "rolling" ||
+    (state.phase !== "rolling" && state.phase !== "play") ||
     !isDiceRollMap(state.diceRolls)
   ) {
     return room;
   }
-
-  const rollRoundId = resolveMemoryRollRoundId(room, state.rollRoundId);
-  if (!rollRoundId) return room;
 
   const playerIds = new Set(room.players.map((player) => player.id));
   const diceRolls = Object.fromEntries(
@@ -63,7 +84,82 @@ export function settleMemoryRollingRoom(room: GameRoom): GameRoom {
   );
   const removedRoll =
     Object.keys(diceRolls).length !== Object.keys(state.diceRolls).length;
+
+  if (state.phase === "play") {
+    if (
+      !isStringArray(state.turnOrder) ||
+      !isNonNegativeInteger(state.currentTurnIdx) ||
+      (state.turnOrder.length > 0 &&
+        state.currentTurnIdx >= state.turnOrder.length)
+    ) {
+      return room;
+    }
+
+    const oldTurnOrder = state.turnOrder;
+    const oldCurrentTurnIdx = state.currentTurnIdx;
+    const oldCurrentPlayerId = oldTurnOrder[oldCurrentTurnIdx];
+    const seen = new Set<string>();
+    const turnOrder = oldTurnOrder.filter((playerId) => {
+      if (!playerIds.has(playerId) || seen.has(playerId)) return false;
+      seen.add(playerId);
+      return true;
+    });
+    for (const player of room.players) {
+      if (!seen.has(player.id)) {
+        seen.add(player.id);
+        turnOrder.push(player.id);
+      }
+    }
+
+    let nextCurrentPlayerId: string | undefined = oldCurrentPlayerId;
+    if (!nextCurrentPlayerId || !playerIds.has(nextCurrentPlayerId)) {
+      nextCurrentPlayerId = undefined;
+      for (let offset = 1; offset <= oldTurnOrder.length; offset += 1) {
+        const candidate = oldTurnOrder[
+          (oldCurrentTurnIdx + offset) % oldTurnOrder.length
+        ];
+        if (playerIds.has(candidate)) {
+          nextCurrentPlayerId = candidate;
+          break;
+        }
+      }
+    }
+    if (!nextCurrentPlayerId) nextCurrentPlayerId = turnOrder[0];
+    const currentTurnIdx = Math.max(
+      0,
+      turnOrder.indexOf(nextCurrentPlayerId),
+    );
+    const currentPlayerLeft =
+      oldCurrentPlayerId !== undefined && !playerIds.has(oldCurrentPlayerId);
+    const lastRevealPlayerLeft =
+      isRecord(state.lastReveal) &&
+      typeof state.lastReveal.turnPlayerId === "string" &&
+      !playerIds.has(state.lastReveal.turnPlayerId);
+    const clearTurnArtifacts = currentPlayerLeft || lastRevealPlayerLeft;
+    const changed =
+      removedRoll ||
+      !sameStringArray(turnOrder, oldTurnOrder) ||
+      currentTurnIdx !== oldCurrentTurnIdx ||
+      clearTurnArtifacts;
+
+    if (!changed) return room;
+    const nextState: Record<string, unknown> = {
+      ...state,
+      diceRolls,
+      turnOrder,
+      currentTurnIdx,
+    };
+    if (clearTurnArtifacts) {
+      nextState.revealedIds = [];
+      delete nextState.lastReveal;
+    }
+    return { ...room, gameState: nextState };
+  }
+
+  const rollRoundId = resolveMemoryRollRoundId(room, state.rollRoundId);
+  if (!rollRoundId) return room;
   const addedRoundId = state.rollRoundId === undefined;
+
   const isComplete =
     room.players.length > 0 &&
     room.players.every((player) => diceRolls[player.id] !== undefined);
@@ -107,11 +203,7 @@ function evaluateMemoryRoll(
   if (typeof state.phase !== "string" || !isDiceRollMap(state.diceRolls)) {
     return { kind: "corrupt", room };
   }
-  if (
-    !Number.isInteger(input.roll) ||
-    (input.roll as number) < 1 ||
-    (input.roll as number) > 6
-  ) {
+  if (!isDiceRoll(input.roll)) {
     return { kind: "invalid", room, reason: "roll" };
   }
   if (!isMemoryRollRoundId(input.rollRoundId)) {
@@ -147,11 +239,11 @@ function evaluateMemoryRoll(
       rollRoundId: currentRoundId,
       diceRolls: {
         ...state.diceRolls,
-        [input.userId]: input.roll as number,
+        [input.userId]: input.roll,
       },
     },
   });
-  return { kind: "candidate", room: candidate, roll: input.roll as number };
+  return { kind: "candidate", room: candidate, roll: input.roll };
 }
 
 const MEMORY_ROLL_WRITE_ATTEMPTS = 3;
