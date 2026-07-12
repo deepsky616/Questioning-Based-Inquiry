@@ -7,7 +7,9 @@ const teacherSessionMonthList = readFileSync("src/app/(teacher)/teacher-sessions
 const teacherSessionsPage = readFileSync("src/app/(teacher)/teacher-sessions/page.tsx", "utf8");
 const deployedDesignList = readFileSync("src/app/(teacher)/teacher-questions/DeployedDesignList.tsx", "utf8");
 const savedDesignsTab = readFileSync("src/app/(teacher)/teacher-curriculum/SavedDesignsTab.tsx", "utf8");
-const pointReviewView = readFileSync("src/components/teacher/PointReviewView.tsx", "utf8");
+// 포인트 검토는 로직(usePointReview)·세션 선택 카드(AnalysisSessionPicker)로 분리됨
+const pointReviewHook = readFileSync("src/components/teacher/point-review/usePointReview.ts", "utf8");
+const pointReviewPicker = readFileSync("src/components/teacher/point-review/AnalysisSessionPicker.tsx", "utf8");
 const reportView = readFileSync("src/components/reports/ReportView.tsx", "utf8");
 const studentAskSelector = readFileSync("src/app/(student)/student-ask/StudentAskSessionSelector.tsx", "utf8");
 const studentExplore = readFileSync("src/components/student/ExploreQuestionsView.tsx", "utf8");
@@ -56,11 +58,11 @@ describe("session monthly lookup surfaces", () => {
   });
 
   it("groups the point review analysis session dropdown by month", () => {
-    expect(pointReviewView).toContain("groupSessionsByMonth");
-    expect(pointReviewView).toContain("sessionMonthGroups.map");
-    expect(pointReviewView).toContain("pendingCountBySession");
-    expect(pointReviewView).toContain('t("groupPendingCount"');
-    expect(pointReviewView).toContain("bg-amber-100");
+    expect(pointReviewHook).toContain("groupSessionsByMonth");
+    expect(pointReviewPicker).toContain("sessionMonthGroups.map");
+    expect(pointReviewHook).toContain("pendingCountBySession");
+    expect(pointReviewPicker).toContain('t("groupPendingCount"');
+    expect(pointReviewPicker).toContain("bg-amber-100");
   });
 
   it("groups session list surfaces by month", () => {
