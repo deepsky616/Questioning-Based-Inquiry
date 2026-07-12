@@ -27,7 +27,7 @@
 
 ---
 
-### 작업 1: 학습 자료 계약 바로잡기
+### Task 1: 학습 자료 계약 바로잡기
 
 **파일:**
 - 수정: `src/lib/question-detective-content.ts`
@@ -123,7 +123,7 @@ git commit -m "feat(learning): refine question learning content"
 
 ---
 
-### 작업 2: 질문연습에서 전체 학습 분리하기
+### Task 2: 질문연습에서 전체 학습 분리하기
 
 **파일:**
 - 새 파일: `src/components/shared/QuestionLearningSummary.tsx`
@@ -214,7 +214,7 @@ git commit -m "refactor(practice): separate question learning summary"
 
 ---
 
-### 작업 3: 공통 14장 슬라이드와 역할별 학습 페이지 만들기
+### Task 3: 공통 14장 슬라이드와 역할별 학습 페이지 만들기
 
 **파일:**
 - 수정: `src/components/shared/QuestionDetectiveSlides.tsx`
@@ -327,7 +327,7 @@ git commit -m "feat(learning): add shared question learning slides"
 
 ---
 
-### 작업 4: 번역, 보호 경로와 메뉴 순서 연결하기
+### Task 4: 번역, 보호 경로와 메뉴 순서 연결하기
 
 **파일:**
 - 수정: `messages/ko.json`
@@ -424,7 +424,7 @@ git commit -m "feat(navigation): add question learning for both roles"
 
 ---
 
-### 작업 5: 전체 회귀와 실제 화면 검증
+### Task 5: 전체 회귀와 실제 화면 검증
 
 **파일:**
 - 검증 대상: 작업 1부터 4까지에서 변경한 학습 자료, 공통 구성요소, 역할별 페이지, 메뉴, 번역과 시험 파일
