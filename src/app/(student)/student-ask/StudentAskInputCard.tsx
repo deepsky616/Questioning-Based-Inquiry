@@ -130,7 +130,6 @@ export function StudentAskInputCard({
               <Textarea
                 ref={textareaRef}
                 id="content"
-                placeholder={t("questionPlaceholder")}
                 value={content}
                 maxLength={200}
                 onChange={(event) => onContentChange(event.target.value)}
