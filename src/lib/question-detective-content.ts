@@ -25,16 +25,51 @@ export interface QuestionFormula {
 /** 유형별 눈높이 정의 + 만들기 공식 3개 */
 export interface QuestionTypeFormulaGuide {
   typeKey: Cognitive;
+  /** 한 줄 소개 — "3가지 질문 열쇠" 슬라이드용 */
+  tagline: string;
   /** 학생 눈높이 정의 */
   definition: string;
   formulas: QuestionFormula[];
 }
 
+export interface QuestionLearningCheck {
+  id: string;
+  prompt: string;
+  answer: Cognitive;
+  explanation: string;
+}
+
+export const QUESTION_ANSWER_RANGE_GUIDE = {
+  closed: {
+    title: "닫힌 질문",
+    definition: "정해진 정보에서 한 가지 답을 찾아 확인할 수 있는 질문이에요.",
+    example: "광합성에 필요한 기체는 무엇인가요?",
+  },
+  open: {
+    title: "열린 질문",
+    definition: "여러 생각과 근거를 연결해 다양한 답을 만들 수 있는 질문이에요.",
+    example: "광합성이 생태계의 다른 생물에게 어떤 영향을 줄까요?",
+  },
+} as const;
+
+export const QUESTION_CLASSIFICATION_AXES = [
+  { key: "answerRange", title: "답의 범위", description: "닫힌 질문과 열린 질문을 구분해요." },
+  {
+    key: "thinkingPurpose",
+    title: "생각의 목적과 깊이",
+    description: "사실적, 개념적, 논쟁적 질문을 구분해요.",
+  },
+] as const;
+
+export const QUESTION_WORD_HINT =
+  "왜, 어떻게 같은 질문 낱말은 단서일 뿐이에요. 답할 때 필요한 사고와 근거를 보고 질문 유형을 판단해요.";
+
 export const QUESTION_TYPE_FORMULA_GUIDE: QuestionTypeFormulaGuide[] = [
   {
     typeKey: "factual",
+    tagline: "정답이 딱 정해진 기초가 되는 질문",
     definition:
-      "책이나 읽기 자료를 꼼꼼하게 읽으면 눈앞에 정답이 그대로 적혀 있는 질문이에요. 마치 교과서 속에서 숨은 그림 찾기를 하듯, 누구나 똑같은 정답을 찾아낼 수 있는 질문이랍니다.",
+      "기억한 내용이나 관찰한 결과, 자료 조사, 계산 또는 정해진 절차로 확인할 수 있는 정보를 묻는 질문이에요. 답이 한 가지로 정해져 있어 누구나 같은 방법으로 확인할 수 있어요.",
     formulas: [
       {
         icon: "❶",
@@ -59,7 +94,7 @@ export const QUESTION_TYPE_FORMULA_GUIDE: QuestionTypeFormulaGuide[] = [
       {
         icon: "❸",
         title: "'수량과 방법'을 묻는 말 (몇, 어떻게)",
-        words: "몇 개, 몇 명, 어떤 방법(글에 구체적으로 적혀 있는 방법)",
+        words: "몇 개, 몇 명, 어떤 방법(자료, 관찰, 조사 또는 정해진 절차로 확인할 수 있는 방법)",
         pattern: "~은 모두 몇 개인가요? / ~는 어떻게 작동하나요?",
         examples: [
           "우리나라 영해는 기준선으로부터 몇 해리까지인가요?",
@@ -70,6 +105,7 @@ export const QUESTION_TYPE_FORMULA_GUIDE: QuestionTypeFormulaGuide[] = [
   },
   {
     typeKey: "conceptual",
+    tagline: "지식을 연결하여 원리를 찾는 질문",
     definition:
       "책에 정답이 딱 한 단어로 적혀 있지 않아요. 머릿속으로 \"왜 그럴까?\", \"어떤 관계가 있을까?\" 하고 여러 사실을 선으로 연결해서 깨달은 원리를 설명해야 하는 질문이에요. 지식을 튼튼하게 엮어주는 생각의 열쇠랍니다.",
     formulas: [
@@ -107,8 +143,9 @@ export const QUESTION_TYPE_FORMULA_GUIDE: QuestionTypeFormulaGuide[] = [
   },
   {
     typeKey: "controversial",
+    tagline: "생각을 나누고 선택하는 질문",
     definition:
-      "교과서나 책에 딱 하나의 정답이 정해져 있지 않은 질문이에요. 사람마다 가진 가치관, 경험, 생각에 따라 찬성과 반대가 나뉘거나 여러 가지 대안이 나올 수 있어요. 누가 들어도 고개를 끄덕일 만한 '타당한 근거'를 대며 토론하게 만드는 멋진 생각의 전쟁터랍니다.",
+      "교과서나 책에 딱 하나의 정답이 정해져 있지 않은 질문이에요. 사람마다 가진 가치관, 경험, 생각에 따라 찬성과 반대가 나뉘거나 여러 가지 대안이 나올 수 있어요. 서로의 타당한 근거를 듣고 생각을 나누며 토론하게 하는 질문이에요.",
     formulas: [
       {
         icon: "❶",
@@ -187,4 +224,25 @@ export const INQUIRY_STEPS: InquiryStep[] = [
   { step: 1, title: "사실 수집!", description: "궁금한 주제에 대해 정확한 정보를 모아요." },
   { step: 2, title: "연결 고리 찾기!", description: "정보들이 어떻게 연결되는지 개념을 찾아봐요." },
   { step: 3, title: "나만의 의견!", description: "다양한 관점에서 생각하고 나의 생각을 정리해요." },
+];
+
+export const QUESTION_LEARNING_CHECKS: QuestionLearningCheck[] = [
+  {
+    id: "check-factual",
+    prompt: "우리 반에서 오늘 출석한 학생은 몇 명인가요?",
+    answer: "factual",
+    explanation: "관찰하거나 세어 확인할 수 있는 정해진 정보를 묻기 때문에 사실적 질문이에요.",
+  },
+  {
+    id: "check-conceptual",
+    prompt: "숲이 줄어들면 지역의 기후에는 어떤 영향을 줄까요?",
+    answer: "conceptual",
+    explanation: "여러 사실을 연결해 숲과 기후의 관계를 설명해야 하므로 개념적 질문이에요.",
+  },
+  {
+    id: "check-controversial",
+    prompt: "환경 보호를 위해 일회용품 사용을 법으로 제한해야 할까요?",
+    answer: "controversial",
+    explanation: "환경 보호와 선택의 자유라는 가치를 근거로 판단해야 하므로 논쟁적 질문이에요.",
+  },
 ];
