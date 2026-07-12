@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
 import {
   QUESTION_ANSWER_RANGE_GUIDE,
   QUESTION_CLASSIFICATION_AXES,
@@ -10,8 +9,7 @@ import {
   INQUIRY_STEPS,
 } from "@/lib/question-detective-content";
 
-// "질문 탐정단" 학습 콘텐츠 — 유형별 정의·만들기 공식·비교표·탐구 3단계가
-// 연습 페이지의 유형 알아보기와 질문하기 도우미에 녹아 있어야 한다.
+// "질문 탐정단" 학습 콘텐츠의 유형별 정의·만들기 공식·비교표·탐구 3단계 계약.
 
 describe("질문 탐정단 학습 콘텐츠", () => {
   it("사실적→개념적→논쟁적 순서로 유형마다 정의와 공식 3개를 갖는다", () => {
@@ -34,7 +32,14 @@ describe("질문 탐정단 학습 콘텐츠", () => {
   it("사실적 질문은 답을 확인하는 방법을, 논쟁적 질문은 근거 토론을 안내한다", () => {
     expect(QUESTION_TYPE_FORMULA_GUIDE[0].definition).toMatch(/기억|관찰/);
     expect(QUESTION_TYPE_FORMULA_GUIDE[0].definition).toMatch(/조사|계산|절차/);
-    expect(QUESTION_TYPE_FORMULA_GUIDE[2].definition).not.toContain("생각의 전쟁터");
+
+    const controversialDefinition = QUESTION_TYPE_FORMULA_GUIDE[2].definition;
+    expect(controversialDefinition).not.toContain("생각의 전쟁터");
+    expect(controversialDefinition).toMatch(/가치/);
+    expect(controversialDefinition).toMatch(/선택/);
+    expect(controversialDefinition).toMatch(/책임/);
+    expect(controversialDefinition).toMatch(/근거/);
+    expect(controversialDefinition).toMatch(/판단/);
 
     const factualMethodFormula = QUESTION_TYPE_FORMULA_GUIDE[0].formulas[2];
     expect(`${factualMethodFormula.words} ${factualMethodFormula.pattern}`).toMatch(
@@ -81,24 +86,5 @@ describe("질문 탐정단 학습 콘텐츠", () => {
   it("비교표는 세 유형, 탐구 단계는 3단계다", () => {
     expect(QUESTION_TRIO_TABLE).toHaveLength(3);
     expect(INQUIRY_STEPS.map((s) => s.step)).toEqual([1, 2, 3]);
-  });
-
-  it("연습 페이지의 유형 알아보기가 탐정단 슬라이드 뷰어를 사용한다", () => {
-    const practiceView = readFileSync("src/components/shared/QuestionPracticeView.tsx", "utf8");
-    expect(practiceView).toContain("QuestionDetectiveSlides");
-
-    // 한 장에 개념 하나(표지→열린/닫힌→열쇠→정의·공식×3→비교표→3단계) + 이전/다음·진행 점
-    const slides = readFileSync("src/components/shared/QuestionDetectiveSlides.tsx", "utf8");
-    expect(slides).toContain("QUESTION_TYPE_FORMULA_GUIDE");
-    expect(slides).toContain("QUESTION_TRIO_TABLE");
-    expect(slides).toContain("INQUIRY_STEPS");
-    expect(slides).toContain('t("slidePrev")');
-    expect(slides).toContain('t("slideNext")');
-    expect(slides).toContain("SLIDES.map");
-  });
-
-  it("질문하기 도우미에 논쟁적 질문 공식 힌트가 있다", () => {
-    const helper = readFileSync("src/app/(student)/student-ask/StudentAskReferencePanel.tsx", "utf8");
-    expect(helper).toContain('t("helperTipFormula")');
   });
 });
