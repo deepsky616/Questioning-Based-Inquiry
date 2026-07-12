@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, WaitingBanner, playerColorById } from "./roomShared";
 import RoomResult from "./RoomResult";
@@ -53,12 +53,13 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
   const aiGenRef = useRef(false);
   const mountedRef = useRef(false);
   const roomIdentityRef = useRef({ code: room.code, createdAt: room.createdAt });
-  // 효과 전 요청에도 최신 렌더의 방 정체성을 사용해야 한다.
-  // eslint-disable-next-line react-hooks/refs
-  roomIdentityRef.current = { code: room.code, createdAt: room.createdAt };
 
   const [diceLocal, setDiceLocal] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
+
+  useLayoutEffect(() => {
+    roomIdentityRef.current = { code: room.code, createdAt: room.createdAt };
+  }, [room.code, room.createdAt]);
 
   useEffect(() => {
     mountedRef.current = true;
