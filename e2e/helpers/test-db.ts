@@ -17,6 +17,7 @@ export const E2E_QUESTION_CONTENT_PREFIX = "E2E-학생질문-";
 // 학생 계정·번호·세션을 프로젝트 키별로 분리해 경합(unique email,
 // 동일 학교·학년·반·번호 로그인 충돌)을 원천적으로 막는다.
 const STUDENT_EMAIL_BASE = "e2e.student.ask";
+const QUESTION_LEARNING_TEACHER_EMAIL_BASE = "e2e.teacher.learning";
 // 스펙×프로젝트 조합마다 번호를 달리한다(로그인이 학교·학년·반·번호로 계정을 찾으므로)
 const STUDENT_NUMBER_BY_KEY: Record<string, string> = {
   "ask-chromium": "71",
@@ -52,6 +53,15 @@ export interface StudentAskFlowFixture {
     topic: string;
   };
   questionPrefix: string;
+}
+
+export interface QuestionLearningTeacherFixture {
+  email: string;
+  password: string;
+}
+
+function questionLearningTeacherEmailFor(key: string): string {
+  return `${QUESTION_LEARNING_TEACHER_EMAIL_BASE}.${key}@example.com`;
 }
 
 function loadDatabaseUrl(): string {
@@ -112,6 +122,40 @@ export async function prepareTestTeacher(): Promise<string> {
     const teacher = await ensureTestTeacher(prisma, hashed);
     await prisma.user.update({ where: { id: teacher.id }, data: { password: hashed } });
     return password;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/** 질문학습 병렬 화면 시험용 독립 교사 계정을 준비한다. */
+export async function prepareQuestionLearningTeacher(key: string): Promise<QuestionLearningTeacherFixture> {
+  const prisma = client();
+  try {
+    const email = questionLearningTeacherEmailFor(key);
+    const password = `E2e!${randomBytes(9).toString("hex")}`;
+    const hashed = await bcrypt.hash(password, 12);
+    await prisma.user.upsert({
+      where: { email },
+      create: {
+        email,
+        password: hashed,
+        name: `E2E질문학습교사-${key}`,
+        role: "TEACHER",
+        school: "E2E테스트초",
+      },
+      update: { password: hashed },
+    });
+    return { email, password };
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/** 질문학습 화면 시험이 만든 독립 교사 계정만 삭제한다. */
+export async function cleanupQuestionLearningTeacher(key: string): Promise<void> {
+  const prisma = client();
+  try {
+    await prisma.user.deleteMany({ where: { email: questionLearningTeacherEmailFor(key) } });
   } finally {
     await prisma.$disconnect();
   }

@@ -122,7 +122,7 @@ export function QuestionDetectiveSlides() {
           id={panelId}
           role="tabpanel"
           aria-labelledby={activeTabId}
-          className="min-h-[34rem] w-full transition-opacity duration-200 motion-reduce:transition-none lg:h-full lg:min-h-0"
+          className="min-h-[34rem] w-full transition-opacity duration-200 motion-reduce:transition-none motion-reduce:duration-0 lg:h-full lg:min-h-0"
         >
           <QuestionLearningSlideContent
             slide={slide}
