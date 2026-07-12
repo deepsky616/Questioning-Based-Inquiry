@@ -129,6 +129,7 @@ describe("질문학습 슬라이드", () => {
     renderWithIntl(<QuestionLearning.QuestionDetectiveSlides />);
     fireEvent.click(screen.getByRole("tab", { name: "12 / 14" }));
 
+    expect(screen.getAllByText("답에 필요한 사고와 근거")).toHaveLength(4);
     for (const purpose of ["지식 쌓기 (재료 준비)", "이해 넓히기 (연결하기)", "판단하기 (선택하기)"]) {
       expect(screen.getAllByText(purpose)).toHaveLength(2);
     }
@@ -151,7 +152,9 @@ describe("질문학습 슬라이드", () => {
     expect(screen.getByRole("button", { name: messages.questionLearning.checkNext })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: messages.questionLearning.checkNext }));
-    expect(screen.getByText("숲이 줄어들면 지역의 기후에는 어떤 영향을 줄까요?")).toBeInTheDocument();
+    const secondPrompt = screen.getByText("숲이 줄어들면 지역의 기후에는 어떤 영향을 줄까요?");
+    expect(secondPrompt).toBeInTheDocument();
+    expect(document.activeElement).toBe(secondPrompt);
     fireEvent.click(screen.getByRole("button", { name: "개념적 질문" }));
     fireEvent.click(screen.getByRole("button", { name: messages.questionLearning.checkNext }));
     expect(screen.getByText("환경 보호를 위해 일회용품 사용을 법으로 제한해야 할까요?")).toBeInTheDocument();

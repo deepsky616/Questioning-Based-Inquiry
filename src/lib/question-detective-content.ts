@@ -67,9 +67,9 @@ export const QUESTION_WORD_HINT =
 export const QUESTION_TYPE_FORMULA_GUIDE: QuestionTypeFormulaGuide[] = [
   {
     typeKey: "factual",
-    tagline: "정답이 딱 정해진 기초가 되는 질문",
+    tagline: "기억, 관찰, 조사, 계산, 절차로 정보를 확인하는 질문",
     definition:
-      "기억한 내용이나 관찰한 결과, 자료 조사, 계산 또는 정해진 절차로 확인할 수 있는 정보를 묻는 질문이에요. 답이 한 가지로 정해져 있어 누구나 같은 방법으로 확인할 수 있어요.",
+      "기억한 내용이나 관찰한 결과, 자료 조사, 계산 또는 정해진 절차로 확인할 수 있는 정보를 묻는 질문이에요. 무엇을 확인해야 하는지가 중심이며, 답의 범위가 한 가지인지 여러 가지인지는 닫힌 질문과 열린 질문을 가르는 별도 기준이에요.",
     formulas: [
       {
         icon: "❶",
@@ -184,8 +184,8 @@ export const QUESTION_TYPE_FORMULA_GUIDE: QuestionTypeFormulaGuide[] = [
 /** 질문 3형제 비교표 — 유형 라벨은 표시 시점에 i18n으로 해석한다 */
 export interface QuestionTrioRow {
   typeKey: Cognitive;
-  /** 질문의 도구가 되는 말 */
-  tools: string;
+  /** 답할 때 필요한 사고와 근거 */
+  thinkingGuide: string;
   /** 탐구에서의 목적 */
   purpose: string;
   /** 예시 (주제: 환경) */
@@ -195,21 +195,21 @@ export interface QuestionTrioRow {
 export const QUESTION_TRIO_TABLE: QuestionTrioRow[] = [
   {
     typeKey: "factual",
-    tools: "누가, 언제, 어디서, 무엇",
+    thinkingGuide: "자료에 제시된 절차를 찾아 순서대로 확인하기",
     purpose: "지식 쌓기 (재료 준비)",
-    example: "쓰레기 분리배출 방법은 무엇인가요?",
+    example: "자료에 제시된 쓰레기 분리배출 절차는 어떻게 되나요?",
   },
   {
     typeKey: "conceptual",
-    tools: "어떻게, 왜, 어떤 관계",
+    thinkingGuide: "여러 사실을 연결해 관계와 영향을 설명하기",
     purpose: "이해 넓히기 (연결하기)",
-    example: "쓰레기 문제는 지구에 어떤 영향을 주나요?",
+    example: "쓰레기 분리배출은 환경에 어떻게 영향을 주나요?",
   },
   {
     typeKey: "controversial",
-    tools: "~해야 할까?, 당신의 생각은?",
+    thinkingGuide: "가치와 책임을 따져 타당한 근거로 판단하기",
     purpose: "판단하기 (선택하기)",
-    example: "플라스틱 사용을 완전히 금지해야 할까요?",
+    example: "플라스틱 쓰레기를 줄일 책임을 개인과 기업에 어떻게 나누는 것이 바람직할까요?",
   },
 ];
 

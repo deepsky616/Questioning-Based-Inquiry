@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { type ReactNode } from "react";
+import { type ReactNode, type RefObject } from "react";
 import {
   ArrowRight,
   BrainCircuit,
@@ -524,8 +524,8 @@ function ComparisonSlide({ typeLabel }: { typeLabel: (type: Cognitive) => string
           <thead className="bg-muted/70 text-xs text-muted-foreground">
             <tr>
               <th className="w-[18%] px-3 py-3 font-semibold">질문 유형</th>
-              <th className="w-[22%] px-3 py-3 font-semibold">질문의 도구</th>
-              <th className="w-[22%] px-3 py-3 font-semibold">탐구 목적</th>
+              <th className="w-[30%] px-3 py-3 font-semibold">답에 필요한 사고와 근거</th>
+              <th className="w-[20%] px-3 py-3 font-semibold">탐구 목적</th>
               <th className="px-3 py-3 font-semibold">환경 주제 예시</th>
             </tr>
           </thead>
@@ -535,7 +535,7 @@ function ComparisonSlide({ typeLabel }: { typeLabel: (type: Cognitive) => string
                 <th className="px-3 py-3 font-normal">
                   <QuestionTypeLabel type={row.typeKey} label={typeLabel(row.typeKey)} />
                 </th>
-                <td className="px-3 py-3 leading-relaxed text-muted-foreground">{row.tools}</td>
+                <td className="px-3 py-3 leading-relaxed text-muted-foreground">{row.thinkingGuide}</td>
                 <td className="px-3 py-3 leading-relaxed text-muted-foreground">{row.purpose}</td>
                 <td className="px-3 py-3 font-medium leading-relaxed text-foreground">{row.example}</td>
               </tr>
@@ -550,8 +550,8 @@ function ComparisonSlide({ typeLabel }: { typeLabel: (type: Cognitive) => string
             <QuestionTypeLabel type={row.typeKey} label={typeLabel(row.typeKey)} />
             <dl className="mt-3 grid gap-2 text-sm">
               <div>
-                <dt className="font-bold text-foreground">질문의 도구</dt>
-                <dd className="text-muted-foreground">{row.tools}</dd>
+                <dt className="font-bold text-foreground">답에 필요한 사고와 근거</dt>
+                <dd className="text-muted-foreground">{row.thinkingGuide}</dd>
               </div>
               <div>
                 <dt className="font-bold text-foreground">탐구 목적</dt>
@@ -574,6 +574,7 @@ interface CheckSlideProps {
   checkNext: string;
   checkRestart: string;
   checkIndex: number;
+  checkPromptRef: RefObject<HTMLParagraphElement | null>;
   selectedType: Cognitive | null;
   onSelectType: (type: Cognitive) => void;
   onMoveCheck: () => void;
@@ -584,6 +585,7 @@ function CheckSlide({
   checkNext,
   checkRestart,
   checkIndex,
+  checkPromptRef,
   selectedType,
   onSelectType,
   onMoveCheck,
@@ -608,7 +610,14 @@ function CheckSlide({
       </div>
 
       <div className="rounded-lg border bg-muted/20 p-5 text-center">
-        <p id={promptId} className="text-lg font-bold leading-relaxed text-foreground">
+        <p
+          id={promptId}
+          ref={checkPromptRef}
+          tabIndex={-1}
+          aria-live="polite"
+          aria-atomic="true"
+          className="text-lg font-bold leading-relaxed text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
+        >
           {check.prompt}
         </p>
       </div>
@@ -720,6 +729,7 @@ export interface QuestionLearningSlideContentProps {
   checkNext: string;
   checkRestart: string;
   checkIndex: number;
+  checkPromptRef: RefObject<HTMLParagraphElement | null>;
   selectedType: Cognitive | null;
   onSelectType: (type: Cognitive) => void;
   onMoveCheck: () => void;
@@ -731,6 +741,7 @@ export function QuestionLearningSlideContent({
   checkNext,
   checkRestart,
   checkIndex,
+  checkPromptRef,
   selectedType,
   onSelectType,
   onMoveCheck,
@@ -767,6 +778,7 @@ export function QuestionLearningSlideContent({
           checkNext={checkNext}
           checkRestart={checkRestart}
           checkIndex={checkIndex}
+          checkPromptRef={checkPromptRef}
           selectedType={selectedType}
           onSelectType={onSelectType}
           onMoveCheck={onMoveCheck}

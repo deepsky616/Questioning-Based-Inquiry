@@ -30,8 +30,13 @@ describe("질문 탐정단 학습 콘텐츠", () => {
   });
 
   it("사실적 질문은 답을 확인하는 방법을, 논쟁적 질문은 근거 토론을 안내한다", () => {
-    expect(QUESTION_TYPE_FORMULA_GUIDE[0].definition).toMatch(/기억|관찰/);
-    expect(QUESTION_TYPE_FORMULA_GUIDE[0].definition).toMatch(/조사|계산|절차/);
+    const factualGuide = QUESTION_TYPE_FORMULA_GUIDE[0];
+    const factualIntroduction = `${factualGuide.tagline} ${factualGuide.definition}`;
+    expect(factualIntroduction).toMatch(/기억|관찰/);
+    expect(factualIntroduction).toMatch(/조사|계산|절차/);
+    expect(factualIntroduction).not.toMatch(/정답이.*정해|답이 한 가지/);
+    expect(factualGuide.definition).toMatch(/답의 범위/);
+    expect(factualGuide.definition).toMatch(/별도|별개의/);
 
     const controversialDefinition = QUESTION_TYPE_FORMULA_GUIDE[2].definition;
     expect(controversialDefinition).not.toContain("생각의 전쟁터");
@@ -85,6 +90,16 @@ describe("질문 탐정단 학습 콘텐츠", () => {
 
   it("비교표는 세 유형, 탐구 단계는 3단계다", () => {
     expect(QUESTION_TRIO_TABLE).toHaveLength(3);
+    expect(QUESTION_TRIO_TABLE.every((row) => "thinkingGuide" in row)).toBe(true);
+    expect(QUESTION_TRIO_TABLE.every((row) => !("tools" in row))).toBe(true);
+    expect(QUESTION_TRIO_TABLE.map((row) => row.example)).toEqual([
+      expect.stringContaining("어떻게"),
+      expect.stringContaining("어떻게"),
+      expect.stringContaining("어떻게"),
+    ]);
+    expect(QUESTION_TRIO_TABLE[0].thinkingGuide).toMatch(/자료|절차|확인/);
+    expect(QUESTION_TRIO_TABLE[1].thinkingGuide).toMatch(/관계|영향|연결|설명/);
+    expect(QUESTION_TRIO_TABLE[2].thinkingGuide).toMatch(/가치|책임|판단/);
     expect(INQUIRY_STEPS.map((s) => s.step)).toEqual([1, 2, 3]);
   });
 });

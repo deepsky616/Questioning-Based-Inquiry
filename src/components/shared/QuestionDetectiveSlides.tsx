@@ -36,6 +36,8 @@ export function QuestionDetectiveSlides() {
   const [selectedType, setSelectedType] = useState<Cognitive | null>(null);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const pendingTabFocus = useRef<number | null>(null);
+  const checkPromptRef = useRef<HTMLParagraphElement>(null);
+  const pendingCheckPromptFocus = useRef(false);
   const slide = QUESTION_LEARNING_SLIDES[index];
   const total = QUESTION_LEARNING_SLIDES.length;
   const panelId = "question-learning-panel";
@@ -49,6 +51,13 @@ export function QuestionDetectiveSlides() {
     pendingTabFocus.current = null;
   }, [index]);
 
+  useEffect(() => {
+    if (!pendingCheckPromptFocus.current) return;
+
+    checkPromptRef.current?.focus();
+    pendingCheckPromptFocus.current = false;
+  }, [checkIndex]);
+
   const typeLabel = (type: Cognitive) => tClassification(`${type}.label`);
 
   const goTo = (nextIndex: number) => {
@@ -56,6 +65,7 @@ export function QuestionDetectiveSlides() {
   };
 
   const moveCheck = () => {
+    pendingCheckPromptFocus.current = true;
     setCheckIndex((current) => (current + 1) % QUESTION_LEARNING_CHECKS.length);
     setSelectedType(null);
   };
@@ -120,6 +130,7 @@ export function QuestionDetectiveSlides() {
             checkNext={t("checkNext")}
             checkRestart={t("checkRestart")}
             checkIndex={checkIndex}
+            checkPromptRef={checkPromptRef}
             selectedType={selectedType}
             onSelectType={setSelectedType}
             onMoveCheck={moveCheck}
