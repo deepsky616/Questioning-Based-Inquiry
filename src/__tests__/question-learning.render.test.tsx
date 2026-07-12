@@ -17,13 +17,6 @@ const messages = {
     checkNext: "다음 문제",
     checkRestart: "다시 시작",
   },
-  practice: {
-    learnClosed: "정해진 정보에서 답을 확인해요.",
-    learnOpen: "생각과 근거를 연결해 답을 만들어요.",
-    learnTitle: "질문 탐정단",
-    slidePrev: "이전",
-    slideNext: "다음",
-  },
   classification: {
     closed: { label: "닫힌 질문" },
     open: { label: "열린 질문" },
