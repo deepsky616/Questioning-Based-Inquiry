@@ -8,10 +8,12 @@ import { test, expect } from "@playwright/test";
 test.describe("페이지 라우트 보호 (미인증 → /login)", () => {
   const protectedPages = [
     "/teacher-dashboard",
+    "/teacher-question-learning",
     "/teacher-questions",
     "/teacher-sessions",
     "/teacher-students",
     "/student-dashboard",
+    "/student-question-learning",
     "/student-ask",
     "/student-questions",
     "/student-report",

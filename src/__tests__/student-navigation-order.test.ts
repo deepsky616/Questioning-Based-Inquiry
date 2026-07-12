@@ -3,19 +3,25 @@ import { describe, expect, it } from "vitest";
 
 const layoutSource = readFileSync("src/app/(student)/layout.tsx", "utf8");
 
-describe("student navigation order", () => {
-  it("places practice immediately before asking in the student learning flow", () => {
-    const practiceIndex = layoutSource.indexOf('{ href: "/student-practice", key: "practice" }');
-    const askIndex = layoutSource.indexOf('{ href: "/student-ask", key: "ask" }');
-    const exploreIndex = layoutSource.indexOf('{ href: "/student-questions", key: "explore" }');
-    const playIndex = layoutSource.indexOf('{ href: "/student-question-play", key: "questionPlay" }');
+function readStudentPages() {
+  const pagesBlock = layoutSource.match(/const STUDENT_PAGES = \[([\s\S]*?)\] as const;/)?.[1] ?? "";
 
-    expect(practiceIndex).toBeGreaterThan(-1);
-    expect(askIndex).toBeGreaterThan(-1);
-    expect(exploreIndex).toBeGreaterThan(-1);
-    expect(playIndex).toBeGreaterThan(-1);
-    expect(practiceIndex).toBeLessThan(askIndex);
-    expect(askIndex).toBeLessThan(exploreIndex);
-    expect(exploreIndex).toBeLessThan(playIndex);
+  return Array.from(pagesBlock.matchAll(/\{ href: "([^"]+)", key: "([^"]+)" \}/g), ([, href, key]) => ({
+    href,
+    key,
+  }));
+}
+
+describe("student navigation order", () => {
+  it("학생 학습 흐름의 전체 메뉴 순서를 고정한다", () => {
+    expect(readStudentPages()).toEqual([
+      { href: "/student-dashboard", key: "dashboard" },
+      { href: "/student-question-learning", key: "questionLearning" },
+      { href: "/student-practice", key: "practice" },
+      { href: "/student-ask", key: "ask" },
+      { href: "/student-questions", key: "explore" },
+      { href: "/student-question-play", key: "questionPlay" },
+      { href: "/student-settings", key: "settings" },
+    ]);
   });
 });

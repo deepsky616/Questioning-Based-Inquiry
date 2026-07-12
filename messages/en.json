@@ -16,7 +16,8 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "more": "More",
-    "practice": "Practice"
+    "practice": "Practice",
+    "questionLearning": "Question Learning"
   },
   "common": {
     "save": "Save",
@@ -1801,16 +1802,18 @@
     "activateBtn": "Enable",
     "deactivateBtn": "Disable",
     "addToMineBtn": "Add to my items",
-    "attemptStat": "{students} students · {count} attempts · {rate}% correct",
-    "guideFormulaTitle": "How to build one",
-    "guideWordsLabel": "Words to use",
-    "guidePatternLabel": "Sentence endings",
-    "guideExampleLabel": "Examples",
-    "guideTableTitle": "The three question types at a glance",
-    "guideTableType": "Type",
-    "guideTableTools": "Tool words",
-    "guideTablePurpose": "Purpose",
-    "guideTableExample": "Example (topic: environment)",
-    "guideStepsTitle": "Three steps to a great inquirer"
+    "attemptStat": "{students} students · {count} attempts · {rate}% correct"
+  },
+  "questionLearning": {
+    "title": "Question Learning",
+    "subtitle": "Explore questions and strengthen your inquiry skills.",
+    "summaryTitle": "Question Learning Summary",
+    "viewFull": "View full lesson",
+    "previous": "Previous",
+    "next": "Next",
+    "slideNavigation": "Question learning slide navigation",
+    "slideProgress": "{current} / {total}",
+    "checkNext": "Next question",
+    "checkRestart": "Start over"
   }
 }

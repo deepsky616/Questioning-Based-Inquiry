@@ -35,12 +35,14 @@ describe("isPublicRoute", () => {
 describe("getRequiredRole", () => {
   it("teacher 접두사 경로는 TEACHER를 반환한다", () => {
     expect(getRequiredRole("/teacher-dashboard")).toBe("TEACHER");
+    expect(getRequiredRole("/teacher-question-learning")).toBe("TEACHER");
     expect(getRequiredRole("/teacher-questions")).toBe("TEACHER");
     expect(getRequiredRole("/teacher-students")).toBe("TEACHER");
   });
 
   it("student 접두사 경로는 STUDENT를 반환한다", () => {
     expect(getRequiredRole("/student-dashboard")).toBe("STUDENT");
+    expect(getRequiredRole("/student-question-learning")).toBe("STUDENT");
     expect(getRequiredRole("/student-ask")).toBe("STUDENT");
     expect(getRequiredRole("/student-explore")).toBe("STUDENT");
   });

@@ -16,7 +16,8 @@
     "openMenu": "메뉴 열기",
     "closeMenu": "메뉴 닫기",
     "more": "더보기",
-    "practice": "질문연습"
+    "practice": "질문연습",
+    "questionLearning": "질문학습"
   },
   "common": {
     "save": "저장",
@@ -1801,16 +1802,18 @@
     "activateBtn": "사용",
     "deactivateBtn": "중지",
     "addToMineBtn": "내 문항으로",
-    "attemptStat": "학생 {students}명 · 시도 {count}회 · 정답률 {rate}%",
-    "guideFormulaTitle": "이렇게 만들어요",
-    "guideWordsLabel": "쓰는 말",
-    "guidePatternLabel": "끝맺는 말 공식",
-    "guideExampleLabel": "예시",
-    "guideTableTitle": "질문 3형제 비교하기",
-    "guideTableType": "질문 유형",
-    "guideTableTools": "질문의 도구",
-    "guideTablePurpose": "탐구의 목적",
-    "guideTableExample": "예시 (주제: 환경)",
-    "guideStepsTitle": "멋진 탐구자가 되는 3단계"
+    "attemptStat": "학생 {students}명 · 시도 {count}회 · 정답률 {rate}%"
+  },
+  "questionLearning": {
+    "title": "질문학습",
+    "subtitle": "질문을 살펴보고 탐구의 힘을 길러요.",
+    "summaryTitle": "질문학습 요약",
+    "viewFull": "전체 학습 보기",
+    "previous": "이전",
+    "next": "다음",
+    "slideNavigation": "질문학습 장 이동",
+    "slideProgress": "{current} / {total}",
+    "checkNext": "다음 문제",
+    "checkRestart": "다시 시작"
   }
 }
