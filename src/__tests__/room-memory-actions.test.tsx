@@ -19,6 +19,29 @@ import {
 } from "@/lib/question-games-data";
 
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
+const stateUpdateMocks = vi.hoisted(() => ({
+  afterUnmount: false,
+  updateAfterUnmount: vi.fn(),
+}));
+
+vi.mock("react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react")>();
+
+  return {
+    ...actual,
+    useState<T>(initialState: T | (() => T)) {
+      const [value, setValue] = actual.useState(initialState);
+      const setObservedValue = (nextValue: React.SetStateAction<T>) => {
+        if (stateUpdateMocks.afterUnmount) {
+          stateUpdateMocks.updateAfterUnmount();
+        }
+        setValue(nextValue);
+      };
+
+      return [value, setObservedValue] as const;
+    },
+  };
+});
 
 vi.mock("@/app/(student)/student-question-play/games/useAIPlay", () => ({
   useAIPlay: () => ({ ask: aiMocks.ask, loading: false }),
@@ -28,6 +51,8 @@ const fixedRoundId = "00000000-0000-4000-8000-000000000006";
 
 beforeEach(() => {
   aiMocks.ask.mockReset();
+  stateUpdateMocks.afterUnmount = false;
+  stateUpdateMocks.updateAfterUnmount.mockReset();
 });
 
 afterEach(() => {
@@ -225,10 +250,13 @@ describe("메모리 주사위", () => {
     });
   });
 
-  it("주사위 저장 결과가 끝날 때까지 굴리는 상태를 유지한다", async () => {
+  it("주사위 저장 결과가 끝날 때까지 굴리고 서버 결과를 표시한다", async () => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     const room = makeMemoryRoom(makeRollingState());
+    const savedRoom = makeMemoryRoom(
+      makeRollingState({ diceRolls: { host: 4 } }),
+    );
     let resolveAction!: (result: RoomActionResult) => void;
     const pendingAction = new Promise<RoomActionResult>((resolve) => {
       resolveAction = resolve;
@@ -237,7 +265,7 @@ describe("메모리 주사위", () => {
       .fn<RoomActionHandler>()
       .mockReturnValue(pendingAction);
 
-    render(<RoomMemory {...makeProps(room, onAction)} />);
+    const view = render(<RoomMemory {...makeProps(room, onAction)} />);
     fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
     await finishDiceAnimation();
 
@@ -246,10 +274,67 @@ describe("메모리 주사위", () => {
     ).toBeDisabled();
 
     await act(async () => {
-      resolveAction(success(room));
+      resolveAction(success(savedRoom));
       await pendingAction;
     });
-    expect(screen.queryByRole("button", { name: /주사위 굴리기/ })).toBeEnabled();
+    view.rerender(<RoomMemory {...makeProps(savedRoom, onAction)} />);
+
+    expect(screen.getByText("내 주사위").parentElement).toHaveTextContent("4");
+    expect(
+      screen.queryByRole("button", { name: /주사위 굴리기/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("주사위 애니메이션 중 화면을 떠나면 저장 명령을 보내지 않는다", async () => {
+    vi.useFakeTimers();
+    const room = makeMemoryRoom(makeRollingState());
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockResolvedValue(success(room));
+
+    const { unmount } = render(<RoomMemory {...makeProps(room, onAction)} />);
+    fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4 * 80);
+    });
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(12 * 80);
+    });
+
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("주사위 저장 대기 중 화면을 떠나면 응답 뒤 상태를 갱신하지 않는다", async () => {
+    vi.useFakeTimers();
+    const room = makeMemoryRoom(makeRollingState());
+    let resolveAction!: (result: RoomActionResult) => void;
+    const pendingAction = new Promise<RoomActionResult>((resolve) => {
+      resolveAction = resolve;
+    });
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockReturnValue(pendingAction);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const { unmount } = render(<RoomMemory {...makeProps(room, onAction)} />);
+    fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
+    await finishDiceAnimation();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    unmount();
+    stateUpdateMocks.afterUnmount = true;
+    await act(async () => {
+      resolveAction(conflict(room));
+      await pendingAction;
+    });
+
+    expect(stateUpdateMocks.updateAfterUnmount).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(onAction).toHaveBeenCalledTimes(1);
   });
 
   it("주사위 저장이 실패하면 지역 결과를 비우고 다시 굴릴 수 있다", async () => {

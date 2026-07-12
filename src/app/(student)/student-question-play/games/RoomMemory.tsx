@@ -49,10 +49,23 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
 
   const initRef = useRef(false);
   const missTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aiGenRef = useRef(false);
+  const mountedRef = useRef(false);
 
   const [diceLocal, setDiceLocal] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (diceIntervalRef.current !== null) {
+        clearInterval(diceIntervalRef.current);
+        diceIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   /* ── 방장 초기화: 처음 진입 시 setup phase 진입 ── */
   useEffect(() => {
@@ -124,6 +137,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
       roll: final,
       rollRoundId: roundId,
     });
+    if (!mountedRef.current) return;
     setRolling(false);
     if (!result.ok) setDiceLocal(null);
   }
@@ -133,11 +147,14 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
     setRolling(true);
     // 1초 애니메이션
     let count = 0;
-    const iv = setInterval(() => {
+    diceIntervalRef.current = setInterval(() => {
       setDiceLocal(Math.floor(Math.random() * 6) + 1);
       count++;
       if (count >= 12) {
-        clearInterval(iv);
+        if (diceIntervalRef.current !== null) {
+          clearInterval(diceIntervalRef.current);
+          diceIntervalRef.current = null;
+        }
         const final = Math.floor(Math.random() * 6) + 1;
         setDiceLocal(final);
         void persistRoll(final);
