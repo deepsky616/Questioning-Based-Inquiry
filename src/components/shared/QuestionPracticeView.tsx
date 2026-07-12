@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { SectionToggle } from "@/components/shared/SectionToggle";
+import { QuestionTypeGuide } from "@/components/shared/QuestionTypeGuide";
 import {
   PRACTICE_QUIZ_BANK,
   PRACTICE_TRANSFORM_BANK,
@@ -339,42 +340,8 @@ export function QuestionPracticeView() {
         <CardContent className="pt-6">
           {/* w-full — 글씨뿐 아니라 행 전체 어디를 눌러도 접고 펼쳐진다 */}
           <SectionToggle icon="📚" title={t("learnTitle")} open={showLearn} onToggle={() => setShowLearn((v) => !v)} className="w-full" />
-          {showLearn && (
-            <div className="mt-4 space-y-4 text-sm">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border p-3">
-                  <p className="font-semibold text-blue-700 dark:text-blue-300">{tCls("closed.label")}</p>
-                  <p className="text-muted-foreground mt-1">{t("learnClosed")}</p>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <p className="font-semibold text-emerald-700 dark:text-emerald-300">{tCls("open.label")}</p>
-                  <p className="text-muted-foreground mt-1">{t("learnOpen")}</p>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-lg border p-3">
-                  <p className="font-semibold">{tCls("factual.label")}</p>
-                  <p className="text-muted-foreground mt-1">{t("learnFactual")}</p>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <p className="font-semibold">{tCls("conceptual.label")}</p>
-                  <p className="text-muted-foreground mt-1">{t("learnConceptual")}</p>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <p className="font-semibold">{tCls("controversial.label")}</p>
-                  <p className="text-muted-foreground mt-1">{t("learnControversial")}</p>
-                </div>
-              </div>
-              {/* 사고 확장의 연속선 — 사실적(재료) → 개념적(연결) → 논쟁적(관점) */}
-              <div className="rounded-lg bg-muted/40 p-3">
-                <p className="font-medium">{t("stageFlowTitle")}</p>
-                <p className="text-muted-foreground mt-1">
-                  {tCls("factual.label")} → {tCls("conceptual.label")} → {tCls("controversial.label")}
-                </p>
-                <p className="text-muted-foreground mt-1">{t("stageFlowDesc")}</p>
-              </div>
-            </div>
-          )}
+          {/* 질문 탐정단 가이드 — 유형 정의·만들기 공식·비교표·탐구 3단계 */}
+          {showLearn && <QuestionTypeGuide />}
         </CardContent>
       </Card>
 

@@ -41,6 +41,7 @@ export function StudentAskReferencePanel({
         <p className="text-sm font-semibold text-foreground">💡 {t("helperTitle")}</p>
         <p>{t("helperTipClosed")}</p>
         <p>{t("helperTipStage")}</p>
+        <p>{t("helperTipFormula")}</p>
         <p className="italic">{t("helperExample")}</p>
         <Link href="/student-practice" className="mt-1 font-medium text-indigo-600 underline-offset-2 hover:underline dark:text-indigo-300">
           {t("helperPracticeLink")} →

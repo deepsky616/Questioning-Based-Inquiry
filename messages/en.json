@@ -271,7 +271,8 @@
     "helperPracticeLink": "Practice in Question Practice",
     "searchPlaceholder": "Search topic or subject",
     "upcomingSessionsLabel": "Today & upcoming",
-    "pastSessionsLabel": "Past sessions"
+    "pastSessionsLabel": "Past sessions",
+    "helperTipFormula": "Controversial questions are easy to build with endings like 'Should we ~?', 'Is ~ fair?', or 'Which value matters more?'."
   },
   "comment": {
     "loading": "Loading comments...",
@@ -1704,11 +1705,6 @@
     "learnTitle": "Learn the question types",
     "learnClosed": "Has a fixed answer you can recall or look up. e.g. What three things does photosynthesis need?",
     "learnOpen": "Allows many answers; you must reason and imagine. e.g. What would happen to Earth without photosynthesis?",
-    "learnFactual": "Checks facts and information — gathering the 'ingredients' of inquiry. e.g. What heritage sites are in our region?",
-    "learnConceptual": "Uses 'why?' and 'how?' to find relationships and principles. e.g. How does heritage show how people lived?",
-    "learnControversial": "No single answer; different views collide and you judge with your own criteria. e.g. Which comes first, preservation or development?",
-    "stageFlowTitle": "How thinking deepens",
-    "stageFlowDesc": "Gather basic facts with factual questions, connect meaning and relationships with conceptual ones, then explore perspectives and values with debatable ones.",
     "tab_quiz": "1. Classify",
     "tab_transform": "2. Transform",
     "tab_create": "3. Create",
@@ -1805,6 +1801,16 @@
     "activateBtn": "Enable",
     "deactivateBtn": "Disable",
     "addToMineBtn": "Add to my items",
-    "attemptStat": "{students} students · {count} attempts · {rate}% correct"
+    "attemptStat": "{students} students · {count} attempts · {rate}% correct",
+    "guideFormulaTitle": "How to build one",
+    "guideWordsLabel": "Words to use",
+    "guidePatternLabel": "Sentence endings",
+    "guideExampleLabel": "Examples",
+    "guideTableTitle": "The three question types at a glance",
+    "guideTableType": "Type",
+    "guideTableTools": "Tool words",
+    "guideTablePurpose": "Purpose",
+    "guideTableExample": "Example (topic: environment)",
+    "guideStepsTitle": "Three steps to a great inquirer"
   }
 }

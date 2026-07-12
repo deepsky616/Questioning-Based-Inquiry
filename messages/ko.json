@@ -271,7 +271,8 @@
     "helperPracticeLink": "질문연습에서 연습하기",
     "searchPlaceholder": "주제·교과 검색",
     "upcomingSessionsLabel": "오늘·예정",
-    "pastSessionsLabel": "지난 세션"
+    "pastSessionsLabel": "지난 세션",
+    "helperTipFormula": "논쟁이 되는 질문은 '~해야 할까?', '~은 정당한가?', '어떤 가치가 더 중요할까?'로 끝맺으면 쉽게 만들 수 있어요."
   },
   "comment": {
     "loading": "댓글 불러오는 중...",
@@ -1704,11 +1705,6 @@
     "learnTitle": "질문 유형 알아보기",
     "learnClosed": "정해진 답이 있는 질문이에요. 이미 알거나 찾아보면 확인할 수 있어요. 예) 광합성에 필요한 세 가지는 무엇인가요?",
     "learnOpen": "여러 답이 나올 수 있는 질문이에요. 스스로 추론하고 상상해야 답할 수 있어요. 예) 광합성이 없다면 지구는 어떻게 될까요?",
-    "learnFactual": "사실과 정보를 확인하는 질문. 탐구의 '재료'를 모아요. 예) 우리 지역의 문화유산에는 무엇이 있나요?",
-    "learnConceptual": "'왜?', '어떻게?'로 관계와 원리를 찾는 질문. 재료를 연결해요. 예) 문화유산은 옛사람들의 삶을 어떻게 보여줄까요?",
-    "learnControversial": "정답이 없고 서로 다른 생각이 부딪히는 질문. 자기 기준으로 판단해요. 예) 문화유산 보호와 개발 중 무엇이 먼저일까요?",
-    "stageFlowTitle": "생각이 깊어지는 단계",
-    "stageFlowDesc": "사실적 질문으로 기초 정보를 모으고, 개념적 질문으로 의미와 관계를 파악하고, 논쟁적 질문으로 여러 관점과 가치를 탐색해요.",
     "tab_quiz": "1. 분류 연습",
     "tab_transform": "2. 질문 바꾸기",
     "tab_create": "3. 질문 만들기",
@@ -1805,6 +1801,16 @@
     "activateBtn": "사용",
     "deactivateBtn": "중지",
     "addToMineBtn": "내 문항으로",
-    "attemptStat": "학생 {students}명 · 시도 {count}회 · 정답률 {rate}%"
+    "attemptStat": "학생 {students}명 · 시도 {count}회 · 정답률 {rate}%",
+    "guideFormulaTitle": "이렇게 만들어요",
+    "guideWordsLabel": "쓰는 말",
+    "guidePatternLabel": "끝맺는 말 공식",
+    "guideExampleLabel": "예시",
+    "guideTableTitle": "질문 3형제 비교하기",
+    "guideTableType": "질문 유형",
+    "guideTableTools": "질문의 도구",
+    "guideTablePurpose": "탐구의 목적",
+    "guideTableExample": "예시 (주제: 환경)",
+    "guideStepsTitle": "멋진 탐구자가 되는 3단계"
   }
 }
