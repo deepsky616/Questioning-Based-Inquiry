@@ -594,7 +594,8 @@
     "noSessionGroup": "세션 정보 없음",
     "optionPendingCount": " (대기 {count}건)",
     "flaggedZeroPoints": "0점 · 경고",
-    "overridePlaceholderFlagged": "구제 점수"
+    "overridePlaceholderFlagged": "구제 점수",
+    "aiErrorQuota": "AI 무료 사용량 한도를 초과했어요. 내일 다시 시도하거나 유료 API 키를 설정해 주세요."
   },
   "appShell": {
     "errorTitle": "문제가 발생했어요",

@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { CLASSIFICATION_PROMPT, fallbackClassification, parseClassificationResponse } from "@/lib/classify";
 import { isAllowedGeminiModel } from "@/lib/api-config";
-import { AiKeyMissingError, generateJsonWithMetadata } from "@/lib/ai";
+import { AiKeyMissingError, AiQuotaError, generateJsonWithMetadata } from "@/lib/ai";
 
 const classifySchema = z.object({
   apiKey: z.string().optional(),
@@ -57,7 +57,8 @@ export async function POST(req: Request) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
     }
-    if (error instanceof AiKeyMissingError) {
+    if (error instanceof AiKeyMissingError || error instanceof AiQuotaError) {
+      // 키 없음·무료 한도 초과 — 키워드 기반 폴백 분류로 학생의 질문 작성 흐름을 끊지 않는다
       return NextResponse.json(fallbackClassification(fallbackContent));
     }
 

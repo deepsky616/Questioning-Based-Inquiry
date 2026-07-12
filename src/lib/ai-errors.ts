@@ -16,6 +16,24 @@ export class AiBusyError extends Error {
   }
 }
 
+/** 무료 티어 일일 한도 초과(재시도 무의미 — 내일 리셋 또는 유료 키 필요). */
+export class AiQuotaError extends Error {
+  constructor() {
+    super("AI_QUOTA_EXCEEDED");
+    this.name = "AiQuotaError";
+  }
+}
+
+/**
+ * Gemini 무료 티어 '일일' 한도 초과 판별 — 분당 한도(잠시 후 재시도 가능)와 달리
+ * 같은 모델 재시도가 무의미하므로 즉시 대체 모델로 넘어가거나 사용자에게 안내한다.
+ * 예: quotaId "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
+ */
+export function isDailyQuotaError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /PerDay|free_tier_requests/i.test(msg) && /429|Too Many Requests|quota/i.test(msg);
+}
+
 /** 일시 오류(모델 혼잡·레이트 리밋) 판별 — 재시도 대상 */
 export function isTransientAiError(err: unknown): boolean {
   const status =

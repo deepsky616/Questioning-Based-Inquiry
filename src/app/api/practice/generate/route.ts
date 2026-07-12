@@ -3,7 +3,7 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { auth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
-import { AiBusyError, AiKeyMissingError, generateJsonWithMetadata } from "@/lib/ai";
+import { AiBusyError, AiKeyMissingError, AiQuotaError, generateJsonWithMetadata } from "@/lib/ai";
 
 // 질문 연습용 AI 실시간 출제 (바꾸기·만들기 모드 전용).
 // 분류 퀴즈는 정답·해설의 신뢰성이 필요해 검수된 문항 은행만 사용하고,
@@ -108,6 +108,9 @@ export async function POST(req: Request) {
     }
     if (error instanceof AiKeyMissingError) {
       return NextResponse.json({ error: "AI 키가 설정되지 않았습니다" }, { status: 503 });
+    }
+    if (error instanceof AiQuotaError) {
+      return NextResponse.json({ error: "AI 무료 사용량 한도를 초과했어요. 내일 다시 시도하거나 유료 API 키를 설정해 주세요." }, { status: 503 });
     }
     if (error instanceof AiBusyError) {
       return NextResponse.json({ error: "AI 모델이 혼잡합니다. 잠시 후 다시 시도해주세요." }, { status: 503 });

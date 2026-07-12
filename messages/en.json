@@ -594,7 +594,8 @@
     "noSessionGroup": "No session",
     "optionPendingCount": " ({count} pending)",
     "flaggedZeroPoints": "0P · warning",
-    "overridePlaceholderFlagged": "Rescue points"
+    "overridePlaceholderFlagged": "Rescue points",
+    "aiErrorQuota": "The free AI usage quota is exhausted. Try again tomorrow or set a paid API key."
   },
   "appShell": {
     "errorTitle": "Something went wrong",

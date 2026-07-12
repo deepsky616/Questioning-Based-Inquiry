@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { generateJson } from "@/lib/ai";
-import { AiBusyError, AiKeyMissingError } from "@/lib/ai-errors";
+import { AiBusyError, AiKeyMissingError, AiQuotaError } from "@/lib/ai-errors";
 import {
   ACTIVITY_BONUS_TYPES, VALID_ACTIVITY_BONUS,
   MAX_ACTIVITY_BONUS_PER_STUDENT, humanizeBonusReason, replaceActivityBonusCodes,
@@ -20,10 +20,11 @@ const SYS = `당신은 초·중학생 질문기반 탐구 수업을 따뜻하게
 interface AIBonusItem { studentId: string; targetId: string; targetType: "question" | "comment"; bonusType: string; reason: string }
 interface AIResp { bonuses: AIBonusItem[]; summary?: string }
 type AiStatus = "success" | "skipped" | "failed";
-type AiErrorType = "missing_key" | "busy" | "invalid_response" | "unknown";
+type AiErrorType = "missing_key" | "busy" | "quota" | "invalid_response" | "unknown";
 
 function classifyAiError(error: unknown): AiErrorType {
   if (error instanceof AiKeyMissingError) return "missing_key";
+  if (error instanceof AiQuotaError) return "quota";
   if (error instanceof AiBusyError) return "busy";
   if (error instanceof SyntaxError) return "invalid_response";
   const message = error instanceof Error ? error.message : String(error);

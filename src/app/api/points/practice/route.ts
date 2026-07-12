@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
-import { AiKeyMissingError, generateJsonWithMetadata } from "@/lib/ai";
+import { AiKeyMissingError, AiQuotaError, generateJsonWithMetadata } from "@/lib/ai";
 import {
   CLASSIFICATION_PROMPT,
   fallbackClassification,
@@ -138,7 +138,7 @@ async function classifyContent(
     });
     return parseClassificationResponse(JSON.stringify(generated.data)) ?? fallbackClassification(content);
   } catch (error) {
-    if (error instanceof AiKeyMissingError) return fallbackClassification(content);
+    if (error instanceof AiKeyMissingError || error instanceof AiQuotaError) return fallbackClassification(content);
     throw error;
   }
 }

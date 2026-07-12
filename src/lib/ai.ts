@@ -3,11 +3,11 @@ import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { extractJsonArray, extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import { alternateModel, chooseModelAuto, chooseQualityModel, resolveGeminiModel } from "@/lib/api-config";
-import { AiBusyError, AiKeyMissingError, isTransientAiError } from "@/lib/ai-errors";
+import { AiBusyError, AiKeyMissingError, AiQuotaError, isDailyQuotaError, isTransientAiError } from "@/lib/ai-errors";
 import type { GeminiModel } from "@/lib/api-config";
 
 // 기존 import 경로 호환을 위해 재노출 (라우트들은 @/lib/ai에서 가져온다)
-export { AiBusyError, AiKeyMissingError, isTransientAiError };
+export { AiBusyError, AiKeyMissingError, AiQuotaError, isDailyQuotaError, isTransientAiError };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -84,6 +84,8 @@ async function callGeminiWithMetadata({
         });
         return { text: (response.text ?? "").trim(), model: modelName };
       } catch (err) {
+        // 일일 한도 초과는 같은 모델 재시도가 무의미(잔여 한도만 소모) — 즉시 중단
+        if (isDailyQuotaError(err)) throw new AiQuotaError();
         if (!isTransientAiError(err)) throw err;
         if (attempt >= attempts) throw new AiBusyError();
         await sleep(800 * attempt);
@@ -94,8 +96,9 @@ async function callGeminiWithMetadata({
   try {
     return await runWith(primary, 2);
   } catch (err) {
-    // 주 모델이 계속 혼잡하면 대체 모델로 페일오버(모델별 용량 풀이 달라 대개 성공)
-    if (!(err instanceof AiBusyError)) throw err;
+    // 주 모델이 혼잡하거나 일일 한도를 소진하면 대체 모델로 페일오버
+    // (모델별 용량·무료 한도 풀이 달라 대개 성공)
+    if (!(err instanceof AiBusyError || err instanceof AiQuotaError)) throw err;
     return runWith(alternateModel(primary), 2);
   }
 }

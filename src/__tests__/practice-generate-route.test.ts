@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/ai", () => ({
   AiKeyMissingError: class AiKeyMissingError extends Error {},
+  AiQuotaError: class AiQuotaError extends Error {},
   AiBusyError: class AiBusyError extends Error {
     constructor() {
       super("AI_BUSY");

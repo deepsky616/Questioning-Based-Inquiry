@@ -50,7 +50,7 @@ type AnalyzeResponse = {
   questionCount?: number;
   commentCount?: number;
   aiStatus?: "success" | "skipped" | "failed";
-  aiErrorType?: "missing_key" | "busy" | "invalid_response" | "unknown" | null;
+  aiErrorType?: "missing_key" | "busy" | "quota" | "invalid_response" | "unknown" | null;
   fallbackUsed?: boolean;
   error?: string;
 };
@@ -136,6 +136,8 @@ export function PointReviewView() {
         const fallback = results.some((data) => data.fallbackUsed) ? ` ${t("fallbackUsed")}` : "";
         const key = failed[0].aiErrorType === "missing_key"
           ? "aiErrorMissingKey"
+          : failed[0].aiErrorType === "quota"
+          ? "aiErrorQuota"
           : failed[0].aiErrorType === "busy"
           ? "aiErrorBusy"
           : failed[0].aiErrorType === "invalid_response"
