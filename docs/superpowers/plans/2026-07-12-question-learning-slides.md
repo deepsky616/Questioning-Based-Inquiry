@@ -147,8 +147,6 @@ expect(studentPractice).toContain("QuestionLearningSummary");
 expect(studentPractice).toContain('detailsHref="/student-question-learning"');
 expect(teacherPractice).toContain("QuestionLearningSummary");
 expect(teacherPractice).toContain('detailsHref="/teacher-question-learning"');
-expect(studentLearning).toContain("QuestionLearningExperience");
-expect(teacherLearning).toContain("QuestionLearningExperience");
 ```
 
 - [ ] **2단계: 구조 시험이 실패하는지 확인**
@@ -247,6 +245,13 @@ expect(screen.getByText("1 / 14")).toBeInTheDocument();
 ```
 
 즉석 확인 시험에서는 13장으로 이동한 뒤 사실적 선택을 누르고 설명이 표시되는지, `global.fetch`가 호출되지 않는지 검사한다.
+
+`question-learning-architecture.test.ts`에는 역할별 페이지가 생긴 뒤 다음 공통 경험 재사용 단언을 추가한다.
+
+```ts
+expect(studentLearning).toContain("QuestionLearningExperience");
+expect(teacherLearning).toContain("QuestionLearningExperience");
+```
 
 - [ ] **2단계: 렌더 시험이 실패하는지 확인**
 
