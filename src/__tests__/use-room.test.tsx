@@ -2,12 +2,12 @@
 
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GameRoom } from "@/lib/question-games-data";
+import type { GameRoom, RoomActionResult } from "@/lib/question-games-data";
 import { useRoom } from "@/app/(student)/student-question-play/games/useRoom";
 
-function makeRoom(version = 1): GameRoom {
+function makeRoom(version = 1, code = "1234"): GameRoom {
   return {
-    code: "1234",
+    code,
     gameId: "question-chain",
     hostId: "user-1",
     status: "waiting",
@@ -262,6 +262,352 @@ describe("useRoom sendAction", () => {
       reason: "rejected",
       room: { version: 1 },
     });
+    unmount();
+  });
+});
+
+describe("useRoom request ordering", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("나가기 성공 뒤 늦은 PATCH 응답은 이전 방을 되살리지 않는다", async () => {
+    const delayedAction = deferred<Response>();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom() });
+      if (body?.action === "slow") return delayedAction.promise;
+      if (body?.action === "leave") {
+        return jsonResponse({ room: null, deleted: true });
+      }
+      return jsonResponse({ room: makeRoom() });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+
+    let actionResult: RoomActionResult | undefined;
+    await act(async () => {
+      const actionPromise = result.current.sendAction("slow");
+      await result.current.leaveRoom();
+      delayedAction.resolve(jsonResponse({ room: makeRoom(2) }));
+      actionResult = await actionPromise;
+    });
+
+    expect(result.current.room).toBeNull();
+    expect(actionResult).toMatchObject({
+      ok: false,
+      room: null,
+      status: null,
+      reason: "superseded",
+    });
+    unmount();
+  });
+
+  it("다른 방 연결 뒤 이전 방 GET 응답을 무시한다", async () => {
+    const delayedOldPoll = deferred<Response>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = requestBody(init);
+      if (body?.action === "join") {
+        const code = url.endsWith("5678") ? "5678" : "1234";
+        return jsonResponse({ room: makeRoom(1, code) });
+      }
+      if (url.endsWith("1234")) return delayedOldPoll.promise;
+      return jsonResponse({ room: makeRoom(2, "5678") });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      await result.current.joinRoom("5678");
+      delayedOldPoll.resolve(jsonResponse({ room: makeRoom(3, "1234") }));
+      await delayedOldPoll.promise;
+      await Promise.resolve();
+    });
+
+    expect(result.current.room?.code).toBe("5678");
+    unmount();
+  });
+
+  it("다른 방 연결 뒤 이전 방 PATCH 응답은 superseded를 반환한다", async () => {
+    const delayedAction = deferred<Response>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = requestBody(init);
+      if (body?.action === "join") {
+        const code = url.endsWith("5678") ? "5678" : "1234";
+        return jsonResponse({ room: makeRoom(1, code) });
+      }
+      if (body?.action === "slow") return delayedAction.promise;
+      const code = url.endsWith("5678") ? "5678" : "1234";
+      return jsonResponse({ room: makeRoom(1, code) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+
+    let actionResult: RoomActionResult | undefined;
+    await act(async () => {
+      const actionPromise = result.current.sendAction("slow");
+      await result.current.joinRoom("5678");
+      delayedAction.resolve(jsonResponse({ room: makeRoom(2, "1234") }));
+      actionResult = await actionPromise;
+    });
+
+    expect(result.current.room?.code).toBe("5678");
+    expect(actionResult).toMatchObject({
+      ok: false,
+      reason: "superseded",
+    });
+    unmount();
+  });
+
+  it("세대가 지난 실패 응답은 현재 방 오류를 덮지 않는다", async () => {
+    const delayedAction = deferred<Response>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = requestBody(init);
+      if (body?.action === "join") {
+        const code = url.endsWith("5678") ? "5678" : "1234";
+        return jsonResponse({ room: makeRoom(1, code) });
+      }
+      if (body?.action === "slow") return delayedAction.promise;
+      const code = url.endsWith("5678") ? "5678" : "1234";
+      return jsonResponse({ room: makeRoom(1, code) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+
+    await act(async () => {
+      const actionPromise = result.current.sendAction("slow");
+      await result.current.joinRoom("5678");
+      delayedAction.resolve(jsonResponse({ error: "old failure" }, 500));
+      await actionPromise;
+    });
+
+    expect(result.current.room?.code).toBe("5678");
+    expect(result.current.error).toBeNull();
+    unmount();
+  });
+
+  it("생성 뒤 시작한 참가가 먼저 끝나면 늦은 생성 성공은 무시한다", async () => {
+    const delayedCreate = deferred<Response>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (init?.method === "POST") return delayedCreate.promise;
+      if (body?.action === "join") {
+        return jsonResponse({ room: makeRoom(1, "5678") });
+      }
+      return jsonResponse({ room: makeRoom(1, String(input).slice(-4)) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      const createPromise = result.current.createRoom("question-chain");
+      await result.current.joinRoom("5678");
+      delayedCreate.resolve(jsonResponse({ room: makeRoom(1, "1234") }));
+      await createPromise;
+    });
+
+    expect(result.current.room?.code).toBe("5678");
+    unmount();
+  });
+
+  it("참가 뒤 시작한 생성이 먼저 끝나면 늦은 참가 성공은 무시한다", async () => {
+    const delayedJoin = deferred<Response>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return delayedJoin.promise;
+      if (init?.method === "POST") {
+        return jsonResponse({ room: makeRoom(1, "5678") });
+      }
+      return jsonResponse({ room: makeRoom(1, String(input).slice(-4)) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      const joinPromise = result.current.joinRoom("1234");
+      await result.current.createRoom("question-chain");
+      delayedJoin.resolve(jsonResponse({ room: makeRoom(1, "1234") }));
+      await joinPromise;
+    });
+
+    expect(result.current.room?.code).toBe("5678");
+    unmount();
+  });
+
+  it("이전 연결 실패는 최신 연결의 방과 오류를 바꾸지 않는다", async () => {
+    const delayedCreate = deferred<Response>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (init?.method === "POST") return delayedCreate.promise;
+      if (body?.action === "join") {
+        return jsonResponse({ room: makeRoom(1, "5678") });
+      }
+      return jsonResponse({ room: makeRoom(1, String(input).slice(-4)) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      const createPromise = result.current.createRoom("question-chain");
+      await result.current.joinRoom("5678");
+      delayedCreate.resolve(jsonResponse({ error: "old failure" }, 500));
+      await createPromise;
+    });
+
+    expect(result.current.room?.code).toBe("5678");
+    expect(result.current.error).toBeNull();
+    unmount();
+  });
+
+  it("겹친 두 방 동작 중 하나가 먼저 끝나도 actionLoading은 참이다", async () => {
+    const firstAction = deferred<Response>();
+    const secondAction = deferred<Response>();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom() });
+      if (body?.action === "first") return firstAction.promise;
+      if (body?.action === "second") return secondAction.promise;
+      return jsonResponse({ room: makeRoom() });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+
+    let firstPromise: Promise<RoomActionResult>;
+    let secondPromise: Promise<RoomActionResult>;
+    await act(async () => {
+      firstPromise = result.current.sendAction("first");
+      secondPromise = result.current.sendAction("second");
+      await Promise.resolve();
+    });
+    expect(result.current.actionLoading).toBe(true);
+
+    await act(async () => {
+      firstAction.resolve(jsonResponse({ room: makeRoom(2) }));
+      await firstPromise;
+    });
+    expect(result.current.actionLoading).toBe(true);
+
+    await act(async () => {
+      secondAction.reject(new Error("offline"));
+      await secondPromise;
+    });
+    expect(result.current.actionLoading).toBe(false);
+    unmount();
+  });
+
+  it("폴링 요청은 actionLoading에 포함하지 않는다", async () => {
+    const delayedPoll = deferred<Response>();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom() });
+      return delayedPoll.promise;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    expect(result.current.actionLoading).toBe(false);
+    unmount();
+  });
+
+  it("현재 방 PATCH의 404는 연결을 비운다", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom() });
+      if (body?.action === "missing") {
+        return jsonResponse({ error: "room missing" }, 404);
+      }
+      return jsonResponse({ room: makeRoom() });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+
+    let actionResult: RoomActionResult | undefined;
+    await act(async () => {
+      actionResult = await result.current.sendAction("missing");
+    });
+    const requestCount = fetchMock.mock.calls.length;
+    let left = false;
+    await act(async () => {
+      left = await result.current.leaveRoom();
+    });
+
+    expect(result.current.room).toBeNull();
+    expect(result.current.error).toBe("room missing");
+    expect(actionResult).toEqual({
+      ok: false,
+      room: null,
+      status: 404,
+      reason: "missing",
+    });
+    expect(left).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(requestCount);
+    unmount();
+  });
+
+  it("현재 방 GET의 404는 연결을 비운다", async () => {
+    const delayedPoll = deferred<Response>();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom() });
+      return delayedPoll.promise;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      delayedPoll.resolve(jsonResponse({ error: "room missing" }, 404));
+      await delayedPoll.promise;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    const requestCount = fetchMock.mock.calls.length;
+    let left = false;
+    await act(async () => {
+      left = await result.current.leaveRoom();
+    });
+
+    expect(result.current.room).toBeNull();
+    expect(result.current.error).toBe("room missing");
+    expect(left).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(requestCount);
     unmount();
   });
 });

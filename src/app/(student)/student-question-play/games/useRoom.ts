@@ -21,9 +21,30 @@ export function useRoom(): UseRoomResult {
   const roomRef = useRef<GameRoom | null>(null);
   const activeCodeRef = useRef<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollGenerationRef = useRef(0);
+  const roomGenerationRef = useRef(0);
+  const connectIntentRef = useRef(0);
+  const pendingActionCountRef = useRef(0);
+
+  const isCurrentRequest = useCallback((code: string, generation: number) => {
+    return activeCodeRef.current === code &&
+      roomGenerationRef.current === generation;
+  }, []);
+
+  const beginAction = useCallback(() => {
+    pendingActionCountRef.current += 1;
+    if (pendingActionCountRef.current === 1) setActionLoading(true);
+  }, []);
+
+  const endAction = useCallback(() => {
+    pendingActionCountRef.current = Math.max(
+      0,
+      pendingActionCountRef.current - 1,
+    );
+    if (pendingActionCountRef.current === 0) setActionLoading(false);
+  }, []);
 
   const replaceRoom = useCallback((nextRoom: GameRoom) => {
+    roomGenerationRef.current += 1;
     activeCodeRef.current = nextRoom.code;
     roomRef.current = nextRoom;
     setActiveCodeState(nextRoom.code);
@@ -44,30 +65,56 @@ export function useRoom(): UseRoomResult {
     return { room: nextRoom, applied: true };
   }, []);
 
-  const setActiveCode = useCallback((code: string | null) => {
-    activeCodeRef.current = code;
-    setActiveCodeState(code);
+  const clearRoom = useCallback(() => {
+    roomGenerationRef.current += 1;
+    connectIntentRef.current += 1;
+    activeCodeRef.current = null;
+    roomRef.current = null;
+    setActiveCodeState(null);
+    setRoom(null);
   }, []);
+
+  const setActiveCode = useCallback((code: string | null) => {
+    if (activeCodeRef.current === code) return;
+    if (code === null) {
+      clearRoom();
+      return;
+    }
+    roomGenerationRef.current += 1;
+    connectIntentRef.current += 1;
+    activeCodeRef.current = code;
+    roomRef.current = null;
+    setActiveCodeState(code);
+    setRoom(null);
+  }, [clearRoom]);
 
   // 폴링: activeCode가 있으면 2초마다 방 상태 갱신
   useEffect(() => {
-    const generation = ++pollGenerationRef.current;
     if (!activeCode) {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       return;
     }
+    const code = activeCode;
+    const generation = roomGenerationRef.current;
     let cancelled = false;
 
     const poll = async () => {
       if (visibleRefetchInterval(APP_ROOM_POLL_MS) === false) return;
       try {
-        const res = await fetch(`/api/question-games/rooms/${activeCode}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && generation === pollGenerationRef.current && data.room) {
-          applyRoom(data.room);
+        const res = await fetch(`/api/question-games/rooms/${code}`);
+        if (cancelled || !isCurrentRequest(code, generation)) return;
+        const data = await res.json().catch(() => ({}));
+        if (cancelled || !isCurrentRequest(code, generation)) return;
+        if (res.status === 404) {
+          setError(data.error ?? "방을 찾을 수 없어요");
+          clearRoom();
+          return;
         }
-      } catch {}
+        if (!res.ok) return;
+        if (data.room) applyRoom(data.room);
+      } catch {
+        if (cancelled || !isCurrentRequest(code, generation)) return;
+      }
     };
 
     poll();
@@ -82,10 +129,11 @@ export function useRoom(): UseRoomResult {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
-  }, [activeCode, applyRoom]);
+  }, [activeCode, applyRoom, clearRoom, isCurrentRequest]);
 
   const createRoom = useCallback(async (gameId: string): Promise<GameRoom | null> => {
-    setActionLoading(true);
+    const intent = ++connectIntentRef.current;
+    beginAction();
     setError(null);
     try {
       const res = await fetch("/api/question-games/rooms", {
@@ -94,18 +142,20 @@ export function useRoom(): UseRoomResult {
         body: JSON.stringify({ gameId }),
       });
       const data = await res.json();
+      if (intent !== connectIntentRef.current) return null;
       if (!res.ok) { setError(data.error ?? "방 생성 실패"); return null; }
       return replaceRoom(data.room);
     } catch {
-      setError("네트워크 오류");
+      if (intent === connectIntentRef.current) setError("네트워크 오류");
       return null;
     } finally {
-      setActionLoading(false);
+      endAction();
     }
-  }, [replaceRoom]);
+  }, [beginAction, endAction, replaceRoom]);
 
   const joinRoom = useCallback(async (code: string): Promise<GameRoom | null> => {
-    setActionLoading(true);
+    const intent = ++connectIntentRef.current;
+    beginAction();
     setError(null);
     try {
       const res = await fetch(`/api/question-games/rooms/${code}`, {
@@ -114,15 +164,16 @@ export function useRoom(): UseRoomResult {
         body: JSON.stringify({ action: "join" }),
       });
       const data = await res.json();
+      if (intent !== connectIntentRef.current) return null;
       if (!res.ok) { setError(data.error ?? "참가 실패"); return null; }
       return replaceRoom(data.room);
     } catch {
-      setError("네트워크 오류");
+      if (intent === connectIntentRef.current) setError("네트워크 오류");
       return null;
     } finally {
-      setActionLoading(false);
+      endAction();
     }
-  }, [replaceRoom]);
+  }, [beginAction, endAction, replaceRoom]);
 
   const sendAction = useCallback<RoomActionHandler>(
     async (action, extra = {}) => {
@@ -131,7 +182,8 @@ export function useRoom(): UseRoomResult {
       if (!code || !currentRoom) {
         return { ok: false, room: currentRoom, status: null, reason: "inactive" };
       }
-      setActionLoading(true);
+      const generation = roomGenerationRef.current;
+      beginAction();
       setError(null);
       try {
         const body = action === "memory-roll"
@@ -142,7 +194,23 @@ export function useRoom(): UseRoomResult {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+        if (!isCurrentRequest(code, generation)) {
+          return {
+            ok: false,
+            room: roomRef.current,
+            status: null,
+            reason: "superseded",
+          };
+        }
         const data = await res.json();
+        if (!isCurrentRequest(code, generation)) {
+          return {
+            ok: false,
+            room: roomRef.current,
+            status: null,
+            reason: "superseded",
+          };
+        }
         if (res.status === 409) {
           const outcome = data.room
             ? applyRoom(data.room)
@@ -151,6 +219,8 @@ export function useRoom(): UseRoomResult {
           return { ok: false, room: outcome.room, status: 409, reason: "conflict" };
         }
         if (res.status === 404) {
+          setError(data.error ?? "방을 찾을 수 없어요");
+          clearRoom();
           return { ok: false, room: null, status: 404, reason: "missing" };
         }
         if (!res.ok || !data.room || data.room.code !== code) {
@@ -164,6 +234,14 @@ export function useRoom(): UseRoomResult {
         }
         return { ok: true, room: applyRoom(data.room).room ?? data.room };
       } catch {
+        if (!isCurrentRequest(code, generation)) {
+          return {
+            ok: false,
+            room: roomRef.current,
+            status: null,
+            reason: "superseded",
+          };
+        }
         setError("네트워크 오류");
         return {
           ok: false,
@@ -172,22 +250,32 @@ export function useRoom(): UseRoomResult {
           reason: "network",
         };
       } finally {
-        setActionLoading(false);
+        endAction();
       }
     },
-    [applyRoom]
+    [applyRoom, beginAction, clearRoom, endAction, isCurrentRequest]
   );
 
   const leaveRoom = useCallback(async (): Promise<boolean> => {
     const code = activeCodeRef.current;
     if (!code) return true;
+    const generation = roomGenerationRef.current;
+    beginAction();
+    setError(null);
     try {
       const res = await fetch(`/api/question-games/rooms/${code}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "leave" }),
       });
+      if (!isCurrentRequest(code, generation)) return false;
       const data = await res.json().catch(() => ({}));
+      if (!isCurrentRequest(code, generation)) return false;
+      if (res.status === 404) {
+        setError(data.error ?? "방을 찾을 수 없어요");
+        clearRoom();
+        return false;
+      }
       if (!res.ok) {
         const outcome = res.status === 409 && data.room
           ? applyRoom(data.room)
@@ -197,18 +285,17 @@ export function useRoom(): UseRoomResult {
         }
         return false;
       }
-      pollGenerationRef.current += 1;
-      activeCodeRef.current = null;
-      roomRef.current = null;
-      setActiveCodeState(null);
-      setRoom(null);
+      clearRoom();
       setError(null);
       return true;
     } catch {
+      if (!isCurrentRequest(code, generation)) return false;
       setError("네트워크 오류");
       return false;
+    } finally {
+      endAction();
     }
-  }, [applyRoom]);
+  }, [applyRoom, beginAction, clearRoom, endAction, isCurrentRequest]);
 
   return { room, error, actionLoading, createRoom, joinRoom, sendAction, leaveRoom, setActiveCode };
 }
