@@ -228,6 +228,65 @@ describe("메모리 카드 생성", () => {
       }),
     );
   });
+
+  it.each([
+    ["방 코드가", { code: "5678" }],
+    ["방 생성 시각이", { createdAt: 20 }],
+  ])(
+    "인공지능 생성 대기 중 %s 바뀌면 이전 방의 카드를 저장하지 않는다",
+    async (_identityPart, roomOverride) => {
+      const room = makeMemoryRoom(makeSetupState());
+      const nextRoom = { ...makeMemoryRoom(makeSetupState()), ...roomOverride };
+      let resolveAsk!: (value: ReturnType<typeof generatedPairs>) => void;
+      const pendingAsk = new Promise<ReturnType<typeof generatedPairs>>((resolve) => {
+        resolveAsk = resolve;
+      });
+      const onAction = vi
+        .fn<RoomActionHandler>()
+        .mockResolvedValue(success(room));
+      aiMocks.ask.mockReturnValue(pendingAsk);
+
+      const view = render(<RoomMemory {...makeProps(room, onAction)} />);
+      fireEvent.click(screen.getByRole("button", { name: /쉬움/ }));
+
+      await waitFor(() => expect(aiMocks.ask).toHaveBeenCalledTimes(1));
+      expect(onAction).toHaveBeenCalledTimes(1);
+      view.rerender(<RoomMemory {...makeProps(nextRoom, onAction)} />);
+
+      await act(async () => {
+        resolveAsk(generatedPairs(6));
+        await pendingAsk;
+      });
+
+      expect(onAction).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("인공지능 생성 대기 중 같은 방의 버전만 바뀌면 카드를 저장한다", async () => {
+    const room = makeMemoryRoom(makeSetupState());
+    const nextRoom = { ...makeMemoryRoom(makeSetupState()), version: 2 };
+    let resolveAsk!: (value: ReturnType<typeof generatedPairs>) => void;
+    const pendingAsk = new Promise<ReturnType<typeof generatedPairs>>((resolve) => {
+      resolveAsk = resolve;
+    });
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockResolvedValue(success(room));
+    aiMocks.ask.mockReturnValue(pendingAsk);
+
+    const view = render(<RoomMemory {...makeProps(room, onAction)} />);
+    fireEvent.click(screen.getByRole("button", { name: /쉬움/ }));
+
+    await waitFor(() => expect(aiMocks.ask).toHaveBeenCalledTimes(1));
+    view.rerender(<RoomMemory {...makeProps(nextRoom, onAction)} />);
+
+    await act(async () => {
+      resolveAsk(generatedPairs(6));
+      await pendingAsk;
+    });
+
+    expect(onAction).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("메모리 주사위", () => {

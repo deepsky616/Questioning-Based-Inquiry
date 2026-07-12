@@ -52,6 +52,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
   const diceIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const aiGenRef = useRef(false);
   const mountedRef = useRef(false);
+  const roomIdentityRef = useRef({ code: room.code, createdAt: room.createdAt });
 
   const [diceLocal, setDiceLocal] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -66,6 +67,10 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
       }
     };
   }, []);
+
+  useEffect(() => {
+    roomIdentityRef.current = { code: room.code, createdAt: room.createdAt };
+  }, [room.code, room.createdAt]);
 
   /* ── 방장 초기화: 처음 진입 시 setup phase 진입 ── */
   useEffect(() => {
@@ -85,6 +90,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
   /* ── 방장: 난이도 선택 후 AI 페어 생성 ── */
   async function startGame(difficulty: MemoryDifficulty) {
     if (aiGenRef.current) return;
+    const startedRoomIdentity = { code: room.code, createdAt: room.createdAt };
     aiGenRef.current = true;
     try {
       const generating = await onAction("update-state", {
@@ -104,6 +110,13 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
       // 질문/대답 카드 생성 + 셔플
       const qCards: MemoryCard[] = pairs.map((p, i) => ({ id: `q-${i}`, pairId: p.id, type: "q" }));
       const aCards: MemoryCard[] = pairs.map((p, i) => ({ id: `a-${i}`, pairId: p.id, type: "a" }));
+
+      const currentRoomIdentity = roomIdentityRef.current;
+      if (
+        !mountedRef.current ||
+        currentRoomIdentity.code !== startedRoomIdentity.code ||
+        currentRoomIdentity.createdAt !== startedRoomIdentity.createdAt
+      ) return;
 
       await onAction("update-state", {
         patch: {

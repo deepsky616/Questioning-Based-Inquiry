@@ -208,7 +208,7 @@ export function useRoom(): UseRoomResult {
             reason: "superseded",
           };
         }
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!isCurrentRequest(code, generation)) {
           return {
             ok: false,

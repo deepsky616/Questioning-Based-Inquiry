@@ -264,6 +264,39 @@ describe("useRoom sendAction", () => {
     });
     unmount();
   });
+
+  it("일반 글 본문의 HTTP 거절도 실제 상태를 보존한다", async () => {
+    const currentRoom = makeRoom(1);
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: currentRoom });
+      if (!init?.method) return jsonResponse({ room: currentRoom });
+      return new Response("service unavailable", {
+        status: 503,
+        headers: { "Content-Type": "text/plain" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+
+    let actionResult: RoomActionResult | undefined;
+    await act(async () => {
+      actionResult = await result.current.sendAction("start");
+    });
+
+    expect(actionResult).toEqual({
+      ok: false,
+      room: currentRoom,
+      status: 503,
+      reason: "rejected",
+    });
+    expect(result.current.error).toBe("작업 실패");
+    unmount();
+  });
 });
 
 describe("useRoom request ordering", () => {
