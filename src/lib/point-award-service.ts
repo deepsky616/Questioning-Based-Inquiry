@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { generateJson } from "@/lib/ai";
 import { loadGameRoom } from "@/lib/game-room-store";
-import type { GameRoom } from "@/lib/question-games-data";
+import { parseGameRoom, type GameRoom } from "@/lib/question-games-data";
 import {
   BASE_POINTS,
   AI_BONUS_TYPES,
@@ -119,8 +119,12 @@ function buildAwardLogWhere(
   };
 }
 
-async function findAwardLogs(req: AwardRequest, room: GameRoom) {
-  return prisma.pointLog.findMany({
+async function findAwardLogs(
+  client: Pick<Prisma.TransactionClient, "pointLog">,
+  req: AwardRequest,
+  room: GameRoom,
+) {
+  return client.pointLog.findMany({
     where: buildAwardLogWhere(req, room),
     orderBy: { createdAt: "asc" },
   });
@@ -320,7 +324,7 @@ export async function awardGamePoints(body: Partial<AwardRequest>, userId: strin
   );
   const awardRoomCode = buildRoomAwardKey(roomCode, roomCreatedAt);
 
-  const existingLogs = await findAwardLogs(normalized, room);
+  const existingLogs = await findAwardLogs(prisma, normalized, room);
   if (existingLogs.length > 0) return restoreAwardResult(existingLogs);
 
   const ai = await callAI(normalized, userId);
@@ -333,30 +337,61 @@ export async function awardGamePoints(body: Partial<AwardRequest>, userId: strin
   }
 
   try {
-    await prisma.$transaction([
-      ...awards.map((a, index) =>
-        prisma.pointLog.create({
-          data: {
-            studentId: a.studentId, gameId, roomCode: awardRoomCode,
-            bonusType: a.bonusType, points: a.points, reason: a.reason,
-            aiAnalysis: index === 0 ? resultSnapshot : undefined,
-          },
-        })
-      ),
-      ...Object.entries(sumByStudent).map(([id, pts]) =>
-        prisma.user.update({
+    return await prisma.$transaction(async (tx) => {
+      const lockKey = `${gameId}:${awardRoomCode}`;
+      await tx.$queryRaw<Array<{ lock: string }>>`
+        SELECT pg_advisory_xact_lock(
+          hashtextextended(${lockKey}, 0)
+        )::text AS "lock"
+      `;
+      const rows = await tx.$queryRaw<Array<{ data: Prisma.JsonValue }>>`
+        SELECT "data"
+        FROM "game_rooms"
+        WHERE "code" = ${roomCode}
+        FOR SHARE
+      `;
+      const lockedRoom = requireCurrentRoom(
+        normalized,
+        parseGameRoom(rows[0]?.data),
+      );
+      const lockedExistingLogs = await findAwardLogs(
+        tx,
+        normalized,
+        lockedRoom,
+      );
+      if (lockedExistingLogs.length > 0) {
+        return restoreAwardResult(lockedExistingLogs);
+      }
+
+      await tx.pointLog.createMany({
+        data: awards.map((award, index) => ({
+          studentId: award.studentId,
+          gameId,
+          roomCode: awardRoomCode,
+          bonusType: award.bonusType,
+          points: award.points,
+          reason: award.reason,
+          ...(index === 0 ? { aiAnalysis: resultSnapshot } : {}),
+        })),
+      });
+      for (const [id, points] of Object.entries(sumByStudent)) {
+        await tx.user.update({
           where: { id },
-          data: { totalPoints: { increment: pts } },
-        })
-      ),
-    ]);
+          data: { totalPoints: { increment: points } },
+        });
+      }
+
+      return { awards, bestQuestion, summary };
+    });
   } catch (err) {
+    if (err instanceof PointAwardError) throw err;
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      const logs = await findAwardLogs(normalized, room);
+      const logs = await findAwardLogs(prisma, normalized, room);
+      if (logs.length === 0) {
+        throw new PointAwardError("포인트 지급 실패", 500);
+      }
       return restoreAwardResult(logs);
     }
     throw new PointAwardError("포인트 지급 실패", 500);
   }
-
-  return { awards, bestQuestion, summary };
 }

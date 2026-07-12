@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const txMocks = vi.hoisted(() => ({
+  queryRaw: vi.fn(),
+  pointLogFindMany: vi.fn(),
+  pointLogCreate: vi.fn(),
+  pointLogCreateMany: vi.fn(),
+  userUpdate: vi.fn(),
+}));
+
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: vi.fn(() => null) }));
 vi.mock("@/lib/ai", () => ({ generateJson: vi.fn() }));
 vi.mock("@/lib/game-room-store", () => ({ loadGameRoom: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   prisma: {
-    pointLog: { findMany: vi.fn(), create: vi.fn() },
-    user: { update: vi.fn() },
+    pointLog: { findMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -25,8 +32,21 @@ const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mGenerateJson = generateJson as unknown as ReturnType<typeof vi.fn>;
 const mLoadGameRoom = loadGameRoom as unknown as ReturnType<typeof vi.fn>;
 const mFindMany = prisma.pointLog.findMany as unknown as ReturnType<typeof vi.fn>;
-const mPointCreate = prisma.pointLog.create as unknown as ReturnType<typeof vi.fn>;
 const mTx = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
+const txQueryRaw = txMocks.queryRaw;
+const txPointLogFindMany = txMocks.pointLogFindMany;
+const txPointLogCreate = txMocks.pointLogCreate;
+const txPointLogCreateMany = txMocks.pointLogCreateMany;
+const txUserUpdate = txMocks.userUpdate;
+const txClient = {
+  $queryRaw: txQueryRaw,
+  pointLog: {
+    findMany: txPointLogFindMany,
+    create: txPointLogCreate,
+    createMany: txPointLogCreateMany,
+  },
+  user: { update: txUserUpdate },
+};
 
 const awardReq = (body: unknown) =>
   new NextRequest("http://localhost/api/points/award", {
@@ -77,11 +97,30 @@ const snapshot = JSON.stringify({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mTx.mockReset();
+  txQueryRaw.mockReset();
+  txPointLogFindMany.mockReset();
+  txPointLogCreate.mockReset();
+  txPointLogCreateMany.mockReset();
+  txUserUpdate.mockReset();
   mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
   mGenerateJson.mockResolvedValue({ bonuses: [] });
   mLoadGameRoom.mockResolvedValue(makeRoom());
   mFindMany.mockResolvedValue([]);
-  mTx.mockResolvedValue([]);
+  txQueryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
+    const sql = strings.join("?");
+    if (sql.includes("pg_advisory_xact_lock")) return [{ locked: true }];
+    if (sql.includes('FROM "game_rooms"')) return [{ data: makeRoom() }];
+    throw new Error(`알 수 없는 거래 쿼리: ${sql}`);
+  });
+  txPointLogFindMany.mockResolvedValue([]);
+  txPointLogCreate.mockResolvedValue({});
+  txPointLogCreateMany.mockResolvedValue({ count: 0 });
+  txUserUpdate.mockResolvedValue({});
+  mTx.mockImplementation(async (input: unknown) => {
+    if (typeof input !== "function") return [];
+    return input(txClient);
+  });
 });
 
 describe("포인트 지급 요청 검증", () => {
@@ -135,17 +174,35 @@ describe("포인트 지급 수명별 중복 조회", () => {
     expect(mFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { gameId: "dice", roomCode: "room:1234:100" },
     }));
-    expect(mPointCreate).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ roomCode: "room:1234:100" }),
+    expect(txPointLogFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { gameId: "dice", roomCode: "room:1234:100" },
     }));
+    expect(txPointLogCreateMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ roomCode: "room:1234:100" }),
+      ]),
+    });
   });
 
   it("표지 없는 방은 생성 뒤 예전 표시 코드 기록도 확인한다", async () => {
-    mLoadGameRoom.mockResolvedValue(makeRoom({ pointAwardKeyVersion: undefined }));
+    const legacyRoom = makeRoom({ pointAwardKeyVersion: undefined });
+    mLoadGameRoom.mockResolvedValue(legacyRoom);
+    txQueryRaw
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockResolvedValueOnce([{ data: legacyRoom }]);
 
     await POST(awardReq(BODY));
 
     expect(mFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        gameId: "dice",
+        OR: expect.arrayContaining([
+          { roomCode: "room:1234:100" },
+          { roomCode: "1234", createdAt: { gte: new Date(100) } },
+        ]),
+      }),
+    }));
+    expect(txPointLogFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         gameId: "dice",
         OR: expect.arrayContaining([
@@ -186,6 +243,10 @@ describe("포인트 지급 저장", () => {
 
     expect(res.status).toBe(200);
     expect(mTx).toHaveBeenCalledTimes(1);
+    expect(txPointLogCreate).not.toHaveBeenCalled();
+    expect(txPointLogCreateMany).toHaveBeenCalledTimes(1);
+    expect(txPointLogCreateMany.mock.calls[0][0].data).toHaveLength(4);
+    expect(txUserUpdate).toHaveBeenCalledTimes(1);
     const types = data.awards.map((award: { bonusType: string }) => award.bonusType);
     expect(types).toHaveLength(4);
     expect(new Set(types).size).toBe(4);
@@ -200,16 +261,70 @@ describe("포인트 지급 저장", () => {
 
     await POST(awardReq(BODY));
 
-    const firstData = mPointCreate.mock.calls[0][0].data as { aiAnalysis?: string };
+    const rows = txPointLogCreateMany.mock.calls[0][0].data as Array<{
+      aiAnalysis?: string;
+    }>;
+    const firstData = rows[0];
     expect(JSON.parse(firstData.aiAnalysis ?? "null")).toEqual({
       type: "game-room-award-result",
       version: 1,
       bestQuestion: { studentId: "s1", question: "왜?", reason: "좋은 질문" },
       summary: "함께 잘 탐구했습니다.",
     });
-    for (const [args] of mPointCreate.mock.calls.slice(1)) {
-      expect(args.data.aiAnalysis).toBeUndefined();
+    for (const row of rows.slice(1)) {
+      expect(row.aiAnalysis).toBeUndefined();
     }
+  });
+
+  it("잠금과 방 공유 잠금 뒤 같은 수명 기록을 다시 확인하고 쓴다", async () => {
+    await POST(awardReq(BODY));
+
+    expect(txQueryRaw).toHaveBeenCalledTimes(2);
+    const [lockStrings, ...lockValues] = txQueryRaw.mock.calls[0] as [
+      TemplateStringsArray,
+      ...unknown[],
+    ];
+    const [roomStrings, ...roomValues] = txQueryRaw.mock.calls[1] as [
+      TemplateStringsArray,
+      ...unknown[],
+    ];
+    expect(lockStrings.join("?")).toContain("pg_advisory_xact_lock");
+    expect(lockValues).toContain("dice:room:1234:100");
+    expect(roomStrings.join("?")).toContain('FROM "game_rooms"');
+    expect(roomStrings.join("?")).toContain("FOR SHARE");
+    expect(roomValues).toContain("1234");
+    expect(txQueryRaw.mock.invocationCallOrder[1])
+      .toBeLessThan(txPointLogFindMany.mock.invocationCallOrder[0]);
+    expect(txPointLogFindMany.mock.invocationCallOrder[0])
+      .toBeLessThan(txPointLogCreateMany.mock.invocationCallOrder[0]);
+    expect(txPointLogCreateMany.mock.invocationCallOrder[0])
+      .toBeLessThan(txUserUpdate.mock.invocationCallOrder[0]);
+  });
+
+  it("첫 확인 뒤 방 수명이 바뀌면 409이고 쓰지 않는다", async () => {
+    txQueryRaw
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockResolvedValueOnce([{ data: makeRoom({ createdAt: 200 }) }]);
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(409);
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
+    expect(txUserUpdate).not.toHaveBeenCalled();
+  });
+
+  it("잠금 뒤 기존 지급이 생기면 학생 목록이 달라도 새로 쓰지 않는다", async () => {
+    txPointLogFindMany.mockResolvedValue([{
+      id: "existing",
+      studentId: "다른학생",
+      points: 5,
+    }]);
+
+    const data = await (await POST(awardReq(BODY))).json();
+
+    expect(data.alreadyAwarded).toBe(true);
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
+    expect(txUserUpdate).not.toHaveBeenCalled();
   });
 
   it("동시 호출로 unique 충돌이 나면 현재 수명 기록을 반환한다", async () => {
@@ -223,6 +338,17 @@ describe("포인트 지급 저장", () => {
     const data = await (await POST(awardReq(BODY))).json();
 
     expect(data.alreadyAwarded).toBe(true);
+  });
+
+  it("unique 충돌 뒤 현재 수명 기록이 비어 있으면 500이다", async () => {
+    mTx.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "5" }),
+    );
+    mFindMany.mockResolvedValue([]);
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(500);
   });
 
   it("그 외 저장 실패는 500", async () => {
