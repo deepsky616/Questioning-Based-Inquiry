@@ -14,6 +14,7 @@ import {
 
 interface MemoryRoomOptions {
   version?: number;
+  createdAt?: number;
   gameId?: string;
   phase?: string;
   players?: GameRoom["players"];
@@ -47,8 +48,8 @@ function makeMemoryRoom(options: MemoryRoomOptions = {}): GameRoom {
       currentTurnIdx: 0,
     },
     version: options.version ?? 1,
-    createdAt: 10,
-    updatedAt: 10,
+    createdAt: options.createdAt ?? 10,
+    updatedAt: options.createdAt ?? 10,
   };
 }
 
@@ -88,6 +89,29 @@ describe("recordMemoryRoll", () => {
       (secondCandidate.gameState as { diceRolls: Record<string, number> })
         .diceRolls,
     ).toEqual({ host: 6, other: 4, "user-1": 5 });
+  });
+
+  it("저장 충돌의 최신 방 생성 시각이 다르면 새 방에 다시 기록하지 않는다", async () => {
+    const initialRoom = makeMemoryRoom();
+    const replacement = makeMemoryRoom({ version: 1, createdAt: 20 });
+    storeMocks.saveGameRoom.mockResolvedValueOnce({
+      kind: "conflict",
+      room: replacement,
+    });
+
+    await expect(
+      recordMemoryRoll({
+        initialRoom,
+        userId: "user-1",
+        roll: 5,
+        rollRoundId: "round-1",
+      }),
+    ).resolves.toEqual({
+      kind: "conflict",
+      room: replacement,
+      reason: "lifetime",
+    });
+    expect(storeMocks.saveGameRoom).toHaveBeenCalledTimes(1);
   });
 
   it("같은 결과 재전송은 저장하지 않고 재생 결과를 반환한다", async () => {

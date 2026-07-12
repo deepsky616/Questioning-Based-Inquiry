@@ -215,6 +215,41 @@ describe("useRoom sendAction", () => {
     unmount();
   });
 
+  it("다른 코드의 유효한 409 방은 적용하지 않고 기본 오류를 표시한다", async () => {
+    const currentRoom = makeRoom(1, "1234");
+    const otherRoom = makeRoom(2, "5678");
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const body = requestBody(init);
+        if (body?.action === "join") {
+          return jsonResponse({ room: currentRoom });
+        }
+        if (!init?.method) return jsonResponse({ room: currentRoom });
+        return jsonResponse({ room: otherRoom }, 409);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    let actionResult: RoomActionResult | undefined;
+    await act(async () => {
+      actionResult = await result.current.sendAction("start");
+    });
+
+    expect(actionResult).toEqual({
+      ok: false,
+      room: currentRoom,
+      status: 409,
+      reason: "conflict",
+    });
+    expect(result.current.room).toEqual(currentRoom);
+    expect(result.current.error).toBe("작업 실패");
+    unmount();
+  });
+
   it("낮은 폴링 응답이 최신 동작 응답을 덮어쓰지 않는다", async () => {
     const delayedPoll = deferred<Response>();
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {

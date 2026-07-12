@@ -150,6 +150,7 @@ async function joinRoom(
 
 async function leaveRoom(initialRoom: GameRoom, userId: string) {
   let room = initialRoom;
+  const expectedCreatedAt = initialRoom.createdAt;
 
   for (let attempt = 0; attempt < MEMBERSHIP_WRITE_ATTEMPTS; attempt++) {
     let candidate: GameRoom;
@@ -169,6 +170,9 @@ async function leaveRoom(initialRoom: GameRoom, userId: string) {
         if (result.kind === "deleted" || result.kind === "missing") {
           return roomDeleted();
         }
+        if (result.room.createdAt !== expectedCreatedAt) {
+          return roomConflict(result.room);
+        }
         room = result.room;
         continue;
       }
@@ -185,6 +189,9 @@ async function leaveRoom(initialRoom: GameRoom, userId: string) {
       return NextResponse.json({ room: result.room });
     }
     if (result.kind === "missing") return roomDeleted();
+    if (result.room.createdAt !== expectedCreatedAt) {
+      return roomConflict(result.room);
+    }
     room = result.room;
   }
 

@@ -277,19 +277,19 @@ export function useRoom(): UseRoomResult {
         }
         if (res.status === 409) {
           const responseRoom = data.room;
-          let hasValidRoom = false;
+          let hasApplicableRoom = false;
           let outcome = {
             room: roomRef.current,
             applied: false,
             lifetimeChanged: false,
           };
-          if (isGameRoom(responseRoom)) {
-            hasValidRoom = true;
+          if (isGameRoom(responseRoom) && responseRoom.code === code) {
+            hasApplicableRoom = true;
             outcome = applyRoom(responseRoom);
           }
           if (outcome.lifetimeChanged) {
             setError(ROOM_REPLACED_MESSAGE);
-          } else if (outcome.applied || !hasValidRoom) {
+          } else if (outcome.applied || !hasApplicableRoom) {
             setError(responseError(data, "작업 실패"));
           }
           return { ok: false, room: outcome.room, status: 409, reason: "conflict" };

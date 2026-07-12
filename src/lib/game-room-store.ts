@@ -45,7 +45,10 @@ export async function saveGameRoom(
   const updated = await prisma.gameRoom.updateMany({
     where: {
       code: room.code,
-      data: { path: ["version"], equals: expectedVersion },
+      AND: [
+        { data: { path: ["version"], equals: expectedVersion } },
+        { data: { path: ["createdAt"], equals: room.createdAt } },
+      ],
     },
     data: {
       data: nextRoom as unknown as Prisma.InputJsonValue,
@@ -65,6 +68,7 @@ export async function saveGameRoom(
           "data" -> 'version' IS NULL
           OR "data" -> 'version' = 'null'::jsonb
         )
+        AND "data" -> 'createdAt' = ${JSON.stringify(room.createdAt)}::jsonb
     `;
   }
 
@@ -76,13 +80,16 @@ export async function saveGameRoom(
 }
 
 export async function deleteGameRoom(
-  room: Pick<GameRoom, "code" | "version">,
+  room: Pick<GameRoom, "code" | "version" | "createdAt">,
 ): Promise<GameRoomDeleteResult> {
   const expectedVersion = room.version ?? 1;
   const deleted = await prisma.gameRoom.deleteMany({
     where: {
       code: room.code,
-      data: { path: ["version"], equals: expectedVersion },
+      AND: [
+        { data: { path: ["version"], equals: expectedVersion } },
+        { data: { path: ["createdAt"], equals: room.createdAt } },
+      ],
     },
   });
 
@@ -95,6 +102,7 @@ export async function deleteGameRoom(
           "data" -> 'version' IS NULL
           OR "data" -> 'version' = 'null'::jsonb
         )
+        AND "data" -> 'createdAt' = ${JSON.stringify(room.createdAt)}::jsonb
     `;
   }
 

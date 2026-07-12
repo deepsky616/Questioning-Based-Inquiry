@@ -9,6 +9,7 @@ export type MemoryRollConflictReason =
   | "round"
   | "value"
   | "phase"
+  | "lifetime"
   | "retry-exhausted";
 
 export type MemoryRollResult =
@@ -252,6 +253,7 @@ export async function recordMemoryRoll(
   input: RecordMemoryRollInput,
 ): Promise<MemoryRollResult> {
   let room = input.initialRoom;
+  const expectedCreatedAt = input.initialRoom.createdAt;
 
   for (
     let attempt = 0;
@@ -271,6 +273,9 @@ export async function recordMemoryRoll(
       };
     }
     if (saved.kind === "missing") return { kind: "missing", room: null };
+    if (saved.room.createdAt !== expectedCreatedAt) {
+      return { kind: "conflict", room: saved.room, reason: "lifetime" };
+    }
     room = saved.room;
   }
 

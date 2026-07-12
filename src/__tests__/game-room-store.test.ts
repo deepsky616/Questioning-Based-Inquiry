@@ -20,7 +20,7 @@ import {
   saveGameRoom,
 } from "@/lib/game-room-store";
 
-function makeRoom(version = 1): GameRoom {
+function makeRoom(version = 1, createdAt = 1): GameRoom {
   return {
     code: "1234",
     gameId: "question-chain",
@@ -32,7 +32,7 @@ function makeRoom(version = 1): GameRoom {
     turnIndex: 0,
     gameState: {},
     version,
-    createdAt: 1,
+    createdAt,
     updatedAt: 1,
   };
 }
@@ -63,7 +63,10 @@ describe("saveGameRoom", () => {
     expect(prismaMock.gameRoom.updateMany).toHaveBeenCalledWith({
       where: {
         code: "1234",
-        data: { path: ["version"], equals: 1 },
+        AND: [
+          { data: { path: ["version"], equals: 1 } },
+          { data: { path: ["createdAt"], equals: 1 } },
+        ],
       },
       data: {
         data: expect.objectContaining({ code: "1234", version: 2 }),
@@ -85,6 +88,30 @@ describe("saveGameRoom", () => {
     expect(prismaMock.$executeRaw).not.toHaveBeenCalled();
   });
 
+  it("같은 코드와 버전이어도 생성 시각이 다르면 새 방을 덮지 않고 충돌을 반환한다", async () => {
+    const stale = makeRoom(2, 1);
+    const replacement = makeRoom(2, 2);
+    prismaMock.gameRoom.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.gameRoom.findUnique.mockResolvedValue({ data: replacement });
+
+    await expect(saveGameRoom(stale)).resolves.toEqual({
+      kind: "conflict",
+      room: replacement,
+    });
+    expect(prismaMock.gameRoom.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          code: "1234",
+          AND: [
+            { data: { path: ["version"], equals: 2 } },
+            { data: { path: ["createdAt"], equals: 1 } },
+          ],
+        },
+      }),
+    );
+    expect(prismaMock.$executeRaw).not.toHaveBeenCalled();
+  });
+
   it("충돌 뒤 방이 없으면 missing을 반환한다", async () => {
     prismaMock.gameRoom.updateMany.mockResolvedValue({ count: 0 });
     prismaMock.gameRoom.findUnique.mockResolvedValue(null);
@@ -102,7 +129,7 @@ describe("saveGameRoom", () => {
     const result = await saveGameRoom(makeRoom(1));
 
     expect(result.kind).toBe("saved");
-    const [strings] = prismaMock.$executeRaw.mock.calls[0] as [
+    const [strings, ...values] = prismaMock.$executeRaw.mock.calls[0] as [
       TemplateStringsArray,
       ...unknown[],
     ];
@@ -111,6 +138,8 @@ describe("saveGameRoom", () => {
     expect(sql).toContain('"updated_at" =');
     expect(sql).toContain("-> 'version' IS NULL");
     expect(sql).toContain("= 'null'::jsonb");
+    expect(sql).toContain("-> 'createdAt' = ?::jsonb");
+    expect(values).toContain("1");
   });
 });
 
@@ -125,7 +154,10 @@ describe("deleteGameRoom", () => {
     expect(prismaMock.gameRoom.deleteMany).toHaveBeenCalledWith({
       where: {
         code: "1234",
-        data: { path: ["version"], equals: 2 },
+        AND: [
+          { data: { path: ["version"], equals: 2 } },
+          { data: { path: ["createdAt"], equals: 1 } },
+        ],
       },
     });
   });
@@ -139,6 +171,28 @@ describe("deleteGameRoom", () => {
       kind: "conflict",
       room: latest,
     });
+  });
+
+  it("같은 코드와 버전이어도 생성 시각이 다르면 새 방을 삭제하지 않고 충돌을 반환한다", async () => {
+    const stale = makeRoom(2, 1);
+    const replacement = makeRoom(2, 2);
+    prismaMock.gameRoom.deleteMany.mockResolvedValue({ count: 0 });
+    prismaMock.gameRoom.findUnique.mockResolvedValue({ data: replacement });
+
+    await expect(deleteGameRoom(stale)).resolves.toEqual({
+      kind: "conflict",
+      room: replacement,
+    });
+    expect(prismaMock.gameRoom.deleteMany).toHaveBeenCalledWith({
+      where: {
+        code: "1234",
+        AND: [
+          { data: { path: ["version"], equals: 2 } },
+          { data: { path: ["createdAt"], equals: 1 } },
+        ],
+      },
+    });
+    expect(prismaMock.$executeRaw).not.toHaveBeenCalled();
   });
 
   it("삭제 충돌 뒤 방이 없으면 missing을 반환한다", async () => {
@@ -159,7 +213,7 @@ describe("deleteGameRoom", () => {
       kind: "deleted",
       room: null,
     });
-    const [strings] = prismaMock.$executeRaw.mock.calls[0] as [
+    const [strings, ...values] = prismaMock.$executeRaw.mock.calls[0] as [
       TemplateStringsArray,
       ...unknown[],
     ];
@@ -167,6 +221,8 @@ describe("deleteGameRoom", () => {
     expect(sql).toContain('DELETE FROM "game_rooms"');
     expect(sql).toContain("-> 'version' IS NULL");
     expect(sql).toContain("= 'null'::jsonb");
+    expect(sql).toContain("-> 'createdAt' = ?::jsonb");
+    expect(values).toContain("1");
   });
 });
 

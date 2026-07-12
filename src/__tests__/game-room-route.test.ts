@@ -260,7 +260,7 @@ describe("memory-roll 요청", () => {
     mocks.recordMemoryRoll.mockResolvedValue({
       kind: "conflict",
       room: latest,
-      reason: "round",
+      reason: "lifetime",
     });
 
     const response = await patch({
@@ -573,6 +573,34 @@ it("메모리 나가기 저장 충돌 뒤 최신 방에서 완료 판정을 다�
   );
 });
 
+it("나가기 저장 충돌의 최신 방 생성 시각이 다르면 새 방에서 다시 계산하지 않는다", async () => {
+  const current = makeRoom({
+    players: [
+      { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      { id: "other", name: "다른 학생", isHost: false, joinedAt: 2 },
+    ],
+  });
+  const replacement = makeRoom({
+    createdAt: 2,
+    updatedAt: 2,
+    players: current.players,
+  });
+  mocks.loadGameRoom.mockResolvedValue(current);
+  mocks.saveGameRoom
+    .mockResolvedValueOnce({ kind: "conflict", room: replacement })
+    .mockImplementationOnce(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: 2 },
+    }));
+
+  const response = await patch({ action: "leave" });
+
+  expect(response.status).toBe(409);
+  await expect(response.json()).resolves.toMatchObject({ room: replacement });
+  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(1);
+  expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
+});
+
 it("마지막 주사위가 놀이 단계로 바뀐 뒤 나가기 재시도는 실제 정리 함수로 다음 차례를 맞춘다", async () => {
   const { settleMemoryRollingRoom: actualSettleMemoryRoom } =
     await vi.importActual<typeof import("@/lib/memory-room-roll")>(
@@ -726,6 +754,22 @@ it("마지막 메모리 참가자 나가기는 완료 판정 없이 조건부 �
   expect(response.status).toBe(200);
   expect(mocks.deleteGameRoom).toHaveBeenCalledWith(room);
   expect(mocks.settleMemoryRollingRoom).not.toHaveBeenCalled();
+  expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+});
+
+it("나가기 삭제 충돌의 최신 방 생성 시각이 다르면 새 방을 다시 삭제하지 않는다", async () => {
+  const current = makeRoom();
+  const replacement = makeRoom({ createdAt: 2, updatedAt: 2 });
+  mocks.loadGameRoom.mockResolvedValue(current);
+  mocks.deleteGameRoom
+    .mockResolvedValueOnce({ kind: "conflict", room: replacement })
+    .mockResolvedValueOnce({ kind: "deleted", room: null });
+
+  const response = await patch({ action: "leave" });
+
+  expect(response.status).toBe(409);
+  await expect(response.json()).resolves.toMatchObject({ room: replacement });
+  expect(mocks.deleteGameRoom).toHaveBeenCalledTimes(1);
   expect(mocks.saveGameRoom).not.toHaveBeenCalled();
 });
 
