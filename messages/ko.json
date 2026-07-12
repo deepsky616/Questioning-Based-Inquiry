@@ -1805,6 +1805,6 @@
     "activateBtn": "사용",
     "deactivateBtn": "중지",
     "addToMineBtn": "내 문항으로",
-    "solvedStat": "학생 {students}명 · 성공 {count}회"
+    "attemptStat": "학생 {students}명 · 시도 {count}회 · 정답률 {rate}%"
   }
 }

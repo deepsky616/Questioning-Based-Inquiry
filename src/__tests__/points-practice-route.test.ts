@@ -11,6 +11,7 @@ vi.mock("@/lib/db", () => ({
     pointLog: { aggregate: vi.fn(), create: vi.fn() },
     user: { update: vi.fn() },
     practiceCustomItem: { findFirst: vi.fn() },
+    practiceAttempt: { create: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -28,6 +29,7 @@ const mAggregate = prisma.pointLog.aggregate as unknown as ReturnType<typeof vi.
 const mTx = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
 const mGen = generateJsonWithMetadata as unknown as ReturnType<typeof vi.fn>;
 const mCustomFind = prisma.practiceCustomItem.findFirst as unknown as ReturnType<typeof vi.fn>;
+const mAttempt = prisma.practiceAttempt.create as unknown as ReturnType<typeof vi.fn>;
 
 const req = (body: unknown) =>
   new Request("http://localhost/api/points/practice", {
@@ -151,6 +153,57 @@ describe("연습 포인트 — 질문 바꾸기·만들기 (서버 AI 판정)", 
 
     mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
     expect((await POST(req({ mode: "quiz" }))).status).toBe(400);
+  });
+});
+
+describe("연습 시도 기록 — 정답·오답 모두 남긴다", () => {
+  it("퀴즈 오답도 시도로 기록한다(정답률 재료)", async () => {
+    const data = await (await POST(req({ ...QUIZ_OK, answer: "open" }))).json();
+    expect(data.correct).toBe(false);
+    expect(mAttempt).toHaveBeenCalledWith({
+      data: { studentId: "s1", mode: "quiz", itemId: "q01", quizType: "closure", correct: false },
+    });
+  });
+
+  it("퀴즈 정답은 correct=true로 기록한다", async () => {
+    await POST(req(QUIZ_OK));
+    expect(mAttempt).toHaveBeenCalledWith({
+      data: { studentId: "s1", mode: "quiz", itemId: "q01", quizType: "closure", correct: true },
+    });
+  });
+
+  it("교사의 '직접 해보기'는 기록하지 않는다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
+    await POST(req(QUIZ_OK));
+    expect(mAttempt).not.toHaveBeenCalled();
+  });
+
+  it("바꾸기 미달성도 시도로 기록한다", async () => {
+    mGen.mockResolvedValue(aiClassification("closed", "factual"));
+    await POST(req({ mode: "transform", itemId: "t01", content: "주인공 이름이 뭐야?" }));
+    expect(mAttempt).toHaveBeenCalledWith({
+      data: { studentId: "s1", mode: "transform", itemId: "t01", correct: false },
+    });
+  });
+
+  it("AI 실시간 출제는 문항 id 없이 기록한다", async () => {
+    mTx.mockImplementation(async (ops: unknown[]) => ops);
+    await POST(req({
+      mode: "transform-ai",
+      source: "우리나라의 수도는 어디인가요?",
+      target: "open",
+      content: "수도가 서울이 아니었다면 우리 생활은 어떻게 달라졌을까요?",
+    }));
+    expect(mAttempt).toHaveBeenCalledWith({
+      data: { studentId: "s1", mode: "transform-ai", correct: true },
+    });
+  });
+
+  it("기록 실패는 채점 응답을 막지 않는다", async () => {
+    mAttempt.mockRejectedValue(new Error("db down"));
+    const res = await POST(req(QUIZ_OK));
+    expect(res.status).toBe(200);
+    expect((await res.json()).correct).toBe(true);
   });
 });
 

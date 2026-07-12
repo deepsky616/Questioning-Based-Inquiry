@@ -34,8 +34,9 @@ interface CustomItemRow {
   id: string;
   mode: string;
   isActive: boolean;
-  solvedCount?: number;
-  solvedStudents?: number;
+  attemptCount?: number;
+  correctCount?: number;
+  attemptStudents?: number;
   content: string | null;
   closure: string | null;
   cognitive: string | null;
@@ -377,9 +378,13 @@ export function PracticeBankManager({ prefill }: { prefill: { key: number; draft
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {itemMeta(item)}
-                    {(item.solvedCount ?? 0) > 0 && (
+                    {(item.attemptCount ?? 0) > 0 && (
                       <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
-                        {t("solvedStat", { students: item.solvedStudents ?? 0, count: item.solvedCount ?? 0 })}
+                        {t("attemptStat", {
+                          students: item.attemptStudents ?? 0,
+                          count: item.attemptCount ?? 0,
+                          rate: Math.round(((item.correctCount ?? 0) / (item.attemptCount ?? 1)) * 100),
+                        })}
                       </span>
                     )}
                   </p>

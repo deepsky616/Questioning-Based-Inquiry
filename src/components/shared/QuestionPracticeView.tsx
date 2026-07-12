@@ -131,15 +131,15 @@ export function QuestionPracticeView() {
     setQuizAnswer(value);
     const correct = value === quizCorrectValue;
     setQuizStats((s) => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
-    if (!correct) return;
-    // 포인트는 서버가 문항 은행으로 재검증한 뒤 지급한다(하루 상한·문항당 1회)
+    // 오답도 항상 전송 — 서버가 재검증해 정답이면 지급하고, 시도(정답·오답)를
+    // 기록해 문항별 정답률 통계의 재료로 쓴다
     fetch("/api/points/practice", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode: "quiz", itemId: quizItem.id, quizType: quizMode, answer: value }),
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data) setQuizAward(data); })
+      .then((data) => { if (data?.correct) setQuizAward(data); })
       .catch(() => {});
   };
 

@@ -70,6 +70,25 @@ function contentHash(text: string): string {
   return createHash("sha256").update(text.trim()).digest("hex").slice(0, 16);
 }
 
+/**
+ * 시도 기록 — 정답·오답 모두 남겨 문항별 정답률의 재료가 된다.
+ * 학생만 기록하고(교사의 '직접 해보기' 제외), 기록 실패가 채점 응답을
+ * 막지 않도록 오류는 삼킨다.
+ */
+async function recordAttempt(data: {
+  studentId: string;
+  mode: string;
+  itemId?: string | null;
+  quizType?: string | null;
+  correct: boolean;
+}) {
+  try {
+    await prisma.practiceAttempt.create({ data });
+  } catch (error) {
+    logger.error("Practice attempt log error:", error);
+  }
+}
+
 /** 내장 은행에 없는 문항 id는 교사 커스텀 문항에서 찾는다 */
 async function findCustomBankEntry<M extends keyof MergedCustomBank>(
   id: string,
@@ -178,6 +197,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "존재하지 않는 문항입니다" }, { status: 400 });
       }
       const correct = item[body.quizType] === body.answer;
+      if (isStudent) {
+        await recordAttempt({ studentId: userId, mode: "quiz", itemId: item.id, quizType: body.quizType, correct });
+      }
       if (!correct || !isStudent) {
         return NextResponse.json({ correct, ...NO_AWARD });
       }
@@ -200,6 +222,9 @@ export async function POST(req: Request) {
       }
       const classification = await classifyContent(userId, req, body.content);
       const achieved = isTargetAchieved(item.target, classification) && !classification.inappropriate;
+      if (isStudent) {
+        await recordAttempt({ studentId: userId, mode: "transform", itemId: item.id, correct: achieved });
+      }
       if (!achieved || !isStudent) {
         return NextResponse.json({ classification, achieved, ...NO_AWARD });
       }
@@ -222,6 +247,9 @@ export async function POST(req: Request) {
       }
       const classification = await classifyContent(userId, req, body.content);
       const achieved = isTargetAchieved(body.target, classification) && !classification.inappropriate;
+      if (isStudent) {
+        await recordAttempt({ studentId: userId, mode: "create", itemId: topic.id, correct: achieved });
+      }
       if (!achieved || !isStudent) {
         return NextResponse.json({ classification, achieved, ...NO_AWARD });
       }
@@ -238,6 +266,10 @@ export async function POST(req: Request) {
     // AI 실시간 출제 문항(transform-ai / create-ai) — 하루 상한과 원문 해시로 남용을 막는다
     const classification = await classifyContent(userId, req, body.content);
     const achieved = isTargetAchieved(body.target, classification) && !classification.inappropriate;
+    if (isStudent) {
+      // AI 출제는 은행 문항이 아니므로 itemId 없이 학생 단위 통계에만 쓰인다
+      await recordAttempt({ studentId: userId, mode: body.mode, correct: achieved });
+    }
     if (!achieved || !isStudent) {
       return NextResponse.json({ classification, achieved, ...NO_AWARD });
     }

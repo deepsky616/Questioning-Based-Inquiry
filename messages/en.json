@@ -1805,6 +1805,6 @@
     "activateBtn": "Enable",
     "deactivateBtn": "Disable",
     "addToMineBtn": "Add to my items",
-    "solvedStat": "{students} students · {count} solves"
+    "attemptStat": "{students} students · {count} attempts · {rate}% correct"
   }
 }

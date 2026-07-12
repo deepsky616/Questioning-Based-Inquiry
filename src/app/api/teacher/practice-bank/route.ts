@@ -4,7 +4,6 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { practiceCustomItemSchema } from "@/lib/practice-custom";
-import { PRACTICE_GAME_ID } from "@/lib/practice-points";
 
 // 교사 커스텀 연습 문항 관리 — 본인 문항만 조회·추가한다.
 // 저장 즉시 담당 학급 학생의 연습(/api/practice/bank)에 병합된다.
@@ -33,21 +32,18 @@ export async function GET() {
   });
   if (items.length === 0) return NextResponse.json({ items: [] });
 
-  // 문항별 학생 풀이 통계 — 성공(지급) 기록만 남으므로 정답률이 아니라
-  // 성공 횟수·성공 학생 수를 센다. roomCode에 문항 id가 들어 있다(dedupe 키).
-  const logs = await prisma.pointLog.findMany({
-    where: {
-      gameId: PRACTICE_GAME_ID,
-      OR: items.map((item) => ({ roomCode: { contains: item.id } })),
-    },
-    select: { roomCode: true, studentId: true },
+  // 문항별 학생 풀이 통계 — 시도 기록(정답·오답 모두)으로 정답률을 계산한다
+  const attempts = await prisma.practiceAttempt.findMany({
+    where: { itemId: { in: items.map((item) => item.id) } },
+    select: { itemId: true, studentId: true, correct: true },
   });
   const withStats = items.map((item) => {
-    const itemLogs = logs.filter((log) => log.roomCode?.includes(item.id));
+    const itemAttempts = attempts.filter((attempt) => attempt.itemId === item.id);
     return {
       ...item,
-      solvedCount: itemLogs.length,
-      solvedStudents: new Set(itemLogs.map((log) => log.studentId)).size,
+      attemptCount: itemAttempts.length,
+      correctCount: itemAttempts.filter((attempt) => attempt.correct).length,
+      attemptStudents: new Set(itemAttempts.map((attempt) => attempt.studentId)).size,
     };
   });
   return NextResponse.json({ items: withStats });

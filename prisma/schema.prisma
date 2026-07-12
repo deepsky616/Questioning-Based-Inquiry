@@ -284,6 +284,23 @@ model PracticeCustomItem {
   @@map("practice_custom_items")
 }
 
+// 질문 연습 시도 기록 — 정답·오답 모두 남겨 문항별 정답률과 학생별
+// 취약 유형 분석의 재료가 된다(포인트 지급 기록과 달리 오답도 기록).
+// 학생 시도만 기록한다(교사의 '직접 해보기'는 제외).
+model PracticeAttempt {
+  id        String   @id @default(cuid()) @map("id")
+  studentId String   @map("student_id")
+  mode      String   @map("mode") // quiz | transform | create | transform-ai | create-ai
+  itemId    String?  @map("item_id") // 은행·커스텀 문항 id (AI 실시간 출제는 null)
+  quizType  String?  @map("quiz_type") // closure | cognitive (quiz 전용)
+  correct   Boolean  @map("correct") // quiz 정답 / transform·create 목표 달성
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([itemId, createdAt])
+  @@index([studentId, createdAt])
+  @@map("practice_attempts")
+}
+
 // 2022 개정 교육과정 시드 데이터
 model CurriculumArea {
   id             String   @id @default(cuid())
