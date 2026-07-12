@@ -1,32 +1,25 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
 import { useSingleAward, AwardBadge } from "./useSingleAward";
+import { getQuestionGameText, getRelayTopics, isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
-
-const PRESET_TOPICS = [
-  "바다", "날씨", "우주", "학교", "음식",
-  "동물", "계절", "가족", "미래", "환경",
-  "물", "빛", "시간", "꿈", "친구",
-];
 
 const PLAYER_COLORS = ["#F97316", "#3B82F6", "#10B981", "#8B5CF6", "#EF4444"];
 const AI_COLOR = "#6366f1";
 
 interface ChainItem { question: string; player: string; isAI?: boolean }
 
-function isQuestionForm(text: string): boolean {
-  const t = text.trim();
-  return /[?？]/.test(t) ||
-    /(나요|인가요|할까요|까요|니요|니까|가요|는지요|를까요)\s*$/.test(t);
-}
-
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
 export default function RelayGame({ game, onBack, config }: Props) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
+  const presetTopics = getRelayTopics(locale);
   const { mode, players } = config;
   const isAI = mode === "ai";
   const isMulti = mode !== "solo";
@@ -44,7 +37,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
   const { ask, loading: aiLoading } = useAIPlay();
 
   const finalTopic = customTopic.trim() || topic;
-  const myPlayerName = players[0] ?? "나";
+  const myPlayerName = players[0] ?? text.me;
   // 친구 모드에서의 현재 플레이어
   const currentFriendPlayer = players[playerIdx] ?? "나";
   const playerColor = useCallback((name: string) => {
@@ -109,14 +102,14 @@ export default function RelayGame({ game, onBack, config }: Props) {
     setLocalError(null);
 
     // 질문 형식 검사
-    if (!isQuestionForm(trimmed)) {
-      setLocalError("질문 형태로 써야 해요! (~나요? ~인가요? ~할까요?)");
+    if (!isQuestionFormForLocale(trimmed, locale)) {
+      setLocalError(text.questionFormError);
       return;
     }
 
     // 중복 검사
     if (chain.some((c) => c.question.trim() === trimmed)) {
-      setLocalError("이미 나온 질문이에요! 새로운 질문을 만들어봐요.");
+      setLocalError(text.duplicateQuestionError);
       return;
     }
 
@@ -148,13 +141,13 @@ export default function RelayGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">← 목록</button>
+          <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
           <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
             style={{ background: game.gradientCss }}>
             <span className="text-4xl">{game.emoji}</span>
             <div>
               <h1 className="text-xl font-black">{game.title}</h1>
-              <p className="text-white/80 text-sm">질문만 이어가는 릴레이! 대답 금지 🚫</p>
+              <p className="text-white/80 text-sm">{text.relaySubtitle}</p>
             </div>
           </div>
         </div>
@@ -162,28 +155,24 @@ export default function RelayGame({ game, onBack, config }: Props) {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
           {/* 규칙 */}
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-1.5">
-            <p className="text-orange-700 font-black text-sm">📜 게임 규칙</p>
-            {[
-              "앞 질문과 반드시 연결된 새 질문을 만들어요",
-              "대답은 절대 금지! 질문만 이어가요",
-              "같은 질문 반복 금지!",
-            ].map((r, i) => (
+            <p className="text-orange-700 font-black text-sm">{text.gameRules}</p>
+            {text.relayRules.map((r, i) => (
               <p key={i} className="text-orange-600 text-sm flex items-start gap-2">
                 <span className="flex-shrink-0">•</span>{r}
               </p>
             ))}
             {isAI && (
               <p className="text-indigo-600 text-sm font-bold mt-2 bg-indigo-50 rounded-lg px-3 py-1.5">
-                🤖 학생 → AI → 학생 → AI … 순서로 질문이 이어져요
+                {text.relayAiOrder}
               </p>
             )}
           </div>
 
           {/* 주제 선택 */}
           <div>
-            <p className="text-sm font-black text-gray-700 mb-3">🎯 주제를 골라요!</p>
+            <p className="text-sm font-black text-gray-700 mb-3">{text.chooseTopic}</p>
             <div className="flex flex-wrap gap-2 mb-3">
-              {PRESET_TOPICS.map((t) => (
+              {presetTopics.map((t) => (
                 <button key={t}
                   className="px-3 py-1.5 rounded-full text-sm font-bold border-2 transition-all"
                   style={{
@@ -202,7 +191,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
               style={{ borderColor: customTopic ? game.accentColor : "#e5e7eb" }}
               onFocus={(e) => { e.target.style.borderColor = game.accentColor; setTopic(""); }}
               onBlur={(e) => { if (!customTopic) e.target.style.borderColor = "#e5e7eb"; }}
-              placeholder="직접 입력하기 (예: 공룡, 로봇, 초콜릿...)"
+              placeholder={text.topicPlaceholder}
               value={customTopic}
               onChange={(e) => { setCustomTopic(e.target.value); setTopic(""); }}
             />
@@ -211,7 +200,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
           {finalTopic && (
             <div className="rounded-xl px-4 py-3 text-white text-center font-bold"
               style={{ background: game.gradientCss }}>
-              🎯 선택한 주제: <span className="text-xl">{finalTopic}</span>
+              {text.selectedTopic}: <span className="text-xl">{finalTopic}</span>
             </div>
           )}
 
@@ -219,7 +208,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             style={{ background: game.gradientCss, opacity: finalTopic ? 1 : 0.4 }}
             disabled={!finalTopic}
             onClick={startGame}>
-            🏃 질문 릴레이 시작!
+            {text.relayStart}
           </Button>
         </div>
       </div>
@@ -231,19 +220,19 @@ export default function RelayGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">← 목록</button>
+          <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-4">
           <div className="text-6xl">🏆</div>
-          <h2 className="text-2xl font-black text-gray-800">릴레이 완성!</h2>
-          <p className="text-gray-500 text-sm">주제: <span className="font-bold text-orange-500">{finalTopic}</span></p>
+          <h2 className="text-2xl font-black text-gray-800">{text.relayDone}</h2>
+          <p className="text-gray-500 text-sm">{text.topic}: <span className="font-bold text-orange-500">{finalTopic}</span></p>
           <p className="text-gray-500 text-sm">
-            총 <span className="text-3xl font-black" style={{ color: game.accentColor }}>{chain.length}</span>개의 질문이 이어졌어요!
+            {text.relayTotal(chain.length)}
           </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
-          <h3 className="font-black text-gray-700">📜 전체 질문 체인</h3>
+          <h3 className="font-black text-gray-700">{text.relayChain}</h3>
           {chain.map((item, i) => (
             <div key={i} className="flex gap-3 items-start">
               <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black text-white mt-0.5"
@@ -264,7 +253,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
           onClick={() => { setPhase("setup"); setTopic(""); setCustomTopic(""); }}>
-          🔄 다시 하기
+          {text.retry}
         </Button>
       </div>
     );
@@ -275,19 +264,19 @@ export default function RelayGame({ game, onBack, config }: Props) {
     <div className="max-w-lg mx-auto space-y-4">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">← 목록</button>
+        <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
         <div className="flex-1 rounded-2xl py-3 px-5 text-white flex items-center justify-between"
           style={{ background: game.gradientCss }}>
           <div className="flex items-center gap-3">
             <span className="text-3xl">{game.emoji}</span>
             <div>
               <p className="font-black">{game.title}</p>
-              <p className="text-white/80 text-xs">주제: {finalTopic}</p>
+              <p className="text-white/80 text-xs">{text.topic}: {finalTopic}</p>
             </div>
           </div>
           <div className="text-white text-right">
             <p className="text-2xl font-black">{chain.length}</p>
-            <p className="text-xs opacity-80">연결됨</p>
+            <p className="text-xs opacity-80">{text.connectedCount}</p>
           </div>
         </div>
       </div>
@@ -335,7 +324,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
         {chain.length === 0 ? (
           <div className="text-center py-6 text-gray-400 text-sm">
             <p className="text-3xl mb-2">🎯</p>
-            <p>주제 <strong className="text-orange-500">{finalTopic}</strong>에 대한 첫 질문을 만들어봐요!</p>
+            <p>{text.firstQuestionPrompt(finalTopic)}</p>
           </div>
         ) : (
           chain.map((item, i) => (
@@ -371,7 +360,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
               <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
             </div>
             <div className="flex-1 bg-indigo-50 border-2 border-indigo-200 rounded-xl px-3 py-2.5 flex items-center gap-2">
-              <p className="text-indigo-500 text-sm font-medium">🤖 AI가 질문을 만드는 중...</p>
+              <p className="text-indigo-500 text-sm font-medium">{text.aiMakingQuestion}</p>
             </div>
           </div>
         )}
@@ -388,7 +377,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
           }}>
           <p className="text-xs font-bold mb-1"
             style={{ color: lastItem?.isAI ? AI_COLOR : game.accentColor }}>
-            ↳ 이 질문과 연결된 질문을 만들어요
+            {text.connectToQuestion}
           </p>
           <p className="text-gray-800 text-sm font-medium">{prevForHint.question}</p>
         </div>
@@ -410,10 +399,10 @@ export default function RelayGame({ game, onBack, config }: Props) {
           onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
           placeholder={
             aiLoading
-              ? "AI가 질문을 만드는 중이에요..."
+              ? text.aiMakingPlaceholder
               : chain.length === 0
-              ? `'${finalTopic}'과 관련된 첫 번째 질문을 만들어보세요...`
-              : "앞 질문과 연결된 새 질문을 써보세요..."
+              ? text.firstQuestionPlaceholder(finalTopic)
+              : text.connectedQuestionPlaceholder
           }
           value={inputQ}
           onChange={(e) => { if (!aiLoading) { setInputQ(e.target.value); setLocalError(null); } }}
@@ -432,17 +421,17 @@ export default function RelayGame({ game, onBack, config }: Props) {
             style={{ background: game.gradientCss, opacity: inputQ.trim() && !aiLoading ? 1 : 0.4 }}
             disabled={!inputQ.trim() || aiLoading}
             onClick={submitQuestion}>
-            {isAI ? "질문 제출 → AI 차례" : "질문 연결 →"}
+            {isAI ? text.relaySubmitAi : text.relaySubmit}
           </Button>
           {chain.length >= 4 && !aiLoading && (
             <Button variant="outline" className="rounded-xl px-4 text-sm text-gray-400" onClick={endGame}>
-              마치기
+              {text.finish}
             </Button>
           )}
         </div>
 
         <p className="text-xs text-gray-400 text-center">
-          💡 질문 형태로 써야 해요 (~나요? ~인가요? ~할까요?) · Enter 키로 빠르게 제출
+          {text.questionFormHint}
         </p>
       </div>
     </div>

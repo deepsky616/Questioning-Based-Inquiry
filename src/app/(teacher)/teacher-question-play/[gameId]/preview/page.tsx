@@ -1,9 +1,9 @@
 "use client";
 
-import { use, useEffect } from "react";
+import { use } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { BUILT_IN_GAMES, type BuiltInGame } from "@/lib/question-games-data";
+import { useLocale, useTranslations } from "next-intl";
+import { BUILT_IN_GAMES, localizeBuiltInGame, type BuiltInGame } from "@/lib/question-games-data";
 import MemoryGame from "@/app/(student)/student-question-play/games/MemoryGame";
 import StoryDiceGame from "@/app/(student)/student-question-play/games/StoryDiceGame";
 import DiceGame from "@/app/(student)/student-question-play/games/DiceGame";
@@ -34,20 +34,14 @@ export default function TeacherGamePreview({ params }: { params: Promise<{ gameI
   const { gameId } = use(params);
   const router = useRouter();
   const t = useTranslations("gamePreview");
-
-  // 게임 화면은 밝은 인라인 색이 많아 미리보기 동안 라이트 모드로 고정
-  useEffect(() => {
-    const html = document.documentElement;
-    const wasDark = html.classList.contains("dark");
-    if (wasDark) html.classList.remove("dark");
-    return () => { if (wasDark) html.classList.add("dark"); };
-  }, []);
+  const locale = useLocale();
 
   const game = BUILT_IN_GAMES.find((g) => g.id === gameId);
+  const localizedGame = game ? localizeBuiltInGame(game, locale) : null;
   const GameComponent = GAME_MAP[gameId];
   const back = () => router.push("/teacher-question-play");
 
-  if (!game || !GameComponent) {
+  if (!localizedGame || !GameComponent) {
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
         <div className="text-6xl">😢</div>
@@ -74,7 +68,7 @@ export default function TeacherGamePreview({ params }: { params: Promise<{ gameI
           {t("backShort")}
         </button>
       </div>
-      <GameComponent game={game} onBack={back} config={{ mode: "solo", players: [t("teacherPlayer")] }} />
+      <GameComponent game={localizedGame} onBack={back} config={{ mode: "solo", players: [t("teacherPlayer")] }} />
     </div>
   );
 }

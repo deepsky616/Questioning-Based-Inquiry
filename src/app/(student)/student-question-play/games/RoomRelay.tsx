@@ -1,21 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import RoomResult from "./RoomResult";
+import { getQuestionGameText, getRelayTopics, isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
-const PRESET_TOPICS = [
-  "바다", "날씨", "우주", "학교", "음식",
-  "동물", "계절", "가족", "미래", "환경",
-];
 const PLAYER_COLORS = ["#F97316", "#3B82F6", "#10B981", "#8B5CF6", "#EF4444", "#EC4899", "#14B8A6", "#F59E0B"];
-
-function isQuestionForm(text: string): boolean {
-  const t = text.trim();
-  return /[?？]/.test(t) ||
-    /(나요|인가요|할까요|까요|니요|니까|가요|는지요|를까요)\s*$/.test(t);
-}
 
 interface Props {
   game: BuiltInGame;
@@ -27,6 +19,9 @@ interface Props {
 }
 
 export default function RoomRelay({ game, room, myId, actionLoading, onAction, onLeave }: Props) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
+  const presetTopics = getRelayTopics(locale);
   const [topicInput, setTopicInput] = useState("");
   const [customTopic, setCustomTopic] = useState("");
   const [inputQ, setInputQ] = useState("");
@@ -60,12 +55,12 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
     if (!trimmed || actionLoading) return;
     setLocalError(null);
 
-    if (!isQuestionForm(trimmed)) {
-      setLocalError("질문 형태로 써야 해요! (~나요? ~인가요? ~할까요?)");
+    if (!isQuestionFormForLocale(trimmed, locale)) {
+      setLocalError(text.questionFormError);
       return;
     }
     if (room.chain.some((c) => c.question.trim() === trimmed)) {
-      setLocalError("이미 나온 질문이에요!");
+      setLocalError(text.duplicateQuestionError);
       return;
     }
 
@@ -82,7 +77,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
     const questions = room.chain.map((c) => ({ playerId: c.playerId, playerName: c.playerName, question: c.question }));
     return (
       <RoomResult game={game} room={room} myId={myId}
-        scoreLabel="이어간 질문" scoreUnit="개"
+        scoreLabel={text.question} scoreUnit={text.count}
         scores={scores} questions={questions}
         onAction={onAction} onLeave={onLeave} />
     );
@@ -94,20 +89,20 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
       return (
         <div className="max-w-lg mx-auto space-y-5">
           <div className="flex items-center gap-3">
-            <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">← 나가기</button>
+            <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">{text.leave}</button>
             <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
               style={{ background: game.gradientCss }}>
               <span className="text-4xl">{game.emoji}</span>
               <div>
                 <h1 className="text-xl font-black">{game.title}</h1>
-                <p className="text-white/80 text-sm">주제를 정해주세요!</p>
+                <p className="text-white/80 text-sm">{text.chooseTopic}</p>
               </div>
             </div>
           </div>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
-            <p className="text-sm font-black text-gray-700">🎯 주제를 골라요!</p>
+            <p className="text-sm font-black text-gray-700">{text.chooseTopic}</p>
             <div className="flex flex-wrap gap-2">
-              {PRESET_TOPICS.map((t) => (
+              {presetTopics.map((t) => (
                 <button key={t}
                   className="px-3 py-1.5 rounded-full text-sm font-bold border-2 transition-all"
                   style={{
@@ -124,7 +119,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
               type="text"
               className="w-full border-2 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
               style={{ borderColor: customTopic ? game.accentColor : "#e5e7eb" }}
-              placeholder="직접 입력 (예: 공룡, 로봇...)"
+              placeholder={text.topicPlaceholder}
               value={customTopic}
               onChange={(e) => { setCustomTopic(e.target.value); setTopicInput(""); }}
             />
@@ -132,7 +127,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
               style={{ background: game.gradientCss, opacity: finalTopic && !actionLoading ? 1 : 0.5 }}
               disabled={!finalTopic || actionLoading}
               onClick={confirmTopic}>
-              주제 정하고 시작! →
+              {text.relayStart}
             </Button>
           </div>
         </div>
@@ -142,13 +137,13 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">← 나가기</button>
+          <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">{text.leave}</button>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 flex flex-col items-center gap-4">
           <div className="text-5xl animate-bounce">{game.emoji}</div>
           <div className="flex items-center gap-2 text-gray-500">
             <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-            <p className="font-medium">방장이 주제를 정하는 중...</p>
+            <p className="font-medium">{locale === "en" ? "The host is choosing a topic..." : "방장이 주제를 정하는 중..."}</p>
           </div>
         </div>
       </div>
@@ -160,19 +155,19 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
     <div className="max-w-lg mx-auto space-y-4">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">← 나가기</button>
+        <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">{text.leave}</button>
         <div className="flex-1 rounded-2xl py-3 px-5 text-white flex items-center justify-between"
           style={{ background: game.gradientCss }}>
           <div className="flex items-center gap-3">
             <span className="text-3xl">{game.emoji}</span>
             <div>
               <p className="font-black">{game.title}</p>
-              <p className="text-white/80 text-xs">주제: {room.topic}</p>
+              <p className="text-white/80 text-xs">{text.topic}: {room.topic}</p>
             </div>
           </div>
           <div className="text-white text-right">
             <p className="text-2xl font-black">{room.chain.length}</p>
-            <p className="text-xs opacity-80">연결됨</p>
+            <p className="text-xs opacity-80">{text.connectedCount}</p>
           </div>
         </div>
       </div>
@@ -188,7 +183,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
                 background: isCurrent ? playerColor(p.id) : "#f3f4f6",
                 color: isCurrent ? "white" : "#9ca3af",
               }}>
-              {p.name}{p.id === myId ? " (나)" : ""} {isCurrent && "🏃"}
+              {p.name}{p.id === myId ? ` (${text.me})` : ""} {isCurrent && "🏃"}
             </div>
           );
         })}
@@ -200,7 +195,9 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
           background: isMyTurn ? `${game.accentColor}15` : "#f9fafb",
           color: isMyTurn ? game.accentColor : "#9ca3af",
         }}>
-        {isMyTurn ? "🙋 내 차례예요! 질문을 만들어요" : `⏳ ${currentPlayer?.name}님의 차례를 기다려요`}
+        {isMyTurn
+          ? (locale === "en" ? "🙋 Your turn! Make a question" : "🙋 내 차례예요! 질문을 만들어요")
+          : (locale === "en" ? `⏳ Waiting for ${currentPlayer?.name}'s turn` : `⏳ ${currentPlayer?.name}님의 차례를 기다려요`)}
       </div>
 
       {/* 질문 체인 */}
@@ -208,7 +205,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
         {room.chain.length === 0 ? (
           <div className="text-center py-6 text-gray-400 text-sm">
             <p className="text-3xl mb-2">🎯</p>
-            <p>주제 <strong className="text-orange-500">{room.topic}</strong>에 대한 첫 질문을 기다려요!</p>
+            <p>{locale === "en" ? `Waiting for the first question about ${room.topic}!` : <>주제 <strong className="text-orange-500">{room.topic}</strong>에 대한 첫 질문을 기다려요!</>}</p>
           </div>
         ) : (
           room.chain.map((item, i) => (
@@ -238,7 +235,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
       {lastItem && isMyTurn && (
         <div className="rounded-xl border-2 px-4 py-3"
           style={{ borderColor: game.accentColor, background: `${game.accentColor}08` }}>
-          <p className="text-xs font-bold mb-1" style={{ color: game.accentColor }}>↳ 이 질문과 연결하세요</p>
+          <p className="text-xs font-bold mb-1" style={{ color: game.accentColor }}>{text.connectToQuestion}</p>
           <p className="text-gray-800 text-sm font-medium">{lastItem.question}</p>
         </div>
       )}
@@ -255,8 +252,8 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
             onFocus={(e) => { e.target.style.borderColor = game.accentColor; setLocalError(null); }}
             onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
             placeholder={room.chain.length === 0
-              ? `'${room.topic}'과 관련된 첫 질문을 만들어보세요...`
-              : "앞 질문과 연결된 새 질문을 써보세요..."}
+              ? text.firstQuestionPlaceholder(room.topic)
+              : text.connectedQuestionPlaceholder}
             value={inputQ}
             onChange={(e) => { setInputQ(e.target.value); setLocalError(null); }}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitQuestion(); } }}
@@ -266,15 +263,15 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
             style={{ background: game.gradientCss, opacity: inputQ.trim() && !actionLoading ? 1 : 0.4 }}
             disabled={!inputQ.trim() || actionLoading}
             onClick={submitQuestion}>
-            {actionLoading ? "전송 중..." : "질문 연결 →"}
+            {actionLoading ? text.sending : text.relaySubmit}
           </Button>
-          <p className="text-xs text-gray-400 text-center">💡 질문 형태로 써야 해요 (~나요? ~인가요?)</p>
+          <p className="text-xs text-gray-400 text-center">{text.questionFormHint}</p>
         </div>
       ) : (
         <div className="bg-gray-50 rounded-2xl p-5 text-center">
           <div className="flex items-center justify-center gap-2 text-gray-500">
             <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-medium">{currentPlayer?.name}님이 질문을 만드는 중...</p>
+            <p className="text-sm font-medium">{locale === "en" ? `${currentPlayer?.name} is making a question...` : `${currentPlayer?.name}님이 질문을 만드는 중...`}</p>
           </div>
         </div>
       )}
@@ -283,7 +280,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
       {isHost && room.chain.length >= 2 && (
         <Button variant="outline" className="w-full rounded-xl text-gray-500"
           onClick={() => void onAction("end")}>
-          🏁 게임 마치기
+          {text.finishGame}
         </Button>
       )}
     </div>

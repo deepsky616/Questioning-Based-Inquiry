@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RoomHeader, WaitingBanner, PLAYER_COLORS, playerColorById } from "./roomShared";
 import RoomResult from "./RoomResult";
+import { getQuestionGameText } from "@/lib/question-game-i18n";
 import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 const ROWS = 10;
@@ -45,6 +47,8 @@ interface Props {
 }
 
 export default function RoomLadder({ game, room, myId, actionLoading, onAction, onLeave }: Props) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
   const n = room.players.length;
   const [topicInputs, setTopicInputs] = useState<string[]>(Array(n).fill(""));
   const [questionInput, setQuestionInput] = useState("");
@@ -54,7 +58,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
   const hasState = Array.isArray(state?.assignments) && state.assignments.length > 0;
 
   function buildLadder() {
-    const topics = topicInputs.map((t, i) => t.trim() || `주제 ${String.fromCharCode(65 + i)}`);
+    const topics = topicInputs.map((t, i) => t.trim() || text.defaultTopic(String.fromCharCode(65 + i)));
     const grid = generateLadder(n);
     const assignments: Assignment[] = room.players.map((p, i) => ({
       playerId: p.id, playerName: p.name, topic: topics[tracePath(i, grid)],
@@ -72,7 +76,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
     const questions = qs.map((q) => ({ playerId: q.playerId, playerName: q.playerName, question: q.question }));
     return (
       <RoomResult game={game} room={room} myId={myId}
-        scoreLabel="만든 질문" scoreUnit="개"
+        scoreLabel={text.question} scoreUnit={text.count}
         scores={scores} questions={questions}
         onAction={onAction} onLeave={onLeave} />
     );
@@ -83,16 +87,18 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
     if (isHost) {
       return (
         <div className="max-w-lg mx-auto space-y-5">
-          <RoomHeader game={game} room={room} subtitle="주제 정하기" onLeave={onLeave} />
+          <RoomHeader game={game} room={room} subtitle={text.chooseTopic} onLeave={onLeave} />
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-            <p className="text-sm font-black text-gray-700">📌 주제 {n}개를 입력해요 (사다리로 무작위 배정돼요)</p>
+            <p className="text-sm font-black text-gray-700">
+              {locale === "en" ? `📌 Enter ${n} topics. The ladder will assign them randomly.` : `📌 주제 ${n}개를 입력해요 (사다리로 무작위 배정돼요)`}
+            </p>
             <div className="space-y-2">
               {Array.from({ length: n }, (_, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-600 text-xs flex items-center justify-center font-bold flex-shrink-0">
                     {String.fromCharCode(65 + i)}
                   </div>
-                  <Input placeholder={`주제 ${String.fromCharCode(65 + i)}`} value={topicInputs[i] ?? ""}
+                  <Input placeholder={text.defaultTopic(String.fromCharCode(65 + i))} value={topicInputs[i] ?? ""}
                     onChange={(e) => { const t = [...topicInputs]; t[i] = e.target.value; setTopicInputs(t); }}
                     className="h-9 text-sm rounded-lg" />
                 </div>
@@ -101,7 +107,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
             <Button className="w-full py-4 font-black text-white rounded-xl text-lg"
               style={{ background: game.gradientCss }} disabled={actionLoading}
               onClick={buildLadder}>
-              🪜 사다리 만들기!
+              {text.drawLadder}
             </Button>
           </div>
         </div>
@@ -109,8 +115,8 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
     }
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="대기 중..." onLeave={onLeave} />
-        <WaitingBanner text="방장이 주제를 정하는 중..." />
+        <RoomHeader game={game} room={room} subtitle={text.preparing} onLeave={onLeave} />
+        <WaitingBanner text={locale === "en" ? "The host is choosing topics..." : "방장이 주제를 정하는 중..."} />
       </div>
     );
   }
@@ -140,7 +146,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
 
   return (
     <div className="max-w-lg mx-auto space-y-4">
-      <RoomHeader game={game} room={room} subtitle="사다리 결과" onLeave={onLeave} />
+      <RoomHeader game={game} room={room} subtitle={locale === "en" ? "Ladder result" : "사다리 결과"} onLeave={onLeave} />
 
       {/* 사다리 SVG */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 overflow-x-auto">
@@ -175,7 +181,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
           <p className="text-sm text-gray-500 mb-1">
             <span className="font-bold" style={{ color: PLAYER_COLORS[myIndex % PLAYER_COLORS.length] }}>
               {myAssignment.playerName}
-            </span>님의 주제
+            </span>{locale === "en" ? "'s topic" : "님의 주제"}
           </p>
           <p className="text-2xl font-black text-gray-800">📌 {myAssignment.topic}</p>
         </div>
@@ -184,20 +190,20 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
       {/* 질문 작성 */}
       {myQuestion ? (
         <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 text-center">
-          <p className="text-green-600 font-bold text-sm mb-1">✅ 내 질문 완성!</p>
+          <p className="text-green-600 font-bold text-sm mb-1">{locale === "en" ? "✅ My question is done!" : "✅ 내 질문 완성!"}</p>
           <p className="text-gray-700 text-sm">{myQuestion.question}</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-          <p className="text-sm font-bold text-gray-700">내 주제로 질문을 만들어요!</p>
+          <p className="text-sm font-bold text-gray-700">{locale === "en" ? "Make a question with your topic!" : "내 주제로 질문을 만들어요!"}</p>
           <textarea
             className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none h-20"
-            placeholder={`'${myAssignment?.topic}'에 대한 질문을 써보세요...`}
+            placeholder={locale === "en" ? `Write a question about '${myAssignment?.topic}'...` : `'${myAssignment?.topic}'에 대한 질문을 써보세요...`}
             value={questionInput} onChange={(e) => setQuestionInput(e.target.value)} />
           <Button className="w-full font-bold text-white rounded-xl"
             style={{ background: game.gradientCss, opacity: questionInput.trim() && !actionLoading ? 1 : 0.5 }}
             disabled={!questionInput.trim() || actionLoading} onClick={submitQuestion}>
-            질문 제출 ✓
+            {text.storySubmitQuestion.replace(" →", " ✓")}
           </Button>
         </div>
       )}
@@ -205,7 +211,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
       {/* 제출 현황 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <p className="text-xs text-gray-400 font-medium mb-2">
-          질문 작성: {state.questions.length} / {n}명
+          {locale === "en" ? "Questions written" : "질문 작성"}: {state.questions.length} / {n}
         </p>
         <div className="space-y-1.5">
           {state.assignments.map((a) => {
@@ -225,7 +231,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
       {isHost && (
         <Button variant="outline" className="w-full rounded-xl text-gray-500"
           onClick={() => void onAction("update-state", { patch: {}, status: "ended" })}>
-          🏁 결과 보기 (게임 마치기)
+          {locale === "en" ? "🏁 See results and finish" : "🏁 결과 보기 (게임 마치기)"}
         </Button>
       )}
     </div>

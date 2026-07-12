@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import {
   AnyGame,
   GameVisibility,
+  localizeQuestionGames,
 } from "@/lib/question-games-data";
 import { useTeacherStudents } from "@/lib/app-queries";
 
@@ -48,6 +49,7 @@ const VIS_LABEL: Record<VisType, { emoji: string; color: string }> = {
 export default function TeacherQuestionPlayPage() {
   const t = useTranslations("qPlay");
   const tc = useTranslations("common");
+  const locale = useLocale();
   const { toast } = useToast();
   const [games, setGames] = useState<AnyGame[]>([]);
   const [visibilityMap, setVisibilityMap] = useState<Record<string, GameVisibility>>({});
@@ -120,7 +122,9 @@ export default function TeacherQuestionPlayPage() {
   const getVis = (gameId: string): GameVisibility =>
     visibilityMap[gameId] ?? { type: "all" };
 
-  const filtered = games.filter((g) => {
+  const localizedGames = useMemo(() => localizeQuestionGames(games, locale), [games, locale]);
+
+  const filtered = localizedGames.filter((g) => {
     if (tab === "all") return true;
     if (tab === "public") return getVis(g.id).type !== "hidden";
     if (tab === "hidden") return getVis(g.id).type === "hidden";

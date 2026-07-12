@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { getQuestionGameText } from "@/lib/question-game-i18n";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
 const PLAYER_COLORS = ["#F97316", "#3B82F6", "#10B981", "#8B5CF6", "#EF4444", "#EC4899", "#14B8A6", "#F59E0B"];
@@ -16,6 +18,8 @@ interface Props {
 }
 
 export default function RoomLobby({ game, room, myId, actionLoading, onStart, onLeave }: Props) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
   const [copied, setCopied] = useState(false);
   const isHost = room.hostId === myId;
 
@@ -30,20 +34,20 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
     <div className="max-w-lg mx-auto space-y-5">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">← 나가기</button>
+        <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">{text.leave}</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>
           <div>
             <h1 className="text-xl font-black">{game.title}</h1>
-            <p className="text-white/80 text-sm">친구들과 함께하는 대기실 🎮</p>
+            <p className="text-white/80 text-sm">{locale === "en" ? "Lobby with friends" : "친구들과 함께하는 대기실"} 🎮</p>
           </div>
         </div>
       </div>
 
       {/* 방 코드 카드 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center space-y-3">
-        <p className="text-gray-400 text-sm font-medium">방 코드</p>
+        <p className="text-gray-400 text-sm font-medium">{locale === "en" ? "Room code" : "방 코드"}</p>
         <div className="flex items-center justify-center gap-2">
           {room.code.split("").map((d, i) => (
             <span key={i}
@@ -57,18 +61,18 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
           onClick={copyCode}
           className="text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           style={{ color: game.accentColor, background: `${game.accentColor}12` }}>
-          {copied ? "✅ 복사됨!" : "📋 코드 복사하기"}
+          {copied ? (locale === "en" ? "✅ Copied!" : "✅ 복사됨!") : (locale === "en" ? "📋 Copy code" : "📋 코드 복사하기")}
         </button>
-        <p className="text-gray-400 text-xs">친구에게 이 코드를 알려주세요!</p>
+        <p className="text-gray-400 text-xs">{locale === "en" ? "Share this code with your friends!" : "친구에게 이 코드를 알려주세요!"}</p>
       </div>
 
       {/* 참가자 목록 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-black text-gray-800">
-            👥 참가자 <span style={{ color: game.accentColor }}>{room.players.length}</span>명
+            👥 {locale === "en" ? "Players" : "참가자"} <span style={{ color: game.accentColor }}>{room.players.length}</span>
           </h2>
-          <span className="text-xs text-gray-400">최대 8명</span>
+          <span className="text-xs text-gray-400">{locale === "en" ? "Max 8" : "최대 8명"}</span>
         </div>
         <div className="space-y-2">
           {room.players.map((p, i) => (
@@ -81,12 +85,12 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
               </div>
               <span className="font-bold text-gray-800 flex-1">
                 {p.name}
-                {p.id === myId && <span className="text-xs text-gray-400 ml-1">(나)</span>}
+                {p.id === myId && <span className="text-xs text-gray-400 ml-1">({text.me})</span>}
               </span>
               {p.isHost && (
                 <span className="text-xs font-bold px-2.5 py-1 rounded-full text-white"
                   style={{ background: game.accentColor }}>
-                  👑 방장
+                  👑 {locale === "en" ? "Host" : "방장"}
                 </span>
               )}
             </div>
@@ -95,7 +99,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
           {room.players.length < 2 && (
             <div className="flex items-center gap-3 rounded-xl p-3 border-2 border-dashed border-gray-200">
               <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-300 text-lg">+</div>
-              <span className="text-gray-400 text-sm animate-pulse">친구를 기다리는 중...</span>
+              <span className="text-gray-400 text-sm animate-pulse">{locale === "en" ? "Waiting for friends..." : "친구를 기다리는 중..."}</span>
             </div>
           )}
         </div>
@@ -108,13 +112,13 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
           style={{ background: game.gradientCss, opacity: room.players.length >= 1 && !actionLoading ? 1 : 0.5 }}
           disabled={room.players.length < 1 || actionLoading}
           onClick={onStart}>
-          {actionLoading ? "시작하는 중..." : "🚀 게임 시작!"}
+          {actionLoading ? (locale === "en" ? "Starting..." : "시작하는 중...") : (locale === "en" ? "🚀 Start game!" : "🚀 게임 시작!")}
         </Button>
       ) : (
         <div className="bg-gray-50 rounded-2xl p-5 text-center">
           <div className="flex items-center justify-center gap-2 text-gray-500">
             <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-medium">방장이 시작하기를 기다리는 중...</p>
+            <p className="text-sm font-medium">{locale === "en" ? "Waiting for the host to start..." : "방장이 시작하기를 기다리는 중..."}</p>
           </div>
         </div>
       )}

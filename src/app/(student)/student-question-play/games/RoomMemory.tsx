@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, WaitingBanner, playerColorById } from "./roomShared";
 import RoomResult from "./RoomResult";
 import { useAIPlay } from "./useAIPlay";
 import {
   MEMORY_DIFFICULTY, MemoryDifficulty, QAPair,
-  pickFallbackPairs, parseAIPairs, resolveMemoryRollRoundId, shuffle,
+  parseAIBilingualPairs, pickFallbackLocalizedPairs, resolveMemoryRollRoundId, shuffle,
 } from "@/lib/memory-game-data";
+import { getLocalizedText, getMemoryDifficultyLabel, getQuestionGameText } from "@/lib/question-game-i18n";
 import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 interface MemoryCard {
@@ -42,6 +44,8 @@ interface Props {
 const MISS_DELAY = 2500; // 짝이 안 맞을 때 다시 뒤집기까지 대기 (ms)
 
 export default function RoomMemory({ game, room, myId, actionLoading, onAction, onLeave }: Props) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
   const isHost = room.hostId === myId;
   const state = room.gameState as unknown as MemoryState;
   const hasState = state && typeof state.phase === "string";
@@ -100,12 +104,13 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
 
       const cfg = MEMORY_DIFFICULTY[difficulty];
       const response = await ask({
-        action: "memory:pairs",
+        action: "memory:pairs-bilingual",
         context: { count: String(cfg.pairs) },
+        locale: "ko",
       });
       const pairs = response?.text
-        ? parseAIPairs(response.text, cfg.pairs) ?? pickFallbackPairs(cfg.pairs)
-        : pickFallbackPairs(cfg.pairs);
+        ? parseAIBilingualPairs(response.text, cfg.pairs) ?? pickFallbackLocalizedPairs(cfg.pairs)
+        : pickFallbackLocalizedPairs(cfg.pairs);
 
       // 질문/대답 카드 생성 + 셔플
       const qCards: MemoryCard[] = pairs.map((p, i) => ({ id: `q-${i}`, pairId: p.id, type: "q" }));
@@ -257,7 +262,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
     }));
     return (
       <RoomResult game={game} room={room} myId={myId}
-        scoreLabel="모은 짝" scoreUnit="쌍"
+        scoreLabel={locale === "en" ? "Pairs collected" : "모은 짝"} scoreUnit={locale === "en" ? " pairs" : "쌍"}
         scores={scores} questions={[]}
         onAction={onAction} onLeave={onLeave} />
     );
@@ -267,8 +272,8 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
   if (!hasState) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="준비 중..." onLeave={onLeave} />
-        <WaitingBanner text="준비 중..." />
+        <RoomHeader game={game} room={room} subtitle={text.preparing} onLeave={onLeave} />
+        <WaitingBanner text={text.preparing} />
       </div>
     );
   }
@@ -277,9 +282,9 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
   if (state.phase === "setup") {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="난이도 선택" onLeave={onLeave} />
+        <RoomHeader game={game} room={room} subtitle={text.memoryChooseDifficulty} onLeave={onLeave} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
-          <h2 className="font-black text-gray-800">🎚️ 난이도 선택</h2>
+          <h2 className="font-black text-gray-800">{text.memoryChooseDifficulty}</h2>
           {isHost ? (
             <div className="grid grid-cols-3 gap-2">
               {(Object.keys(MEMORY_DIFFICULTY) as MemoryDifficulty[]).map((d) => {
@@ -292,15 +297,15 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
                       borderColor: "#e5e7eb",
                       background: "hsl(var(--card))",
                     }}>
-                    <p className="font-black text-gray-800 text-sm">{cfg.label}</p>
-                    <p className="text-2xl font-black mt-1" style={{ color: game.accentColor }}>{cfg.cards}장</p>
-                    <p className="text-xs text-gray-400">{cfg.pairs}쌍</p>
+                    <p className="font-black text-gray-800 text-sm">{getMemoryDifficultyLabel(locale, d)}</p>
+                    <p className="text-2xl font-black mt-1" style={{ color: game.accentColor }}>{cfg.cards}{locale === "en" ? ` ${text.card}` : text.card}</p>
+                    <p className="text-xs text-gray-400">{cfg.pairs}{locale === "en" ? ` ${text.pair}` : text.pair}</p>
                   </button>
                 );
               })}
             </div>
           ) : (
-            <WaitingBanner text="방장이 난이도를 정하는 중..." />
+            <WaitingBanner text={locale === "en" ? "The host is choosing the difficulty..." : "방장이 난이도를 정하는 중..."} />
           )}
         </div>
       </div>
@@ -311,11 +316,11 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
   if (state.phase === "generating") {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="카드 만드는 중" onLeave={onLeave} />
+        <RoomHeader game={game} room={room} subtitle={text.memoryGeneratingCards} onLeave={onLeave} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
           <div className="text-6xl animate-bounce mb-3">🃏</div>
           <p className="text-gray-600 font-bold text-sm">
-            AI가 질문과 대답 짝을 만드는 중...
+            {text.memoryAiGenerating}
           </p>
         </div>
       </div>
@@ -328,28 +333,28 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
     const myRoll = state.diceRolls?.[myId];
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="순서 정하기 (주사위)" onLeave={onLeave} />
+        <RoomHeader game={game} room={room} subtitle={locale === "en" ? "Decide order with dice" : "순서 정하기 (주사위)"} onLeave={onLeave} />
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4 text-center">
-          <p className="text-sm font-bold text-gray-700">🎲 주사위를 굴려 순서를 정해요!</p>
-          <p className="text-xs text-gray-500">큰 숫자가 나온 친구부터 카드 뒤집기 시작!</p>
+          <p className="text-sm font-bold text-gray-700">{locale === "en" ? "🎲 Roll dice to decide the order!" : "🎲 주사위를 굴려 순서를 정해요!"}</p>
+          <p className="text-xs text-gray-500">{locale === "en" ? "The highest number flips cards first!" : "큰 숫자가 나온 친구부터 카드 뒤집기 시작!"}</p>
 
           {myRoll != null ? (
             <div className="rounded-2xl border-2 border-indigo-200 p-6 space-y-2">
-              <p className="text-xs text-gray-400">내 주사위</p>
+              <p className="text-xs text-gray-400">{locale === "en" ? "My die" : "내 주사위"}</p>
               <p className="text-6xl font-black" style={{ color: game.accentColor }}>{myRoll}</p>
             </div>
           ) : (
             <Button className="w-full py-5 text-xl font-black text-white rounded-2xl"
               style={{ background: "linear-gradient(135deg, #8B5CF6, #7C3AED)" }}
               disabled={rolling || actionLoading} onClick={rollDice}>
-              {rolling ? `🎲 ${diceLocal ?? "?"}` : "🎲 주사위 굴리기"}
+              {rolling ? `🎲 ${diceLocal ?? "?"}` : text.diceRoll}
             </Button>
           )}
 
           {/* 참가자별 주사위 결과 */}
           <div className="space-y-1 text-left">
-            <p className="text-xs font-bold text-gray-500 mb-2">참가자 ({rolledIds.length}/{room.players.length})</p>
+            <p className="text-xs font-bold text-gray-500 mb-2">{locale === "en" ? "Players" : "참가자"} ({rolledIds.length}/{room.players.length})</p>
             {room.players.map((p) => {
               const v = state.diceRolls?.[p.id];
               return (
@@ -358,7 +363,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
                     style={{ background: playerColorById(room, p.id) }}>
                     {p.name.charAt(0)}
                   </div>
-                  <span className="flex-1 text-gray-700">{p.name}{p.id === myId && " (나)"}</span>
+                  <span className="flex-1 text-gray-700">{p.name}{p.id === myId && ` (${text.me})`}</span>
                   <span className="font-black text-lg" style={{ color: v != null ? game.accentColor : "#d1d5db" }}>
                     {v ?? "?"}
                   </span>
@@ -385,6 +390,8 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
     state.revealedIds.includes(card.id) || state.takenIds.includes(card.id);
   const isTaken = (card: MemoryCard) => state.takenIds.includes(card.id);
   const findPair = (pid: string) => state.pairs.find((p) => p.id === pid);
+  const questionOf = (pair?: QAPair) => getLocalizedText(pair?.questionText, locale, pair?.question ?? "?");
+  const answerOf = (pair?: QAPair) => getLocalizedText(pair?.answerText, locale, pair?.answer ?? "!");
 
   const cfg = MEMORY_DIFFICULTY[state.difficulty];
   const cols = cfg.pairs <= 6 ? 3 : cfg.pairs <= 10 ? 5 : 5; // 그리드 컬럼 수
@@ -392,16 +399,16 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
       <RoomHeader game={game} room={room}
-        subtitle={`남은 카드 ${remaining}장 · ${cfg.label}`}
+        subtitle={`${text.remainingCards(remaining)} · ${getMemoryDifficultyLabel(locale, state.difficulty)}`}
         onLeave={onLeave} />
 
       {/* 차례 표시 + 점수 */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-sm font-bold text-gray-700">
-            {isMyTurn ? "🙋 내 차례!" : `⏳ ${turnPlayer?.name}의 차례`}
-            {lastIsMatch && <span className="ml-2 text-green-600 text-xs">✨ 짝 성공! 한 번 더!</span>}
-            {lastIsMiss && <span className="ml-2 text-orange-600 text-xs">아쉬워요... 다음 차례로</span>}
+            {isMyTurn ? (locale === "en" ? "🙋 My turn!" : "🙋 내 차례!") : `⏳ ${text.turnOf(turnPlayer?.name ?? "")}`}
+            {lastIsMatch && <span className="ml-2 text-green-600 text-xs">{locale === "en" ? "✨ Match! One more turn!" : "✨ 짝 성공! 한 번 더!"}</span>}
+            {lastIsMiss && <span className="ml-2 text-orange-600 text-xs">{locale === "en" ? "Not a match. Next turn" : "아쉬워요... 다음 차례로"}</span>}
           </p>
         </div>
         {/* 스코어 미니바 */}
@@ -425,7 +432,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
 
       {/* 질문 카드 (파란색) */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
-        <p className="text-xs font-black text-blue-600 mb-2">💧 질문 카드 (파란색)</p>
+        <p className="text-xs font-black text-blue-600 mb-2">{text.questionCard}</p>
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {state.qCards.map((c) => {
             const flipped = isFlipped(c);
@@ -444,7 +451,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
                   cursor: !isMyTurn || flipped ? "default" : "pointer",
                 }}>
                 {flipped ? (
-                  <span className="text-[10px] leading-tight">{pair?.question ?? "?"}</span>
+                  <span className="text-[10px] leading-tight">{questionOf(pair)}</span>
                 ) : (
                   <span className="text-3xl">❓</span>
                 )}
@@ -456,7 +463,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
 
       {/* 대답 카드 (노란색) */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
-        <p className="text-xs font-black text-amber-600 mb-2">⭐ 대답 카드 (노란색)</p>
+        <p className="text-xs font-black text-amber-600 mb-2">{text.answerCard}</p>
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {state.aCards.map((c) => {
             const flipped = isFlipped(c);
@@ -479,7 +486,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
                   cursor: !isMyTurn || flipped ? "default" : "pointer",
                 }}>
                 {flipped ? (
-                  <span className="text-[10px] leading-tight">{pair?.answer ?? "!"}</span>
+                  <span className="text-[10px] leading-tight">{answerOf(pair)}</span>
                 ) : (
                   <span className="text-3xl">❗</span>
                 )}
@@ -492,9 +499,9 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
       {/* 안내 */}
       {isMyTurn && (
         <p className="text-xs text-center text-gray-500">
-          {state.revealedIds.length === 0 && "💧 파란색(질문) 카드 1장을 골라요"}
-          {state.revealedIds.length === 1 && "⭐ 노란색(대답) 카드 1장을 골라 짝을 맞춰요"}
-          {state.revealedIds.length === 2 && lastIsMiss && "❌ 짝이 아니에요. 잠시 후 다시 뒤집혀요..."}
+          {state.revealedIds.length === 0 && text.pickQuestionCard}
+          {state.revealedIds.length === 1 && text.pickAnswerCard}
+          {state.revealedIds.length === 2 && lastIsMiss && (locale === "en" ? "❌ Not a match. Cards will flip back soon..." : "❌ 짝이 아니에요. 잠시 후 다시 뒤집혀요...")}
         </p>
       )}
 
@@ -502,7 +509,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
       {isHost && (
         <Button variant="outline" className="w-full rounded-xl text-gray-500"
           onClick={() => onAction("update-state", { patch: { phase: "done" }, status: "ended" })}>
-          🏁 게임 마치기
+          {text.finishGame}
         </Button>
       )}
     </div>

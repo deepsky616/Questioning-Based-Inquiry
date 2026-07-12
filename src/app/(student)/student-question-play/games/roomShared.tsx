@@ -1,6 +1,8 @@
 "use client";
 
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import { useLocale } from "next-intl";
+import { getQuestionGameText } from "@/lib/question-game-i18n";
 
 export const PLAYER_COLORS = [
   "#F97316", "#3B82F6", "#10B981", "#8B5CF6",
@@ -23,21 +25,23 @@ export function RoomHeader({
   subtitle?: string;
   onLeave: () => void;
 }) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
   return (
     <div className="flex items-center gap-3">
-      <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">← 나가기</button>
+      <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">{text.leave}</button>
       <div className="flex-1 rounded-2xl py-3 px-5 text-white flex items-center justify-between"
         style={{ background: game.gradientCss }}>
         <div className="flex items-center gap-3">
           <span className="text-3xl">{game.emoji}</span>
           <div>
             <p className="font-black">{game.title}</p>
-            <p className="text-white/80 text-xs">{subtitle ?? `방 ${room.code}`}</p>
+            <p className="text-white/80 text-xs">{subtitle ?? (locale === "en" ? `Room ${room.code}` : `방 ${room.code}`)}</p>
           </div>
         </div>
         <div className="text-white/90 text-right">
-          <p className="text-lg font-black">{room.players.length}명</p>
-          <p className="text-xs opacity-80">참여 중</p>
+          <p className="text-lg font-black">{room.players.length}</p>
+          <p className="text-xs opacity-80">{text.inProgress}</p>
         </div>
       </div>
     </div>
@@ -53,6 +57,7 @@ export function TurnBar({
   myId: string;
   currentId?: string;
 }) {
+  const text = getQuestionGameText(useLocale());
   return (
     <div className="flex gap-2 flex-wrap">
       {room.players.map((p) => {
@@ -64,7 +69,7 @@ export function TurnBar({
               background: isCurrent ? playerColorById(room, p.id) : "#f3f4f6",
               color: isCurrent ? "white" : "#9ca3af",
             }}>
-            {p.name}{p.id === myId ? " (나)" : ""} {isCurrent && "🎮"}
+            {p.name}{p.id === myId ? ` (${text.me})` : ""} {isCurrent && "🎮"}
           </div>
         );
       })}

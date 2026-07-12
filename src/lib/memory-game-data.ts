@@ -3,10 +3,14 @@
  * AI가 페어 생성에 실패할 때 사용.
  */
 
+import type { LocalizedText } from "@/lib/question-game-i18n";
+
 export interface QAPair {
   id: string;
   question: string;
   answer: string;
+  questionText?: LocalizedText;
+  answerText?: LocalizedText;
 }
 
 export const MEMORY_FALLBACK_PAIRS: ReadonlyArray<{ question: string; answer: string }> = [
@@ -30,6 +34,29 @@ export const MEMORY_FALLBACK_PAIRS: ReadonlyArray<{ question: string; answer: st
   { question: "사람은 왜 음식이 필요할까?", answer: "음식에서 힘과 영양을 얻어 자라기 때문이에요." },
   { question: "왜 신호등은 빨간색일까?", answer: "빨간색이 멀리서도 잘 보여서 '멈춰'라는 뜻을 알리기 좋아요." },
   { question: "왜 친구가 필요할까?", answer: "함께 놀고 도와주며 마음을 나눌 수 있어요." },
+];
+
+export const MEMORY_FALLBACK_PAIRS_EN: ReadonlyArray<{ question: string; answer: string }> = [
+  { question: "Why is the sky blue?", answer: "Sunlight scatters in the air, and blue light spreads out the most." },
+  { question: "How is rain made?", answer: "Water vapor cools, gathers into drops, and falls as rain." },
+  { question: "Why do we need sleep?", answer: "Our body and brain rest, recover, and grow while we sleep." },
+  { question: "How does Earth move?", answer: "Earth spins each day and travels around the sun each year." },
+  { question: "How does a seed grow?", answer: "It uses water, sunlight, and nutrients from soil to grow slowly." },
+  { question: "Why do rainbows appear?", answer: "Sunlight bends through raindrops and separates into colors." },
+  { question: "Why does the moon change shape?", answer: "We see different sunlit parts of the moon as it moves around Earth." },
+  { question: "Why is the ocean salty?", answer: "Minerals and salts from rocks travel through rivers into the ocean." },
+  { question: "Why do bees visit flowers?", answer: "They collect nectar for food and help flowers make seeds." },
+  { question: "Why is the North Pole so cold?", answer: "Sunlight reaches it at a low angle, so it warms the area less." },
+  { question: "Why should we wash our hands?", answer: "Washing removes tiny germs and helps prevent sickness." },
+  { question: "Why do stars twinkle?", answer: "Starlight shakes a little as it passes through Earth's moving air." },
+  { question: "Why did dinosaurs disappear?", answer: "A huge space rock likely changed Earth's environment very quickly." },
+  { question: "Why does wind blow?", answer: "Air moves from one place to another when temperatures and pressure change." },
+  { question: "Why do cats purr?", answer: "Cats often purr when they feel calm, happy, or safe." },
+  { question: "Why does ice take more space than water?", answer: "Water molecules spread into a wider pattern when they freeze." },
+  { question: "Why is reading helpful?", answer: "Reading helps us learn new ideas and grow our imagination." },
+  { question: "Why do people need food?", answer: "Food gives our bodies energy and nutrients to grow and move." },
+  { question: "Why are stop lights red?", answer: "Red is easy to notice from far away and means stop." },
+  { question: "Why do we need friends?", answer: "Friends help us share feelings, play together, and support each other." },
 ];
 
 /** 카드 수 → 쌍 수 */
@@ -69,11 +96,27 @@ export function shuffle<T>(a: T[]): T[] {
   return c;
 }
 
-export function pickFallbackPairs(n: number): QAPair[] {
-  const shuffled = shuffle([...MEMORY_FALLBACK_PAIRS]);
+export function pickFallbackPairs(n: number, locale = "ko"): QAPair[] {
+  const source = locale === "en" ? MEMORY_FALLBACK_PAIRS_EN : MEMORY_FALLBACK_PAIRS;
+  const shuffled = shuffle([...source]);
   return shuffled.slice(0, n).map((p, idx) => ({
     id: `p${idx}`, question: p.question, answer: p.answer,
   }));
+}
+
+export function pickFallbackLocalizedPairs(n: number): QAPair[] {
+  const indices = shuffle(Array.from({ length: MEMORY_FALLBACK_PAIRS.length }, (_, i) => i));
+  return indices.slice(0, n).map((sourceIndex, idx) => {
+    const ko = MEMORY_FALLBACK_PAIRS[sourceIndex];
+    const en = MEMORY_FALLBACK_PAIRS_EN[sourceIndex] ?? MEMORY_FALLBACK_PAIRS_EN[idx % MEMORY_FALLBACK_PAIRS_EN.length];
+    return {
+      id: `p${idx}`,
+      question: ko.question,
+      answer: ko.answer,
+      questionText: { ko: ko.question, en: en.question },
+      answerText: { ko: ko.answer, en: en.answer },
+    };
+  });
 }
 
 export function parseAIPairs(text: string, expected: number): QAPair[] | null {
@@ -89,6 +132,44 @@ export function parseAIPairs(text: string, expected: number): QAPair[] | null {
     if (valid.length < expected) return null;
     return valid.slice(0, expected).map((p, idx) => ({
       id: `p${idx}`, question: p.question.trim(), answer: p.answer.trim(),
+    }));
+  } catch {
+    return null;
+  }
+}
+
+function localizedTextFrom(value: unknown): LocalizedText | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.ko !== "string" || typeof record.en !== "string") return null;
+  const ko = record.ko.trim();
+  const en = record.en.trim();
+  return ko && en ? { ko, en } : null;
+}
+
+export function parseAIBilingualPairs(text: string, expected: number): QAPair[] | null {
+  try {
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) return null;
+    const arr = JSON.parse(match[0]);
+    if (!Array.isArray(arr)) return null;
+    const valid = arr.flatMap((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+      const record = item as Record<string, unknown>;
+      const questionText = localizedTextFrom(record.question);
+      const answerText = localizedTextFrom(record.answer);
+      if (!questionText || !answerText) return [];
+      return [{
+        question: questionText.ko,
+        answer: answerText.ko,
+        questionText,
+        answerText,
+      }];
+    });
+    if (valid.length < expected) return null;
+    return valid.slice(0, expected).map((pair, idx) => ({
+      id: `p${idx}`,
+      ...pair,
     }));
   } catch {
     return null;

@@ -1,6 +1,8 @@
 "use client";
 
 import type { BuiltInGame } from "@/lib/question-games-data";
+import { useLocale } from "next-intl";
+import { getQuestionGameText } from "@/lib/question-game-i18n";
 
 interface GameHeaderProps {
   game: BuiltInGame;
@@ -9,10 +11,11 @@ interface GameHeaderProps {
 }
 
 export function GameHeader({ game, subtitle, onBack }: GameHeaderProps) {
+  const text = getQuestionGameText(useLocale());
   return (
     <div className="game-shared-header flex items-center gap-3">
       <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">
-        ← 목록
+        {text.backToList}
       </button>
       <div
         className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"

@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, WaitingBanner, playerColorById } from "./roomShared";
 import RoomResult from "./RoomResult";
 import { useAIPlay } from "./useAIPlay";
 import {
-  STORY_DICE_LABEL, STORY_DICE_EMOJI, STORY_DICE_COLOR, getWordEmoji,
-  pickFallbackWords, parseAIWords, StoryDiceWords, DiceCategory,
+  STORY_DICE_EMOJI, STORY_DICE_COLOR, getWordEmoji,
+  getStoryDiceWordText, parseAIBilingualWords, pickFallbackBilingualWords, StoryDiceWords, DiceCategory,
 } from "@/lib/story-dice-data";
+import { getQuestionGameText, getStoryDiceCategoryLabel } from "@/lib/question-game-i18n";
 import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 interface ChainItem { type: "story" | "question" | "answer"; text: string; playerId: string; playerName: string }
@@ -31,6 +33,8 @@ function shuffleArr<T>(arr: T[]): T[] { return [...arr].sort(() => Math.random()
 function pickOne<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
 export default function RoomStoryDice({ game, room, myId, actionLoading, onAction, onLeave }: Props) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
   const isHost = room.hostId === myId;
   const state = room.gameState as unknown as StoryDiceState;
   const hasState = state && typeof state.phase === "string";
@@ -65,10 +69,9 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
 
     (async () => {
       // AI로 단어 생성, 실패 시 폴백
-      const res = await ask({ action: "story-dice:words" });
-      const parsed = (res?.parsed as unknown as StoryDiceWords | undefined)
-        ?? (res?.text ? parseAIWords(res.text) : null)
-        ?? pickFallbackWords(8);
+      const res = await ask({ action: "story-dice:words-bilingual", locale: "ko" });
+      const parsed = (res?.text ? parseAIBilingualWords(res.text) : null)
+        ?? pickFallbackBilingualWords(8);
 
       const init: StoryDiceState = {
         phase: "rolling",
@@ -118,7 +121,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
     const trimmed = input.trim();
     if (!trimmed || actionLoading) return;
     const entry: ChainItem = {
-      type: "story", text: trimmed, playerId: myId, playerName: tagger?.name ?? "술래",
+      type: "story", text: trimmed, playerId: myId, playerName: tagger?.name ?? (locale === "en" ? "Storyteller" : "술래"),
     };
     const result = await onAction("update-state", {
       patch: { phase: "qa", chain: [entry] },
@@ -142,7 +145,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
     const trimmed = input.trim();
     if (!trimmed || actionLoading) return;
     const entry: ChainItem = {
-      type: "answer", text: trimmed, playerId: myId, playerName: tagger?.name ?? "술래",
+      type: "answer", text: trimmed, playerId: myId, playerName: tagger?.name ?? (locale === "en" ? "Storyteller" : "술래"),
     };
     const result = await onAction("update-state", {
       patch: {
@@ -165,7 +168,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
       .map((c) => ({ playerId: c.playerId, playerName: c.playerName, question: c.text }));
     return (
       <RoomResult game={game} room={room} myId={myId}
-        scoreLabel="발화 수" scoreUnit="개"
+        scoreLabel={locale === "en" ? "Turns" : "발화 수"} scoreUnit={text.count}
         scores={scores} questions={questions}
         onAction={onAction} onLeave={onLeave} />
     );
@@ -175,8 +178,8 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
   if (!hasState || !state.words) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle="이야기 주사위 준비 중" onLeave={onLeave} />
-        <WaitingBanner text={isHost && aiLoading ? "AI가 주사위 단어를 만드는 중..." : "잠시만 기다려주세요..."} />
+        <RoomHeader game={game} room={room} subtitle={text.storyWordsLoading} onLeave={onLeave} />
+        <WaitingBanner text={isHost && aiLoading ? text.storyAiWords : text.loading} />
       </div>
     );
   }
@@ -184,23 +187,23 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
   return (
     <div className="max-w-lg mx-auto space-y-5">
       <RoomHeader game={game} room={room}
-        subtitle={tagger ? `술래: ${tagger.name}` : ""}
+        subtitle={tagger ? `${locale === "en" ? "Storyteller" : "술래"}: ${tagger.name}` : ""}
         onLeave={onLeave} />
 
       {/* 주사위 단어 풀 (한 번 정해지면 끝까지) */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <h3 className="text-xs font-black text-gray-600">🎲 주사위 단어 (게임 끝까지 유지)</h3>
+        <h3 className="text-xs font-black text-gray-600">{text.storyWordPool}</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {(["protagonist", "place", "event"] as DiceCategory[]).map((cat) => (
             <div key={cat} className="rounded-xl p-2 border"
               style={{ borderColor: STORY_DICE_COLOR[cat] + "40", background: STORY_DICE_COLOR[cat] + "08" }}>
               <p className="text-xs font-bold text-center mb-1" style={{ color: STORY_DICE_COLOR[cat] }}>
-                {STORY_DICE_EMOJI[cat]} {STORY_DICE_LABEL[cat]}
+                {STORY_DICE_EMOJI[cat]} {getStoryDiceCategoryLabel(locale, cat)}
               </p>
               <div className="flex flex-wrap gap-1 justify-center">
                 {state.words![cat].map((w) => (
                   <span key={w} className="text-[11px] bg-white border border-gray-200 rounded-full px-2 py-0.5 text-gray-600">
-                    {getWordEmoji(w, cat, state.words?.emojis)} {w}
+                    {getWordEmoji(w, cat, state.words?.emojis)} {getStoryDiceWordText(state.words, w, locale)}
                   </span>
                 ))}
               </div>
@@ -217,7 +220,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
             return (
               <div key={cat} className="text-center">
                 <p className="text-xs font-bold mb-1" style={{ color: STORY_DICE_COLOR[cat] }}>
-                  {STORY_DICE_EMOJI[cat]} {STORY_DICE_LABEL[cat]}
+                  {STORY_DICE_EMOJI[cat]} {getStoryDiceCategoryLabel(locale, cat)}
                 </p>
                 <div
                   className="rounded-2xl py-3 text-white shadow-md flex flex-col items-center gap-0.5"
@@ -229,7 +232,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
                   <span className="text-3xl leading-none">
                     {value === "?" ? "🎲" : getWordEmoji(value, cat, state.words?.emojis)}
                   </span>
-                  <span className="text-lg font-black">{value}</span>
+                  <span className="text-lg font-black">{getStoryDiceWordText(state.words, value, locale)}</span>
                 </div>
               </div>
             );
@@ -241,16 +244,16 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
       {state.phase === "rolling" && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3 text-center">
           <p className="text-sm font-bold text-gray-700">
-            🎲 술래({tagger?.name})가 주사위 3개를 굴려요!
+            {locale === "en" ? `🎲 Storyteller (${tagger?.name}) rolls 3 dice!` : `🎲 술래(${tagger?.name})가 주사위 3개를 굴려요!`}
           </p>
           {amTagger ? (
             <Button className="w-full py-4 text-lg font-black text-white rounded-2xl"
               style={{ background: "linear-gradient(135deg, #FB923C, #EF4444)" }}
               onClick={rollDice} disabled={!!rolling || actionLoading}>
-              {rolling ? "굴리는 중..." : "🎲 주사위 굴리기!"}
+              {rolling ? text.diceRolling : text.diceRoll}
             </Button>
           ) : (
-            <WaitingBanner text={`${tagger?.name}님이 주사위를 굴리는 중...`} />
+            <WaitingBanner text={locale === "en" ? `${tagger?.name} is rolling the dice...` : `${tagger?.name}님이 주사위를 굴리는 중...`} />
           )}
         </div>
       )}
@@ -258,18 +261,18 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
       {state.phase === "story" && state.rolled && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
           <p className="text-sm font-bold text-gray-700">
-            ✏️ 술래({tagger?.name})가 세 단어로 이야기 한 문장을 만들어요!
+            {locale === "en" ? `✏️ Storyteller (${tagger?.name}) makes one story sentence with the three words!` : `✏️ 술래(${tagger?.name})가 세 단어로 이야기 한 문장을 만들어요!`}
           </p>
           <p className="text-xs text-gray-500">
-            힌트: <span className="font-bold text-red-500">{state.rolled.protagonist}</span>
-            가/이 <span className="font-bold text-emerald-600">{state.rolled.place}</span>에서
-            <span className="font-bold text-violet-600"> {state.rolled.event}</span>을(를) ...
+            {locale === "en" ? "Hint" : "힌트"}: <span className="font-bold text-red-500">{getStoryDiceWordText(state.words, state.rolled.protagonist, locale)}</span>
+            {locale === "en" ? " at " : "가/이 "}<span className="font-bold text-emerald-600">{getStoryDiceWordText(state.words, state.rolled.place, locale)}</span>
+            {locale === "en" ? " with " : "에서"}<span className="font-bold text-violet-600"> {getStoryDiceWordText(state.words, state.rolled.event, locale)}</span>{locale === "en" ? " ..." : "을(를) ..."}
           </p>
           {amTagger ? (
             <>
               <textarea
                 className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none h-24"
-                placeholder="단어를 모두 사용해 짧은 이야기를 한 문장으로 만들어보세요..."
+                placeholder={text.storyMakeSentence}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 autoFocus />
@@ -277,11 +280,11 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
                 style={{ background: "linear-gradient(135deg, #FB923C, #EF4444)" }}
                 disabled={!input.trim() || actionLoading}
                 onClick={submitStory}>
-                이야기 시작! →
+                {text.storyStart}
               </Button>
             </>
           ) : (
-            <WaitingBanner text={`${tagger?.name}님이 이야기를 만드는 중...`} />
+            <WaitingBanner text={locale === "en" ? `${tagger?.name} is making a story...` : `${tagger?.name}님이 이야기를 만드는 중...`} />
           )}
         </div>
       )}
@@ -304,7 +307,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
                     border: i === state.chain.length - 1 ? `2px solid ${c.type === "story" ? "#f59e0b" : playerColorById(room, c.playerId)}` : "none",
                   }}>
                   <p className="text-[11px] font-bold mb-0.5" style={{ color: playerColorById(room, c.playerId) }}>
-                    {c.playerName} {c.type === "story" ? "(이야기)" : c.type === "question" ? "(질문)" : "(대답)"}
+                    {c.playerName} ({c.type === "story" ? text.story : c.type === "question" ? text.question : text.answer})
                   </p>
                   {c.text}
                 </div>
@@ -319,10 +322,12 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
               color: isMyTurn ? game.accentColor : "#9ca3af",
             }}>
             {isMyTurn
-              ? (nextAction === "question" ? "🙋 내 차례! 이야기에 어울리는 질문을 만들어요" : "💬 내 차례! 학생의 질문에 대답해요")
+              ? (nextAction === "question"
+                ? (locale === "en" ? "🙋 Your turn! Make a question for the story" : "🙋 내 차례! 이야기에 어울리는 질문을 만들어요")
+                : (locale === "en" ? "💬 Your turn! Answer the student's question" : "💬 내 차례! 학생의 질문에 대답해요"))
               : nextAction === "question"
-                ? `⏳ ${currentQuestioner?.name}님이 질문을 만드는 중...`
-                : `⏳ ${tagger?.name}님이 대답하는 중...`}
+                ? (locale === "en" ? `⏳ ${currentQuestioner?.name} is making a question...` : `⏳ ${currentQuestioner?.name}님이 질문을 만드는 중...`)
+                : (locale === "en" ? `⏳ ${tagger?.name} is answering...` : `⏳ ${tagger?.name}님이 대답하는 중...`)}
           </div>
 
           {/* 입력 */}
@@ -332,8 +337,8 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
                 className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none h-20"
                 placeholder={
                   nextAction === "question"
-                    ? "이야기/앞 대답에 어울리는 질문을 만들어보세요..."
-                    : "학생의 질문에 어울리는 대답을 한 문장으로 해보세요..."
+                    ? text.storyQuestionPlaceholder
+                    : text.storyAnswerPlaceholder
                 }
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -345,7 +350,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
                 }}
                 disabled={!input.trim() || actionLoading}
                 onClick={nextAction === "question" ? submitQuestion : submitAnswer}>
-                {nextAction === "question" ? "질문 제출 →" : "대답 제출 →"}
+                {nextAction === "question" ? text.storySubmitQuestion : text.storySubmitAnswer}
               </Button>
             </div>
           ) : null}
@@ -354,7 +359,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
           {isHost && state.chain.length >= 4 && (
             <Button variant="outline" className="w-full rounded-xl text-gray-500"
               onClick={() => void onAction("update-state", { patch: { phase: "done" }, status: "ended" })}>
-              🏁 이야기 마치기
+              {text.storyFinish}
             </Button>
           )}
         </>

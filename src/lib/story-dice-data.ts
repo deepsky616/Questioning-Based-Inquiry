@@ -3,6 +3,8 @@
  * AI가 단어를 생성하지 못할 때 폴백으로 사용.
  */
 
+import type { LocalizedText } from "@/lib/question-game-i18n";
+
 export const STORY_DICE_FALLBACK = {
   protagonist: [
     "로봇", "탐정", "마법사", "발명가", "외계인", "초등학생", "강아지", "해적",
@@ -21,6 +23,24 @@ export const STORY_DICE_FALLBACK = {
   ],
 } as const;
 
+export const STORY_DICE_FALLBACK_EN = {
+  protagonist: [
+    "robot", "detective", "wizard", "inventor", "alien", "student", "puppy", "pirate",
+    "dinosaur", "fairy", "knight", "cat", "scientist", "astronaut", "mermaid", "dragon",
+    "turtle", "lion", "monkey", "ghost", "ninja", "princess", "prince", "giant",
+  ],
+  place: [
+    "school", "forest", "ocean", "space", "amusement park", "deserted island", "cave", "future city",
+    "library", "old castle", "underground world", "above the clouds", "desert", "jungle", "museum", "faraway island",
+    "secret base", "magic school", "giant tree", "time tunnel", "quiet lake", "lava volcano", "haunted house", "North Pole",
+  ],
+  event: [
+    "treasure chest", "secret map", "key", "time machine", "magic book", "letter", "button", "strange sound",
+    "mysterious shadow", "odd box", "glowing stone", "missing clock", "old diary", "invisibility cloak", "singing bird", "mystery mirror",
+    "sudden rainstorm", "strange footprints", "talking doll", "mystery message", "sparkling powder", "sudden light", "old coin", "huge shadow",
+  ],
+} as const;
+
 export type DiceCategory = "protagonist" | "place" | "event";
 
 export interface StoryDiceWords {
@@ -28,6 +48,7 @@ export interface StoryDiceWords {
   place: string[];
   event: string[];
   emojis?: Record<string, string>; // AI가 단어별로 함께 생성한 이모지 (선택)
+  wordText?: Record<string, LocalizedText>;
 }
 
 export const STORY_DICE_LABEL: Record<DiceCategory, string> = {
@@ -49,7 +70,8 @@ export const STORY_DICE_COLOR: Record<DiceCategory, string> = {
 };
 
 /** 폴백 단어 풀에서 카테고리당 N개 랜덤 선택 (중복 없음) */
-export function pickFallbackWords(n = 8): StoryDiceWords {
+export function pickFallbackWords(n = 8, locale = "ko"): StoryDiceWords {
+  const source = locale === "en" ? STORY_DICE_FALLBACK_EN : STORY_DICE_FALLBACK;
   const pick = (arr: readonly string[]) => {
     const copy = [...arr];
     for (let i = copy.length - 1; i > 0; i--) {
@@ -59,9 +81,37 @@ export function pickFallbackWords(n = 8): StoryDiceWords {
     return copy.slice(0, n);
   };
   return {
-    protagonist: pick(STORY_DICE_FALLBACK.protagonist),
-    place: pick(STORY_DICE_FALLBACK.place),
-    event: pick(STORY_DICE_FALLBACK.event),
+    protagonist: pick(source.protagonist),
+    place: pick(source.place),
+    event: pick(source.event),
+  };
+}
+
+export function pickFallbackBilingualWords(n = 8): StoryDiceWords {
+  const pickIndices = (length: number) => {
+    const copy = Array.from({ length }, (_, i) => i);
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy.slice(0, n);
+  };
+  const wordText: Record<string, LocalizedText> = {};
+  const build = (category: DiceCategory) => {
+    const koSource = STORY_DICE_FALLBACK[category];
+    const enSource = STORY_DICE_FALLBACK_EN[category];
+    return pickIndices(koSource.length).map((index) => {
+      const ko = koSource[index];
+      const en = enSource[index] ?? enSource[index % enSource.length];
+      wordText[ko] = { ko, en };
+      return ko;
+    });
+  };
+  return {
+    protagonist: build("protagonist"),
+    place: build("place"),
+    event: build("event"),
+    wordText,
   };
 }
 
@@ -90,6 +140,56 @@ export function parseAIWords(text: string): StoryDiceWords | null {
   } catch {
     return null;
   }
+}
+
+function parseLocalizedWord(value: unknown): LocalizedText | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.ko !== "string" || typeof record.en !== "string") return null;
+  const ko = record.ko.trim();
+  const en = record.en.trim();
+  return ko && en ? { ko, en } : null;
+}
+
+export function parseAIBilingualWords(text: string): StoryDiceWords | null {
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    const obj = JSON.parse(match[0]);
+    const wordText: Record<string, LocalizedText> = {};
+    const readCategory = (category: DiceCategory): string[] | null => {
+      const values = obj[category];
+      if (!Array.isArray(values) || values.length < 6) return null;
+      const keys: string[] = [];
+      for (const value of values.slice(0, 8)) {
+        const localized = parseLocalizedWord(value);
+        if (!localized) return null;
+        wordText[localized.ko] = localized;
+        keys.push(localized.ko);
+      }
+      return keys;
+    };
+    const protagonist = readCategory("protagonist");
+    const place = readCategory("place");
+    const event = readCategory("event");
+    if (!protagonist || !place || !event) return null;
+    const words: StoryDiceWords = { protagonist, place, event, wordText };
+    if (obj.emojis && typeof obj.emojis === "object" && !Array.isArray(obj.emojis)) {
+      const em: Record<string, string> = {};
+      for (const [k, v] of Object.entries(obj.emojis)) {
+        if (typeof v === "string" && v.trim()) em[k.trim()] = v.trim();
+      }
+      if (Object.keys(em).length > 0) words.emojis = em;
+    }
+    return words;
+  } catch {
+    return null;
+  }
+}
+
+export function getStoryDiceWordText(words: StoryDiceWords | null | undefined, word: string, locale: string) {
+  if (locale !== "en") return word;
+  return words?.wordText?.[word]?.en ?? word;
 }
 
 /** 단어 → 이모지 매핑 (폴백 풀 단어 전체를 커버) */

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
+import { useLocale } from "next-intl";
 
 export interface SingleAwardResult {
   awarded: number;
@@ -66,6 +67,7 @@ export function useSingleAward() {
 
 /** 공통 결과 표시 컴포넌트 props용 */
 export function AwardBadge({ result }: { result: SingleAwardResult | null }) {
+  const locale = useLocale();
   if (!result) return null;
   if (result.awarded === 0 && result.dailyLimitReached) {
     return (
@@ -78,13 +80,19 @@ export function AwardBadge({ result }: { result: SingleAwardResult | null }) {
     return (
       <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm text-emerald-700 flex items-center gap-2">
         <span>🏆</span>
-        <span className="font-bold">+{result.awarded}점 적립!</span>
+        <span className="font-bold">
+          {locale === "en" ? `+${result.awarded} points earned!` : `+${result.awarded}점 적립!`}
+        </span>
         {result.cappedByLimit && (
-          <span className="text-xs text-amber-600">(일일 상한 도달)</span>
+          <span className="text-xs text-amber-600">
+            {locale === "en" ? "(daily limit reached)" : "(일일 상한 도달)"}
+          </span>
         )}
         {typeof result.dailyRemaining === "number" && result.dailyRemaining > 0 && (
           <span className="text-xs text-emerald-500 ml-auto">
-            오늘 {result.dailyRemaining}점 더 받을 수 있어요
+            {locale === "en"
+              ? `${result.dailyRemaining} points still available today`
+              : `오늘 ${result.dailyRemaining}점 더 받을 수 있어요`}
           </span>
         )}
       </div>

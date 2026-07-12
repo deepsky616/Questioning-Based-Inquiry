@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { RefreshCw, Share2 } from "lucide-react";
+import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, playerColorById } from "./roomShared";
 import { GameResultReview } from "./GameResultReview";
 import { AI_BONUS_TYPES, BonusKey, SYSTEM_BONUS, BASE_POINTS } from "@/lib/points-policy";
+import { getQuestionGameText } from "@/lib/question-game-i18n";
 import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 export interface ScoreEntry { playerId: string; name: string; score: number }
@@ -80,6 +82,8 @@ interface Props {
 export default function RoomResult({
   game, room, myId, scoreLabel, scoreUnit, scores, questions, onAction, onLeave,
 }: Props) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
   const isHost = room.hostId === myId;
   const lifetimeKey = lifetimeKeyOf(room);
   const currentLifetimeRef = useRef(lifetimeKey);
@@ -149,7 +153,7 @@ export default function RoomResult({
       if (!shared.ok) {
         setShareErrorState({
           lifetimeKey: requestLifetimeKey,
-          message: "결과를 방에 공유하지 못했어요.",
+          message: text.shareFailed,
         });
       }
     } catch {
@@ -159,7 +163,7 @@ export default function RoomResult({
       ) {
         setShareErrorState({
           lifetimeKey: requestLifetimeKey,
-          message: "결과를 방에 공유하지 못했어요.",
+          message: text.shareFailed,
         });
       }
     }
@@ -204,7 +208,7 @@ export default function RoomResult({
       });
       const value: unknown = await response.json().catch(() => null);
       if (!response.ok || !isAwardResponse(value)) {
-        throw new Error("포인트 지급 실패");
+        throw new Error(text.awardRequestFailed);
       }
       if (
         !mountedRef.current ||
@@ -223,7 +227,7 @@ export default function RoomResult({
       ) {
         setAwardErrorState({
           lifetimeKey: requestLifetimeKey,
-          message: "포인트를 받지 못했어요.",
+          message: text.awardFailed,
         });
       }
     } finally {
@@ -260,7 +264,7 @@ export default function RoomResult({
 
   return (
     <div className="max-w-lg mx-auto space-y-5">
-      <RoomHeader game={game} room={room} subtitle="게임 종료!" onLeave={onLeave} />
+      <RoomHeader game={game} room={room} subtitle={text.gameEnded} onLeave={onLeave} />
 
       {/* 우승자 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-3">
@@ -268,7 +272,7 @@ export default function RoomResult({
         {winnersSet.size > 0 ? (
           <>
             <h2 className="text-2xl font-black text-gray-800">
-              {winnersSet.size === 1 ? "우승!" : "공동 우승!"}
+              {winnersSet.size === 1 ? text.winner : text.jointWinner}
             </h2>
             <div className="flex flex-wrap justify-center gap-2">
               {sorted.filter((s) => winnersSet.has(s.playerId)).map((w) => (
@@ -282,13 +286,13 @@ export default function RoomResult({
             <p className="text-gray-400 text-sm">{topScore}{scoreUnit} {scoreLabel}</p>
           </>
         ) : (
-          <h2 className="text-xl font-black text-gray-600">모두 수고했어요!</h2>
+          <h2 className="text-xl font-black text-gray-600">{text.everyoneDidWell}</h2>
         )}
       </div>
 
       {/* 점수판 (게임 내 활동) */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-2">
-        <h3 className="font-black text-gray-700 mb-1">📊 게임 점수표</h3>
+        <h3 className="font-black text-gray-700 mb-1">{text.scoreboard}</h3>
         {sorted.map((s, i) => {
           const isWinner = winnersSet.has(s.playerId);
           return (
@@ -301,7 +305,7 @@ export default function RoomResult({
                 {s.name.charAt(0)}
               </div>
               <span className="font-bold text-gray-800 flex-1">
-                {s.name}{s.playerId === myId && <span className="text-xs text-gray-400 ml-1">(나)</span>}
+                {s.name}{s.playerId === myId && <span className="text-xs text-gray-400 ml-1">({text.me})</span>}
               </span>
               <span className="font-black" style={{ color: game.accentColor }}>
                 {s.score}{scoreUnit}
@@ -314,13 +318,13 @@ export default function RoomResult({
       {/* 포인트 분석 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
         <h3 className="font-black text-gray-700 flex items-center gap-2">
-          🤖 AI 포인트 분석
+          {text.pointAnalysis}
         </h3>
 
         {!award && awarding && (
           <div className="flex items-center gap-3 text-gray-500 text-sm py-4">
             <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-            AI가 게임을 분석하고 포인트를 나눠주는 중...
+            {text.analyzingPoints}
           </div>
         )}
 
@@ -336,14 +340,14 @@ export default function RoomResult({
               onClick={() => void requestAward()}
             >
               <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              포인트 다시 받기
+              {text.retryPoints}
             </Button>
           </div>
         )}
 
         {!award && !awarding && !isHost && (
           <p className="text-gray-400 text-sm text-center py-4">
-            방장 화면에서 AI 분석이 진행 중이에요...
+            {text.waitingPointAnalysis}
           </p>
         )}
 
@@ -371,7 +375,7 @@ export default function RoomResult({
                   )}
                 >
                   <Share2 className="h-4 w-4" aria-hidden="true" />
-                  결과 다시 공유
+                  {text.shareResultAgain}
                 </Button>
               </div>
             )}
@@ -392,10 +396,10 @@ export default function RoomResult({
                         {s.name.charAt(0)}
                       </div>
                       <span className="font-bold text-gray-800 flex-1 text-sm">
-                        {s.name}{s.playerId === myId && <span className="text-xs text-gray-400 ml-1">(나)</span>}
+                        {s.name}{s.playerId === myId && <span className="text-xs text-gray-400 ml-1">({text.me})</span>}
                       </span>
                       <span className="font-black text-base" style={{ color: game.accentColor }}>
-                        +{pts}점
+                        +{pts}{locale === "en" ? " pts" : "점"}
                       </span>
                     </div>
                     {aiBonuses.length > 0 && (
@@ -421,7 +425,7 @@ export default function RoomResult({
             {bestQ && (
               <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl p-4 space-y-2">
                 <p className="text-yellow-600 font-black text-sm flex items-center gap-1">
-                  🏆 베스트 질문
+                  {text.bestQuestion}
                 </p>
                 <p className="text-gray-800 font-bold">&ldquo;{bestQ.question}&rdquo;</p>
                 <p className="text-gray-500 text-xs">💬 {bestQ.reason}</p>
@@ -429,8 +433,9 @@ export default function RoomResult({
             )}
 
             <p className="text-xs text-gray-400 text-center pt-1">
-              기본 점수: 참여 {BASE_POINTS.PARTICIPATION}점, 유효 질문당 {BASE_POINTS.PER_VALID_QUESTION}점,
-              완료 {BASE_POINTS.COMPLETION}점, 우승 {BASE_POINTS.WINNER_BONUS}점
+              {text.pointBase}: {text.participation} {BASE_POINTS.PARTICIPATION},
+              {text.perValidQuestion} {BASE_POINTS.PER_VALID_QUESTION},
+              {text.completion} {BASE_POINTS.COMPLETION}, {text.winnerBonus} {BASE_POINTS.WINNER_BONUS}
             </p>
           </>
         )}
@@ -438,7 +443,7 @@ export default function RoomResult({
 
       {/* 우리가 만든 질문 정리 */}
       <GameResultReview
-        title="📋 우리가 만든 질문"
+        title={text.madeQuestions}
         accentColor={game.accentColor}
         entries={questions.map((q) => ({ q: `${q.playerName} · ${q.question}` }))}
       />
@@ -448,10 +453,10 @@ export default function RoomResult({
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
           onClick={() => void onAction("restart")}>
-          🔄 대기실로 돌아가기
+          {text.returnLobby}
         </Button>
       ) : (
-        <p className="text-center text-gray-400 text-sm">방장이 다음 게임을 준비하고 있어요...</p>
+        <p className="text-center text-gray-400 text-sm">{text.waitingHost}</p>
       )}
     </div>
   );

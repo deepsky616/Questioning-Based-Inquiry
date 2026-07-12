@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { GameHeader } from "./GameHeader";
 import { useAIPlay } from "./useAIPlay";
@@ -10,6 +11,7 @@ import {
   MEMORY_DIFFICULTY, MemoryDifficulty, QAPair,
   pickFallbackPairs, parseAIPairs, shuffle,
 } from "@/lib/memory-game-data";
+import { getMemoryDifficultyLabel, getQuestionGameText } from "@/lib/question-game-i18n";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -26,15 +28,17 @@ const AI_NAME = "🤖 AI";
 const AI_THINK_MS = 1200;
 
 export default function MemoryGame({ game, onBack, config }: Props) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
   const { mode } = config;
   const isAI = mode === "ai";
   const isSolo = mode === "solo";
 
   // 참가자 구성
   const playersList = (() => {
-    if (isSolo) return [config.players[0]?.trim() || "나"];
-    if (isAI) return [config.players[0]?.trim() || "나", AI_NAME];
-    return config.players.length > 0 ? config.players : ["나"];
+    if (isSolo) return [config.players[0]?.trim() || text.me];
+    if (isAI) return [config.players[0]?.trim() || text.me, AI_NAME];
+    return config.players.length > 0 ? config.players : [text.me];
   })();
   const hasOpponents = playersList.length > 1;
 
@@ -78,7 +82,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  const currentPlayer = playersList[turnIdx % playersList.length] ?? "나";
+  const currentPlayer = playersList[turnIdx % playersList.length] ?? text.me;
   const isAITurn = isAI && currentPlayer === AI_NAME;
   const isHumanTurn = !isAITurn;
 
@@ -90,7 +94,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     const res = await ask({ action: "memory:pairs", context: { count: String(cfg.pairs) } });
     let p: QAPair[] | null = null;
     if (res?.text) p = parseAIPairs(res.text, cfg.pairs);
-    if (!p) p = pickFallbackPairs(cfg.pairs);
+    if (!p) p = pickFallbackPairs(cfg.pairs, locale);
 
     const q: Card[] = p.map((pp, i) => ({ id: `q-${i}`, pairId: pp.id, type: "q" }));
     const a: Card[] = p.map((pp, i) => ({ id: `a-${i}`, pairId: pp.id, type: "a" }));
@@ -222,13 +226,13 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     const winners = sorted.filter(([, s]) => s === topScore && topScore > 0);
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <GameHeader game={game} subtitle="완성!" onBack={onBack} />
+        <GameHeader game={game} subtitle={locale === "en" ? "Complete!" : "완성!"} onBack={onBack} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 flex flex-col items-center gap-3">
           <div className="text-6xl">🏆</div>
-          <h2 className="text-2xl font-black text-gray-800">짝 찾기 완성!</h2>
+          <h2 className="text-2xl font-black text-gray-800">{text.memoryDone}</h2>
           {hasOpponents && winners.length > 0 ? (
             <>
-              <p className="text-gray-500 text-sm">{winners.length === 1 ? "우승" : "공동 우승"}</p>
+              <p className="text-gray-500 text-sm">{winners.length === 1 ? text.winner : text.jointWinner}</p>
               <div className="flex flex-wrap gap-2">
                 {winners.map(([name]) => (
                   <span key={name} className="px-3 py-1 rounded-full text-white text-sm font-black"
@@ -239,19 +243,21 @@ export default function MemoryGame({ game, onBack, config }: Props) {
               </div>
             </>
           ) : (
-            <p className="text-gray-500 text-sm">{cfg.label} · {tries}번 시도</p>
+            <p className="text-gray-500 text-sm">{getMemoryDifficultyLabel(locale, difficulty)} · {text.attempts(tries)}</p>
           )}
         </div>
 
         {/* 점수판 */}
         {hasOpponents && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
-            <h3 className="font-black text-gray-700 text-sm mb-1">📊 점수판</h3>
+            <h3 className="font-black text-gray-700 text-sm mb-1">{text.scoreboard}</h3>
             {sorted.map(([name, score], i) => (
               <div key={name} className="flex items-center gap-3 rounded-xl p-3 bg-gray-50">
                 <span className="text-lg w-6 text-center">{["🥇", "🥈", "🥉"][i] ?? `${i + 1}`}</span>
                 <span className="font-bold text-gray-800 flex-1">{name}</span>
-                <span className="font-black" style={{ color: game.accentColor }}>{score}쌍</span>
+                <span className="font-black" style={{ color: game.accentColor }}>
+                  {score}{locale === "en" ? ` ${text.pair}` : text.pair}
+                </span>
               </div>
             ))}
           </div>
@@ -259,7 +265,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
 
         {/* 질문-대답 짝 정리 */}
         <GameResultReview
-          title="📋 오늘의 질문-대답 짝"
+          title={text.memoryPairsTitle}
           accentColor={game.accentColor}
           entries={pairs.map((p) => ({ q: p.question, a: p.answer }))}
           qPrefix="💧"
@@ -272,7 +278,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
           onClick={() => { resetAward(); setPhase("setup"); }}>
-          🔄 다시 하기
+          {text.retry}
         </Button>
       </div>
     );
@@ -283,12 +289,12 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <GameHeader game={game} subtitle={
-          isSolo ? "혼자 모드 — 자유롭게 진행"
-          : isAI ? "AI와 함께 — 점수 경쟁"
-          : `친구 모드 — ${playersList.length}명 차례 진행`
+          isSolo ? text.soloModeSubtitle
+          : isAI ? text.aiModeSubtitle
+          : text.friendModeSubtitle(playersList.length)
         } onBack={onBack} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-          <h2 className="font-black text-gray-800">🎚️ 난이도를 골라요</h2>
+          <h2 className="font-black text-gray-800">{text.memoryChooseDifficulty}</h2>
           {hasOpponents && (
             <div className="flex flex-wrap gap-2">
               {playersList.map((p, i) => (
@@ -304,9 +310,11 @@ export default function MemoryGame({ game, onBack, config }: Props) {
               return (
                 <button key={d} onClick={() => startGame(d)}
                   className="rounded-2xl border-2 border-gray-200 p-4 hover:scale-105 transition-all">
-                  <p className="font-black text-gray-800 text-sm">{cfg.label}</p>
-                  <p className="text-2xl font-black mt-1" style={{ color: game.accentColor }}>{cfg.cards}장</p>
-                  <p className="text-xs text-gray-400">{cfg.pairs}쌍</p>
+                  <p className="font-black text-gray-800 text-sm">{getMemoryDifficultyLabel(locale, d)}</p>
+                  <p className="text-2xl font-black mt-1" style={{ color: game.accentColor }}>
+                    {cfg.cards}{locale === "en" ? ` ${text.card}` : text.card}
+                  </p>
+                  <p className="text-xs text-gray-400">{cfg.pairs}{locale === "en" ? ` ${text.pair}` : text.pair}</p>
                 </button>
               );
             })}
@@ -320,11 +328,11 @@ export default function MemoryGame({ game, onBack, config }: Props) {
   if (phase === "generating") {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <GameHeader game={game} subtitle="카드 만드는 중" onBack={onBack} />
+        <GameHeader game={game} subtitle={text.memoryGeneratingCards} onBack={onBack} />
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
           <div className="text-6xl animate-bounce mb-3">🃏</div>
           <p className="text-gray-600 font-bold text-sm">
-            {aiLoading ? "AI가 질문과 대답 짝을 만드는 중..." : "준비하는 중..."}
+            {aiLoading ? text.memoryAiGenerating : text.preparing}
           </p>
         </div>
       </div>
@@ -340,8 +348,8 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     <div className="max-w-2xl mx-auto space-y-4">
       <GameHeader game={game}
         subtitle={hasOpponents
-          ? `${currentPlayer}의 차례 · 남은 카드 ${remaining}장`
-          : `남은 카드 ${remaining}장 · 시도 ${tries}번`}
+          ? `${text.turnOf(currentPlayer)} · ${text.remainingCards(remaining)}`
+          : `${text.remainingCards(remaining)} · ${text.attempts(tries)}`}
         onBack={onBack} />
 
       {/* 점수판 (멀티/AI 모드) */}
@@ -369,14 +377,14 @@ export default function MemoryGame({ game, onBack, config }: Props) {
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center">
           <div className="flex items-center justify-center gap-2 text-indigo-600">
             <span className="w-4 h-4 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-bold">🤖 AI가 카드를 고르는 중...</p>
+            <p className="text-sm font-bold">{text.aiChoosingCard}</p>
           </div>
         </div>
       )}
 
       {/* 질문 카드 */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
-        <p className="text-xs font-black text-blue-600 mb-2">💧 질문 카드 (파란색)</p>
+        <p className="text-xs font-black text-blue-600 mb-2">{text.questionCard}</p>
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {qCards.map((c) => {
             const flipped = isFlipped(c);
@@ -406,7 +414,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
 
       {/* 대답 카드 */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
-        <p className="text-xs font-black text-amber-600 mb-2">⭐ 대답 카드 (노란색)</p>
+        <p className="text-xs font-black text-amber-600 mb-2">{text.answerCard}</p>
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {aCards.map((c) => {
             const flipped = isFlipped(c);
@@ -435,10 +443,10 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       </div>
 
       <p className="text-xs text-center text-gray-500">
-        {isHumanTurn && revealed.length === 0 && "💧 파란색(질문) 카드 1장을 골라요"}
-        {isHumanTurn && revealed.length === 1 && "⭐ 노란색(대답) 카드 1장을 골라 짝을 맞춰요"}
-        {isHumanTurn && revealed.length === 2 && "✨ 짝 확인 중..."}
-        {isAITurn && revealed.length > 0 && "🤖 AI가 카드를 뒤집고 있어요..."}
+        {isHumanTurn && revealed.length === 0 && text.pickQuestionCard}
+        {isHumanTurn && revealed.length === 1 && text.pickAnswerCard}
+        {isHumanTurn && revealed.length === 2 && text.checkingPair}
+        {isAITurn && revealed.length > 0 && text.aiFlippingCard}
       </p>
     </div>
   );

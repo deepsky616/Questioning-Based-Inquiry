@@ -43,6 +43,113 @@ export interface CustomGame {
 
 export type AnyGame = BuiltInGame | CustomGame;
 
+type BuiltInGameText = Pick<BuiltInGame, "title" | "description" | "playerCount" | "duration" | "instructions">;
+
+const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
+  en: {
+    memory: {
+      title: "Q&A Matching",
+      description: "Find matching pairs of question cards and answer cards in this memory game.",
+      playerCount: "1-6 players",
+      duration: "15-25 min",
+      instructions: [
+        "AI creates blue question cards and yellow answer cards.",
+        "All players roll a die to decide the turn order, highest number first.",
+        "On your turn, flip one question card and one answer card.",
+        "If they match, keep the pair and take one more turn.",
+        "If they do not match, flip them back and pass the turn.",
+        "The player with the most pairs wins when all cards are gone.",
+      ],
+    },
+    "story-dice": {
+      title: "Story Dice",
+      description: "Roll three dice, build a story from the words, and complete it through friends' questions.",
+      playerCount: "2-30 players",
+      duration: "15-25 min",
+      instructions: [
+        "The storyteller rolls three dice for a character, place, and event or object.",
+        "The storyteller makes one story sentence using the three words.",
+        "Other players ask questions that fit the story.",
+        "The storyteller answers, and the next player continues with a new question from that answer.",
+        "Repeat question and answer turns to complete the story together.",
+      ],
+    },
+    dice: {
+      title: "Question Dice",
+      description: "Roll the die and create a question that matches the question type you get.",
+      playerCount: "2-30 players",
+      duration: "10-20 min",
+      instructions: [
+        "Roll the die.",
+        "Each number is a question type: 1=factual, 2=conceptual, 3=debate, 4=imaginative, 5=comparison, 6=free choice.",
+        "Create and share a question of that type within 30 seconds.",
+        "Give points to the most creative question.",
+      ],
+    },
+    ladder: {
+      title: "Question Ladder",
+      description: "Use a ladder draw to match players with topics for question making.",
+      playerCount: "4-20 players",
+      duration: "15-20 min",
+      instructions: [
+        "Draw a ladder. Write player names at the top and question topics at the bottom.",
+        "Each player follows the ladder from their name.",
+        "Create and present a question for the topic you land on.",
+        "Enjoy the unexpected topic combinations together.",
+      ],
+    },
+    relay: {
+      title: "Question Relay",
+      description: "Choose a topic and continue only with connected questions. No answers allowed.",
+      playerCount: "2-30 players",
+      duration: "15-25 min",
+      instructions: [
+        "Choose one topic or word, such as ocean, weather, or space.",
+        "Create the first question related to the topic.",
+        "The next person creates a new question connected to the previous one.",
+        "No answers. Only questions. Repeating the same question is not allowed.",
+      ],
+    },
+    "mystery-box": {
+      title: "Mystery Box",
+      description: "Guess the hidden object in the box by asking questions only.",
+      playerCount: "2-30 players",
+      duration: "20-30 min",
+      instructions: [
+        "Hide an object inside a box.",
+        "Other players may ask only questions that can be answered yes or no.",
+        "Guess the object within 20 questions to succeed.",
+        "Better questions make the object easier to discover.",
+      ],
+    },
+    kaba: {
+      title: "Kaba Game",
+      description: "Turn statements into questions, such as 'The cat sleeps' into 'Does the cat sleep?'",
+      playerCount: "1-30 players",
+      duration: "10-20 min",
+      instructions: [
+        "Read the statement shown by the teacher or screen.",
+        "Change the statement into a question by speaking or writing it.",
+        "Use question endings such as 'does it?', 'is it?', or 'will it?'.",
+        "In AI mode, the AI teacher checks whether your question works well.",
+      ],
+    },
+  },
+};
+
+export function localizeBuiltInGame<T extends BuiltInGame>(game: T, locale: string): T {
+  const text = locale === "en" ? BUILT_IN_GAME_TEXT.en[game.id] : null;
+  return text ? { ...game, ...text } : game;
+}
+
+export function localizeQuestionGame<T extends AnyGame>(game: T, locale: string): T {
+  return game.isBuiltIn ? localizeBuiltInGame(game, locale) as T : game;
+}
+
+export function localizeQuestionGames<T extends AnyGame>(games: T[], locale: string): T[] {
+  return games.map((game) => localizeQuestionGame(game, locale));
+}
+
 /* ── 멀티플레이 방(대기실) 관련 타입 ── */
 export interface RoomPlayer {
   id: string;

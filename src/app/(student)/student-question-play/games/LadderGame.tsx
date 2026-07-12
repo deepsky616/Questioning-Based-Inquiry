@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAIPlay } from "./useAIPlay";
 import { useSingleAward, AwardBadge } from "./useSingleAward";
+import { getQuestionGameText } from "@/lib/question-game-i18n";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -44,11 +46,13 @@ function tracePath(startCol: number, grid: boolean[][]): number[] {
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
 export default function LadderGame({ game, onBack, config }: Props) {
+  const locale = useLocale();
+  const text = getQuestionGameText(locale);
   const { mode } = config;
   const isAI = mode === "ai";
   const isSolo = mode === "solo";
   const AI_NAME = "🤖 AI";
-  const myName = config.players[0]?.trim() || "나";
+  const myName = config.players[0]?.trim() || text.me;
 
   const { ask, loading: aiLoading } = useAIPlay();
   const { award, result: awardResult } = useSingleAward();
@@ -123,8 +127,8 @@ export default function LadderGame({ game, onBack, config }: Props) {
 
   function buildLadder() {
     const n = count;
-    const validNames = names.slice(0, n).map((v, i) => v.trim() || `학생 ${i + 1}`);
-    const validTopics = topics.slice(0, n).map((v, i) => v.trim() || `주제 ${i + 1}`);
+    const validNames = names.slice(0, n).map((v, i) => v.trim() || text.defaultStudent(i + 1));
+    const validTopics = topics.slice(0, n).map((v, i) => v.trim() || text.defaultTopic(i + 1));
     const g = generateLadder(n, ROWS);
     const ps = Array.from({ length: n }, (_, i) => tracePath(i, g));
     const asgn = validNames.map((name, i) => ({
@@ -156,13 +160,13 @@ export default function LadderGame({ game, onBack, config }: Props) {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">← 목록</button>
+        <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>
           <div>
             <h1 className="text-xl font-black">{game.title}</h1>
-            <p className="text-white/80 text-sm">사다리를 타고 질문 주제를 정해요!</p>
+            <p className="text-white/80 text-sm">{text.ladderSubtitle}</p>
           </div>
         </div>
       </div>
@@ -170,7 +174,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
       {phase === "setup" && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
           <div className="flex items-center justify-between">
-            <h2 className="font-black text-gray-800">참가자 수 선택</h2>
+            <h2 className="font-black text-gray-800">{text.playerCountTitle}</h2>
             <div className="flex gap-2">
               {[2,3,4,5,6].map((n) => (
                 <button key={n}
@@ -183,13 +187,13 @@ export default function LadderGame({ game, onBack, config }: Props) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm font-bold text-gray-600 mb-2">👤 참가자 이름</p>
+              <p className="text-sm font-bold text-gray-600 mb-2">{text.playerNames}</p>
               <div className="space-y-2">
                 {Array.from({ length: count }, (_, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0"
                       style={{ background: COLORS[i] }}>{i+1}</div>
-                    <Input placeholder={`학생 ${i+1}`} value={names[i] ?? ""}
+                    <Input placeholder={text.defaultStudent(i + 1)} value={names[i] ?? ""}
                       onChange={(e) => {
                         const n2 = [...names]; n2[i] = e.target.value; setNames(n2);
                       }} className="h-8 text-sm rounded-lg" />
@@ -198,14 +202,14 @@ export default function LadderGame({ game, onBack, config }: Props) {
               </div>
             </div>
             <div>
-              <p className="text-sm font-bold text-gray-600 mb-2">📌 질문 주제</p>
+              <p className="text-sm font-bold text-gray-600 mb-2">{text.questionTopics}</p>
               <div className="space-y-2">
                 {Array.from({ length: count }, (_, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-600 text-xs flex items-center justify-center font-bold flex-shrink-0">
                       {String.fromCharCode(65 + i)}
                     </div>
-                    <Input placeholder={`주제 ${String.fromCharCode(65+i)}`} value={topics[i] ?? ""}
+                    <Input placeholder={text.defaultTopic(String.fromCharCode(65+i))} value={topics[i] ?? ""}
                       onChange={(e) => {
                         const t2 = [...topics]; t2[i] = e.target.value; setTopics(t2);
                       }} className="h-8 text-sm rounded-lg" />
@@ -218,7 +222,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
           <Button className="w-full py-4 font-black text-white rounded-xl text-lg"
             style={{ background: game.gradientCss }}
             onClick={buildLadder}>
-            🪜 사다리 그리기!
+            {text.drawLadder}
           </Button>
         </div>
       )}
@@ -232,14 +236,14 @@ export default function LadderGame({ game, onBack, config }: Props) {
               {Array.from({ length: count }, (_, i) => (
                 <text key={i} x={colX(i)} y={36} textAnchor="middle"
                   fontSize="13" fontWeight="bold" fill={COLORS[i]}>
-                  {names[i]?.trim() || `학생${i+1}`}
+                  {names[i]?.trim() || text.defaultStudentTight(i + 1)}
                 </text>
               ))}
               {/* 주제 (하단) */}
               {Array.from({ length: count }, (_, i) => (
                 <text key={i} x={colX(i)} y={SVG_H - 10} textAnchor="middle"
                   fontSize="12" fontWeight="bold" fill="#6b7280">
-                  {topics[i]?.trim() || `주제${String.fromCharCode(65+i)}`}
+                  {topics[i]?.trim() || text.defaultTopicTight(String.fromCharCode(65+i))}
                 </text>
               ))}
 
@@ -302,14 +306,14 @@ export default function LadderGame({ game, onBack, config }: Props) {
           {/* 참가자 선택 버튼 */}
           {phase === "reveal" && (
             <div className="space-y-3">
-              <p className="text-sm font-medium text-gray-600 text-center">사다리를 탈 친구를 선택하세요</p>
+              <p className="text-sm font-medium text-gray-600 text-center">{text.chooseLadderPlayer}</p>
               <div className="grid grid-cols-3 gap-2">
                 {Array.from({ length: count }, (_, i) => (
                   <button key={i}
                     className="py-3 rounded-xl font-bold text-white text-sm transition-all hover:opacity-90 hover:scale-105"
                     style={{ background: COLORS[i] }}
                     onClick={() => setRevealedIdx(i)}>
-                    {names[i]?.trim() || `학생 ${i+1}`}
+                    {names[i]?.trim() || text.defaultStudent(i + 1)}
                   </button>
                 ))}
               </div>
@@ -318,8 +322,8 @@ export default function LadderGame({ game, onBack, config }: Props) {
                   style={{ borderColor: COLORS[revealedIdx] }}>
                   <p className="text-sm text-gray-500 mb-1">
                     <span className="font-bold" style={{ color: COLORS[revealedIdx] }}>
-                      {names[revealedIdx]?.trim() || `학생 ${revealedIdx+1}`}
-                    </span> 의 주제
+                      {text.playerTopic(names[revealedIdx]?.trim() || text.defaultStudent(revealedIdx + 1))}
+                    </span>
                   </p>
                   <p className="text-xl font-black text-gray-800">
                     {assignments[revealedIdx]?.topic}
@@ -329,7 +333,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
               <Button className="w-full py-4 font-black text-white rounded-xl"
                 style={{ background: game.gradientCss }}
                 onClick={() => setPhase("result")}>
-                🎉 전체 결과 공개!
+                {text.revealAll}
               </Button>
             </div>
           )}
@@ -349,7 +353,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
                         {names[i]?.trim().charAt(0) || (i+1)}
                       </div>
                       <div className="flex-1">
-                        <p className="font-bold text-gray-800">{names[i]?.trim() || `학생 ${i+1}`}</p>
+                        <p className="font-bold text-gray-800">{names[i]?.trim() || text.defaultStudent(i + 1)}</p>
                         <p className="text-sm" style={{ color: COLORS[i] }}>📌 {a.topic}</p>
                       </div>
                     </div>
@@ -357,13 +361,13 @@ export default function LadderGame({ game, onBack, config }: Props) {
                       <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-sm">
                         {aiQ ? (
                           <>
-                            <p className="text-xs font-bold text-indigo-600 mb-0.5">🤖 AI 친구의 질문</p>
+                            <p className="text-xs font-bold text-indigo-600 mb-0.5">{text.aiFriendQuestion}</p>
                             <p className="text-gray-700">{aiQ}</p>
                           </>
                         ) : aiLoading ? (
                           <div className="flex items-center gap-2 text-indigo-500">
                             <span className="w-3 h-3 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
-                            <span className="text-xs">AI 친구가 질문을 만드는 중...</span>
+                            <span className="text-xs">{text.aiFriendThinking}</span>
                           </div>
                         ) : null}
                       </div>
@@ -374,11 +378,11 @@ export default function LadderGame({ game, onBack, config }: Props) {
               <AwardBadge result={awardResult} />
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" className="flex-1 rounded-xl" onClick={() => { setPhase("reveal"); setRevealedIdx(-1); }}>
-                  사다리 다시 보기
+                  {text.viewLadderAgain}
                 </Button>
                 <Button className="flex-1 font-bold text-white rounded-xl" style={{ background: game.gradientCss }}
                   onClick={() => setPhase("setup")}>
-                  🔄 새로 하기
+                  {text.newGame}
                 </Button>
               </div>
             </div>

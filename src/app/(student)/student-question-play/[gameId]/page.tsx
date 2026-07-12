@@ -1,9 +1,10 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { BUILT_IN_GAMES } from "@/lib/question-games-data";
+import { useLocale, useTranslations } from "next-intl";
+import { BUILT_IN_GAMES, localizeBuiltInGame } from "@/lib/question-games-data";
 import MemoryGame from "../games/MemoryGame";
 import StoryDiceGame from "../games/StoryDiceGame";
 import DiceGame from "../games/DiceGame";
@@ -67,23 +68,15 @@ const ROOM_GAME_MAP: Record<string, RoomGameComponent> = {
 
 export default function GamePage({ params }: { params: Promise<{ gameId: string }> }) {
   const { gameId } = use(params);
-
-  // 질문놀이 게임 화면은 알록달록한 밝은 디자인(인라인 색 다수)이라,
-  // 다크 테마에서 글씨가 안 보이는 문제를 막기 위해 플레이 동안 라이트 모드로 고정한다.
-  useEffect(() => {
-    const html = document.documentElement;
-    const wasDark = html.classList.contains("dark");
-    if (wasDark) html.classList.remove("dark");
-    return () => {
-      if (wasDark) html.classList.add("dark");
-    };
-  }, []);
+  const t = useTranslations("gamePlay");
+  const locale = useLocale();
 
   const router = useRouter();
   const { data: session } = useSession();
   const myId = (session?.user as { id?: string } | undefined)?.id ?? "";
 
-  const game = BUILT_IN_GAMES.find((g) => g.id === gameId);
+  const baseGame = BUILT_IN_GAMES.find((g) => g.id === gameId);
+  const game = baseGame ? localizeBuiltInGame(baseGame, locale) : undefined;
   const GameComponent = GAME_MAP[gameId];
 
   const [mode, setMode] = useState<GameMode>("solo");
@@ -99,8 +92,8 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
 
   function startSoloOrAI() {
     const players = mode === "ai"
-      ? [playerName.trim() || "나", "🤖 AI"]
-      : [playerName.trim() || "나"];
+      ? [playerName.trim() || t("defaultPlayer"), "🤖 AI"]
+      : [playerName.trim() || t("defaultPlayer")];
     setStartConfig({ mode, players });
   }
 
@@ -124,11 +117,11 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
     return (
       <div className="flex flex-col items-center justify-center py-32 gap-4">
         <div className="text-6xl">😢</div>
-        <p className="text-muted-foreground text-lg font-medium">게임을 찾을 수 없어요</p>
+        <p className="text-muted-foreground text-lg font-medium">{t("notFound")}</p>
         <button className="mt-2 text-sm text-white px-5 py-2.5 rounded-xl font-bold"
           style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
           onClick={handleBack}>
-          ← 목록으로
+          {t("backToList")}
         </button>
       </div>
     );
@@ -198,13 +191,13 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
     return (
       <div className="max-w-lg mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => setRoomStep(null)} className="text-muted-foreground hover:text-gray-600 text-sm">← 뒤로</button>
+          <button onClick={() => setRoomStep(null)} className="text-muted-foreground hover:text-gray-600 text-sm">{t("back")}</button>
           <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
             style={{ background: game.gradientCss }}>
-            <span className="text-4xl">{game.emoji}</span>
+              <span className="text-4xl">{game.emoji}</span>
             <div>
               <h1 className="text-xl font-black">{game.title}</h1>
-              <p className="text-white/80 text-sm">친구와 함께 놀아요! 👥</p>
+              <p className="text-white/80 text-sm">{t("playWithFriends")}</p>
             </div>
           </div>
         </div>
@@ -225,8 +218,8 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
               🏠
             </div>
             <div>
-              <h3 className="font-black text-foreground text-lg">방 개설하기</h3>
-              <p className="text-muted-foreground text-sm">새 방을 만들고 방 코드를 친구에게 알려줘요</p>
+              <h3 className="font-black text-foreground text-lg">{t("createRoomTitle")}</h3>
+              <p className="text-muted-foreground text-sm">{t("createRoomDesc")}</p>
             </div>
           </button>
 
@@ -239,8 +232,8 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
               🔑
             </div>
             <div>
-              <h3 className="font-black text-foreground text-lg">방 코드 입력</h3>
-              <p className="text-muted-foreground text-sm">친구가 알려준 방 코드로 참가해요</p>
+              <h3 className="font-black text-foreground text-lg">{t("joinRoomTitle")}</h3>
+              <p className="text-muted-foreground text-sm">{t("joinRoomDesc")}</p>
             </div>
           </button>
         </div>
@@ -248,7 +241,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
         {actionLoading && (
           <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
             <span className="w-4 h-4 border-2 border-input border-t-transparent rounded-full animate-spin" />
-            방을 만드는 중...
+            {t("creatingRoom")}
           </div>
         )}
       </div>
@@ -260,13 +253,13 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
     return (
       <div className="max-w-lg mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => { setRoomStep("choice"); setJoinCode(""); }} className="text-muted-foreground hover:text-gray-600 text-sm">← 뒤로</button>
+          <button onClick={() => { setRoomStep("choice"); setJoinCode(""); }} className="text-muted-foreground hover:text-gray-600 text-sm">{t("back")}</button>
           <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
             style={{ background: game.gradientCss }}>
             <span className="text-4xl">🔑</span>
             <div>
-              <h1 className="text-xl font-black">방 코드 입력</h1>
-              <p className="text-white/80 text-sm">친구가 알려준 4자리 코드를 입력해요</p>
+              <h1 className="text-xl font-black">{t("joinRoomTitle")}</h1>
+              <p className="text-white/80 text-sm">{t("joinCodeDesc")}</p>
             </div>
           </div>
         </div>
@@ -293,7 +286,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
             style={{ background: game.gradientCss, opacity: joinCode.length === 4 && !actionLoading ? 1 : 0.4 }}
             disabled={joinCode.length !== 4 || actionLoading}
             onClick={handleJoinRoom}>
-            {actionLoading ? "참가하는 중..." : "🚪 방 참가하기"}
+            {actionLoading ? t("joiningRoom") : t("joinRoomButton")}
           </Button>
         </div>
       </div>
@@ -304,7 +297,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={handleBack} className="text-muted-foreground hover:text-gray-600 text-sm">← 목록</button>
+        <button onClick={handleBack} className="text-muted-foreground hover:text-gray-600 text-sm">{t("backToList")}</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>
@@ -316,13 +309,13 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
       </div>
 
       <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-4">
-        <h2 className="font-black text-foreground text-lg">어떻게 놀이할까요?</h2>
+        <h2 className="font-black text-foreground text-lg">{t("modeTitle")}</h2>
 
         <div className="grid grid-cols-3 gap-3">
           {[
-            { value: "solo" as GameMode, emoji: "👤", label: "혼자하기", desc: "혼자서 연습해요" },
-            { value: "friend" as GameMode, emoji: "👥", label: "친구와 함께", desc: "방 만들고 함께해요" },
-            { value: "ai" as GameMode, emoji: "🤖", label: "AI와 함께", desc: "AI 파트너와 함께" },
+            { value: "solo" as GameMode, emoji: "👤", label: t("modeSolo"), desc: t("modeSoloDesc") },
+            { value: "friend" as GameMode, emoji: "👥", label: t("modeFriend"), desc: t("modeFriendDesc") },
+            { value: "ai" as GameMode, emoji: "🤖", label: t("modeAi"), desc: t("modeAiDesc") },
           ].map((m) => (
             <button key={m.value}
               onClick={() => setMode(m.value)}
@@ -344,8 +337,8 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
             <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
               <span className="text-2xl">👥</span>
               <div>
-                <p className="text-amber-700 text-sm font-bold">친구와 함께하기</p>
-                <p className="text-amber-600 text-xs">방을 만들거나 방 코드로 참가해서 같이 놀아요!</p>
+                <p className="text-amber-700 text-sm font-bold">{t("friendModeTitle")}</p>
+                <p className="text-amber-600 text-xs">{t("friendModeDesc")}</p>
               </div>
             </div>
           </div>
@@ -357,9 +350,9 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full text-white text-xs flex items-center justify-center font-bold flex-shrink-0"
                 style={{ background: game.accentColor }}>
-                나
+                {t("meBadge")}
               </div>
-              <Input placeholder="내 이름 (선택)" value={playerName}
+              <Input placeholder={t("namePlaceholder")} value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
                 className="h-8 text-sm rounded-lg" />
             </div>
@@ -367,8 +360,8 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
               <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl p-3">
                 <span className="text-2xl">🤖</span>
                 <div>
-                  <p className="text-blue-700 text-sm font-bold">AI 파트너</p>
-                  <p className="text-blue-500 text-xs">선생님이 설정한 Gemini 모델이 함께 놀아요</p>
+                  <p className="text-blue-700 text-sm font-bold">{t("aiPartnerTitle")}</p>
+                  <p className="text-blue-500 text-xs">{t("aiPartnerDesc")}</p>
                 </div>
               </div>
             )}
@@ -382,7 +375,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
             if (mode === "friend") setRoomStep("choice");
             else startSoloOrAI();
           }}>
-          {mode === "solo" ? "🎮 시작하기!" : mode === "friend" ? "👥 친구와 함께하기!" : "🤖 AI와 시작!"}
+          {mode === "solo" ? t("startSolo") : mode === "friend" ? t("startFriend") : t("startAi")}
         </Button>
       </div>
     </div>

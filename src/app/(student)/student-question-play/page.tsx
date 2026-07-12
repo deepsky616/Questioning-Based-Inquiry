@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AnyGame } from "@/lib/question-games-data";
+import { AnyGame, localizeQuestionGames } from "@/lib/question-games-data";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function StudentQuestionPlayPage() {
   const t = useTranslations("playLanding");
+  const locale = useLocale();
   const [games, setGames] = useState<AnyGame[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState<AnyGame | null>(null);
@@ -68,7 +69,7 @@ export default function StudentQuestionPlayPage() {
 
       {!isLoading && games.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {games.map((game, i) => (
+          {localizeQuestionGames(games, locale).map((game, i) => (
             <GameCard key={game.id} game={game} index={i} onSelect={() => setSelectedGame(game)} />
           ))}
         </div>
