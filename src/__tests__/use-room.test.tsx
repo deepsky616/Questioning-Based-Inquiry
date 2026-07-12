@@ -70,6 +70,29 @@ describe("useRoom sendAction", () => {
     unmount();
   });
 
+  it("기대 방이 있지만 현재 방이 없으면 superseded를 반환한다", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    let actionResult: RoomActionResult | undefined;
+    await act(async () => {
+      actionResult = await result.current.sendAction("start", {}, {
+        expectedRoom: { code: "1234", createdAt: 1 },
+      });
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(actionResult).toEqual({
+      ok: false,
+      room: null,
+      status: null,
+      reason: "superseded",
+    });
+    expect(result.current.error).toBeNull();
+    unmount();
+  });
+
   it("같은 sendAction 참조는 호출 시점의 최신 버전을 보낸다", async () => {
     const sentVersions: number[] = [];
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -98,6 +121,58 @@ describe("useRoom sendAction", () => {
     expect(sentVersions).toEqual([1, 2]);
     unmount();
   });
+
+  it.each([
+    ["코드", { code: "1234", createdAt: 2 }],
+    ["생성 시각", { code: "5678", createdAt: 1 }],
+  ])(
+    "이전 방 %s 조건이면 새 방에 요청하지 않고 superseded를 반환한다",
+    async (_identityPart, expectedRoom) => {
+      const currentRoom = {
+        ...makeRoom(1, "5678"),
+        createdAt: 2,
+        updatedAt: 2,
+      };
+      const fetchMock = vi.fn(
+        async (_input: RequestInfo | URL, init?: RequestInit) => {
+          const body = requestBody(init);
+          if (body?.action === "fail") {
+            return jsonResponse({ error: "기존 오류" }, 400);
+          }
+          return jsonResponse({ room: currentRoom });
+        },
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const { result, unmount } = renderHook(() => useRoom());
+
+      await act(async () => {
+        await result.current.joinRoom("5678");
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+      await act(async () => {
+        await result.current.sendAction("fail");
+      });
+      expect(result.current.error).toBe("기존 오류");
+      fetchMock.mockClear();
+
+      let actionResult: RoomActionResult | undefined;
+      await act(async () => {
+        actionResult = await result.current.sendAction("start", {}, {
+          expectedRoom,
+        });
+      });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(actionResult).toEqual({
+        ok: false,
+        room: currentRoom,
+        status: null,
+        reason: "superseded",
+      });
+      expect(result.current.error).toBe("기존 오류");
+      unmount();
+    },
+  );
 
   it("높은 409를 먼저 반영하면 늦은 성공 응답이 방 버전을 낮추지 않는다", async () => {
     const delayedSuccess = deferred<Response>();

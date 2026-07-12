@@ -89,9 +89,14 @@ export type RoomActionResult =
         | "rejected";
     };
 
+export interface RoomActionOptions {
+  expectedRoom?: Pick<GameRoom, "code" | "createdAt">;
+}
+
 export type RoomActionHandler = (
   action: string,
   extra?: Record<string, unknown>,
+  options?: RoomActionOptions,
 ) => Promise<RoomActionResult>;
 
 export interface GameVisibility {

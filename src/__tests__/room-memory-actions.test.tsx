@@ -226,7 +226,34 @@ describe("메모리 카드 생성", () => {
           rollRoundId: fixedRoundId,
         }),
       }),
+      { expectedRoom: { code: "1234", createdAt: 10 } },
     );
+  });
+
+  it("인공지능 생성 대기 중 화면을 떠나면 이전 방의 카드를 저장하지 않는다", async () => {
+    const room = makeMemoryRoom(makeSetupState());
+    let resolveAsk!: (value: ReturnType<typeof generatedPairs>) => void;
+    const pendingAsk = new Promise<ReturnType<typeof generatedPairs>>((resolve) => {
+      resolveAsk = resolve;
+    });
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockResolvedValue(success(room));
+    aiMocks.ask.mockReturnValue(pendingAsk);
+
+    const { unmount } = render(<RoomMemory {...makeProps(room, onAction)} />);
+    fireEvent.click(screen.getByRole("button", { name: /쉬움/ }));
+
+    await waitFor(() => expect(aiMocks.ask).toHaveBeenCalledTimes(1));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    unmount();
+
+    await act(async () => {
+      resolveAsk(generatedPairs(6));
+      await pendingAsk;
+    });
+
+    expect(onAction).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -286,6 +313,12 @@ describe("메모리 카드 생성", () => {
     });
 
     expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction).toHaveBeenNthCalledWith(
+      2,
+      "update-state",
+      expect.any(Object),
+      { expectedRoom: { code: "1234", createdAt: 10 } },
+    );
   });
 });
 

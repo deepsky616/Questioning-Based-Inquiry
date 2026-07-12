@@ -182,9 +182,23 @@ export function useRoom(): UseRoomResult {
   }, [beginAction, endAction, replaceRoom]);
 
   const sendAction = useCallback<RoomActionHandler>(
-    async (action, extra = {}) => {
+    async (action, extra = {}, options) => {
       const code = activeCodeRef.current;
       const currentRoom = roomRef.current;
+      const expectedRoom = options?.expectedRoom;
+      if (
+        expectedRoom &&
+        (!currentRoom ||
+          currentRoom.code !== expectedRoom.code ||
+          currentRoom.createdAt !== expectedRoom.createdAt)
+      ) {
+        return {
+          ok: false,
+          room: currentRoom,
+          status: null,
+          reason: "superseded",
+        };
+      }
       if (!code || !currentRoom) {
         return { ok: false, room: currentRoom, status: null, reason: "inactive" };
       }

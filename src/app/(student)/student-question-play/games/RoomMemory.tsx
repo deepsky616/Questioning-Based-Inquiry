@@ -53,6 +53,9 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
   const aiGenRef = useRef(false);
   const mountedRef = useRef(false);
   const roomIdentityRef = useRef({ code: room.code, createdAt: room.createdAt });
+  // 효과 전 요청에도 최신 렌더의 방 정체성을 사용해야 한다.
+  // eslint-disable-next-line react-hooks/refs
+  roomIdentityRef.current = { code: room.code, createdAt: room.createdAt };
 
   const [diceLocal, setDiceLocal] = useState<number | null>(null);
   const [rolling, setRolling] = useState(false);
@@ -67,10 +70,6 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
       }
     };
   }, []);
-
-  useEffect(() => {
-    roomIdentityRef.current = { code: room.code, createdAt: room.createdAt };
-  }, [room.code, room.createdAt]);
 
   /* ── 방장 초기화: 처음 진입 시 setup phase 진입 ── */
   useEffect(() => {
@@ -131,7 +130,7 @@ export default function RoomMemory({ game, room, myId, actionLoading, onAction, 
             generating.room.players.map((p) => [p.id, 0]),
           ),
         },
-      });
+      }, { expectedRoom: startedRoomIdentity });
     } finally {
       aiGenRef.current = false;
     }
