@@ -153,8 +153,14 @@ function generatedPairs(count: number) {
   return {
     text: JSON.stringify(
       Array.from({ length: count }, (_, index) => ({
-        question: `질문 ${index + 1}`,
-        answer: `대답 ${index + 1}`,
+        question: {
+          ko: `질문 ${index + 1}`,
+          en: `Question ${index + 1}`,
+        },
+        answer: {
+          ko: `대답 ${index + 1}`,
+          en: `Answer ${index + 1}`,
+        },
       })),
     ),
   };
@@ -225,6 +231,15 @@ describe("메모리 카드 생성", () => {
         patch: expect.objectContaining({
           phase: "rolling",
           rollRoundId: fixedRoundId,
+          pairs: expect.arrayContaining([
+            expect.objectContaining({
+              id: "p0",
+              question: "질문 1",
+              answer: "대답 1",
+              questionText: { ko: "질문 1", en: "Question 1" },
+              answerText: { ko: "대답 1", en: "Answer 1" },
+            }),
+          ]),
         }),
       }),
       { expectedRoom: { code: "1234", createdAt: 10 } },
