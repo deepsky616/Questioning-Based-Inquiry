@@ -41,6 +41,25 @@ export const MEMORY_DIFFICULTY = {
 
 export type MemoryDifficulty = keyof typeof MEMORY_DIFFICULTY;
 
+export function isMemoryRollRoundId(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 128 &&
+    value.trim() === value
+  );
+}
+
+export function resolveMemoryRollRoundId(
+  room: { code: string; createdAt: number },
+  stored: unknown,
+): string | null {
+  if (stored === undefined) {
+    return ["legacy", room.code, room.createdAt].join(":");
+  }
+  return isMemoryRollRoundId(stored) ? stored : null;
+}
+
 export function shuffle<T>(a: T[]): T[] {
   const c = [...a];
   for (let i = c.length - 1; i > 0; i--) {
