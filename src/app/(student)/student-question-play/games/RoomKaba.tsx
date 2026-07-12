@@ -42,7 +42,7 @@ export default function RoomKaba({ game, room, myId, actionLoading, onAction, on
   useEffect(() => {
     if (isHost && !hasState && !initRef.current && room.status === "playing") {
       initRef.current = true;
-      onAction("set-state", {
+      void onAction("set-state", {
         state: { sentences: shuffle(SENTENCES).slice(0, ROUNDS), idx: 0, history: [] },
         turnIndex: 0,
       });

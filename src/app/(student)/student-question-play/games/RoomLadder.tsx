@@ -59,7 +59,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
     const assignments: Assignment[] = room.players.map((p, i) => ({
       playerId: p.id, playerName: p.name, topic: topics[tracePath(i, grid)],
     }));
-    onAction("set-state", { state: { topics, grid, assignments, questions: [] } });
+    void onAction("set-state", { state: { topics, grid, assignments, questions: [] } });
   }
 
   // ─── 종료 ───
@@ -224,7 +224,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
       {/* 방장 종료 */}
       {isHost && (
         <Button variant="outline" className="w-full rounded-xl text-gray-500"
-          onClick={() => onAction("update-state", { patch: {}, status: "ended" })}>
+          onClick={() => void onAction("update-state", { patch: {}, status: "ended" })}>
           🏁 결과 보기 (게임 마치기)
         </Button>
       )}

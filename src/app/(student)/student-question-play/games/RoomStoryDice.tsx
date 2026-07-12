@@ -78,7 +78,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
         taggerId: room.players[0]?.id ?? myId,
         nextQuestionerIdx: 0,
       };
-      await onAction("set-state", { state: init, turnIndex: 0 });
+      void onAction("set-state", { state: init, turnIndex: 0 });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHost, hasState, room.status]);
@@ -105,7 +105,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
         clearInterval(iv);
         setRolling(final);
         setTimeout(() => {
-          onAction("update-state", {
+          void onAction("update-state", {
             patch: { rolled: final, phase: "story" },
           });
           setRolling(null);
@@ -353,7 +353,7 @@ export default function RoomStoryDice({ game, room, myId, actionLoading, onActio
           {/* 방장 종료 */}
           {isHost && state.chain.length >= 4 && (
             <Button variant="outline" className="w-full rounded-xl text-gray-500"
-              onClick={() => onAction("update-state", { patch: { phase: "done" }, status: "ended" })}>
+              onClick={() => void onAction("update-state", { patch: { phase: "done" }, status: "ended" })}>
               🏁 이야기 마치기
             </Button>
           )}

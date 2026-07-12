@@ -45,7 +45,7 @@ export default function RoomDice({ game, room, myId, actionLoading, onAction, on
   useEffect(() => {
     if (isHost && !hasState && !initRef.current && room.status === "playing") {
       initRef.current = true;
-      onAction("set-state", { state: { phase: "rolling", face: 0, history: [] }, turnIndex: 0 });
+      void onAction("set-state", { state: { phase: "rolling", face: 0, history: [] }, turnIndex: 0 });
     }
   }, [isHost, hasState, room.status, onAction]);
 
@@ -85,7 +85,7 @@ export default function RoomDice({ game, room, myId, actionLoading, onAction, on
         clearInterval(iv);
         setDisplayFace(final);
         setLocalRolling(false);
-        onAction("update-state", { patch: { phase: "writing", face: final } });
+        void onAction("update-state", { patch: { phase: "writing", face: final } });
       }
     }, 100);
   }
@@ -187,7 +187,7 @@ export default function RoomDice({ game, room, myId, actionLoading, onAction, on
       {/* 방장 종료 */}
       {isHost && state.history.length >= 2 && (
         <Button variant="outline" className="w-full rounded-xl text-gray-500"
-          onClick={() => onAction("update-state", { patch: {}, status: "ended" })}>
+          onClick={() => void onAction("update-state", { patch: {}, status: "ended" })}>
           🏁 게임 마치기
         </Button>
       )}

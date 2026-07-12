@@ -50,9 +50,9 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
 
   const finalTopic = customTopic.trim() || topicInput;
 
-  async function confirmTopic() {
+  function confirmTopic() {
     if (!finalTopic) return;
-    await onAction("set-topic", { topic: finalTopic });
+    void onAction("set-topic", { topic: finalTopic });
   }
 
   async function submitQuestion() {
@@ -282,7 +282,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
       {/* 방장: 종료 버튼 */}
       {isHost && room.chain.length >= 2 && (
         <Button variant="outline" className="w-full rounded-xl text-gray-500"
-          onClick={() => onAction("end")}>
+          onClick={() => void onAction("end")}>
           🏁 게임 마치기
         </Button>
       )}

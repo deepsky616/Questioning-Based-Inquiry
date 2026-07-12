@@ -1,15 +1,30 @@
 // @vitest-environment jsdom
 
+import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import RoomDice from "@/app/(student)/student-question-play/games/RoomDice";
+import RoomKaba from "@/app/(student)/student-question-play/games/RoomKaba";
+import RoomLadder from "@/app/(student)/student-question-play/games/RoomLadder";
+import RoomRelay from "@/app/(student)/student-question-play/games/RoomRelay";
 import RoomStoryDice from "@/app/(student)/student-question-play/games/RoomStoryDice";
 import {
   BUILT_IN_GAMES,
+  type BuiltInGame,
   type GameRoom,
   type RoomActionHandler,
+  type RoomActionResult,
 } from "@/lib/question-games-data";
 
-const game = BUILT_IN_GAMES.find((candidate) => candidate.id === "story-dice")!;
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
+
+function getGame(id: string): BuiltInGame {
+  return BUILT_IN_GAMES.find((candidate) => candidate.id === id)!;
+}
+
+const game = getGame("story-dice");
 
 const words = {
   protagonist: ["토끼"],
@@ -23,9 +38,17 @@ const players = [
 ];
 
 function makeRoom(gameState: Record<string, unknown>): GameRoom {
+  return makeGameRoom("story-dice", gameState);
+}
+
+function makeGameRoom(
+  gameId: string,
+  gameState: Record<string, unknown>,
+  overrides: Partial<GameRoom> = {},
+): GameRoom {
   return {
     code: "1234",
-    gameId: "story-dice",
+    gameId,
     hostId: "user-1",
     status: "playing",
     players,
@@ -36,7 +59,39 @@ function makeRoom(gameState: Record<string, unknown>): GameRoom {
     version: 1,
     createdAt: 1,
     updatedAt: 1,
+    ...overrides,
   };
+}
+
+const conflict = (room: GameRoom): RoomActionResult => ({
+  ok: false,
+  room,
+  status: 409,
+  reason: "conflict",
+});
+
+const success = (room: GameRoom): RoomActionResult => ({ ok: true, room });
+
+function actionSequence(room: GameRoom) {
+  return vi.fn<RoomActionHandler>()
+    .mockResolvedValueOnce(conflict(room))
+    .mockResolvedValueOnce(success(room));
+}
+
+async function expectFailureThenSuccess(
+  input: HTMLInputElement | HTMLTextAreaElement,
+  submit: HTMLElement,
+  onAction: ReturnType<typeof actionSequence>,
+  value: string,
+) {
+  fireEvent.change(input, { target: { value } });
+  fireEvent.click(submit);
+  await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+  expect(input).toHaveValue(value);
+
+  fireEvent.click(submit);
+  await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+  expect(input).toHaveValue("");
 }
 
 const flowCases = [
@@ -118,15 +173,7 @@ describe("이야기 주사위 입력", () => {
     state,
   }) => {
     const room = makeRoom(state);
-    const onAction = vi.fn<RoomActionHandler>();
-    onAction
-      .mockResolvedValueOnce({
-        ok: false,
-        room,
-        status: 409,
-        reason: "conflict",
-      })
-      .mockResolvedValueOnce({ ok: true, room });
+    const onAction = actionSequence(room);
 
     render(
       <RoomStoryDice
@@ -141,14 +188,113 @@ describe("이야기 주사위 입력", () => {
 
     const textArea = screen.getByPlaceholderText(placeholder) as HTMLTextAreaElement;
     const submitButton = screen.getByRole("button", { name: buttonName });
-    fireEvent.change(textArea, { target: { value: input } });
+    await expectFailureThenSuccess(textArea, submitButton, onAction, input);
+  });
+});
 
-    fireEvent.click(submitButton);
-    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
-    expect(textArea.value).toBe(input);
+describe("게임 방 입력", () => {
+  it("질문 릴레이 제출은 실패 뒤 유지하고 성공 뒤 비운다", async () => {
+    const room = makeGameRoom("relay", {}, { topic: "우주" });
+    const onAction = actionSequence(room);
 
-    fireEvent.click(submitButton);
-    await waitFor(() => expect(textArea.value).toBe(""));
-    expect(onAction).toHaveBeenCalledTimes(2);
+    render(
+      <RoomRelay
+        game={getGame("relay")}
+        room={room}
+        myId="user-1"
+        actionLoading={false}
+        onAction={onAction}
+        onLeave={vi.fn()}
+      />,
+    );
+
+    await expectFailureThenSuccess(
+      screen.getByPlaceholderText(/첫 질문/) as HTMLTextAreaElement,
+      screen.getByRole("button", { name: /질문 연결/ }),
+      onAction,
+      "우주는 얼마나 넓은가요?",
+    );
+  });
+
+  it("까바놀이 제출은 실패 뒤 유지하고 성공 뒤 비운다", async () => {
+    const room = makeGameRoom("kaba", {
+      sentences: ["고양이가 잔다"],
+      idx: 0,
+      history: [],
+    });
+    const onAction = actionSequence(room);
+
+    render(
+      <RoomKaba
+        game={getGame("kaba")}
+        room={room}
+        myId="user-1"
+        actionLoading={false}
+        onAction={onAction}
+        onLeave={vi.fn()}
+      />,
+    );
+
+    await expectFailureThenSuccess(
+      screen.getByPlaceholderText(/질문으로 바꿔/) as HTMLInputElement,
+      screen.getByRole("button", { name: /확인하기/ }),
+      onAction,
+      "고양이가 자나요?",
+    );
+  });
+
+  it("질문 주사위 제출은 실패 뒤 유지하고 성공 뒤 비운다", async () => {
+    const room = makeGameRoom("dice", {
+      phase: "writing",
+      face: 1,
+      history: [],
+    });
+    const onAction = actionSequence(room);
+
+    render(
+      <RoomDice
+        game={getGame("dice")}
+        room={room}
+        myId="user-1"
+        actionLoading={false}
+        onAction={onAction}
+        onLeave={vi.fn()}
+      />,
+    );
+
+    await expectFailureThenSuccess(
+      screen.getByPlaceholderText(/질문 유형/) as HTMLTextAreaElement,
+      screen.getByRole("button", { name: /제출하기/ }),
+      onAction,
+      "달은 지구 주위를 도나요?",
+    );
+  });
+
+  it("질문 사다리 제출은 실패 뒤 유지하고 성공 뒤 비운다", async () => {
+    const room = makeGameRoom("ladder", {
+      topics: ["우주"],
+      grid: Array.from({ length: 10 }, () => [false]),
+      assignments: [{ playerId: "user-1", playerName: "서연", topic: "우주" }],
+      questions: [],
+    });
+    const onAction = actionSequence(room);
+
+    render(
+      <RoomLadder
+        game={getGame("ladder")}
+        room={room}
+        myId="user-1"
+        actionLoading={false}
+        onAction={onAction}
+        onLeave={vi.fn()}
+      />,
+    );
+
+    await expectFailureThenSuccess(
+      screen.getByPlaceholderText(/대한 질문/) as HTMLTextAreaElement,
+      screen.getByRole("button", { name: /질문 제출/ }),
+      onAction,
+      "우주에는 별이 몇 개 있나요?",
+    );
   });
 });
