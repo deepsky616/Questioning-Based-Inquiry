@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { generateJson } from "@/lib/ai";
+import { loadGameRoom } from "@/lib/game-room-store";
+import type { GameRoom } from "@/lib/question-games-data";
 import {
   BASE_POINTS,
   AI_BONUS_TYPES,
@@ -23,6 +25,7 @@ interface StudentContribution {
 interface AwardRequest {
   gameId: string;
   roomCode: string;
+  roomCreatedAt: number;
   topic?: string;
   contributions: StudentContribution[];
 }
@@ -30,6 +33,15 @@ interface AwardRequest {
 interface AIBonus { studentId: string; bonusType: string; points?: number; reason: string }
 interface AIVerdictResponse { bonuses: AIBonus[]; bestQuestion?: { studentId: string; question: string; reason: string }; summary?: string }
 interface Award { studentId: string; bonusType: string; points: number; reason: string }
+interface AwardResultSnapshot {
+  type: "game-room-award-result";
+  version: 1;
+  bestQuestion?: { studentId: string; question: string; reason: string };
+  summary?: string;
+}
+
+const AWARD_RESULT_TYPE = "game-room-award-result";
+const AWARD_RESULT_VERSION = 1;
 
 export class PointAwardError extends Error {
   constructor(message: string, public readonly status: number) {
@@ -51,7 +63,125 @@ function normalizeAwardRequest(body: Partial<AwardRequest>): AwardRequest {
   if (!gameId || !roomCode || contributions.length === 0) {
     throw new PointAwardError("필수 항목 누락", 400);
   }
-  return { gameId, roomCode, topic: body.topic, contributions: contributions as StudentContribution[] };
+  if (body.roomCreatedAt === undefined) {
+    throw new PointAwardError("방 정보를 다시 불러와 주세요", 409);
+  }
+  if (
+    typeof body.roomCreatedAt !== "number" ||
+    !Number.isFinite(body.roomCreatedAt) ||
+    !Number.isInteger(body.roomCreatedAt) ||
+    body.roomCreatedAt < 0
+  ) {
+    throw new PointAwardError("잘못된 방 생성 시각", 400);
+  }
+  return {
+    gameId,
+    roomCode,
+    roomCreatedAt: body.roomCreatedAt,
+    topic: body.topic,
+    contributions: contributions as StudentContribution[],
+  };
+}
+
+function buildRoomAwardKey(roomCode: string, roomCreatedAt: number) {
+  return `room:${roomCode}:${roomCreatedAt}`;
+}
+
+function requireCurrentRoom(req: AwardRequest, room: GameRoom | null): GameRoom {
+  if (
+    !room ||
+    room.code !== req.roomCode ||
+    room.gameId !== req.gameId ||
+    room.createdAt !== req.roomCreatedAt
+  ) {
+    throw new PointAwardError("방이 바뀌었습니다. 다시 열어 주세요", 409);
+  }
+  return room;
+}
+
+function buildAwardLogWhere(
+  req: AwardRequest,
+  room: GameRoom,
+): Prisma.PointLogWhereInput {
+  const awardKey = buildRoomAwardKey(req.roomCode, req.roomCreatedAt);
+  if (room.pointAwardKeyVersion === 1) {
+    return { gameId: req.gameId, roomCode: awardKey };
+  }
+  return {
+    gameId: req.gameId,
+    OR: [
+      { roomCode: awardKey },
+      {
+        roomCode: req.roomCode,
+        createdAt: { gte: new Date(req.roomCreatedAt) },
+      },
+    ],
+  };
+}
+
+async function findAwardLogs(req: AwardRequest, room: GameRoom) {
+  return prisma.pointLog.findMany({
+    where: buildAwardLogWhere(req, room),
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseAwardResultSnapshot(value: unknown): AwardResultSnapshot | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (
+      !isRecord(parsed) ||
+      parsed.type !== AWARD_RESULT_TYPE ||
+      parsed.version !== AWARD_RESULT_VERSION ||
+      (parsed.summary !== undefined && typeof parsed.summary !== "string")
+    ) {
+      return null;
+    }
+    if (parsed.bestQuestion !== undefined) {
+      if (
+        !isRecord(parsed.bestQuestion) ||
+        typeof parsed.bestQuestion.studentId !== "string" ||
+        typeof parsed.bestQuestion.question !== "string" ||
+        typeof parsed.bestQuestion.reason !== "string"
+      ) {
+        return null;
+      }
+    }
+    return parsed as unknown as AwardResultSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function restoreAwardResult<T extends { aiAnalysis?: string | null }>(logs: T[]) {
+  let snapshot: AwardResultSnapshot | null = null;
+  for (const log of logs) {
+    snapshot = parseAwardResultSnapshot(log.aiAnalysis);
+    if (snapshot) break;
+  }
+  return {
+    alreadyAwarded: true,
+    awards: logs,
+    ...(snapshot?.bestQuestion ? { bestQuestion: snapshot.bestQuestion } : {}),
+    ...(snapshot?.summary !== undefined ? { summary: snapshot.summary } : {}),
+  };
+}
+
+function serializeAwardResult(
+  bestQuestion: AwardResultSnapshot["bestQuestion"],
+  summary: string | undefined,
+) {
+  return JSON.stringify({
+    type: AWARD_RESULT_TYPE,
+    version: AWARD_RESULT_VERSION,
+    ...(bestQuestion ? { bestQuestion } : {}),
+    ...(summary !== undefined ? { summary } : {}),
+  });
 }
 
 function buildPrompt(req: AwardRequest): string {
@@ -183,22 +313,19 @@ export function buildAwardList(req: AwardRequest, ai: AIVerdictResponse | null):
 
 export async function awardGamePoints(body: Partial<AwardRequest>, userId: string) {
   const normalized = normalizeAwardRequest(body);
-  const { gameId, roomCode } = normalized;
+  const { gameId, roomCode, roomCreatedAt } = normalized;
+  const room = requireCurrentRoom(
+    normalized,
+    await loadGameRoom(roomCode),
+  );
+  const awardRoomCode = buildRoomAwardKey(roomCode, roomCreatedAt);
 
-  const existing = await prisma.pointLog.findFirst({
-    where: { gameId, roomCode },
-    select: { id: true },
-  });
-  if (existing) {
-    const logs = await prisma.pointLog.findMany({
-      where: { gameId, roomCode },
-      orderBy: { createdAt: "asc" },
-    });
-    return { alreadyAwarded: true, awards: logs };
-  }
+  const existingLogs = await findAwardLogs(normalized, room);
+  if (existingLogs.length > 0) return restoreAwardResult(existingLogs);
 
   const ai = await callAI(normalized, userId);
   const { awards, bestQuestion, summary } = buildAwardList(normalized, ai);
+  const resultSnapshot = serializeAwardResult(bestQuestion, summary);
 
   const sumByStudent: Record<string, number> = {};
   for (const a of awards) {
@@ -207,11 +334,12 @@ export async function awardGamePoints(body: Partial<AwardRequest>, userId: strin
 
   try {
     await prisma.$transaction([
-      ...awards.map((a) =>
+      ...awards.map((a, index) =>
         prisma.pointLog.create({
           data: {
-            studentId: a.studentId, gameId, roomCode,
+            studentId: a.studentId, gameId, roomCode: awardRoomCode,
             bonusType: a.bonusType, points: a.points, reason: a.reason,
+            aiAnalysis: index === 0 ? resultSnapshot : undefined,
           },
         })
       ),
@@ -224,11 +352,8 @@ export async function awardGamePoints(body: Partial<AwardRequest>, userId: strin
     ]);
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      const logs = await prisma.pointLog.findMany({
-        where: { gameId, roomCode },
-        orderBy: { createdAt: "asc" },
-      });
-      return { alreadyAwarded: true, awards: logs };
+      const logs = await findAwardLogs(normalized, room);
+      return restoreAwardResult(logs);
     }
     throw new PointAwardError("포인트 지급 실패", 500);
   }
