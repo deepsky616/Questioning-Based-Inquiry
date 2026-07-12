@@ -1762,9 +1762,6 @@
     "bankTransformTitle": "질문 바꾸기 문항 ({count}개)",
     "bankCreateTitle": "질문 만들기 제시문 ({count}개)",
     "bankAiHint": "새로운 문제가 필요하면 '직접 해보기' 탭의 🎲 AI 새 문제/새 주제 버튼으로 무한히 만들 수 있어요.",
-    "copy": "복사",
-    "copied": "복사했어요",
-    "copyFailed": "복사에 실패했어요",
     "statsIntro": "담당 학급 학생의 연습 포인트 현황이에요 (하루 최대 {cap}P). 최근 7일 기준.",
     "statsRefresh": "새로고침",
     "statsLoading": "불러오는 중...",
@@ -1778,7 +1775,7 @@
     "teacherItemBadge": "교사 출제",
     "myBankTitle": "내 문항 ({count}개)",
     "myBankIntro": "직접 만든 문항은 저장 즉시 담당 학급 학생의 질문 연습에 출제돼요. AI가 잘못 만든 문제는 여기서 좋은 문항으로 직접 채워 주세요.",
-    "myBankEmpty": "아직 만든 문항이 없어요. 아래 내장 문항의 '복사해서 편집'으로 시작해 보세요.",
+    "myBankEmpty": "아직 만든 문항이 없어요. 아래 내장 문항의 '내 문항으로' 버튼으로 시작해 보세요.",
     "addItemBtn": "새 문항 만들기",
     "editBtn": "수정",
     "deleteBtn": "삭제",
@@ -1805,9 +1802,9 @@
     "savedToast": "문항을 저장했어요. 학생 연습에 바로 반영돼요.",
     "deletedToast": "문항을 삭제했어요.",
     "saveFailed": "저장하지 못했어요",
-    "copyToEditBtn": "복사해서 편집",
     "inactiveBadge": "사용 안 함",
     "activateBtn": "사용",
-    "deactivateBtn": "중지"
+    "deactivateBtn": "중지",
+    "addToMineBtn": "내 문항으로"
   }
 }

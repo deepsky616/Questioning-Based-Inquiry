@@ -1762,9 +1762,6 @@
     "bankTransformTitle": "Transform items ({count})",
     "bankCreateTitle": "Creation passages ({count})",
     "bankAiHint": "Need fresh problems? Use the 🎲 AI buttons in the Try it tab to generate endlessly.",
-    "copy": "Copy",
-    "copied": "Copied",
-    "copyFailed": "Copy failed",
     "statsIntro": "Practice points for your class (max {cap}P a day), last 7 days.",
     "statsRefresh": "Refresh",
     "statsLoading": "Loading...",
@@ -1778,7 +1775,7 @@
     "teacherItemBadge": "Teacher-made",
     "myBankTitle": "My items ({count})",
     "myBankIntro": "Items you create appear in your students' question practice as soon as you save. If the AI generates a poor problem, replace it with a good one here.",
-    "myBankEmpty": "No items yet. Start by using 'Copy & edit' on a built-in item below.",
+    "myBankEmpty": "No items yet. Start with the 'Add to my items' button on a built-in item below.",
     "addItemBtn": "New item",
     "editBtn": "Edit",
     "deleteBtn": "Delete",
@@ -1805,9 +1802,9 @@
     "savedToast": "Item saved. It appears in student practice immediately.",
     "deletedToast": "Item deleted.",
     "saveFailed": "Could not save",
-    "copyToEditBtn": "Copy & edit",
     "inactiveBadge": "Inactive",
     "activateBtn": "Enable",
-    "deactivateBtn": "Disable"
+    "deactivateBtn": "Disable",
+    "addToMineBtn": "Add to my items"
   }
 }
