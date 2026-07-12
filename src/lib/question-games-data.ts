@@ -72,6 +72,7 @@ export interface GameRoom {
   version: number;
   createdAt: number;
   updatedAt: number;
+  pointAwardKeyVersion?: 1;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -127,8 +128,16 @@ export function isGameRoom(value: unknown): value is GameRoom {
     isRecord(value.gameState) &&
     isNonNegativeInteger(value.version) &&
     isNonNegativeNumber(value.createdAt) &&
-    isNonNegativeNumber(value.updatedAt)
+    isNonNegativeNumber(value.updatedAt) &&
+    (value.pointAwardKeyVersion === undefined ||
+      value.pointAwardKeyVersion === 1)
   );
+}
+
+export function parseGameRoom(value: unknown): GameRoom | null {
+  if (!isRecord(value)) return null;
+  const normalized = value.version == null ? { ...value, version: 1 } : value;
+  return isGameRoom(normalized) ? normalized : null;
 }
 
 export type RoomActionResult =

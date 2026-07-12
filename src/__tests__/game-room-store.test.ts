@@ -17,6 +17,7 @@ vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 import {
   createGameRoom,
   deleteGameRoom,
+  loadGameRoom,
   saveGameRoom,
 } from "@/lib/game-room-store";
 
@@ -47,6 +48,24 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("loadGameRoom", () => {
+  it("이전 방의 빈 버전은 1로 보정한 뒤 판별한다", async () => {
+    prismaMock.gameRoom.findUnique.mockResolvedValue({
+      data: { ...makeRoom(), version: null },
+    });
+
+    await expect(loadGameRoom("1234")).resolves.toMatchObject({ version: 1 });
+  });
+
+  it("알 수 없는 지급 키 버전은 이전 방으로 낮추지 않는다", async () => {
+    prismaMock.gameRoom.findUnique.mockResolvedValue({
+      data: { ...makeRoom(), pointAwardKeyVersion: 2 },
+    });
+
+    await expect(loadGameRoom("1234")).resolves.toBeNull();
+  });
 });
 
 describe("saveGameRoom", () => {
@@ -227,6 +246,23 @@ describe("deleteGameRoom", () => {
 });
 
 describe("createGameRoom", () => {
+  it("새 방은 포인트 지급 키 버전 1을 저장한다", async () => {
+    prismaMock.gameRoom.create.mockResolvedValue({});
+
+    const room = await createGameRoom({
+      gameId: "question-chain",
+      hostId: "host",
+      hostName: "방장",
+    });
+
+    expect(room?.pointAwardKeyVersion).toBe(1);
+    expect(prismaMock.gameRoom.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        data: expect.objectContaining({ pointAwardKeyVersion: 1 }),
+      }),
+    });
+  });
+
   it("P2002 코드 겹침이면 다음 후보로 생성한다", async () => {
     const collision = new Prisma.PrismaClientKnownRequestError("dup", {
       code: "P2002",

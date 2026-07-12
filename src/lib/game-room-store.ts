@@ -1,6 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import type { GameRoom, RoomPlayer } from "@/lib/question-games-data";
+import {
+  parseGameRoom,
+  type GameRoom,
+  type RoomPlayer,
+} from "@/lib/question-games-data";
 
 export type GameRoomWriteResult =
   | { kind: "saved"; room: GameRoom }
@@ -23,12 +27,7 @@ export function isStaleRoomAction(room: GameRoom, expectedVersion: unknown) {
 export async function loadGameRoom(code: string): Promise<GameRoom | null> {
   const rec = await prisma.gameRoom.findUnique({ where: { code } });
   if (!rec) return null;
-  try {
-    const room = rec.data as unknown as GameRoom;
-    return { ...room, version: room.version ?? 1 };
-  } catch {
-    return null;
-  }
+  return parseGameRoom(rec.data);
 }
 
 export async function saveGameRoom(
@@ -144,6 +143,7 @@ export async function createGameRoom({
       version: 1,
       createdAt: now,
       updatedAt: now,
+      pointAwardKeyVersion: 1,
     };
 
     try {
