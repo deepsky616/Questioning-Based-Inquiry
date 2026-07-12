@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
+import ko from "../../messages/ko.json";
+import en from "../../messages/en.json";
 
 const practiceView = readFileSync("src/components/shared/QuestionPracticeView.tsx", "utf8");
 const studentPractice = readFileSync("src/app/(student)/student-practice/page.tsx", "utf8");
@@ -32,6 +34,11 @@ describe("질문 학습과 질문 연습의 구성 경계", () => {
   it("요약은 승인된 자료에서 닫힌 질문과 열린 질문의 차이를 읽는다", () => {
     expect(summary).toContain("QUESTION_ANSWER_RANGE_GUIDE.closed.definition");
     expect(summary).toContain("QUESTION_ANSWER_RANGE_GUIDE.open.definition");
+  });
+
+  it("연습 요약은 기존 질문 유형 알아보기 이름을 유지한다", () => {
+    expect(ko.questionLearning.summaryTitle).toBe("질문 유형 알아보기");
+    expect(en.questionLearning.summaryTitle).toBe("Learn the question types");
   });
 
   it("학생과 교사 전체 학습 페이지가 같은 공통 경험을 사용한다", () => {

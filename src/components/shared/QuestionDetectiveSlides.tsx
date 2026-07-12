@@ -150,6 +150,10 @@ export function QuestionDetectiveSlides() {
           >
             {QUESTION_LEARNING_SLIDES.map((slideKey, tabIndex) => {
               const distance = Math.abs(tabIndex - index);
+              const showOnNarrowScreen =
+                distance <= 1 ||
+                (index === 0 && tabIndex < 3) ||
+                (index === total - 1 && tabIndex >= total - 3);
               const showOnCompactScreen =
                 distance <= 2 ||
                 (index < 2 && tabIndex < 5) ||
@@ -172,7 +176,11 @@ export function QuestionDetectiveSlides() {
                   onKeyDown={(event) => handleTabKeyDown(event, tabIndex)}
                   className={cn(
                     "h-11 w-11 shrink-0 items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none xl:flex",
-                    showOnCompactScreen ? "flex" : "hidden",
+                    showOnNarrowScreen
+                      ? "flex"
+                      : showOnCompactScreen
+                        ? "hidden min-[360px]:flex"
+                        : "hidden",
                   )}
                 >
                   <span

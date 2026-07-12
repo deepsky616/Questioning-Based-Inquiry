@@ -141,10 +141,10 @@ function CoverSlide() {
         className="-z-20 object-cover object-[32%_center] sm:object-center"
       />
       <div className="absolute inset-0 -z-10 bg-white/35 sm:bg-white/20 dark:bg-white/20" />
-      <div className="w-[72%] max-w-md px-5 py-10 sm:w-[52%] sm:px-10">
+      <div className="w-[82%] max-w-md px-5 py-10 sm:w-[52%] sm:px-10">
         <span className="mb-5 block h-1.5 w-16 rounded-full bg-violet-500" aria-hidden="true" />
         <p className="text-sm font-bold text-sky-900">탐구의 열쇠를 찾아서</p>
-        <h3 className="mt-2 text-4xl font-black leading-tight text-slate-950">질문 탐정단</h3>
+        <h3 className="mt-2 whitespace-nowrap text-3xl font-black leading-tight text-slate-950 sm:text-4xl">질문 탐정단</h3>
         <p className="mt-4 max-w-sm text-base font-medium leading-relaxed text-slate-800">
           사실을 찾고, 관계를 연결하고, 근거 있는 선택을 만드는 질문의 힘을 발견해 봐요.
         </p>

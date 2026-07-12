@@ -13,6 +13,7 @@ import ko from "../../messages/ko.json";
 import { SectionToggle, CollapseChevron } from "@/components/shared/SectionToggle";
 import { PasswordInput } from "@/components/shared/PasswordInput";
 import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
+import { LanguageToggle } from "@/components/shared/LanguageToggle";
 
 function renderWithIntl(ui: React.ReactElement) {
   return render(
@@ -62,6 +63,21 @@ describe("PasswordInput", () => {
 
     fireEvent.click(screen.getByRole("button"));
     expect(input).toHaveAttribute("type", "password");
+  });
+});
+
+describe("LanguageToggle", () => {
+  it("작은 상단에서는 아이콘 조작으로 줄고 메뉴에서는 전체 선택기를 표시한다", () => {
+    const compact = renderWithIntl(<LanguageToggle />);
+    const compactSelect = screen.getByRole("combobox", { name: ko.common.language });
+    expect(compactSelect).toHaveAttribute("id", "lang-select");
+    expect(compactSelect).toHaveClass("absolute", "opacity-0", "sm:static", "sm:opacity-100");
+    compact.unmount();
+
+    renderWithIntl(<LanguageToggle id="mobile-lang-select" compactOnMobile={false} />);
+    const fullSelect = screen.getByRole("combobox", { name: ko.common.language });
+    expect(fullSelect).toHaveAttribute("id", "mobile-lang-select");
+    expect(fullSelect).not.toHaveClass("absolute", "opacity-0");
   });
 });
 

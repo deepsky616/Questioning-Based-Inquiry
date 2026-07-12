@@ -174,9 +174,11 @@ export function AppNav({
           </div>
 
           {/* 오른쪽: 도구 — 항상 고정폭(네비에 절대 안 가려짐) */}
-          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2 xl:gap-3 [&_button]:min-h-11 [&_button]:min-w-11">
             {extra}
-            <LanguageToggle />
+            <div className="hidden min-[360px]:block">
+              <LanguageToggle />
+            </div>
             <ThemeToggle />
             <span className="hidden xl:inline text-sm text-muted-foreground truncate max-w-[8rem]">
               {userName} {roleSuffix}
@@ -195,7 +197,7 @@ export function AppNav({
               aria-label={open ? t("closeMenu") : t("openMenu")}
               aria-expanded={open}
               onClick={() => setOpen((v) => !v)}
-              className="lg:hidden inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-muted"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted lg:hidden"
             >
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -222,6 +224,9 @@ export function AppNav({
                 {p.label}
               </Link>
             ))}
+            <div className="mt-1 hidden border-t pt-2 max-[359px]:block">
+              <LanguageToggle id="mobile-lang-select" compactOnMobile={false} />
+            </div>
             <div className="flex items-center justify-between pt-2 mt-1 border-t">
               <span className="text-sm text-muted-foreground truncate">{userName} {roleSuffix}</span>
               <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
