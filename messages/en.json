@@ -219,7 +219,6 @@
     "alreadyAsked": "You've already written a question in this session",
     "separateSaveNotice": "A new question is saved separately from your existing one.",
     "questionLabel": "Question",
-    "questionPlaceholder": "e.g., Why can't we see stars at night?",
     "analyzing": "Analyzing...",
     "analyze": "Analyze question",
     "resultHeader": "Analysis result",
@@ -1805,6 +1804,7 @@
     "inactiveBadge": "Inactive",
     "activateBtn": "Enable",
     "deactivateBtn": "Disable",
-    "addToMineBtn": "Add to my items"
+    "addToMineBtn": "Add to my items",
+    "solvedStat": "{students} students · {count} solves"
   }
 }

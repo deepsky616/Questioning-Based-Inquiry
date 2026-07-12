@@ -219,7 +219,6 @@
     "alreadyAsked": "이 세션에 이미 질문을 작성했습니다",
     "separateSaveNotice": "새 질문을 작성하면 기존 질문과 별도로 저장됩니다.",
     "questionLabel": "질문",
-    "questionPlaceholder": "예: 왜 밤에는 별이 보이지 않을까?",
     "analyzing": "분석 중...",
     "analyze": "질문 분석하기",
     "resultHeader": "분석 결과",
@@ -1805,6 +1804,7 @@
     "inactiveBadge": "사용 안 함",
     "activateBtn": "사용",
     "deactivateBtn": "중지",
-    "addToMineBtn": "내 문항으로"
+    "addToMineBtn": "내 문항으로",
+    "solvedStat": "학생 {students}명 · 성공 {count}회"
   }
 }

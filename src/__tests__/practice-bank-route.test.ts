@@ -11,6 +11,7 @@ vi.mock("@/lib/db", () => ({
       update: vi.fn(),
       deleteMany: vi.fn(),
     },
+    pointLog: { findMany: vi.fn() },
   },
 }));
 
@@ -27,6 +28,7 @@ const mCount = prisma.practiceCustomItem.count as unknown as ReturnType<typeof v
 const mCreate = prisma.practiceCustomItem.create as unknown as ReturnType<typeof vi.fn>;
 const mUpdate = prisma.practiceCustomItem.update as unknown as ReturnType<typeof vi.fn>;
 const mDeleteMany = prisma.practiceCustomItem.deleteMany as unknown as ReturnType<typeof vi.fn>;
+const mLogFindMany = prisma.pointLog.findMany as unknown as ReturnType<typeof vi.fn>;
 
 const QUIZ_BODY = {
   mode: "quiz",
@@ -61,6 +63,7 @@ beforeEach(() => {
   mCreate.mockImplementation(async ({ data }: { data: object }) => ({ id: "new1", isActive: true, ...data }));
   mUpdate.mockImplementation(async ({ data }: { data: object }) => ({ id: "item1", ...data }));
   mDeleteMany.mockResolvedValue({ count: 1 });
+  mLogFindMany.mockResolvedValue([]);
 });
 
 describe("교사 커스텀 문항 API — 권한", () => {
@@ -71,6 +74,20 @@ describe("교사 커스텀 문항 API — 권한", () => {
 
     mAuth.mockResolvedValue(null);
     expect((await POST(post(QUIZ_BODY))).status).toBe(401);
+  });
+});
+
+describe("교사 커스텀 문항 API — 풀이 통계", () => {
+  it("문항별 성공 횟수와 성공 학생 수를 함께 돌려준다", async () => {
+    mFindMany.mockResolvedValue([{ id: "cust1", mode: "quiz" }]);
+    mLogFindMany.mockResolvedValue([
+      { roomCode: "quiz:cust1:closure:2026-07-11", studentId: "s1" },
+      { roomCode: "quiz:cust1:closure:2026-07-12", studentId: "s1" },
+      { roomCode: "quiz:cust1:cognitive:2026-07-12", studentId: "s2" },
+    ]);
+    const data = await (await GET()).json();
+    expect(data.items[0].solvedCount).toBe(3);
+    expect(data.items[0].solvedStudents).toBe(2);
   });
 });
 
