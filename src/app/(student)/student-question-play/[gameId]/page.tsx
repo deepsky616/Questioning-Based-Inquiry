@@ -21,7 +21,7 @@ import RoomLadder from "../games/RoomLadder";
 import { useRoom } from "../games/useRoom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 export type GameMode = "solo" | "friend" | "ai";
 
@@ -51,7 +51,7 @@ type RoomGameComponent = React.ComponentType<{
   room: GameRoom;
   myId: string;
   actionLoading: boolean;
-  onAction: (action: string, extra?: Record<string, unknown>) => Promise<GameRoom | null>;
+  onAction: RoomActionHandler;
   onLeave: () => void;
 }>;
 
@@ -152,7 +152,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
             room={room}
             myId={myId}
             actionLoading={actionLoading}
-            onStart={() => sendAction("start")}
+            onStart={() => { void sendAction("start"); }}
             onLeave={handleLeaveRoom}
           />
         </>

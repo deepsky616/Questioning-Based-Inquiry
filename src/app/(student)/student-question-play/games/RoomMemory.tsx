@@ -9,7 +9,7 @@ import {
   MEMORY_DIFFICULTY, MemoryDifficulty, QAPair,
   pickFallbackPairs, parseAIPairs, shuffle,
 } from "@/lib/memory-game-data";
-import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 interface MemoryCard {
   id: string;
@@ -34,7 +34,7 @@ interface MemoryState {
 
 interface Props {
   game: BuiltInGame; room: GameRoom; myId: string; actionLoading: boolean;
-  onAction: (action: string, extra?: Record<string, unknown>) => Promise<GameRoom | null>;
+  onAction: RoomActionHandler;
   onLeave: () => void;
 }
 

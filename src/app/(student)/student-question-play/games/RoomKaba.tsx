@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, TurnBar, WaitingBanner, playerColorById } from "./roomShared";
 import RoomResult from "./RoomResult";
-import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 const SENTENCES = [
   "고양이가 잔다", "개미가 걷는다", "토끼가 뛴다", "꽃이 예쁘다", "사과가 빨갛다",
@@ -24,7 +24,7 @@ interface KabaState { sentences: string[]; idx: number; history: KabaEntry[] }
 
 interface Props {
   game: BuiltInGame; room: GameRoom; myId: string; actionLoading: boolean;
-  onAction: (action: string, extra?: Record<string, unknown>) => Promise<GameRoom | null>;
+  onAction: RoomActionHandler;
   onLeave: () => void;
 }
 
@@ -94,7 +94,7 @@ export default function RoomKaba({ game, room, myId, actionLoading, onAction, on
       turnIndex: (room.turnIndex + 1) % room.players.length,
       ...(ended ? { status: "ended" } : {}),
     });
-    if (res) setInput("");
+    if (res.ok) setInput("");
   }
 
   return (

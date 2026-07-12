@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RoomHeader, WaitingBanner, PLAYER_COLORS, playerColorById } from "./roomShared";
 import RoomResult from "./RoomResult";
-import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 const ROWS = 10;
 
@@ -40,7 +40,7 @@ interface LadderState {
 
 interface Props {
   game: BuiltInGame; room: GameRoom; myId: string; actionLoading: boolean;
-  onAction: (action: string, extra?: Record<string, unknown>) => Promise<GameRoom | null>;
+  onAction: RoomActionHandler;
   onLeave: () => void;
 }
 
@@ -135,7 +135,7 @@ export default function RoomLadder({ game, room, myId, actionLoading, onAction, 
       topic: myAssignment.topic, question: trimmed,
     };
     const res = await onAction("update-state", { patch: { questions: [...state.questions, q] } });
-    if (res) setQuestionInput("");
+    if (res.ok) setQuestionInput("");
   }
 
   return (

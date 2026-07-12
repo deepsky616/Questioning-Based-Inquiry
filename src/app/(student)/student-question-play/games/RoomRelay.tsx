@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import RoomResult from "./RoomResult";
-import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 const PRESET_TOPICS = [
   "바다", "날씨", "우주", "학교", "음식",
@@ -22,7 +22,7 @@ interface Props {
   room: GameRoom;
   myId: string;
   actionLoading: boolean;
-  onAction: (action: string, extra?: Record<string, unknown>) => Promise<GameRoom | null>;
+  onAction: RoomActionHandler;
   onLeave: () => void;
 }
 
@@ -70,7 +70,7 @@ export default function RoomRelay({ game, room, myId, actionLoading, onAction, o
     }
 
     const result = await onAction("add-question", { question: trimmed });
-    if (result) setInputQ("");
+    if (result.ok) setInputQ("");
   }
 
   /* ─── 종료 화면 ─── */

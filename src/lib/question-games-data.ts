@@ -74,6 +74,26 @@ export interface GameRoom {
   updatedAt: number;
 }
 
+export type RoomActionResult =
+  | { ok: true; room: GameRoom }
+  | {
+      ok: false;
+      room: GameRoom | null;
+      status: number | null;
+      reason:
+        | "conflict"
+        | "missing"
+        | "network"
+        | "inactive"
+        | "superseded"
+        | "rejected";
+    };
+
+export type RoomActionHandler = (
+  action: string,
+  extra?: Record<string, unknown>,
+) => Promise<RoomActionResult>;
+
 export interface GameVisibility {
   type: "all" | "hidden" | "classes" | "students";
   classKeys?: string[]; // "{grade}-{className}" 형식

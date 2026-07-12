@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, TurnBar, WaitingBanner, playerColorById } from "./roomShared";
 import RoomResult from "./RoomResult";
-import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 const DICE_TYPES = [
   { face: 1, type: "사실질문", desc: "사실·정보를 확인하는 질문", color: "#3b82f6" },
@@ -26,7 +26,7 @@ interface DiceState { phase: "rolling" | "writing"; face: number; history: DiceE
 
 interface Props {
   game: BuiltInGame; room: GameRoom; myId: string; actionLoading: boolean;
-  onAction: (action: string, extra?: Record<string, unknown>) => Promise<GameRoom | null>;
+  onAction: RoomActionHandler;
   onLeave: () => void;
 }
 
@@ -102,7 +102,7 @@ export default function RoomDice({ game, room, myId, actionLoading, onAction, on
       patch: { phase: "rolling", face: 0, history: [...state.history, entry] },
       turnIndex: (room.turnIndex + 1) % room.players.length,
     });
-    if (res) setInput("");
+    if (res.ok) setInput("");
   }
 
   const shownFace = state.phase === "writing" ? state.face : (localRolling ? displayFace : (state.face || 1));

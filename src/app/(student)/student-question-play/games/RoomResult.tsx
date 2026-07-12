@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { RoomHeader, playerColorById } from "./roomShared";
 import { GameResultReview } from "./GameResultReview";
 import { AI_BONUS_TYPES, BonusKey, SYSTEM_BONUS, BASE_POINTS } from "@/lib/points-policy";
-import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 export interface ScoreEntry { playerId: string; name: string; score: number }
 export interface QInfo { playerId: string; playerName: string; question: string }
@@ -28,7 +28,7 @@ interface Props {
   scoreUnit: string;
   scores: ScoreEntry[];
   questions: QInfo[];
-  onAction: (action: string, extra?: Record<string, unknown>) => Promise<GameRoom | null>;
+  onAction: RoomActionHandler;
   onLeave: () => void;
 }
 

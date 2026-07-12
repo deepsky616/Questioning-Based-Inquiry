@@ -31,6 +31,202 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function requestBody(init?: RequestInit) {
+  return init?.body ? JSON.parse(String(init.body)) : null;
+}
+
+describe("useRoom sendAction", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("inactive: 활성 방이 없으면 요청하지 않고 실패 결과를 반환한다", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    let actionResult;
+    await act(async () => {
+      actionResult = await result.current.sendAction("start");
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(actionResult).toEqual({
+      ok: false,
+      room: null,
+      status: null,
+      reason: "inactive",
+    });
+    unmount();
+  });
+
+  it("같은 sendAction 참조는 호출 시점의 최신 버전을 보낸다", async () => {
+    const sentVersions: number[] = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom(1) });
+      if (!init?.method) return jsonResponse({ room: makeRoom(1) });
+      sentVersions.push(body.expectedVersion);
+      return jsonResponse({ room: makeRoom(body.expectedVersion + 1) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(result.current.room?.version).toBe(1));
+    const sendAction = result.current.sendAction;
+
+    await act(async () => {
+      await sendAction("start");
+    });
+    await act(async () => {
+      await sendAction("end");
+    });
+
+    expect(sentVersions).toEqual([1, 2]);
+    unmount();
+  });
+
+  it("높은 409를 먼저 반영하면 늦은 성공 응답이 방 버전을 낮추지 않는다", async () => {
+    const delayedSuccess = deferred<Response>();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom(1) });
+      if (!init?.method) return jsonResponse({ room: makeRoom(1) });
+      if (body?.action === "slow") return delayedSuccess.promise;
+      return jsonResponse({ error: "conflict", room: makeRoom(3) }, 409);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(result.current.room?.version).toBe(1));
+
+    let conflictResult;
+    let successResult;
+    await act(async () => {
+      const successPromise = result.current.sendAction("slow");
+      const conflictPromise = result.current.sendAction("fast");
+      conflictResult = await conflictPromise;
+      delayedSuccess.resolve(jsonResponse({ room: makeRoom(2) }));
+      successResult = await successPromise;
+    });
+
+    expect(result.current.room?.version).toBe(3);
+    expect(conflictResult).toMatchObject({
+      ok: false,
+      status: 409,
+      reason: "conflict",
+      room: { version: 3 },
+    });
+    expect(successResult).toMatchObject({
+      ok: true,
+      room: { version: 3 },
+    });
+    unmount();
+  });
+
+  it("낮은 폴링 응답이 최신 동작 응답을 덮어쓰지 않는다", async () => {
+    const delayedPoll = deferred<Response>();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom(1) });
+      if (!init?.method) return delayedPoll.promise;
+      return jsonResponse({ room: makeRoom(2) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      await result.current.sendAction("start");
+      delayedPoll.resolve(jsonResponse({ room: makeRoom(1) }));
+      await delayedPoll.promise;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.room?.version).toBe(2);
+    unmount();
+  });
+
+  it("network: 연결 오류면 현재 방을 담은 실패 결과를 반환한다", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom(1) });
+      if (!init?.method) return jsonResponse({ room: makeRoom(1) });
+      throw new Error("offline");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+
+    let actionResult;
+    await act(async () => {
+      actionResult = await result.current.sendAction("start");
+    });
+
+    expect(result.current.room?.version).toBe(1);
+    expect(actionResult).toMatchObject({
+      ok: false,
+      status: null,
+      reason: "network",
+      room: { version: 1 },
+    });
+    unmount();
+  });
+
+  it("rejected: 서버 거절이면 현재 방을 담은 실패 결과를 반환한다", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom(1) });
+      if (!init?.method) return jsonResponse({ room: makeRoom(1) });
+      return jsonResponse({ error: "bad request" }, 400);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+
+    let actionResult;
+    await act(async () => {
+      actionResult = await result.current.sendAction("start");
+    });
+
+    expect(result.current.room?.version).toBe(1);
+    expect(actionResult).toMatchObject({
+      ok: false,
+      status: 400,
+      reason: "rejected",
+      room: { version: 1 },
+    });
+    unmount();
+  });
+});
+
 describe("useRoom leaveRoom", () => {
   let leaveResponse: Response | Error;
   let fetchMock: ReturnType<typeof vi.fn>;
