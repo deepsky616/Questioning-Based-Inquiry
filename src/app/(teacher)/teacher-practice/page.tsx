@@ -11,6 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { QuestionLearningSummary } from "@/components/shared/QuestionLearningSummary";
 import { QuestionPracticeView } from "@/components/shared/QuestionPracticeView";
 import { PracticeBankManager, type PracticeDraft } from "@/components/teacher/PracticeBankManager";
 import {
@@ -124,6 +125,7 @@ export default function TeacherPracticePage() {
               cap: PRACTICE_DAILY_CAP,
             })}
           </p>
+          <QuestionLearningSummary detailsHref="/teacher-question-learning" />
           <QuestionPracticeView />
         </div>
       )}

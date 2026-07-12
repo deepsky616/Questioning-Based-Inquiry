@@ -13,8 +13,6 @@ import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { SectionToggle } from "@/components/shared/SectionToggle";
-import { QuestionTypeGuide } from "@/components/shared/QuestionTypeGuide";
 import {
   PRACTICE_QUIZ_BANK,
   PRACTICE_TRANSFORM_BANK,
@@ -68,7 +66,6 @@ export function QuestionPracticeView() {
   const t = useTranslations("practice");
   const tCls = useTranslations("classification");
   const [tab, setTab] = useState<PracticeTab>("quiz");
-  const [showLearn, setShowLearn] = useState(false);
 
   const typeLabel = (target: TransformTarget) =>
     target === "open" ? tCls("open.label") : target === "conceptual" ? tCls("conceptual.label") : tCls("controversial.label");
@@ -335,16 +332,6 @@ export function QuestionPracticeView() {
 
   return (
     <div className="space-y-6">
-      {/* 유형 알아보기 — 문서 기반 정의·예시 요약 */}
-      <Card>
-        <CardContent className="pt-6">
-          {/* w-full — 글씨뿐 아니라 행 전체 어디를 눌러도 접고 펼쳐진다 */}
-          <SectionToggle icon="📚" title={t("learnTitle")} open={showLearn} onToggle={() => setShowLearn((v) => !v)} className="w-full" />
-          {/* 질문 탐정단 가이드 — 유형 정의·만들기 공식·비교표·탐구 3단계 */}
-          {showLearn && <QuestionTypeGuide />}
-        </CardContent>
-      </Card>
-
       {/* 연습 모드 탭 */}
       <div className="flex gap-2" role="tablist" aria-label={t("title")}>
         {(["quiz", "transform", "create"] as const).map((key) => (
