@@ -10,9 +10,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { writePracticeDraft } from "@/lib/practice-draft";
 import {
   PRACTICE_QUIZ_BANK,
   PRACTICE_TRANSFORM_BANK,
@@ -62,9 +64,15 @@ const CLOSURE_CHOICES: Closure[] = ["closed", "open"];
 const COGNITIVE_CHOICES: Cognitive[] = ["factual", "conceptual", "controversial"];
 const TARGET_CHOICES: TransformTarget[] = ["open", "conceptual", "controversial"];
 
-export function QuestionPracticeView() {
+interface QuestionPracticeViewProps {
+  audience: "student" | "teacher";
+  studentId?: string;
+}
+
+export function QuestionPracticeView({ audience, studentId }: QuestionPracticeViewProps) {
   const t = useTranslations("practice");
   const tCls = useTranslations("classification");
+  const router = useRouter();
   const [tab, setTab] = useState<PracticeTab>("quiz");
 
   const typeLabel = (target: TransformTarget) =>
@@ -257,6 +265,20 @@ export function QuestionPracticeView() {
   const activeTarget: TransformTarget = tab === "transform" ? transformItem.target : createTarget;
   const achieved = checkResult?.achieved ?? false;
 
+  const useQuestionInClass = () => {
+    if (audience !== "student" || !studentId) return;
+    const saved = writePracticeDraft(window.sessionStorage, studentId, {
+      content: input,
+      mode: tab === "transform" ? "transform" : "create",
+      target: activeTarget,
+    });
+    if (!saved) {
+      setCheckError(t("draftSaveFailed"));
+      return;
+    }
+    router.push("/student-ask?draft=practice");
+  };
+
   const switchTab = (next: PracticeTab) => {
     setTab(next);
     resetCheck();
@@ -315,7 +337,11 @@ export function QuestionPracticeView() {
     <div className="space-y-3">
       <Textarea
         value={input}
-        onChange={(e) => setInput(e.target.value.slice(0, MAX_QUESTION_LENGTH))}
+        onChange={(e) => {
+          setInput(e.target.value.slice(0, MAX_QUESTION_LENGTH));
+          setCheckResult(null);
+          setCheckError(null);
+        }}
         placeholder={placeholder}
         rows={3}
       />
@@ -327,6 +353,11 @@ export function QuestionPracticeView() {
       </div>
       {checkError && <p className="text-sm text-red-600">{checkError}</p>}
       {renderCheckResult()}
+      {achieved && audience === "student" && studentId && (
+        <Button onClick={useQuestionInClass} variant="outline" className="h-11 w-full sm:w-auto">
+          {t("useQuestionInClass")}
+        </Button>
+      )}
     </div>
   );
 

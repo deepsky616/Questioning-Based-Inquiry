@@ -9,6 +9,7 @@ import { getSessionFilterOptions, filterSessions, isInquiryDesignSession } from 
 import { getSessionUser } from "@/lib/auth-helpers";
 import { appNotificationQueryKeys } from "@/lib/app-notifications";
 import { useStudentSessions } from "@/lib/app-queries";
+import { consumePracticeDraft } from "@/lib/practice-draft";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
 import { StudentAskCompletionCard } from "./StudentAskCompletionCard";
@@ -46,6 +47,7 @@ function AskContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const draftAppliedRef = useRef(false);
   const { data: authSession } = useSession();
   const user = getSessionUser(authSession);
   const taskParam = searchParams.get("task");
@@ -59,6 +61,7 @@ function AskContent() {
       : null;
 
   const [content, setContent] = useState("");
+  const [draftAnnouncement, setDraftAnnouncement] = useState<string | null>(null);
   const { toast } = useToast();
   const [existingQuestion, setExistingQuestion] = useState<{ id: string; content: string } | null>(null);
   const [isCheckingExisting, setIsCheckingExisting] = useState(false);
@@ -82,6 +85,16 @@ function AskContent() {
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    if (!user.id || draftAppliedRef.current || searchParams.get("draft") !== "practice") return;
+    draftAppliedRef.current = true;
+    const draft = consumePracticeDraft(window.sessionStorage, user.id);
+    if (!draft) return;
+    setContent(draft.content);
+    setDraftAnnouncement(t("practiceDraftLoaded"));
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [searchParams, t, user.id]);
 
   useEffect(() => {
     fetch("/api/config")
@@ -387,6 +400,12 @@ function AskContent() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {draftAnnouncement && (
+        <p role="status" className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-500/30 dark:bg-green-950/40 dark:text-green-200">
+          {draftAnnouncement}
+        </p>
       )}
 
       <StudentAskInputCard

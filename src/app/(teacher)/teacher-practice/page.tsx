@@ -126,7 +126,7 @@ export default function TeacherPracticePage() {
             })}
           </p>
           <QuestionLearningSummary detailsHref="/teacher-question-learning" />
-          <QuestionPracticeView />
+          <QuestionPracticeView audience="teacher" />
         </div>
       )}
 
