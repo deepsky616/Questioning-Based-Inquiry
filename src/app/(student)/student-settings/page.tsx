@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
+import { AccountWithdrawalCard } from "@/components/shared/AccountWithdrawalCard";
 import type { UserRole } from "@/types/user";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useTranslations } from "next-intl";
@@ -74,6 +75,8 @@ export default function SettingsPage() {
       </Card>
 
       <PasswordChangeCard />
+
+      <AccountWithdrawalCard role="STUDENT" />
     </div>
   );
 }

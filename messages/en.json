@@ -7,7 +7,7 @@
     "questions": "Browse Questions",
     "curriculum": "Inquiry Questions",
     "reports": "Activity Report",
-    "settings": "Settings",
+    "settings": "Edit profile",
     "ask": "Ask a Question",
     "explore": "Explore Questions",
     "logout": "Log out",
@@ -17,7 +17,11 @@
     "closeMenu": "Close menu",
     "more": "More",
     "practice": "Practice",
-    "questionLearning": "Question Learning"
+    "questionLearning": "Question Learning",
+    "accountMenu": "Account menu",
+    "personalInfo": "Edit profile",
+    "withdraw": "Delete account",
+    "studentManagement": "Student management"
   },
   "common": {
     "save": "Save",
@@ -164,15 +168,15 @@
       "description": "View question, like, and comment trends and AI analysis by class or by student"
     },
     "teacherSettings": {
-      "title": "Settings",
-      "description": "Manage your teacher account and AI settings"
+      "title": "Edit profile",
+      "description": "Manage your teacher account, password, and AI settings"
     },
     "studentQuestions": {
       "title": "Explore Questions",
       "description": "Manage your own questions, explore your friends' questions, and join the inquiry questions your teacher shared"
     },
     "studentSettings": {
-      "title": "Settings",
+      "title": "Edit profile",
       "description": "View your account info and change your password"
     }
   },
@@ -718,6 +722,25 @@
     "resetCardTitle": "Reset student passwords",
     "resetCardDesc": "Pick students who forgot their password (multiple allowed) and reset to a new one",
     "resetBtnEmpty": "Select students"
+  },
+  "accountWithdrawal": {
+    "title": "Delete account",
+    "teacherDesc": "Please review what will be deleted before deleting your account.",
+    "studentDesc": "If a student account needs to be deleted, ask the teacher in charge of the class.",
+    "openNotice": "Delete account",
+    "noticeTitle": "Before deleting your account",
+    "noticeNoRestore": "Deleted data cannot be restored, so please proceed carefully.",
+    "noticeStudentAskTeacher": "Students who need account deletion should ask the teacher in charge of the class.",
+    "noticeTeacherSessions": "If you have created class sessions or currently active class sessions, all of those class sessions will be deleted.",
+    "finalButton": "Delete account",
+    "finalConfirmTitle": "Delete this account?",
+    "finalConfirmDesc": "Your account data and the class sessions you created will be deleted. This cannot be undone.",
+    "deleting": "Deleting account...",
+    "deleteFailed": "Failed to delete the account",
+    "studentDeleteButton": "Delete student account",
+    "studentDeleteConfirmTitle": "Delete student account",
+    "studentDeleteConfirmDesc": "Delete {name}'s student account?\nThe student's questions, answers, points, and practice history will be deleted and cannot be restored.",
+    "studentDeleteDone": "Deleted {name}'s student account"
   },
   "curriculum": {
     "step1": "Explore curriculum",

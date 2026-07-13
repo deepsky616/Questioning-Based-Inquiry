@@ -55,6 +55,11 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         userName={user.name ?? ""}
         roleSuffix={t("teacherSuffix")}
         extra={<NotificationBell />}
+        accountLinks={{
+          settingsHref: "/teacher-settings",
+          withdrawalHref: "/teacher-settings#account-withdrawal",
+          studentManagementHref: "/teacher-students",
+        }}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PasswordChangeCard } from "@/components/shared/PasswordChangeCard";
+import { AccountWithdrawalCard } from "@/components/shared/AccountWithdrawalCard";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -203,6 +204,8 @@ export default function TeacherSettingsPage() {
       </Card>
 
       <PasswordChangeCard />
+
+      <AccountWithdrawalCard role="TEACHER" />
 
       <Card>
         <CardHeader>

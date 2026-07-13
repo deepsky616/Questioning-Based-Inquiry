@@ -7,7 +7,7 @@
     "questions": "질문조회",
     "curriculum": "탐구질문",
     "reports": "활동 리포트",
-    "settings": "설정",
+    "settings": "개인 정보 수정",
     "ask": "질문하기",
     "explore": "질문탐구",
     "logout": "로그아웃",
@@ -17,7 +17,11 @@
     "closeMenu": "메뉴 닫기",
     "more": "더보기",
     "practice": "질문연습",
-    "questionLearning": "질문학습"
+    "questionLearning": "질문학습",
+    "accountMenu": "계정 메뉴",
+    "personalInfo": "개인 정보 수정",
+    "withdraw": "탈퇴",
+    "studentManagement": "학생관리"
   },
   "common": {
     "save": "저장",
@@ -164,15 +168,15 @@
       "description": "학급별 또는 학생별로 질문·좋아요·댓글 추세와 AI 분석을 볼 수 있어요"
     },
     "teacherSettings": {
-      "title": "설정",
-      "description": "교사 계정 정보 및 AI 설정을 관리하세요"
+      "title": "개인 정보 수정",
+      "description": "교사 계정 정보, 비밀번호, AI 설정을 관리하세요"
     },
     "studentQuestions": {
       "title": "질문탐구",
       "description": "내 질문을 관리하고, 친구들의 질문을 탐구하고, 선생님이 배포한 수업 탐구 질문에 참여해 보세요"
     },
     "studentSettings": {
-      "title": "설정",
+      "title": "개인 정보 수정",
       "description": "계정 정보를 확인하고 비밀번호를 변경할 수 있어요"
     }
   },
@@ -718,6 +722,25 @@
     "resetCardTitle": "학생 비밀번호 재설정",
     "resetCardDesc": "비밀번호를 잊은 담당 학생을 골라(여러 명 가능) 새 비밀번호로 재설정해요",
     "resetBtnEmpty": "학생을 선택하세요"
+  },
+  "accountWithdrawal": {
+    "title": "회원 탈퇴",
+    "teacherDesc": "회원 탈퇴 전 삭제되는 정보를 반드시 확인해 주세요.",
+    "studentDesc": "학생 계정 탈퇴가 필요한 경우 학급담당 선생님에게 요청해 주세요.",
+    "openNotice": "회원 탈퇴",
+    "noticeTitle": "회원 탈퇴 시 유의사항",
+    "noticeNoRestore": "데이터는 복구할 수 없으므로 회원 탈퇴 시 신중히 진행해 주시기 바랍니다.",
+    "noticeStudentAskTeacher": "학생 탈퇴 필요 시 학급담당 선생님에게 문의해 주시기 바랍니다.",
+    "noticeTeacherSessions": "개설된 수업세션과 현재 진행중인 수업세션이 있을 경우 탈퇴시 모든 수업세션이 삭제됩니다.",
+    "finalButton": "회원탈퇴",
+    "finalConfirmTitle": "정말 회원탈퇴를 진행할까요?",
+    "finalConfirmDesc": "회원 데이터와 교사가 개설한 수업세션이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+    "deleting": "탈퇴 처리 중...",
+    "deleteFailed": "회원 탈퇴에 실패했습니다",
+    "studentDeleteButton": "학생 회원 탈퇴",
+    "studentDeleteConfirmTitle": "학생 회원 탈퇴",
+    "studentDeleteConfirmDesc": "{name} 학생 계정을 삭제할까요?\n학생의 질문, 답변, 포인트, 연습 기록이 삭제되며 복구할 수 없습니다.",
+    "studentDeleteDone": "{name} 학생 계정을 삭제했습니다"
   },
   "curriculum": {
     "step1": "교육과정 탐색",

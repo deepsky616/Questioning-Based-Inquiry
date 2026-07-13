@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, Menu, X } from "lucide-react";
+import { ChevronDown, LogOut, Pencil, Trash2, UserCircle, Users, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -15,6 +15,12 @@ import { cn } from "@/lib/utils";
 export interface NavPage {
   href: string;
   label: string;
+}
+
+export interface AccountNavLinks {
+  settingsHref: string;
+  withdrawalHref?: string;
+  studentManagementHref?: string;
 }
 
 const ITEM_GAP = 4; // gap-1
@@ -151,14 +157,17 @@ export function AppNav({
   userName,
   roleSuffix,
   extra,
+  accountLinks,
 }: {
   pages: NavPage[];
   userName: string;
   roleSuffix: string;
   extra?: React.ReactNode;
+  accountLinks?: AccountNavLinks;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const t = useTranslations("nav");
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
@@ -180,17 +189,67 @@ export function AppNav({
               <LanguageToggle />
             </div>
             <ThemeToggle />
-            <span className="hidden xl:inline text-sm text-muted-foreground truncate max-w-[8rem]">
-              {userName} {roleSuffix}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden lg:inline-flex"
-              onClick={() => signOut({ callbackUrl: "/login" })}
-            >
-              {t("logout")}
-            </Button>
+            <Popover open={accountOpen} onOpenChange={setAccountOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={t("accountMenu")}
+                  className="hidden min-[420px]:inline-flex h-11 items-center gap-2 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-primary xl:max-w-[14rem]"
+                >
+                  <UserCircle className="h-5 w-5 shrink-0" />
+                  <span className="hidden xl:inline truncate">
+                    {userName} {roleSuffix}
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-0">
+                <div className="border-b px-4 py-3">
+                  <p className="truncate text-sm font-semibold text-foreground">{userName} {roleSuffix}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Question Lab</p>
+                </div>
+                <div className="p-1">
+                  {accountLinks?.settingsHref && (
+                    <Link
+                      href={accountLinks.settingsHref}
+                      onClick={() => setAccountOpen(false)}
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+                    >
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
+                      {t("personalInfo")}
+                    </Link>
+                  )}
+                  {accountLinks?.withdrawalHref && (
+                    <Link
+                      href={accountLinks.withdrawalHref}
+                      onClick={() => setAccountOpen(false)}
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      {t("withdraw")}
+                    </Link>
+                  )}
+                  {accountLinks?.studentManagementHref && (
+                    <Link
+                      href={accountLinks.studentManagementHref}
+                      onClick={() => setAccountOpen(false)}
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+                    >
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      {t("studentManagement")}
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+                  >
+                    <LogOut className="h-4 w-4 text-muted-foreground" />
+                    {t("logout")}
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
             {/* 햄버거: 인라인 네비가 숨는 lg 미만에서 표시 */}
             <button
               type="button"
@@ -233,6 +292,38 @@ export function AppNav({
                 {t("logout")}
               </Button>
             </div>
+            {accountLinks && (
+              <div className="grid gap-1 border-t pt-2">
+                <Link
+                  href={accountLinks.settingsHref}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+                >
+                  <Pencil className="h-4 w-4" />
+                  {t("personalInfo")}
+                </Link>
+                {accountLinks.withdrawalHref && (
+                  <Link
+                    href={accountLinks.withdrawalHref}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {t("withdraw")}
+                  </Link>
+                )}
+                {accountLinks.studentManagementHref && (
+                  <Link
+                    href={accountLinks.studentManagementHref}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+                  >
+                    <Users className="h-4 w-4" />
+                    {t("studentManagement")}
+                  </Link>
+                )}
+              </div>
+            )}
           </nav>
         </div>
       )}

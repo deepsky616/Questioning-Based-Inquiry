@@ -6,6 +6,8 @@ import { useTranslations, useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/use-toast";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -210,14 +212,18 @@ export function StudentDetailDialog({
   const t = useTranslations("students");
   const tc = useTranslations("common");
   const tCls = useTranslations("classification");
+  const tWithdrawal = useTranslations("accountWithdrawal");
   const locale = useLocale();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const confirm = useConfirm();
   const [period, setPeriod] = useState<Period>("month");
   const [metric, setMetric] = useState<Metric>("question");
   const [delta, setDelta] = useState(0);
   const [reason, setReason] = useState("");
   // 최근 활동 탭(질문/답변/포인트) — 폭 전체를 써서 내용을 읽을 수 있게
   const [activityTab, setActivityTab] = useState<"questions" | "answers" | "points">("questions");
+  const [deletingStudent, setDeletingStudent] = useState(false);
   // 항목에서 '지급' 클릭 → 사유 자동 채움 + 점수 입력 포커스
   const deltaInputRef = useRef<HTMLInputElement>(null);
   const fillReasonFrom = (prefix: string, content: string) => {
@@ -273,6 +279,37 @@ export function StudentDetailDialog({
         onChanged();
       }
     } catch {} finally { setSaving(false); }
+  }
+
+  async function deleteStudentAccount() {
+    if (deletingStudent) return;
+    if (!(await confirm({
+      title: tWithdrawal("studentDeleteConfirmTitle"),
+      description: tWithdrawal("studentDeleteConfirmDesc", { name: student.name }),
+      confirmText: tWithdrawal("studentDeleteButton"),
+      destructive: true,
+    }))) return;
+
+    setDeletingStudent(true);
+    try {
+      const res = await fetch(`/api/teacher/students/${student.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || tWithdrawal("deleteFailed"));
+      }
+      toast({ variant: "success", description: tWithdrawal("studentDeleteDone", { name: student.name }) });
+      await queryClient.invalidateQueries({ queryKey: ["student-stats", student.id] });
+      await queryClient.invalidateQueries({ queryKey: appQueryKeys.teacherStudents });
+      onChanged();
+      onClose();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        description: error instanceof Error ? error.message : tWithdrawal("deleteFailed"),
+      });
+    } finally {
+      setDeletingStudent(false);
+    }
   }
 
   return (
@@ -589,6 +626,9 @@ export function StudentDetailDialog({
         </div>
 
         <DialogFooter>
+          <Button variant="destructive" onClick={deleteStudentAccount} disabled={deletingStudent}>
+            {deletingStudent ? tWithdrawal("deleting") : tWithdrawal("studentDeleteButton")}
+          </Button>
           <Button variant="outline" onClick={onClose}>{tc("close")}</Button>
         </DialogFooter>
       </DialogContent>
