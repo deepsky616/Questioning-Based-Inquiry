@@ -53,6 +53,9 @@ describe("core screen layout improvements", () => {
     expect(teacherDashboard.indexOf("{/* 오늘 할 일 */")).toBeLessThan(
       teacherDashboard.indexOf("{/* 총 질문 수 */"),
     );
+    expect(teacherDashboard).not.toContain('t("taskNoQuestionsTitle")');
+    expect(teacherDashboard).not.toContain('t("taskUnfinishedSessionsTitle")');
+    expect(teacherDashboard).not.toContain('t("taskDecliningTitle")');
   });
 
   it("keeps teacher curriculum page width aligned with dashboard", () => {

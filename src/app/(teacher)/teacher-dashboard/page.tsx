@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { useTranslations } from "next-intl";
 import { useTeacherStudents } from "@/lib/app-queries";
+import { buildTeacherPriorityCounts } from "@/lib/dashboard-priority-tasks";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
 interface TeacherClass {
@@ -74,14 +75,13 @@ function TeacherDashboard() {
   const t = useTranslations("dashboard");
   const router = useRouter();
   const studentStatsRef = useRef<HTMLDivElement | null>(null);
-  const [highlightStudentStats, setHighlightStudentStats] = useState(false);
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
   const [period, setPeriod] = useState("month");
   const [selectedClass, setSelectedClass] = useState("all");
 
   // 학급 통계(질문수·댓글수·좋아요수 등)는 react-query로 주기 폴링(12초)+포커스 재조회.
-  const { data: stats, isLoading } = useQuery<Stats>({
+  const statsQuery = useQuery<Stats>({
     queryKey: ["teacher-stats", period, selectedClass],
     queryFn: async () => {
       const params = new URLSearchParams({ period });
@@ -97,29 +97,31 @@ function TeacherDashboard() {
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
-  const { data: pendingPointCount = 0 } = useQuery<number>({
+  const { data: stats, isLoading } = statsQuery;
+  const pendingPointQuery = useQuery<number>({
     queryKey: ["teacher-pending-point-count"],
     queryFn: async () => {
       const r = await fetch("/api/teacher/points/pending-count");
-      if (!r.ok) return 0;
+      if (!r.ok) throw new Error("추천 포인트 수를 불러오지 못했습니다");
       const data = await r.json();
       return Number(data.count ?? 0);
     },
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
-  const { data: flaggedTotal = 0 } = useQuery<number>({
+  const flaggedQuery = useQuery<number>({
     queryKey: ["teacher-flagged-count"],
     queryFn: async () => {
       const r = await fetch("/api/teacher/flagged-count");
-      if (!r.ok) return 0;
+      if (!r.ok) throw new Error("부적절 의심 활동 수를 불러오지 못했습니다");
       const data = await r.json();
       return Number(data.total ?? 0);
     },
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
-  const { data: teacherStudentData } = useTeacherStudents<TeacherStudent, TeacherClass>();
+  const teacherStudentsQuery = useTeacherStudents<TeacherStudent, TeacherClass>();
+  const { data: teacherStudentData } = teacherStudentsQuery;
   const teacherStudents = useMemo(() => teacherStudentData?.students ?? [], [teacherStudentData]);
 
   // 학급 변경 시 선택값이 새 목록에 없으면 "전체"로 초기화
@@ -142,11 +144,6 @@ function TeacherDashboard() {
 
   // 추세 열 정렬: 기본(번호순) ↔ 감소 학생 우선(지도가 필요한 학생 찾기)
   const [trendSortOn, setTrendSortOn] = useState(false);
-  const focusStudentStats = () => {
-    studentStatsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    setHighlightStudentStats(true);
-    window.setTimeout(() => setHighlightStudentStats(false), 1600);
-  };
 
   const teacherClasses = stats?.teacherClasses ?? [];
   const scopedStudents = useMemo(() => {
@@ -158,20 +155,8 @@ function TeacherDashboard() {
     () => new Set((stats?.byStudent ?? []).map((student) => student.studentId)),
     [stats],
   );
-  const noQuestionStudentCount = scopedStudents.filter((student) => !activeStudentIds.has(student.id)).length;
-  const unfinishedSessionStudentCount = scopedStudents.filter((student) => (student.sessionProgress?.remaining ?? 0) > 0).length;
-  const decliningStudentCount = (stats?.byStudent ?? []).filter((student) => student.trend !== null && student.trend < 0).length;
-  const noQuestionsHref = (() => {
-    const params = new URLSearchParams({ filter: "noQuestions", period });
-    if (selectedClass !== "all") {
-      const [grade, className] = selectedClass.split("|");
-      params.set("grade", grade);
-      params.set("className", className);
-    }
-    return `/teacher-students?${params.toString()}`;
-  })();
-  const unfinishedSessionsHref = (() => {
-    const params = new URLSearchParams({ progress: "remaining", sort: "progressAsc" });
+  const attentionHref = (() => {
+    const params = new URLSearchParams({ filter: "attention", period });
     if (selectedClass !== "all") {
       const [grade, className] = selectedClass.split("|");
       params.set("grade", grade);
@@ -187,61 +172,60 @@ function TeacherDashboard() {
     const [grade, className] = selectedClass.split("|");
     return `${stats.school ? `${stats.school} ` : ""}${t("gradeClass", { grade, className })}`;
   })();
-  const taskItems: TeacherTaskItem[] = [
-    {
-      key: "points",
-      title: t("taskPointsTitle"),
-      description: t("taskPointsDesc"),
-      count: pendingPointCount,
-      action: t("taskReview"),
-      href: "/teacher-points?tab=points",
-      activeClass: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200",
-    },
-    {
-      key: "flagged",
-      title: t("taskFlaggedTitle"),
-      description: t("taskFlaggedDesc"),
-      count: flaggedTotal,
-      action: t("taskReview"),
-      href: "/teacher-questions?flagged=1",
-      activeClass: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-200",
-    },
-    {
-      key: "noQuestions",
-      title: t("taskNoQuestionsTitle"),
-      description: t("taskNoQuestionsDesc"),
-      count: noQuestionStudentCount,
-      action: t("taskOpenStudents"),
-      href: noQuestionsHref,
-      activeClass: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200",
-    },
-    {
-      key: "unfinishedSessions",
-      title: t("taskUnfinishedSessionsTitle"),
-      description: t("taskUnfinishedSessionsDesc"),
-      count: unfinishedSessionStudentCount,
-      action: t("taskOpenStudents"),
-      href: unfinishedSessionsHref,
-      activeClass: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200",
-    },
-    {
-      key: "declining",
-      title: t("taskDecliningTitle"),
-      description: t("taskDecliningDesc"),
-      count: decliningStudentCount,
-      action: t("taskSortTrend"),
-      href: "",
-      activeClass: "border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-950/30 dark:text-orange-200",
-    },
-  ];
-  const hasOpenTasks = taskItems.some((item) => item.count > 0);
-  const handleTaskClick = (item: TeacherTaskItem) => {
-    if (item.key === "declining") {
-      setTrendSortOn(true);
-      focusStudentStats();
-      return;
+  const taskStatus =
+    statsQuery.isError || pendingPointQuery.isError || flaggedQuery.isError || teacherStudentsQuery.isError
+      ? "error"
+      : statsQuery.isSuccess && pendingPointQuery.isSuccess && flaggedQuery.isSuccess && teacherStudentsQuery.isSuccess
+        ? "ready"
+        : "loading";
+  const taskCounts = taskStatus === "ready"
+    ? buildTeacherPriorityCounts({
+        flaggedCount: flaggedQuery.data ?? 0,
+        pendingPointCount: pendingPointQuery.data ?? 0,
+        students: scopedStudents.map((student) => ({
+          id: student.id,
+          hasQuestion: activeStudentIds.has(student.id),
+          remainingSessionCount: student.sessionProgress?.remaining ?? 0,
+        })),
+      })
+    : [];
+  const taskItems: TeacherTaskItem[] = taskCounts.map((item) => {
+    if (item.key === "flagged") {
+      return {
+        key: item.key,
+        label: t("taskFlaggedTitle"),
+        countLabel: t("taskItemCount", { count: item.count }),
+        detail: t("taskWholeScope"),
+        href: "/teacher-questions?flagged=1",
+      };
     }
-    if (item.href) router.push(item.href);
+    if (item.key === "points") {
+      return {
+        key: item.key,
+        label: t("taskPointsTitle"),
+        countLabel: t("taskItemCount", { count: item.count }),
+        detail: t("taskWholeScope"),
+        href: "/teacher-points?tab=points",
+      };
+    }
+    return {
+      key: item.key,
+      label: t("taskAttentionTitle"),
+      countLabel: t("taskStudentCount", { count: item.count }),
+      detail: dashboardScopeLabel,
+      href: attentionHref,
+    };
+  });
+  const handleTaskClick = (item: TeacherTaskItem) => {
+    router.push(item.href);
+  };
+  const handleTaskRetry = () => {
+    void Promise.all([
+      statsQuery.refetch(),
+      pendingPointQuery.refetch(),
+      flaggedQuery.refetch(),
+      teacherStudentsQuery.refetch(),
+    ]);
   };
 
   return (
@@ -273,24 +257,28 @@ function TeacherDashboard() {
         }}
       />
 
+      {/* 오늘 할 일 */}
+      <TeacherTodayTasksCard
+        taskItems={taskItems}
+        status={taskStatus}
+        onTaskClick={handleTaskClick}
+        onRetry={handleTaskRetry}
+        labels={{
+          title: t("todayTasksTitle"),
+          description: t("todayTasksDesc"),
+          done: t("taskDone"),
+          loading: t("taskLoading"),
+          error: t("taskLoadError"),
+          retry: t("taskRetry"),
+        }}
+      />
+
       {isLoading ? (
         <DashboardSkeleton />
       ) : !stats ? (
         <div className="text-center py-16 text-muted-foreground">{t("statsLoadError")}</div>
       ) : (
         <>
-          {/* 오늘 할 일 */}
-          <TeacherTodayTasksCard
-            taskItems={taskItems}
-            hasOpenTasks={hasOpenTasks}
-            onTaskClick={handleTaskClick}
-            labels={{
-              title: t("todayTasksTitle"),
-              description: t("todayTasksDesc"),
-              done: t("taskDone"),
-            }}
-          />
-
           {/* 총 질문 수 */}
           <Card>
             <CardContent className="pt-6">
@@ -407,7 +395,7 @@ function TeacherDashboard() {
             ref={studentStatsRef}
             students={stats.byStudent}
             trendSortOn={trendSortOn}
-            highlight={highlightStudentStats}
+            highlight={false}
             onTrendSortToggle={() => setTrendSortOn((v) => !v)}
           />
 

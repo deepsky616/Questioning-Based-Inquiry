@@ -1,84 +1,72 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
+import {
+  PriorityTaskList,
+  type PriorityTaskListItem,
+} from "@/components/shared/PriorityTaskList";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export interface TeacherTaskItem {
-  key: string;
-  title: string;
-  description: string;
-  count: number;
-  action: string;
+export interface TeacherTaskItem extends PriorityTaskListItem {
   href: string;
-  activeClass: string;
 }
 
 interface TeacherTodayTasksCardProps {
   taskItems: TeacherTaskItem[];
-  hasOpenTasks: boolean;
+  status: "loading" | "ready" | "error";
   onTaskClick: (item: TeacherTaskItem) => void;
+  onRetry: () => void;
   labels: {
     title: string;
     description: string;
     done: string;
+    loading: string;
+    error: string;
+    retry: string;
   };
 }
 
 export function TeacherTodayTasksCard({
   taskItems,
-  hasOpenTasks,
+  status,
   onTaskClick,
+  onRetry,
   labels,
 }: TeacherTodayTasksCardProps) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <CardTitle className="text-base">{labels.title}</CardTitle>
-            <p className="mt-1 text-xs text-muted-foreground">{labels.description}</p>
-          </div>
-          {!hasOpenTasks && (
-            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200">
-              {labels.done}
-            </span>
-          )}
-        </div>
+        <CardTitle className="text-base">{labels.title}</CardTitle>
+        <p className="mt-1 text-xs text-muted-foreground">{labels.description}</p>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-2 md:grid-cols-2">
-          {taskItems.map((item) => {
-            const active = item.count > 0;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => onTaskClick(item)}
-                className={`rounded-lg border px-3 py-3 text-left transition-colors ${
-                  active
-                    ? item.activeClass
-                    : "border-border bg-muted/20 text-muted-foreground hover:bg-muted/40"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                    <p className="mt-0.5 text-xs leading-5">{item.description}</p>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-bold ${
-                      active
-                        ? "bg-white/80 text-foreground dark:bg-background/70"
-                        : "bg-background text-muted-foreground"
-                    }`}
-                  >
-                    {item.count}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs font-semibold">{item.action}</p>
-              </button>
-            );
-          })}
-        </div>
+        {status === "loading" && (
+          <div role="status" aria-label={labels.loading} className="space-y-3 py-1">
+            <p className="text-sm text-muted-foreground">{labels.loading}</p>
+            <Skeleton className="h-11 w-full" />
+            <Skeleton className="h-11 w-full" />
+          </div>
+        )}
+
+        {status === "error" && (
+          <div role="alert" className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-destructive">{labels.error}</p>
+            <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+              <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+              {labels.retry}
+            </Button>
+          </div>
+        )}
+
+        {status === "ready" && taskItems.length === 0 && (
+          <p className="py-3 text-sm text-muted-foreground">{labels.done}</p>
+        )}
+
+        {status === "ready" && taskItems.length > 0 && (
+          <PriorityTaskList items={taskItems} onSelect={onTaskClick} />
+        )}
       </CardContent>
     </Card>
   );

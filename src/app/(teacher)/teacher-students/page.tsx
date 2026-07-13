@@ -60,10 +60,13 @@ export default function StudentsPage() {
   const [progressFilter, setProgressFilter] = useState<ProgressFilter>("all");
   const [studentSort, setStudentSort] = useState<StudentSort>("class");
   const [selected, setSelected] = useState<Student | null>(null);
-  const noQuestionsFilterOn = searchParams.get("filter") === "noQuestions";
-  const noQuestionsPeriod = searchParams.get("period") ?? "month";
-  const noQuestionsGrade = searchParams.get("grade");
-  const noQuestionsClassName = searchParams.get("className");
+  const dashboardFilter = searchParams.get("filter");
+  const noQuestionsFilterOn = dashboardFilter === "noQuestions";
+  const attentionFilterOn = dashboardFilter === "attention";
+  const questionActivityFilterOn = noQuestionsFilterOn || attentionFilterOn;
+  const questionActivityPeriod = searchParams.get("period") ?? "month";
+  const questionActivityGrade = searchParams.get("grade");
+  const questionActivityClassName = searchParams.get("className");
   const progressParam = searchParams.get("progress");
   const sortParam = searchParams.get("sort");
 
@@ -71,48 +74,47 @@ export default function StudentsPage() {
   const students = data?.students ?? EMPTY_STUDENTS;
   const teacherClasses = data?.teacherClasses ?? EMPTY_TEACHER_CLASSES;
   const refetchList = () => queryClient.invalidateQueries({ queryKey: appQueryKeys.teacherStudents });
-  const { data: noQuestionsStats } = useQuery<TeacherStatsSummary | null>({
-    queryKey: ["teacher-students-no-questions-filter", noQuestionsPeriod, noQuestionsGrade, noQuestionsClassName],
+  const questionActivityStatsQuery = useQuery<TeacherStatsSummary>({
+    queryKey: ["teacher-students-question-activity-filter", questionActivityPeriod, questionActivityGrade, questionActivityClassName],
     queryFn: async () => {
-      if (!noQuestionsFilterOn) return null;
-      const params = new URLSearchParams({ period: noQuestionsPeriod });
-      if (noQuestionsGrade && noQuestionsClassName) {
-        params.set("grade", noQuestionsGrade);
-        params.set("className", noQuestionsClassName);
+      const params = new URLSearchParams({ period: questionActivityPeriod });
+      if (questionActivityGrade && questionActivityClassName) {
+        params.set("grade", questionActivityGrade);
+        params.set("className", questionActivityClassName);
       }
       const r = await fetch(`/api/stats?${params.toString()}`);
-      if (!r.ok) return null;
+      if (!r.ok) throw new Error("학생 질문 활동을 불러오지 못했습니다");
       return r.json();
     },
-    enabled: noQuestionsFilterOn,
+    enabled: questionActivityFilterOn,
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const activeStudentIdsForFilter = useMemo(
-    () => new Set((noQuestionsStats?.byStudent ?? []).map((student) => student.studentId)),
-    [noQuestionsStats],
+    () => new Set((questionActivityStatsQuery.data?.byStudent ?? []).map((student) => student.studentId)),
+    [questionActivityStatsQuery.data],
   );
 
   useEffect(() => {
-    if (!noQuestionsFilterOn) return;
+    if (!questionActivityFilterOn) return;
     setMgmtTab("list");
     setSearch("");
-    if (noQuestionsGrade && noQuestionsClassName) {
-      setFilterClass(`${noQuestionsGrade}-${noQuestionsClassName}`);
+    if (questionActivityGrade && questionActivityClassName) {
+      setFilterClass(`${questionActivityGrade}-${questionActivityClassName}`);
     } else {
       setFilterClass("all");
     }
-  }, [noQuestionsFilterOn, noQuestionsGrade, noQuestionsClassName]);
+  }, [questionActivityFilterOn, questionActivityGrade, questionActivityClassName]);
 
   useEffect(() => {
     if (progressParam !== "remaining" && sortParam !== "progressAsc") return;
     setMgmtTab("list");
     if (progressParam === "remaining") setProgressFilter("remaining");
     if (sortParam === "progressAsc") setStudentSort("progressAsc");
-    if (noQuestionsGrade && noQuestionsClassName) {
-      setFilterClass(`${noQuestionsGrade}-${noQuestionsClassName}`);
+    if (questionActivityGrade && questionActivityClassName) {
+      setFilterClass(`${questionActivityGrade}-${questionActivityClassName}`);
     }
-  }, [progressParam, sortParam, noQuestionsGrade, noQuestionsClassName]);
+  }, [progressParam, sortParam, questionActivityGrade, questionActivityClassName]);
 
   const normalizedSearch = search.trim().replace(/학년|반/g, "").trim();
 
@@ -127,11 +129,17 @@ export default function StudentsPage() {
       `${s.grade}-${s.className}` === filterClass;
     const matchNoQuestions =
       !noQuestionsFilterOn ||
-      !activeStudentIdsForFilter.has(s.id);
+      (questionActivityStatsQuery.isSuccess && !activeStudentIdsForFilter.has(s.id));
+    const matchAttention =
+      !attentionFilterOn ||
+      (questionActivityStatsQuery.isSuccess && (
+        !activeStudentIdsForFilter.has(s.id) ||
+        (s.sessionProgress?.remaining ?? 0) > 0
+      ));
     const matchProgress =
       progressFilter === "all" ||
       (s.sessionProgress?.remaining ?? 0) > 0;
-    return matchSearch && matchClass && matchNoQuestions && matchProgress;
+    return matchSearch && matchClass && matchNoQuestions && matchAttention && matchProgress;
   });
 
   const sortedFiltered = [...filtered].sort((a, b) => {
@@ -157,10 +165,13 @@ export default function StudentsPage() {
   const totalP = students.reduce((a, b) => a + b.totalPoints, 0);
   const avgP = students.length === 0 ? 0 : Math.round(totalP / students.length);
   const selectedStudentId = searchParams.get("studentId");
-  const noQuestionsPeriodLabel =
-    noQuestionsPeriod === "week" ? t("filterNoQuestionsWeek")
-    : noQuestionsPeriod === "semester" ? t("filterNoQuestionsSemester")
+  const questionActivityPeriodLabel =
+    questionActivityPeriod === "week" ? t("filterNoQuestionsWeek")
+    : questionActivityPeriod === "semester" ? t("filterNoQuestionsSemester")
     : t("filterNoQuestionsMonth");
+  const studentListLoading = isLoading || (
+    questionActivityFilterOn && questionActivityStatsQuery.isPending
+  );
 
   useEffect(() => {
     if (!selectedStudentId || students.length === 0) return;
@@ -299,7 +310,7 @@ export default function StudentsPage() {
       {noQuestionsFilterOn && (
         <div className="flex flex-col gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-medium">
-            {t("filterNoQuestionsActive", { period: noQuestionsPeriodLabel })}
+            {t("filterNoQuestionsActive", { period: questionActivityPeriodLabel })}
           </p>
           <button
             type="button"
@@ -311,7 +322,36 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {isLoading ? (
+      {attentionFilterOn && (
+        <div className="flex flex-col gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-medium">
+            {t("filterAttentionActive", { period: questionActivityPeriodLabel })}
+          </p>
+          <button
+            type="button"
+            onClick={() => router.replace("/teacher-students")}
+            className="self-start rounded-md border border-sky-300 bg-white px-2.5 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-100 dark:bg-background dark:text-sky-200 sm:self-auto"
+          >
+            {t("filterNoQuestionsClear")}
+          </button>
+        </div>
+      )}
+
+      {questionActivityFilterOn && questionActivityStatsQuery.isError && (
+        <div role="alert" className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-medium">{t("filterActivityLoadError")}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void questionActivityStatsQuery.refetch()}
+          >
+            {t("filterActivityRetry")}
+          </Button>
+        </div>
+      )}
+
+      {questionActivityFilterOn && questionActivityStatsQuery.isError ? null : studentListLoading ? (
         <div className="text-center py-16 text-muted-foreground">{t("loading")}</div>
       ) : students.length === 0 ? (
         <Card><CardContent className="p-0">
