@@ -248,18 +248,6 @@ function TeacherDashboard() {
     <div className="space-y-6">
       <PageHeader title={tPages("teacherDashboard.title")} description={tPages("teacherDashboard.description")} />
 
-      <div className="flex w-fit overflow-hidden rounded-md border">
-        <button
-          type="button"
-          onClick={() => router.replace("/teacher-dashboard", { scroll: false })}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            tab === "overview" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-          }`}
-        >
-          {t("tabOverview")}
-        </button>
-      </div>
-
       {tab === "reports" ? (
         <TeacherReportsView />
       ) : (
