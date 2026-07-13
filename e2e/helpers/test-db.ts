@@ -26,6 +26,8 @@ const STUDENT_NUMBER_BY_KEY: Record<string, string> = {
   "nav-tablet": "74",
   "learning-chromium": "75",
   "learning-tablet": "76",
+  "flow-chromium": "77",
+  "flow-tablet": "78",
 };
 
 function studentEmailFor(key: string): string {

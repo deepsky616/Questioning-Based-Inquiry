@@ -73,7 +73,7 @@ test.describe("학생 질문 작성 흐름", () => {
 
     await expect(work.getByText("열린 질문", { exact: true })).toBeVisible({ timeout: 10000 });
     await expect(work.getByText("개념적 질문", { exact: true })).toBeVisible();
-    await work.getByRole("button", { name: /질문 저장하기/ }).click();
+    await work.getByRole("button", { name: "질문 저장", exact: true }).click();
 
     await expect(work.getByText("질문이 저장되었습니다")).toBeVisible({ timeout: 10000 });
     await work.getByRole("button", { name: "내 질문 보기" }).click();
