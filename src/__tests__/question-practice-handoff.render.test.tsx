@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import { QuestionPracticeView } from "@/components/shared/QuestionPracticeView";
@@ -32,6 +32,25 @@ async function completeTransform() {
   });
   fireEvent.click(screen.getByRole("button", { name: "AI에게 확인받기" }));
   await screen.findByText(/목표 달성/);
+}
+
+function successfulCheckResponse() {
+  return {
+    ok: true,
+    json: async () => ({
+      achieved: true,
+      awarded: 0,
+      classification: { closure: "open", cognitive: "conceptual" },
+    }),
+  };
+}
+
+function deferredCheckResponse() {
+  let resolve!: (response: ReturnType<typeof successfulCheckResponse>) => void;
+  const promise = new Promise<ReturnType<typeof successfulCheckResponse>>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }
 
 beforeEach(() => {
@@ -117,5 +136,56 @@ describe("연습 질문 전달", () => {
     });
 
     expect(screen.queryByRole("button", { name: "이 질문으로 질문하기" })).not.toBeInTheDocument();
+  });
+
+  it("요청 중 입력을 고치면 늦게 도착한 이전 성공 결과를 버린다", async () => {
+    const delayed = deferredCheckResponse();
+    vi.stubGlobal("fetch", vi.fn(() => delayed.promise));
+    renderPractice("student", "student-1");
+    fireEvent.click(screen.getByRole("tab", { name: "2. 질문 바꾸기" }));
+    const input = screen.getByPlaceholderText("바꾼 질문을 써 보세요");
+    fireEvent.change(input, { target: { value: "처음 확인을 요청한 질문입니다" } });
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 확인받기" }));
+
+    fireEvent.change(input, { target: { value: "요청 뒤에 고친 질문입니다" } });
+    await act(async () => {
+      delayed.resolve(successfulCheckResponse());
+      await delayed.promise;
+    });
+
+    expect(screen.queryByRole("button", { name: "이 질문으로 질문하기" })).not.toBeInTheDocument();
+    expect(input).toHaveValue("요청 뒤에 고친 질문입니다");
+  });
+
+  it("늦은 이전 요청의 마무리가 새 판정 요청의 진행 상태를 바꾸지 않는다", async () => {
+    const first = deferredCheckResponse();
+    const second = deferredCheckResponse();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise),
+    );
+    renderPractice("student", "student-1");
+    fireEvent.click(screen.getByRole("tab", { name: "2. 질문 바꾸기" }));
+    const input = screen.getByPlaceholderText("바꾼 질문을 써 보세요");
+    fireEvent.change(input, { target: { value: "첫 번째 질문입니다" } });
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 확인받기" }));
+
+    fireEvent.change(input, { target: { value: "두 번째 질문입니다" } });
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 확인받기" }));
+    await act(async () => {
+      first.resolve(successfulCheckResponse());
+      await first.promise;
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "확인하는 중..." })).toBeDisabled();
+      expect(screen.queryByRole("button", { name: "이 질문으로 질문하기" })).not.toBeInTheDocument();
+    });
+
+    await act(async () => {
+      second.resolve(successfulCheckResponse());
+      await second.promise;
+    });
+    expect(await screen.findByRole("button", { name: "이 질문으로 질문하기" })).toBeInTheDocument();
   });
 });

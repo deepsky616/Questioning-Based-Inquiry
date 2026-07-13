@@ -154,11 +154,18 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
   const [isChecking, setIsChecking] = useState(false);
   const [checkResult, setCheckResult] = useState<PracticeCheckResponse | null>(null);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const checkRequestRef = useRef(0);
+
+  const invalidateCheck = () => {
+    checkRequestRef.current += 1;
+    setIsChecking(false);
+    setCheckResult(null);
+    setCheckError(null);
+  };
 
   const resetCheck = () => {
     setInput("");
-    setCheckResult(null);
-    setCheckError(null);
+    invalidateCheck();
   };
 
   // ── 모드 2: 질문 바꾸기 ──
@@ -234,6 +241,7 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
   const runCheck = async () => {
     const content = input.trim();
     if (!content || isChecking) return;
+    const requestId = ++checkRequestRef.current;
     setIsChecking(true);
     setCheckError(null);
     setCheckResult(null);
@@ -253,12 +261,14 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
         body: JSON.stringify(payload),
       });
       const data = await res.json();
+      if (checkRequestRef.current !== requestId) return;
       if (!res.ok) throw new Error(data.error || t("aiError"));
       setCheckResult(data);
     } catch (err) {
+      if (checkRequestRef.current !== requestId) return;
       setCheckError(err instanceof Error ? err.message : t("aiError"));
     } finally {
-      setIsChecking(false);
+      if (checkRequestRef.current === requestId) setIsChecking(false);
     }
   };
 
@@ -339,8 +349,7 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
         value={input}
         onChange={(e) => {
           setInput(e.target.value.slice(0, MAX_QUESTION_LENGTH));
-          setCheckResult(null);
-          setCheckError(null);
+          invalidateCheck();
         }}
         placeholder={placeholder}
         rows={3}
@@ -538,7 +547,10 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
                   <button
                     key={target}
                     type="button"
-                    onClick={() => { setCreateTarget(target); setCheckResult(null); }}
+                    onClick={() => {
+                      setCreateTarget(target);
+                      invalidateCheck();
+                    }}
                     className={`rounded-full border px-4 py-1.5 text-sm font-medium ${
                       createTarget === target ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300" : "text-muted-foreground"
                     }`}
