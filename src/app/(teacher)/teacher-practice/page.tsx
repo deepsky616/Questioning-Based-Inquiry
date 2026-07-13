@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Copy, RefreshCw } from "lucide-react";
+import { ChevronDown, Copy, Printer, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -127,6 +127,7 @@ function TeacherPracticeContent() {
   ).map((q) => localizePracticeQuizItem(q, locale));
   const localizedTransformBank = PRACTICE_TRANSFORM_BANK.map((item) => localizePracticeTransformItem(item, locale));
   const localizedCreateTopics = PRACTICE_CREATE_TOPICS.map((topic) => localizePracticeCreateTopic(topic, locale));
+  const printGuideLabel = locale === "en" ? "Print worksheet" : "학습지 출력";
 
   // ── 탭 3: 학생 연습 현황 ──
   const [focusFilter, setFocusFilter] = useState<PracticeFocusFilter>(requestedFocus);
@@ -225,7 +226,18 @@ function TeacherPracticeContent() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t("title")} description={t("teacherSubtitle")} />
+      <PageHeader
+        title={t("title")}
+        description={t("teacherSubtitle")}
+        actions={
+          <Button asChild variant="outline" className="gap-2">
+            <Link href="/teacher-practice/print-guide">
+              <Printer className="h-4 w-4" />
+              {printGuideLabel}
+            </Link>
+          </Button>
+        }
+      />
 
       <div className="flex gap-2" role="tablist" aria-label={t("title")}>
         {(["try", "bank", "stats"] as const).map((key) => (
