@@ -9,8 +9,9 @@ import { AppNav } from "@/components/shared/AppNav";
 import { StudentNotificationBell } from "@/components/student/StudentNotificationBell";
 import { getSessionUser } from "@/lib/auth-helpers";
 
-// 학습 흐름 순서: 홈(대시보드+상세 리포트 탭) → 질문학습 → 질문연습 → 질문하기 → 질문탐구 → 질문놀이 → 설정
+// 학습 흐름 순서: 홈(대시보드+상세 리포트 탭) → 질문학습 → 질문연습 → 질문하기 → 질문탐구 → 질문놀이
 // 활동 리포트는 대시보드의 '상세 리포트' 탭으로 통합되어 별도 메뉴에서 제외.
+// 개인 정보 수정은 상단 계정 메뉴에서 접근한다.
 const STUDENT_PAGES = [
   { href: "/student-dashboard", key: "dashboard" },
   { href: "/student-question-learning", key: "questionLearning" },
@@ -18,7 +19,6 @@ const STUDENT_PAGES = [
   { href: "/student-ask", key: "ask" },
   { href: "/student-questions", key: "explore" },
   { href: "/student-question-play", key: "questionPlay" },
-  { href: "/student-settings", key: "settings" },
 ] as const;
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
