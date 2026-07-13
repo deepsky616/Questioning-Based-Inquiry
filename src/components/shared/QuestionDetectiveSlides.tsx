@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuestionLearningSlideContent } from "@/components/shared/QuestionLearningSlideContent";
 import { cn } from "@/lib/utils";
-import { QUESTION_LEARNING_CHECKS } from "@/lib/question-detective-content";
+import { getQuestionDetectiveContent } from "@/lib/question-detective-content";
 import type { Cognitive } from "@/lib/question-practice-data";
 
 export const QUESTION_LEARNING_SLIDES = [
@@ -29,8 +29,10 @@ export const QUESTION_LEARNING_SLIDES = [
 export type QuestionLearningSlide = (typeof QUESTION_LEARNING_SLIDES)[number];
 
 export function QuestionDetectiveSlides({ completionActions }: { completionActions?: ReactNode }) {
+  const locale = useLocale();
   const t = useTranslations("questionLearning");
   const tClassification = useTranslations("classification");
+  const content = getQuestionDetectiveContent(locale);
   const [index, setIndex] = useState(0);
   const [checkIndex, setCheckIndex] = useState(0);
   const [selectedType, setSelectedType] = useState<Cognitive | null>(null);
@@ -66,7 +68,7 @@ export function QuestionDetectiveSlides({ completionActions }: { completionActio
 
   const moveCheck = () => {
     pendingCheckPromptFocus.current = true;
-    setCheckIndex((current) => (current + 1) % QUESTION_LEARNING_CHECKS.length);
+    setCheckIndex((current) => (current + 1) % content.checks.length);
     setSelectedType(null);
   };
 
@@ -116,7 +118,7 @@ export function QuestionDetectiveSlides({ completionActions }: { completionActio
       onKeyDown={handleStageKeyDown}
       className="mt-4 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
     >
-      <div className="w-full overflow-hidden rounded-lg border bg-background shadow-sm lg:aspect-video">
+      <div className="w-full overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm lg:aspect-video">
         <div
           key={slide}
           id={panelId}
@@ -126,6 +128,7 @@ export function QuestionDetectiveSlides({ completionActions }: { completionActio
         >
           <QuestionLearningSlideContent
             completionActions={completionActions}
+            content={content}
             slide={slide}
             typeLabel={typeLabel}
             checkNext={t("checkNext")}

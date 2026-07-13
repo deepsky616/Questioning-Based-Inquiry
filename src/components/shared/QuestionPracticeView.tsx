@@ -9,7 +9,7 @@
 //  - 닫힌→열린, 사실적→개념적→논쟁적 전환·생성 연습 → AI 분류로 즉시 피드백
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,11 @@ import {
   focusedPracticeQuizBank,
   type PracticeSelection,
 } from "@/lib/practice-selection";
+import {
+  localizePracticeCreateTopic,
+  localizePracticeQuizItem,
+  localizePracticeTransformItem,
+} from "@/lib/question-practice-localization";
 
 // /api/practice/bank 응답 — 담당 교사가 만든 커스텀 문항(내장 은행에 병합)
 interface CustomBank {
@@ -75,6 +80,7 @@ interface QuestionPracticeViewProps {
 }
 
 export function QuestionPracticeView({ audience, studentId, initialSelection }: QuestionPracticeViewProps) {
+  const locale = useLocale();
   const t = useTranslations("practice");
   const tCls = useTranslations("classification");
   const router = useRouter();
@@ -140,7 +146,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
       [],
     ),
   );
-  const quizItem = quizDeck.item;
+  const quizItem = localizePracticeQuizItem(quizDeck.item, locale);
   const [quizAnswer, setQuizAnswer] = useState<string | null>(null);
   const [quizStats, setQuizStats] = useState({ correct: 0, total: 0 });
 
@@ -208,7 +214,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   const [transformDeck, setTransformDeck] = useState(() => drawFromDeck(PRACTICE_TRANSFORM_BANK, []));
   // AI가 실시간 출제한 문제(있으면 은행 문항 대신 사용, 실패 시 은행이 폴백)
   const [aiTransform, setAiTransform] = useState<{ source: string; target: TransformTarget; hint: string; example: string } | null>(null);
-  const transformItem = aiTransform ?? transformDeck.item;
+  const transformItem = aiTransform ?? localizePracticeTransformItem(transformDeck.item, locale);
   const [showHint, setShowHint] = useState(false);
   const nextTransform = () => {
     invalidateGeneration();
@@ -221,7 +227,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   // ── 모드 3: 질문 만들기 ──
   const [createDeck, setCreateDeck] = useState(() => drawFromDeck(PRACTICE_CREATE_TOPICS, []));
   const [aiTopic, setAiTopic] = useState<{ title: string; passage: string } | null>(null);
-  const createTopic = aiTopic ?? createDeck.item;
+  const createTopic = aiTopic ?? localizePracticeCreateTopic(createDeck.item, locale);
   const [createTarget, setCreateTarget] = useState<TransformTarget>("conceptual");
   const nextCreateTopic = () => {
     invalidateGeneration();

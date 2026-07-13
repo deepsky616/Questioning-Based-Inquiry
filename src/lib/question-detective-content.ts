@@ -6,7 +6,7 @@
  * 열린·닫힌 질문과 사실적→개념적→논쟁적 질문 체계는 교육부
  * 「질문기반 탐구수업」·「학생 질문 중심의 교과 수업 모델」과 동일한 틀.
  *
- * 콘텐츠는 한국어 고정(문항 은행·게임 콘텐츠와 동일 원칙), UI 라벨만 i18n.
+ * 학습 콘텐츠는 현재 로케일에 맞춰 한국어/영어를 선택한다.
  */
 
 import type { Cognitive } from "@/lib/question-practice-data";
@@ -246,3 +246,390 @@ export const QUESTION_LEARNING_CHECKS: QuestionLearningCheck[] = [
     explanation: "환경 보호와 선택의 자유라는 가치를 근거로 판단해야 하므로 논쟁적 질문이에요.",
   },
 ];
+
+interface AnswerRangeGuide {
+  closed: { title: string; definition: string; example: string };
+  open: { title: string; definition: string; example: string };
+}
+
+interface ClassificationAxis {
+  key: string;
+  title: string;
+  description: string;
+}
+
+export interface QuestionDetectiveContent {
+  answerRangeGuide: AnswerRangeGuide;
+  classificationAxes: readonly ClassificationAxis[];
+  wordHint: string;
+  typeFormulaGuide: QuestionTypeFormulaGuide[];
+  trioTable: QuestionTrioRow[];
+  inquirySteps: InquiryStep[];
+  checks: QuestionLearningCheck[];
+  cover: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    badge: string;
+  };
+  whyQuestions: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    aiStatement: string;
+    humanStatement: string;
+    strengths: string[];
+  };
+  twoAxes: {
+    eyebrow: string;
+    title: string;
+    axisLabel: string;
+    closedLabel: string;
+    openLabel: string;
+    factualShort: string;
+    conceptualShort: string;
+    controversialShort: string;
+  };
+  openClosed: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    compare: string;
+  };
+  inquiryDepth: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    descriptions: Record<Cognitive, string>;
+  };
+  factualDefinition: {
+    action: string;
+    eyebrow: string;
+    title: string;
+    exampleLabel: string;
+  };
+  factualFormulas: {
+    eyebrow: string;
+    title: string;
+    formulaLabel: string;
+    exampleLabel: string;
+  };
+  conceptualDefinition: {
+    factOne: string;
+    factTwo: string;
+    relation: string;
+    eyebrow: string;
+    title: string;
+  };
+  conceptualFormulas: {
+    eyebrow: string;
+    title: string;
+  };
+  controversialDefinition: {
+    valueChoice: string;
+    responsibilityImpact: string;
+    eyebrow: string;
+    title: string;
+    note: string;
+  };
+  controversialFormulas: {
+    eyebrow: string;
+    title: string;
+    judgmentLabel: string;
+  };
+  comparison: {
+    eyebrow: string;
+    title: string;
+    typeHeader: string;
+    thinkingHeader: string;
+    purposeHeader: string;
+    exampleHeader: string;
+  };
+  check: {
+    eyebrow: string;
+    title: string;
+    correct: string;
+    answerPrefix: string;
+    answerSuffix: string;
+  };
+  synthesis: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    finalPrompt: string;
+  };
+}
+
+const QUESTION_DETECTIVE_KO: QuestionDetectiveContent = {
+  answerRangeGuide: QUESTION_ANSWER_RANGE_GUIDE,
+  classificationAxes: QUESTION_CLASSIFICATION_AXES,
+  wordHint: QUESTION_WORD_HINT,
+  typeFormulaGuide: QUESTION_TYPE_FORMULA_GUIDE,
+  trioTable: QUESTION_TRIO_TABLE,
+  inquirySteps: INQUIRY_STEPS,
+  checks: QUESTION_LEARNING_CHECKS,
+  cover: {
+    eyebrow: "탐구의 열쇠를 찾아서",
+    title: "질문 탐정단",
+    description: "사실을 찾고, 관계를 연결하고, 근거 있는 선택을 만드는 질문의 힘을 발견해 봐요.",
+    badge: "무엇을 물을지 정하는 힘",
+  },
+  whyQuestions: {
+    eyebrow: "질문의 힘",
+    title: "답을 찾는 시대에도 질문은 사람이 정해요",
+    description: "빠른 답보다 먼저 필요한 것은 무엇을 알아야 하는지 정하는 일이에요.",
+    aiStatement: "인공지능은 답을 빠르게 찾을 수 있어요.",
+    humanStatement: "하지만 어떤 답이 필요한지, 무엇을 더 살펴봐야 하는지는 질문하는 사람이 정해요.",
+    strengths: ["모르는 것을 정확히 발견해요", "흩어진 사실의 관계를 찾아요", "근거를 비교해 더 나은 선택을 해요"],
+  },
+  twoAxes: {
+    eyebrow: "분류의 출발점",
+    title: "질문에는 두 개의 분류 기준이 있어요",
+    axisLabel: "기준",
+    closedLabel: "닫힌 질문",
+    openLabel: "열린 질문",
+    factualShort: "사실적",
+    conceptualShort: "개념적",
+    controversialShort: "논쟁적",
+  },
+  openClosed: {
+    eyebrow: "답의 범위",
+    title: "닫힌 질문은 확인하고 열린 질문은 생각을 넓혀요",
+    description: "같은 광합성 주제도 답의 범위에 따라 질문이 달라져요.",
+    compare: "대조",
+  },
+  inquiryDepth: {
+    eyebrow: "생각의 목적과 깊이",
+    title: "탐구는 사실에서 관계와 판단으로 깊어져요",
+    description: "세 질문은 우열이 아니라 서로 이어지는 탐구의 단계예요.",
+    descriptions: {
+      factual: "확인할 정보를 모아요",
+      conceptual: "사실의 관계를 설명해요",
+      controversial: "가치와 근거를 판단해요",
+    },
+  },
+  factualDefinition: {
+    action: "정확하게 확인하기",
+    eyebrow: "첫 번째 질문 열쇠",
+    title: "확인 가능한 정보를 정확하게 찾아요",
+    exampleLabel: "예시",
+  },
+  factualFormulas: {
+    eyebrow: "질문 만들기 공식",
+    title: "{label}은 대상, 때와 곳, 수량과 방법을 물어요",
+    formulaLabel: "공식",
+    exampleLabel: "예시",
+  },
+  conceptualDefinition: {
+    factOne: "사실 하나",
+    factTwo: "사실 둘",
+    relation: "관계와\n원리",
+    eyebrow: "두 번째 질문 열쇠",
+    title: "사실을 연결해 원리를 찾아요",
+  },
+  conceptualFormulas: {
+    eyebrow: "질문 만들기 공식",
+    title: "{label}은 이유, 비교, 의미와 영향을 물어요",
+  },
+  controversialDefinition: {
+    valueChoice: "가치와 선택",
+    responsibilityImpact: "책임과 영향",
+    eyebrow: "세 번째 질문 열쇠",
+    title: "충돌하는 가치를 근거로 판단해요",
+    note: "단순히 좋아하는 것을 고르는 질문과 달라요. 여러 관점을 살피고 타당한 근거로 선택해야 해요.",
+  },
+  controversialFormulas: {
+    eyebrow: "질문 만들기 공식",
+    title: "{label}은 선택, 공정함, 책임과 대안을 물어요",
+    judgmentLabel: "판단",
+  },
+  comparison: {
+    eyebrow: "한눈에 비교하기",
+    title: "같은 환경 주제도 세 깊이로 물을 수 있어요",
+    typeHeader: "질문 유형",
+    thinkingHeader: "답에 필요한 사고와 근거",
+    purposeHeader: "탐구 목적",
+    exampleHeader: "환경 주제 예시",
+  },
+  check: {
+    eyebrow: "즉석 확인",
+    title: "어떤 질문인지 직접 찾아보세요",
+    correct: "정답이에요!",
+    answerPrefix: "이 질문은 ",
+    answerSuffix: "이에요.",
+  },
+  synthesis: {
+    eyebrow: "탐구를 시작할 시간",
+    title: "사실을 모으고 연결한 뒤 근거 있는 의견을 만들어요",
+    description: "좋은 탐구는 하나의 멋진 질문에서 시작해요.",
+    finalPrompt: "이제 질문연습에서 나만의 질문을 직접 만들어 보세요.",
+  },
+};
+
+const QUESTION_DETECTIVE_EN: QuestionDetectiveContent = {
+  ...QUESTION_DETECTIVE_KO,
+  answerRangeGuide: {
+    closed: {
+      title: "Closed question",
+      definition: "A question you can answer by finding one fixed piece of information.",
+      example: "What gas do plants need for photosynthesis?",
+    },
+    open: {
+      title: "Open question",
+      definition: "A question that can have different answers when you connect ideas and reasons.",
+      example: "How might photosynthesis affect other living things in an ecosystem?",
+    },
+  },
+  classificationAxes: [
+    { key: "answerRange", title: "Answer range", description: "Sort questions into closed and open questions." },
+    { key: "thinkingPurpose", title: "Thinking purpose and depth", description: "Sort questions into factual, conceptual, and debatable questions." },
+  ],
+  wordHint: "Words like why and how are clues, but they are not enough. Decide the type by looking at the thinking and evidence needed to answer.",
+  typeFormulaGuide: [
+    {
+      typeKey: "factual",
+      tagline: "Questions that check information through memory, observation, research, calculation, or steps",
+      definition: "Factual questions ask for information that can be checked through memory, observation, research, calculation, or a known procedure. The focus is what information must be confirmed.",
+      formulas: [
+        { icon: "1", title: "Ask about people or things", words: "who, what, which thing, name", pattern: "Who is ...? / What is the name of ...?", examples: ["Who founded Joseon?", "What is the name of the object the main character values most?"] },
+        { icon: "2", title: "Ask about time or place", words: "when, where, place, setting, period", pattern: "When did ... happen? / Where is ... located?", examples: ["When did the Imjin War begin?", "What is the name of the mountain where Seokguram is located?"] },
+        { icon: "3", title: "Ask about amount or method", words: "how many, how much, method, procedure", pattern: "How many ... are there? / How does ... work?", examples: ["How many nautical miles from the baseline does a country's territorial sea usually extend?", "What gas do plants need for photosynthesis?"] },
+      ],
+    },
+    {
+      typeKey: "conceptual",
+      tagline: "Questions that connect knowledge to find principles",
+      definition: "Conceptual questions are not answered by one copied word. You connect facts and explain reasons, relationships, meanings, or effects.",
+      formulas: [
+        { icon: "1", title: "Dig into reasons and causes", words: "why, because, cause, reason", pattern: "Why is ... necessary? / What caused ...?", examples: ["Why should we sort our waste?", "Why do plants need sunlight to grow?"] },
+        { icon: "2", title: "Explore relationships and comparisons", words: "difference, similarity, relationship, effect", pattern: "How are ... and ... different? / How does ... affect ...?", examples: ["How was the Joseon status system different from democracy today?", "How are producers and consumers connected in an ecosystem?"] },
+        { icon: "3", title: "Expand meaning and impact", words: "meaning, role, impact, if ... then", pattern: "What meaning does ... have for us? / What would happen if ... disappeared?", examples: ["What role do genre paintings play in understanding ordinary people's lives?", "What would happen to an ecosystem if all microbes disappeared?"] },
+      ],
+    },
+    {
+      typeKey: "controversial",
+      tagline: "Questions that invite discussion and choice",
+      definition: "Debatable questions do not have one fixed answer. You compare values, choices, responsibilities, and alternatives from more than one point of view.",
+      formulas: [
+        { icon: "1", title: "Lead choice or pro/con thinking", words: "agree, disagree, should, allow, ban", pattern: "Do you agree or disagree with ...? / Should ... be limited by law?", examples: ["Should smartphones be completely banned on the school playground?", "Should AI-generated paintings be accepted as artworks?"] },
+        { icon: "2", title: "Ask about value and fairness", words: "fair, right, just, desirable, equal", pattern: "Can ... be called fair? / Is ... a good solution?", examples: ["Is it fair to limit personal freedom for everyone's safety?", "Is giving cleaning duty a good solution when a class rule is broken?"] },
+        { icon: "3", title: "Examine responsibility and alternatives", words: "responsibility, priority, important value", pattern: "Which value should society prioritize, ... or ...?", examples: ["Should humanity prioritize environmental protection or technology development?", "Who has more responsibility for climate change damage, developing countries or developed countries?"] },
+      ],
+    },
+  ],
+  trioTable: [
+    { typeKey: "factual", thinkingGuide: "Find the procedure in the material and check it step by step", purpose: "Build knowledge", example: "What are the waste sorting steps shown in the material?" },
+    { typeKey: "conceptual", thinkingGuide: "Connect facts to explain relationships and effects", purpose: "Deepen understanding", example: "How does sorting waste affect the environment?" },
+    { typeKey: "controversial", thinkingGuide: "Judge with reasons by considering values and responsibility", purpose: "Make a reasoned choice", example: "How should responsibility for reducing plastic waste be shared between individuals and companies?" },
+  ],
+  inquirySteps: [
+    { step: 1, title: "Collect facts", description: "Gather accurate information about the topic you wonder about." },
+    { step: 2, title: "Find connections", description: "Look for concepts that connect the information." },
+    { step: 3, title: "Build your opinion", description: "Think from different viewpoints and organize your own idea." },
+  ],
+  checks: [
+    { id: "check-factual", prompt: "How many students are present in our class today?", answer: "factual", explanation: "This asks for fixed information that can be counted or observed, so it is a factual question." },
+    { id: "check-conceptual", prompt: "How might a shrinking forest affect the local climate?", answer: "conceptual", explanation: "This asks you to connect facts and explain the relationship between forests and climate, so it is a conceptual question." },
+    { id: "check-controversial", prompt: "Should the law limit single-use products to protect the environment?", answer: "controversial", explanation: "This asks you to judge using values such as environmental protection and freedom of choice, so it is a debatable question." },
+  ],
+  cover: {
+    eyebrow: "Find the key to inquiry",
+    title: "Question Detectives",
+    description: "Discover the power of questions that find facts, connect relationships, and build reasoned choices.",
+    badge: "The power to decide what to ask",
+  },
+  whyQuestions: {
+    eyebrow: "The power of questions",
+    title: "Even in an age of quick answers, people decide the questions",
+    description: "Before a fast answer, we first need to decide what we need to know.",
+    aiStatement: "AI can find answers quickly.",
+    humanStatement: "But people decide which answers are needed and what should be examined next.",
+    strengths: ["Find exactly what you do not know", "Discover relationships among scattered facts", "Compare reasons and make better choices"],
+  },
+  twoAxes: {
+    eyebrow: "Starting the classification",
+    title: "Questions have two classification axes",
+    axisLabel: "Axis",
+    closedLabel: "Closed question",
+    openLabel: "Open question",
+    factualShort: "Factual",
+    conceptualShort: "Conceptual",
+    controversialShort: "Debatable",
+  },
+  openClosed: {
+    eyebrow: "Answer range",
+    title: "Closed questions check; open questions expand thinking",
+    description: "The same photosynthesis topic can lead to different questions depending on the answer range.",
+    compare: "Compare",
+  },
+  inquiryDepth: {
+    eyebrow: "Thinking purpose and depth",
+    title: "Inquiry deepens from facts to relationships and judgment",
+    description: "The three question types are not ranked; they are connected steps in inquiry.",
+    descriptions: {
+      factual: "Gather information to check",
+      conceptual: "Explain relationships among facts",
+      controversial: "Judge values and reasons",
+    },
+  },
+  factualDefinition: {
+    action: "Check accurately",
+    eyebrow: "First question key",
+    title: "Find checkable information accurately",
+    exampleLabel: "Example",
+  },
+  factualFormulas: {
+    eyebrow: "Question-making formula",
+    title: "{label} ask about objects, time, place, amount, and method",
+    formulaLabel: "Formula",
+    exampleLabel: "Example",
+  },
+  conceptualDefinition: {
+    factOne: "Fact one",
+    factTwo: "Fact two",
+    relation: "Relationship\nand principle",
+    eyebrow: "Second question key",
+    title: "Connect facts to find principles",
+  },
+  conceptualFormulas: {
+    eyebrow: "Question-making formula",
+    title: "{label} ask about reasons, comparisons, meanings, and effects",
+  },
+  controversialDefinition: {
+    valueChoice: "Values and choices",
+    responsibilityImpact: "Responsibility and impact",
+    eyebrow: "Third question key",
+    title: "Judge conflicting values with reasons",
+    note: "This is different from simply choosing what you like. You need to examine different viewpoints and choose with sound reasons.",
+  },
+  controversialFormulas: {
+    eyebrow: "Question-making formula",
+    title: "{label} ask about choice, fairness, responsibility, and alternatives",
+    judgmentLabel: "Judgment",
+  },
+  comparison: {
+    eyebrow: "Compare at a glance",
+    title: "The same environmental topic can be asked at three depths",
+    typeHeader: "Question type",
+    thinkingHeader: "Thinking and evidence needed",
+    purposeHeader: "Inquiry purpose",
+    exampleHeader: "Environmental topic example",
+  },
+  check: {
+    eyebrow: "Quick check",
+    title: "Find the question type yourself",
+    correct: "Correct!",
+    answerPrefix: "This question is ",
+    answerSuffix: ".",
+  },
+  synthesis: {
+    eyebrow: "Time to start inquiry",
+    title: "Gather facts, connect them, and build a reasoned opinion",
+    description: "Good inquiry begins with one strong question.",
+    finalPrompt: "Now try making your own question in Question Practice.",
+  },
+};
+
+export function getQuestionDetectiveContent(locale: string): QuestionDetectiveContent {
+  return locale === "en" ? QUESTION_DETECTIVE_EN : QUESTION_DETECTIVE_KO;
+}

@@ -5,7 +5,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Copy, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +24,11 @@ import {
   type Cognitive,
   type Closure,
 } from "@/lib/question-practice-data";
+import {
+  localizePracticeCreateTopic,
+  localizePracticeQuizItem,
+  localizePracticeTransformItem,
+} from "@/lib/question-practice-localization";
 import { PRACTICE_POINTS, PRACTICE_DAILY_CAP } from "@/lib/practice-points";
 import {
   parsePracticeSelection,
@@ -83,6 +88,7 @@ export default function TeacherPracticePage() {
 }
 
 function TeacherPracticeContent() {
+  const locale = useLocale();
   const t = useTranslations("practice");
   const tCls = useTranslations("classification");
   const tc = useTranslations("common");
@@ -118,7 +124,9 @@ function TeacherPracticeContent() {
     (q) =>
       (filterCognitive === "all" || q.cognitive === filterCognitive) &&
       (filterClosure === "all" || q.closure === filterClosure),
-  );
+  ).map((q) => localizePracticeQuizItem(q, locale));
+  const localizedTransformBank = PRACTICE_TRANSFORM_BANK.map((item) => localizePracticeTransformItem(item, locale));
+  const localizedCreateTopics = PRACTICE_CREATE_TOPICS.map((topic) => localizePracticeCreateTopic(topic, locale));
 
   // ── 탭 3: 학생 연습 현황 ──
   const [focusFilter, setFocusFilter] = useState<PracticeFocusFilter>(requestedFocus);
@@ -307,9 +315,9 @@ function TeacherPracticeContent() {
 
           <Card>
             <CardContent className="pt-6 space-y-3">
-              <h3 className="font-semibold">{t("bankTransformTitle", { count: PRACTICE_TRANSFORM_BANK.length })}</h3>
+              <h3 className="font-semibold">{t("bankTransformTitle", { count: localizedTransformBank.length })}</h3>
               <div className="grid gap-3 md:grid-cols-2">
-                {PRACTICE_TRANSFORM_BANK.map((item) => (
+                {localizedTransformBank.map((item) => (
                   <div key={item.id} className="rounded-lg border p-3 text-sm space-y-1">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium">{item.source}</p>
@@ -335,9 +343,9 @@ function TeacherPracticeContent() {
 
           <Card>
             <CardContent className="pt-6 space-y-3">
-              <h3 className="font-semibold">{t("bankCreateTitle", { count: PRACTICE_CREATE_TOPICS.length })}</h3>
+              <h3 className="font-semibold">{t("bankCreateTitle", { count: localizedCreateTopics.length })}</h3>
               <div className="grid gap-3 md:grid-cols-2">
-                {PRACTICE_CREATE_TOPICS.map((topic) => (
+                {localizedCreateTopics.map((topic) => (
                   <div key={topic.id} className="rounded-lg border p-3 text-sm space-y-1">
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium">📖 {topic.title}</p>

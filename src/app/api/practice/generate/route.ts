@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import { auth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { AiBusyError, AiKeyMissingError, AiQuotaError, generateJsonWithMetadata } from "@/lib/ai";
+import { getRequestLocale } from "@/lib/locale";
 
 // 질문 연습용 AI 실시간 출제 (바꾸기·만들기 모드 전용).
 // 분류 퀴즈는 정답·해설의 신뢰성이 필요해 검수된 문항 은행만 사용하고,
@@ -33,7 +34,27 @@ const TARGET_LABEL: Record<(typeof TARGETS)[number], string> = {
   controversial: "논쟁적 질문(정답이 없고 가치 판단·찬반이 갈리는 질문)",
 };
 
-function buildTransformPrompt(target: (typeof TARGETS)[number]): string {
+const TARGET_LABEL_EN: Record<(typeof TARGETS)[number], string> = {
+  open: "open question (a question with multiple possible answers that needs reasoning or imagination)",
+  conceptual: "conceptual question (a question that connects relationships, causes, meanings, or effects)",
+  controversial: "debatable question (a question with no single fixed answer that requires value judgment or pro/con reasoning)",
+};
+
+function buildTransformPrompt(target: (typeof TARGETS)[number], locale: string): string {
+  if (locale === "en") {
+    return `You are a teacher creating question practice items for elementary students.
+
+The student will transform a short closed factual question into a "${TARGET_LABEL_EN[target]}".
+
+Requirements:
+- source: one short closed factual question from elementary subjects, with one fixed answer (within 60 characters, vary the subject and topic each time)
+- hint: one student-friendly sentence explaining how to transform it into the target type
+- example: one model question that transforms source into the target type (within 80 characters)
+
+Output only this JSON:
+{"source": "...", "hint": "...", "example": "..."}`;
+  }
+
   return `당신은 초등학생의 질문 만들기 연습 문제를 출제하는 선생님입니다.
 
 학생이 "닫힌·사실적 질문"을 "${TARGET_LABEL[target]}"으로 바꿔 쓰는 연습을 합니다.
@@ -59,12 +80,25 @@ const CREATE_PROMPT = `당신은 초등학생의 질문 만들기 연습 문제�
 아래 JSON만 출력:
 {"title": "...", "passage": "..."}`;
 
+const CREATE_PROMPT_EN = `You are a teacher creating question practice items for elementary students.
+
+Students read a short passage and create factual, conceptual, or debatable questions.
+
+Requirements:
+- title: passage topic (within 40 characters)
+- passage: 2 to 3 student-friendly sentences with basic information and something to think about or disagree about, so all three question types can be made
+- vary elementary subjects and topics each time
+
+Output only this JSON:
+{"title": "...", "passage": "..."}`;
+
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
   const userId = (session.user as { id: string }).id;
+  const locale = getRequestLocale(req);
 
   const { success } = rateLimit(`practice-gen:${userId}`, { limit: 10, windowMs: 60_000 });
   if (!success) {
@@ -83,7 +117,7 @@ export async function POST(req: Request) {
       const target = TARGETS[Math.floor(Math.random() * TARGETS.length)];
       const generated = await generateJsonWithMetadata<unknown>({
         userId,
-        prompt: buildTransformPrompt(target),
+        prompt: buildTransformPrompt(target, locale),
         req,
         localize: true,
         temperature: 0.9, // 매번 다른 문제가 나오도록 다양성 우선
@@ -94,7 +128,7 @@ export async function POST(req: Request) {
 
     const generated = await generateJsonWithMetadata<unknown>({
       userId,
-      prompt: CREATE_PROMPT,
+      prompt: locale === "en" ? CREATE_PROMPT_EN : CREATE_PROMPT,
       req,
       localize: true,
       temperature: 0.9,
