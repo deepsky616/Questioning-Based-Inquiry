@@ -65,6 +65,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
           withdrawalHref: "/teacher-settings#account-withdrawal",
           studentManagementHref: "/teacher-students",
           rankingsHref: "/teacher-points",
+          detailedReportHref: "/teacher-dashboard?tab=reports",
         }}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

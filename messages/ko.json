@@ -23,6 +23,7 @@
     "withdraw": "탈퇴",
     "studentManagement": "학생관리",
     "rankings": "순위",
+    "detailedReport": "상세 리포트",
     "gradeValue": "{grade}학년",
     "classValue": "{className}반",
     "numberValue": "{n}번"

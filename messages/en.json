@@ -23,6 +23,7 @@
     "withdraw": "Delete account",
     "studentManagement": "Student management",
     "rankings": "Rankings",
+    "detailedReport": "Detailed report",
     "gradeValue": "Grade {grade}",
     "classValue": "Class {className}",
     "numberValue": "No. {n}"
