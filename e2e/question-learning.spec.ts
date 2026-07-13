@@ -57,12 +57,12 @@ async function openAuthenticatedPage(
   await context.addInitScript(() => {
     window.localStorage.setItem("question-lab-theme", "dark");
   });
-  const page = await context.newPage();
-  await login(page);
+  const loginPage = await context.newPage();
+  await login(loginPage);
   await expect
     .poll(
       () =>
-        page.evaluate(async () => {
+        loginPage.evaluate(async () => {
           const response = await fetch("/api/auth/session", { cache: "no-store" });
           const session = (await response.json()) as { user?: { role?: string } };
           return session.user?.role ?? null;
@@ -70,7 +70,9 @@ async function openAuthenticatedPage(
       { timeout: 20_000 },
     )
     .toBe(expectedRole);
-  await expect(page.locator("header").getByRole("heading", { name: "Question Lab", exact: true })).toBeVisible();
+  await expect(loginPage.locator("header").getByRole("heading", { name: "Question Lab", exact: true })).toBeVisible();
+  const page = await context.newPage();
+  await loginPage.close();
   return { context, page };
 }
 

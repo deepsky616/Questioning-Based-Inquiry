@@ -26,13 +26,13 @@ npx playwright test e2e/question-learning-flow.spec.ts --project=chromium --proj
 
 결과는 6건 통과, 실패 0건이었다. 첫 태블릿 실행에서 로그인 직후 남은 이동이 학생 연습 화면 이동을 끊는 경합이 한 번 드러났고, 기존 학생 로그인 도움 함수와 같은 재시도 경계를 인증 경로 이동에 적용한 뒤 두 프로젝트가 모두 통과했다.
 
-요구된 두 시험 묶음도 아래 명령으로 실행을 시도했다.
+요구된 두 시험 묶음은 승인된 실행으로 아래 명령을 실제 실행했다.
 
 ```bash
 npx playwright test e2e/question-learning.spec.ts e2e/question-learning-flow.spec.ts --project=chromium --project=tablet
 ```
 
-이 명령은 샌드박스에서 자체 개발 서버가 `0.0.0.0:3000`에 연결 지점을 열 때 `EPERM`으로 거부되어 실제 시험이 시작되지 않았다. 권한 확대 실행은 승인 대기 상태가 이어져 세션을 종료했다. 새 통합 흐름 두 프로젝트의 실제 6건 통과 결과는 위 별도 실행으로 확보했다.
+결과는 6건 통과, 1건 실패였다. 기존 `question-learning.spec.ts`의 학생 시험에서 첫 `/student-question-learning` 이동이 로그인 쪽의 늦은 `/login` 이동에 끊겼다. 인증 역할과 헤더 확인을 로그인 쪽에서 끝낸 뒤 같은 브라우저 문맥에 검증 전용 쪽을 새로 열고 로그인 쪽을 닫도록 보완해, 남은 로그인 이동이 학습 검증 쪽에 영향을 주지 않게 했다. 수정 뒤 묶음 브라우저 재실행은 승인된 실행 환경에서 별도로 진행한다.
 
 검증한 화면 크기는 새 진단 기능 화면에만 다음과 같이 적용했다.
 
@@ -58,10 +58,11 @@ npx playwright test e2e/question-learning.spec.ts e2e/question-learning-flow.spe
 ## 변경 파일
 
 - `e2e/question-learning-flow.spec.ts`
+- `e2e/question-learning.spec.ts`
 - `e2e/helpers/test-db.ts`
 - `.superpowers/sdd/task-8-report.md`
 
 ## 우려
 
-- 샌드박스 연결 지점 권한 때문에 `question-learning.spec.ts`와 새 통합 흐름을 함께 묶은 최종 브라우저 명령은 실제 시험을 시작하지 못했다. 새 통합 흐름 자체는 크로미엄과 태블릿에서 6건 모두 통과했다.
-- 지시에 따라 원격 푸시는 하지 않는다. 따라서 작업 8 커밋 뒤 로컬 `main`은 원격 `main`보다 한 커밋 앞서게 된다.
+- 승인된 묶음 실행에서 드러난 로그인 쪽 늦은 이동 경합을 검증 쪽 격리로 보완했다. 수정 뒤 묶음 브라우저 재실행 결과는 아직 이 보고서에 반영되지 않았다.
+- 지시에 따라 원격 푸시는 하지 않는다. 따라서 로컬 `main`이 원격 `main`보다 앞선 상태를 유지한다.
