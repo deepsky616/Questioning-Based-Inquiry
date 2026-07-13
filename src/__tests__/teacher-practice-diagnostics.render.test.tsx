@@ -58,11 +58,11 @@ const summary = {
     create: { attempts: 0, correct: 0, accuracy: null },
   },
   types: {
-    closed: { attempts: 3, correct: 2, accuracy: 67 },
+    closed: { attempts: 1, correct: 1, accuracy: 100 },
     open: { attempts: 2, correct: 1, accuracy: 50 },
     factual: { attempts: 3, correct: 2, accuracy: 67 },
     conceptual: { attempts: 0, correct: 0, accuracy: null },
-    controversial: { attempts: 0, correct: 0, accuracy: null },
+    controversial: { attempts: 4, correct: 1, accuracy: 25 },
   },
   unknownTypeAttempts: 0,
   recommendation: {
@@ -89,6 +89,11 @@ const students = [
     activityAttempts: 5,
     diagnosticAttempts: 4,
     overall: { attempts: 4, correct: 3, accuracy: 75 },
+    modes: {
+      quiz: { attempts: 7, correct: 4, accuracy: 57 },
+      transform: { attempts: 4, correct: 1, accuracy: 25 },
+      create: { attempts: 3, correct: 0, accuracy: 0 },
+    },
     capped: false,
   },
 ];
@@ -133,6 +138,55 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("교사 학급 연습 진단", () => {
+  it("학급 요약에서 다섯 유형의 시도 수와 정답률을 한눈에 비교한다", () => {
+    renderPage();
+
+    const classSummary = screen
+      .getByRole("heading", { name: "학급 연습 진단" })
+      .closest("section");
+    expect(classSummary).not.toBeNull();
+
+    for (const [label, attempts, accuracy] of [
+      ["닫힌 질문", 1, "100%"],
+      ["열린 질문", 2, "50%"],
+      ["사실적 질문", 3, "67%"],
+      ["개념적 질문", 0, "표본 없음"],
+      ["논쟁적 질문", 4, "25%"],
+    ] as const) {
+      const typeMetric = within(classSummary as HTMLElement)
+        .getByText(label, { exact: true })
+        .closest("div");
+      expect(typeMetric).not.toBeNull();
+      expect(within(typeMetric as HTMLElement).getByText(`시도 ${attempts}회`)).toBeVisible();
+      expect(within(typeMetric as HTMLElement).getByText(accuracy)).toBeVisible();
+    }
+  });
+
+  it("학생 모드별 진단에서 시도 수와 포인트 성공 횟수를 따로 보여 준다", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /가학생/ }));
+
+    const details = screen.getByLabelText("가학생 진단 세부");
+    const modeMetrics = within(details)
+      .getByRole("heading", { name: "연습 모드별 정답률" })
+      .closest("div");
+    expect(modeMetrics).not.toBeNull();
+
+    for (const [label, accuracy, attempts, successes] of [
+      ["분류", "57%", 7, 2],
+      ["바꾸기", "25%", 4, 1],
+      ["만들기", "0%", 3, 0],
+    ] as const) {
+      const modeMetric = within(modeMetrics as HTMLElement)
+        .getByText(label, { exact: true })
+        .closest("div");
+      expect(modeMetric).not.toBeNull();
+      expect(within(modeMetric as HTMLElement).getByText(accuracy)).toBeVisible();
+      expect(within(modeMetric as HTMLElement).getByText(`시도 ${attempts}회`)).toBeVisible();
+      expect(within(modeMetric as HTMLElement).getByText(`성공 ${successes}회`)).toBeVisible();
+    }
+  });
+
   it("학급 요약을 표시하고 학생 한 행을 펼쳐 모드와 유형별 진단을 보여 준다", () => {
     renderPage();
 
@@ -146,8 +200,9 @@ describe("교사 학급 연습 진단", () => {
     fireEvent.click(studentButton);
 
     expect(studentButton).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("연습 모드별 정답률")).toBeVisible();
-    expect(screen.getByText("사고 유형별 정답률")).toBeVisible();
+    const studentDetails = screen.getByLabelText("가학생 진단 세부");
+    expect(within(studentDetails).getByText("연습 모드별 정답률")).toBeVisible();
+    expect(within(studentDetails).getByText("사고 유형별 정답률")).toBeVisible();
   });
 
   it("불러오기 오류를 빈 자료보다 먼저 알리고 다시 시도한다", () => {

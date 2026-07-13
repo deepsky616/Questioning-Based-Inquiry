@@ -436,6 +436,28 @@ function TeacherPracticeContent() {
                       </dd>
                     </div>
                   </dl>
+                  <div className="mt-4 border-t pt-4">
+                    <h3 className="text-xs font-bold text-foreground">
+                      {t("statsTypeMetrics")}
+                    </h3>
+                    <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                      {PRACTICE_FOCUSES.map((focus) => (
+                        <div key={focus} className="min-w-0 border-l-2 border-emerald-300 pl-2">
+                          <dt className="text-xs text-muted-foreground">
+                            {tCls(`${focus}.label`)}
+                          </dt>
+                          <dd className="mt-1 text-sm font-semibold text-foreground">
+                            {metricText(statsQuery.data.summary.types[focus])}
+                          </dd>
+                          <dd className="text-xs text-muted-foreground">
+                            {t("statsAttemptCount", {
+                              count: statsQuery.data.summary.types[focus].attempts,
+                            })}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
                 </section>
 
                 <div
@@ -640,7 +662,7 @@ function TeacherPracticeContent() {
                                     <h3 className="text-sm font-bold text-foreground">
                                       {t("statsModeMetrics")}
                                     </h3>
-                                    <dl className="mt-2 grid grid-cols-3 gap-2">
+                                    <dl className="mt-2 grid grid-cols-1 gap-2 min-[360px]:grid-cols-3">
                                       {([
                                         ["quiz", t("statsModeQuiz"), student.quizCount],
                                         ["transform", t("statsModeTransform"), student.transformCount],
@@ -650,6 +672,11 @@ function TeacherPracticeContent() {
                                           <dt className="text-xs text-muted-foreground">{label}</dt>
                                           <dd className="mt-1 text-sm font-semibold text-foreground">
                                             {metricText(student.modes[mode])}
+                                          </dd>
+                                          <dd className="text-xs text-muted-foreground">
+                                            {t("statsAttemptCount", {
+                                              count: student.modes[mode].attempts,
+                                            })}
                                           </dd>
                                           <dd className="text-xs text-muted-foreground">
                                             {t("statsSuccessCount", { count: successCount })}
