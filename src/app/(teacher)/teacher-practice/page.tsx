@@ -66,6 +66,8 @@ const PRACTICE_FOCUSES: PracticeFocus[] = [
   "conceptual",
   "controversial",
 ];
+const PRACTICE_STATS_GRID_COLUMNS =
+  "md:grid-cols-[minmax(10rem,1.4fr)_minmax(3.75rem,0.55fr)_minmax(4rem,0.6fr)_minmax(4.25rem,0.65fr)_minmax(4.25rem,0.65fr)_minmax(4rem,0.6fr)_minmax(13rem,2fr)]";
 
 function teacherViewFrom(params: Pick<URLSearchParams, "get">): TeacherPracticeTab {
   const view = params.get("view");
@@ -516,7 +518,7 @@ function TeacherPracticeContent() {
                   <div role="rowgroup" className="hidden bg-muted/40 md:block">
                     <div
                       role="row"
-                      className="grid grid-cols-[minmax(12rem,2fr)_repeat(6,minmax(5rem,1fr))] items-center"
+                      className={`grid items-center ${PRACTICE_STATS_GRID_COLUMNS}`}
                     >
                       <div role="columnheader" className="px-3 py-2 text-xs font-medium text-muted-foreground">
                         {t("statsColStudent")}
@@ -530,11 +532,13 @@ function TeacherPracticeContent() {
                         selectedFocus
                           ? t("statsSelectedType", { type: tCls(`${selectedFocus}.label`) })
                           : t("statsRecommendation"),
-                      ].map((label) => (
+                      ].map((label, index) => (
                         <div
                           key={label}
                           role="columnheader"
-                          className="px-2 py-2 text-center text-xs font-medium text-muted-foreground"
+                          className={`px-2 py-2 text-xs font-medium text-muted-foreground ${
+                            index === 5 ? "text-left" : "text-center"
+                          }`}
                         >
                           {label}
                         </div>
@@ -563,7 +567,7 @@ function TeacherPracticeContent() {
                         >
                           <div
                             role="row"
-                            className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3 md:grid-cols-[minmax(12rem,2fr)_repeat(6,minmax(5rem,1fr))] md:items-center md:gap-0 md:px-0 md:py-0"
+                            className={`grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3 md:items-center md:gap-0 md:px-0 md:py-0 ${PRACTICE_STATS_GRID_COLUMNS}`}
                           >
                             <div role="rowheader" className="col-span-2 min-w-0 md:col-span-1 md:px-3 md:py-3">
                               <button
@@ -607,11 +611,13 @@ function TeacherPracticeContent() {
                                   ? metricText(selectedMetric)
                                   : recommendationText(student),
                               },
-                            ].map(({ label, value }) => (
+                            ].map(({ label, value }, index) => (
                               <div
                                 key={label}
                                 role="cell"
-                                className="flex min-w-0 items-baseline justify-between gap-2 text-sm md:block md:px-2 md:py-3 md:text-center"
+                                className={`flex min-w-0 items-baseline justify-between gap-2 text-sm md:block md:px-2 md:py-3 ${
+                                  index === 5 ? "md:text-left" : "md:text-center"
+                                }`}
                               >
                                 <span className="text-xs text-muted-foreground md:hidden">{label}</span>
                                 <span className="min-w-0 font-medium text-foreground md:text-xs">

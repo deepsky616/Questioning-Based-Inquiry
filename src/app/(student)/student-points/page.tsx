@@ -11,7 +11,7 @@ export default function StudentPointsPage() {
     <div className="space-y-6">
       <PageHeader title={tPages("studentPoints.title")} description={tPages("studentPoints.description")} />
 
-      <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
         <StudentRankPanel highlightSelf scrollable={false} />
         <ClassRankingPanel highlightSelf defaultScope="school" scrollable={false} />
       </div>
