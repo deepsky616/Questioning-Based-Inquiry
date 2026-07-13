@@ -222,6 +222,11 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   // ── AI 실시간 출제 ──
   const [isGenerating, setIsGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const generationRequestRef = useRef(0);
+  const invalidateGeneration = useCallback(() => {
+    generationRequestRef.current += 1;
+    setIsGenerating(false);
+  }, []);
 
   const initialSelectionKeyRef = useRef(
     `${initialSelection?.tab ?? "quiz"}:${initialSelection?.quizMode ?? "closure"}:${initialSelection?.focus ?? ""}`,
@@ -234,6 +239,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
     if (initialSelectionKeyRef.current === nextKey) return;
     initialSelectionKeyRef.current = nextKey;
 
+    invalidateGeneration();
     setTab(nextTab);
     setQuizMode(nextQuizMode);
     setFocus(nextFocus);
@@ -247,6 +253,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
     initialSelection?.focus,
     initialSelection?.quizMode,
     initialSelection?.tab,
+    invalidateGeneration,
     invalidateQuiz,
     quizBank,
     resetCheck,
@@ -271,6 +278,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
 
   const generateAiProblem = async (mode: "transform" | "create") => {
     if (isGenerating) return;
+    const requestId = ++generationRequestRef.current;
     setIsGenerating(true);
     setGenError(null);
     try {
@@ -280,6 +288,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
         body: JSON.stringify({ mode }),
       });
       const data = await res.json();
+      if (generationRequestRef.current !== requestId) return;
       if (!res.ok) throw new Error(data.error || t("generateFailed"));
       if (mode === "transform") {
         setAiTransform(data);
@@ -289,9 +298,10 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
       }
       resetCheck();
     } catch (err) {
+      if (generationRequestRef.current !== requestId) return;
       setGenError(err instanceof Error ? err.message : t("generateFailed"));
     } finally {
-      setIsGenerating(false);
+      if (generationRequestRef.current === requestId) setIsGenerating(false);
     }
   };
 
@@ -350,6 +360,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
     if (next !== tab) {
       setQuizAnswer(null);
       invalidateQuiz();
+      invalidateGeneration();
     }
     setTab(next);
     resetCheck();

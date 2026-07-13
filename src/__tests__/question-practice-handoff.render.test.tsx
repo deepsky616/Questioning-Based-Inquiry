@@ -85,6 +85,18 @@ function deferredQuizResponse(awarded: number) {
   return { promise, resolve: () => resolve(response) };
 }
 
+function deferredGenerateResponse<T extends Record<string, unknown>>(data: T, ok = true) {
+  const response = {
+    ok,
+    json: async () => data,
+  };
+  let resolve!: () => void;
+  const promise = new Promise<typeof response>((done) => {
+    resolve = () => done(response);
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   push.mockReset();
   customBankState.current = undefined;
@@ -219,6 +231,140 @@ describe("연습 질문 전달", () => {
     );
 
     expect(await screen.findByPlaceholderText("개념적 질문을 만들어 써 보세요")).toHaveValue("");
+  });
+
+  it("직접 탭을 바꾸면 늦은 이전 생성 응답이 현재 입력과 문항을 바꾸지 않는다", async () => {
+    const delayed = deferredGenerateResponse({
+      source: "늦게 도착한 바꾸기 문항",
+      target: "open",
+      hint: "이전 힌트",
+      example: "이전 예시",
+    });
+    vi.stubGlobal("fetch", vi.fn(() => delayed.promise));
+    renderPractice("student", "student-1", {
+      tab: "transform",
+      quizMode: "cognitive",
+      focus: null,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /AI 새 문제/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "3. 질문 만들기" }));
+    const createInput = screen.getByPlaceholderText("개념적 질문을 만들어 써 보세요");
+    fireEvent.change(createInput, { target: { value: "현재 만들기 입력입니다" } });
+
+    await act(async () => {
+      delayed.resolve();
+      await delayed.promise;
+    });
+
+    expect(createInput).toHaveValue("현재 만들기 입력입니다");
+    fireEvent.click(screen.getByRole("tab", { name: "2. 질문 바꾸기" }));
+    expect(screen.queryByText("늦게 도착한 바꾸기 문항")).not.toBeInTheDocument();
+  });
+
+  it("주소 선택이 바뀌면 늦은 이전 생성 응답을 버린다", async () => {
+    const delayed = deferredGenerateResponse({
+      source: "주소 변경 전 바꾸기 문항",
+      target: "conceptual",
+      hint: "이전 힌트",
+      example: "이전 예시",
+    });
+    vi.stubGlobal("fetch", vi.fn(() => delayed.promise));
+    const view = renderPractice("student", "student-1", {
+      tab: "transform",
+      quizMode: "cognitive",
+      focus: null,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /AI 새 문제/ }));
+
+    view.rerender(
+      practiceElement("student", "student-1", {
+        tab: "create",
+        quizMode: "cognitive",
+        focus: null,
+      }),
+    );
+    const createInput = await screen.findByPlaceholderText("개념적 질문을 만들어 써 보세요");
+    fireEvent.change(createInput, { target: { value: "주소 변경 뒤 입력입니다" } });
+
+    await act(async () => {
+      delayed.resolve();
+      await delayed.promise;
+    });
+
+    expect(createInput).toHaveValue("주소 변경 뒤 입력입니다");
+    view.rerender(
+      practiceElement("student", "student-1", {
+        tab: "transform",
+        quizMode: "cognitive",
+        focus: null,
+      }),
+    );
+    expect(await screen.findByPlaceholderText("바꾼 질문을 써 보세요")).toHaveValue("");
+    expect(screen.queryByText("주소 변경 전 바꾸기 문항")).not.toBeInTheDocument();
+  });
+
+  it("이전 생성 요청의 실패와 마무리가 새 요청 상태를 덮지 않는다", async () => {
+    const previous = deferredGenerateResponse({ error: "이전 생성 오류" }, false);
+    const current = deferredGenerateResponse({
+      title: "현재 만들기 주제",
+      passage: "현재 요청으로 만든 제시문입니다.",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementationOnce(() => previous.promise).mockImplementationOnce(() => current.promise),
+    );
+    renderPractice("student", "student-1", {
+      tab: "transform",
+      quizMode: "cognitive",
+      focus: null,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /AI 새 문제/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "3. 질문 만들기" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /AI 새 주제/ }));
+    expect(screen.getByRole("button", { name: "AI가 만드는 중..." })).toBeDisabled();
+
+    await act(async () => {
+      previous.resolve();
+      await previous.promise;
+    });
+
+    expect(screen.queryByText("이전 생성 오류")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI가 만드는 중..." })).toBeDisabled();
+
+    await act(async () => {
+      current.resolve();
+      await current.promise;
+    });
+
+    expect(await screen.findByText(/현재 만들기 주제/)).toBeInTheDocument();
+    expect(screen.getByText("현재 요청으로 만든 제시문입니다.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /AI 새 주제/ })).toBeEnabled();
+  });
+
+  it("현재 탭을 다시 누르면 진행 중인 생성 요청을 유지한다", async () => {
+    const delayed = deferredGenerateResponse({
+      source: "유지된 바꾸기 문항",
+      target: "open",
+      hint: "유지된 힌트",
+      example: "유지된 예시",
+    });
+    vi.stubGlobal("fetch", vi.fn(() => delayed.promise));
+    renderPractice("student", "student-1", {
+      tab: "transform",
+      quizMode: "cognitive",
+      focus: null,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /AI 새 문제/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "2. 질문 바꾸기" }));
+
+    await act(async () => {
+      delayed.resolve();
+      await delayed.promise;
+    });
+
+    expect(await screen.findByText("유지된 바꾸기 문항")).toBeInTheDocument();
   });
 
   it("직접 탭을 왕복하면 분류 답을 지우고 늦은 이전 지급 응답을 버린다", async () => {
