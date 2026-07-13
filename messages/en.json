@@ -184,8 +184,8 @@
       "description": "Manage your own questions, explore your friends' questions, and join the inquiry questions your teacher shared"
     },
     "studentPoints": {
-      "title": "Rankings",
-      "description": "Check your point ranking and your class ranking"
+      "title": "My ranking and class ranking",
+      "description": "Check your class, school, and overall rank plus your class average ranking"
     },
     "studentSettings": {
       "title": "Edit profile",
