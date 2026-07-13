@@ -26,10 +26,13 @@ describe("질문연습 학습지 출력", () => {
     expect(pageSource).toContain("question-practice-print-page");
     expect(pageSource).toContain("qp-toolbar");
     expect(pageSource).toContain('style={{ colorScheme: "light" }}');
-    expect(pageSource).toContain("qp-student-fields ml-auto");
+    expect(pageSource).toContain("qp-student-fields ml-auto flex");
+    expect(pageSource).toContain("qp-student-row-meta grid grid-cols-3");
+    expect(pageSource).toContain("qp-student-row-name flex justify-end");
     expect(pageSource).toContain("guide.gradeLabel");
     expect(pageSource).toContain("guide.classNameLabel");
     expect(pageSource).toContain("guide.numberLabel");
+    expect(pageSource).toContain("guide.nameLabel");
     expect(pageSource).not.toContain("guide.dateLabel");
     expect(pageSource).not.toContain("guide.lessonLabel");
     expect(pageSource).not.toContain("guide.goalTitle");
@@ -55,8 +58,12 @@ describe("질문연습 학습지 출력", () => {
     expect(cssSource).toContain("body.question-practice-print-light main > div.mt-8.pt-4.border-t");
     expect(cssSource).toContain("mix-blend-mode: normal !important");
     expect(cssSource).toContain("text-shadow: none !important");
+    expect(cssSource).toContain(".question-practice-print-page .question-practice-print h1");
+    expect(cssSource).toContain(".question-practice-print-page .question-practice-print.qp-paper");
+    expect(cssSource).toContain(".question-practice-print-page .question-practice-print .qp-card");
     expect(cssSource).toContain(".question-practice-print .qp-write-line");
     expect(cssSource).toContain(".question-practice-print .qp-card");
+    expect(cssSource).toContain(".question-practice-print .qp-student-row-meta");
     expect(cssSource).toContain(".question-practice-print-page .qp-toolbar");
   });
 });

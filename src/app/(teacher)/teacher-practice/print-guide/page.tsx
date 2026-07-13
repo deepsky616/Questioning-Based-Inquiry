@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -13,7 +13,7 @@ export default function TeacherPracticePrintGuidePage() {
   const isKo = locale === "ko";
   const originalThemeRef = useRef<{ rootDark: boolean; bodyDark: boolean } | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     const body = document.body;
     originalThemeRef.current = {
@@ -76,18 +76,21 @@ export default function TeacherPracticePrintGuidePage() {
               <h1 className="qp-title text-3xl font-extrabold leading-tight text-slate-950">{guide.title}</h1>
               <p className="qp-subtitle mt-2 text-sm leading-6 text-slate-700">{guide.subtitle}</p>
             </div>
-            <div className="qp-student-fields ml-auto grid w-full max-w-md grid-cols-2 gap-x-4 gap-y-2 text-right text-sm text-slate-700 print:max-w-sm">
-              {[
-                guide.gradeLabel,
-                guide.classNameLabel,
-                guide.numberLabel,
-                guide.nameLabel,
-              ].map((label) => (
-                <div key={label} className="qp-field flex items-center justify-end gap-2">
-                  <span className="w-12 shrink-0 font-semibold">{label}</span>
-                  <span className="qp-write-line h-7 min-w-16 flex-1 border-b border-slate-500" />
+            <div className="qp-student-fields ml-auto flex w-full max-w-lg flex-col gap-2 text-right text-sm text-slate-700 print:max-w-md">
+              <div className="qp-student-row qp-student-row-meta grid grid-cols-3 gap-x-4 gap-y-2">
+                {[guide.gradeLabel, guide.classNameLabel, guide.numberLabel].map((label) => (
+                  <div key={label} className="qp-field flex items-center justify-end gap-2">
+                    <span className="w-10 shrink-0 font-semibold">{label}</span>
+                    <span className="qp-write-line h-7 min-w-12 flex-1 border-b border-slate-500" />
+                  </div>
+                ))}
+              </div>
+              <div className="qp-student-row qp-student-row-name flex justify-end">
+                <div className="qp-field flex w-full max-w-xs items-center justify-end gap-2">
+                  <span className="w-10 shrink-0 font-semibold">{guide.nameLabel}</span>
+                  <span className="qp-write-line h-7 min-w-24 flex-1 border-b border-slate-500" />
                 </div>
-              ))}
+              </div>
             </div>
           </div>
           <p className="no-print mt-4 rounded-md bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 print:bg-indigo-50">

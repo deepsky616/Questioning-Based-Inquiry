@@ -434,7 +434,95 @@ body.question-practice-print-mode {
 
 .question-practice-print-page .qp-toolbar button,
 .question-practice-print-page .qp-toolbar a {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #111827 !important;
   color-scheme: light !important;
+}
+
+.question-practice-print-page .qp-toolbar button:hover,
+.question-practice-print-page .qp-toolbar a:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.question-practice-print-page .qp-toolbar svg {
+  color: #334155 !important;
+}
+
+.question-practice-print-page .question-practice-print,
+.question-practice-print-page .question-practice-print * {
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+.question-practice-print-page .question-practice-print h1,
+.question-practice-print-page .question-practice-print h2,
+.question-practice-print-page .question-practice-print h3,
+.question-practice-print-page .question-practice-print h4,
+.question-practice-print-page .question-practice-print strong,
+.question-practice-print-page .question-practice-print .qp-title,
+.question-practice-print-page .question-practice-print .qp-section-heading,
+.question-practice-print-page .question-practice-print .qp-card-title,
+.question-practice-print-page .question-practice-print .qp-pattern-title,
+.question-practice-print-page .question-practice-print .qp-prompt {
+  color: #0f172a !important;
+}
+
+.question-practice-print-page .question-practice-print p,
+.question-practice-print-page .question-practice-print li,
+.question-practice-print-page .question-practice-print span,
+.question-practice-print-page .question-practice-print div,
+.question-practice-print-page .question-practice-print .qp-muted {
+  color: #334155 !important;
+}
+
+.question-practice-print-page .question-practice-print .text-indigo-700,
+.question-practice-print-page .question-practice-print .text-indigo-900,
+.question-practice-print-page .question-practice-print .qp-eyebrow,
+.question-practice-print-page .question-practice-print .qp-callout-title {
+  color: #312e81 !important;
+}
+
+.question-practice-print-page .question-practice-print .border,
+.question-practice-print-page .question-practice-print .border-b,
+.question-practice-print-page .question-practice-print.qp-paper,
+.question-practice-print-page .question-practice-print .qp-card,
+.question-practice-print-page .question-practice-print .qp-pattern,
+.question-practice-print-page .question-practice-print .qp-callout,
+.question-practice-print-page .question-practice-print .qp-answer-box {
+  border-color: #cbd5e1 !important;
+}
+
+.question-practice-print-page .question-practice-print .qp-write-line {
+  border-color: #64748b !important;
+}
+
+.question-practice-print-page .question-practice-print.qp-paper,
+.question-practice-print-page .question-practice-print .qp-paper,
+.question-practice-print-page .question-practice-print .qp-card,
+.question-practice-print-page .question-practice-print .qp-pattern,
+.question-practice-print-page .question-practice-print .qp-answer-box {
+  background: #ffffff !important;
+}
+
+.question-practice-print-page .question-practice-print .qp-callout {
+  background: #f8fafc !important;
+}
+
+.question-practice-print-page .question-practice-print .bg-indigo-50 {
+  background: #eef2ff !important;
+}
+
+.question-practice-print-page .question-practice-print .bg-slate-100 {
+  background: #f1f5f9 !important;
+}
+
+.question-practice-print-page .question-practice-print .qp-pill {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
 }
 
 @page question-practice {
@@ -505,68 +593,6 @@ body.question-practice-print-mode {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  .question-practice-print,
-  .question-practice-print * {
-    filter: none !important;
-    mix-blend-mode: normal !important;
-    opacity: 1 !important;
-    text-shadow: none !important;
-  }
-  .question-practice-print h1,
-  .question-practice-print h2,
-  .question-practice-print h3,
-  .question-practice-print h4,
-  .question-practice-print strong,
-  .question-practice-print .qp-title,
-  .question-practice-print .qp-section-heading,
-  .question-practice-print .qp-card-title,
-  .question-practice-print .qp-pattern-title,
-  .question-practice-print .qp-prompt {
-    color: #0f172a !important;
-  }
-  .question-practice-print p,
-  .question-practice-print li,
-  .question-practice-print span,
-  .question-practice-print div,
-  .question-practice-print .qp-muted {
-    color: #334155 !important;
-  }
-  .question-practice-print .text-indigo-700,
-  .question-practice-print .text-indigo-900,
-  .question-practice-print .qp-eyebrow,
-  .question-practice-print .qp-callout-title {
-    color: #312e81 !important;
-  }
-  .question-practice-print .border,
-  .question-practice-print .border-b,
-  .question-practice-print .qp-card,
-  .question-practice-print .qp-pattern,
-  .question-practice-print .qp-callout,
-  .question-practice-print .qp-answer-box {
-    border-color: #cbd5e1 !important;
-  }
-  .question-practice-print .qp-write-line {
-    border-color: #64748b !important;
-  }
-  .question-practice-print .qp-paper,
-  .question-practice-print .qp-card,
-  .question-practice-print .qp-pattern,
-  .question-practice-print .qp-answer-box {
-    background: #ffffff !important;
-  }
-  .question-practice-print .qp-callout {
-    background: #f8fafc !important;
-  }
-  .question-practice-print .bg-indigo-50 {
-    background: #eef2ff !important;
-  }
-  .question-practice-print .bg-slate-100 {
-    background: #f1f5f9 !important;
-  }
-  .question-practice-print .qp-pill {
-    background: #f1f5f9 !important;
-    color: #334155 !important;
-  }
   .question-practice-print .qp-student-fields,
   .question-practice-print .qp-question-block {
     break-inside: avoid;
@@ -585,9 +611,15 @@ body.question-practice-print-mode {
     line-height: 1.35 !important;
   }
   .question-practice-print .qp-student-fields {
-    max-width: 330px !important;
+    max-width: 390px !important;
     gap: 5px 12px !important;
     font-size: 12px !important;
+  }
+  .question-practice-print .qp-student-row-meta {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .question-practice-print .qp-student-row-name {
+    justify-content: flex-end !important;
   }
   .question-practice-print .qp-field {
     gap: 6px !important;
