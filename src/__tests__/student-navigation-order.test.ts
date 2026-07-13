@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const layoutSource = readFileSync("src/app/(student)/layout.tsx", "utf8");
@@ -10,6 +11,37 @@ function readStudentPages() {
     href,
     key,
   }));
+}
+
+function readAppNavAccountLinks(source: string) {
+  const sourceFile = ts.createSourceFile("student-layout.tsx", source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TSX);
+  const accountLinks: Record<string, string> = {};
+
+  function visit(node: ts.Node) {
+    if (ts.isJsxSelfClosingElement(node) && ts.isIdentifier(node.tagName) && node.tagName.text === "AppNav") {
+      const accountLinksAttribute = node.attributes.properties.find(
+        (attribute): attribute is ts.JsxAttribute =>
+          ts.isJsxAttribute(attribute) && ts.isIdentifier(attribute.name) && attribute.name.text === "accountLinks",
+      );
+      const expression =
+        accountLinksAttribute?.initializer && ts.isJsxExpression(accountLinksAttribute.initializer)
+          ? accountLinksAttribute.initializer.expression
+          : undefined;
+
+      if (expression && ts.isObjectLiteralExpression(expression)) {
+        for (const property of expression.properties) {
+          if (ts.isPropertyAssignment(property) && ts.isStringLiteral(property.initializer)) {
+            accountLinks[property.name.getText(sourceFile)] = property.initializer.text;
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return accountLinks;
 }
 
 describe("student navigation order", () => {
@@ -25,6 +57,15 @@ describe("student navigation order", () => {
   });
 
   it("학생 설정을 상단 계정 메뉴에서 접근할 수 있다", () => {
-    expect(layoutSource).toContain('settingsHref: "/student-settings"');
+    expect(readAppNavAccountLinks(layoutSource)).toMatchObject({ settingsHref: "/student-settings" });
+  });
+
+  it("AppNav 밖에 있는 계정 경로는 무시한다", () => {
+    const detachedAccountLink = `
+      <AppNav pages={pages} />
+      const detached = { settingsHref: "/student-settings" };
+    `;
+
+    expect(readAppNavAccountLinks(detachedAccountLink)).toEqual({});
   });
 });
