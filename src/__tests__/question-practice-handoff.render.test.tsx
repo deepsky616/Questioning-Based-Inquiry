@@ -200,6 +200,56 @@ describe("연습 질문 전달", () => {
     expect(await screen.findByText("+1P 획득!")).toBeInTheDocument();
   });
 
+  it("주소 선택으로 바꾸기에서 만들기로 이동하면 이전 입력을 지운다", async () => {
+    const view = renderPractice("student", "student-1", {
+      tab: "transform",
+      quizMode: "cognitive",
+      focus: null,
+    });
+    fireEvent.change(screen.getByPlaceholderText("바꾼 질문을 써 보세요"), {
+      target: { value: "바꾸기 탭에서 작성한 질문입니다" },
+    });
+
+    view.rerender(
+      practiceElement("student", "student-1", {
+        tab: "create",
+        quizMode: "cognitive",
+        focus: null,
+      }),
+    );
+
+    expect(await screen.findByPlaceholderText("개념적 질문을 만들어 써 보세요")).toHaveValue("");
+  });
+
+  it("직접 탭을 왕복하면 분류 답을 지우고 늦은 이전 지급 응답을 버린다", async () => {
+    const first = deferredQuizResponse(99);
+    const second = deferredQuizResponse(1);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise),
+    );
+    renderPractice("student", "student-1");
+    fireEvent.click(screen.getByRole("button", { name: "닫힌 질문" }));
+    expect(screen.getByText(/정답이에요/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "2. 질문 바꾸기" }));
+    fireEvent.click(screen.getByRole("tab", { name: "1. 분류 연습" }));
+    expect(screen.queryByText(/정답이에요/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      first.resolve();
+      await first.promise;
+    });
+    fireEvent.click(screen.getByRole("button", { name: "닫힌 질문" }));
+    expect(screen.queryByText("+99P 획득!")).not.toBeInTheDocument();
+
+    await act(async () => {
+      second.resolve();
+      await second.promise;
+    });
+    expect(await screen.findByText("+1P 획득!")).toBeInTheDocument();
+  });
+
   it("학생의 바꾸기 성공 결과를 현재 학생 초안으로 저장하고 질문하기로 이동한다", async () => {
     renderPractice("student", "student-1");
     expect(screen.queryByRole("button", { name: "이 질문으로 질문하기" })).not.toBeInTheDocument();

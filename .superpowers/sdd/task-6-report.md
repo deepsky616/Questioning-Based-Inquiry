@@ -87,3 +87,49 @@ git diff --check
 - 진단은 요구대로 최근 100개 시도만 사용하므로 최근 30일 안에 시도가 더 많아도 그 이전 시도는 결과에 포함되지 않는다.
 - 진단 요약은 학생 본인 결과만 보여 주며 학급 비교나 순위 자료를 의도적으로 포함하지 않는다.
 - 문항 묶음이 비는 경우 전체 묶음으로 돌아가므로 추천 유형의 커스텀 문항이 없어도 연습 화면은 멈추지 않는다.
+
+## 검토 수정: 선택 전환 상태 초기화
+
+검토에서 발견된 두 상태 유지 결함을 시험 우선으로 수정했다.
+
+- 주소의 `initialSelection`이 바꾸기에서 만들기로 바뀔 때 이전 입력을 지운다.
+- 분류 답을 제출한 뒤 직접 탭을 왕복하면 이전 답과 지급 상태를 지운다.
+- 직접 탭을 떠날 때 지급 요청 식별값을 올려 늦은 이전 응답을 무시한다.
+
+실패 확인:
+
+```bash
+npm test -- src/__tests__/question-practice-handoff.render.test.tsx
+```
+
+- 시험 11개 중 새 회귀 시험 2개 실패, 기존 시험 9개 통과
+- 주소 선택 뒤 바꾸기 입력이 만들기 입력에 남아 실패
+- 직접 탭 왕복 뒤 분류 정답 상태가 남아 실패
+
+수정 뒤 검증:
+
+```bash
+npm test -- src/__tests__/question-practice-handoff.render.test.tsx
+npm test -- src/__tests__/practice-progress-route.test.ts src/__tests__/practice-progress-summary.render.test.tsx src/__tests__/practice-selection.test.ts src/__tests__/question-practice-data.test.ts src/__tests__/question-practice-handoff.render.test.tsx
+npm run lint
+npx tsc --noEmit --pretty false
+git diff --check
+```
+
+- 연습 화면 렌더 시험 11개 통과
+- 작업 6 집중 시험 파일 5개, 시험 41개 통과
+- 전체 린트 통과
+- 자료형 검사 통과
+- 차이 공백 검사 통과
+
+이번 수정 파일:
+
+- `src/components/shared/QuestionPracticeView.tsx`
+- `src/__tests__/question-practice-handoff.render.test.tsx`
+- `.superpowers/sdd/task-6-report.md`
+
+추가 자체 검토:
+
+- 주소 선택 변경은 `resetCheck`를 사용해 입력, 판정 결과, 오류, 진행 상태를 함께 초기화한다.
+- 직접 다른 탭으로 이동할 때만 분류 답과 지급 요청을 무효화해 선택된 현재 탭을 다시 누르는 동작에는 영향을 주지 않는다.
+- 늦은 지급 응답 뒤 새 분류 답을 제출해도 이전 99 포인트가 나타나지 않고 현재 1 포인트만 나타나는 시험으로 요청 경계를 확인했다.

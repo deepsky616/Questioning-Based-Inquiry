@@ -240,16 +240,16 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
     setQuizDeck(drawFromDeck(focusedPracticeQuizBank(quizBank, nextQuizMode, nextFocus), []));
     setQuizAnswer(null);
     invalidateQuiz();
-    invalidateCheck();
+    resetCheck();
     setShowHint(false);
     setGenError(null);
   }, [
     initialSelection?.focus,
     initialSelection?.quizMode,
     initialSelection?.tab,
-    invalidateCheck,
     invalidateQuiz,
     quizBank,
+    resetCheck,
   ]);
 
   // 커스텀 문항이 도착하면 진행 중인 셔플백에 즉시 합류시킨다
@@ -347,6 +347,10 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   };
 
   const switchTab = (next: PracticeTab) => {
+    if (next !== tab) {
+      setQuizAnswer(null);
+      invalidateQuiz();
+    }
     setTab(next);
     resetCheck();
     setShowHint(false);
