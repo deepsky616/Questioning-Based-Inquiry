@@ -26,13 +26,9 @@ export interface QuestionPracticePrintGuide {
   printButton: string;
   backButton: string;
   nameLabel: string;
-  classLabel: string;
-  dateLabel: string;
-  lessonLabel: string;
-  goalTitle: string;
-  goals: string[];
-  howToTitle: string;
-  howToItems: string[];
+  gradeLabel: string;
+  classNameLabel: string;
+  numberLabel: string;
   termsLabel: string;
   formulasLabel: string;
   guideTitle: string;
@@ -49,21 +45,9 @@ const koGuide: QuestionPracticePrintGuide = {
   printButton: "인쇄 또는 PDF 저장",
   backButton: "질문연습으로 돌아가기",
   nameLabel: "이름",
-  classLabel: "학년 반 번호",
-  dateLabel: "날짜",
-  lessonLabel: "수업/단원",
-  goalTitle: "오늘의 학습 목표",
-  goals: [
-    "사실적·개념적·논쟁적 질문의 차이를 설명할 수 있습니다.",
-    "하나의 질문을 더 깊이 생각하게 만드는 질문으로 바꿀 수 있습니다.",
-    "배운 내용을 바탕으로 나만의 탐구 질문을 만들 수 있습니다.",
-  ],
-  howToTitle: "학습지 사용 방법",
-  howToItems: [
-    "먼저 질문 유형 정리를 읽고, 각 유형의 특징에 밑줄을 그어 봅니다.",
-    "활동을 할 때는 정답만 쓰지 말고 그렇게 생각한 까닭도 함께 씁니다.",
-    "마지막에는 내가 만든 질문 중 친구와 토의하고 싶은 질문에 표시합니다.",
-  ],
+  gradeLabel: "학년",
+  classNameLabel: "반",
+  numberLabel: "번호",
   termsLabel: "단어",
   formulasLabel: "공식",
   guideTitle: "질문 유형 이해하기",
@@ -206,21 +190,9 @@ const enGuide: QuestionPracticePrintGuide = {
   printButton: "Print or save PDF",
   backButton: "Back to practice",
   nameLabel: "Name",
-  classLabel: "Grade, class, number",
-  dateLabel: "Date",
-  lessonLabel: "Lesson or unit",
-  goalTitle: "Learning Goals",
-  goals: [
-    "Explain the differences among factual, conceptual, and debatable questions.",
-    "Change a simple question into a question that requires deeper thinking.",
-    "Create your own inquiry questions from today's lesson.",
-  ],
-  howToTitle: "How to Use This Worksheet",
-  howToItems: [
-    "Read the question-type guide first and underline the key features.",
-    "For each activity, write your reason, not only your answer.",
-    "At the end, mark the question you would most like to discuss with classmates.",
-  ],
+  gradeLabel: "Grade",
+  classNameLabel: "Class",
+  numberLabel: "Number",
   termsLabel: "Key words",
   formulasLabel: "Question frames",
   guideTitle: "Understanding Question Types",

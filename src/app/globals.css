@@ -390,6 +390,27 @@
   }
 }
 
+/* 질문연습 학습지 페이지는 화면과 인쇄 모두 밝은 문서로 고정한다.
+   사용자가 어두운 테마에서 인쇄해도 루트 color-scheme과 배경이 인쇄 결과에 섞이지 않게 한다. */
+html.question-practice-print-light,
+body.question-practice-print-light {
+  background: #ffffff !important;
+  color: #111827 !important;
+  color-scheme: light !important;
+}
+
+body.question-practice-print-light main > div.mt-8.pt-4.border-t {
+  display: none !important;
+}
+
+.question-practice-print-page,
+.question-practice-print-page main,
+.question-practice-print-page .question-practice-print {
+  background: #ffffff !important;
+  color: #111827 !important;
+  color-scheme: light !important;
+}
+
 /* ── 활동 리포트 인쇄(PDF 저장) ── */
 @media print {
   /* 네비/헤더/버튼 등 리포트 외 요소 숨김 */
@@ -405,6 +426,15 @@
   main {
     max-width: none !important;
     padding: 0 !important;
+  }
+  html.question-practice-print-light,
+  html.question-practice-print-light body,
+  body.question-practice-print-light,
+  body.question-practice-print-light main,
+  body.question-practice-print-light .question-practice-print-page {
+    background: #ffffff !important;
+    color: #111827 !important;
+    color-scheme: light !important;
   }
   /* 차트·카드가 페이지 경계에서 잘리지 않도록 */
   .report-print .recharts-wrapper,

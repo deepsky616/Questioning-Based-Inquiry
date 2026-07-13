@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -11,8 +12,17 @@ export default function TeacherPracticePrintGuidePage() {
   const guide = getQuestionPracticePrintGuide(locale);
   const isKo = locale === "ko";
 
+  useEffect(() => {
+    document.documentElement.classList.add("question-practice-print-light");
+    document.body.classList.add("question-practice-print-light");
+    return () => {
+      document.documentElement.classList.remove("question-practice-print-light");
+      document.body.classList.remove("question-practice-print-light");
+    };
+  }, []);
+
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
+    <div className="question-practice-print-page mx-auto max-w-5xl space-y-5 bg-white text-slate-950 [color-scheme:light]">
       <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background/95 p-3 shadow-sm">
         <Button asChild variant="outline" className="gap-2">
           <Link href="/teacher-practice">
@@ -26,7 +36,7 @@ export default function TeacherPracticePrintGuidePage() {
         </Button>
       </div>
 
-      <article className="question-practice-print qp-paper rounded-xl border bg-white p-6 text-slate-950 shadow-sm [color-scheme:light] dark:bg-white dark:text-slate-950 print:border-0 print:p-0 print:shadow-none">
+      <article className="question-practice-print qp-paper rounded-xl border bg-white p-6 text-slate-950 shadow-sm [color-scheme:light] dark:bg-white dark:text-slate-950 print:border-0 print:p-0 print:shadow-none" style={{ colorScheme: "light" }}>
         <div className="qp-header border-b border-slate-300 pb-5">
           <p className="qp-eyebrow text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">{guide.eyebrow}</p>
           <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
@@ -34,44 +44,24 @@ export default function TeacherPracticePrintGuidePage() {
               <h1 className="qp-title text-3xl font-extrabold leading-tight text-slate-950">{guide.title}</h1>
               <p className="qp-subtitle mt-2 text-sm leading-6 text-slate-700">{guide.subtitle}</p>
             </div>
-            <div className="qp-student-fields grid w-full max-w-sm grid-cols-1 gap-2 text-sm text-slate-700 print:max-w-72">
-              <div className="qp-field flex items-center gap-2">
-                <span className="w-24 font-semibold">{guide.classLabel}</span>
-                <span className="qp-write-line h-7 flex-1 border-b border-slate-500" />
-              </div>
-              <div className="qp-field flex items-center gap-2">
-                <span className="w-24 font-semibold">{guide.nameLabel}</span>
-                <span className="qp-write-line h-7 flex-1 border-b border-slate-500" />
-              </div>
-              <div className="qp-field flex items-center gap-2">
-                <span className="w-24 font-semibold">{guide.dateLabel}</span>
-                <span className="qp-write-line h-7 flex-1 border-b border-slate-500" />
-              </div>
-              <div className="qp-field flex items-center gap-2">
-                <span className="w-24 font-semibold">{guide.lessonLabel}</span>
-                <span className="qp-write-line h-7 flex-1 border-b border-slate-500" />
-              </div>
+            <div className="qp-student-fields ml-auto grid w-full max-w-md grid-cols-2 gap-x-4 gap-y-2 text-right text-sm text-slate-700 print:max-w-sm">
+              {[
+                guide.gradeLabel,
+                guide.classNameLabel,
+                guide.numberLabel,
+                guide.nameLabel,
+              ].map((label) => (
+                <div key={label} className="qp-field flex items-center justify-end gap-2">
+                  <span className="w-12 shrink-0 font-semibold">{label}</span>
+                  <span className="qp-write-line h-7 min-w-16 flex-1 border-b border-slate-500" />
+                </div>
+              ))}
             </div>
           </div>
           <p className="no-print mt-4 rounded-md bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 print:bg-indigo-50">
             {guide.teacherNote}
           </p>
         </div>
-
-        <section className="qp-intro mt-5 grid gap-3 md:grid-cols-2 print:grid-cols-2">
-          <div className="qp-callout rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-            <h2 className="qp-callout-title text-base font-extrabold text-indigo-900">{guide.goalTitle}</h2>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-800">
-              {guide.goals.map((goal) => <li key={goal}>{goal}</li>)}
-            </ul>
-          </div>
-          <div className="qp-callout rounded-lg border border-slate-300 bg-slate-50 p-4">
-            <h2 className="qp-callout-title text-base font-extrabold text-slate-950">{guide.howToTitle}</h2>
-            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-slate-800">
-              {guide.howToItems.map((item) => <li key={item}>{item}</li>)}
-            </ol>
-          </div>
-        </section>
 
         <section className="mt-6 space-y-4">
           <h2 className="qp-section-heading text-xl font-extrabold text-slate-950">{guide.guideTitle}</h2>
