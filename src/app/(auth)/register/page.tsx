@@ -134,11 +134,11 @@ function RegisterContent() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="className">{t("className")}</Label>
-                    <Input id="className" name="className" placeholder="2" value={form.className} onChange={handleChange} />
+                    <Input id="className" name="className" placeholder="1" value={form.className} onChange={handleChange} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="studentNumber">{t("studentNumber")}</Label>
-                    <Input id="studentNumber" name="studentNumber" placeholder="15" value={form.studentNumber} onChange={handleChange} />
+                    <Input id="studentNumber" name="studentNumber" placeholder="1" value={form.studentNumber} onChange={handleChange} />
                   </div>
                 </div>
               </TabsContent>
@@ -146,7 +146,7 @@ function RegisterContent() {
               <TabsContent value="TEACHER" className="mt-4 space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">{t("email")}</Label>
-                  <Input id="email" name="email" type="email" placeholder="teacher@school.kr" value={form.email} onChange={handleChange} />
+                  <Input id="email" name="email" type="email" placeholder="teacher@gmail.com" value={form.email} onChange={handleChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="teacher-school">{t("school")}</Label>
