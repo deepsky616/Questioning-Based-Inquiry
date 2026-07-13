@@ -2,7 +2,7 @@
 
 ## 결과
 
-`DONE_WITH_CONCERNS`
+`DONE`
 
 학생 추천이 개념적 내장 문항 연습으로 이어지는 흐름과, 교사 수업 활용이 개념적 학급 진단, 표본 없음 안내, 학생용 주소 복사, 내장 연습 미리보기로 이어지는 흐름을 통합 시험으로 추가했다. 교사 시험 자료는 프로젝트와 시험 파일 키마다 학교, 담당 학급, 교사, 전용 학생을 분리했다.
 
@@ -32,7 +32,7 @@ npx playwright test e2e/question-learning-flow.spec.ts --project=chromium --proj
 npx playwright test e2e/question-learning.spec.ts e2e/question-learning-flow.spec.ts --project=chromium --project=tablet
 ```
 
-결과는 6건 통과, 1건 실패였다. 기존 `question-learning.spec.ts`의 학생 시험에서 첫 `/student-question-learning` 이동이 로그인 쪽의 늦은 `/login` 이동에 끊겼다. 인증 역할과 헤더 확인을 로그인 쪽에서 끝낸 뒤 같은 브라우저 문맥에 검증 전용 쪽을 새로 열고 로그인 쪽을 닫도록 보완해, 남은 로그인 이동이 학습 검증 쪽에 영향을 주지 않게 했다. 수정 뒤 묶음 브라우저 재실행은 승인된 실행 환경에서 별도로 진행한다.
+첫 실행은 6건 통과, 1건 실패였다. 기존 `question-learning.spec.ts`의 학생 시험에서 첫 `/student-question-learning` 이동이 로그인 쪽의 늦은 `/login` 이동에 끊겼다. 인증 역할과 헤더 확인을 로그인 쪽에서 끝낸 뒤 같은 브라우저 문맥에 검증 전용 쪽을 새로 열고 로그인 쪽을 닫도록 보완해, 남은 로그인 이동이 학습 검증 쪽에 영향을 주지 않게 했다. 수정 뒤 같은 명령을 다시 실행한 결과 10건 통과, 실패 0건이었다.
 
 검증한 화면 크기는 새 진단 기능 화면에만 다음과 같이 적용했다.
 
@@ -64,5 +64,5 @@ npx playwright test e2e/question-learning.spec.ts e2e/question-learning-flow.spe
 
 ## 우려
 
-- 승인된 묶음 실행에서 드러난 로그인 쪽 늦은 이동 경합을 검증 쪽 격리로 보완했다. 수정 뒤 묶음 브라우저 재실행 결과는 아직 이 보고서에 반영되지 않았다.
-- 지시에 따라 원격 푸시는 하지 않는다. 따라서 로컬 `main`이 원격 `main`보다 앞선 상태를 유지한다.
+- 로그인 쪽 늦은 이동 경합은 검증 전용 쪽 격리로 보완했고, 묶음 재실행 10건 통과로 확인했다.
+- 작업 8 구현 중에는 원격 푸시를 하지 않았으며 최종 푸시는 전체 검토 뒤 상위 작업에서 진행한다.
