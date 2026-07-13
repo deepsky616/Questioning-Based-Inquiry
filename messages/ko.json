@@ -180,6 +180,10 @@
       "title": "개인 정보 수정",
       "description": "교사 계정 정보, 비밀번호, AI 설정을 관리하세요"
     },
+    "studentDashboard": {
+      "title": "학생 대시보드",
+      "description": "오늘 할 일과 나의 질문 활동을 한눈에 확인하세요"
+    },
     "studentQuestions": {
       "title": "질문탐구",
       "description": "내 질문을 관리하고, 친구들의 질문을 탐구하고, 선생님이 배포한 수업 탐구 질문에 참여해 보세요"
@@ -187,6 +191,10 @@
     "studentPoints": {
       "title": "내 순위와 반 순위",
       "description": "우리반, 교내, 전체 기준의 내 순위와 우리 반 평균 순위를 확인하세요"
+    },
+    "studentReports": {
+      "title": "상세 리포트",
+      "description": "나의 질문·댓글·수업세션 활동 추세와 AI 분석을 확인하세요"
     },
     "studentSettings": {
       "title": "개인 정보 수정",
