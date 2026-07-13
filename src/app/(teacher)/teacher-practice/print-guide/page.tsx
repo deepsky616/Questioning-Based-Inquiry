@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -11,22 +11,32 @@ export default function TeacherPracticePrintGuidePage() {
   const locale = useLocale();
   const guide = getQuestionPracticePrintGuide(locale);
   const isKo = locale === "ko";
+  const originalThemeRef = useRef<{ rootDark: boolean; bodyDark: boolean } | null>(null);
 
   useEffect(() => {
-    document.documentElement.classList.add("question-practice-print-light");
-    document.body.classList.add("question-practice-print-light");
+    const root = document.documentElement;
+    const body = document.body;
+    originalThemeRef.current = {
+      rootDark: root.classList.contains("dark"),
+      bodyDark: body.classList.contains("dark"),
+    };
+
+    root.classList.remove("dark");
+    body.classList.remove("dark");
+    root.classList.add("question-practice-print-light");
+    body.classList.add("question-practice-print-light");
+
     return () => {
-      document.documentElement.classList.remove("question-practice-print-light");
-      document.body.classList.remove("question-practice-print-light");
+      root.classList.remove("question-practice-print-light");
+      body.classList.remove("question-practice-print-light", "question-practice-print-mode");
+      if (originalThemeRef.current?.rootDark) root.classList.add("dark");
+      if (originalThemeRef.current?.bodyDark) body.classList.add("dark");
     };
   }, []);
 
   const printWorksheet = () => {
     const root = document.documentElement;
     const body = document.body;
-    const rootWasDark = root.classList.contains("dark");
-    const bodyWasDark = body.classList.contains("dark");
-
     root.classList.remove("dark");
     body.classList.remove("dark");
     root.classList.add("question-practice-print-light");
@@ -34,8 +44,6 @@ export default function TeacherPracticePrintGuidePage() {
 
     const cleanup = () => {
       body.classList.remove("question-practice-print-mode");
-      if (rootWasDark) root.classList.add("dark");
-      if (bodyWasDark) body.classList.add("dark");
       window.removeEventListener("afterprint", cleanup);
     };
     window.addEventListener("afterprint", cleanup, { once: true });
@@ -47,7 +55,7 @@ export default function TeacherPracticePrintGuidePage() {
 
   return (
     <div className="question-practice-print-page mx-auto max-w-5xl space-y-5 bg-white text-slate-950 [color-scheme:light]">
-      <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background/95 p-3 shadow-sm">
+      <div className="no-print qp-toolbar flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 text-slate-950 shadow-sm">
         <Button asChild variant="outline" className="gap-2">
           <Link href="/teacher-practice">
             <ArrowLeft className="h-4 w-4" />

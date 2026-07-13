@@ -393,7 +393,15 @@
 /* 질문연습 학습지 페이지는 화면과 인쇄 모두 밝은 문서로 고정한다.
    사용자가 어두운 테마에서 인쇄해도 루트 color-scheme과 배경이 인쇄 결과에 섞이지 않게 한다. */
 html.question-practice-print-light,
-body.question-practice-print-light {
+html.question-practice-print-light.dark,
+body.question-practice-print-light,
+body.question-practice-print-light.dark {
+  background: #ffffff !important;
+  color: #111827 !important;
+  color-scheme: light !important;
+}
+
+body.question-practice-print-light main {
   background: #ffffff !important;
   color: #111827 !important;
   color-scheme: light !important;
@@ -415,6 +423,23 @@ body.question-practice-print-mode {
   background: #ffffff !important;
   color: #111827 !important;
   color-scheme: light !important;
+}
+
+.question-practice-print-page .qp-toolbar {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #111827 !important;
+  color-scheme: light !important;
+}
+
+.question-practice-print-page .qp-toolbar button,
+.question-practice-print-page .qp-toolbar a {
+  color-scheme: light !important;
+}
+
+@page question-practice {
+  size: A4;
+  margin: 7mm;
 }
 
 /* ── 활동 리포트 인쇄(PDF 저장) ── */
@@ -474,6 +499,9 @@ body.question-practice-print-mode {
     border-color: transparent !important;
     color: #111827 !important;
     color-scheme: light !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+    page: question-practice;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -543,6 +571,73 @@ body.question-practice-print-mode {
   .question-practice-print .qp-question-block {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+  .question-practice-print .qp-header {
+    padding-bottom: 8px !important;
+  }
+  .question-practice-print .qp-title {
+    font-size: 25px !important;
+    line-height: 1.15 !important;
+  }
+  .question-practice-print .qp-subtitle {
+    margin-top: 4px !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+  }
+  .question-practice-print .qp-student-fields {
+    max-width: 330px !important;
+    gap: 5px 12px !important;
+    font-size: 12px !important;
+  }
+  .question-practice-print .qp-field {
+    gap: 6px !important;
+  }
+  .question-practice-print .qp-field .qp-write-line {
+    height: 20px !important;
+    min-width: 48px !important;
+  }
+  .question-practice-print section {
+    margin-top: 10px !important;
+  }
+  .question-practice-print .qp-section-heading {
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+  }
+  .question-practice-print .qp-card {
+    padding: 9px !important;
+    border-radius: 0 !important;
+  }
+  .question-practice-print .qp-card-title {
+    font-size: 13px !important;
+    line-height: 1.25 !important;
+  }
+  .question-practice-print .qp-muted {
+    margin-top: 3px !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+  }
+  .question-practice-print .qp-pill {
+    padding: 2px 8px !important;
+    font-size: 10px !important;
+  }
+  .question-practice-print .qp-pattern {
+    padding: 7px !important;
+  }
+  .question-practice-print .qp-pattern-title,
+  .question-practice-print .qp-prompt {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+  }
+  .question-practice-print .qp-answer-box {
+    min-height: 28px !important;
+    padding: 5px 8px !important;
+    font-size: 11px !important;
+  }
+  .question-practice-print .qp-question-block {
+    gap: 4px !important;
+  }
+  .question-practice-print .qp-question-block .qp-write-line {
+    height: 22px !important;
   }
 }
 
