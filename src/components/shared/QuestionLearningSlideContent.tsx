@@ -684,7 +684,7 @@ function CheckSlide({
   );
 }
 
-function SynthesisSlide() {
+function SynthesisSlide({ completionActions }: { completionActions?: ReactNode }) {
   const stepIcons = [Search, Link2, Scale] as const;
   const stepStyles = [TYPE_STYLE.factual, TYPE_STYLE.conceptual, TYPE_STYLE.controversial] as const;
 
@@ -719,11 +719,13 @@ function SynthesisSlide() {
         <Check className="h-5 w-5 shrink-0 text-emerald-400 dark:text-emerald-700" aria-hidden="true" />
         <p className="text-sm font-bold">이제 질문연습에서 나만의 질문을 직접 만들어 보세요.</p>
       </div>
+      {completionActions && <div className="flex flex-wrap gap-2">{completionActions}</div>}
     </div>
   );
 }
 
 export interface QuestionLearningSlideContentProps {
+  completionActions?: ReactNode;
   slide: QuestionLearningSlide;
   typeLabel: (type: Cognitive) => string;
   checkNext: string;
@@ -736,6 +738,7 @@ export interface QuestionLearningSlideContentProps {
 }
 
 export function QuestionLearningSlideContent({
+  completionActions,
   slide,
   typeLabel,
   checkNext,
@@ -785,6 +788,6 @@ export function QuestionLearningSlideContent({
         />
       );
     case "synthesis":
-      return <SynthesisSlide />;
+      return <SynthesisSlide completionActions={completionActions} />;
   }
 }

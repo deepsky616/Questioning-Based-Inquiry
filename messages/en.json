@@ -1845,6 +1845,18 @@
     "slideNavigation": "Question learning slide navigation",
     "slideProgress": "{current} / {total}",
     "checkNext": "Next question",
-    "checkRestart": "Start over"
+    "checkRestart": "Start over",
+    "startPractice": "Start question practice",
+    "tryPractice": "Try it yourself",
+    "viewTeachingGuide": "View teaching guide",
+    "teacherViewsLabel": "Teacher question learning views",
+    "learningView": "Learning content",
+    "teachingView": "Teaching guide",
+    "teachingGuideDescription": "Use these notes when applying the core learning content in class.",
+    "backToLearning": "Back to learning content",
+    "objective": "Learning objective",
+    "misconception": "Common misconception",
+    "prompt": "Opening classroom prompt",
+    "followUp": "Follow-up after a student response"
   }
 }

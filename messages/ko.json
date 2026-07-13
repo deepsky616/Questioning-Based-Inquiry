@@ -1845,6 +1845,18 @@
     "slideNavigation": "질문학습 장 이동",
     "slideProgress": "{current} / {total}",
     "checkNext": "다음 문제",
-    "checkRestart": "다시 시작"
+    "checkRestart": "다시 시작",
+    "startPractice": "질문연습 시작",
+    "tryPractice": "직접 연습하기",
+    "viewTeachingGuide": "수업 활용 보기",
+    "teacherViewsLabel": "교사용 질문학습 보기",
+    "learningView": "학습 내용",
+    "teachingView": "수업 활용",
+    "teachingGuideDescription": "핵심 학습 내용을 수업에 적용할 때 참고하세요.",
+    "backToLearning": "학습 내용으로 돌아가기",
+    "objective": "학습 목표",
+    "misconception": "자주 생기는 혼동",
+    "prompt": "수업에서 먼저 물을 질문",
+    "followUp": "학생 답변 뒤 이어서 물을 질문"
   }
 }

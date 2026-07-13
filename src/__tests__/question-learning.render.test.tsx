@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import * as QuestionLearning from "@/components/shared/QuestionDetectiveSlides";
+import { QuestionLearningExperience } from "@/components/shared/QuestionLearningExperience";
 
 const messages = {
   questionLearning: {
@@ -16,6 +17,18 @@ const messages = {
     slideProgress: "{current} / {total}",
     checkNext: "다음 문제",
     checkRestart: "다시 시작",
+    startPractice: "질문연습 시작",
+    tryPractice: "직접 연습하기",
+    viewTeachingGuide: "수업 활용 보기",
+    teacherViewsLabel: "교사용 질문학습 보기",
+    learningView: "학습 내용",
+    teachingView: "수업 활용",
+    teachingGuideDescription: "핵심 학습 내용을 수업에 적용할 때 참고하세요.",
+    backToLearning: "학습 내용으로 돌아가기",
+    objective: "학습 목표",
+    misconception: "자주 생기는 혼동",
+    prompt: "수업에서 먼저 물을 질문",
+    followUp: "학생 답변 뒤 이어서 물을 질문",
   },
   classification: {
     closed: { label: "닫힌 질문" },
@@ -57,6 +70,49 @@ describe("질문학습 슬라이드", () => {
       "check",
       "synthesis",
     ]);
+  });
+
+  it("학생 완료 화면에서 학생 질문연습으로 이동한다", () => {
+    renderWithIntl(<QuestionLearningExperience audience="student" />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "14 / 14" }));
+
+    expect(screen.getByRole("link", { name: "질문연습 시작" })).toHaveAttribute(
+      "href",
+      "/student-practice",
+    );
+  });
+
+  it("교사 완료 화면에서 연습과 수업 활용으로 이동하고 보기 탭을 키로 바꾼다", () => {
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    renderWithIntl(<QuestionLearningExperience audience="teacher" />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "14 / 14" }));
+    expect(screen.getByRole("link", { name: "직접 연습하기" })).toHaveAttribute(
+      "href",
+      "/teacher-practice",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "수업 활용 보기" }));
+    expect(screen.getByRole("heading", { name: "수업 활용" })).toHaveFocus();
+    expect(screen.getAllByText("자주 생기는 혼동")).toHaveLength(6);
+
+    const teachingTab = screen.getByRole("tab", { name: "수업 활용" });
+    const teachingPanel = screen.getByRole("tabpanel");
+    expect(teachingTab).toHaveAttribute("aria-selected", "true");
+    expect(teachingTab).toHaveAttribute("aria-controls", teachingPanel.id);
+    expect(teachingPanel).toHaveAttribute("aria-labelledby", teachingTab.id);
+
+    fireEvent.keyDown(teachingTab, { key: "Home" });
+    const learningTab = screen.getByRole("tab", { name: "학습 내용" });
+    expect(learningTab).toHaveFocus();
+    expect(learningTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(learningTab, { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "수업 활용" })).toHaveFocus();
   });
 
   it("활성 패널과 진행 탭을 연결하고 단추와 키로 경계 안에서 이동한다", () => {

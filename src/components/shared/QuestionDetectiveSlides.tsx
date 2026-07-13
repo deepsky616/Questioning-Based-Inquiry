@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ export const QUESTION_LEARNING_SLIDES = [
 
 export type QuestionLearningSlide = (typeof QUESTION_LEARNING_SLIDES)[number];
 
-export function QuestionDetectiveSlides() {
+export function QuestionDetectiveSlides({ completionActions }: { completionActions?: ReactNode }) {
   const t = useTranslations("questionLearning");
   const tClassification = useTranslations("classification");
   const [index, setIndex] = useState(0);
@@ -125,6 +125,7 @@ export function QuestionDetectiveSlides() {
           className="min-h-[34rem] w-full transition-opacity duration-200 motion-reduce:transition-none motion-reduce:duration-0 lg:h-full lg:min-h-0"
         >
           <QuestionLearningSlideContent
+            completionActions={completionActions}
             slide={slide}
             typeLabel={typeLabel}
             checkNext={t("checkNext")}

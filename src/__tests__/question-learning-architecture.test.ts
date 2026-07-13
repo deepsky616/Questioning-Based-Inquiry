@@ -48,6 +48,13 @@ describe("질문 학습과 질문 연습의 구성 경계", () => {
     expect(teacherLearning).toContain("QuestionLearningExperience");
   });
 
+  it("학생과 교사 학습 페이지가 역할을 명시한다", () => {
+    expect(studentLearning).toContain('audience="student"');
+    expect(teacherLearning).toContain('audience="teacher"');
+    expect(slideContent).not.toContain("student-practice");
+    expect(slideContent).not.toContain("teacher-practice");
+  });
+
   it("학습 본문의 접근성 이름을 고정된 한국어 문구로 덮어쓰지 않는다", () => {
     expect(slideContent).not.toContain('aria-label="좋은 질문이 하는 일"');
     expect(slideContent).not.toContain('aria-label="질문 유형 세로 비교 자료"');
