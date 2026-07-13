@@ -82,8 +82,8 @@ function questionLearningSchoolFor(key: string): string {
   return `E2E질문학습학교-${key}`;
 }
 
-function questionLearningClassFor(key: string): string {
-  return `질문학습-${key}`;
+function questionLearningClassFor(): string {
+  return "1";
 }
 
 function loadDatabaseUrl(): string {
@@ -176,7 +176,7 @@ export async function prepareQuestionLearningTeacher(key: string): Promise<Quest
     const email = questionLearningTeacherEmailFor(key);
     const school = questionLearningSchoolFor(key);
     const grade = "6";
-    const className = questionLearningClassFor(key);
+    const className = questionLearningClassFor();
     const password = `E2e!${randomBytes(9).toString("hex")}`;
     const hashed = await bcrypt.hash(password, 12);
     await cleanupQuestionLearningStudentWithClient(prisma, key);
