@@ -37,6 +37,7 @@ export interface Question {
   createdAt: string;
   comments?: Array<{ id: string; content: string; author: { id?: string; name: string }; createdAt: string; flagged?: boolean; flagReason?: string }>;
   likeCount: number;
+  commentCount?: number;
   likedBy?: Array<{ id: string; name: string }>;
 }
 
