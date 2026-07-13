@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { GripVertical, ChevronUp, ChevronDown, Pencil, Trash2, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Pencil, Save, Trash2, X } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,11 @@ import { filterSortSavedDesigns } from "@/lib/saved-designs";
 import { getSavedDesignTimeline, type SavedDesignTimelineKind } from "@/lib/saved-design-timeline";
 import { groupSessionDatesByMonth } from "@/lib/sessions";
 import { formatDateTime } from "@/lib/datetime";
+import { appQueryKeys } from "@/lib/app-queries";
+import {
+  postQuestionClassFromDesign,
+  runSavedDesignQuestionClassCreation,
+} from "@/lib/question-class-creation";
 import {
   buildClassStudentTargetPayload,
   defaultTargetSelection,
@@ -30,7 +37,7 @@ import { todayStr, type InquiryQuestion, type SavedInquiryDesign } from "./types
 
 interface SavedDesignsTabProps {
   savedList: SavedInquiryDesign[];
-  /** 삭제·수정·재배포 후 저장 목록을 최신화한다 */
+  /** 삭제, 수정, 새 수업 생성 뒤 저장 목록을 최신화한다. */
   onChanged: () => void | Promise<unknown>;
   students: SessionTargetStudent[];
   targetClasses: SessionTargetClass[];
@@ -40,7 +47,7 @@ interface SavedDesignsTabProps {
  * 저장된 탐구질문 탭.
  * 조회(날짜·학년·교과·영역·단원)·정렬, 항목별 접기, 참고자료 미리보기,
  * 인라인 편집(제목·날짜·공개설정·배포대상·핵심아이디어·문장·질문)과
- * 저장/재배포/삭제를 자체 상태로 처리한다.
+ * 저장, 새 수업 만들기, 삭제를 자체 상태로 처리한다.
  */
 export function SavedDesignsTab({ savedList, onChanged, students, targetClasses }: SavedDesignsTabProps) {
   const t = useTranslations("curriculum");
@@ -49,6 +56,8 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   const tSess = useTranslations("sessions");
   const confirm = useConfirm();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const router = useRouter();
   const typeLabel = (type: string) => `${tCls(`${type}.label`)}`;
   const isAfter = (a?: string | null, b?: string | null) => {
     if (!a || !b) return false;
@@ -75,7 +84,8 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
       className: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200",
     };
   };
-  const needsRedeploy = (design: SavedInquiryDesign) => Boolean(design.lastDeployedAt) && isAfter(design.updatedAt, design.lastDeployedAt);
+  const needsNewQuestionClass = (design: SavedInquiryDesign) =>
+    Boolean(design.lastDeployedAt) && isAfter(design.updatedAt, design.lastDeployedAt);
   const timelineLabelKey: Record<SavedDesignTimelineKind, "savedPrimarySavedAt" | "savedPrimaryUpdatedAt" | "savedPrimaryDeployedAt"> = {
     saved: "savedPrimarySavedAt",
     updated: "savedPrimaryUpdatedAt",
@@ -269,48 +279,57 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     }
   };
 
-  // 저장하고 수업세션에 재배포(탐구질문 수업 세션 생성)
-  const redeployEditDesign = async (id: string) => {
+  // 수정한 설계를 저장하고 그 설정으로 새 질문수업을 만든다.
+  const createQuestionClassFromDesign = async (id: string) => {
     if (!editTitle.trim() || !editDate || savingEdit) return;
     setSavingEdit(true);
     try {
-      const { ok } = await patchEditDesign(id);
-      if (!ok) throw new Error();
       const target = buildClassStudentTargetPayload({
         targetClassValue: editTargetClassValue,
         selectedStudentIds: editSelectedStudentIds,
         students,
       });
-      const res = await fetch(`/api/unit-design/${id}/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: editDate,
-          topic: editTitle.trim(),
-          defaultQuestionPublic: editVisibility.defaultQuestionPublic,
-          isActive: editVisibility.isActive,
-          likesVisibleToPeers: editVisibility.likesVisibleToPeers,
-          commentsVisibleToPeers: editVisibility.commentsVisibleToPeers,
-          ...target,
-          // sharedQuestions 생략 → 탐구질문 수업 세션
-        }),
+      const result = await runSavedDesignQuestionClassCreation({
+        updateDesign: async () => (await patchEditDesign(id)).ok,
+        createSession: () =>
+          postQuestionClassFromDesign({
+            designId: id,
+            fallbackError: t("sessionCreateFailed"),
+            payload: {
+              date: editDate,
+              topic: editTitle.trim(),
+              defaultQuestionPublic: editVisibility.defaultQuestionPublic,
+              isActive: editVisibility.isActive,
+              likesVisibleToPeers: editVisibility.likesVisibleToPeers,
+              commentsVisibleToPeers: editVisibility.commentsVisibleToPeers,
+              ...target,
+            },
+          }),
+        refreshDesigns: onChanged,
+        onSuccess: async (createdSession) => {
+          await queryClient
+            .invalidateQueries({ queryKey: appQueryKeys.teacherSessions })
+            .catch(() => undefined);
+          cancelEditDesign();
+          toast({
+            variant: "success",
+            description: t("designRedeployedAt", {
+              time: formatDateTime(createdSession.createdAt ?? new Date().toISOString()),
+            }),
+          });
+          router.push(`/teacher-sessions?session=${encodeURIComponent(createdSession.id)}`);
+        },
       });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        toast({ variant: "destructive", description: d.error || t("sessionCreateFailed") });
-        return;
+
+      if (result.status === "update-failed") {
+        toast({ variant: "destructive", description: t("designUpdateFailed") });
+      } else if (result.status === "session-failed") {
+        const description =
+          result.error instanceof Error && result.error.message
+            ? result.error.message
+            : t("sessionCreateFailed");
+        toast({ variant: "destructive", description });
       }
-      const createdSession = await res.json().catch(() => null);
-      cancelEditDesign();
-      onChanged();
-      toast({
-        variant: "success",
-        description: t("designRedeployedAt", {
-          time: formatDateTime(createdSession?.createdAt ?? new Date().toISOString()),
-        }),
-      });
-    } catch {
-      toast({ variant: "destructive", description: t("designUpdateFailed") });
     } finally {
       setSavingEdit(false);
     }
@@ -395,7 +414,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
           <ul className="divide-y rounded-md border">
             {visibleSaved.map((d) => {
               const status = getDesignStatus(d);
-              const redeployNeeded = needsRedeploy(d);
+              const newQuestionClassNeeded = needsNewQuestionClass(d);
               const timeline = getSavedDesignTimeline(d);
               return (
               <li key={d.id} className="p-3">
@@ -463,7 +482,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                 {/* 인라인 편집: 제목 + 질문 수정/추가/삭제 */}
                 {editingDesignId === d.id && (
                   <div className="mt-3 space-y-3 rounded-md border bg-muted/30 p-3">
-                    {redeployNeeded && (
+                    {newQuestionClassNeeded && (
                       <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-medium text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/30 dark:text-orange-200">
                         {t("redeployNeededNotice")}
                       </div>
@@ -638,17 +657,19 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                         variant="gradient"
                         className="h-11 flex-1 text-base font-semibold"
                       >
-                        💾 {savingEdit ? tc("loading") : tc("save")}
+                        <Save className="h-4 w-4" />
+                        {savingEdit ? tc("loading") : tc("save")}
                       </Button>
                       <Button
-                        variant={redeployNeeded ? "default" : "secondary"}
-                        onClick={() => redeployEditDesign(d.id)}
+                        variant={newQuestionClassNeeded ? "default" : "secondary"}
+                        onClick={() => createQuestionClassFromDesign(d.id)}
                         disabled={savingEdit || !editTitle.trim() || !editDate}
                         className={`h-11 flex-1 text-base font-semibold ${
-                          redeployNeeded ? "bg-orange-600 text-white hover:bg-orange-700" : ""
+                          newQuestionClassNeeded ? "bg-orange-600 text-white hover:bg-orange-700" : ""
                         }`}
                       >
-                        📤 {t(redeployNeeded ? "redeployNeededButton" : "redeployToSession")}
+                        <BookOpenCheck className="h-4 w-4" />
+                        {t(newQuestionClassNeeded ? "redeployNeededButton" : "redeployToSession")}
                       </Button>
                       <Button
                         variant="outline"
@@ -665,7 +686,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
 
                 {selectedSavedId === d.id && (
                   <div className="mt-3 rounded-md border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50/60 dark:bg-indigo-950/30 p-3">
-                    {/* 학생에게 전달되는 참고자료 미리보기(수정·재배포는 위 '수정' 버튼) */}
+                    {/* 학생에게 전달되는 참고자료 미리보기 */}
                     <p className="mb-1 text-xs font-semibold text-indigo-700 dark:text-indigo-300">📚 {t("referencePreview")}</p>
                     <DesignReferenceView
                       data={{

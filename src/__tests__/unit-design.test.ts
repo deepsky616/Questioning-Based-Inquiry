@@ -148,15 +148,45 @@ describe("POST /api/unit-design — 탐구 질문 저장", () => {
     expect(res.status).toBe(403);
   });
 
-  it("유효한 데이터로 저장하면 ok와 designId를 반환하고 세션은 자동 생성하지 않는다", async () => {
+  it("유효한 데이터로 저장하면 같은 설계 식별값과 날짜를 반환하고 대상과 공개 설정을 보존한다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
-    mockQueryRawUnsafe.mockResolvedValue([{ id: "ud-new" }]);
+    const createdAt = new Date("2026-07-13T00:00:00.000Z");
+    const updatedAt = new Date("2026-07-13T00:00:01.000Z");
+    mockQueryRawUnsafe.mockResolvedValue([{ id: "ud-new", created_at: createdAt, updated_at: updatedAt }]);
 
-    const res = await POST(makeRequest(VALID_DESIGN));
+    const input = {
+      ...VALID_DESIGN,
+      grade: "5",
+      sessionDate: "2026-07-20",
+      isActive: false,
+      defaultQuestionPublic: false,
+      likesVisibleToPeers: true,
+      commentsVisibleToPeers: false,
+      targetClassValue: "class:5:1",
+      targetStudentIds: ["student-1"],
+    };
+
+    const res = await POST(makeRequest(input));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(body.designId).toBe("ud-new");
+    expect(body.design).toMatchObject({
+      id: body.designId,
+      grade: "5",
+      sessionDate: "2026-07-20",
+    });
+    const savedArguments = mockQueryRawUnsafe.mock.calls[0].slice(1);
+    expect(savedArguments.slice(11)).toEqual([
+      "5",
+      "2026-07-20",
+      false,
+      false,
+      true,
+      false,
+      "class:5:1",
+      JSON.stringify(["student-1"]),
+    ]);
     expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
@@ -288,6 +318,7 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
     mockQueryRaw.mockResolvedValue([SAVED_DESIGN]);
     mockSessionCreate.mockResolvedValue({
       id: "qs-1",
+      unitDesignId: "ud-1",
       date: "2026-05-10",
       subject: "과학",
       topic: "광합성과 에너지",
@@ -303,6 +334,8 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
 
     const res = await createSessionFromDesign(req, ctx);
     expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body).toMatchObject({ id: "qs-1", unitDesignId: "ud-1" });
     expect(mockSessionCreate).toHaveBeenCalledWith({
       data: {
         date: "2026-05-10",

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
   buildClassStudentTargetPayload,
   defaultTargetSelection,
@@ -27,11 +28,18 @@ import {
   filterSelectedTexts,
   selectAllIndices,
 } from "@/lib/inquiry-design-selection";
-import { useTeacherStudents } from "@/lib/app-queries";
+import { appQueryKeys, useTeacherStudents } from "@/lib/app-queries";
+import { sortCurriculumAreas } from "@/lib/curriculum-area-order";
 import { CurriculumCreateFlow } from "./CurriculumCreateFlow";
 import { CurriculumMainTabs, type CurriculumMainTab } from "./CurriculumMainTabs";
 import type { CurriculumStep } from "./CurriculumStepProgress";
 import { SavedDesignsTab } from "./SavedDesignsTab";
+import {
+  postInquiryDesign,
+  postQuestionClassFromDesign,
+  runInquiryQuestionClassCreation,
+  type PendingQuestionClassDesign,
+} from "@/lib/question-class-creation";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 import {
   KNOWLEDGE_ITEM_LIMIT,
@@ -45,35 +53,6 @@ import {
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 type LastDesignAction = { type: "saved" | "deployed"; at: string };
-
-// Codex(웹검색) 검증 완료 — 2022 개정 교육과정 문서 순서
-const AREA_ORDER: Record<string, string[]> = {
-  국어: ["듣기·말하기", "읽기", "쓰기", "문법", "문학", "매체"],
-  수학: ["수와 연산", "변화와 관계", "도형과 측정", "자료와 가능성"],
-  사회: ["지리 인식", "자연환경과 인간생활", "인문환경과 인간생활", "지속가능한 세계", "정치", "법", "경제", "사회·문화", "역사 일반", "지역사", "한국사"],
-  과학: ["운동과 에너지", "물질", "생명", "지구와 우주", "과학과 사회"],
-  도덕: ["자신과의 관계", "타인과의 관계", "사회·공동체와의 관계", "자연과의 관계"],
-  음악: ["연주", "감상", "창작"],
-  미술: ["미적 체험", "표현", "감상"],
-  체육: ["운동", "스포츠", "표현"],
-  영어: ["이해(reception)", "표현(production)"],
-  실과: ["인간 발달과 주도적 삶", "생활환경과 지속가능한 선택", "기술적 문제해결과 혁신", "지속가능한 기술과 융합", "디지털 사회와 인공지능"],
-  "바른 생활": ["나와 우리", "자연과 더불어 사는 삶", "인터넷·AI와 생활"],
-  "슬기로운 생활": ["나와 가족", "마을과 우리나라", "봄·여름", "가을·겨울"],
-  "즐거운 생활": ["나와 가족", "마을과 우리나라", "봄·여름", "가을·겨울"],
-};
-
-function sortAreasByOrder(areas: { id: string; area: string }[], subject: string) {
-  const order = AREA_ORDER[subject] ?? [];
-  return [...areas].sort((a, b) => {
-    const ai = order.indexOf(a.area);
-    const bi = order.indexOf(b.area);
-    if (ai === -1 && bi === -1) return a.area.localeCompare(b.area, "ko");
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
-  });
-}
 
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
 export default function CurriculumPage() {
@@ -89,6 +68,8 @@ export default function CurriculumPage() {
   const [saveDate, setSaveDate] = useState(todayStr);
   const [lastDesignAction, setLastDesignAction] = useState<LastDesignAction | null>(null);
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const pendingQuestionClassDesign = useRef<PendingQuestionClassDesign<SavedInquiryDesign> | null>(null);
   // 저장 목록(조회·정렬·인라인 편집)은 SavedDesignsTab이 자체 상태로 처리한다
   const [mainTab, setMainTab] = useState<CurriculumMainTab>("create");
   const [defaultQuestionPublic, setDefaultQuestionPublic] = useState(true);
@@ -206,7 +187,7 @@ export default function CurriculumPage() {
     setSelectedAchievementCodes([]);
     fetch(`/api/curriculum?subject=${encodeURIComponent(selSubject)}&gradeRange=${encodeURIComponent(selGrade)}`)
       .then((r) => r.json())
-      .then((d) => setAreas(sortAreasByOrder(d.areas ?? [], selSubject)))
+      .then((d) => setAreas(sortCurriculumAreas(d.areas ?? [], selSubject)))
       .catch(() => {});
   }, [selSubject, selGrade]);
 
@@ -408,47 +389,47 @@ export default function CurriculumPage() {
     curriculumData && saveTitle.trim() && saveGrade && saveDate && selectedInquiryQuestions.length > 0,
   );
 
-  // 설계 저장만 수행하고 생성된 설계를 반환(이동/폼 리셋은 호출자가 처리)
-  const saveDesign = async (): Promise<SavedInquiryDesign | null> => {
+  const buildDesignPayload = () => ({
+    title: saveTitle.trim(),
+    curriculumAreaId: curriculumData?.id,
+    subject: curriculumData?.subject,
+    gradeRange: curriculumData?.gradeRange,
+    grade: saveGrade,
+    sessionDate: saveDate,
+    area: curriculumData?.area,
+    coreIdea: curriculumData?.coreIdea,
+    selectedKeywords,
+    coreSentences: selectedCoreSentences,
+    essentialQuestions: selectedEssentialQuestions,
+    inquiryQuestions: selectedInquiryQuestions,
+    isActive: sessionIsActive,
+    defaultQuestionPublic,
+    likesVisibleToPeers: sessionLikesVisible,
+    commentsVisibleToPeers: sessionCommentsVisible,
+    targetClassValue,
+    targetStudentIds: selectedStudentIds,
+  });
+
+  // 설계 저장만 수행하고 생성된 설계를 반환한다.
+  const saveDesign = async (
+    payload = buildDesignPayload(),
+  ): Promise<SavedInquiryDesign | null> => {
     if (!curriculumData) return null;
-    const res = await fetch("/api/unit-design", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: saveTitle.trim(),
-        curriculumAreaId: curriculumData.id,
-        subject: curriculumData.subject,
-        gradeRange: curriculumData.gradeRange,
-        grade: saveGrade,
-        sessionDate: saveDate,
-        area: curriculumData.area,
-        coreIdea: curriculumData.coreIdea,
-        selectedKeywords,
-        coreSentences: selectedCoreSentences,
-        essentialQuestions: selectedEssentialQuestions,
-        inquiryQuestions: selectedInquiryQuestions,
-        isActive: sessionIsActive,
-        defaultQuestionPublic,
-        likesVisibleToPeers: sessionLikesVisible,
-        commentsVisibleToPeers: sessionCommentsVisible,
-        targetClassValue,
-        targetStudentIds: selectedStudentIds,
-      }),
-    });
-    if (!res.ok) {
-      toast({ variant: "destructive", description: t("saveFailed") });
-      return null;
-    }
-    const data = await res.json();
-    const savedDesign: SavedInquiryDesign | null = data.design ?? null;
-    if (savedDesign?.id) {
+    try {
+      const savedDesign = await postInquiryDesign<SavedInquiryDesign>({
+        payload,
+        fallbackError: t("saveFailed"),
+      });
       queryClient.setQueryData<SavedInquiryDesign[]>(["unit-designs"], (prev) => [
         savedDesign,
         ...(prev ?? []).filter((design) => design.id !== savedDesign.id),
       ]);
+      fetchSaved();
+      return savedDesign;
+    } catch {
+      toast({ variant: "destructive", description: t("saveFailed") });
+      return null;
     }
-    fetchSaved();
-    return savedDesign;
   };
 
   const resetSaveForm = () => {
@@ -464,6 +445,7 @@ export default function CurriculumPage() {
     try {
       const d = await saveDesign();
       if (d?.id) {
+        pendingQuestionClassDesign.current = null;
         setLastDesignAction({ type: "saved", at: d.updatedAt ?? d.createdAt ?? new Date().toISOString() });
         resetSaveForm();
         // 저장 탭은 SavedDesignsTab이 새로 마운트되며 접힌 상태로 시작한다
@@ -474,47 +456,59 @@ export default function CurriculumPage() {
     }
   };
 
-  // 저장하고 바로 수업 세션 만들기 — mode: "inquiry"(학생이 직접 작성) / "deploy"(질문 배포)
+  // 설계를 저장하고 질문수업을 만든다. 같은 입력 재시도에서는 직전에 저장한 설계를 재사용한다.
   const handleSaveAndCreateSession = async (mode: "inquiry" | "deploy") => {
     if (!canSaveDesign || !curriculumData) return;
     setIsSaving(true);
     try {
-      const d = await saveDesign();
-      if (!d?.id) return;
+      const designPayload = buildDesignPayload();
+      const inputSignature = JSON.stringify(designPayload);
       const target = buildClassStudentTargetPayload({ targetClassValue, selectedStudentIds, students });
-      const res = await fetch(`/api/unit-design/${d.id}/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: saveDate,
-          topic: saveTitle.trim(),
-          defaultQuestionPublic,
-          isActive: sessionIsActive,
-          likesVisibleToPeers: sessionLikesVisible,
-          commentsVisibleToPeers: sessionCommentsVisible,
-          ...target,
-          ...(mode === "deploy" ? { sharedQuestions: selectedInquiryQuestions } : {}),
-        }),
-      });
-      if (res.ok) {
-        const createdSession = await res.json().catch(() => null);
-        const actionAt = createdSession?.createdAt ?? new Date().toISOString();
-        setLastDesignAction({
-          type: "deployed",
-          at: actionAt,
-        });
-        toast({
-          variant: "success",
-          description: t(mode === "deploy" ? "sessionCreated" : "inquirySessionCreated", {
-            date: saveDate,
-            subject: curriculumData.subject,
+      const result = await runInquiryQuestionClassCreation({
+        inputSignature,
+        pendingDesign: pendingQuestionClassDesign.current,
+        saveDesign: () => saveDesign(designPayload),
+        createSession: (design) =>
+          postQuestionClassFromDesign({
+            designId: design.id,
+            fallbackError: t("sessionCreateFailed"),
+            payload: {
+              date: saveDate,
+              topic: saveTitle.trim(),
+              defaultQuestionPublic,
+              isActive: sessionIsActive,
+              likesVisibleToPeers: sessionLikesVisible,
+              commentsVisibleToPeers: sessionCommentsVisible,
+              ...target,
+              ...(mode === "deploy" ? { sharedQuestions: selectedInquiryQuestions } : {}),
+            },
           }),
-        });
-        resetSaveForm();
-        setMainTab("saved");
-      } else {
-        const data = await res.json().catch(() => ({}));
-        toast({ variant: "destructive", description: data.error || t("sessionCreateFailed") });
+        onSuccess: async (createdSession) => {
+          await queryClient
+            .invalidateQueries({ queryKey: appQueryKeys.teacherSessions })
+            .catch(() => undefined);
+          const actionAt = createdSession.createdAt ?? new Date().toISOString();
+          setLastDesignAction({ type: "deployed", at: actionAt });
+          toast({
+            variant: "success",
+            description: t(mode === "deploy" ? "sessionCreated" : "inquirySessionCreated", {
+              date: saveDate,
+              subject: curriculumData.subject,
+            }),
+          });
+          resetSaveForm();
+          setMainTab("saved");
+          router.push(`/teacher-sessions?session=${encodeURIComponent(createdSession.id)}`);
+        },
+      });
+
+      pendingQuestionClassDesign.current = result.pendingDesign;
+      if (result.status === "session-failed") {
+        const description =
+          result.error instanceof Error && result.error.message
+            ? result.error.message
+            : t("sessionCreateFailed");
+        toast({ variant: "destructive", description });
       }
     } finally {
       setIsSaving(false);
@@ -633,7 +627,7 @@ export default function CurriculumPage() {
 
       <CurriculumMainTabs value={mainTab} savedCount={savedList.length} onChange={setMainTab} />
 
-      {/* 저장 목록 — 조회·정렬·접기·인라인 편집·재배포·삭제 포함 */}
+      {/* 저장 목록 — 조회, 정렬, 접기, 인라인 편집, 새 수업 만들기, 삭제 포함 */}
       {mainTab === "saved" && (
         <SavedDesignsTab savedList={savedList} onChanged={fetchSaved} students={students} targetClasses={targetClasses} />
       )}

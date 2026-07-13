@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import DatePicker from "@/components/shared/DatePicker";
@@ -259,7 +259,8 @@ export function CurriculumInquiryStep({
               variant="gradient"
               className="h-11 flex-1 text-base font-semibold"
             >
-              ➕ {t("addSessionBtn")}
+              <BookOpenCheck className="h-5 w-5" />
+              {t("createInquiryQuestionClass")}
             </Button>
             <Button
               variant="outline"
@@ -267,7 +268,8 @@ export function CurriculumInquiryStep({
               disabled={isSaving || !canSaveDesign}
               className="h-11 flex-1 text-base"
             >
-              💾 {t("saveOnly")}
+              <Save className="h-5 w-5" />
+              {t("saveOnly")}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">{t("addSessionHint")}</p>
