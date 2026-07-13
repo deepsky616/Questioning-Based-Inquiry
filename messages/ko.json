@@ -21,7 +21,10 @@
     "accountMenu": "계정 메뉴",
     "personalInfo": "개인 정보 수정",
     "withdraw": "탈퇴",
-    "studentManagement": "학생관리"
+    "studentManagement": "학생관리",
+    "gradeValue": "{grade}학년",
+    "classValue": "{className}반",
+    "numberValue": "{n}번"
   },
   "common": {
     "save": "저장",

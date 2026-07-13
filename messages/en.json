@@ -21,7 +21,10 @@
     "accountMenu": "Account menu",
     "personalInfo": "Edit profile",
     "withdraw": "Delete account",
-    "studentManagement": "Student management"
+    "studentManagement": "Student management",
+    "gradeValue": "Grade {grade}",
+    "classValue": "Class {className}",
+    "numberValue": "No. {n}"
   },
   "common": {
     "save": "Save",

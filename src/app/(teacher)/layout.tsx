@@ -54,6 +54,12 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
         userName={user.name ?? ""}
         roleSuffix={t("teacherSuffix")}
         extra={<NotificationBell />}
+        accountProfile={{
+          school: user.school,
+          grade: user.grade,
+          className: user.className,
+          studentNumber: user.studentNumber,
+        }}
         accountLinks={{
           settingsHref: "/teacher-settings",
           withdrawalHref: "/teacher-settings#account-withdrawal",

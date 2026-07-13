@@ -23,6 +23,13 @@ export interface AccountNavLinks {
   studentManagementHref?: string;
 }
 
+export interface AccountProfile {
+  school?: string | null;
+  grade?: string | null;
+  className?: string | null;
+  studentNumber?: string | null;
+}
+
 const ITEM_GAP = 4; // gap-1
 const MORE_RESERVE = 104; // "더보기/More ▾" 버튼 + 여유 폭
 
@@ -158,12 +165,14 @@ export function AppNav({
   roleSuffix,
   extra,
   accountLinks,
+  accountProfile,
 }: {
   pages: NavPage[];
   userName: string;
   roleSuffix: string;
   extra?: React.ReactNode;
   accountLinks?: AccountNavLinks;
+  accountProfile?: AccountProfile;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -171,6 +180,11 @@ export function AppNav({
   const t = useTranslations("nav");
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const classInfo = [
+    accountProfile?.grade ? t("gradeValue", { grade: accountProfile.grade }) : null,
+    accountProfile?.className ? t("classValue", { className: accountProfile.className }) : null,
+    accountProfile?.studentNumber ? t("numberValue", { n: accountProfile.studentNumber }) : null,
+  ].filter(Boolean).join(" ");
 
   return (
     <header className="bg-card shadow-sm border-b sticky top-0 z-30">
@@ -206,7 +220,12 @@ export function AppNav({
               <PopoverContent align="end" className="w-64 p-0">
                 <div className="border-b px-4 py-3">
                   <p className="truncate text-sm font-semibold text-foreground">{userName} {roleSuffix}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Question Lab</p>
+                  {(accountProfile?.school || classInfo) && (
+                    <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                      {accountProfile?.school && <p className="truncate">{accountProfile.school}</p>}
+                      {classInfo && <p className="truncate">{classInfo}</p>}
+                    </div>
+                  )}
                 </div>
                 <div className="p-1">
                   {accountLinks?.settingsHref && (

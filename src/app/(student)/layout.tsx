@@ -53,9 +53,14 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         userName={user.name ?? ""}
         roleSuffix={t("studentSuffix")}
         extra={<StudentNotificationBell />}
+        accountProfile={{
+          school: user.school,
+          grade: user.grade,
+          className: user.className,
+          studentNumber: user.studentNumber,
+        }}
         accountLinks={{
           settingsHref: "/student-settings",
-          withdrawalHref: "/student-settings#account-withdrawal",
         }}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
