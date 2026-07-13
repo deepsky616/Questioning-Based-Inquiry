@@ -390,27 +390,6 @@
   }
 }
 
-/* 질문연습 학습지 페이지는 화면과 인쇄 모두 밝은 문서로 고정한다.
-   사용자가 어두운 테마에서 인쇄해도 루트 color-scheme과 배경이 인쇄 결과에 섞이지 않게 한다. */
-html.question-practice-print-light,
-html.question-practice-print-light.dark,
-body.question-practice-print-light,
-body.question-practice-print-light.dark {
-  background: #ffffff !important;
-  color: #111827 !important;
-  color-scheme: light !important;
-}
-
-body.question-practice-print-light main {
-  background: #ffffff !important;
-  color: #111827 !important;
-  color-scheme: light !important;
-}
-
-body.question-practice-print-light main > div.mt-8.pt-4.border-t {
-  display: none !important;
-}
-
 body.question-practice-print-mode {
   background: #ffffff !important;
   color: #111827 !important;
@@ -419,13 +398,17 @@ body.question-practice-print-mode {
 
 .question-practice-print-page,
 .question-practice-print-page main,
-.question-practice-print-page .question-practice-print {
+.question-practice-print-page .question-practice-print,
+html.dark .question-practice-print-page,
+html.dark .question-practice-print-page main,
+html.dark .question-practice-print-page .question-practice-print {
   background: #ffffff !important;
   color: #111827 !important;
   color-scheme: light !important;
 }
 
-.question-practice-print-page .qp-toolbar {
+.question-practice-print-page .qp-toolbar,
+html.dark .question-practice-print-page .qp-toolbar {
   background: #ffffff !important;
   border-color: #cbd5e1 !important;
   color: #111827 !important;
@@ -433,7 +416,9 @@ body.question-practice-print-mode {
 }
 
 .question-practice-print-page .qp-toolbar button,
-.question-practice-print-page .qp-toolbar a {
+.question-practice-print-page .qp-toolbar a,
+html.dark .question-practice-print-page .qp-toolbar button,
+html.dark .question-practice-print-page .qp-toolbar a {
   background: #ffffff !important;
   border-color: #cbd5e1 !important;
   color: #111827 !important;
@@ -441,17 +426,22 @@ body.question-practice-print-mode {
 }
 
 .question-practice-print-page .qp-toolbar button:hover,
-.question-practice-print-page .qp-toolbar a:hover {
+.question-practice-print-page .qp-toolbar a:hover,
+html.dark .question-practice-print-page .qp-toolbar button:hover,
+html.dark .question-practice-print-page .qp-toolbar a:hover {
   background: #f8fafc !important;
   color: #0f172a !important;
 }
 
-.question-practice-print-page .qp-toolbar svg {
+.question-practice-print-page .qp-toolbar svg,
+html.dark .question-practice-print-page .qp-toolbar svg {
   color: #334155 !important;
 }
 
 .question-practice-print-page .question-practice-print,
-.question-practice-print-page .question-practice-print * {
+.question-practice-print-page .question-practice-print *,
+html.dark .question-practice-print-page .question-practice-print,
+html.dark .question-practice-print-page .question-practice-print * {
   filter: none !important;
   mix-blend-mode: normal !important;
   opacity: 1 !important;
@@ -467,7 +457,17 @@ body.question-practice-print-mode {
 .question-practice-print-page .question-practice-print .qp-section-heading,
 .question-practice-print-page .question-practice-print .qp-card-title,
 .question-practice-print-page .question-practice-print .qp-pattern-title,
-.question-practice-print-page .question-practice-print .qp-prompt {
+.question-practice-print-page .question-practice-print .qp-prompt,
+html.dark .question-practice-print-page .question-practice-print h1,
+html.dark .question-practice-print-page .question-practice-print h2,
+html.dark .question-practice-print-page .question-practice-print h3,
+html.dark .question-practice-print-page .question-practice-print h4,
+html.dark .question-practice-print-page .question-practice-print strong,
+html.dark .question-practice-print-page .question-practice-print .qp-title,
+html.dark .question-practice-print-page .question-practice-print .qp-section-heading,
+html.dark .question-practice-print-page .question-practice-print .qp-card-title,
+html.dark .question-practice-print-page .question-practice-print .qp-pattern-title,
+html.dark .question-practice-print-page .question-practice-print .qp-prompt {
   color: #0f172a !important;
 }
 
@@ -475,14 +475,23 @@ body.question-practice-print-mode {
 .question-practice-print-page .question-practice-print li,
 .question-practice-print-page .question-practice-print span,
 .question-practice-print-page .question-practice-print div,
-.question-practice-print-page .question-practice-print .qp-muted {
+.question-practice-print-page .question-practice-print .qp-muted,
+html.dark .question-practice-print-page .question-practice-print p,
+html.dark .question-practice-print-page .question-practice-print li,
+html.dark .question-practice-print-page .question-practice-print span,
+html.dark .question-practice-print-page .question-practice-print div,
+html.dark .question-practice-print-page .question-practice-print .qp-muted {
   color: #334155 !important;
 }
 
 .question-practice-print-page .question-practice-print .text-indigo-700,
 .question-practice-print-page .question-practice-print .text-indigo-900,
 .question-practice-print-page .question-practice-print .qp-eyebrow,
-.question-practice-print-page .question-practice-print .qp-callout-title {
+.question-practice-print-page .question-practice-print .qp-callout-title,
+html.dark .question-practice-print-page .question-practice-print .text-indigo-700,
+html.dark .question-practice-print-page .question-practice-print .text-indigo-900,
+html.dark .question-practice-print-page .question-practice-print .qp-eyebrow,
+html.dark .question-practice-print-page .question-practice-print .qp-callout-title {
   color: #312e81 !important;
 }
 
@@ -492,11 +501,19 @@ body.question-practice-print-mode {
 .question-practice-print-page .question-practice-print .qp-card,
 .question-practice-print-page .question-practice-print .qp-pattern,
 .question-practice-print-page .question-practice-print .qp-callout,
-.question-practice-print-page .question-practice-print .qp-answer-box {
+.question-practice-print-page .question-practice-print .qp-answer-box,
+html.dark .question-practice-print-page .question-practice-print .border,
+html.dark .question-practice-print-page .question-practice-print .border-b,
+html.dark .question-practice-print-page .question-practice-print.qp-paper,
+html.dark .question-practice-print-page .question-practice-print .qp-card,
+html.dark .question-practice-print-page .question-practice-print .qp-pattern,
+html.dark .question-practice-print-page .question-practice-print .qp-callout,
+html.dark .question-practice-print-page .question-practice-print .qp-answer-box {
   border-color: #cbd5e1 !important;
 }
 
-.question-practice-print-page .question-practice-print .qp-write-line {
+.question-practice-print-page .question-practice-print .qp-write-line,
+html.dark .question-practice-print-page .question-practice-print .qp-write-line {
   border-color: #64748b !important;
 }
 
@@ -504,23 +521,32 @@ body.question-practice-print-mode {
 .question-practice-print-page .question-practice-print .qp-paper,
 .question-practice-print-page .question-practice-print .qp-card,
 .question-practice-print-page .question-practice-print .qp-pattern,
-.question-practice-print-page .question-practice-print .qp-answer-box {
+.question-practice-print-page .question-practice-print .qp-answer-box,
+html.dark .question-practice-print-page .question-practice-print.qp-paper,
+html.dark .question-practice-print-page .question-practice-print .qp-paper,
+html.dark .question-practice-print-page .question-practice-print .qp-card,
+html.dark .question-practice-print-page .question-practice-print .qp-pattern,
+html.dark .question-practice-print-page .question-practice-print .qp-answer-box {
   background: #ffffff !important;
 }
 
-.question-practice-print-page .question-practice-print .qp-callout {
+.question-practice-print-page .question-practice-print .qp-callout,
+html.dark .question-practice-print-page .question-practice-print .qp-callout {
   background: #f8fafc !important;
 }
 
-.question-practice-print-page .question-practice-print .bg-indigo-50 {
+.question-practice-print-page .question-practice-print .bg-indigo-50,
+html.dark .question-practice-print-page .question-practice-print .bg-indigo-50 {
   background: #eef2ff !important;
 }
 
-.question-practice-print-page .question-practice-print .bg-slate-100 {
+.question-practice-print-page .question-practice-print .bg-slate-100,
+html.dark .question-practice-print-page .question-practice-print .bg-slate-100 {
   background: #f1f5f9 !important;
 }
 
-.question-practice-print-page .question-practice-print .qp-pill {
+.question-practice-print-page .question-practice-print .qp-pill,
+html.dark .question-practice-print-page .question-practice-print .qp-pill {
   background: #f1f5f9 !important;
   color: #334155 !important;
 }
@@ -546,11 +572,6 @@ body.question-practice-print-mode {
     max-width: none !important;
     padding: 0 !important;
   }
-  html.question-practice-print-light,
-  html.question-practice-print-light body,
-  body.question-practice-print-light,
-  body.question-practice-print-light main,
-  body.question-practice-print-light .question-practice-print-page,
   body.question-practice-print-mode {
     background: #ffffff !important;
     color: #111827 !important;

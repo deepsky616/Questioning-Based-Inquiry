@@ -1,6 +1,5 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { ArrowLeft, Printer } from "lucide-react";
@@ -11,45 +10,25 @@ export default function TeacherPracticePrintGuidePage() {
   const locale = useLocale();
   const guide = getQuestionPracticePrintGuide(locale);
   const isKo = locale === "ko";
-  const originalThemeRef = useRef<{ rootDark: boolean; bodyDark: boolean } | null>(null);
-
-  useLayoutEffect(() => {
-    const root = document.documentElement;
-    const body = document.body;
-    originalThemeRef.current = {
-      rootDark: root.classList.contains("dark"),
-      bodyDark: body.classList.contains("dark"),
-    };
-
-    root.classList.remove("dark");
-    body.classList.remove("dark");
-    root.classList.add("question-practice-print-light");
-    body.classList.add("question-practice-print-light");
-
-    return () => {
-      root.classList.remove("question-practice-print-light");
-      body.classList.remove("question-practice-print-light", "question-practice-print-mode");
-      if (originalThemeRef.current?.rootDark) root.classList.add("dark");
-      if (originalThemeRef.current?.bodyDark) body.classList.add("dark");
-    };
-  }, []);
 
   const printWorksheet = () => {
-    const root = document.documentElement;
     const body = document.body;
-    root.classList.remove("dark");
-    body.classList.remove("dark");
-    root.classList.add("question-practice-print-light");
-    body.classList.add("question-practice-print-light", "question-practice-print-mode");
+    body.classList.add("question-practice-print-mode");
 
+    let cleaned = false;
     const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
       body.classList.remove("question-practice-print-mode");
       window.removeEventListener("afterprint", cleanup);
     };
     window.addEventListener("afterprint", cleanup, { once: true });
 
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => window.print());
+      requestAnimationFrame(() => {
+        window.print();
+        window.setTimeout(cleanup, 250);
+      });
     });
   };
 
