@@ -183,6 +183,10 @@
       "title": "질문탐구",
       "description": "내 질문을 관리하고, 친구들의 질문을 탐구하고, 선생님이 배포한 수업 탐구 질문에 참여해 보세요"
     },
+    "studentPoints": {
+      "title": "순위",
+      "description": "내 포인트 순위와 우리 반 순위를 확인하세요"
+    },
     "studentSettings": {
       "title": "개인 정보 수정",
       "description": "계정 정보를 확인하고 비밀번호를 변경할 수 있어요"
@@ -1591,7 +1595,13 @@
     "tabRanking": "순위",
     "tabPoints": "포인트",
     "rankingTitle": "학생 순위와 반 순위",
-    "rankingDesc": "담당 학급 기준으로 학생별 포인트 순위와 반별 평균 순위를 확인하세요"
+    "rankingDesc": "담당 학급 기준으로 학생별 포인트 순위와 반별 평균 순위를 확인하세요",
+    "pointReviewTitle": "AI 추천 포인트 검토",
+    "pointReviewDesc": "학급을 선택하면 해당 학급에 해당하는 수업세션과 승인 대기 항목만 보여줍니다"
+  },
+  "studentPoints": {
+    "rankingTitle": "내 순위와 반 순위",
+    "rankingDesc": "우리반, 교내, 전체 기준의 내 순위와 우리 반 평균 순위를 확인하세요"
   },
   "targetSelector": {
     "selectClass": "학급 선택",

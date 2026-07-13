@@ -16,9 +16,44 @@ import {
   groupSessionsByMonth,
 } from "@/lib/sessions";
 import { useTeacherSessions } from "@/lib/app-queries";
-import { MAX_ANALYZE_SESSIONS, type AnalyzeResponse, type PendingLog, type SessionItem } from "./types";
+import { MAX_ANALYZE_SESSIONS, type AnalyzeResponse, type PendingLog, type PointReviewClassFilter, type SessionItem } from "./types";
 
-export function usePointReview() {
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function sessionMatchesClass(session: SessionItem, classFilter?: PointReviewClassFilter): boolean {
+  if (!classFilter) return true;
+  const targetStudentIds = stringArray(session.targetStudentIds);
+  const classStudentIds = new Set(classFilter.studentIds ?? []);
+  const targetsClassStudent = (id: string | null | undefined) => Boolean(id && classStudentIds.has(id));
+  const targetsAnyClassStudent = targetStudentIds.some((id) => classStudentIds.has(id));
+
+  if (!session.targetType || session.targetType === "ALL") return true;
+  if (session.targetType === "CLASS") {
+    return (
+      (session.targetGrade === classFilter.grade && session.targetClassName === classFilter.className) ||
+      targetsAnyClassStudent
+    );
+  }
+  if (session.targetType === "CUSTOM") {
+    return (
+      (session.targetGrade === classFilter.grade && session.targetClassName === classFilter.className) ||
+      targetsAnyClassStudent
+    );
+  }
+  if (session.targetType === "STUDENT") {
+    return targetsClassStudent(session.targetStudentId) || targetsAnyClassStudent;
+  }
+  return false;
+}
+
+function pendingMatchesClass(pending: PendingLog, classFilter?: PointReviewClassFilter): boolean {
+  if (!classFilter) return true;
+  return pending.grade === classFilter.grade && pending.className === classFilter.className;
+}
+
+export function usePointReview({ classFilter }: { classFilter?: PointReviewClassFilter } = {}) {
   const t = useTranslations("pointReview");
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -36,6 +71,7 @@ export function usePointReview() {
   const [reviewFilterTopic, setReviewFilterTopic] = useState("");
   const [reviewSelectedSessionId, setReviewSelectedSessionId] = useState("all");
   const focusStudentId = searchParams.get("studentId");
+  const classFilterKey = classFilter ? `${classFilter.grade}|${classFilter.className}|${(classFilter.studentIds ?? []).join(",")}` : "all";
 
   // 항상 전체를 받아 클라이언트에서 필터한다 — 세션을 바꿔도 다른 세션의 대기
   // 항목이 "사라진" 것처럼 보이지 않고, 세션 선택지에 대기 건수도 보여줄 수 있다.
@@ -135,19 +171,42 @@ export function usePointReview() {
     } catch {} finally { setBusy(false); }
   }
 
-  const pendingCountBySession = pending.reduce<Record<string, number>>((acc, p) => {
+  const classFilteredSessions = useMemo(
+    () => sessions.filter((session) => sessionMatchesClass(session, classFilter)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [classFilterKey, sessions],
+  );
+  const classFilteredPending = useMemo(
+    () => pending.filter((item) => pendingMatchesClass(item, classFilter)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [classFilterKey, pending],
+  );
+
+  useEffect(() => {
+    const availableSessionIds = new Set(classFilteredSessions.map((session) => session.id));
+    setSelectedAnalysisSessionIds((prev) => {
+      const next = new Set(Array.from(prev).filter((id) => availableSessionIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [classFilteredSessions]);
+
+  useEffect(() => {
+    setSelected(new Set());
+  }, [classFilterKey]);
+
+  const pendingCountBySession = classFilteredPending.reduce<Record<string, number>>((acc, p) => {
     const key = p.sessionId ?? "none";
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
-  const sessionById = useMemo(() => new Map(sessions.map((session) => [session.id, session])), [sessions]);
+  const sessionById = useMemo(() => new Map(classFilteredSessions.map((session) => [session.id, session])), [classFilteredSessions]);
   const pendingSessionIds = useMemo(
-    () => new Set(pending.map((p) => p.sessionId).filter((id): id is string => Boolean(id))),
-    [pending],
+    () => new Set(classFilteredPending.map((p) => p.sessionId).filter((id): id is string => Boolean(id))),
+    [classFilteredPending],
   );
   const pendingSessions = useMemo(
-    () => sessions.filter((session) => pendingSessionIds.has(session.id)),
-    [pendingSessionIds, sessions],
+    () => classFilteredSessions.filter((session) => pendingSessionIds.has(session.id)),
+    [classFilteredSessions, pendingSessionIds],
   );
   const reviewDateOptions = getSessionFilterOptions(pendingSessions).dates;
   const reviewDateMonthGroups = groupSessionDatesByMonth(reviewDateOptions);
@@ -158,7 +217,7 @@ export function usePointReview() {
   const reviewFilteredSessions = filterSessions(reviewTopicBase, { topic: reviewFilterTopic || undefined });
   const reviewSessionMonthGroups = groupSessionsByMonth(reviewFilteredSessions);
   const hasReviewFilter = Boolean(reviewFilterDate || reviewFilterSubject || reviewFilterTopic || reviewSelectedSessionId !== "all");
-  const visiblePending = pending.filter((p) => {
+  const visiblePending = classFilteredPending.filter((p) => {
     if (reviewSelectedSessionId !== "all") return p.sessionId === reviewSelectedSessionId;
     if (!reviewFilterDate && !reviewFilterSubject && !reviewFilterTopic) return true;
     if (!p.sessionId) return false;
@@ -170,12 +229,12 @@ export function usePointReview() {
       (!reviewFilterTopic || session.topic === reviewFilterTopic)
     );
   });
-  const sessionMonthGroups = groupSessionsByMonth(sessions);
+  const sessionMonthGroups = groupSessionsByMonth(classFilteredSessions);
 
   // 세션별 그룹 — 방금 분석한 세션 먼저, 나머지는 세션 날짜 내림차순
   const sessionLabelOf = (sessionId: string | null) => {
     if (!sessionId) return t("noSessionGroup");
-    const s = sessions.find((x) => x.id === sessionId);
+    const s = classFilteredSessions.find((x) => x.id === sessionId);
     return s ? buildSessionLabel(s.date, s.subject, s.topic) : t("noSessionGroup");
   };
   const groupBySession = (rows: PendingLog[]) => {
@@ -184,7 +243,7 @@ export function usePointReview() {
       const key = p.sessionId ?? "none";
       map.set(key, [...(map.get(key) ?? []), p]);
     });
-    const dateOf = (key: string) => sessions.find((x) => x.id === key)?.date ?? "";
+    const dateOf = (key: string) => classFilteredSessions.find((x) => x.id === key)?.date ?? "";
     return Array.from(map.entries())
       .sort(([a], [b]) => {
         if (lastAnalyzedSessionIds.has(a) && !lastAnalyzedSessionIds.has(b)) return -1;

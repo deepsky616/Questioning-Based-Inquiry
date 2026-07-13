@@ -183,6 +183,10 @@
       "title": "Explore Questions",
       "description": "Manage your own questions, explore your friends' questions, and join the inquiry questions your teacher shared"
     },
+    "studentPoints": {
+      "title": "Rankings",
+      "description": "Check your point ranking and your class ranking"
+    },
     "studentSettings": {
       "title": "Edit profile",
       "description": "View your account info and change your password"
@@ -1591,7 +1595,13 @@
     "tabRanking": "Rankings",
     "tabPoints": "Points",
     "rankingTitle": "Student and class rankings",
-    "rankingDesc": "Review student point rankings and class average rankings for your assigned classes"
+    "rankingDesc": "Review student point rankings and class average rankings for your assigned classes",
+    "pointReviewTitle": "AI recommended point review",
+    "pointReviewDesc": "Choose a class to show only matching class sessions and pending review items"
+  },
+  "studentPoints": {
+    "rankingTitle": "My ranking and class ranking",
+    "rankingDesc": "Check your class, school, and overall rank plus your class average ranking"
   },
   "targetSelector": {
     "selectClass": "Select class",

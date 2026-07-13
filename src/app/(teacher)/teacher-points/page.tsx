@@ -1,14 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 import { PointReviewView } from "@/components/teacher/PointReviewView";
-import { visibleDataRefetchInterval } from "@/lib/query-refresh";
+import { useTeacherStudents } from "@/lib/app-queries";
 import { cn } from "@/lib/utils";
 
 type TeacherPointsTab = "ranking" | "points";
@@ -18,9 +17,10 @@ interface TeacherClass {
   className: string;
 }
 
-interface RankContext {
-  school?: string | null;
-  teacherClasses: TeacherClass[];
+interface TeacherStudent {
+  id: string;
+  grade: string;
+  className: string;
 }
 
 function classKey(tc: TeacherClass) {
@@ -55,30 +55,48 @@ function TeacherPointsTabs({
   );
 }
 
-function TeacherRankingsView() {
-  const t = useTranslations("teacherPoints");
+function TeacherClassSelector({
+  selectedClass,
+  teacherClasses,
+  onChange,
+}: {
+  selectedClass: string;
+  teacherClasses: TeacherClass[];
+  onChange: (value: string) => void;
+}) {
   const tTarget = useTranslations("targetSelector");
-  const [selectedClass, setSelectedClass] = useState("all");
-  const { data, isLoading } = useQuery<RankContext>({
-    queryKey: ["teacher-points-rank-context"],
-    queryFn: async () => {
-      const r = await fetch("/api/stats?period=month");
-      if (!r.ok) throw new Error("순위 기준 정보를 불러오지 못했습니다");
-      return r.json();
-    },
-    refetchInterval: visibleDataRefetchInterval,
-    refetchOnWindowFocus: true,
-  });
 
-  const teacherClasses = useMemo(() => data?.teacherClasses ?? [], [data]);
+  return (
+    <div className="flex min-w-0 flex-col gap-1 sm:w-60">
+      <label className="text-xs font-medium text-muted-foreground">{tTarget("selectClass")}</label>
+      <select
+        value={selectedClass}
+        onChange={(event) => onChange(event.target.value)}
+        className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <option value="all">{tTarget("allClasses")}</option>
+        {teacherClasses.map((tc) => (
+          <option key={classKey(tc)} value={classKey(tc)}>
+            {tTarget("gradeClass", { grade: tc.grade, className: tc.className })}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
-  useEffect(() => {
-    if (selectedClass === "all") return;
-    if (!teacherClasses.some((tc) => classKey(tc) === selectedClass)) {
-      setSelectedClass("all");
-    }
-  }, [selectedClass, teacherClasses]);
-
+function TeacherRankingsView({
+  selectedClass,
+  teacherClasses,
+  onSelectedClassChange,
+  isLoading,
+}: {
+  selectedClass: string;
+  teacherClasses: TeacherClass[];
+  onSelectedClassChange: (value: string) => void;
+  isLoading: boolean;
+}) {
+  const t = useTranslations("teacherPoints");
   const [selGrade, selClassName] =
     selectedClass !== "all" ? selectedClass.split("|") : [undefined, undefined];
 
@@ -93,21 +111,11 @@ function TeacherRankingsView() {
           <h2 className="text-lg font-semibold text-foreground">{t("rankingTitle")}</h2>
           <p className="text-sm text-muted-foreground">{t("rankingDesc")}</p>
         </div>
-        <div className="flex min-w-0 flex-col gap-1 sm:w-60">
-          <label className="text-xs font-medium text-muted-foreground">{tTarget("selectClass")}</label>
-          <select
-            value={selectedClass}
-            onChange={(event) => setSelectedClass(event.target.value)}
-            className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="all">{tTarget("allClasses")}</option>
-            {teacherClasses.map((tc) => (
-              <option key={classKey(tc)} value={classKey(tc)}>
-                {tTarget("gradeClass", { grade: tc.grade, className: tc.className })}
-              </option>
-            ))}
-          </select>
-        </div>
+        <TeacherClassSelector
+          selectedClass={selectedClass}
+          teacherClasses={teacherClasses}
+          onChange={onSelectedClassChange}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -134,13 +142,74 @@ function TeacherRankingsView() {
   );
 }
 
+function TeacherPointReviewWithClass({
+  selectedClass,
+  teacherClasses,
+  students,
+  onSelectedClassChange,
+}: {
+  selectedClass: string;
+  teacherClasses: TeacherClass[];
+  students: TeacherStudent[];
+  onSelectedClassChange: (value: string) => void;
+}) {
+  const t = useTranslations("teacherPoints");
+  const [grade, className] = selectedClass !== "all" ? selectedClass.split("|") : ["", ""];
+  const studentIds = useMemo(
+    () =>
+      selectedClass === "all"
+        ? []
+        : students
+            .filter((student) => student.grade === grade && student.className === className)
+            .map((student) => student.id),
+    [className, grade, selectedClass, students],
+  );
+  const classFilter =
+    selectedClass === "all"
+      ? undefined
+      : {
+          grade,
+          className,
+          studentIds,
+        };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">{t("pointReviewTitle")}</h2>
+          <p className="text-sm text-muted-foreground">{t("pointReviewDesc")}</p>
+        </div>
+        <TeacherClassSelector
+          selectedClass={selectedClass}
+          teacherClasses={teacherClasses}
+          onChange={onSelectedClassChange}
+        />
+      </div>
+
+      <PointReviewView classFilter={classFilter} />
+    </div>
+  );
+}
+
 function TeacherPointsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tPages = useTranslations("pages");
   const t = useTranslations("teacherPoints");
+  const { data, isLoading } = useTeacherStudents<TeacherStudent, TeacherClass>();
+  const teacherClasses = useMemo(() => data?.teacherClasses ?? [], [data]);
+  const students = useMemo(() => data?.students ?? [], [data]);
+  const [selectedClass, setSelectedClass] = useState("all");
   const tabParam = searchParams.get("tab");
   const tab: TeacherPointsTab = tabParam === "points" || tabParam === "review" ? "points" : "ranking";
+
+  useEffect(() => {
+    if (selectedClass === "all") return;
+    if (!teacherClasses.some((tc) => classKey(tc) === selectedClass)) {
+      setSelectedClass("all");
+    }
+  }, [selectedClass, teacherClasses]);
 
   useEffect(() => {
     if (tabParam !== "review") return;
@@ -171,7 +240,21 @@ function TeacherPointsContent() {
         labels={{ ranking: t("tabRanking"), points: t("tabPoints") }}
       />
 
-      {tab === "ranking" ? <TeacherRankingsView /> : <PointReviewView />}
+      {tab === "ranking" ? (
+        <TeacherRankingsView
+          selectedClass={selectedClass}
+          teacherClasses={teacherClasses}
+          onSelectedClassChange={setSelectedClass}
+          isLoading={isLoading}
+        />
+      ) : (
+        <TeacherPointReviewWithClass
+          selectedClass={selectedClass}
+          teacherClasses={teacherClasses}
+          students={students}
+          onSelectedClassChange={setSelectedClass}
+        />
+      )}
     </div>
   );
 }

@@ -15,7 +15,6 @@ import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
 import PointsCard from "@/components/shared/PointsCard";
-import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { isSessionAvailable } from "@/lib/sessions";
 import {
@@ -437,12 +436,6 @@ function StudentDashboard() {
           </div>
         </CardContent>
       </Card>
-
-      {/* 순위 (개인: 우리반/교내/전체 · 반: 교내/전체) */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <StudentRankPanel highlightSelf />
-        <ClassRankingPanel highlightSelf defaultScope="school" />
-      </div>
         </>
       )}
       </>

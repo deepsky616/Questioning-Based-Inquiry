@@ -61,6 +61,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         }}
         accountLinks={{
           settingsHref: "/student-settings",
+          rankingsHref: "/student-points",
         }}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -18,11 +18,11 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { usePointReview } from "@/components/teacher/point-review/usePointReview";
 import { AnalysisSessionPicker } from "@/components/teacher/point-review/AnalysisSessionPicker";
 import { PendingRow } from "@/components/teacher/point-review/PendingRow";
-import type { PendingLog } from "@/components/teacher/point-review/types";
+import type { PendingLog, PointReviewClassFilter } from "@/components/teacher/point-review/types";
 
-export function PointReviewView() {
+export function PointReviewView({ classFilter }: { classFilter?: PointReviewClassFilter } = {}) {
   const t = useTranslations("pointReview");
-  const review = usePointReview();
+  const review = usePointReview({ classFilter });
   const {
     pendingSessions,
     visiblePending,

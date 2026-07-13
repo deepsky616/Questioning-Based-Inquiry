@@ -10,6 +10,17 @@ export interface SessionItem {
   date: string;
   subject: string;
   topic: string;
+  targetType?: string | null;
+  targetGrade?: string | null;
+  targetClassName?: string | null;
+  targetStudentId?: string | null;
+  targetStudentIds?: string[] | null;
+}
+
+export interface PointReviewClassFilter {
+  grade: string;
+  className: string;
+  studentIds?: string[];
 }
 
 export interface PendingLog {
