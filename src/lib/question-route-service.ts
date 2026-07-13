@@ -299,10 +299,9 @@ export async function getStudentDashboardQuestionSummary(sessionUser: QuestionRo
       where,
       _count: { _all: true },
     }),
-    prisma.question.findMany({
+    prisma.question.groupBy({
+      by: ["sessionId"],
       where: { authorId: studentId, sessionId: { not: null } },
-      select: { sessionId: true },
-      distinct: ["sessionId"],
       orderBy: { sessionId: "asc" },
     }),
   ]);
@@ -332,6 +331,29 @@ export async function getStudentDashboardQuestionSummary(sessionUser: QuestionRo
       .map((session) => session.sessionId)
       .filter((sessionId): sessionId is string => Boolean(sessionId)),
   };
+}
+
+export async function getStudentSessionQuestion(
+  req: Request,
+  sessionUser: QuestionRouteUser,
+) {
+  if (sessionUser.role !== "STUDENT") {
+    throw new QuestionRouteError("학생만 조회할 수 있습니다", 403);
+  }
+
+  const studentId = requireUserId(sessionUser);
+  const sessionId = new URL(req.url).searchParams.get("sessionId")?.trim();
+  if (!sessionId) {
+    throw new QuestionRouteError("질문수업 정보가 필요합니다", 400);
+  }
+
+  const existingQuestion = await prisma.question.findFirst({
+    where: { authorId: studentId, sessionId },
+    select: { id: true, content: true },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
+
+  return { existingQuestion };
 }
 
 export async function listTeacherQuestionPage(

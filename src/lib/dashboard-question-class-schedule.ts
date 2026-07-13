@@ -1,4 +1,4 @@
-import { isValidSessionDateString } from "@/lib/sessions";
+import { isInquiryDesignSession, isValidSessionDateString } from "@/lib/sessions";
 
 export interface DashboardQuestionClassSession {
   id: string;
@@ -11,6 +11,8 @@ export interface DashboardQuestionClassSession {
   targetClassName?: string | null;
   targetStudentId?: string | null;
   targetStudentIds?: unknown;
+  unitDesignId?: string | null;
+  sharedQuestions?: unknown[] | null;
 }
 
 export interface DashboardQuestionClassScope {
@@ -43,6 +45,15 @@ export type DashboardQuestionClassSchedule<TSession extends DashboardQuestionCla
   primarySession: TSession | null;
   selectableSessions: TSession[];
 };
+
+export function teacherDashboardSessionHref(
+  session: DashboardQuestionClassSession,
+): string {
+  const path = session.unitDesignId && !isInquiryDesignSession(session)
+    ? "/teacher-sessions"
+    : "/teacher-questions";
+  return `${path}?session=${encodeURIComponent(session.id)}`;
+}
 
 export function localDateKey(date = new Date()): string {
   return [

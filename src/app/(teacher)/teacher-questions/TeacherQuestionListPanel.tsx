@@ -119,6 +119,7 @@ export function TeacherQuestionListPanel({
             </span>
           </h3>
           <Input
+            aria-label={t("searchPlaceholder")}
             placeholder={t("searchPlaceholder")}
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
@@ -127,6 +128,7 @@ export function TeacherQuestionListPanel({
           <button
             type="button"
             onClick={onToggleFlaggedOnly}
+            aria-pressed={showFlaggedOnly}
             className={`h-8 rounded-md border px-3 text-xs font-medium transition-colors ${
               showFlaggedOnly ? "border-red-400 bg-red-500 text-white" : "bg-white text-red-600 border-red-200 hover:bg-red-50"
             }`}
@@ -163,6 +165,7 @@ export function TeacherQuestionListPanel({
                 key={value}
                 type="button"
                 onClick={() => onFilterClosureChange(value)}
+                aria-pressed={filterClosure === value}
                 className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
                   filterClosure === value ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
                 }`}
@@ -176,6 +179,7 @@ export function TeacherQuestionListPanel({
                 key={value}
                 type="button"
                 onClick={() => onFilterCognitiveChange(value)}
+                aria-pressed={filterCognitive === value}
                 className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
                   filterCognitive === value ? "border-indigo-500 bg-indigo-500 text-white" : "bg-background text-muted-foreground hover:bg-muted"
                 }`}

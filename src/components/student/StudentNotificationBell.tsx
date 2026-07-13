@@ -1,7 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { MessageSquareText } from "lucide-react";
-import { NotificationBellMenu, type NotificationMenuItem } from "@/components/shared/NotificationBellMenu";
+import {
+  NotificationBellMenu,
+  type NotificationMenuItem,
+  type NotificationMenuSection,
+} from "@/components/shared/NotificationBellMenu";
 import { useTranslations } from "next-intl";
 import { formatShortDateTime } from "@/lib/datetime";
 import {
@@ -13,9 +18,11 @@ import {
 
 export function StudentNotificationBell() {
   const t = useTranslations("notify");
-  const { notifications, unreadCount, markRead, markAllRead } = useAppNotifications({
+  const [open, setOpen] = useState(false);
+  const notificationQuery = useAppNotifications({
     queryKey: appNotificationQueryKeys.student,
   });
+  const { notifications, unreadCount, markRead, markAllRead } = notificationQuery;
 
   const renderMessage = (item: AppNotification) => {
     if (item.type === "SESSION_REMINDER") {
@@ -41,6 +48,22 @@ export function StudentNotificationBell() {
     tone: "default",
     onClick: () => markRead(item.id),
   }));
+  const sections: NotificationMenuSection[] = [{
+    id: "saved",
+    title: t("savedSection"),
+    items,
+    status: notificationQuery.isError
+      ? "error"
+      : notificationQuery.isLoading
+        ? "loading"
+        : "ready",
+    loadingText: t("loading"),
+    errorText: t("loadError"),
+    emptyText: t("empty"),
+    actionText: unreadCount > 0 ? t("markAllRead") : undefined,
+    onAction: markAllRead,
+    actionDisabled: unreadCount === 0,
+  }];
 
   return (
     <NotificationBellMenu
@@ -48,10 +71,9 @@ export function StudentNotificationBell() {
       emptyText={t("empty")}
       unreadText={t("unread")}
       count={unreadCount}
-      items={items}
-      actionText={unreadCount > 0 ? t("markAllRead") : undefined}
-      onAction={markAllRead}
-      actionDisabled={unreadCount === 0}
+      sections={sections}
+      open={open}
+      onOpenChange={setOpen}
     />
   );
 }

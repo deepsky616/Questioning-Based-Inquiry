@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { BookOpenCheck, CircleAlert, RefreshCw } from "lucide-react";
@@ -64,6 +64,24 @@ function TeacherSessionsPageContent() {
   const [expandedPastMonths, setExpandedPastMonths] = useState<Set<string> | null>(null);
   const [listParticipationFilter, setListParticipationFilter] = useState<SessionParticipationFilter>("all");
   const [listSort, setListSort] = useState<SessionListSort>("desc");
+  const pendingSessionIdsRef = useRef<Set<string>>(new Set());
+  const [pendingSessionIds, setPendingSessionIds] = useState<Set<string>>(new Set());
+
+  const beginSessionMutation = (id: string) => {
+    if (pendingSessionIdsRef.current.has(id)) return false;
+    const next = new Set(pendingSessionIdsRef.current);
+    next.add(id);
+    pendingSessionIdsRef.current = next;
+    setPendingSessionIds(next);
+    return true;
+  };
+
+  const finishSessionMutation = (id: string) => {
+    const next = new Set(pendingSessionIdsRef.current);
+    next.delete(id);
+    pendingSessionIdsRef.current = next;
+    setPendingSessionIds(next);
+  };
 
   const handleHighlight = (sessionId: string) => {
     setListFilterDate("");
@@ -77,101 +95,105 @@ function TeacherSessionsPageContent() {
 
   const toggleFailed = () => toast({ variant: "destructive", description: t("toggleFailed") });
 
+  const patchSession = async (id: string, patch: Partial<QuestionSession>) => {
+    try {
+      const response = await fetch(`/api/sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const recoverFailedChange = async () => {
+    toggleFailed();
+    await Promise.resolve(refetch()).catch(() => undefined);
+  };
+
+  const cancelPendingSessionList = () =>
+    queryClient.cancelQueries({ queryKey: appQueryKeys.teacherSessions, exact: true });
+
+  const refreshSessionList = () => {
+    void queryClient.invalidateQueries({ queryKey: appQueryKeys.teacherSessions });
+  };
+
   const confirm = useConfirm();
 
   const handleDelete = async (id: string) => {
-    if (!(await confirm({ description: t("deleteConfirm"), confirmText: tc("delete"), destructive: true }))) return;
-    const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" }).catch(() => null);
-    if (!res || !res.ok) {
-      toast({ variant: "destructive", description: t("deleteFailed") });
-      return;
-    }
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-  };
-
-  const handleToggleActive = async (id: string, currentValue: boolean) => {
-    const next = !currentValue;
-    setSessions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isActive: next } : s))
-    );
-    const res = await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isActive: next }),
-    });
-    if (!res.ok) {
-      toggleFailed();
-      setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, isActive: currentValue } : s))
-      );
+    if (!beginSessionMutation(id)) return;
+    try {
+      if (!(await confirm({ description: t("deleteConfirm"), confirmText: tc("delete"), destructive: true }))) return;
+      await cancelPendingSessionList();
+      const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" }).catch(() => null);
+      if (!res || !res.ok) {
+        toast({ variant: "destructive", description: t("deleteFailed") });
+        return;
+      }
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      refreshSessionList();
+    } finally {
+      finishSessionMutation(id);
     }
   };
 
-  const handleTogglePublic = async (id: string, currentValue: boolean) => {
-    const next = !currentValue;
-    setSessions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, defaultQuestionPublic: next } : s))
-    );
-    const res = await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ defaultQuestionPublic: next }),
-    });
-    if (!res.ok) {
-      toggleFailed();
+  const handleToggleSetting = async (
+    id: string,
+    key: "isActive" | "defaultQuestionPublic" | "likesVisibleToPeers" | "commentsVisibleToPeers",
+    currentValue: boolean,
+  ) => {
+    if (!beginSessionMutation(id)) return;
+    try {
+      await cancelPendingSessionList();
+      const next = !currentValue;
       setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, defaultQuestionPublic: currentValue } : s))
+        prev.map((session) => (session.id === id ? { ...session, [key]: next } : session)),
       );
+      if (!(await patchSession(id, { [key]: next }))) {
+        setSessions((prev) =>
+          prev.map((session) => (
+            session.id === id ? { ...session, [key]: currentValue } : session
+          )),
+        );
+        await recoverFailedChange();
+      } else {
+        refreshSessionList();
+      }
+    } finally {
+      finishSessionMutation(id);
     }
   };
 
-  const handleToggleCommentsVisible = async (id: string, currentValue: boolean) => {
-    const next = !currentValue;
-    setSessions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, commentsVisibleToPeers: next } : s))
-    );
-    const res = await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ commentsVisibleToPeers: next }),
-    });
-    if (!res.ok) {
-      toggleFailed();
-      setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, commentsVisibleToPeers: currentValue } : s))
-      );
-    }
-  };
+  const handleToggleActive = (id: string, currentValue: boolean) =>
+    handleToggleSetting(id, "isActive", currentValue);
+
+  const handleTogglePublic = (id: string, currentValue: boolean) =>
+    handleToggleSetting(id, "defaultQuestionPublic", currentValue);
+
+  const handleToggleCommentsVisible = (id: string, currentValue: boolean) =>
+    handleToggleSetting(id, "commentsVisibleToPeers", currentValue);
 
   // 날짜·교과·주제 수정 저장 (탐구질문 세션은 교과 제외)
   const handleEditSave = async (id: string, patch: { date: string; subject?: string; topic: string }): Promise<boolean> => {
-    const res = await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    if (!res.ok) { toggleFailed(); return false; }
-    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
-    return true;
-  };
-
-  const handleToggleLikes = async (id: string, currentValue: boolean) => {
-    const next = !currentValue;
-    setSessions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, likesVisibleToPeers: next } : s))
-    );
-    const res = await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ likesVisibleToPeers: next }),
-    });
-    if (!res.ok) {
-      toggleFailed();
-      setSessions((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, likesVisibleToPeers: currentValue } : s))
-      );
+    if (!beginSessionMutation(id)) return false;
+    try {
+      await cancelPendingSessionList();
+      if (!(await patchSession(id, patch))) {
+        await recoverFailedChange();
+        return false;
+      }
+      setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+      refreshSessionList();
+      return true;
+    } finally {
+      finishSessionMutation(id);
     }
   };
+
+  const handleToggleLikes = (id: string, currentValue: boolean) =>
+    handleToggleSetting(id, "likesVisibleToPeers", currentValue);
 
   // 세션 목록 조회 필터(날짜·교과·주제·참여 상태) + 정렬
   const filterOptions = getSessionFilterOptions(sessions);
@@ -337,6 +359,7 @@ function TeacherSessionsPageContent() {
                 <TeacherSessionMonthList
                   groups={activeSessionMonthGroups}
                   highlightSessionId={highlightSessionId}
+                  pendingSessionIds={pendingSessionIds}
                   onDelete={handleDelete}
                   onToggleActive={handleToggleActive}
                   onTogglePublic={handleTogglePublic}
@@ -366,6 +389,7 @@ function TeacherSessionsPageContent() {
                 <TeacherSessionMonthList
                   groups={pastSessionMonthGroups}
                   highlightSessionId={highlightSessionId}
+                  pendingSessionIds={pendingSessionIds}
                   collapsible
                   forceOpen={Boolean(searchQuery || listFilterDate || listFilterSubject || listFilterTopic)}
                   expandedKeys={expandedPastMonths}

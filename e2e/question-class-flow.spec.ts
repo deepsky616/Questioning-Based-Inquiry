@@ -73,6 +73,9 @@ function questionReadResponse(requestUrl: string): unknown {
       },
     };
   }
+  if (view === "student-session") {
+    return { existingQuestion: null };
+  }
   return [];
 }
 
@@ -134,13 +137,25 @@ async function stubTeacherReads(
       unexpectedWrites,
     ),
   );
-  await page.route("**/api/teacher/students**", (route) =>
-    fulfillReadOnly(
+  await page.route("**/api/teacher/students**", (route) => {
+    const view = new URL(route.request().url()).searchParams.get("view");
+    return fulfillReadOnly(
       route,
-      { students: [student], teacherClasses },
+      view === "activity"
+        ? {
+            activity: [{
+              studentId: student.id,
+              questionCount: 0,
+              commentCount: 0,
+              totalPoints: 0,
+              lastActivityAt: null,
+              sessionProgress: student.sessionProgress,
+            }],
+          }
+        : { students: [student], teacherClasses },
       unexpectedWrites,
-    ),
-  );
+    );
+  });
   await page.route("**/api/teacher/flagged-count**", (route) =>
     fulfillReadOnly(
       route,
@@ -205,18 +220,21 @@ async function stubStudentReads(
       date: today,
       subject: "과학",
       topic: "선생님 요청 수업",
+      teacher: { name: "합성 시험 교사" },
     },
     {
       id: "e2e-question-class-today",
       date: today,
       subject: "사회",
       topic: "오늘 질문할 수업",
+      teacher: { name: "합성 시험 교사" },
     },
     {
       id: "e2e-question-class-past",
       date: localDate(-1),
       subject: "국어",
       topic: "최근 놓친 수업",
+      teacher: { name: "합성 시험 교사" },
     },
   ];
   const notifications = [
@@ -407,8 +425,29 @@ test.describe("질문수업 통합 흐름", () => {
       .getByRole("button", { name: "사회 지역의 변화", exact: true })
       .click();
     await expect(page).toHaveURL(
-      /\/teacher-sessions\?session=e2e-teacher-today-second-class$/,
+      /\/teacher-questions\?session=e2e-teacher-today-second-class$/,
     );
+    await expect(page.getByLabel("질문수업", { exact: true })).toHaveValue(
+      "e2e-teacher-today-second-class",
+    );
+
+    const questionClassSelect = page.getByLabel("질문수업", { exact: true });
+    await questionClassSelect.selectOption("e2e-teacher-today-class");
+    await expect(page).toHaveURL(
+      /\/teacher-questions\?session=e2e-teacher-today-class$/,
+    );
+    await page.goBack();
+    await expect(page).toHaveURL(
+      /\/teacher-questions\?session=e2e-teacher-today-second-class$/,
+    );
+    await expect(questionClassSelect).toHaveValue("e2e-teacher-today-second-class");
+    await page.goForward();
+    await expect(page).toHaveURL(
+      /\/teacher-questions\?session=e2e-teacher-today-class$/,
+    );
+    await expect(questionClassSelect).toHaveValue("e2e-teacher-today-class");
+
+    await page.goto("/teacher-sessions");
     await expectQuestionClassNavActive(page);
 
     const primaryAction = page.getByTestId("question-class-primary-action");
@@ -472,6 +511,7 @@ test.describe("질문수업 통합 흐름", () => {
     await expect(page).toHaveURL(
       /\/student-ask\?sessionId=e2e-question-class-today$/,
     );
+    await expect(page.locator("#session")).toHaveValue("e2e-question-class-today");
     expect(unexpectedWrites).toEqual([]);
   });
 });

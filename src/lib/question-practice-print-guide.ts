@@ -27,6 +27,12 @@ export interface QuestionPracticePrintGuide {
   backButton: string;
   nameLabel: string;
   classLabel: string;
+  dateLabel: string;
+  lessonLabel: string;
+  goalTitle: string;
+  goals: string[];
+  howToTitle: string;
+  howToItems: string[];
   termsLabel: string;
   formulasLabel: string;
   guideTitle: string;
@@ -36,14 +42,28 @@ export interface QuestionPracticePrintGuide {
 }
 
 const koGuide: QuestionPracticePrintGuide = {
-  eyebrow: "교사용 인쇄 학습지",
+  eyebrow: "학생 배부용 질문연습 학습지",
   title: "사실적·개념적·논쟁적 질문을 만드는 방법",
-  subtitle: "학생들이 질문 유형을 이해하고 직접 질문을 만들 수 있도록 정리한 활동지입니다.",
-  teacherNote: "인쇄하거나 PDF로 저장해 학생 학습 자료와 질문연습 활동지로 활용할 수 있습니다.",
+  subtitle: "질문의 종류를 구분하고, 배운 내용을 더 깊이 탐구하는 질문으로 바꾸어 봅니다.",
+  teacherNote: "학생에게 나누어 줄 학습지입니다. 인쇄하거나 PDF로 저장해 수업 자료로 활용하세요.",
   printButton: "인쇄 또는 PDF 저장",
   backButton: "질문연습으로 돌아가기",
   nameLabel: "이름",
   classLabel: "학년 반 번호",
+  dateLabel: "날짜",
+  lessonLabel: "수업/단원",
+  goalTitle: "오늘의 학습 목표",
+  goals: [
+    "사실적·개념적·논쟁적 질문의 차이를 설명할 수 있습니다.",
+    "하나의 질문을 더 깊이 생각하게 만드는 질문으로 바꿀 수 있습니다.",
+    "배운 내용을 바탕으로 나만의 탐구 질문을 만들 수 있습니다.",
+  ],
+  howToTitle: "학습지 사용 방법",
+  howToItems: [
+    "먼저 질문 유형 정리를 읽고, 각 유형의 특징에 밑줄을 그어 봅니다.",
+    "활동을 할 때는 정답만 쓰지 말고 그렇게 생각한 까닭도 함께 씁니다.",
+    "마지막에는 내가 만든 질문 중 친구와 토의하고 싶은 질문에 표시합니다.",
+  ],
   termsLabel: "단어",
   formulasLabel: "공식",
   guideTitle: "질문 유형 이해하기",
@@ -179,14 +199,28 @@ const koGuide: QuestionPracticePrintGuide = {
 };
 
 const enGuide: QuestionPracticePrintGuide = {
-  eyebrow: "Teacher printable worksheet",
+  eyebrow: "Student question-practice worksheet",
   title: "How to Make Factual, Conceptual, and Debatable Questions",
-  subtitle: "A worksheet for helping students understand question types and practice writing their own questions.",
-  teacherNote: "Print this page or save it as a PDF for class learning and question practice.",
+  subtitle: "Learn the question types, then change simple questions into deeper inquiry questions.",
+  teacherNote: "This worksheet is for students. Print it or save it as a PDF for classroom use.",
   printButton: "Print or save PDF",
   backButton: "Back to practice",
   nameLabel: "Name",
   classLabel: "Grade, class, number",
+  dateLabel: "Date",
+  lessonLabel: "Lesson or unit",
+  goalTitle: "Learning Goals",
+  goals: [
+    "Explain the differences among factual, conceptual, and debatable questions.",
+    "Change a simple question into a question that requires deeper thinking.",
+    "Create your own inquiry questions from today's lesson.",
+  ],
+  howToTitle: "How to Use This Worksheet",
+  howToItems: [
+    "Read the question-type guide first and underline the key features.",
+    "For each activity, write your reason, not only your answer.",
+    "At the end, mark the question you would most like to discuss with classmates.",
+  ],
   termsLabel: "Key words",
   formulasLabel: "Question frames",
   guideTitle: "Understanding Question Types",

@@ -21,10 +21,13 @@ export async function GET(req: Request) {
   }
 
   const teacherId = (session.user as { id: string }).id;
-  const requestedToday = new URL(req.url).searchParams.get("today") ?? "";
-  const today = isValidSessionDateString(requestedToday)
-    ? requestedToday
-    : localDateKey();
+  const searchParams = new URL(req.url).searchParams;
+  const requestedView = searchParams.get("view");
+  const view = requestedView === "activity"
+    ? "activity"
+    : requestedView === "directory"
+      ? "directory"
+      : "legacy";
 
   const teacher = await prisma.user.findUnique({
     where: { id: teacherId },
@@ -40,7 +43,11 @@ export async function GET(req: Request) {
 
   // school 미설정이면 빈 목록 반환
   if (!teacher.school) {
-    return NextResponse.json({ students: [], teacherClasses: [] });
+    return NextResponse.json(
+      view === "activity"
+        ? { activity: [] }
+        : { students: [], teacherClasses: [] },
+    );
   }
 
   const teacherClasses = teacher.teacherClasses;
@@ -55,20 +62,52 @@ export async function GET(req: Request) {
           OR: teacherClasses.map((tc) => ({ grade: tc.grade, className: tc.className })),
         };
 
+  if (view === "directory") {
+    const students = await prisma.user.findMany({
+      where: studentWhere,
+      select: {
+        id: true,
+        name: true,
+        grade: true,
+        className: true,
+        studentNumber: true,
+      },
+    });
+    students.sort(compareByClassAndNumber);
+    return NextResponse.json({
+      students: students.map((student) => ({
+        id: student.id,
+        name: student.name,
+        grade: student.grade ?? "",
+        className: student.className ?? "",
+        studentNumber: student.studentNumber ?? "",
+      })),
+      teacherClasses,
+    });
+  }
+
+  const requestedToday = searchParams.get("today") ?? "";
+  const today = isValidSessionDateString(requestedToday)
+    ? requestedToday
+    : localDateKey();
   const students = await prisma.user.findMany({
     where: studentWhere,
     select: {
       id: true,
-      name: true,
+      ...(view === "legacy" ? { name: true, school: true } : {}),
       grade: true,
       className: true,
       studentNumber: true,
-      school: true,
       totalPoints: true,
-      _count: { select: { questions: true, comments: true, pointLogs: true } },
+      _count: {
+        select: {
+          questions: true,
+          comments: true,
+          ...(view === "legacy" ? { pointLogs: true } : {}),
+        },
+      },
     },
   });
-  // 학급(학년·반) → 번호순 정렬(번호는 숫자 해석 — 문자열 사전순 "10"<"2" 방지)
   students.sort(compareByClassAndNumber);
 
   // 마지막 활동일(질문·댓글 중 최신) — 학생별 max createdAt
@@ -89,9 +128,9 @@ export async function GET(req: Request) {
             targetStudentIds: true,
           },
         }),
-        prisma.question.findMany({
+        prisma.question.groupBy({
+          by: ["authorId", "sessionId"],
           where: { authorId: { in: ids }, sessionId: { not: null }, source: { not: "TEACHER_SHARED" } },
-          select: { authorId: true, sessionId: true },
         }),
       ])
     : [[], [], [], []];
@@ -109,37 +148,37 @@ export async function GET(req: Request) {
     answeredByStudent.set(pair.authorId, set);
   }
 
+  const normalizedSessions = sessions.map((questionSession) => {
+    const { targetStudentIds, ...sessionFields } = questionSession;
+    return {
+      ...sessionFields,
+      targetStudentIds: new Set(jsonStringArray(targetStudentIds)),
+    };
+  });
   const visibleSessionsFor = (student: (typeof students)[number]) =>
-    sessions.filter((s) => {
-      const targetStudentIds = jsonStringArray(s.targetStudentIds);
+    normalizedSessions.filter((s) => {
+      const targetStudentIds = s.targetStudentIds;
       if (s.targetType === "ALL") return true;
       if (s.targetType === "CLASS") {
         return (
           (s.targetGrade === student.grade && s.targetClassName === student.className) ||
-          targetStudentIds.includes(student.id)
+          targetStudentIds.has(student.id)
         );
       }
       if (s.targetType === "STUDENT") {
-        return s.targetStudentId === student.id || targetStudentIds.includes(student.id);
+        return s.targetStudentId === student.id || targetStudentIds.has(student.id);
       }
-      if (s.targetType === "CUSTOM") return targetStudentIds.includes(student.id);
+      if (s.targetType === "CUSTOM") return targetStudentIds.has(student.id);
       return false;
     });
 
-  return NextResponse.json({
-    students: students.map((s) => {
+  const activity = students.map((s) => {
       const visibleSessions = visibleSessionsFor(s);
       const answered = answeredByStudent.get(s.id) ?? new Set<string>();
       return {
-        id: s.id,
-        name: s.name,
-        grade: s.grade ?? "",
-        className: s.className ?? "",
-        studentNumber: s.studentNumber ?? "",
-        school: s.school ?? "",
+        studentId: s.id,
         questionCount: s._count.questions,
         commentCount: s._count.comments,
-        pointLogCount: s._count.pointLogs,
         totalPoints: s.totalPoints,
         lastActivityAt: lastActivity.has(s.id) ? new Date(lastActivity.get(s.id)!).toISOString() : null,
         sessionProgress: buildStudentSessionProgress({
@@ -147,6 +186,35 @@ export async function GET(req: Request) {
           completedSessionIds: answered,
           today,
         }),
+      };
+    });
+
+  if (view === "activity") {
+    return NextResponse.json({ activity });
+  }
+
+  const legacyStudents = students as Array<(typeof students)[number] & {
+    name: string;
+    school: string | null;
+    _count: (typeof students)[number]["_count"] & { pointLogs: number };
+  }>;
+  const activityByStudent = new Map(activity.map((item) => [item.studentId, item]));
+  return NextResponse.json({
+    students: legacyStudents.map((student) => {
+      const studentActivity = activityByStudent.get(student.id)!;
+      return {
+        id: student.id,
+        name: student.name,
+        grade: student.grade ?? "",
+        className: student.className ?? "",
+        studentNumber: student.studentNumber ?? "",
+        school: student.school ?? "",
+        questionCount: studentActivity.questionCount,
+        commentCount: studentActivity.commentCount,
+        pointLogCount: student._count.pointLogs,
+        totalPoints: studentActivity.totalPoints,
+        lastActivityAt: studentActivity.lastActivityAt,
+        sessionProgress: studentActivity.sessionProgress,
       };
     }),
     teacherClasses,

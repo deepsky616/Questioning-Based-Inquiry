@@ -9,6 +9,7 @@ import { getQuestionPracticePrintGuide } from "@/lib/question-practice-print-gui
 export default function TeacherPracticePrintGuidePage() {
   const locale = useLocale();
   const guide = getQuestionPracticePrintGuide(locale);
+  const isKo = locale === "ko";
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -25,52 +26,75 @@ export default function TeacherPracticePrintGuidePage() {
         </Button>
       </div>
 
-      <article className="question-practice-print rounded-xl border bg-white p-6 text-slate-950 shadow-sm [color-scheme:light] dark:bg-white dark:text-slate-950 print:border-0 print:p-0 print:shadow-none">
-        <div className="border-b border-slate-300 pb-5">
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">{guide.eyebrow}</p>
-          <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+      <article className="question-practice-print qp-paper rounded-xl border bg-white p-6 text-slate-950 shadow-sm [color-scheme:light] dark:bg-white dark:text-slate-950 print:border-0 print:p-0 print:shadow-none">
+        <div className="qp-header border-b border-slate-300 pb-5">
+          <p className="qp-eyebrow text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">{guide.eyebrow}</p>
+          <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-3xl">
-              <h1 className="text-3xl font-extrabold leading-tight text-slate-950">{guide.title}</h1>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{guide.subtitle}</p>
+              <h1 className="qp-title text-3xl font-extrabold leading-tight text-slate-950">{guide.title}</h1>
+              <p className="qp-subtitle mt-2 text-sm leading-6 text-slate-700">{guide.subtitle}</p>
             </div>
-            <div className="w-full max-w-xs space-y-2 text-sm text-slate-700 print:max-w-64">
-              <div className="flex items-center gap-2">
-                <span className="w-20 font-semibold">{guide.classLabel}</span>
-                <span className="h-7 flex-1 border-b border-slate-400" />
+            <div className="qp-student-fields grid w-full max-w-sm grid-cols-1 gap-2 text-sm text-slate-700 print:max-w-72">
+              <div className="qp-field flex items-center gap-2">
+                <span className="w-24 font-semibold">{guide.classLabel}</span>
+                <span className="qp-write-line h-7 flex-1 border-b border-slate-500" />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-20 font-semibold">{guide.nameLabel}</span>
-                <span className="h-7 flex-1 border-b border-slate-400" />
+              <div className="qp-field flex items-center gap-2">
+                <span className="w-24 font-semibold">{guide.nameLabel}</span>
+                <span className="qp-write-line h-7 flex-1 border-b border-slate-500" />
+              </div>
+              <div className="qp-field flex items-center gap-2">
+                <span className="w-24 font-semibold">{guide.dateLabel}</span>
+                <span className="qp-write-line h-7 flex-1 border-b border-slate-500" />
+              </div>
+              <div className="qp-field flex items-center gap-2">
+                <span className="w-24 font-semibold">{guide.lessonLabel}</span>
+                <span className="qp-write-line h-7 flex-1 border-b border-slate-500" />
               </div>
             </div>
           </div>
-          <p className="mt-4 rounded-md bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 print:bg-indigo-50">
+          <p className="no-print mt-4 rounded-md bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 print:bg-indigo-50">
             {guide.teacherNote}
           </p>
         </div>
 
+        <section className="qp-intro mt-5 grid gap-3 md:grid-cols-2 print:grid-cols-2">
+          <div className="qp-callout rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+            <h2 className="qp-callout-title text-base font-extrabold text-indigo-900">{guide.goalTitle}</h2>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-800">
+              {guide.goals.map((goal) => <li key={goal}>{goal}</li>)}
+            </ul>
+          </div>
+          <div className="qp-callout rounded-lg border border-slate-300 bg-slate-50 p-4">
+            <h2 className="qp-callout-title text-base font-extrabold text-slate-950">{guide.howToTitle}</h2>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-slate-800">
+              {guide.howToItems.map((item) => <li key={item}>{item}</li>)}
+            </ol>
+          </div>
+        </section>
+
         <section className="mt-6 space-y-4">
-          <h2 className="text-xl font-extrabold text-slate-950">{guide.guideTitle}</h2>
-          <div className="grid gap-4">
+          <h2 className="qp-section-heading text-xl font-extrabold text-slate-950">{guide.guideTitle}</h2>
+          <div className="grid gap-4 print:gap-3">
             {guide.sections.map((section) => (
               <section
                 key={section.title}
-                className="break-inside-avoid rounded-lg border border-slate-300 p-4 print:rounded-none"
+                className="qp-card break-inside-avoid rounded-lg border border-slate-300 p-4 print:rounded-none"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="max-w-3xl">
-                    <h3 className="text-lg font-extrabold text-slate-950">{section.title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-slate-700">{section.summary}</p>
+                    <h3 className="qp-card-title text-lg font-extrabold text-slate-950">{section.title}</h3>
+                    <p className="qp-muted mt-1 text-sm leading-6 text-slate-700">{section.summary}</p>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                  <span className="qp-pill rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
                     {section.note}
                   </span>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-3 print:grid-cols-3">
                   {section.patterns.map((pattern) => (
-                    <div key={pattern.title} className="rounded-md border border-slate-200 p-3">
-                      <h4 className="text-sm font-extrabold text-slate-950">{pattern.title}</h4>
-                      <div className="mt-2 space-y-2 text-xs leading-5 text-slate-700">
+                    <div key={pattern.title} className="qp-pattern rounded-md border border-slate-200 p-3">
+                      <h4 className="qp-pattern-title text-sm font-extrabold text-slate-950">{pattern.title}</h4>
+                      <div className="qp-muted mt-2 space-y-2 text-xs leading-5 text-slate-700">
                         <p>
                           <strong className="text-slate-950">{guide.termsLabel}: </strong>
                           {pattern.terms.join(", ")}
@@ -93,27 +117,44 @@ export default function TeacherPracticePrintGuidePage() {
           </div>
         </section>
 
-        <section className="mt-7 space-y-4">
-          <h2 className="text-xl font-extrabold text-slate-950">{guide.worksheetTitle}</h2>
-          <div className="grid gap-4">
-            {guide.worksheets.map((worksheet) => (
+        <section className="qp-activity mt-7 space-y-4">
+          <h2 className="qp-section-heading text-xl font-extrabold text-slate-950">{guide.worksheetTitle}</h2>
+          <div className="grid gap-4 print:gap-3">
+            {guide.worksheets.map((worksheet, worksheetIndex) => (
               <section
                 key={worksheet.title}
-                className="break-inside-avoid rounded-lg border border-slate-300 p-4 print:rounded-none"
+                className="qp-card break-inside-avoid rounded-lg border border-slate-300 p-4 print:rounded-none"
               >
-                <h3 className="text-base font-extrabold text-slate-950">{worksheet.title}</h3>
-                <p className="mt-1 text-sm text-slate-700">{worksheet.directions}</p>
+                <h3 className="qp-card-title text-base font-extrabold text-slate-950">{worksheet.title}</h3>
+                <p className="qp-muted mt-1 text-sm text-slate-700">{worksheet.directions}</p>
                 <div className="mt-4 space-y-4">
                   {worksheet.prompts.map((prompt, index) => (
-                    <div key={prompt} className="grid gap-2">
-                      <p className="text-sm font-bold text-slate-900">
+                    <div key={prompt} className="qp-question-block grid gap-2">
+                      <p className="qp-prompt text-sm font-bold text-slate-900">
                         {index + 1}. {prompt}
                       </p>
-                      <div className="space-y-2">
-                        <div className="h-7 border-b border-slate-300" />
-                        <div className="h-7 border-b border-slate-300" />
+                      {worksheetIndex === 0 ? (
+                        <div className="grid gap-2 sm:grid-cols-[11rem_1fr] print:grid-cols-[11rem_1fr]">
+                          <div className="qp-answer-box rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700">
+                            {isKo ? "내 분류" : "My type"}
+                          </div>
+                          <div className="qp-answer-box rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700">
+                            {isKo ? "그렇게 생각한 까닭" : "My reason"}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div className="qp-write-line h-8 border-b border-slate-400" />
+                          <div className="qp-write-line h-8 border-b border-slate-400" />
+                        </div>
+                      )}
+                      {worksheetIndex === 2 && index === worksheet.prompts.length - 1 && (
+                        <div className="qp-discussion-check mt-1 flex flex-wrap gap-3 text-xs font-semibold text-slate-700">
+                          <span>□ {isKo ? "친구와 토의하고 싶은 질문" : "Question I want to discuss"}</span>
+                          <span>□ {isKo ? "더 고쳐 보고 싶은 질문" : "Question I want to improve"}</span>
+                        </div>
+                      )}
                       </div>
-                    </div>
                   ))}
                 </div>
               </section>

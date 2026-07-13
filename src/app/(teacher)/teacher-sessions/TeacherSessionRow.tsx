@@ -37,6 +37,7 @@ interface SessionReminderResponse {
 interface TeacherSessionRowProps {
   session: QuestionSession;
   isHighlighted?: boolean;
+  isMutationPending?: boolean;
   onDelete: (id: string) => void;
   onToggleActive: (id: string, current: boolean) => void;
   onTogglePublic: (id: string, current: boolean) => void;
@@ -48,6 +49,7 @@ interface TeacherSessionRowProps {
 export function TeacherSessionRow({
   session,
   isHighlighted = false,
+  isMutationPending = false,
   onDelete,
   onToggleActive,
   onTogglePublic,
@@ -109,6 +111,7 @@ export function TeacherSessionRow({
   };
 
   const openEdit = () => {
+    if (isMutationPending) return;
     setEditDate(session.date);
     setEditSubject(session.subject);
     setEditTopic(session.topic);
@@ -122,7 +125,13 @@ export function TeacherSessionRow({
   };
 
   const saveEdit = async () => {
-    if (!editDate || !editTopic.trim() || (!isDesignSession && !editSubject.trim())) return;
+    if (
+      savingEdit ||
+      isMutationPending ||
+      !editDate ||
+      !editTopic.trim() ||
+      (!isDesignSession && !editSubject.trim())
+    ) return;
     setSavingEdit(true);
     const ok = await onEditSave(session.id, {
       date: editDate,
@@ -237,10 +246,10 @@ export function TeacherSessionRow({
         </div>
         <div className="grid grid-cols-2 gap-2 border-t border-border pt-3 lg:flex lg:shrink-0 lg:items-center lg:gap-5 lg:border-t-0 lg:pt-0">
           {([
-            [tSeq("activeLabel"), <Switch key="active" checked={session.isActive} onCheckedChange={() => onToggleActive(session.id, session.isActive)} />],
-            [tSeq("publicLabel"), <Switch key="public" checked={session.defaultQuestionPublic} onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)} />],
-            [tSeq("likesLabel"), <Switch key="likes" checked={session.likesVisibleToPeers} onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)} />],
-            [tSeq("commentsLabel"), <Switch key="comments" checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} />],
+            [tSeq("activeLabel"), <Switch key="active" aria-label={`${sessionText.label(session)} · ${tSeq("activeLabel")}`} disabled={isMutationPending} checked={session.isActive} onCheckedChange={() => onToggleActive(session.id, session.isActive)} />],
+            [tSeq("publicLabel"), <Switch key="public" aria-label={`${sessionText.label(session)} · ${tSeq("publicLabel")}`} disabled={isMutationPending} checked={session.defaultQuestionPublic} onCheckedChange={() => onTogglePublic(session.id, session.defaultQuestionPublic)} />],
+            [tSeq("likesLabel"), <Switch key="likes" aria-label={`${sessionText.label(session)} · ${tSeq("likesLabel")}`} disabled={isMutationPending} checked={session.likesVisibleToPeers} onCheckedChange={() => onToggleLikes(session.id, session.likesVisibleToPeers)} />],
+            [tSeq("commentsLabel"), <Switch key="comments" aria-label={`${sessionText.label(session)} · ${tSeq("commentsLabel")}`} disabled={isMutationPending} checked={session.commentsVisibleToPeers} onCheckedChange={() => onToggleCommentsVisible(session.id, session.commentsVisibleToPeers)} />],
           ] as const).map(([label, control]) => (
             <div key={label} className="flex items-center justify-between rounded-md border bg-background px-3 py-2 lg:w-20 lg:justify-center lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
               <span className="text-xs font-medium text-muted-foreground lg:hidden">{label}</span>
@@ -251,7 +260,8 @@ export function TeacherSessionRow({
             <button
               type="button"
               onClick={openEdit}
-              className="rounded-md border border-indigo-200 p-1.5 text-indigo-600 hover:bg-indigo-50"
+              disabled={isMutationPending}
+              className="rounded-md border border-indigo-200 p-1.5 text-indigo-600 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
               title={tc("edit")}
               aria-label={tc("edit")}
             >
@@ -260,7 +270,8 @@ export function TeacherSessionRow({
             <button
               type="button"
               onClick={() => onDelete(session.id)}
-              className="rounded-md border border-red-200 p-1.5 text-red-500 hover:bg-red-50"
+              disabled={isMutationPending}
+              className="rounded-md border border-red-200 p-1.5 text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               title={tc("delete")}
               aria-label={tc("delete")}
             >
@@ -326,10 +337,10 @@ export function TeacherSessionRow({
               <Input className="h-9 bg-background" value={editTopic} onChange={(event) => setEditTopic(event.target.value)} placeholder={t("topicPlaceholderShort")} />
             </div>
             <div className="flex gap-2">
-              <Button size="sm" disabled={savingEdit} onClick={saveEdit} className="font-semibold">
+              <Button size="sm" disabled={savingEdit || isMutationPending} onClick={saveEdit} className="font-semibold">
                 {savingEdit ? t("saving") : tc("save")}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setEditing(false)}>{tc("cancel")}</Button>
+              <Button size="sm" variant="outline" disabled={savingEdit || isMutationPending} onClick={() => setEditing(false)}>{tc("cancel")}</Button>
             </div>
           </div>
           {isDesignSession && (

@@ -120,4 +120,28 @@ describe("AiAnswerPreviewDialog", () => {
     expect(screen.getByText("전송에 실패했습니다")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /0개 답변 전송/ })).toBeDisabled();
   });
+
+  it("답변 재생성 중에는 대화창을 닫거나 취소하거나 전송하지 못한다", () => {
+    const onDismiss = vi.fn();
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
+    renderWithIntl(
+      <AiAnswerPreviewDialog
+        previews={previews}
+        {...baseProps}
+        regeneratingId="q1"
+        onDismiss={onDismiss}
+        onCancel={onCancel}
+        onConfirm={onConfirm}
+      />,
+    );
+
+    const cancelButton = screen.getByRole("button", { name: ko.common.cancel });
+    const sendButton = screen.getByRole("button", { name: /2개 답변 전송/ });
+    expect(cancelButton).toBeDisabled();
+    expect(sendButton).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
 });

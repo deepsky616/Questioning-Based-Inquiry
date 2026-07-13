@@ -77,6 +77,8 @@ export async function GET(req: Request) {
           targetClassName: true,
           targetStudentId: true,
           targetStudentIds: true,
+          unitDesignId: true,
+          sharedQuestions: true,
         },
       });
       return NextResponse.json(sessions);

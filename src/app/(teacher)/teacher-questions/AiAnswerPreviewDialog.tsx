@@ -47,9 +47,10 @@ export function AiAnswerPreviewDialog({
   const ready = previews?.filter((p) => (editedAnswers[p.questionId] ?? p.answer).trim().length > 0).length ?? 0;
   const overLimitCount = previews?.filter((p) => (editedAnswers[p.questionId] ?? p.answer).length > 150).length ?? 0;
   const sendCount = previews?.filter((p) => !excludedIds.has(p.questionId)).length ?? 0;
+  const isBusy = isSending || Boolean(regeneratingId);
 
   return (
-    <Dialog open={!!previews} onOpenChange={() => { if (!isSending) onDismiss(); }}>
+    <Dialog open={!!previews} onOpenChange={(open) => { if (!open && !isBusy) onDismiss(); }}>
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{t("previewDialogTitle")}</DialogTitle>
@@ -158,12 +159,12 @@ export function AiAnswerPreviewDialog({
           <p className="text-sm text-red-600 mt-1">{errorText}</p>
         )}
         <DialogFooter className="gap-2 mt-4">
-          <Button variant="outline" onClick={onCancel} disabled={isSending}>
+          <Button variant="outline" onClick={onCancel} disabled={isBusy}>
             {tc("cancel")}
           </Button>
           <Button
             onClick={onConfirm}
-            disabled={isSending || sendCount === 0}
+            disabled={isBusy || sendCount === 0}
             className="bg-indigo-600 hover:bg-indigo-700 text-white"
           >
             {isSending ? t("sending") : t("sendCount", { count: sendCount })}

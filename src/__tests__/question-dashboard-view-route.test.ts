@@ -29,7 +29,7 @@ beforeEach(() => {
   mAuth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
   mUserFind.mockResolvedValue({ school: "테스트초", grade: "5", className: "1", teacherClasses: [] });
 
-  mFindMany.mockImplementation((args: { take?: number; distinct?: string[] }) => {
+  mFindMany.mockImplementation((args: { take?: number }) => {
     if (args.take === 5) {
       return [
         {
@@ -48,9 +48,6 @@ beforeEach(() => {
         },
       ];
     }
-    if (args.distinct?.includes("sessionId")) {
-      return [{ sessionId: "session-1" }, { sessionId: "session-2" }];
-    }
     return [];
   });
 
@@ -67,6 +64,9 @@ beforeEach(() => {
         { cognitive: "conceptual", _count: { _all: 2 } },
         { cognitive: "controversial", _count: { _all: 2 } },
       ];
+    }
+    if (args.by.includes("sessionId")) {
+      return [{ sessionId: "session-1" }, { sessionId: "session-2" }];
     }
     throw new Error("예상하지 못한 groupBy 호출입니다");
   });
@@ -116,11 +116,10 @@ describe("학생 대시보드 질문 요약", () => {
       take: 5,
     });
 
-    const sessionCall = mFindMany.mock.calls.find(([args]) => args.distinct?.includes("sessionId"))?.[0];
+    const sessionCall = mGroupBy.mock.calls.find(([args]) => args.by.includes("sessionId"))?.[0];
     expect(sessionCall).toEqual({
+      by: ["sessionId"],
       where: { authorId: "student-1", sessionId: { not: null } },
-      select: { sessionId: true },
-      distinct: ["sessionId"],
       orderBy: { sessionId: "asc" },
     });
     expect(mGroupBy.mock.calls.every(([args]) => args.where.authorId === "student-1")).toBe(true);

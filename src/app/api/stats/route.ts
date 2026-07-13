@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { compareByClassAndNumber } from "@/lib/student-sort";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { calcTrend, calcStartDate, aggregateByStudent, buildTimeline } from "@/lib/stats-calc";
-import { matchesCognitiveCategory } from "@/lib/question-labels";
+import { calcStartDate } from "@/lib/stats-calc";
+import { aggregateTeacherStats } from "@/lib/teacher-stats-aggregate";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -19,6 +18,7 @@ export async function GET(req: Request) {
   const teacherId = (session.user as { id: string }).id;
   const { searchParams } = new URL(req.url);
   const period = searchParams.get("period") ?? "month";
+  const view = searchParams.get("view");
   const filterGrade = searchParams.get("grade");
   const filterClass = searchParams.get("className");
 
@@ -39,6 +39,9 @@ export async function GET(req: Request) {
 
   // 교사 정보 없거나 학교 미설정이면 빈 데이터 반환
   if (!teacher?.school) {
+    if (view === "student-activity") {
+      return NextResponse.json({ activeStudentIds: [] });
+    }
     return NextResponse.json({
       total: 0,
       byClosure: { closed: 0, open: 0 },
@@ -79,81 +82,38 @@ export async function GET(req: Request) {
     authorFilter = { role: "STUDENT", school };
   }
 
+  if (view === "student-activity") {
+    const studentGroups = await prisma.question.groupBy({
+      by: ["authorId"],
+      where: {
+        createdAt: { gte: startDate },
+        author: authorFilter,
+      },
+    });
+    return NextResponse.json({
+      activeStudentIds: studentGroups.map((group) => group.authorId),
+    });
+  }
+
   const questions = await prisma.question.findMany({
     where: {
       createdAt: { gte: startDate },
       author: authorFilter,
     },
-    include: {
+    select: {
+      createdAt: true,
+      closure: true,
+      cognitive: true,
       author: {
         select: { id: true, name: true, className: true, grade: true, studentNumber: true },
       },
     },
-    orderBy: { createdAt: "asc" },
   });
 
-  const total = questions.length;
-
-  const byClosure = {
-    closed: questions.filter((q) => q.closure === "closed").length,
-    open: questions.filter((q) => q.closure === "open").length,
-  };
-
-  const byCognitive = {
-    factual: questions.filter((q) => matchesCognitiveCategory(q.cognitive, "factual")).length,
-    conceptual: questions.filter((q) => matchesCognitiveCategory(q.cognitive, "conceptual")).length,
-    controversial: questions.filter((q) => matchesCognitiveCategory(q.cognitive, "controversial")).length,
-  };
-
-  const midpoint = new Date(
-    startDate.getTime() + (now.getTime() - startDate.getTime()) / 2
-  );
-  const firstHalf = questions.filter((q) => q.createdAt < midpoint);
-  const secondHalf = questions.filter((q) => q.createdAt >= midpoint);
-
-  const byStudentBase = aggregateByStudent(
-    questions.map((q) => ({
-      ...q,
-      closure: q.closure as "closed" | "open",
-      cognitive: q.cognitive as "factual" | "conceptual" | "controversial",
-      author: { id: q.author.id, name: q.author.name, className: q.author.className, grade: q.author.grade, studentNumber: q.author.studentNumber },
-    }))
-  );
-
-  // 스파크라인: 기간을 6버킷으로 나눠 학생별 질문 수 배열 생성(추세 리듬 시각화)
-  const BUCKETS = 6;
-  const spanMs = Math.max(1, now.getTime() - startDate.getTime());
-  const bucketOf = (d: Date) =>
-    Math.min(BUCKETS - 1, Math.floor(((d.getTime() - startDate.getTime()) / spanMs) * BUCKETS));
-
-  const byStudent = byStudentBase
-    .map((student) => {
-      const s1 = firstHalf.filter((q) => q.author.id === student.studentId).length;
-      const s2 = secondHalf.filter((q) => q.author.id === student.studentId).length;
-      const sparkline = Array.from({ length: BUCKETS }, () => 0);
-      for (const q of questions) {
-        if (q.author.id === student.studentId) sparkline[bucketOf(q.createdAt)] += 1;
-      }
-      return { ...student, trend: calcTrend(s1, s2), sparkline };
-    })
-    // 학급(학년·반) → 번호순 정렬(번호는 숫자 해석 — 문자열 사전순 방지)
-    .sort(compareByClassAndNumber);
-
-  const timeline = buildTimeline(
-    questions.map((q) => ({
-      ...q,
-      closure: q.closure as "closed" | "open",
-      cognitive: q.cognitive as "factual" | "conceptual" | "controversial",
-      author: { id: q.author.id, name: q.author.name, className: q.author.className, grade: q.author.grade, studentNumber: q.author.studentNumber },
-    }))
-  );
+  const stats = aggregateTeacherStats(questions, startDate, now);
 
   return NextResponse.json({
-    total,
-    byClosure,
-    byCognitive,
-    byStudent,
-    timeline,
+    ...stats,
     school, // 교사 소속 학교 (학급 드롭다운 표기용)
     teacherClasses, // 프론트엔드 학급 드롭다운 구성용
   });

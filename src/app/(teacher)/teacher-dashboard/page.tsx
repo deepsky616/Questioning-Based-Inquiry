@@ -13,15 +13,21 @@ import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { useTranslations } from "next-intl";
-import { useTeacherDashboardSchedule, useTeacherStudents } from "@/lib/app-queries";
+import {
+  mergeTeacherStudentActivity,
+  useTeacherDashboardSchedule,
+  useTeacherStudentActivity,
+  useTeacherStudentDirectory,
+} from "@/lib/app-queries";
 import { buildTeacherPriorityCounts } from "@/lib/dashboard-priority-tasks";
-import { visibleDataRefetchInterval } from "@/lib/query-refresh";
+import { visibleReportRefetchInterval } from "@/lib/query-refresh";
 import {
   buildDashboardQuestionClassSchedule,
-  localDateKey,
   resolveDashboardScheduleStatus,
+  teacherDashboardSessionHref,
 } from "@/lib/dashboard-question-class-schedule";
 import { teacherAlertQueryOptions } from "@/lib/teacher-alert-counts";
+import { useLocalDateKey } from "@/lib/use-local-date-key";
 
 interface TeacherClass {
   grade: string;
@@ -79,6 +85,8 @@ interface TeacherDashboardSession {
   targetClassName?: string | null;
   targetStudentId?: string | null;
   targetStudentIds?: unknown;
+  unitDesignId?: string | null;
+  sharedQuestions?: unknown[] | null;
 }
 
 // 학급 Select에서 사용할 복합 키 (grade|className)
@@ -106,7 +114,7 @@ function TeacherDashboard() {
   const [period, setPeriod] = useState("month");
   const [selectedClass, setSelectedClass] = useState("all");
 
-  // 학급 통계(질문수·댓글수·좋아요수 등)는 react-query로 주기 폴링(12초)+포커스 재조회.
+  // 집계 자료는 1분 주기와 화면 복귀 시 갱신한다.
   const statsQuery = useQuery<Stats>({
     queryKey: ["teacher-stats", period, selectedClass],
     queryFn: async () => {
@@ -120,17 +128,23 @@ function TeacherDashboard() {
       if (!r.ok) throw new Error("통계를 불러오지 못했습니다");
       return r.json();
     },
-    refetchInterval: visibleDataRefetchInterval,
+    refetchInterval: visibleReportRefetchInterval,
     refetchOnWindowFocus: true,
   });
   const { data: stats, isLoading } = statsQuery;
   const pendingPointQuery = useQuery(teacherAlertQueryOptions.pendingPoints());
   const flaggedQuery = useQuery(teacherAlertQueryOptions.flagged());
-  const teacherStudentsQuery = useTeacherStudents<TeacherStudent, TeacherClass>();
+  const today = useLocalDateKey();
+  const teacherStudentDirectoryQuery = useTeacherStudentDirectory<TeacherStudent, TeacherClass>();
+  const teacherStudentActivityQuery = useTeacherStudentActivity();
   const teacherSessionsQuery = useTeacherDashboardSchedule<TeacherDashboardSession>();
-  const { data: teacherStudentData } = teacherStudentsQuery;
-  const teacherStudents = useMemo(() => teacherStudentData?.students ?? [], [teacherStudentData]);
-  const today = localDateKey();
+  const teacherStudents = useMemo(
+    () => mergeTeacherStudentActivity(
+      teacherStudentDirectoryQuery.data?.students ?? [],
+      teacherStudentActivityQuery.data?.activity ?? [],
+    ),
+    [teacherStudentActivityQuery.data, teacherStudentDirectoryQuery.data],
+  );
   const selectedClassScheduleScope = useMemo(() => {
     if (selectedClass === "all") return undefined;
     const [grade, className] = selectedClass.split("|");
@@ -208,9 +222,9 @@ function TeacherDashboard() {
       : teacherSessionsQuery.isSuccess
         ? "success"
         : "pending",
-    scope: teacherStudentsQuery.isError
+    scope: teacherStudentDirectoryQuery.isError
       ? "error"
-      : teacherStudentsQuery.isSuccess
+      : teacherStudentDirectoryQuery.isSuccess
         ? "success"
         : "pending",
     requiresScope: selectedClass !== "all",
@@ -235,7 +249,7 @@ function TeacherDashboard() {
       detail: teacherSchedule.kind === "today"
         ? sessionTitle
         : `${dateLabel} · ${sessionTitle}`,
-      href: `/teacher-sessions?session=${encodeURIComponent(session.id)}`,
+      href: teacherDashboardSessionHref(session),
     };
   })();
   const teacherScheduleChoices = teacherSchedule.selectableSessions.map((session) => ({
@@ -243,12 +257,14 @@ function TeacherDashboard() {
     label: session.subject.trim() || t("scheduleTodayTitle"),
     countLabel: "",
     detail: session.topic.trim(),
-    href: `/teacher-sessions?session=${encodeURIComponent(session.id)}`,
+    href: teacherDashboardSessionHref(session),
   }));
   const taskStatus =
-    statsQuery.isError || pendingPointQuery.isError || flaggedQuery.isError || teacherStudentsQuery.isError
+    statsQuery.isError || pendingPointQuery.isError || flaggedQuery.isError ||
+      teacherStudentDirectoryQuery.isError || teacherStudentActivityQuery.isError
       ? "error"
-      : statsQuery.isSuccess && pendingPointQuery.isSuccess && flaggedQuery.isSuccess && teacherStudentsQuery.isSuccess
+      : statsQuery.isSuccess && pendingPointQuery.isSuccess && flaggedQuery.isSuccess &&
+          teacherStudentDirectoryQuery.isSuccess && teacherStudentActivityQuery.isSuccess
         ? "ready"
         : "loading";
   const taskCounts = taskStatus === "ready"
@@ -297,7 +313,8 @@ function TeacherDashboard() {
       statsQuery.refetch(),
       pendingPointQuery.refetch(),
       flaggedQuery.refetch(),
-      teacherStudentsQuery.refetch(),
+      teacherStudentDirectoryQuery.refetch(),
+      teacherStudentActivityQuery.refetch(),
     ]);
   };
 
@@ -343,7 +360,7 @@ function TeacherDashboard() {
           onSelect: (item) => router.push(item.href),
           onRetry: () => {
             void teacherSessionsQuery.refetch();
-            if (selectedClass !== "all") void teacherStudentsQuery.refetch();
+            if (selectedClass !== "all") void teacherStudentDirectoryQuery.refetch();
           },
           labels: {
             empty: t("scheduleEmpty"),

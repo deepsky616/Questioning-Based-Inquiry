@@ -32,7 +32,7 @@ describe.each(["attention", "noQuestions"])("%s 학급 범위", (filter) => {
       null,
       null,
     ]);
-    expect(scope.statsPath).toBe("/api/stats?period=month");
+    expect(scope.statsPath).toBe("/api/stats?view=student-activity&period=month");
   });
 
   it("특정 학급에서 다른 학급으로 바꾸면 주소와 통계 범위를 함께 교체한다", () => {
@@ -58,7 +58,7 @@ describe.each(["attention", "noQuestions"])("%s 학급 범위", (filter) => {
       "1",
     ]);
     expect(scope.statsPath).toBe(
-      "/api/stats?period=semester&grade=6&className=1",
+      "/api/stats?view=student-activity&period=semester&grade=6&className=1",
     );
   });
 });
@@ -73,6 +73,9 @@ describe("교사 학생 화면 범위 연동", () => {
     );
     expect(teacherStudentsPage).toContain(
       "fetch(questionActivityScope.statsPath)",
+    );
+    expect(teacherStudentsPage).toContain(
+      "questionActivityStatsQuery.data?.activeStudentIds",
     );
     expect(teacherStudentsPage).toContain(
       "buildQuestionActivityScopeHref(searchParams, nextClass)",

@@ -19,10 +19,20 @@ export function TeacherQuestionTopTabs({ value, onChange, labels }: TeacherQuest
 
   return (
     <div className="flex rounded-md border overflow-hidden w-fit">
-      <button type="button" onClick={() => onChange("questions")} className={tabClass("questions")}>
+      <button
+        type="button"
+        aria-pressed={value === "questions"}
+        onClick={() => onChange("questions")}
+        className={tabClass("questions")}
+      >
         {labels.questions}
       </button>
-      <button type="button" onClick={() => onChange("design")} className={tabClass("design", true)}>
+      <button
+        type="button"
+        aria-pressed={value === "design"}
+        onClick={() => onChange("design")}
+        className={tabClass("design", true)}
+      >
         {labels.design}
       </button>
     </div>

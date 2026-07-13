@@ -23,7 +23,7 @@ export function readQuestionActivityScope(searchParams: SearchParamsReader) {
   const hasSpecificClass = Boolean(rawGrade && rawClassName);
   const grade = hasSpecificClass ? rawGrade : null;
   const className = hasSpecificClass ? rawClassName : null;
-  const statsParams = new URLSearchParams({ period });
+  const statsParams = new URLSearchParams({ view: "student-activity", period });
 
   if (grade && className) {
     statsParams.set("grade", grade);

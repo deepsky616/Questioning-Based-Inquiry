@@ -35,7 +35,7 @@ export function TeacherQuestionPageNavigation({
       >
         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
       </button>
-      <span className="min-w-0 text-center text-xs font-medium text-muted-foreground">
+      <span aria-live="polite" className="min-w-0 text-center text-xs font-medium text-muted-foreground">
         {labels.status(page, totalPages, total)}
       </span>
       <button

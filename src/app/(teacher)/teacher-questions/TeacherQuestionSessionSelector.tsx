@@ -19,6 +19,7 @@ interface SessionFilterOptions {
 
 interface TeacherQuestionSessionSelectorProps {
   sessions: QuestionSession[];
+  status?: "ready" | "loading" | "error";
   filterOptions: SessionFilterOptions;
   filteredSessions: QuestionSession[];
   selectedSessionId: string;
@@ -29,7 +30,11 @@ interface TeacherQuestionSessionSelectorProps {
   onFilterSubjectChange: (value: string) => void;
   onFilterTopicChange: (value: string) => void;
   onSessionChange: (value: string) => void;
+  onRetry?: () => void;
   labels: {
+    loadingSessions?: string;
+    sessionLoadError?: string;
+    sessionRetry?: string;
     noSessions: string;
     date: string;
     allDates: string;
@@ -49,6 +54,7 @@ interface TeacherQuestionSessionSelectorProps {
 
 export function TeacherQuestionSessionSelector({
   sessions,
+  status = "ready",
   filterOptions,
   filteredSessions,
   selectedSessionId,
@@ -59,11 +65,37 @@ export function TeacherQuestionSessionSelector({
   onFilterSubjectChange,
   onFilterTopicChange,
   onSessionChange,
+  onRetry,
   labels,
 }: TeacherQuestionSessionSelectorProps) {
   const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
   const sessionText = useSessionMetaTranslation(sessions);
+
+  if (status === "loading") {
+    return (
+      <div role="status" className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+        {labels.loadingSessions}
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+        <span className="font-medium text-destructive">{labels.sessionLoadError}</span>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-md border border-border bg-card px-3 py-1.5 font-semibold text-foreground hover:bg-muted"
+          >
+            {labels.sessionRetry}
+          </button>
+        )}
+      </div>
+    );
+  }
 
   if (sessions.length === 0) {
     return (
@@ -98,7 +130,7 @@ export function TeacherQuestionSessionSelector({
         <div className="flex flex-col gap-1 w-32">
           <label className="text-xs font-medium text-muted-foreground">{labels.subject}</label>
           <Select value={filterSubject || "__all__"} onValueChange={(value) => onFilterSubjectChange(value === "__all__" ? "" : value)}>
-            <SelectTrigger className="h-8 text-sm bg-card">
+            <SelectTrigger aria-label={labels.subject} className="h-8 text-sm bg-card">
               <SelectValue placeholder={labels.all} />
             </SelectTrigger>
             <SelectContent>
@@ -115,7 +147,7 @@ export function TeacherQuestionSessionSelector({
         <div className="flex flex-col gap-1 w-52">
           <label className="text-xs font-medium text-muted-foreground">{labels.topicFilterLabel}</label>
           <Select value={filterTopic || "__all__"} onValueChange={(value) => onFilterTopicChange(value === "__all__" ? "" : value)}>
-            <SelectTrigger className="h-8 text-sm bg-card">
+            <SelectTrigger aria-label={labels.topicFilterLabel} className="h-8 text-sm bg-card">
               <SelectValue placeholder={labels.all} />
             </SelectTrigger>
             <SelectContent>

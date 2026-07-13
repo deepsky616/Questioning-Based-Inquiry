@@ -19,6 +19,7 @@ interface RowHandlers {
 interface TeacherSessionMonthListProps extends RowHandlers {
   groups: SessionMonthGroup<QuestionSession>[];
   highlightSessionId?: string | null;
+  pendingSessionIds?: ReadonlySet<string>;
   /** 접이식 여부 — 지난 세션 목록만 true */
   collapsible?: boolean;
   /** 검색·필터 중에는 결과가 가려지지 않게 모두 펼친다 */
@@ -31,6 +32,7 @@ interface TeacherSessionMonthListProps extends RowHandlers {
 export function TeacherSessionMonthList({
   groups,
   highlightSessionId = null,
+  pendingSessionIds = new Set(),
   collapsible = false,
   forceOpen = false,
   expandedKeys = null,
@@ -76,6 +78,7 @@ export function TeacherSessionMonthList({
                   key={s.id}
                   session={s}
                   isHighlighted={s.id === highlightSessionId}
+                  isMutationPending={pendingSessionIds.has(s.id)}
                   {...rowHandlers}
                 />
               ))}

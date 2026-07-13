@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { StudentReportView } from "@/components/reports/StudentReportView";
@@ -21,41 +20,24 @@ import {
   appNotificationQueryKeys,
   useAppNotifications,
 } from "@/lib/app-notifications";
-import { useStudentSessions } from "@/lib/app-queries";
+import {
+  type StudentQuestionSummary,
+  useStudentQuestionSummary,
+  useStudentSessions,
+} from "@/lib/app-queries";
 import {
   buildStudentPriorityCounts,
   isDashboardActionableSessionDate,
   selectActionableSessionReminders,
 } from "@/lib/dashboard-priority-tasks";
-import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 import { StudentDashboardTasksCard, type StudentDashboardTaskItem } from "./StudentDashboardTasksCard";
 import {
   buildDashboardQuestionClassSchedule,
-  localDateKey,
 } from "@/lib/dashboard-question-class-schedule";
 import { isValidSessionDateString } from "@/lib/sessions";
+import { useLocalDateKey } from "@/lib/use-local-date-key";
 
-interface Question {
-  id: string;
-  content: string;
-  closure: string;
-  cognitive: string;
-  createdAt: string;
-}
-
-interface Stats {
-  total: number;
-  byClosure: { closed: number; open: number };
-  byCognitive: { factual: number; conceptual: number; controversial: number };
-}
-
-interface StudentDashboardQuestionData {
-  recent: Question[];
-  stats: Stats;
-  answeredSessionIds: string[];
-}
-
-const EMPTY_STATS: Stats = {
+const EMPTY_STATS: StudentQuestionSummary["stats"] = {
   total: 0,
   byClosure: { closed: 0, open: 0 },
   byCognitive: { factual: 0, conceptual: 0, controversial: 0 },
@@ -87,18 +69,7 @@ function StudentDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
-  // 내 질문/통계는 react-query로 주기 폴링(12초)+포커스 재조회.
-  const questionsQuery = useQuery<StudentDashboardQuestionData>({
-    queryKey: ["student-dashboard-questions", user.id],
-    queryFn: async () => {
-      const r = await fetch("/api/questions?view=dashboard");
-      if (!r.ok) throw new Error("질문을 불러오지 못했습니다");
-      return r.json();
-    },
-    enabled: Boolean(user.id),
-    refetchInterval: visibleDataRefetchInterval,
-    refetchOnWindowFocus: true,
-  });
+  const questionsQuery = useStudentQuestionSummary({ userId: user.id });
   const { data: questionData, isLoading } = questionsQuery;
   const sessionsQuery = useStudentSessions<StudentSession>({ userId: user.id });
   const { data: sessions = [] } = sessionsQuery;
@@ -110,7 +81,7 @@ function StudentDashboard() {
 
   const questions = questionData?.recent ?? [];
   const stats = questionData?.stats ?? EMPTY_STATS;
-  const todayStr = localDateKey();
+  const todayStr = useLocalDateKey();
   const questionSessionIds = useMemo(
     () => new Set(
       questionData?.answeredSessionIds ?? [],
@@ -309,7 +280,9 @@ function StudentDashboard() {
                 <CardContent className="flex items-center justify-between gap-3 p-4">
                   <div>
                     <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-200">{t("totalQuestions")}</p>
-                    <p className="mt-0.5 text-3xl font-black text-foreground">{isLoading ? "..." : stats.total}</p>
+                    <p className="mt-0.5 text-3xl font-black text-foreground">
+                      {isLoading ? "..." : questionsQuery.isError ? "--" : stats.total}
+                    </p>
                   </div>
                   <Link
                     href="/student-questions"
@@ -324,7 +297,18 @@ function StudentDashboard() {
 
       {isLoading && <DashboardSkeleton />}
 
-      {!isLoading && (
+      {questionsQuery.isError && (
+        <Card>
+          <CardContent role="alert" className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <p className="text-sm font-medium text-destructive">{t("questionSummaryLoadError")}</p>
+            <Button type="button" variant="outline" onClick={() => void questionsQuery.refetch()}>
+              {t("questionSummaryRetry")}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && !questionsQuery.isError && (
         <>
       {/* 분류 1 · 닫힌 질문 / 열린 질문 */}
       <Card>

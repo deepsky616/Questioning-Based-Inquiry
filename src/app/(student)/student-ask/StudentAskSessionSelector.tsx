@@ -31,6 +31,7 @@ interface StudentAskSessionSelectorProps {
   filteredSessions: QuestionSession[];
   selectedSessionId: string;
   questionSessionIds: Set<string>;
+  questionStatusAvailable: boolean;
   sessionProgress: SessionProgress;
   search: string;
   onSearch: (value: string) => void;
@@ -55,6 +56,7 @@ export function StudentAskSessionSelector({
   filteredSessions,
   selectedSessionId,
   questionSessionIds,
+  questionStatusAvailable,
   sessionProgress,
   search,
   onSearch,
@@ -185,34 +187,36 @@ export function StudentAskSessionSelector({
 
         {filteredSessions.length > 0 && (
           <div className="space-y-2">
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-950/30">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">{t("sessionProgressTitle")}</p>
-                  <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
-                    {t("sessionProgressSummary", {
-                      total: sessionProgress.total,
-                      completed: sessionProgress.completed,
-                      remaining: sessionProgress.remaining,
-                      percent: sessionProgress.percent,
-                    })}
-                  </p>
+            {questionStatusAvailable && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-950/30">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">{t("sessionProgressTitle")}</p>
+                    <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                      {t("sessionProgressSummary", {
+                        total: sessionProgress.total,
+                        completed: sessionProgress.completed,
+                        remaining: sessionProgress.remaining,
+                        percent: sessionProgress.percent,
+                      })}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">
+                    {sessionProgress.percent}%
+                  </span>
                 </div>
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-100">
-                  {sessionProgress.percent}%
-                </span>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white dark:bg-emerald-950">
+                  <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${sessionProgress.percent}%` }} />
+                </div>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white dark:bg-emerald-950">
-                <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${sessionProgress.percent}%` }} />
-              </div>
-            </div>
+            )}
 
             {/* 목록 상한을 오른쪽 패널(입력창+도우미) 높이 수준으로 — 좌우 불균형의 원천 축소 */}
             {(() => {
               const renderSessionCard = (session: QuestionSession) => {
                 const active = selectedSessionId === session.id;
                 const isInquiry = isInquiryDesignSession(session);
-                const alreadyAskedInSession = questionSessionIds.has(session.id);
+                const alreadyAskedInSession = questionStatusAvailable && questionSessionIds.has(session.id);
                 return (
                   <button
                     key={session.id}

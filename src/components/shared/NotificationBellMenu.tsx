@@ -20,6 +20,19 @@ export interface NotificationMenuItem {
   onClick?: () => void | Promise<void>;
 }
 
+export interface NotificationMenuSection {
+  id: string;
+  title: string;
+  items: NotificationMenuItem[];
+  status?: "ready" | "loading" | "error";
+  loadingText?: string;
+  errorText?: string;
+  emptyText?: string;
+  actionText?: string;
+  onAction?: () => void | Promise<void>;
+  actionDisabled?: boolean;
+}
+
 const badgeClass: Record<NotificationTone, string> = {
   default: "bg-indigo-500",
   danger: "bg-red-500",
@@ -45,6 +58,7 @@ export function NotificationBellMenu({
   count,
   badgeTone = "default",
   items,
+  sections,
   open,
   onOpenChange,
   className,
@@ -57,7 +71,8 @@ export function NotificationBellMenu({
   unreadText?: string;
   count: number;
   badgeTone?: NotificationTone;
-  items: NotificationMenuItem[];
+  items?: NotificationMenuItem[];
+  sections?: NotificationMenuSection[];
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   className?: string;
@@ -65,6 +80,9 @@ export function NotificationBellMenu({
   onAction?: () => void | Promise<void>;
   actionDisabled?: boolean;
 }) {
+  const triggerLabel = count > 0 && unreadText
+    ? `${title}: ${unreadText} ${count > 99 ? "99+" : count}`
+    : title;
   const renderItem = (item: NotificationMenuItem) => {
     const tone = item.tone ?? "default";
     const content = (
@@ -118,11 +136,15 @@ export function NotificationBellMenu({
         <button
           type="button"
           title={title}
+          aria-label={triggerLabel}
           className={cn("relative inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-muted", className)}
         >
-          <Bell className="h-5 w-5 text-muted-foreground" />
+          <Bell aria-hidden="true" className="h-5 w-5 text-muted-foreground" />
           {count > 0 && (
-            <span className={cn("absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full px-1 text-center text-[10px] font-bold leading-[18px] text-white", badgeClass[badgeTone])}>
+            <span
+              aria-hidden="true"
+              className={cn("absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full px-1 text-center text-[10px] font-bold leading-[18px] text-white", badgeClass[badgeTone])}
+            >
               {count > 99 ? "99+" : count}
             </span>
           )}
@@ -142,11 +164,67 @@ export function NotificationBellMenu({
             </button>
           )}
         </div>
-        {items.length === 0 ? (
+        {sections ? (
+          <div className="max-h-96 overflow-y-auto">
+            {sections.map((section, index) => {
+              const status = section.status ?? "ready";
+              const headingId = `notification-section-${section.id}`;
+              return (
+                <section
+                  key={section.id}
+                  aria-labelledby={headingId}
+                  className={cn(index > 0 && "border-t border-border")}
+                >
+                  <div className="flex items-center justify-between gap-2 bg-muted/50 px-3 py-1.5">
+                    <h3
+                      id={headingId}
+                      className="text-xs font-semibold text-muted-foreground"
+                    >
+                      {section.title}
+                    </h3>
+                    {section.actionText && section.onAction && (
+                      <button
+                        type="button"
+                        disabled={section.actionDisabled}
+                        onClick={() => void section.onAction?.()}
+                        className="rounded-md px-2 py-0.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-indigo-300 dark:hover:bg-indigo-950/40"
+                      >
+                        {section.actionText}
+                      </button>
+                    )}
+                  </div>
+                  {status === "loading" && section.loadingText && (
+                    <p
+                      role="status"
+                      aria-label={section.loadingText}
+                      className="px-3 py-2 text-xs text-muted-foreground"
+                    >
+                      {section.loadingText}
+                    </p>
+                  )}
+                  {status === "error" && section.errorText && (
+                    <p
+                      role="alert"
+                      className="px-3 py-2 text-xs font-medium text-destructive"
+                    >
+                      {section.errorText}
+                    </p>
+                  )}
+                  {section.items.map(renderItem)}
+                  {status === "ready" && section.items.length === 0 && section.emptyText && (
+                    <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+                      {section.emptyText}
+                    </p>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        ) : (items?.length ?? 0) === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">{emptyText}</p>
         ) : (
           <div className="max-h-96 overflow-y-auto py-1">
-            {items.map(renderItem)}
+            {items?.map(renderItem)}
           </div>
         )}
       </PopoverContent>

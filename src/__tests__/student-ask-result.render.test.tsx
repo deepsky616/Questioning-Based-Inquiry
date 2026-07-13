@@ -3,7 +3,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
-import { createRef, type ReactElement } from "react";
+import { createRef, StrictMode, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import AskPage from "@/app/(student)/student-ask/page";
@@ -14,6 +14,10 @@ import ko from "../../messages/ko.json";
 
 const appState = vi.hoisted(() => ({
   search: "",
+  routerPush: vi.fn(),
+  routerReplace: vi.fn(),
+  questionSummaryRefetch: vi.fn(),
+  existingQuestionRefetch: vi.fn(),
   sessions: [
     {
       id: "session-1",
@@ -40,13 +44,36 @@ const appState = vi.hoisted(() => ({
     sessionId: string | null;
     readAt: string | null;
   }>,
+  unreadSessionReminders: undefined as
+    | Array<{ id: string; sessionId: string | null; href: string | null }>
+    | undefined,
   notificationIsLoading: false,
   notificationIsError: false,
   notificationIsSuccess: true,
+  questionSummary: {
+    recent: [],
+    stats: {
+      total: 0,
+      byClosure: { closed: 0, open: 0 },
+      byCognitive: { factual: 0, conceptual: 0, controversial: 0 },
+    },
+    answeredSessionIds: [] as string[],
+  },
+  questionSummaryIsError: false,
+  questionSummaryIsSuccess: true,
+  existingQuestion: null as { id: string; content: string } | null,
+  existingQuestionIsLoading: false,
+  existingQuestionIsError: false,
+}));
+
+const queryClientState = vi.hoisted(() => ({
+  cancelQueries: vi.fn(() => Promise.resolve()),
+  invalidateQueries: vi.fn(),
+  setQueryData: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRouter: () => ({ push: appState.routerPush, replace: appState.routerReplace }),
   useSearchParams: () => new URLSearchParams(appState.search),
 }));
 
@@ -59,11 +86,29 @@ vi.mock("@/lib/auth-helpers", () => ({
 }));
 
 vi.mock("@/lib/app-queries", () => ({
+  appQueryKeys: {
+    studentQuestionSummary: (userId: string) => ["student-question-summary", userId],
+    studentSessionQuestion: (userId: string, sessionId: string) =>
+      ["student-session-question", userId, sessionId],
+  },
   useStudentSessions: () => ({
     data: appState.sessions,
     isLoading: false,
     isError: false,
     isSuccess: true,
+    refetch: vi.fn(),
+  }),
+  useStudentQuestionSummary: () => ({
+    data: appState.questionSummary,
+    isError: appState.questionSummaryIsError,
+    isSuccess: appState.questionSummaryIsSuccess,
+    refetch: appState.questionSummaryRefetch,
+  }),
+  useStudentSessionQuestion: () => ({
+    data: { existingQuestion: appState.existingQuestion },
+    isLoading: appState.existingQuestionIsLoading,
+    isError: appState.existingQuestionIsError,
+    refetch: appState.existingQuestionRefetch,
   }),
 }));
 
@@ -72,15 +117,20 @@ vi.mock("@/lib/app-notifications", () => ({
     student: ["student-notifications"],
   },
   useAppNotifications: () => ({
+    data: appState.unreadSessionReminders === undefined
+      ? undefined
+      : { unreadSessionReminders: appState.unreadSessionReminders },
     notifications: appState.notifications,
+    unreadSessionReminders: appState.unreadSessionReminders ?? [],
     isLoading: appState.notificationIsLoading,
     isError: appState.notificationIsError,
     isSuccess: appState.notificationIsSuccess,
+    refetch: vi.fn(),
   }),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => queryClientState,
 }));
 
 vi.mock("@/components/ui/use-toast", () => ({
@@ -107,6 +157,7 @@ const result: ClassificationResult = {
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
   vi.unstubAllGlobals();
   appState.search = "";
   appState.sessions = [
@@ -130,12 +181,167 @@ afterEach(() => {
     },
   ];
   appState.notifications = [];
+  appState.unreadSessionReminders = undefined;
   appState.notificationIsLoading = false;
   appState.notificationIsError = false;
   appState.notificationIsSuccess = true;
+  appState.questionSummary.answeredSessionIds = [];
+  appState.questionSummaryIsError = false;
+  appState.questionSummaryIsSuccess = true;
+  appState.existingQuestion = null;
+  appState.existingQuestionIsLoading = false;
+  appState.existingQuestionIsError = false;
 });
 
 describe("학생 질문 분석 결과", () => {
+  it("주소로 연 수업 뒤 학생이 직접 고른 수업을 다시 덮지 않고 주소를 맞춘다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    appState.search = "sessionId=session-2";
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response),
+    ));
+
+    renderWithIntl(<StrictMode><AskPage /></StrictMode>);
+    const sessionSelect = await screen.findByLabelText(/질문수업 선택/);
+    await waitFor(() => expect(sessionSelect).toHaveValue("session-2"));
+    expect(appState.routerReplace).not.toHaveBeenCalled();
+
+    fireEvent.change(sessionSelect, { target: { value: "session-1" } });
+
+    await waitFor(() => expect(sessionSelect).toHaveValue("session-1"));
+    expect(appState.routerReplace).toHaveBeenCalledWith(
+      "/student-ask?sessionId=session-1",
+      { scroll: false },
+    );
+  });
+
+  it("주소의 수업이 없으면 첫 수업을 고르고 올바른 주소로 바꾼다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    appState.search = "sessionId=missing-session";
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response),
+    ));
+
+    renderWithIntl(<AskPage />);
+
+    expect(await screen.findByLabelText(/질문수업 선택/)).toHaveValue("session-1");
+    await waitFor(() => expect(appState.routerReplace).toHaveBeenCalledWith(
+      "/student-ask?sessionId=session-1",
+      { scroll: false },
+    ));
+  });
+
+  it("질문 작성 상태를 불러오지 못하면 진행률을 미작성으로 표시하지 않고 다시 시도한다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    appState.questionSummaryIsError = true;
+    appState.questionSummaryIsSuccess = false;
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response),
+    ));
+
+    renderWithIntl(<AskPage />);
+
+    expect(await screen.findByText("작성한 질문 상태를 불러오지 못했습니다. 다시 시도해 주세요.")).toBeInTheDocument();
+    expect(screen.queryByText(/작성 완료/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/질문수업 선택/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(appState.questionSummaryRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("선택한 수업의 기존 질문 조회가 실패하면 구분된 안내와 다시 시도를 제공한다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    appState.existingQuestionIsError = true;
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response),
+    ));
+
+    renderWithIntl(<AskPage />);
+
+    expect(await screen.findByText("이 수업에 작성한 질문을 불러오지 못했습니다.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(appState.existingQuestionRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("수업을 빠르게 바꿔도 늦게 온 이전 수업 참고 자료로 덮이지 않는다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    appState.sessions = appState.sessions.map((session, index) => ({
+      ...session,
+      unitDesignId: `design-${index + 1}`,
+    }));
+    let resolveFirst!: (response: Response) => void;
+    let resolveSecond!: (response: Response) => void;
+    const firstContext = new Promise<Response>((resolve) => { resolveFirst = resolve; });
+    const secondContext = new Promise<Response>((resolve) => { resolveSecond = resolve; });
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/sessions/session-1/design-context") return firstContext;
+      if (url === "/api/sessions/session-2/design-context") return secondContext;
+      return Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response);
+    }));
+
+    renderWithIntl(<AskPage />);
+    const sessionSelect = await screen.findByLabelText(/질문수업 선택/);
+    await waitFor(() => expect(sessionSelect).toHaveValue("session-1"));
+    fireEvent.change(sessionSelect, { target: { value: "session-2" } });
+    await waitFor(() => expect(sessionSelect).toHaveValue("session-2"));
+
+    await act(async () => {
+      resolveSecond({
+        ok: true,
+        json: async () => ({ context: { title: "둘째 참고 자료" } }),
+      } as Response);
+      await secondContext;
+    });
+    expect(await screen.findByText("둘째 참고 자료")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveFirst({
+        ok: true,
+        json: async () => ({ context: { title: "첫째 참고 자료" } }),
+      } as Response);
+      await firstContext;
+    });
+    expect(screen.getByText("둘째 참고 자료")).toBeInTheDocument();
+    expect(screen.queryByText("첫째 참고 자료")).not.toBeInTheDocument();
+  });
+
+  it("저장 전에 기존 질문 조회를 취소하고 기존 질문과 요약 캐시를 함께 갱신한다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/classify") {
+        return Promise.resolve({ ok: true, json: async () => result } as Response);
+      }
+      if (url === "/api/questions" && init?.method === "POST") {
+        return Promise.resolve({ ok: true, json: async () => ({ id: "saved-1" }) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response);
+    }));
+
+    renderWithIntl(<AskPage />);
+    const input = await screen.findByLabelText("질문");
+    fireEvent.change(input, { target: { value: "저장할 질문입니다" } });
+    fireEvent.click(screen.getByRole("button", { name: "질문 분석하기" }));
+    await screen.findByText("분석 결과");
+    fireEvent.click(screen.getByRole("button", { name: "질문 저장" }));
+
+    const existingKey = ["student-session-question", "student-1", "session-1"];
+    await waitFor(() => expect(queryClientState.cancelQueries).toHaveBeenCalledWith({ queryKey: existingKey }));
+    expect(queryClientState.setQueryData).toHaveBeenCalledWith(existingKey, {
+      existingQuestion: { id: "saved-1", content: "저장할 질문입니다" },
+    });
+    const summaryCall = queryClientState.setQueryData.mock.calls.find(
+      ([queryKey]) => JSON.stringify(queryKey) === JSON.stringify(["student-question-summary", "student-1"]),
+    );
+    expect(summaryCall).toBeDefined();
+    const updateSummary = summaryCall?.[1] as (previous: typeof appState.questionSummary) => typeof appState.questionSummary;
+    expect(updateSummary(appState.questionSummary).answeredSessionIds).toContain("session-1");
+    expect(queryClientState.cancelQueries.mock.invocationCallOrder[0]).toBeLessThan(
+      queryClientState.setQueryData.mock.invocationCallOrder[0],
+    );
+  });
+
   it.each([
     ["오늘", "today-unasked", 0],
     ["지난", "past-unasked", -1],
@@ -165,12 +371,12 @@ describe("학생 질문 분석 결과", () => {
         defaultQuestionPublic: false,
       },
     ];
-    appState.notifications = [
+    appState.notifications = [];
+    appState.unreadSessionReminders = [
       {
         id: "request-1",
-        type: "SESSION_REMINDER",
         sessionId: "requested-session",
-        readAt: null,
+        href: "/student-ask?sessionId=requested-session",
       },
     ];
     appState.notificationIsLoading = true;
@@ -198,6 +404,63 @@ describe("학생 질문 분석 결과", () => {
     expect((await screen.findAllByText("일반 수업")).length).toBeGreaterThan(0);
     expect(screen.queryAllByText("요청 수업")).toHaveLength(0);
     expect(screen.getByText("전체 1개 중 0개 작성 완료, 1개 남음")).toBeInTheDocument();
+  });
+
+  it("전체 수업 보기에서 기존 검색어도 함께 지운다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    appState.search = "task=past-unasked";
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    appState.sessions = [{
+      id: "past-session",
+      date: `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`,
+      subject: "과학",
+      topic: "날씨",
+      teacher: { name: "선생님" },
+      sharedQuestions: [],
+      defaultQuestionPublic: false,
+    }];
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response),
+    ));
+
+    renderWithIntl(<AskPage />);
+    const searchInput = await screen.findByRole("searchbox", { name: "주제·교과 검색" });
+    fireEvent.change(searchInput, { target: { value: "날씨" } });
+    expect(searchInput).toHaveValue("날씨");
+
+    fireEvent.click(screen.getByRole("button", { name: "전체 수업 보기" }));
+
+    expect(searchInput).toHaveValue("");
+  });
+
+  it("저장 뒤 다른 수업을 선택할 때 기존 검색어도 함께 지운다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/classify") {
+        return Promise.resolve({ ok: true, json: async () => result } as Response);
+      }
+      if (url === "/api/questions" && init?.method === "POST") {
+        return Promise.resolve({ ok: true, json: async () => ({ id: "saved-1" }) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response);
+    }));
+
+    renderWithIntl(<AskPage />);
+    const searchInput = await screen.findByRole("searchbox", { name: "주제·교과 검색" });
+    fireEvent.change(searchInput, { target: { value: "날씨" } });
+    const input = screen.getByLabelText("질문");
+    fireEvent.change(input, { target: { value: "저장할 질문입니다" } });
+    fireEvent.click(screen.getByRole("button", { name: "질문 분석하기" }));
+    await screen.findByText("분석 결과");
+    fireEvent.click(screen.getByRole("button", { name: "질문 저장" }));
+    await screen.findByText("질문이 저장되었습니다");
+
+    fireEvent.click(screen.getByRole("button", { name: "다른 수업 선택하기" }));
+
+    expect(searchInput).toHaveValue("");
   });
 
   it("최근 놓친 수업 범위에서 30일보다 오래된 수업은 제외한다", async () => {

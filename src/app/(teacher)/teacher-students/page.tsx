@@ -16,7 +16,12 @@ import { StudentBulkRegisterCard } from "@/components/teacher/StudentBulkRegiste
 import { StudentPasswordResetCard } from "@/components/teacher/StudentPasswordResetCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useTranslations, useLocale } from "next-intl";
-import { appQueryKeys, useTeacherStudents } from "@/lib/app-queries";
+import {
+  appQueryKeys,
+  mergeTeacherStudentActivity,
+  useTeacherStudentActivity,
+  useTeacherStudentDirectory,
+} from "@/lib/app-queries";
 import { StudentDetailDialog, StudentSessionProgress } from "./StudentDetailDialog";
 import type { Student, TeacherClass } from "./types";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
@@ -39,7 +44,7 @@ function lastActiveLabel(iso?: string | null): { key: "today" | "yesterday" | "d
 /* ─── 타입 ─── */
 /* ─── 타입 ─── */
 interface TeacherStatsSummary {
-  byStudent: Array<{ studentId: string }>;
+  activeStudentIds: string[];
 }
 
 
@@ -76,9 +81,19 @@ export default function StudentsPage() {
   const progressParam = searchParams.get("progress");
   const sortParam = searchParams.get("sort");
 
-  const { data, isLoading } = useTeacherStudents<Student, TeacherClass>();
-  const students = data?.students ?? EMPTY_STUDENTS;
-  const teacherClasses = data?.teacherClasses ?? EMPTY_TEACHER_CLASSES;
+  const teacherStudentDirectoryQuery = useTeacherStudentDirectory<Student, TeacherClass>();
+  const teacherStudentActivityQuery = useTeacherStudentActivity();
+  const students = useMemo(
+    () => mergeTeacherStudentActivity(
+      teacherStudentDirectoryQuery.data?.students ?? EMPTY_STUDENTS,
+      teacherStudentActivityQuery.data?.activity ?? [],
+    ),
+    [teacherStudentActivityQuery.data, teacherStudentDirectoryQuery.data],
+  );
+  const teacherClasses = teacherStudentDirectoryQuery.data?.teacherClasses ?? EMPTY_TEACHER_CLASSES;
+  const isLoading = teacherStudentDirectoryQuery.isLoading || teacherStudentActivityQuery.isLoading;
+  const studentDataError =
+    teacherStudentDirectoryQuery.isError || teacherStudentActivityQuery.isError;
   const refetchList = () => queryClient.invalidateQueries({ queryKey: appQueryKeys.teacherStudents });
   const questionActivityStatsQuery = useQuery<TeacherStatsSummary>({
     queryKey: questionActivityScope.queryKey,
@@ -92,7 +107,7 @@ export default function StudentsPage() {
     refetchOnWindowFocus: true,
   });
   const activeStudentIdsForFilter = useMemo(
-    () => new Set((questionActivityStatsQuery.data?.byStudent ?? []).map((student) => student.studentId)),
+    () => new Set(questionActivityStatsQuery.data?.activeStudentIds ?? []),
     [questionActivityStatsQuery.data],
   );
 
@@ -239,7 +254,24 @@ export default function StudentsPage() {
         </Card>
       )}
 
-      {mgmtTab === "list" && (
+      {mgmtTab === "list" && studentDataError && (
+        <div role="alert" className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-medium">{t("filterActivityLoadError")}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void Promise.all([
+              teacherStudentDirectoryQuery.refetch(),
+              teacherStudentActivityQuery.refetch(),
+            ])}
+          >
+            {t("filterActivityRetry")}
+          </Button>
+        </div>
+      )}
+
+      {mgmtTab === "list" && !studentDataError && (
       <>
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

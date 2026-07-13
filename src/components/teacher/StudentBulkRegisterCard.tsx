@@ -10,6 +10,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import { buildTeacherClassLabel, resolveClassInputMode } from "@/lib/teacher";
 import { useTranslations } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
+import { appQueryKeys } from "@/lib/app-queries";
 
 interface BulkStudent {
   studentNumber: string;
@@ -26,6 +28,7 @@ export function StudentBulkRegisterCard() {
   const t = useTranslations("settings");
   const tAcc = useTranslations("account");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
   const [bulkSchool, setBulkSchool] = useState("");
@@ -100,6 +103,7 @@ export function StudentBulkRegisterCard() {
         toast({ variant: "destructive", description: data.error || t("registerFailed") });
       } else {
         toast({ variant: "success", description: t("registerDone", { created: data.created, skipped: data.skipped, errors: data.errors?.length ? t("errorsSuffix", { count: data.errors.length }) : "" }) });
+        void queryClient.invalidateQueries({ queryKey: appQueryKeys.teacherStudents });
         if (data.created > 0) setBulkText("");
       }
     } catch {
