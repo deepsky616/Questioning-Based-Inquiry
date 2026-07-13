@@ -237,12 +237,14 @@ function StudentDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-2xl font-bold leading-tight text-foreground md:text-3xl">
-          {t("greeting", { name: user.name ?? "" })}
-        </h2>
-        <p className="text-sm leading-6 text-muted-foreground md:text-base">{t("greetingSub")}</p>
-      </div>
+      {tab !== "reports" && (
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold leading-tight text-foreground md:text-3xl">
+            {t("greeting", { name: user.name ?? "" })}
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground md:text-base">{t("greetingSub")}</p>
+        </div>
+      )}
 
       {tab === "reports" ? (
         <StudentReportView />

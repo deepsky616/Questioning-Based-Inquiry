@@ -246,7 +246,9 @@ function TeacherDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={tPages("teacherDashboard.title")} description={tPages("teacherDashboard.description")} />
+      {tab !== "reports" && (
+        <PageHeader title={tPages("teacherDashboard.title")} description={tPages("teacherDashboard.description")} />
+      )}
 
       {tab === "reports" ? (
         <TeacherReportsView />
