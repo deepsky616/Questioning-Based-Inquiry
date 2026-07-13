@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 
 const teacherSessionsPage = readFileSync("src/app/(teacher)/teacher-sessions/page.tsx", "utf8");
+const teacherQuestionClassActions = readFileSync(
+  "src/app/(teacher)/teacher-sessions/TeacherQuestionClassActions.tsx",
+  "utf8",
+);
 const reportView = readFileSync("src/components/reports/ReportView.tsx", "utf8");
 
 describe("core screen component split", () => {
@@ -9,10 +13,12 @@ describe("core screen component split", () => {
     expect(existsSync("src/app/(teacher)/teacher-sessions/TeacherSessionSummaryGrid.tsx")).toBe(true);
     expect(existsSync("src/app/(teacher)/teacher-sessions/TeacherSessionListControls.tsx")).toBe(true);
     expect(existsSync("src/app/(teacher)/teacher-sessions/TeacherSessionCreateCard.tsx")).toBe(true);
+    expect(existsSync("src/app/(teacher)/teacher-sessions/TeacherQuestionClassActions.tsx")).toBe(true);
     expect(existsSync("src/app/(teacher)/teacher-sessions/TeacherSessionRow.tsx")).toBe(true);
     expect(teacherSessionsPage).toContain("TeacherSessionSummaryGrid");
     expect(teacherSessionsPage).toContain("TeacherSessionListControls");
-    expect(teacherSessionsPage).toContain("TeacherSessionCreateCard");
+    expect(teacherSessionsPage).toContain("TeacherQuestionClassActions");
+    expect(teacherQuestionClassActions).toContain("TeacherSessionCreateCard");
     // 세션 행 렌더링은 월 그룹 목록(TeacherSessionMonthList)이 담당하고,
     // 그 안에서 TeacherSessionRow를 사용한다(지난 세션 월별 접기 도입 시 이동).
     expect(teacherSessionsPage).toContain("TeacherSessionMonthList");

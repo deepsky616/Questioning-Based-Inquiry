@@ -18,6 +18,7 @@ interface RowHandlers {
 
 interface TeacherSessionMonthListProps extends RowHandlers {
   groups: SessionMonthGroup<QuestionSession>[];
+  highlightSessionId?: string | null;
   /** 접이식 여부 — 지난 세션 목록만 true */
   collapsible?: boolean;
   /** 검색·필터 중에는 결과가 가려지지 않게 모두 펼친다 */
@@ -29,6 +30,7 @@ interface TeacherSessionMonthListProps extends RowHandlers {
 
 export function TeacherSessionMonthList({
   groups,
+  highlightSessionId = null,
   collapsible = false,
   forceOpen = false,
   expandedKeys = null,
@@ -40,8 +42,14 @@ export function TeacherSessionMonthList({
   return (
     <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
       {groups.map((group) => {
+        const containsHighlightedSession = group.sessions.some(
+          (session) => session.id === highlightSessionId,
+        );
         const open =
-          !collapsible || forceOpen || (expandedKeys ? expandedKeys.has(group.key) : false);
+          !collapsible ||
+          forceOpen ||
+          containsHighlightedSession ||
+          (expandedKeys ? expandedKeys.has(group.key) : false);
         const header = (
           <>
             {group.label} <span className="font-normal">({group.sessions.length})</span>
@@ -64,7 +72,12 @@ export function TeacherSessionMonthList({
             )}
             {open &&
               group.sessions.map((s) => (
-                <TeacherSessionRow key={s.id} session={s} {...rowHandlers} />
+                <TeacherSessionRow
+                  key={s.id}
+                  session={s}
+                  isHighlighted={s.id === highlightSessionId}
+                  {...rowHandlers}
+                />
               ))}
           </section>
         );

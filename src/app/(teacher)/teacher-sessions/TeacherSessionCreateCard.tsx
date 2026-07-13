@@ -37,9 +37,11 @@ export function TeacherSessionCreateCard({
   const tSeq = useTranslations("sequencePanel");
 
   return (
-    <Card>
+    <Card aria-labelledby="quick-question-class-form-title">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">{t("newSession")}</CardTitle>
+        <CardTitle id="quick-question-class-form-title" className="text-base">
+          {t("newSession")}
+        </CardTitle>
         <CardDescription>{t("newSessionDesc")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

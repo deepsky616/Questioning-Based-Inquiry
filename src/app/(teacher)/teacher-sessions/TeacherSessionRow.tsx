@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -36,6 +36,7 @@ interface SessionReminderResponse {
 
 interface TeacherSessionRowProps {
   session: QuestionSession;
+  isHighlighted?: boolean;
   onDelete: (id: string) => void;
   onToggleActive: (id: string, current: boolean) => void;
   onTogglePublic: (id: string, current: boolean) => void;
@@ -46,6 +47,7 @@ interface TeacherSessionRowProps {
 
 export function TeacherSessionRow({
   session,
+  isHighlighted = false,
   onDelete,
   onToggleActive,
   onTogglePublic,
@@ -58,6 +60,7 @@ export function TeacherSessionRow({
   const tSeq = useTranslations("sequencePanel");
   const { toast } = useToast();
   const isDesignSession = !!session.unitDesignId;
+  const rowRef = useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState(false);
   const [editDate, setEditDate] = useState(session.date);
   const [editSubject, setEditSubject] = useState(session.subject);
@@ -78,6 +81,11 @@ export function TeacherSessionRow({
     staleTime: 30000,
   });
   const missingStudents = (participationDetail?.students ?? []).filter((student) => !student.hasQuestion);
+
+  useEffect(() => {
+    if (!isHighlighted) return;
+    rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [isHighlighted]);
 
   const handleSendReminder = async () => {
     if (missingCount <= 0 || sendingReminder) return;
@@ -125,7 +133,18 @@ export function TeacherSessionRow({
   };
 
   return (
-    <div className={session.isActive ? "bg-card" : "bg-muted/40"}>
+    <div
+      ref={rowRef}
+      data-session-id={session.id}
+      aria-current={isHighlighted ? "true" : undefined}
+      className={`scroll-mt-24 transition-colors ${
+        isHighlighted
+          ? "bg-primary/10 ring-2 ring-inset ring-primary/40"
+          : session.isActive
+            ? "bg-card"
+            : "bg-muted/40"
+      }`}
+    >
       <div className={`flex flex-col gap-3 px-4 py-3 transition-colors lg:flex-row lg:items-center lg:justify-between ${session.isActive ? "hover:bg-muted/50" : "hover:bg-muted"}`}>
         <div className="flex min-w-0 items-start gap-3 lg:items-center">
           <span className={`h-2 w-2 shrink-0 rounded-full ${session.isActive ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} />
@@ -146,9 +165,11 @@ export function TeacherSessionRow({
               {!session.commentsVisibleToPeers && (
                 <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs text-rose-600 dark:bg-rose-950/40 dark:text-rose-300">{t("badgePrivateComments")}</span>
               )}
-              {isDesignSession && (
-                <span className="inline-flex items-center gap-0.5 rounded bg-indigo-600 px-1.5 py-0.5 text-xs font-bold text-white">{t("badgeInquiry")}</span>
-              )}
+              <span className="inline-flex items-center rounded bg-indigo-600 px-1.5 py-0.5 text-xs font-bold text-white">
+                {isDesignSession
+                  ? t("badgeInquiryQuestionClass")
+                  : t("badgeQuickQuestionClass")}
+              </span>
               <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 {buildTargetLabel({
                   targetType: session.targetType,

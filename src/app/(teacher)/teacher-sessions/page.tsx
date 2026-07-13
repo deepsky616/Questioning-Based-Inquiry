@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { BookOpenCheck, CircleAlert, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { isSessionAvailable, sortSessionsAsc, sortSessionsDesc, compareSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionsByMonth } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions, useTeacherStudents } from "@/lib/app-queries";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -12,44 +15,46 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { useTranslations } from "next-intl";
 import { TeacherSessionListControls, type SessionListSort, type SessionParticipationFilter } from "./TeacherSessionListControls";
 import { TeacherSessionSummaryGrid } from "./TeacherSessionSummaryGrid";
-import { TeacherSessionCreateCard } from "./TeacherSessionCreateCard";
+import { TeacherQuestionClassActions } from "./TeacherQuestionClassActions";
 import { TeacherSessionMonthList } from "./TeacherSessionMonthList";
-import type { QuestionSession, TeacherSessionForm } from "./types";
+import type { QuestionSession } from "./types";
 import {
-  defaultTargetSelection,
-  buildClassStudentTargetPayload,
-  getSubjectsForGrade,
-  getTargetGrade,
   type SessionTargetClass,
   type SessionTargetStudent,
 } from "@/lib/session-targeting";
 
 export default function TeacherSessionsPage() {
+  return (
+    <Suspense fallback={<div className="h-24 animate-pulse rounded-md bg-muted" />}>
+      <TeacherSessionsPageContent />
+    </Suspense>
+  );
+}
+
+function TeacherSessionsPageContent() {
   const tPages = useTranslations("pages");
   const t = useTranslations("sessions");
   const tc = useTranslations("common");
   const tSeq = useTranslations("sequencePanel");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: sessions = [], isLoading } = useTeacherSessions<QuestionSession>();
+  const searchParams = useSearchParams();
+  const requestedSessionId = searchParams.get("session")?.trim() || null;
+  const { data: sessions = [], isLoading, isError, refetch } =
+    useTeacherSessions<QuestionSession>();
   // 기존 낙관적 업데이트 호출부를 그대로 유지하기 위해 캐시 기록 함수를 setSessions 이름으로 제공한다.
   const setSessions = (updater: (prev: QuestionSession[]) => QuestionSession[]) =>
     queryClient.setQueryData<QuestionSession[]>(appQueryKeys.teacherSessions, (prev) => updater(prev ?? []));
   const { data: targetData } = useTeacherStudents<SessionTargetStudent, SessionTargetClass>();
   const students = useMemo(() => targetData?.students ?? [], [targetData]);
   const teacherClasses = useMemo(() => targetData?.teacherClasses ?? [], [targetData]);
-  const [sessForm, setSessForm] = useState<TeacherSessionForm>({
-    targetClassValue: "all",
-    selectedStudentIds: [] as string[],
-    date: "",
-    subject: "",
-    topic: "",
-    defaultQuestionPublic: true,
-    likesVisibleToPeers: true,
-    commentsVisibleToPeers: true,
-    isActive: true,
-  });
-  const [isSaving, setIsSaving] = useState(false);
+  const [createdHighlightSessionId, setCreatedHighlightSessionId] = useState<string | null>(null);
+  const [dismissedRequestedSessionId, setDismissedRequestedSessionId] = useState<string | null>(null);
+  const highlightSessionId =
+    createdHighlightSessionId ??
+    (requestedSessionId && requestedSessionId !== dismissedRequestedSessionId
+      ? requestedSessionId
+      : null);
   // 세션 목록 조회/정렬 상태
   const [listFilterDate, setListFilterDate] = useState("");
   const [listFilterSubject, setListFilterSubject] = useState("");
@@ -59,82 +64,15 @@ export default function TeacherSessionsPage() {
   const [expandedPastMonths, setExpandedPastMonths] = useState<Set<string> | null>(null);
   const [listParticipationFilter, setListParticipationFilter] = useState<SessionParticipationFilter>("all");
   const [listSort, setListSort] = useState<SessionListSort>("desc");
-  const [targetDefaulted, setTargetDefaulted] = useState(false);
 
-  const targetClasses = useMemo(() => {
-    if (teacherClasses.length > 0) return teacherClasses;
-    const map = new Map<string, SessionTargetClass>();
-    students.forEach((student) => {
-      if (student.grade && student.className) {
-        map.set(`${student.grade}-${student.className}`, {
-          grade: student.grade,
-          className: student.className,
-        });
-      }
-    });
-    return Array.from(map.values());
-  }, [students, teacherClasses]);
-
-  const selectedTargetGrade = getTargetGrade(sessForm.targetClassValue, targetClasses, students);
-  const subjectOptions = getSubjectsForGrade(selectedTargetGrade);
-
-  useEffect(() => {
-    if (targetDefaulted || !targetData) return;
-    // 기본값: 학급이 여러 개면 전체 담당 학급, 한 개뿐이면 그 학급 전체 학생
-    const defaults = defaultTargetSelection(targetData.students, targetData.teacherClasses);
-    setSessForm((prev) => ({ ...prev, ...defaults }));
-    setTargetDefaulted(true);
-  }, [targetData, targetDefaulted]);
-
-  useEffect(() => {
-    if (!subjectOptions.includes(sessForm.subject)) {
-      setSessForm((prev) => ({ ...prev, subject: subjectOptions[0] ?? "" }));
-    }
-  }, [sessForm.subject, subjectOptions]);
-
-  const handleCreate = async () => {
-    if (!sessForm.date || !sessForm.subject.trim() || !sessForm.topic.trim()) {
-      toast({ variant: "destructive", description: t("dateRequired") });
-      return;
-    }
-    if (sessForm.targetClassValue !== "all" && sessForm.selectedStudentIds.length === 0) {
-      toast({ variant: "destructive", description: t("selectTargets") });
-      return;
-    }
-    setIsSaving(true);
-    try {
-      const res = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...sessForm,
-          ...buildClassStudentTargetPayload({
-            targetClassValue: sessForm.targetClassValue,
-            selectedStudentIds: sessForm.selectedStudentIds,
-            students,
-          }),
-        }),
-      });
-      if (!res.ok) throw new Error();
-      const created: QuestionSession = await res.json();
-      setSessions((prev) => sortSessionsDesc([created, ...prev]));
-      setSessForm((prev) => ({
-        targetClassValue: prev.targetClassValue,
-        selectedStudentIds: prev.selectedStudentIds,
-        date: "",
-        subject: getSubjectsForGrade(getTargetGrade(prev.targetClassValue, targetClasses, students))[0] ?? "",
-        topic: "",
-        defaultQuestionPublic: true,
-        likesVisibleToPeers: true,
-        commentsVisibleToPeers: true,
-        isActive: true,
-      }));
-      toast({ variant: "success", description: t("sessionAdded") });
-    } catch {
-      toast({ variant: "destructive", description: t("saveFailed") });
-    } finally {
-      setIsSaving(false);
-    }
+  const handleHighlight = (sessionId: string) => {
+    setListFilterDate("");
+    setListFilterSubject("");
+    setListFilterTopic("");
+    setListSearch("");
+    setListParticipationFilter("all");
+    setDismissedRequestedSessionId(requestedSessionId);
+    setCreatedHighlightSessionId(sessionId);
   };
 
   const toggleFailed = () => toast({ variant: "destructive", description: t("toggleFailed") });
@@ -276,26 +214,70 @@ export default function TeacherSessionsPage() {
     return total > 0 && (s.participation?.missing ?? 0) === 0;
   }).length;
   const totalMissingStudents = sortedSessions.reduce((sum, s) => sum + (s.participation?.missing ?? 0), 0);
+  const highlightedSessionIsVisible = Boolean(
+    highlightSessionId && sortedSessions.some((session) => session.id === highlightSessionId),
+  );
+  const highlightedPastMonthKey = highlightSessionId
+    ? pastSessionMonthGroups.find((group) =>
+        group.sessions.some((session) => session.id === highlightSessionId),
+      )?.key ?? null
+    : null;
+
+  useEffect(() => {
+    if (!highlightedPastMonthKey) return;
+    setExpandedPastMonths((current) => {
+      if (current?.has(highlightedPastMonthKey)) return current;
+      const next = new Set(current ?? []);
+      next.add(highlightedPastMonthKey);
+      return next;
+    });
+  }, [highlightedPastMonthKey]);
+
+  useEffect(() => {
+    if (!highlightSessionId || !highlightedSessionIsVisible) return;
+    const timeout = window.setTimeout(() => {
+      setCreatedHighlightSessionId((current) =>
+        current === highlightSessionId ? null : current,
+      );
+      if (requestedSessionId === highlightSessionId) {
+        setDismissedRequestedSessionId(requestedSessionId);
+      }
+    }, 4000);
+    return () => window.clearTimeout(timeout);
+  }, [highlightSessionId, highlightedSessionIsVisible, requestedSessionId]);
 
   return (
     <div className="space-y-6">
       <PageHeader title={tPages("teacherSessions.title")} description={tPages("teacherSessions.description")} />
 
-      <TeacherSessionCreateCard
-        form={sessForm}
-        setForm={setSessForm}
-        isSaving={isSaving}
-        subjectOptions={subjectOptions}
-        targetClasses={targetClasses}
+      <TeacherQuestionClassActions
         students={students}
-        onCreate={handleCreate}
+        teacherClasses={teacherClasses}
+        targetsReady={Boolean(targetData)}
+        onHighlight={handleHighlight}
       />
 
       {/* 세션 목록 */}
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">{t("loading")}</div>
+      ) : isError ? (
+        <EmptyState
+          icon={<CircleAlert className="h-8 w-8" />}
+          title={t("loadFailedTitle")}
+          description={t("loadFailedDesc")}
+          action={(
+            <Button type="button" variant="outline" size="sm" onClick={() => void refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {t("retry")}
+            </Button>
+          )}
+        />
       ) : sessions.length === 0 ? (
-        <EmptyState icon="📅" title={t("emptyTitle")} description={t("emptyDesc")} />
+        <EmptyState
+          icon={<BookOpenCheck className="h-8 w-8" />}
+          title={t("emptyTitle")}
+          description={t("emptyDesc")}
+        />
       ) : (
         <Card className="teacher-sessions-desktop-management">
           <CardHeader className="pb-3 space-y-3">
@@ -353,6 +335,7 @@ export default function TeacherSessionsPage() {
                 </div>
                 <TeacherSessionMonthList
                   groups={activeSessionMonthGroups}
+                  highlightSessionId={highlightSessionId}
                   onDelete={handleDelete}
                   onToggleActive={handleToggleActive}
                   onTogglePublic={handleTogglePublic}
@@ -381,6 +364,7 @@ export default function TeacherSessionsPage() {
                 </div>
                 <TeacherSessionMonthList
                   groups={pastSessionMonthGroups}
+                  highlightSessionId={highlightSessionId}
                   collapsible
                   forceOpen={Boolean(searchQuery || listFilterDate || listFilterSubject || listFilterTopic)}
                   expandedKeys={expandedPastMonths}
