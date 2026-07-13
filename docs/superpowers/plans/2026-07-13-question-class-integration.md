@@ -19,7 +19,7 @@
 
 ---
 
-### 작업 1: 질문수업 단일 메뉴와 주소 별칭
+### Task 1: 질문수업 단일 메뉴와 주소 별칭
 
 **파일:**
 - 수정: `src/components/shared/AppNav.tsx`
@@ -68,7 +68,7 @@ git add src/components/shared/AppNav.tsx src/components/shared/PageNav.tsx 'src/
 git commit -m "feat(nav): unify teacher question classes"
 ```
 
-### 작업 2: 질문수업 통합 진입과 간단 만들기
+### Task 2: 질문수업 통합 진입과 간단 만들기
 
 **파일:**
 - 수정: `src/app/(teacher)/teacher-sessions/page.tsx`
@@ -112,7 +112,7 @@ git add 'src/app/(teacher)/teacher-sessions' messages/ko.json messages/en.json s
 git commit -m "feat(sessions): add question class hub"
 ```
 
-### 작업 3: 탐구질문 수업 생성 뒤 관리 연결
+### Task 3: 탐구질문 수업 생성 뒤 관리 연결
 
 **파일:**
 - 수정: `src/app/(teacher)/teacher-curriculum/page.tsx`
@@ -149,7 +149,7 @@ git add 'src/app/(teacher)/teacher-curriculum' messages/ko.json messages/en.json
 git commit -m "feat(curriculum): hand off created question classes"
 ```
 
-### 작업 4: 사용자 용어 전체 점검
+### Task 4: 사용자 용어 전체 점검
 
 **파일:**
 - 수정: `messages/ko.json`
@@ -184,7 +184,7 @@ git add messages/ko.json messages/en.json src src/__tests__/question-class-termi
 git commit -m "refactor(copy): standardize question class terms"
 ```
 
-### 작업 5: 최종 회귀 검사
+### Task 5: 최종 회귀 검사
 
 - [ ] **단계 1: 전체 단위 시험**
 
@@ -217,4 +217,3 @@ npm test
 git push origin main
 git ls-remote origin refs/heads/main
 ```
-

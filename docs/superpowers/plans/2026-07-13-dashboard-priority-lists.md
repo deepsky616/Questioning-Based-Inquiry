@@ -19,7 +19,7 @@
 
 ---
 
-### 작업 1: 역할별 우선순위 집계
+### Task 1: 역할별 우선순위 집계
 
 **파일:**
 - 생성: `src/lib/dashboard-priority-tasks.ts`
@@ -102,7 +102,7 @@ git add src/lib/dashboard-priority-tasks.ts src/__tests__/dashboard-priority-tas
 git commit -m "feat(dashboard): derive role priority tasks"
 ```
 
-### 작업 2: 공통 한 줄 목록과 교사 화면
+### Task 2: 공통 한 줄 목록과 교사 화면
 
 **파일:**
 - 생성: `src/components/shared/PriorityTaskList.tsx`
@@ -160,7 +160,7 @@ git add src/components/shared/PriorityTaskList.tsx 'src/app/(teacher)/teacher-da
 git commit -m "feat(dashboard): prioritize teacher actions"
 ```
 
-### 작업 3: 학생 화면 단순화
+### Task 3: 학생 화면 단순화
 
 **파일:**
 - 수정: `src/app/(student)/student-dashboard/page.tsx`
@@ -205,4 +205,3 @@ npx eslint 'src/app/(student)/student-dashboard/page.tsx' 'src/app/(student)/stu
 git add 'src/app/(student)/student-dashboard' messages/ko.json messages/en.json src/__tests__/student-dashboard-split.test.ts src/__tests__/core-screen-layout-improvements.test.ts
 git commit -m "feat(dashboard): focus student next actions"
 ```
-
