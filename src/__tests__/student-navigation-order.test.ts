@@ -21,7 +21,10 @@ describe("student navigation order", () => {
       { href: "/student-ask", key: "ask" },
       { href: "/student-questions", key: "explore" },
       { href: "/student-question-play", key: "questionPlay" },
-      { href: "/student-settings", key: "settings" },
     ]);
+  });
+
+  it("학생 설정을 상단 계정 메뉴에서 접근할 수 있다", () => {
+    expect(layoutSource).toContain('settingsHref: "/student-settings"');
   });
 });

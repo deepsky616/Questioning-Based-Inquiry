@@ -22,8 +22,11 @@ describe("teacher navigation order", () => {
       { href: "/teacher-sessions", key: "sessions" },
       { href: "/teacher-questions", key: "questions" },
       { href: "/teacher-question-play", key: "questionPlay" },
-      { href: "/teacher-students", key: "students" },
-      { href: "/teacher-settings", key: "settings" },
     ]);
+  });
+
+  it("교사 설정과 학생 관리를 상단 계정 메뉴에서 접근할 수 있다", () => {
+    expect(layoutSource).toContain('settingsHref: "/teacher-settings"');
+    expect(layoutSource).toContain('studentManagementHref: "/teacher-students"');
   });
 });
