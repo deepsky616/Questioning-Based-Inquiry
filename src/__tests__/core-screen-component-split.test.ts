@@ -34,7 +34,7 @@ describe("core screen component split", () => {
     expect(existsSync("src/components/teacher/point-review/PendingRow.tsx")).toBe(true);
     expect(existsSync("src/components/teacher/point-review/types.ts")).toBe(true);
     const pointReviewView = readFileSync("src/components/teacher/PointReviewView.tsx", "utf8");
-    expect(pointReviewView).toContain("usePointReview()");
+    expect(pointReviewView).toContain("usePointReview({ classFilter })");
     expect(pointReviewView).toContain("AnalysisSessionPicker");
     expect(pointReviewView).toContain("PendingRow");
     // 조립 전용 — 로직이 다시 이 파일로 흘러들지 않게 크기를 고정
