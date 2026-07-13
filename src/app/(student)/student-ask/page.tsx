@@ -90,7 +90,19 @@ function AskContent() {
   const [filterTopic, setFilterTopic] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const result = analysis?.result ?? null;
-  const analysisCurrent = isAnalysisCurrent(content, analysis);
+  const analysisCurrent = isAnalysisCurrent(content, selectedSessionId, analysis);
+
+  const transitionSession = useCallback((id: string, focusInput = false) => {
+    if (id !== selectedSessionId) {
+      analysisRequestRef.current += 1;
+      selectedSessionIdRef.current = id;
+      setIsLoading(false);
+      setSelectedSessionId(id);
+      setAnalysis(null);
+      setSaveComplete(false);
+    }
+    if (focusInput) requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [selectedSessionId]);
 
   useEffect(() => {
     contentRef.current = content;
@@ -120,15 +132,16 @@ function AskContent() {
 
   useEffect(() => {
     if (!sessionsLoaded || sessionsError) return;
-    setSelectedSessionId((prev) => {
-      const requestedSession = requestedSessionId
-        ? sessions.find((item) => item.id === requestedSessionId)
-        : null;
-      if (requestedSession) return requestedSession.id;
-      if (prev && sessions.some((item) => item.id === prev)) return prev;
-      return sessions[0]?.id ?? "";
-    });
-  }, [requestedSessionId, sessions, sessionsError, sessionsLoaded]);
+    const requestedSession = requestedSessionId
+      ? sessions.find((item) => item.id === requestedSessionId)
+      : null;
+    const nextSessionId = requestedSession?.id ?? (
+      selectedSessionId && sessions.some((item) => item.id === selectedSessionId)
+        ? selectedSessionId
+        : sessions[0]?.id ?? ""
+    );
+    transitionSession(nextSessionId);
+  }, [requestedSessionId, selectedSessionId, sessions, sessionsError, sessionsLoaded, transitionSession]);
 
   useEffect(() => {
     if (!user.id) return;
@@ -209,16 +222,6 @@ function AskContent() {
     return { total, completed, remaining, percent };
   }, [filteredSessions, questionSessionIds]);
 
-  const selectSession = (id: string) => {
-    analysisRequestRef.current += 1;
-    setIsLoading(false);
-    setSelectedSessionId(id);
-    setAnalysis(null); // issue #5: 세션 변경 시 분류 결과 초기화
-    setSaveComplete(false);
-
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  };
-
   const showAllSessions = () => {
     setFilterDate("");
     setFilterSubject("");
@@ -236,13 +239,13 @@ function AskContent() {
   useEffect(() => {
     if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) return;
     if (filteredSessions.length === 0) {
-      if (selectedSessionId) setSelectedSessionId("");
+      if (selectedSessionId) transitionSession("");
       return;
     }
     if (!filteredSessions.some((s) => s.id === selectedSessionId)) {
-      selectSession(filteredSessions[0].id);
+      transitionSession(filteredSessions[0].id, true);
     }
-  }, [filterDate, filterSubject, filterTopic, sessionsLoaded, questionsLoaded, needsQuestionScope, filteredSessions, selectedSessionId]);
+  }, [filterDate, filterSubject, filterTopic, sessionsLoaded, questionsLoaded, needsQuestionScope, filteredSessions, selectedSessionId, transitionSession]);
 
   useEffect(() => {
     setExistingQuestion(null);
@@ -267,6 +270,7 @@ function AskContent() {
 
   const handleClassify = async () => {
     const normalized = content.trim();
+    const analysisSessionId = selectedSessionId;
     // issue #3: handler 단에서도 세션 필수 검증
     if (!canAsk) return;
     if (!normalized) {
@@ -285,12 +289,15 @@ function AskContent() {
       });
       const data = await res.json();
 
-      if (analysisRequestRef.current !== requestId) return;
+      if (
+        analysisRequestRef.current !== requestId ||
+        selectedSessionIdRef.current !== analysisSessionId
+      ) return;
       if (!res.ok) {
         throw new Error(data.error || t("classifyFailed"));
       }
 
-      setAnalysis({ content: normalized, result: data });
+      setAnalysis({ content: normalized, sessionId: analysisSessionId, result: data });
     } catch (error: unknown) {
       if (analysisRequestRef.current !== requestId) return;
       const msg = error instanceof Error ? error.message : t("classifyError");
@@ -302,7 +309,7 @@ function AskContent() {
 
   const handleSave = async () => {
     // issue #3: handler 단에서도 세션 필수 검증
-    if (!canAsk || !analysis || !isAnalysisCurrent(content, analysis)) {
+    if (!canAsk || !analysis || !isAnalysisCurrent(content, selectedSessionId, analysis)) {
       toast({ variant: "destructive", description: t("reanalyzeBeforeSave") });
       return;
     }
@@ -332,7 +339,7 @@ function AskContent() {
       queryClient.invalidateQueries({ queryKey: appNotificationQueryKeys.student });
       if (
         selectedSessionIdRef.current !== savedSessionId ||
-        !isAnalysisCurrent(contentRef.current, savedAnalysis)
+        !isAnalysisCurrent(contentRef.current, selectedSessionIdRef.current, savedAnalysis)
       ) return;
       setExistingQuestion({
         id: typeof saved?.id === "string" ? saved.id : existingQuestion?.id ?? "saved",
@@ -475,7 +482,7 @@ function AskContent() {
             onFilterDateChange={setFilterDate}
             onFilterSubjectChange={setFilterSubject}
             onFilterTopicChange={setFilterTopic}
-            onSelectSession={selectSession}
+            onSelectSession={(id) => transitionSession(id, true)}
             getSessionDateBadge={getSessionDateBadge}
           />
         }

@@ -12,9 +12,33 @@ import { StudentAskResultCard } from "@/app/(student)/student-ask/StudentAskResu
 import type { ClassificationResult } from "@/app/(student)/student-ask/types";
 import ko from "../../messages/ko.json";
 
+const appState = vi.hoisted(() => ({
+  search: "",
+  sessions: [
+    {
+      id: "session-1",
+      date: "2026-07-13",
+      subject: "과학",
+      topic: "날씨",
+      teacher: { name: "선생님" },
+      sharedQuestions: [],
+      defaultQuestionPublic: false,
+    },
+    {
+      id: "session-2",
+      date: "2026-07-14",
+      subject: "사회",
+      topic: "지역",
+      teacher: { name: "선생님" },
+      sharedQuestions: [],
+      defaultQuestionPublic: false,
+    },
+  ],
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(appState.search),
 }));
 
 vi.mock("next-auth/react", () => ({
@@ -27,15 +51,7 @@ vi.mock("@/lib/auth-helpers", () => ({
 
 vi.mock("@/lib/app-queries", () => ({
   useStudentSessions: () => ({
-    data: [{
-      id: "session-1",
-      date: "2026-07-13",
-      subject: "과학",
-      topic: "날씨",
-      teacher: { name: "선생님" },
-      sharedQuestions: [],
-      defaultQuestionPublic: false,
-    }],
+    data: appState.sessions,
     isLoading: false,
     isError: false,
   }),
@@ -70,6 +86,7 @@ const result: ClassificationResult = {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  appState.search = "";
 });
 
 describe("학생 질문 분석 결과", () => {
@@ -195,5 +212,44 @@ describe("학생 질문 분석 결과", () => {
 
     expect(input).toHaveValue("저장 중에 고친 새 초안입니다");
     expect(screen.queryByText("질문이 저장되었습니다")).not.toBeInTheDocument();
+  });
+
+  it("주소 동기화로 수업이 바뀌면 늦은 이전 수업 분석을 적용하지 않는다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    appState.search = "sessionId=session-1";
+    let resolveClassification!: (response: Response) => void;
+    const delayedClassification = new Promise<Response>((resolve) => {
+      resolveClassification = resolve;
+    });
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/classify") return delayedClassification;
+      if (url === "/api/config") {
+        return Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => [] } as Response);
+    }));
+
+    const view = renderWithIntl(<AskPage />);
+    const input = await screen.findByLabelText("질문");
+    const sessionSelect = screen.getByLabelText(/수업 세션 선택/);
+    await waitFor(() => expect(sessionSelect).toHaveValue("session-1"));
+    fireEvent.change(input, { target: { value: "어느 수업에도 같은 질문입니다" } });
+    fireEvent.click(screen.getByRole("button", { name: "질문 분석하기" }));
+
+    appState.search = "sessionId=session-2";
+    view.rerender(
+      <NextIntlClientProvider locale="ko" messages={ko as never} timeZone="Asia/Seoul">
+        <AskPage />
+      </NextIntlClientProvider>,
+    );
+    await waitFor(() => expect(sessionSelect).toHaveValue("session-2"));
+    await act(async () => {
+      resolveClassification({ ok: true, json: async () => result } as Response);
+      await delayedClassification;
+    });
+
+    expect(screen.queryByText("분석 결과")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "질문 저장" })).not.toBeInTheDocument();
   });
 });
