@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 const curriculumPage = readFileSync("src/app/(teacher)/teacher-curriculum/page.tsx", "utf8");
 const questionsPage = readFileSync("src/app/(teacher)/teacher-questions/page.tsx", "utf8");
 const dashboardPage = readFileSync("src/app/(teacher)/teacher-dashboard/page.tsx", "utf8");
+const teacherLayout = readFileSync("src/app/(teacher)/layout.tsx", "utf8");
 const reportsView = readFileSync("src/components/teacher/TeacherReportsView.tsx", "utf8");
 
 describe("teacher priority screen refactors", () => {
@@ -23,11 +24,12 @@ describe("teacher priority screen refactors", () => {
   });
 
   it("keeps dashboard controls and report print controls separated for output flow safety", () => {
-    expect(existsSync("src/app/(teacher)/teacher-dashboard/TeacherDashboardTabs.tsx")).toBe(true);
     expect(existsSync("src/app/(teacher)/teacher-dashboard/TeacherDashboardFilters.tsx")).toBe(true);
     expect(existsSync("src/components/teacher/ReportPrintControls.tsx")).toBe(true);
-    expect(dashboardPage).toContain("TeacherDashboardTabs");
+    expect(dashboardPage).not.toContain("TeacherDashboardTabs");
     expect(dashboardPage).toContain("TeacherDashboardFilters");
+    expect(dashboardPage).toContain("TeacherReportsView");
+    expect(teacherLayout).toContain('detailedReportHref: "/teacher-dashboard?tab=reports"');
     expect(reportsView).toContain("ReportPrintControls");
     expect(reportsView).toContain("showPrintPreview([");
   });
