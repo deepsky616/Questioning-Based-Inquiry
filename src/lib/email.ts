@@ -72,8 +72,8 @@ export async function sendTeacherWelcomeEmail(to: string, name: string): Promise
   return sendEmail({
     to,
     subject: "Question Lab 교사 계정이 생성되었습니다",
-    text: `${name} 선생님, Question Lab 교사 계정 생성이 완료되었습니다.\n\n로그인 후 학생 등록과 질문 세션을 시작할 수 있습니다.`,
-    html: `<p>${escapeHtml(name)} 선생님, Question Lab 교사 계정 생성이 완료되었습니다.</p><p>로그인 후 학생 등록과 질문 세션을 시작할 수 있습니다.</p>`,
+    text: `${name} 선생님, Question Lab 교사 계정 생성이 완료되었습니다.\n\n로그인 후 학생 등록과 질문수업을 시작할 수 있습니다.`,
+    html: `<p>${escapeHtml(name)} 선생님, Question Lab 교사 계정 생성이 완료되었습니다.</p><p>로그인 후 학생 등록과 질문수업을 시작할 수 있습니다.</p>`,
   });
 }
 
@@ -148,8 +148,8 @@ export async function sendQuestionNotificationEmail({
   return sendEmail({
     to,
     subject: "Question Lab 새 질문이 등록되었습니다",
-    text: `${teacherName} 선생님, ${studentName} 학생이 새 질문을 등록했습니다.\n\n세션: ${sessionTitle}\n질문: ${question}`,
-    html: `<p>${escapeHtml(teacherName)} 선생님, ${escapeHtml(studentName)} 학생이 새 질문을 등록했습니다.</p><p><strong>세션:</strong> ${escapeHtml(sessionTitle)}</p><p><strong>질문:</strong> ${escapeHtml(question)}</p>`,
+    text: `${teacherName} 선생님, ${studentName} 학생이 새 질문을 등록했습니다.\n\n질문수업: ${sessionTitle}\n질문: ${question}`,
+    html: `<p>${escapeHtml(teacherName)} 선생님, ${escapeHtml(studentName)} 학생이 새 질문을 등록했습니다.</p><p><strong>질문수업:</strong> ${escapeHtml(sessionTitle)}</p><p><strong>질문:</strong> ${escapeHtml(question)}</p>`,
   });
 }
 

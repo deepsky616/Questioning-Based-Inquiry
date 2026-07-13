@@ -117,7 +117,7 @@ export async function POST(req: Request, { params }: Params) {
     }
 
     if (question.session && !question.session.isActive && userRole !== "TEACHER") {
-      return NextResponse.json({ error: "비활성화된 세션에서는 댓글을 작성할 수 없습니다" }, { status: 403 });
+      return NextResponse.json({ error: "비활성화된 수업에서는 댓글을 작성할 수 없습니다" }, { status: 403 });
     }
 
     // 중복 검사 (학생 + 같은 질문 + 정규화 동일)

@@ -183,7 +183,7 @@ describe("학생 질문 분석 결과", () => {
     }));
 
     const view = renderWithIntl(<AskPage />);
-    expect(screen.getByText("수업 세션 확인 중...")).toBeInTheDocument();
+    expect(screen.getByText("질문수업 확인 중...")).toBeInTheDocument();
     expect(screen.queryAllByText("요청 수업")).toHaveLength(0);
     expect(screen.queryAllByText("일반 수업")).toHaveLength(0);
 
@@ -211,8 +211,8 @@ describe("학생 질문 분석 결과", () => {
 
     renderWithIntl(<AskPage />);
 
-    expect(await screen.findByText("수업 세션 정보를 불러오지 못했습니다. 페이지를 새로고침해 주세요.")).toBeInTheDocument();
-    expect(screen.queryByLabelText(/수업 세션 선택/)).not.toBeInTheDocument();
+    expect(await screen.findByText("질문수업 정보를 불러오지 못했습니다. 페이지를 새로고침해 주세요.")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/질문수업 선택/)).not.toBeInTheDocument();
   });
 
   it("수정된 질문에는 이전 피드백을 남기고 저장을 막으며 개선 예시를 전달한다", () => {
@@ -357,7 +357,7 @@ describe("학생 질문 분석 결과", () => {
 
     const view = renderWithIntl(<AskPage />);
     const input = await screen.findByLabelText("질문");
-    const sessionSelect = screen.getByLabelText(/수업 세션 선택/);
+    const sessionSelect = screen.getByLabelText(/질문수업 선택/);
     await waitFor(() => expect(sessionSelect).toHaveValue("session-1"));
     fireEvent.change(input, { target: { value: "어느 수업에도 같은 질문입니다" } });
     fireEvent.click(screen.getByRole("button", { name: "질문 분석하기" }));

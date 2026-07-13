@@ -25,7 +25,7 @@ export interface TeacherStudentListResponse<TStudent, TClass> {
 
 async function fetchSessions<TSession extends BasicSession>(): Promise<TSession[]> {
   const res = await fetch("/api/sessions");
-  if (!res.ok) throw new Error("수업 세션을 불러오지 못했습니다");
+  if (!res.ok) throw new Error("질문수업을 불러오지 못했습니다");
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }

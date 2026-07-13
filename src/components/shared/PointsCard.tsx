@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { AI_BONUS_TYPES, BASE_POINTS } from "@/lib/points-policy";
+import { AI_BONUS_TYPES, BASE_POINTS, shouldShowPointReason } from "@/lib/points-policy";
 import { usePointBonusLabel } from "@/components/shared/use-point-label";
 import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -112,8 +112,7 @@ export default function PointsCard() {
               const game = gameLabel(log.gameId);
               const isPending = log.status === "PENDING";
               const isRejected = log.status === "REJECTED";
-              // instance:<UUID>는 중복 지급 방지용 내부 키이므로 표시하지 않는다
-              const showReason = log.reason && log.reason !== b.label && !log.reason.startsWith("instance:");
+              const showReason = shouldShowPointReason(log.reason, b.label, log.bonusType);
               return (
                 <div key={log.id}
                   className={`flex items-center gap-3 text-sm py-1 ${isRejected ? "opacity-40" : ""}`}>

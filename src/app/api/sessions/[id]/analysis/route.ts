@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: Params) {
 
   const userRole = (session.user as { role?: string }).role;
   if (userRole !== "TEACHER") {
-    return NextResponse.json({ error: "교사만 세션 분석을 실행할 수 있습니다" }, { status: 403 });
+    return NextResponse.json({ error: "교사만 수업 분석을 실행할 수 있습니다" }, { status: 403 });
   }
 
   const limited = checkRateLimit(`session-analysis:${(session.user as { id: string }).id}`, 10);
@@ -76,12 +76,12 @@ export async function POST(req: Request, { params }: Params) {
   });
 
   if (!questionSession) {
-    return NextResponse.json({ error: "세션을 찾을 수 없습니다" }, { status: 404 });
+    return NextResponse.json({ error: "질문수업을 찾을 수 없습니다" }, { status: 404 });
   }
 
   const teacherId = (session.user as { id: string }).id;
   if (questionSession.teacherId !== teacherId) {
-    return NextResponse.json({ error: "세션 분석 권한이 없습니다" }, { status: 403 });
+    return NextResponse.json({ error: "수업 분석 권한이 없습니다" }, { status: 403 });
   }
 
   const questions = questionSession.questions

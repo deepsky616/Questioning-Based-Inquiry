@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const res = await runStudentSessionAnalysis({ studentId: targetId, sessionId, req });
-    if (!res) return NextResponse.json({ error: "이 세션에서 한 활동이 없어요" }, { status: 400 });
+    if (!res) return NextResponse.json({ error: "이 수업에서 한 활동이 없어요" }, { status: 400 });
     return NextResponse.json({ ...res.result, totals: res.totals });
   } catch (error) {
     if (error instanceof AiKeyMissingError) {

@@ -14,7 +14,7 @@ import {
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
 import { formatShortDateTime } from "@/lib/datetime";
-import { GAME_LABEL, pointBonusLabel } from "@/lib/points-policy";
+import { GAME_LABEL, pointBonusLabel, shouldShowPointReason } from "@/lib/points-policy";
 import { appQueryKeys } from "@/lib/app-queries";
 import Link from "next/link";
 import { buildTeacherClassLabel } from "@/lib/teacher";
@@ -545,8 +545,7 @@ export function StudentDetailDialog({
                 ) : stats.recentPoints.map((p) => {
                   const b = pointBonusLabel(p.bonusType);
                   const game = GAME_LABEL[p.gameId];
-                  // instance:<UUID>는 중복 지급 방지용 내부 키이므로 표시하지 않는다
-                  const showReason = p.reason && p.reason !== b.label && !p.reason.startsWith("instance:");
+                  const showReason = shouldShowPointReason(p.reason, b.label, p.bonusType);
                   return (
                     <div key={p.id} className="text-xs flex items-center gap-1.5 text-foreground">
                       <span className="shrink-0">{b.emoji}</span>

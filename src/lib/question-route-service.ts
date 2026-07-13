@@ -213,7 +213,7 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
 
   const userRole = sessionUser.role ?? undefined;
   if (selectedSession && !selectedSession.isActive && userRole !== "TEACHER") {
-    throw new QuestionRouteError("비활성화된 세션에서는 질문을 작성할 수 없습니다", 403);
+    throw new QuestionRouteError("비활성화된 수업에서는 질문을 작성할 수 없습니다", 403);
   }
 
   const normalized = normalizeContent(data.content);
@@ -272,7 +272,7 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
             gameId: "ACTIVITY",
             bonusType: "QUESTION_WRITE",
             points: ACTIVITY_BASE_POINTS.QUESTION_WRITE,
-            reason: "수업세션 질문 작성",
+            reason: "질문수업 질문 작성",
             status: "APPROVED",
             sessionId: question.sessionId,
             relatedQuestionId: question.id,

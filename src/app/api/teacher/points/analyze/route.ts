@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     where: { id: sessionId },
     select: { id: true, teacherId: true, subject: true, topic: true, date: true },
   });
-  if (!qs) return NextResponse.json({ error: "세션 없음" }, { status: 404 });
+  if (!qs) return NextResponse.json({ error: "질문수업을 찾을 수 없습니다" }, { status: 404 });
   if (qs.teacherId !== teacherId) return NextResponse.json({ error: "권한 없음" }, { status: 403 });
 
   // 데이터 수집: 해당 세션의 학생 질문 + 답변

@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     select: { id: true },
   });
   if (!owned) {
-    return NextResponse.json({ error: "수업세션을 찾을 수 없습니다" }, { status: 404 });
+    return NextResponse.json({ error: "질문수업을 찾을 수 없습니다" }, { status: 404 });
   }
 
   const entries = Object.entries(fields).filter(([, v]) => v.trim().length > 0);

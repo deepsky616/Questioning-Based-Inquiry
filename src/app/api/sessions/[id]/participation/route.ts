@@ -33,7 +33,7 @@ export async function GET(
 
   if (!questionSession) {
     return NextResponse.json(
-      { error: "세션을 찾을 수 없습니다" },
+      { error: "질문수업을 찾을 수 없습니다" },
       { status: 404 }
     );
   }

@@ -17,7 +17,7 @@ async function assertTeacherOwnsSession(sessionId: string, teacherId: string) {
     where: { id: sessionId },
     select: { id: true, teacherId: true, sharedQuestions: true },
   });
-  if (!qs) throw new PublishQuestionsError("세션 없음", 404);
+  if (!qs) throw new PublishQuestionsError("질문수업을 찾을 수 없습니다", 404);
   if (qs.teacherId !== teacherId) throw new PublishQuestionsError("권한 없음", 403);
   return qs;
 }

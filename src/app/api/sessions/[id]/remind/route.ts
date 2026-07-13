@@ -28,7 +28,7 @@ export async function POST(
   });
 
   if (!questionSession) {
-    return NextResponse.json({ error: "세션을 찾을 수 없습니다" }, { status: 404 });
+    return NextResponse.json({ error: "질문수업을 찾을 수 없습니다" }, { status: 404 });
   }
   if (questionSession.teacherId !== teacherId) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });

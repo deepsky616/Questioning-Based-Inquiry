@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     });
 
     if (!questionSession) {
-      return NextResponse.json({ error: "수업세션을 찾을 수 없습니다" }, { status: 404 });
+      return NextResponse.json({ error: "질문수업을 찾을 수 없습니다" }, { status: 404 });
     }
 
     let questions: SequenceInputQuestion[];
