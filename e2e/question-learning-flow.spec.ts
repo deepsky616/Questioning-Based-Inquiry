@@ -21,7 +21,7 @@ const TEACHING_GUIDE_TITLES = [
 
 async function loginAsTeacher(page: Page, teacher: QuestionLearningTeacherFixture) {
   await page.goto("/login");
-  await page.getByRole("tab", { name: /교사/ }).click();
+  await page.getByRole("tab", { name: "교사 로그인", exact: true }).click();
   await page.locator("#t-email").fill(teacher.email);
   await page.locator("#t-password").fill(teacher.password);
   await page.getByRole("button", { name: "교사 로그인" }).click();
@@ -75,8 +75,18 @@ test.describe("역할별 질문학습 통합 흐름", () => {
 
   test.afterAll(async ({}, testInfo) => {
     const key = `flow-${testInfo.project.name}`;
-    await cleanupStudentAskFlow(key);
-    await cleanupQuestionLearningTeacher(key);
+    const cleanupResults = await Promise.allSettled([
+      cleanupStudentAskFlow(key),
+      cleanupQuestionLearningTeacher(key),
+    ]);
+    const cleanupErrors = cleanupResults.flatMap((result) =>
+      result.status === "rejected" ? [result.reason] : [],
+    );
+
+    if (cleanupErrors.length === 1) throw cleanupErrors[0];
+    if (cleanupErrors.length > 1) {
+      throw new AggregateError(cleanupErrors, `질문학습 통합 시험 자료 정리 실패: ${key}`);
+    }
   });
 
   test("학생이 학습과 연습을 거쳐 실제 수업 질문 초안을 만든다", async ({ page }) => {
@@ -87,10 +97,13 @@ test.describe("역할별 질문학습 통합 흐름", () => {
     await work.goto("/student-question-learning");
     await openLastLearningSlide(work);
     await work.getByRole("link", { name: "질문연습 시작" }).click();
-    await work.getByRole("tab", { name: "질문 만들기" }).click();
-    await work.getByRole("textbox").fill(PRACTICE_QUESTION);
-    await work.getByRole("button", { name: /확인(?:받)?기/ }).click();
-    await work.getByRole("button", { name: "이 질문으로 질문하기" }).click();
+    const questionPractice = work
+      .getByRole("tablist", { name: "질문 연습", exact: true })
+      .locator("..");
+    await questionPractice.getByRole("tab", { name: "질문 만들기" }).click();
+    await questionPractice.getByRole("textbox").fill(PRACTICE_QUESTION);
+    await questionPractice.getByRole("button", { name: "AI에게 확인받기", exact: true }).click();
+    await questionPractice.getByRole("button", { name: "이 질문으로 질문하기" }).click();
 
     await expect(work).toHaveURL(/student-ask\?draft=practice/);
     await expect(work.locator("#content")).toHaveValue(PRACTICE_QUESTION);
