@@ -1,14 +1,30 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { compareByClassAndNumber } from "@/lib/student-sort";
 import { PRACTICE_GAME_ID, practiceDayStartUtc } from "@/lib/practice-points";
+import {
+  buildPracticeDiagnostic,
+  type PracticeAttemptInput,
+} from "@/lib/practice-diagnostics";
 
 // 담당 학급 학생들의 질문 연습 현황(오늘/최근 7일 포인트, 모드별 성공 횟수).
 // 연습 지급이 PointLog(gameId=PRACTICE)에 남으므로 추가 수집 없이 집계만 한다.
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+function compareAttemptsNewestFirst(
+  left: PracticeAttemptInput,
+  right: PracticeAttemptInput,
+): number {
+  const timeDifference = right.createdAt.getTime() - left.createdAt.getTime();
+  if (timeDifference !== 0) return timeDifference;
+  if (left.id === right.id) return 0;
+  return left.id < right.id ? 1 : -1;
+}
 
 export async function GET() {
   const session = await auth();
@@ -21,6 +37,7 @@ export async function GET() {
   const teacherId = (session.user as { id: string }).id;
 
   try {
+    const emptySummary = buildPracticeDiagnostic([]);
     const teacher = await prisma.user.findUnique({
       where: { id: teacherId },
       select: {
@@ -29,7 +46,7 @@ export async function GET() {
       },
     });
     if (!teacher?.school) {
-      return NextResponse.json({ students: [] });
+      return NextResponse.json({ summary: emptySummary, students: [] });
     }
 
     // 담당 학급이 있으면 해당 학년·반만, 없으면 같은 학교 학생 전체 (기존 학생 목록과 동일 규칙)
@@ -44,7 +61,41 @@ export async function GET() {
       select: { id: true, name: true, grade: true, className: true, studentNumber: true },
     });
     if (students.length === 0) {
-      return NextResponse.json({ students: [] });
+      return NextResponse.json({ summary: emptySummary, students: [] });
+    }
+
+    const studentIds = students.map((student) => student.id);
+    const allowedStudentIds = new Set(studentIds);
+    const cutoff = new Date(Date.now() - THIRTY_DAYS_MS);
+    const rawAttempts = await prisma.$queryRaw<PracticeAttemptInput[]>(Prisma.sql`
+      SELECT id,
+             student_id AS "studentId",
+             mode,
+             item_id AS "itemId",
+             quiz_type AS "quizType",
+             correct,
+             created_at AS "createdAt"
+      FROM (
+        SELECT id, student_id, mode, item_id, quiz_type, correct, created_at,
+               ROW_NUMBER() OVER (
+                 PARTITION BY student_id ORDER BY created_at DESC, id DESC
+               ) AS row_number
+        FROM practice_attempts
+        WHERE student_id IN (${Prisma.join(studentIds)})
+          AND created_at >= ${cutoff}
+      ) ranked
+      WHERE row_number <= 101
+      ORDER BY created_at DESC, id DESC
+    `);
+    const attemptsByStudent = new Map<string, PracticeAttemptInput[]>();
+    for (const attempt of rawAttempts) {
+      if (!allowedStudentIds.has(attempt.studentId)) continue;
+      const studentAttempts = attemptsByStudent.get(attempt.studentId) ?? [];
+      studentAttempts.push(attempt);
+      attemptsByStudent.set(attempt.studentId, studentAttempts);
+    }
+    for (const studentAttempts of attemptsByStudent.values()) {
+      studentAttempts.sort(compareAttemptsNewestFirst);
     }
 
     const todayStart = practiceDayStartUtc();
@@ -52,7 +103,7 @@ export async function GET() {
     const logs = await prisma.pointLog.findMany({
       where: {
         gameId: PRACTICE_GAME_ID,
-        studentId: { in: students.map((s) => s.id) },
+        studentId: { in: studentIds },
         createdAt: { gte: new Date(Math.min(weekStart.getTime(), Date.now() - WEEK_MS)) },
       },
       select: { studentId: true, bonusType: true, points: true, createdAt: true },
@@ -74,22 +125,33 @@ export async function GET() {
       byStudent.set(log.studentId, stat);
     }
 
+    const diagnosticAttempts = students.flatMap((student) =>
+      (attemptsByStudent.get(student.id) ?? []).slice(0, 100),
+    );
     const result = students
       .sort(compareByClassAndNumber)
-      .map((s) => ({
-        id: s.id,
-        name: s.name,
-        grade: s.grade,
-        className: s.className,
-        studentNumber: s.studentNumber,
-        todayPoints: byStudent.get(s.id)?.todayPoints ?? 0,
-        weekPoints: byStudent.get(s.id)?.weekPoints ?? 0,
-        quizCount: byStudent.get(s.id)?.quizCount ?? 0,
-        transformCount: byStudent.get(s.id)?.transformCount ?? 0,
-        createCount: byStudent.get(s.id)?.createCount ?? 0,
-      }));
+      .map((student) => {
+        const attempts = attemptsByStudent.get(student.id) ?? [];
+        return {
+          id: student.id,
+          name: student.name,
+          grade: student.grade,
+          className: student.className,
+          studentNumber: student.studentNumber,
+          todayPoints: byStudent.get(student.id)?.todayPoints ?? 0,
+          weekPoints: byStudent.get(student.id)?.weekPoints ?? 0,
+          quizCount: byStudent.get(student.id)?.quizCount ?? 0,
+          transformCount: byStudent.get(student.id)?.transformCount ?? 0,
+          createCount: byStudent.get(student.id)?.createCount ?? 0,
+          ...buildPracticeDiagnostic(attempts.slice(0, 100)),
+          capped: attempts.length > 100,
+        };
+      });
 
-    return NextResponse.json({ students: result });
+    return NextResponse.json({
+      summary: buildPracticeDiagnostic(diagnosticAttempts),
+      students: result,
+    });
   } catch (error) {
     logger.error("Practice stats error:", error);
     return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });

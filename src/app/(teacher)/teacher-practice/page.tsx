@@ -2,10 +2,12 @@
 
 // 교사용 질문 연습 — 학생과 같은 연습(탭1)에 더해, 교사 전용으로
 // 문항 은행 열람·복사(탭2)와 담당 학급 학생의 연습 현황(탭3)을 제공한다.
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronDown, Copy, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,11 +25,19 @@ import {
   type Closure,
 } from "@/lib/question-practice-data";
 import { PRACTICE_POINTS, PRACTICE_DAILY_CAP } from "@/lib/practice-points";
-import { parsePracticeSelection } from "@/lib/practice-selection";
+import {
+  parsePracticeSelection,
+  practiceSelectionSearch,
+} from "@/lib/practice-selection";
+import type {
+  AccuracyMetric,
+  PracticeDiagnostic,
+  PracticeFocus,
+} from "@/lib/practice-diagnostics";
 
 type TeacherPracticeTab = "try" | "bank" | "stats";
 
-interface PracticeStatRow {
+interface PracticeStatRow extends PracticeDiagnostic {
   id: string;
   name: string;
   grade?: string | null;
@@ -38,6 +48,28 @@ interface PracticeStatRow {
   quizCount: number;
   transformCount: number;
   createCount: number;
+  capped: boolean;
+}
+
+interface PracticeStatsResponse {
+  summary: PracticeDiagnostic;
+  students: PracticeStatRow[];
+}
+
+type PracticeFocusFilter = "all" | PracticeFocus;
+type CopyStatus = "success" | "error" | null;
+
+const PRACTICE_FOCUSES: PracticeFocus[] = [
+  "closed",
+  "open",
+  "factual",
+  "conceptual",
+  "controversial",
+];
+
+function teacherViewFrom(params: Pick<URLSearchParams, "get">): TeacherPracticeTab {
+  const view = params.get("view");
+  return view === "bank" || view === "stats" ? view : "try";
 }
 
 export default function TeacherPracticePage() {
@@ -51,9 +83,27 @@ export default function TeacherPracticePage() {
 function TeacherPracticeContent() {
   const t = useTranslations("practice");
   const tCls = useTranslations("classification");
+  const tc = useTranslations("common");
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialSelection = parsePracticeSelection(searchParams);
-  const [tab, setTab] = useState<TeacherPracticeTab>("try");
+  const requestedView = teacherViewFrom(searchParams);
+  const requestedFocus: PracticeFocusFilter =
+    requestedView === "stats" && initialSelection.tab === "quiz" && initialSelection.focus
+      ? initialSelection.focus
+      : "all";
+  const [tab, setTab] = useState<TeacherPracticeTab>(requestedView);
+
+  const switchTeacherView = (nextView: TeacherPracticeTab) => {
+    setTab(nextView);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("view", nextView);
+    router.replace(`/teacher-practice?${nextParams.toString()}`, { scroll: false });
+  };
+
+  useEffect(() => {
+    setTab(requestedView);
+  }, [requestedView]);
 
   // ── 탭 2: 문항 은행 필터 ──
   // 내장 문항 "복사해서 편집" — 사본 초안을 내 문항 폼으로 넘긴다(원본은 보존)
@@ -69,7 +119,15 @@ function TeacherPracticeContent() {
   );
 
   // ── 탭 3: 학생 연습 현황 ──
-  const { data: stats, isLoading: statsLoading, refetch } = useQuery<{ students: PracticeStatRow[] }>({
+  const [focusFilter, setFocusFilter] = useState<PracticeFocusFilter>(requestedFocus);
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>(null);
+  useEffect(() => {
+    setFocusFilter(requestedFocus);
+    setCopyStatus(null);
+  }, [requestedFocus]);
+
+  const statsQuery = useQuery<PracticeStatsResponse>({
     queryKey: ["teacher-practice-stats"],
     queryFn: async () => {
       const r = await fetch("/api/teacher/practice-stats");
@@ -79,6 +137,55 @@ function TeacherPracticeContent() {
     enabled: tab === "stats",
     refetchOnWindowFocus: true,
   });
+
+  const selectedFocus = focusFilter === "all" ? null : focusFilter;
+  const selectedQuizMode =
+    selectedFocus === "closed" || selectedFocus === "open" ? "closure" : "cognitive";
+  const selectedSearch = selectedFocus
+    ? practiceSelectionSearch({
+        tab: "quiz",
+        quizMode: selectedQuizMode,
+        focus: selectedFocus,
+      })
+    : null;
+  const previewHref = selectedSearch
+    ? `/teacher-practice?view=try&${selectedSearch}`
+    : null;
+  const studentHref = selectedSearch ? `/student-practice?${selectedSearch}` : null;
+
+  const copyStudentHref = async () => {
+    if (!studentHref) return;
+    setCopyStatus(null);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(new URL(studentHref, window.location.origin).toString());
+      setCopyStatus("success");
+    } catch {
+      setCopyStatus("error");
+    }
+  };
+
+  const selectFocus = (focus: PracticeFocusFilter) => {
+    setFocusFilter(focus);
+    setCopyStatus(null);
+  };
+
+  const metricText = (metric: AccuracyMetric) =>
+    metric.attempts === 0 ? t("statsNoSample") : `${metric.accuracy}%`;
+
+  const recommendationText = (diagnostic: PracticeDiagnostic) => {
+    if (diagnostic.recommendation.kind === "collect") {
+      return t("statsRecommendationCollect");
+    }
+    if (diagnostic.recommendation.kind === "advance") {
+      return t("statsRecommendationAdvance");
+    }
+    const focus = diagnostic.recommendation.focus;
+    const type = tCls(`${focus}.label`);
+    return diagnostic.types[focus].attempts < 3
+      ? t("statsRecommendationSample", { type })
+      : t("statsRecommendationWeakest", { type });
+  };
 
   const cognitiveChip = (value: "all" | Cognitive, label: string) => (
     <button
@@ -117,7 +224,7 @@ function TeacherPracticeContent() {
             type="button"
             role="tab"
             aria-selected={tab === key}
-            onClick={() => setTab(key)}
+            onClick={() => switchTeacherView(key)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
               tab === key ? "bg-indigo-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/70"
             }`}
@@ -251,51 +358,334 @@ function TeacherPracticeContent() {
         </div>
       )}
 
-      {/* 탭 3: 학생 연습 현황 — PointLog(PRACTICE) 집계 */}
+      {/* 탭 3: 최근 진단과 기존 포인트 집계를 함께 보는 담당 학급 현황 */}
       {tab === "stats" && (
         <Card>
-          <CardContent className="pt-6 space-y-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">{t("statsIntro", { cap: PRACTICE_DAILY_CAP })}</p>
-              <Button variant="outline" size="sm" onClick={() => refetch()}>{t("statsRefresh")}</Button>
+          <CardContent className="space-y-5 pt-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                {t("statsIntro", { cap: PRACTICE_DAILY_CAP })}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => statsQuery.refetch()}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                {t("statsRefresh")}
+              </Button>
             </div>
-            {statsLoading ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">{t("statsLoading")}</p>
-            ) : !stats?.students.length ? (
+
+            {statsQuery.isError ? (
+              <div
+                role="alert"
+                className="flex flex-wrap items-center justify-between gap-3 border-y border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+              >
+                <span>{t("statsLoadFailed")}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => statsQuery.refetch()}
+                >
+                  {tc("retry")}
+                </Button>
+              </div>
+            ) : statsQuery.isLoading ? (
+              <p role="status" className="py-8 text-center text-sm text-muted-foreground">
+                {t("statsLoading")}
+              </p>
+            ) : !statsQuery.data?.students.length ? (
               <p className="py-8 text-center text-sm text-muted-foreground">{t("statsEmpty")}</p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("statsColStudent")}</TableHead>
-                      <TableHead className="text-center">{t("statsColToday")}</TableHead>
-                      <TableHead className="text-center">{t("statsColWeek")}</TableHead>
-                      <TableHead className="text-center">{t("statsColQuiz")}</TableHead>
-                      <TableHead className="text-center">{t("statsColTransform")}</TableHead>
-                      <TableHead className="text-center">{t("statsColCreate")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {stats.students.map((s) => (
-                      <TableRow key={s.id} className={s.weekPoints === 0 ? "opacity-60" : ""}>
-                        <TableCell className="font-medium">
-                          {[s.grade && `${s.grade}학년`, s.className && `${s.className}반`, s.studentNumber && `${s.studentNumber}번`]
-                            .filter(Boolean)
-                            .join(" ")}{" "}
-                          {s.name}
-                        </TableCell>
-                        <TableCell className="text-center font-semibold">
-                          {s.todayPoints > 0 ? `${s.todayPoints}P` : "-"}
-                        </TableCell>
-                        <TableCell className="text-center">{s.weekPoints > 0 ? `${s.weekPoints}P` : "-"}</TableCell>
-                        <TableCell className="text-center">{s.quizCount || "-"}</TableCell>
-                        <TableCell className="text-center">{s.transformCount || "-"}</TableCell>
-                        <TableCell className="text-center">{s.createCount || "-"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="space-y-5">
+                <section
+                  aria-labelledby="practice-class-summary-title"
+                  className="border-y bg-muted/20 px-4 py-4"
+                >
+                  <h2 id="practice-class-summary-title" className="text-sm font-bold text-foreground">
+                    {t("statsClassSummary")}
+                  </h2>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-4">
+                    <div>
+                      <dt className="text-xs text-muted-foreground">{t("statsActivityAttempts")}</dt>
+                      <dd className="mt-0.5 text-lg font-bold text-foreground">
+                        {statsQuery.data.summary.activityAttempts}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">{t("statsDiagnosticAttempts")}</dt>
+                      <dd className="mt-0.5 text-lg font-bold text-foreground">
+                        {statsQuery.data.summary.diagnosticAttempts}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">{t("statsClassAccuracy")}</dt>
+                      <dd className="mt-0.5 text-lg font-bold text-foreground">
+                        {metricText(statsQuery.data.summary.overall)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-muted-foreground">{t("statsRecommendation")}</dt>
+                      <dd className="mt-0.5 text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+                        {recommendationText(statsQuery.data.summary)}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <div
+                  role="group"
+                  aria-label={t("statsFocusFilter")}
+                  className="flex flex-wrap gap-1.5"
+                >
+                  <button
+                    type="button"
+                    aria-pressed={focusFilter === "all"}
+                    onClick={() => selectFocus("all")}
+                    className={`min-h-9 rounded-md border px-3 py-1.5 text-xs font-medium ${
+                      focusFilter === "all"
+                        ? "border-foreground bg-foreground text-background"
+                        : "bg-background text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {t("statsFilterAll")}
+                  </button>
+                  {PRACTICE_FOCUSES.map((focus) => (
+                    <button
+                      key={focus}
+                      type="button"
+                      aria-pressed={focusFilter === focus}
+                      onClick={() => selectFocus(focus)}
+                      className={`min-h-9 rounded-md border px-3 py-1.5 text-xs font-medium ${
+                        focusFilter === focus
+                          ? "border-foreground bg-foreground text-background"
+                          : "bg-background text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {tCls(`${focus}.label`)}
+                    </button>
+                  ))}
+                </div>
+
+                {selectedFocus && statsQuery.data.summary.types[selectedFocus].attempts === 0 && (
+                  <section className="border-y border-amber-200 bg-amber-50/70 px-4 py-4 dark:border-amber-900 dark:bg-amber-950/25">
+                    <p className="text-sm font-semibold text-foreground">
+                      {t("statsNoSampleTitle", { type: tCls(`${selectedFocus}.label`) })}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button asChild size="sm">
+                        <Link href={previewHref ?? "/teacher-practice?view=try"}>
+                          {t("statsPreviewBuiltIn")}
+                        </Link>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={copyStudentHref}
+                      >
+                        <Copy className="h-4 w-4" aria-hidden="true" />
+                        {t("statsCopyStudentLink")}
+                      </Button>
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/teacher-practice?view=bank">{t("statsManageBank")}</Link>
+                      </Button>
+                    </div>
+                    {copyStatus === "success" && (
+                      <p role="status" className="mt-2 text-sm text-emerald-700 dark:text-emerald-300">
+                        {t("statsCopySuccess")}
+                      </p>
+                    )}
+                    {copyStatus === "error" && (
+                      <p role="alert" className="mt-2 text-sm text-red-700 dark:text-red-300">
+                        {t("statsCopyFailed")}
+                      </p>
+                    )}
+                  </section>
+                )}
+
+                <div
+                  role="table"
+                  aria-label={t("statsStudentTableLabel")}
+                  className="overflow-hidden border-y md:border-x"
+                >
+                  <div role="rowgroup" className="hidden bg-muted/40 md:block">
+                    <div
+                      role="row"
+                      className="grid grid-cols-[minmax(12rem,2fr)_repeat(6,minmax(5rem,1fr))] items-center"
+                    >
+                      <div role="columnheader" className="px-3 py-2 text-xs font-medium text-muted-foreground">
+                        {t("statsColStudent")}
+                      </div>
+                      {[
+                        t("statsColToday"),
+                        t("statsColWeek"),
+                        t("statsActivityAttempts"),
+                        t("statsDiagnosticAttempts"),
+                        t("statsColAccuracy"),
+                        selectedFocus
+                          ? t("statsSelectedType", { type: tCls(`${selectedFocus}.label`) })
+                          : t("statsRecommendation"),
+                      ].map((label) => (
+                        <div
+                          key={label}
+                          role="columnheader"
+                          className="px-2 py-2 text-center text-xs font-medium text-muted-foreground"
+                        >
+                          {label}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div role="rowgroup">
+                    {statsQuery.data.students.map((student) => {
+                      const isExpanded = expandedStudentId === student.id;
+                      const selectedMetric = selectedFocus
+                        ? student.types[selectedFocus]
+                        : student.overall;
+                      const studentContext = [
+                        student.grade && t("statsGrade", { grade: student.grade }),
+                        student.className && t("statsClass", { className: student.className }),
+                        student.studentNumber && t("statsNumber", { number: student.studentNumber }),
+                      ]
+                        .filter(Boolean)
+                        .join(" ");
+
+                      return (
+                        <div
+                          key={student.id}
+                          role="presentation"
+                          className="border-t first:border-t-0"
+                        >
+                          <div
+                            role="row"
+                            className="grid grid-cols-2 gap-x-4 gap-y-3 px-3 py-3 md:grid-cols-[minmax(12rem,2fr)_repeat(6,minmax(5rem,1fr))] md:items-center md:gap-0 md:px-0 md:py-0"
+                          >
+                            <div role="rowheader" className="col-span-2 min-w-0 md:col-span-1 md:px-3 md:py-3">
+                              <button
+                                type="button"
+                                aria-expanded={isExpanded}
+                                aria-controls={`practice-student-${student.id}`}
+                                onClick={() =>
+                                  setExpandedStudentId((current) =>
+                                    current === student.id ? null : student.id,
+                                  )
+                                }
+                                className="flex min-h-11 w-full items-center justify-between gap-3 text-left font-medium text-foreground hover:underline"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block truncate">{student.name}</span>
+                                  {studentContext && (
+                                    <span className="block truncate text-xs font-normal text-muted-foreground">
+                                      {studentContext}
+                                    </span>
+                                  )}
+                                </span>
+                                <ChevronDown
+                                  className={`h-4 w-4 shrink-0 transition-transform ${
+                                    isExpanded ? "rotate-180" : ""
+                                  }`}
+                                  aria-hidden="true"
+                                />
+                              </button>
+                            </div>
+                            {[
+                              { label: t("statsColToday"), value: student.todayPoints ? `${student.todayPoints}P` : "-" },
+                              { label: t("statsColWeek"), value: student.weekPoints ? `${student.weekPoints}P` : "-" },
+                              { label: t("statsActivityAttempts"), value: student.activityAttempts },
+                              { label: t("statsDiagnosticAttempts"), value: student.diagnosticAttempts },
+                              { label: t("statsColAccuracy"), value: metricText(student.overall) },
+                              {
+                                label: selectedFocus
+                                  ? t("statsSelectedType", { type: tCls(`${selectedFocus}.label`) })
+                                  : t("statsRecommendation"),
+                                value: selectedFocus
+                                  ? metricText(selectedMetric)
+                                  : recommendationText(student),
+                              },
+                            ].map(({ label, value }) => (
+                              <div
+                                key={label}
+                                role="cell"
+                                className="flex min-w-0 items-baseline justify-between gap-2 text-sm md:block md:px-2 md:py-3 md:text-center"
+                              >
+                                <span className="text-xs text-muted-foreground md:hidden">{label}</span>
+                                <span className="min-w-0 font-medium text-foreground md:text-xs">
+                                  {value}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {isExpanded && (
+                            <section
+                              id={`practice-student-${student.id}`}
+                              role="row"
+                              aria-label={t("statsStudentDetails", { student: student.name })}
+                              className="border-t bg-muted/20 px-4 py-4"
+                            >
+                              <div role="cell" aria-colspan={7}>
+                                <div className="grid gap-5 lg:grid-cols-2">
+                                  <div>
+                                    <h3 className="text-sm font-bold text-foreground">
+                                      {t("statsModeMetrics")}
+                                    </h3>
+                                    <dl className="mt-2 grid grid-cols-3 gap-2">
+                                      {([
+                                        ["quiz", t("statsModeQuiz"), student.quizCount],
+                                        ["transform", t("statsModeTransform"), student.transformCount],
+                                        ["create", t("statsModeCreate"), student.createCount],
+                                      ] as const).map(([mode, label, successCount]) => (
+                                        <div key={mode} className="border-l-2 border-indigo-300 pl-2">
+                                          <dt className="text-xs text-muted-foreground">{label}</dt>
+                                          <dd className="mt-1 text-sm font-semibold text-foreground">
+                                            {metricText(student.modes[mode])}
+                                          </dd>
+                                          <dd className="text-xs text-muted-foreground">
+                                            {t("statsSuccessCount", { count: successCount })}
+                                          </dd>
+                                        </div>
+                                      ))}
+                                    </dl>
+                                  </div>
+                                  <div>
+                                    <h3 className="text-sm font-bold text-foreground">
+                                      {t("statsTypeMetrics")}
+                                    </h3>
+                                    <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                      {PRACTICE_FOCUSES.map((focus) => (
+                                        <div key={focus} className="border-l-2 border-emerald-300 pl-2">
+                                          <dt className="text-xs text-muted-foreground">
+                                            {tCls(`${focus}.label`)}
+                                          </dt>
+                                          <dd className="mt-1 text-sm font-semibold text-foreground">
+                                            {metricText(student.types[focus])}
+                                          </dd>
+                                          <dd className="text-xs text-muted-foreground">
+                                            {t("statsAttemptCount", {
+                                              count: student.types[focus].attempts,
+                                            })}
+                                          </dd>
+                                        </div>
+                                      ))}
+                                    </dl>
+                                  </div>
+                                </div>
+                                {student.capped && (
+                                  <p className="mt-3 text-xs text-muted-foreground">{t("statsCapped")}</p>
+                                )}
+                              </div>
+                            </section>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>

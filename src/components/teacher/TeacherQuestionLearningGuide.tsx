@@ -1,10 +1,12 @@
 "use client";
 
 import type { RefObject } from "react";
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowLeft, MessageCircleQuestion, Target } from "lucide-react";
+import { ArrowLeft, BarChart3, MessageCircleQuestion, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { questionTeachingGuideForLocale } from "@/lib/question-teaching-guide-data";
+import { practiceSelectionSearch } from "@/lib/practice-selection";
 
 interface TeacherQuestionLearningGuideProps {
   titleRef: RefObject<HTMLHeadingElement | null>;
@@ -39,47 +41,66 @@ export function TeacherQuestionLearningGuide({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {teachingGuide.map((item, index) => (
-          <article key={item.id} className="rounded-lg border bg-background p-5">
-            <div className="flex items-start gap-3">
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-sky-100 text-sm font-black text-sky-800 dark:bg-sky-950 dark:text-sky-200"
-                aria-hidden="true"
-              >
-                {index + 1}
-              </span>
-              <h4 className="pt-1 text-lg font-bold text-foreground">{item.title}</h4>
-            </div>
+        {teachingGuide.map((item, index) => {
+          const statsHref = item.focus
+            ? `/teacher-practice?view=stats&${practiceSelectionSearch({
+                tab: "quiz",
+                quizMode:
+                  item.focus === "closed" || item.focus === "open" ? "closure" : "cognitive",
+                focus: item.focus,
+              })}`
+            : null;
 
-            <dl className="mt-5 space-y-4">
-              <div>
-                <dt className="flex items-center gap-2 text-sm font-bold text-foreground">
-                  <Target className="h-4 w-4 text-sky-700 dark:text-sky-300" aria-hidden="true" />
-                  {t("objective")}
-                </dt>
-                <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.objective}</dd>
+          return (
+            <article key={item.id} className="rounded-lg border bg-background p-5">
+              <div className="flex items-start gap-3">
+                <span
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-sky-100 text-sm font-black text-sky-800 dark:bg-sky-950 dark:text-sky-200"
+                  aria-hidden="true"
+                >
+                  {index + 1}
+                </span>
+                <h4 className="pt-1 text-lg font-bold text-foreground">{item.title}</h4>
               </div>
-              <div>
-                <dt className="text-sm font-bold text-foreground">{t("misconception")}</dt>
-                <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.misconception}</dd>
-              </div>
-              <div className="border-l-4 border-emerald-400 pl-3">
-                <dt className="flex items-center gap-2 text-sm font-bold text-foreground">
-                  <MessageCircleQuestion
-                    className="h-4 w-4 text-emerald-700 dark:text-emerald-300"
-                    aria-hidden="true"
-                  />
-                  {t("prompt")}
-                </dt>
-                <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.prompt}</dd>
-              </div>
-              <div className="border-l-4 border-rose-400 pl-3">
-                <dt className="text-sm font-bold text-foreground">{t("followUp")}</dt>
-                <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.followUp}</dd>
-              </div>
-            </dl>
-          </article>
-        ))}
+
+              <dl className="mt-5 space-y-4">
+                <div>
+                  <dt className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <Target className="h-4 w-4 text-sky-700 dark:text-sky-300" aria-hidden="true" />
+                    {t("objective")}
+                  </dt>
+                  <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.objective}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-bold text-foreground">{t("misconception")}</dt>
+                  <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.misconception}</dd>
+                </div>
+                <div className="border-l-4 border-emerald-400 pl-3">
+                  <dt className="flex items-center gap-2 text-sm font-bold text-foreground">
+                    <MessageCircleQuestion
+                      className="h-4 w-4 text-emerald-700 dark:text-emerald-300"
+                      aria-hidden="true"
+                    />
+                    {t("prompt")}
+                  </dt>
+                  <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.prompt}</dd>
+                </div>
+                <div className="border-l-4 border-rose-400 pl-3">
+                  <dt className="text-sm font-bold text-foreground">{t("followUp")}</dt>
+                  <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.followUp}</dd>
+                </div>
+              </dl>
+              {statsHref && (
+                <Button asChild variant="outline" size="sm" className="mt-5 gap-2">
+                  <Link href={statsHref}>
+                    <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                    {t("viewClassDiagnostic")}
+                  </Link>
+                </Button>
+              )}
+            </article>
+          );
+        })}
       </div>
     </div>
   );
