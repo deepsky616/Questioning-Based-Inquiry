@@ -6,6 +6,7 @@ import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import * as QuestionLearning from "@/components/shared/QuestionDetectiveSlides";
 import { QuestionLearningExperience } from "@/components/shared/QuestionLearningExperience";
+import en from "../../messages/en.json";
 
 const messages = {
   questionLearning: {
@@ -42,6 +43,14 @@ const messages = {
 function renderWithIntl(ui: React.ReactElement) {
   return render(
     <NextIntlClientProvider locale="ko" messages={messages} timeZone="Asia/Seoul">
+      {ui}
+    </NextIntlClientProvider>,
+  );
+}
+
+function renderWithEnglishIntl(ui: React.ReactElement) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={en as never} timeZone="Asia/Seoul">
       {ui}
     </NextIntlClientProvider>,
   );
@@ -113,6 +122,47 @@ describe("질문학습 슬라이드", () => {
 
     fireEvent.keyDown(learningTab, { key: "ArrowRight" });
     expect(screen.getByRole("tab", { name: "수업 활용" })).toHaveFocus();
+  });
+
+  it("수업 활용에서 돌아오면 마지막 장을 유지하고 진입 단추로 초점을 돌린다", () => {
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    renderWithIntl(<QuestionLearningExperience audience="teacher" />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "14 / 14" }));
+    fireEvent.click(screen.getByRole("button", { name: "수업 활용 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "학습 내용으로 돌아가기" }));
+
+    expect(screen.getByRole("tab", { name: "14 / 14" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "수업 활용 보기" })).toHaveFocus();
+  });
+
+  it("영어 화면에서 여섯 수업 활용 항목의 제목과 본문을 영어로 표시한다", () => {
+    renderWithEnglishIntl(<QuestionLearningExperience audience="teacher" />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Teaching guide" }));
+
+    expect(
+      screen.getByRole("heading", { name: "Two dimensions of question classification" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Classify the range of acceptable answers and the thinking required to answer as separate dimensions.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Open and closed questions" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Factual questions" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Conceptual questions" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Debatable questions" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Comparing the three types and checking understanding" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("질문의 두 분류 축")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("답의 범위와 답에 필요한 사고를 서로 다른 기준으로 분류한다."),
+    ).not.toBeInTheDocument();
   });
 
   it("활성 패널과 진행 탭을 연결하고 단추와 키로 경계 안에서 이동한다", () => {

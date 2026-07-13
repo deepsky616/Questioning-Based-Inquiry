@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 export type QuestionLearningAudience = "student" | "teacher";
 type TeacherView = "learning" | "teaching";
+type PendingFocus = "teachingTitle" | "teachingGuideTrigger" | null;
 
 export function QuestionLearningExperience({ audience }: { audience: QuestionLearningAudience }) {
   const t = useTranslations("questionLearning");
@@ -18,25 +19,35 @@ export function QuestionLearningExperience({ audience }: { audience: QuestionLea
   const learningTabRef = useRef<HTMLButtonElement>(null);
   const teachingTabRef = useRef<HTMLButtonElement>(null);
   const teachingTitleRef = useRef<HTMLHeadingElement>(null);
-  const pendingTeachingTitleFocus = useRef(false);
+  const teachingGuideTriggerRef = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<PendingFocus>(null);
 
   useEffect(() => {
-    if (teacherView !== "teaching" || !pendingTeachingTitleFocus.current) return;
+    const focusTarget = pendingFocus.current;
+    const targetIsVisible =
+      (teacherView === "teaching" && focusTarget === "teachingTitle") ||
+      (teacherView === "learning" && focusTarget === "teachingGuideTrigger");
+    if (!targetIsVisible) return;
 
     requestAnimationFrame(() => {
-      if (!pendingTeachingTitleFocus.current) return;
-      teachingTitleRef.current?.focus();
-      pendingTeachingTitleFocus.current = false;
+      if (pendingFocus.current !== focusTarget) return;
+      (focusTarget === "teachingTitle" ? teachingTitleRef : teachingGuideTriggerRef).current?.focus();
+      pendingFocus.current = null;
     });
   }, [teacherView]);
 
   const showTeaching = () => {
-    pendingTeachingTitleFocus.current = true;
+    pendingFocus.current = "teachingTitle";
     setTeacherView("teaching");
   };
 
+  const returnToLearning = () => {
+    pendingFocus.current = "teachingGuideTrigger";
+    setTeacherView("learning");
+  };
+
   const selectTeacherView = (next: TeacherView) => {
-    pendingTeachingTitleFocus.current = false;
+    pendingFocus.current = null;
     setTeacherView(next);
   };
 
@@ -71,7 +82,7 @@ export function QuestionLearningExperience({ audience }: { audience: QuestionLea
         <Button asChild>
           <Link href="/teacher-practice">{t("tryPractice")}</Link>
         </Button>
-        <Button variant="outline" onClick={showTeaching}>
+        <Button ref={teachingGuideTriggerRef} variant="outline" onClick={showTeaching}>
           {t("viewTeachingGuide")}
         </Button>
       </>
@@ -113,18 +124,20 @@ export function QuestionLearningExperience({ audience }: { audience: QuestionLea
             ))}
           </div>
           <section
-            id={`question-learning-panel-${teacherView}`}
+            id="question-learning-panel-learning"
             role="tabpanel"
-            aria-labelledby={`question-learning-view-${teacherView}`}
+            aria-labelledby="question-learning-view-learning"
+            hidden={teacherView !== "learning"}
           >
-            {teacherView === "learning" ? (
-              <QuestionDetectiveSlides completionActions={completionActions} />
-            ) : (
-              <TeacherQuestionLearningGuide
-                titleRef={teachingTitleRef}
-                onBack={() => selectTeacherView("learning")}
-              />
-            )}
+            <QuestionDetectiveSlides completionActions={completionActions} />
+          </section>
+          <section
+            id="question-learning-panel-teaching"
+            role="tabpanel"
+            aria-labelledby="question-learning-view-teaching"
+            hidden={teacherView !== "teaching"}
+          >
+            <TeacherQuestionLearningGuide titleRef={teachingTitleRef} onBack={returnToLearning} />
           </section>
         </>
       )}

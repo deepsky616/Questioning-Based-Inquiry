@@ -137,7 +137,8 @@ async function expectViewportSpecificLayout(page: Page, width: number) {
     expect(frameBox!.width / frameBox!.height).toBeGreaterThan(1.7);
     expect(frameBox!.width / frameBox!.height).toBeLessThan(1.85);
 
-    const visibleTabCount = await page.getByRole("tab").evaluateAll((tabs) =>
+    const stage = page.getByTestId("question-learning-stage");
+    const visibleTabCount = await stage.getByRole("tab").evaluateAll((tabs) =>
       tabs.filter((tab) => {
         const rect = tab.getBoundingClientRect();
         return getComputedStyle(tab).display !== "none" && rect.width > 0 && rect.height > 0;
@@ -160,8 +161,8 @@ async function verifyLearningRoute(page: Page, route: string, viewport: { width:
 
   const stage = page.getByTestId("question-learning-stage");
   const frame = stage.locator(":scope > div").first();
-  const panel = page.getByRole("tabpanel");
-  const tabs = page.locator('[role="tab"][aria-controls="question-learning-panel"]');
+  const panel = stage.getByRole("tabpanel");
+  const tabs = stage.locator('[role="tab"][aria-controls="question-learning-panel"]');
   const nextSlide = page.getByRole("button", { name: "다음", exact: true });
 
   await expect(tabs).toHaveCount(TOTAL_SLIDES);
@@ -215,6 +216,32 @@ async function verifyLearningRoute(page: Page, route: string, viewport: { width:
   }
 }
 
+async function verifyTeacherViewTabs(page: Page) {
+  const tablist = page.getByRole("tablist", { name: "교사용 질문학습 보기" });
+  const learningTab = tablist.getByRole("tab", { name: "학습 내용" });
+  const teachingTab = tablist.getByRole("tab", { name: "수업 활용" });
+  const learningPanel = page.locator("#question-learning-panel-learning");
+  const teachingPanel = page.locator("#question-learning-panel-teaching");
+
+  await expect(learningTab).toHaveAttribute("aria-selected", "true");
+  await expect(learningTab).toHaveAttribute("aria-controls", "question-learning-panel-learning");
+  await expect(learningPanel).toHaveAttribute("aria-labelledby", "question-learning-view-learning");
+  await expect(learningPanel).toBeVisible();
+  await expect(teachingPanel).toBeHidden();
+
+  await teachingTab.click();
+  await expect(teachingTab).toHaveAttribute("aria-selected", "true");
+  await expect(teachingTab).toHaveAttribute("aria-controls", "question-learning-panel-teaching");
+  await expect(teachingPanel).toHaveAttribute("aria-labelledby", "question-learning-view-teaching");
+  await expect(teachingPanel).toBeVisible();
+  await expect(learningPanel).toBeHidden();
+
+  await learningTab.click();
+  await expect(learningTab).toHaveAttribute("aria-selected", "true");
+  await expect(learningPanel).toBeVisible();
+  await expect(teachingPanel).toBeHidden();
+}
+
 test.describe("질문학습 화면", () => {
   test.describe.configure({ mode: "serial" });
   test.setTimeout(180_000);
@@ -264,6 +291,7 @@ test.describe("질문학습 화면", () => {
       for (const viewport of viewports) {
         await verifyLearningRoute(page, "/teacher-question-learning", viewport);
       }
+      await verifyTeacherViewTabs(page);
       await page.goto("/teacher-practice");
       await expect(page.getByRole("button", { name: "질문 유형 알아보기", exact: true })).toBeVisible();
       await expectNoHorizontalOverflow(page);

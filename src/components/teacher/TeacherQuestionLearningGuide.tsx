@@ -1,10 +1,10 @@
 "use client";
 
 import type { RefObject } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { ArrowLeft, MessageCircleQuestion, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { QUESTION_TEACHING_GUIDE } from "@/lib/question-teaching-guide-data";
+import { questionTeachingGuideForLocale } from "@/lib/question-teaching-guide-data";
 
 interface TeacherQuestionLearningGuideProps {
   titleRef: RefObject<HTMLHeadingElement | null>;
@@ -16,6 +16,8 @@ export function TeacherQuestionLearningGuide({
   onBack,
 }: TeacherQuestionLearningGuideProps) {
   const t = useTranslations("questionLearning");
+  const locale = useLocale();
+  const teachingGuide = questionTeachingGuideForLocale(locale);
 
   return (
     <div className="space-y-5">
@@ -37,7 +39,7 @@ export function TeacherQuestionLearningGuide({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {QUESTION_TEACHING_GUIDE.map((item, index) => (
+        {teachingGuide.map((item, index) => (
           <article key={item.id} className="rounded-lg border bg-background p-5">
             <div className="flex items-start gap-3">
               <span
