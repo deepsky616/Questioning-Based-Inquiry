@@ -10,6 +10,7 @@ vi.mock("@/lib/db", () => ({
       groupBy: vi.fn(),
     },
     user: { findUnique: vi.fn() },
+    questionSession: { findUnique: vi.fn() },
   },
 }));
 
@@ -19,6 +20,8 @@ import { GET } from "@/app/api/questions/route";
 
 const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mFindFirst = prisma.question.findFirst as unknown as ReturnType<typeof vi.fn>;
+const mUserFind = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
+const mSessionFind = prisma.questionSession.findUnique as unknown as ReturnType<typeof vi.fn>;
 
 const sessionRequest = (query = "sessionId=session-1") =>
   new Request(`http://localhost/api/questions?view=student-session&${query}`);
@@ -26,6 +29,25 @@ const sessionRequest = (query = "sessionId=session-1") =>
 beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
+  mUserFind.mockResolvedValue({
+    id: "student-1",
+    role: "STUDENT",
+    school: "한빛초",
+    grade: "5",
+    className: "1",
+  });
+  mSessionFind.mockResolvedValue({
+    teacherId: "teacher-1",
+    targetType: "CLASS",
+    targetGrade: "5",
+    targetClassName: "1",
+    targetStudentId: null,
+    targetStudentIds: [],
+    teacher: {
+      school: "한빛초",
+      teacherClasses: [{ grade: "5", className: "1" }],
+    },
+  });
   mFindFirst.mockResolvedValue({ id: "question-2", content: "최근 질문" });
 });
 
@@ -51,6 +73,26 @@ describe("학생 수업별 기존 질문 보기", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ existingQuestion: null });
+  });
+
+  it("현재 수업 대상에서 제외된 학생은 자기 질문도 조회할 수 없다", async () => {
+    mSessionFind.mockResolvedValue({
+      teacherId: "teacher-1",
+      targetType: "STUDENT",
+      targetGrade: null,
+      targetClassName: null,
+      targetStudentId: "student-other",
+      targetStudentIds: ["student-other"],
+      teacher: {
+        school: "한빛초",
+        teacherClasses: [{ grade: "5", className: "1" }],
+      },
+    });
+
+    const response = await GET(sessionRequest());
+
+    expect(response.status).toBe(403);
+    expect(mFindFirst).not.toHaveBeenCalled();
   });
 
   it("수업 값이 없으면 잘못된 요청으로 처리한다", async () => {

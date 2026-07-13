@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { compareByClassAndNumber } from "@/lib/student-sort";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { studentWhereForSessionTarget } from "@/lib/session-access";
 import { buildSessionLabel } from "@/lib/sessions";
 
 export async function POST(
@@ -49,30 +50,15 @@ export async function POST(
       },
     });
 
-    const classes = teacher?.teacherClasses ?? [];
-    const schoolFilter = teacher?.school ? { school: teacher.school } : {};
-    const targetIds = Array.isArray(questionSession.targetStudentIds)
-      ? questionSession.targetStudentIds.filter((item): item is string => typeof item === "string")
-      : [];
-    const studentWhere =
-      questionSession.targetType === "CLASS" && questionSession.targetGrade && questionSession.targetClassName
-        ? {
-            role: "STUDENT" as const,
-            ...schoolFilter,
-            grade: questionSession.targetGrade,
-            className: questionSession.targetClassName,
-          }
-        : questionSession.targetType === "STUDENT" && questionSession.targetStudentId
-          ? { role: "STUDENT" as const, id: questionSession.targetStudentId }
-          : questionSession.targetType === "CUSTOM" && targetIds.length > 0
-            ? { role: "STUDENT" as const, id: { in: targetIds } }
-            : {
-                role: "STUDENT" as const,
-                ...schoolFilter,
-                ...(classes.length > 0 && {
-                  OR: classes.map((c) => ({ grade: c.grade, className: c.className })),
-                }),
-              };
+    const teacherScope = teacher?.school
+      ? { school: teacher.school, classes: teacher.teacherClasses }
+      : null;
+    const studentWhere = teacherScope
+      ? studentWhereForSessionTarget(teacherScope, questionSession)
+      : null;
+    if (!studentWhere) {
+      return NextResponse.json({ error: "질문수업 대상을 조회할 권한이 없습니다" }, { status: 403 });
+    }
 
     const [students, questions] = await Promise.all([
       prisma.user.findMany({

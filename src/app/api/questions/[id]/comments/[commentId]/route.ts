@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { canModerateQuestion } from "@/lib/content-visibility";
+import { canModerateQuestion, canViewQuestion } from "@/lib/content-visibility";
 import { normalizeContent } from "@/lib/content-normalize";
 import { checkProfanity } from "@/lib/profanity";
 import { cleanupCommentTranslations } from "@/lib/translation-cleanup";
@@ -13,6 +13,28 @@ const patchSchema = z.object({
 });
 
 type Params = { params: Promise<{ id: string; commentId: string }> };
+
+const questionAccessSelect = {
+  isPublic: true,
+  authorId: true,
+  author: { select: { role: true, school: true, grade: true, className: true } },
+  session: {
+    select: {
+      teacherId: true,
+      targetType: true,
+      targetGrade: true,
+      targetClassName: true,
+      targetStudentId: true,
+      targetStudentIds: true,
+      teacher: {
+        select: {
+          school: true,
+          teacherClasses: { select: { grade: true, className: true } },
+        },
+      },
+    },
+  },
+} as const;
 
 async function getViewer(userId: string) {
   return prisma.user.findUnique({
@@ -44,6 +66,9 @@ export async function PATCH(
   }
   const userId = (session.user as { id: string }).id;
   const role = (session.user as { role?: string }).role;
+  if (role !== "TEACHER" && role !== "STUDENT") {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const data = patchSchema.parse(body);
@@ -55,13 +80,7 @@ export async function PATCH(
       select: {
         authorId: true,
         questionId: true,
-        question: {
-          select: {
-            isPublic: true,
-            authorId: true,
-            author: { select: { role: true, school: true, grade: true, className: true } },
-          },
-        },
+        question: { select: questionAccessSelect },
       },
     }),
   ]);
@@ -81,7 +100,10 @@ export async function PATCH(
     if (!data.flagged) updateData.flagReason = null;
   }
   if (data.content !== undefined) {
-    if (existing.authorId !== userId) {
+    const canAccessQuestion = role === "TEACHER"
+      ? canModerateQuestion(viewer, existing.question)
+      : canViewQuestion(viewer, existing.question);
+    if (existing.authorId !== userId || !canAccessQuestion) {
       return NextResponse.json({ error: "본인 댓글만 수정할 수 있습니다" }, { status: 403 });
     }
     const content = data.content.trim();
@@ -120,6 +142,9 @@ export async function DELETE(
   }
   const userId = (session.user as { id: string }).id;
   const role = (session.user as { role?: string }).role;
+  if (role !== "TEACHER" && role !== "STUDENT") {
+    return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
+  }
 
   const [viewer, comment] = await Promise.all([
     getViewer(userId),
@@ -128,13 +153,7 @@ export async function DELETE(
       select: {
         authorId: true,
         questionId: true,
-        question: {
-          select: {
-            isPublic: true,
-            authorId: true,
-            author: { select: { role: true, school: true, grade: true, className: true } },
-          },
-        },
+        question: { select: questionAccessSelect },
       },
     }),
   ]);
@@ -144,7 +163,10 @@ export async function DELETE(
   if (comment.questionId !== id) {
     return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
   }
-  if (comment.authorId !== userId && (role !== "TEACHER" || !canModerateQuestion(viewer, comment.question))) {
+  const canDelete = role === "TEACHER"
+    ? canModerateQuestion(viewer, comment.question)
+    : comment.authorId === userId && canViewQuestion(viewer, comment.question);
+  if (!canDelete) {
     return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
   }
 

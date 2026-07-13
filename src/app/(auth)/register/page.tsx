@@ -4,8 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { validateTeacherClasses, buildTeacherClassLabel } from "@/lib/teacher";
@@ -15,17 +14,12 @@ import { useTranslations } from "next-intl";
 function RegisterContent() {
   const t = useTranslations("auth");
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const initialRole = searchParams.get("role") === "teacher" ? "TEACHER" : "STUDENT";
-  const [role, setRole] = useState<"STUDENT" | "TEACHER">(initialRole);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState({
     email: "",
     school: "",
-    grade: "",
-    className: "",
-    studentNumber: "",
+    registrationCode: "",
     name: "",
     password: "",
     confirmPassword: "",
@@ -41,27 +35,21 @@ function RegisterContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { email, school, grade, className, studentNumber, name, password, confirmPassword } = form;
+    const { email, school, registrationCode, name, password, confirmPassword } = form;
 
     // 항목별로 무엇이 비었는지 구체적으로 안내
     const missing = (label: string) => { setError(t("fieldRequired", { field: label })); };
     if (!name) { missing(t("name")); return; }
     if (!school) { missing(t("school")); return; }
-    if (role === "STUDENT") {
-      if (!grade) { missing(t("grade")); return; }
-      if (!className) { missing(t("className")); return; }
-      if (!studentNumber) { missing(t("studentNumber")); return; }
-    }
-    if (role === "TEACHER" && !email) { missing(t("email")); return; }
+    if (!email) { missing(t("email")); return; }
+    if (!registrationCode) { missing(t("teacherRegistrationCode")); return; }
     if (!password) { missing(t("password")); return; }
-    if (role === "TEACHER" && !email.includes("@")) {
+    if (!email.includes("@")) {
       setError(t("invalidEmail"));
       return;
     }
-    if (role === "TEACHER") {
-      const classError = validateTeacherClasses(teacherClasses);
-      if (classError) { setError(classError); return; }
-    }
+    const classError = validateTeacherClasses(teacherClasses);
+    if (classError) { setError(classError); return; }
     const passwordError = validatePasswordPolicy(password);
     if (passwordError) {
       setError(passwordError);
@@ -79,11 +67,15 @@ function RegisterContent() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          role === "TEACHER"
-            ? { role, email, school, name, password, teacherClasses }
-            : { role, school, grade, className, studentNumber, name, password }
-        ),
+        body: JSON.stringify({
+          role: "TEACHER",
+          email,
+          school,
+          registrationCode,
+          name,
+          password,
+          teacherClasses,
+        }),
       });
 
       if (!res.ok) {
@@ -92,7 +84,7 @@ function RegisterContent() {
         return;
       }
 
-      router.push(`/login?registered=true&type=${role === "TEACHER" ? "teacher" : "student"}`);
+      router.push("/login?registered=true&type=teacher");
     } catch {
       setError(t("serverError"));
     } finally {
@@ -106,7 +98,7 @@ function RegisterContent() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl text-center">Question Lab</CardTitle>
           <CardDescription className="text-center">
-            {role === "TEACHER" ? t("createTeacherAccount") : t("createStudentAccount")}
+            {t("createTeacherAccount")}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -115,105 +107,85 @@ function RegisterContent() {
               <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
             )}
 
-            <Tabs value={role} onValueChange={(value) => { setRole(value as "STUDENT" | "TEACHER"); setError(null); }}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="STUDENT">{t("studentSignup")}</TabsTrigger>
-                <TabsTrigger value="TEACHER">{t("teacherSignup")}</TabsTrigger>
-              </TabsList>
+            <div className="space-y-2">
+              <Label htmlFor="email">{t("email")}</Label>
+              <Input id="email" name="email" type="email" placeholder="teacher@gmail.com" value={form.email} onChange={handleChange} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="teacher-school">{t("school")}</Label>
+              <Input id="teacher-school" name="school" placeholder={t("schoolPlaceholder")} value={form.school} onChange={handleChange} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="registration-code">{t("teacherRegistrationCode")}</Label>
+              <Input
+                id="registration-code"
+                name="registrationCode"
+                type="password"
+                autoComplete="one-time-code"
+                placeholder={t("teacherRegistrationCodePlaceholder")}
+                value={form.registrationCode}
+                onChange={handleChange}
+              />
+            </div>
 
-              <TabsContent value="STUDENT" className="mt-4 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="school">{t("school")}</Label>
-                  <Input id="school" name="school" placeholder={t("schoolPlaceholder")} value={form.school} onChange={handleChange} />
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="grade">{t("grade")}</Label>
-                    <Input id="grade" name="grade" placeholder="3" value={form.grade} onChange={handleChange} />
+            <div className="space-y-2">
+              <Label>{t("teacherClassLabel")} <span className="text-red-500">*</span></Label>
+              <div className="space-y-2">
+                {teacherClasses.map((tc, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <Input
+                      placeholder={t("gradePlaceholderShort")}
+                      value={tc.grade}
+                      onChange={(e) => {
+                        const updated = [...teacherClasses];
+                        updated[idx] = { ...tc, grade: e.target.value };
+                        setTeacherClasses(updated);
+                        setError(null);
+                      }}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-gray-500">{t("grade")}</span>
+                    <Input
+                      placeholder={t("classPlaceholderShort")}
+                      value={tc.className}
+                      onChange={(e) => {
+                        const updated = [...teacherClasses];
+                        updated[idx] = { ...tc, className: e.target.value };
+                        setTeacherClasses(updated);
+                        setError(null);
+                      }}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-gray-500">{t("className")}</span>
+                    {teacherClasses.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setTeacherClasses(teacherClasses.filter((_, i) => i !== idx))}
+                        className="text-gray-400 hover:text-red-500 text-lg leading-none"
+                      >
+                        ×
+                      </button>
+                    )}
+                    {tc.grade && tc.className && (
+                      <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                        {buildTeacherClassLabel(tc.grade, tc.className)}
+                      </span>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="className">{t("className")}</Label>
-                    <Input id="className" name="className" placeholder="1" value={form.className} onChange={handleChange} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="studentNumber">{t("studentNumber")}</Label>
-                    <Input id="studentNumber" name="studentNumber" placeholder="1" value={form.studentNumber} onChange={handleChange} />
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="TEACHER" className="mt-4 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">{t("email")}</Label>
-                  <Input id="email" name="email" type="email" placeholder="teacher@gmail.com" value={form.email} onChange={handleChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="teacher-school">{t("school")}</Label>
-                  <Input id="teacher-school" name="school" placeholder={t("schoolPlaceholder")} value={form.school} onChange={handleChange} />
-                </div>
-
-                {/* 담당 학년·반 다중 선택 */}
-                <div className="space-y-2">
-                  <Label>{t("teacherClassLabel")} <span className="text-red-500">*</span></Label>
-                  <div className="space-y-2">
-                    {teacherClasses.map((tc, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <Input
-                          placeholder={t("gradePlaceholderShort")}
-                          value={tc.grade}
-                          onChange={(e) => {
-                            const updated = [...teacherClasses];
-                            updated[idx] = { ...tc, grade: e.target.value };
-                            setTeacherClasses(updated);
-                            setError(null);
-                          }}
-                          className="w-24"
-                        />
-                        <span className="text-sm text-gray-500">{t("grade")}</span>
-                        <Input
-                          placeholder={t("classPlaceholderShort")}
-                          value={tc.className}
-                          onChange={(e) => {
-                            const updated = [...teacherClasses];
-                            updated[idx] = { ...tc, className: e.target.value };
-                            setTeacherClasses(updated);
-                            setError(null);
-                          }}
-                          className="w-24"
-                        />
-                        <span className="text-sm text-gray-500">{t("className")}</span>
-                        {teacherClasses.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => setTeacherClasses(teacherClasses.filter((_, i) => i !== idx))}
-                            className="text-gray-400 hover:text-red-500 text-lg leading-none"
-                          >
-                            ×
-                          </button>
-                        )}
-                        {tc.grade && tc.className && (
-                          <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-                            {buildTeacherClassLabel(tc.grade, tc.className)}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setTeacherClasses([...teacherClasses, { grade: "", className: "" }])}
-                      className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                    >
-                      {t("addClass")}
-                    </button>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setTeacherClasses([...teacherClasses, { grade: "", className: "" }])}
+                  className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                >
+                  {t("addClass")}
+                </button>
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="name">{t("name")}</Label>
-              <Input id="name" name="name" placeholder={role === "TEACHER" ? t("namePlaceholderTeacher") : t("namePlaceholderStudent")} value={form.name} onChange={handleChange} />
+              <Input id="name" name="name" placeholder={t("namePlaceholderTeacher")} value={form.name} onChange={handleChange} />
             </div>
 
             <div className="space-y-2">

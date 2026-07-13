@@ -5,6 +5,8 @@ import { checkRateLimit } from "@/lib/api-rate-limit";
 import { prisma } from "@/lib/db";
 import { buildAnswerPrompt } from "@/lib/ai-prompts";
 import { generateText, AiKeyMissingError } from "@/lib/ai";
+import { canViewQuestion } from "@/lib/content-visibility";
+import { loadQuestionAccessContext } from "@/lib/question-detail-service";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -20,10 +22,22 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ error: "교사만 AI 답변을 생성할 수 있습니다" }, { status: 403 });
   }
 
-  const limited = checkRateLimit(`ai-answer:${(session.user as { id: string }).id}`, 20);
+  const userId = (session.user as { id: string }).id;
+  const access = await loadQuestionAccessContext(userId, id);
+  if (!access.question) {
+    return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
+  }
+  if (!canViewQuestion(access.viewer, access.question)) {
+    return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
+  }
+
+  const limited = checkRateLimit(`ai-answer:${userId}`, 20);
   if (limited) return limited;
 
-  const question = await prisma.question.findUnique({ where: { id } });
+  const question = await prisma.question.findUnique({
+    where: { id },
+    select: { content: true, closure: true, cognitive: true, context: true },
+  });
   if (!question) {
     return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
   }
@@ -35,7 +49,7 @@ export async function POST(req: Request, { params }: Params) {
       question.cognitive ?? undefined,
       question.context ?? undefined
     );
-    const answer = await generateText({ userId: (session.user as { id: string }).id, prompt, req, localize: true });
+    const answer = await generateText({ userId, prompt, req, localize: true });
     return NextResponse.json({ answer });
   } catch (error) {
     if (error instanceof AiKeyMissingError) {

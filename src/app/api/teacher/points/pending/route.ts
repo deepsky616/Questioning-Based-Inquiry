@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import {
+  loadTeacherStudentScope,
+  studentWhereForTeacherScope,
+} from "@/lib/teacher-student-access";
 
 // 교사가 검토할 PENDING 보너스 목록 (세션별)
 export async function GET(req: NextRequest) {
@@ -11,6 +15,10 @@ export async function GET(req: NextRequest) {
   const teacherId = (session.user as { id: string }).id;
 
   const sessionId = req.nextUrl.searchParams.get("sessionId") ?? undefined;
+  const teacherScope = await loadTeacherStudentScope(teacherId);
+  if (!teacherScope) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
 
   // 교사 담당 세션만
   const sessions = await prisma.questionSession.findMany({
@@ -22,9 +30,8 @@ export async function GET(req: NextRequest) {
   const logs = await prisma.pointLog.findMany({
     where: {
       status: "PENDING",
-      ...(sessionId
-        ? { sessionId }
-        : { sessionId: { in: sessionIds } }),
+      sessionId: { in: sessionIds },
+      student: studentWhereForTeacherScope(teacherScope),
     },
     orderBy: { createdAt: "desc" },
     include: {

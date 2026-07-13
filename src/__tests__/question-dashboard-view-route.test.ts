@@ -27,7 +27,14 @@ const dashboardRequest = (query = "") =>
 beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
-  mUserFind.mockResolvedValue({ school: "테스트초", grade: "5", className: "1", teacherClasses: [] });
+  mUserFind.mockResolvedValue({
+    id: "student-1",
+    role: "STUDENT",
+    school: "테스트초",
+    grade: "5",
+    className: "1",
+    teacherClasses: [],
+  });
 
   mFindMany.mockImplementation((args: { take?: number }) => {
     if (args.take === 5) {
@@ -103,8 +110,30 @@ describe("학생 대시보드 질문 요약", () => {
     });
 
     const recentCall = mFindMany.mock.calls.find(([args]) => args.take === 5)?.[0];
+    const sessionScope = {
+      teacher: {
+        school: "테스트초",
+        OR: [
+          { teacherClasses: { some: { grade: "5", className: "1" } } },
+          { teacherClasses: { none: {} } },
+        ],
+      },
+      OR: [
+        { targetType: "ALL" },
+        { targetType: "CLASS", targetGrade: "5", targetClassName: "1" },
+        { targetType: "STUDENT", targetStudentId: "student-1" },
+        {
+          targetType: { in: ["CLASS", "STUDENT", "CUSTOM"] },
+          targetStudentIds: { array_contains: "student-1" },
+        },
+      ],
+    };
+    const ownVisibleQuestions = {
+      authorId: "student-1",
+      OR: [{ sessionId: null }, { session: sessionScope }],
+    };
     expect(recentCall).toEqual({
-      where: { authorId: "student-1" },
+      where: ownVisibleQuestions,
       select: {
         id: true,
         content: true,
@@ -119,7 +148,7 @@ describe("학생 대시보드 질문 요약", () => {
     const sessionCall = mGroupBy.mock.calls.find(([args]) => args.by.includes("sessionId"))?.[0];
     expect(sessionCall).toEqual({
       by: ["sessionId"],
-      where: { authorId: "student-1", sessionId: { not: null } },
+      where: { ...ownVisibleQuestions, sessionId: { not: null } },
       orderBy: { sessionId: "asc" },
     });
     expect(mGroupBy.mock.calls.every(([args]) => args.where.authorId === "student-1")).toBe(true);

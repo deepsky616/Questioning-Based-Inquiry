@@ -4,6 +4,11 @@ import { generateJson } from "@/lib/ai";
 import { loadGameRoom } from "@/lib/game-room-store";
 import { parseGameRoom, type GameRoom } from "@/lib/question-games-data";
 import {
+  isStudentInTeacherScope,
+  loadTeacherStudentScope,
+  type TeacherStudentScope,
+} from "@/lib/teacher-student-access";
+import {
   BASE_POINTS,
   AI_BONUS_TYPES,
   VALID_BONUS_KEYS,
@@ -11,6 +16,9 @@ import {
   MAX_BONUSES_PER_STUDENT,
   SYSTEM_BONUS,
   GAME_LABEL,
+  isValidQuestionForm,
+  normalizeQuestionActivity,
+  RELAY_ACTIVITY_LIMITS,
   type BonusKey,
 } from "@/lib/points-policy";
 
@@ -22,10 +30,13 @@ interface StudentContribution {
   isWinner: boolean;
 }
 
-interface AwardRequest {
+interface AwardIdentity {
   gameId: string;
   roomCode: string;
   roomCreatedAt: number;
+}
+
+interface AwardRequest extends AwardIdentity {
   topic?: string;
   contributions: StudentContribution[];
 }
@@ -42,6 +53,15 @@ interface AwardResultSnapshot {
 
 const AWARD_RESULT_TYPE = "game-room-award-result";
 const AWARD_RESULT_VERSION = 1;
+const SERVER_VERIFIED_AWARD_GAMES = new Set(["relay"]);
+const GAME_ACTIVITY_LIMITS: Record<string, { perStudent: number; perRoom: number }> = {
+  relay: RELAY_ACTIVITY_LIMITS,
+  dice: { perStudent: 20, perRoom: 80 },
+  kaba: { perStudent: 12, perRoom: 24 },
+  ladder: { perStudent: 1, perRoom: 8 },
+  "story-dice": { perStudent: 20, perRoom: 80 },
+  memory: { perStudent: 15, perRoom: 15 },
+};
 
 export class PointAwardError extends Error {
   constructor(message: string, public readonly status: number) {
@@ -56,11 +76,10 @@ const AI_SYSTEM = `당신은 초·중학생의 질문놀이 활동을 따뜻하�
 - 명확한 근거 없으면 보너스를 주지 마세요.
 - 반드시 요구된 JSON 형식으로만 답하세요.`;
 
-function normalizeAwardRequest(body: Partial<AwardRequest>): AwardRequest {
+function normalizeAwardRequest(body: Partial<AwardRequest>): AwardIdentity {
   const gameId = typeof body.gameId === "string" ? body.gameId : "";
   const roomCode = typeof body.roomCode === "string" ? body.roomCode : "";
-  const contributions = Array.isArray(body.contributions) ? body.contributions : [];
-  if (!gameId || !roomCode || contributions.length === 0) {
+  if (!gameId || !roomCode) {
     throw new PointAwardError("필수 항목 누락", 400);
   }
   if (body.roomCreatedAt === undefined) {
@@ -78,8 +97,6 @@ function normalizeAwardRequest(body: Partial<AwardRequest>): AwardRequest {
     gameId,
     roomCode,
     roomCreatedAt: body.roomCreatedAt,
-    topic: body.topic,
-    contributions: contributions as StudentContribution[],
   };
 }
 
@@ -87,7 +104,7 @@ function buildRoomAwardKey(roomCode: string, roomCreatedAt: number) {
   return `room:${roomCode}:${roomCreatedAt}`;
 }
 
-function requireCurrentRoom(req: AwardRequest, room: GameRoom | null): GameRoom {
+function requireCurrentRoom(req: AwardIdentity, room: GameRoom | null): GameRoom {
   if (
     !room ||
     room.code !== req.roomCode ||
@@ -99,8 +116,38 @@ function requireCurrentRoom(req: AwardRequest, room: GameRoom | null): GameRoom 
   return room;
 }
 
+function requireAwardableRoom(
+  req: AwardIdentity,
+  room: GameRoom | null,
+  userId: string,
+): GameRoom {
+  const current = requireCurrentRoom(req, room);
+  if (!SERVER_VERIFIED_AWARD_GAMES.has(current.gameId)) {
+    throw new PointAwardError(
+      "서버에서 활동을 확인할 수 있는 놀이만 점수를 지급할 수 있습니다",
+      409,
+    );
+  }
+  if (current.pointEvidenceVersion !== 1) {
+    throw new PointAwardError(
+      "서버에서 활동을 확인한 새 놀이만 점수를 지급할 수 있습니다",
+      409,
+    );
+  }
+  if (current.hostId !== userId) {
+    throw new PointAwardError("방장만 점수를 지급할 수 있어요", 403);
+  }
+  if (current.status !== "ended") {
+    throw new PointAwardError("놀이가 끝난 뒤 점수를 지급할 수 있어요", 409);
+  }
+  if (current.players.length === 0) {
+    throw new PointAwardError("점수를 지급할 참가자가 없습니다", 409);
+  }
+  return current;
+}
+
 function buildAwardLogWhere(
-  req: AwardRequest,
+  req: AwardIdentity,
   room: GameRoom,
 ): Prisma.PointLogWhereInput {
   const awardKey = buildRoomAwardKey(req.roomCode, req.roomCreatedAt);
@@ -121,7 +168,7 @@ function buildAwardLogWhere(
 
 async function findAwardLogs(
   client: Pick<Prisma.TransactionClient, "pointLog">,
-  req: AwardRequest,
+  req: AwardIdentity,
   room: GameRoom,
 ) {
   return client.pointLog.findMany({
@@ -132,6 +179,304 @@ async function findAwardLogs(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readNonEmptyString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function assertStoredActivityCount(
+  room: GameRoom,
+  count: number,
+  limit: { perRoom: number },
+) {
+  if (count > limit.perRoom || count > room.version) {
+    throw new PointAwardError("저장된 놀이 활동 수를 확인할 수 없습니다", 409);
+  }
+}
+
+function readMemoryCards(
+  value: unknown,
+  maxCards: number,
+): Map<string, string> {
+  const cards = Array.isArray(value) ? value : [];
+  if (cards.length > maxCards) {
+    throw new PointAwardError("저장된 짝 찾기 카드 수를 확인할 수 없습니다", 409);
+  }
+  const byId = new Map<string, string>();
+  const pairIds = new Set<string>();
+  for (const card of cards) {
+    if (!isRecord(card)) {
+      throw new PointAwardError("저장된 짝 찾기 카드를 확인할 수 없습니다", 409);
+    }
+    const id = readNonEmptyString(card.id);
+    const pairId = readNonEmptyString(card.pairId);
+    if (!id || !pairId || byId.has(id) || pairIds.has(pairId)) {
+      throw new PointAwardError("저장된 짝 찾기 카드를 확인할 수 없습니다", 409);
+    }
+    byId.set(id, pairId);
+    pairIds.add(pairId);
+  }
+  return byId;
+}
+
+function buildStoredContributions(
+  room: GameRoom,
+  studentIds: Set<string>,
+): StudentContribution[] {
+  const allPlayers = Array.from(
+    new Map(room.players.map((player) => [player.id, player])).values(),
+  );
+  const players = allPlayers.filter((player) => studentIds.has(player.id));
+  const questionsByStudent = new Map(
+    players.map((player) => [player.id, [] as string[]]),
+  );
+  const scoreByStudent = new Map(players.map((player) => [player.id, 0]));
+  const seenByStudent = new Map(
+    players.map((player) => [player.id, new Set<string>()]),
+  );
+  const activityLimit = GAME_ACTIVITY_LIMITS[room.gameId];
+  if (!activityLimit) {
+    throw new PointAwardError("이 놀이는 서버에서 점수를 확인할 수 없습니다", 409);
+  }
+  let roomActivityCount = 0;
+
+  const addActivity = (
+    studentId: unknown,
+    text: unknown,
+    dedupContext = "",
+  ) => {
+    if (typeof studentId !== "string" || !scoreByStudent.has(studentId)) return;
+    const normalizedText = readNonEmptyString(text);
+    if (!normalizedText) return;
+    const activityKey = `${dedupContext}:${normalizeQuestionActivity(normalizedText)}`;
+    const seen = seenByStudent.get(studentId);
+    if (!seen || seen.has(activityKey)) {
+      throw new PointAwardError("같은 놀이 활동이 반복 저장되었습니다", 409);
+    }
+    const currentStudentCount = scoreByStudent.get(studentId) ?? 0;
+    if (currentStudentCount >= activityLimit.perStudent) {
+      throw new PointAwardError("학생별 놀이 활동 상한을 넘었습니다", 409);
+    }
+    if (roomActivityCount >= activityLimit.perRoom) {
+      throw new PointAwardError("방 전체 놀이 활동 상한을 넘었습니다", 409);
+    }
+    seen.add(activityKey);
+    questionsByStudent.get(studentId)?.push(normalizedText);
+    scoreByStudent.set(studentId, currentStudentCount + 1);
+    roomActivityCount++;
+  };
+
+  const state = room.gameState;
+  switch (room.gameId) {
+    case "relay":
+      assertStoredActivityCount(room, room.chain.length, activityLimit);
+      for (const item of room.chain) {
+        if (item.question.length > 200 || !isValidQuestionForm(item.question)) {
+          throw new PointAwardError("저장된 질문 형식을 확인할 수 없습니다", 409);
+        }
+        addActivity(item.playerId, item.question);
+      }
+      break;
+    case "dice": {
+      const history = Array.isArray(state.history) ? state.history : [];
+      assertStoredActivityCount(room, history.length, activityLimit);
+      for (const item of history) {
+        if (isRecord(item)) addActivity(item.playerId, item.question);
+      }
+      break;
+    }
+    case "kaba": {
+      const history = Array.isArray(state.history) ? state.history : [];
+      assertStoredActivityCount(room, history.length, activityLimit);
+      for (const item of history) {
+        if (isRecord(item) && item.correct === true) {
+          const sentence = readNonEmptyString(item.sentence) ?? "";
+          addActivity(item.playerId, item.answer, normalizeQuestionActivity(sentence));
+        }
+      }
+      break;
+    }
+    case "ladder": {
+      const questions = Array.isArray(state.questions) ? state.questions : [];
+      assertStoredActivityCount(room, questions.length, activityLimit);
+      const recorded = new Set<string>();
+      for (const item of questions) {
+        if (!isRecord(item) || typeof item.playerId !== "string") continue;
+        if (recorded.has(item.playerId)) continue;
+        const before = scoreByStudent.get(item.playerId) ?? 0;
+        addActivity(item.playerId, item.question);
+        if ((scoreByStudent.get(item.playerId) ?? 0) > before) {
+          recorded.add(item.playerId);
+        }
+      }
+      break;
+    }
+    case "story-dice": {
+      const chain = Array.isArray(state.chain) ? state.chain : [];
+      assertStoredActivityCount(room, chain.length, activityLimit);
+      for (const item of chain) {
+        if (isRecord(item) && item.type !== "story") {
+          const type = readNonEmptyString(item.type) ?? "activity";
+          addActivity(item.playerId, item.text, type);
+        }
+      }
+      break;
+    }
+    case "memory": {
+      const scores = isRecord(state.scores) ? state.scores : {};
+      const qCards = readMemoryCards(state.qCards, activityLimit.perRoom);
+      const aCards = readMemoryCards(state.aCards, activityLimit.perRoom);
+      for (const id of qCards.keys()) {
+        if (aCards.has(id)) {
+          throw new PointAwardError("저장된 짝 찾기 카드를 확인할 수 없습니다", 409);
+        }
+      }
+      const rawTakenIds = Array.isArray(state.takenIds) ? state.takenIds : [];
+      if (rawTakenIds.some((id) => typeof id !== "string")) {
+        throw new PointAwardError("저장된 짝 찾기 활동을 확인할 수 없습니다", 409);
+      }
+      const takenIds = new Set(rawTakenIds as string[]);
+      if (takenIds.size !== rawTakenIds.length) {
+        throw new PointAwardError("같은 놀이 활동이 반복 저장되었습니다", 409);
+      }
+      const takenQuestionPairs = new Set<string>();
+      const takenAnswerPairs = new Set<string>();
+      for (const id of takenIds) {
+        const questionPairId = qCards.get(id);
+        const answerPairId = aCards.get(id);
+        if (!questionPairId && !answerPairId) {
+          throw new PointAwardError("저장된 짝 찾기 활동을 확인할 수 없습니다", 409);
+        }
+        if (questionPairId) takenQuestionPairs.add(questionPairId);
+        if (answerPairId) takenAnswerPairs.add(answerPairId);
+      }
+      const verifiedPairs = Array.from(takenQuestionPairs)
+        .filter((pairId) => takenAnswerPairs.has(pairId)).length;
+      if (takenIds.size !== verifiedPairs * 2) {
+        throw new PointAwardError("저장된 짝 찾기 활동을 확인할 수 없습니다", 409);
+      }
+      assertStoredActivityCount(room, verifiedPairs, activityLimit);
+      let storedScoreSum = 0;
+      for (const player of allPlayers) {
+        const score = scores[player.id];
+        if (typeof score !== "number" || !Number.isInteger(score) || score < 0) {
+          throw new PointAwardError("저장된 놀이 점수를 확인할 수 없습니다", 409);
+        }
+        if (studentIds.has(player.id) && score > activityLimit.perStudent) {
+          throw new PointAwardError("학생별 놀이 활동 상한을 넘었습니다", 409);
+        }
+        if (studentIds.has(player.id)) scoreByStudent.set(player.id, score);
+        storedScoreSum += score;
+      }
+      if (storedScoreSum !== verifiedPairs) {
+        throw new PointAwardError("저장된 놀이 점수가 활동 기록과 맞지 않습니다", 409);
+      }
+      break;
+    }
+    default:
+      throw new PointAwardError("이 놀이는 서버에서 점수를 확인할 수 없습니다", 409);
+  }
+
+  const topScore = Math.max(...scoreByStudent.values(), 0);
+  if (topScore <= 0) {
+    throw new PointAwardError("확인할 수 있는 놀이 활동이 없습니다", 409);
+  }
+  return players.map((player) => ({
+    studentId: player.id,
+    studentName: player.name,
+    validQuestions: scoreByStudent.get(player.id) ?? 0,
+    questions: questionsByStudent.get(player.id) ?? [],
+    isWinner: (scoreByStudent.get(player.id) ?? 0) === topScore,
+  }));
+}
+
+async function loadScopedStudentIds(
+  room: GameRoom,
+  client: Pick<Prisma.TransactionClient, "user">,
+  teacherScope: TeacherStudentScope,
+): Promise<Set<string>> {
+  const participantIds = Array.from(new Set(
+    room.players
+      .filter((player) => player.id !== room.hostId)
+      .map((player) => player.id),
+  ));
+  if (participantIds.length === 0) {
+    throw new PointAwardError("점수를 지급할 학생 참가자가 없습니다", 409);
+  }
+  const students = await client.user.findMany({
+    where: { id: { in: participantIds } },
+    select: {
+      id: true,
+      role: true,
+      school: true,
+      grade: true,
+      className: true,
+    },
+  });
+  if (students.length !== participantIds.length) {
+    throw new PointAwardError("학생 참가자 정보를 확인할 수 없습니다", 409);
+  }
+  if (students.some((student) => !isStudentInTeacherScope(teacherScope, student))) {
+    throw new PointAwardError("담당 학생에게만 점수를 지급할 수 있습니다", 403);
+  }
+  return new Set(students.map((student) => student.id));
+}
+
+function buildStoredAwardRequest(
+  req: AwardIdentity,
+  room: GameRoom,
+  studentIds: Set<string>,
+): AwardRequest {
+  return {
+    ...req,
+    topic: room.topic,
+    contributions: buildStoredContributions(room, studentIds),
+  };
+}
+
+function participantIdsForRoom(room: GameRoom) {
+  return Array.from(new Set(
+    room.players
+      .filter((player) => player.id !== room.hostId)
+      .map((player) => player.id),
+  ));
+}
+
+async function lockAwardScopeRows(
+  tx: Pick<Prisma.TransactionClient, "$queryRaw">,
+  teacherId: string,
+  participantIds: string[],
+) {
+  const userIds = Array.from(new Set([teacherId, ...participantIds]));
+  await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT "id"
+    FROM "users"
+    WHERE "id" IN (${Prisma.join(userIds)})
+    FOR SHARE
+  `;
+  await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT "id"
+    FROM "teacher_classes"
+    WHERE "teacher_id" = ${teacherId}
+    FOR SHARE
+  `;
+}
+
+async function loadCurrentTeacherScope(
+  client: Pick<Prisma.TransactionClient, "user">,
+  teacherId: string,
+): Promise<TeacherStudentScope | null> {
+  const teacher = await client.user.findUnique({
+    where: { id: teacherId },
+    select: {
+      role: true,
+      school: true,
+      teacherClasses: { select: { grade: true, className: true } },
+    },
+  });
+  if (teacher?.role !== "TEACHER" || !teacher.school) return null;
+  return { school: teacher.school, classes: teacher.teacherClasses };
 }
 
 function parseAwardResultSnapshot(value: unknown): AwardResultSnapshot | null {
@@ -174,6 +519,17 @@ function restoreAwardResult<T extends { aiAnalysis?: string | null }>(logs: T[])
     ...(snapshot?.bestQuestion ? { bestQuestion: snapshot.bestQuestion } : {}),
     ...(snapshot?.summary !== undefined ? { summary: snapshot.summary } : {}),
   };
+}
+
+function restoreScopedAwardResult<
+  T extends { studentId?: unknown; aiAnalysis?: string | null },
+>(logs: T[], studentIds: Set<string>) {
+  if (logs.some((log) =>
+    typeof log.studentId !== "string" || !studentIds.has(log.studentId)
+  )) {
+    throw new PointAwardError("현재 방 참가 학생의 점수만 확인할 수 있습니다", 403);
+  }
+  return restoreAwardResult(logs);
 }
 
 function serializeAwardResult(
@@ -315,26 +671,39 @@ export function buildAwardList(req: AwardRequest, ai: AIVerdictResponse | null):
   return { awards, bestQuestion, summary };
 }
 
-export async function awardGamePoints(body: Partial<AwardRequest>, userId: string) {
+export async function awardGamePoints(
+  body: Partial<AwardRequest>,
+  userId: string,
+  userRole: string,
+) {
+  if (userRole !== "TEACHER") {
+    throw new PointAwardError("교사만 질문놀이 점수를 지급할 수 있습니다", 403);
+  }
   const normalized = normalizeAwardRequest(body);
   const { gameId, roomCode, roomCreatedAt } = normalized;
-  const room = requireCurrentRoom(
+  const room = requireAwardableRoom(
     normalized,
     await loadGameRoom(roomCode),
+    userId,
   );
+  const teacherScope = await loadTeacherStudentScope(userId);
+  if (!teacherScope) {
+    throw new PointAwardError("교사 소속 학교를 확인할 수 없습니다", 403);
+  }
   const awardRoomCode = buildRoomAwardKey(roomCode, roomCreatedAt);
+  const studentIds = await loadScopedStudentIds(room, prisma, teacherScope);
 
   const existingLogs = await findAwardLogs(prisma, normalized, room);
-  if (existingLogs.length > 0) return restoreAwardResult(existingLogs);
-
-  const ai = await callAI(normalized, userId);
-  const { awards, bestQuestion, summary } = buildAwardList(normalized, ai);
-  const resultSnapshot = serializeAwardResult(bestQuestion, summary);
-
-  const sumByStudent: Record<string, number> = {};
-  for (const a of awards) {
-    sumByStudent[a.studentId] = (sumByStudent[a.studentId] ?? 0) + a.points;
+  if (existingLogs.length > 0) {
+    return restoreScopedAwardResult(existingLogs, studentIds);
   }
+
+  const storedRequest = buildStoredAwardRequest(
+    normalized,
+    room,
+    studentIds,
+  );
+  const ai = await callAI(storedRequest, userId);
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -350,9 +719,21 @@ export async function awardGamePoints(body: Partial<AwardRequest>, userId: strin
         WHERE "code" = ${roomCode}
         FOR SHARE
       `;
-      const lockedRoom = requireCurrentRoom(
+      const lockedRoom = requireAwardableRoom(
         normalized,
         parseGameRoom(rows[0]?.data),
+        userId,
+      );
+      const lockedParticipantIds = participantIdsForRoom(lockedRoom);
+      await lockAwardScopeRows(tx, userId, lockedParticipantIds);
+      const currentTeacherScope = await loadCurrentTeacherScope(tx, userId);
+      if (!currentTeacherScope) {
+        throw new PointAwardError("교사 소속 학교를 확인할 수 없습니다", 403);
+      }
+      const lockedStudentIds = await loadScopedStudentIds(
+        lockedRoom,
+        tx,
+        currentTeacherScope,
       );
       const lockedExistingLogs = await findAwardLogs(
         tx,
@@ -360,7 +741,23 @@ export async function awardGamePoints(body: Partial<AwardRequest>, userId: strin
         lockedRoom,
       );
       if (lockedExistingLogs.length > 0) {
-        return restoreAwardResult(lockedExistingLogs);
+        return restoreScopedAwardResult(lockedExistingLogs, lockedStudentIds);
+      }
+
+      if (lockedRoom.version !== room.version) {
+        throw new PointAwardError("놀이 결과가 바뀌었습니다. 다시 확인해 주세요", 409);
+      }
+      const lockedRequest = buildStoredAwardRequest(
+        normalized,
+        lockedRoom,
+        lockedStudentIds,
+      );
+      const { awards, bestQuestion, summary } = buildAwardList(lockedRequest, ai);
+      const resultSnapshot = serializeAwardResult(bestQuestion, summary);
+      const sumByStudent: Record<string, number> = {};
+      for (const award of awards) {
+        sumByStudent[award.studentId] =
+          (sumByStudent[award.studentId] ?? 0) + award.points;
       }
 
       await tx.pointLog.createMany({
@@ -382,15 +779,27 @@ export async function awardGamePoints(body: Partial<AwardRequest>, userId: strin
       }
 
       return { awards, bestQuestion, summary };
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   } catch (err) {
     if (err instanceof PointAwardError) throw err;
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+      throw new PointAwardError("점수 자료가 바뀌었습니다. 다시 시도해 주세요", 409);
+    }
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const currentScope = await loadTeacherStudentScope(userId);
+      if (!currentScope) {
+        throw new PointAwardError("교사 소속 학교를 확인할 수 없습니다", 403);
+      }
+      const currentStudentIds = await loadScopedStudentIds(
+        room,
+        prisma,
+        currentScope,
+      );
       const logs = await findAwardLogs(prisma, normalized, room);
       if (logs.length === 0) {
         throw new PointAwardError("포인트 지급 실패", 500);
       }
-      return restoreAwardResult(logs);
+      return restoreScopedAwardResult(logs, currentStudentIds);
     }
     throw new PointAwardError("포인트 지급 실패", 500);
   }

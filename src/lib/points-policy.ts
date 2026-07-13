@@ -151,6 +151,15 @@ export function pointBonusSpec(bonusType: string): PointBonusSpec {
   return { kind: "activity", code, emoji: ACTIVITY_EMOJI[code] ?? "🎯" };
 }
 
+export const RELAY_ACTIVITY_LIMITS = {
+  perStudent: 30,
+  perRoom: 120,
+} as const;
+
+export function normalizeQuestionActivity(text: string): string {
+  return text.trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
+
 // ── 유효 질문 판정 (서버에서 재검증) ─────────────────────
 export function isValidQuestionForm(text: string): boolean {
   const t = text.trim();

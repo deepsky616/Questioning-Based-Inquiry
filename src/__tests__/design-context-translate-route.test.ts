@@ -10,6 +10,7 @@ vi.mock("@/lib/translate", async (importActual) => {
 vi.mock("@/lib/db", () => ({
   prisma: {
     questionSession: { findUnique: vi.fn() },
+    user: { findUnique: vi.fn() },
     translation: { findUnique: vi.fn(), upsert: vi.fn() },
     $queryRaw: vi.fn(),
   },
@@ -23,6 +24,7 @@ import { translateTexts } from "@/lib/translate";
 
 const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mSession = prisma.questionSession.findUnique as unknown as ReturnType<typeof vi.fn>;
+const mUser = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mQueryRaw = prisma.$queryRaw as unknown as ReturnType<typeof vi.fn>;
 const mFind = prisma.translation.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mUpsert = prisma.translation.upsert as unknown as ReturnType<typeof vi.fn>;
@@ -41,6 +43,7 @@ function req(locale: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "st1", role: "STUDENT", grade: "5", className: "1" } });
+  mUser.mockResolvedValue({ id: "st1", role: "STUDENT", school: "테스트학교", grade: "5", className: "1" });
   mSession.mockResolvedValue({
     unitDesignId: "ud1",
     date: "2026-07-01",
@@ -50,6 +53,10 @@ beforeEach(() => {
     targetClassName: "1",
     targetStudentId: null,
     targetStudentIds: [],
+    teacher: {
+      school: "테스트학교",
+      teacherClasses: [{ grade: "5", className: "1" }],
+    },
   });
   mQueryRaw.mockResolvedValue([{
     id: "ud1",

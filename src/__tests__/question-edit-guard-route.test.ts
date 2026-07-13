@@ -24,6 +24,7 @@ const mPointCount = prisma.pointLog.count as unknown as ReturnType<typeof vi.fn>
 const mCommentCount = prisma.comment.count as unknown as ReturnType<typeof vi.fn>;
 const mLikeCount = prisma.questionLike.count as unknown as ReturnType<typeof vi.fn>;
 const mTx = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
+const mUserFind = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 
 const patchReq = (body: unknown) =>
   new Request("http://localhost/api/questions/q1", {
@@ -38,13 +39,42 @@ const cleanQuestion = (overrides = {}) => ({
   id: "q1",
   authorId: "s1",
   content: "원래 질문",
+  isPublic: false,
+  author: {
+    role: "STUDENT",
+    school: "한빛초",
+    grade: "5",
+    className: "1",
+  },
+  session: null,
   _count: { likes: 0, comments: 0 },
   ...overrides,
 });
 
+const removedSession = {
+  teacherId: "t1",
+  targetType: "STUDENT",
+  targetGrade: null,
+  targetClassName: null,
+  targetStudentId: "s2",
+  targetStudentIds: ["s2"],
+  teacher: {
+    school: "한빛초",
+    teacherClasses: [{ grade: "5", className: "1" }],
+  },
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
+  mUserFind.mockResolvedValue({
+    id: "s1",
+    role: "STUDENT",
+    school: "한빛초",
+    grade: "5",
+    className: "1",
+    teacherClasses: [],
+  });
   mFind.mockResolvedValue(cleanQuestion());
   mPointCount.mockResolvedValue(0);
   mUpdate.mockResolvedValue({ id: "q1", author: { id: "s1", name: "학생", className: "1" } });
@@ -91,6 +121,13 @@ describe("학생 질문 내용 수정 가드 (반응 전까지만)", () => {
     expect((await PATCH(patchReq({ content: "남의 질문" }), ctx)).status).toBe(403);
   });
 
+  it("현재 수업 대상에서 제외되면 자기 질문 분류도 수정할 수 없다", async () => {
+    mFind.mockResolvedValue(cleanQuestion({ session: removedSession }));
+
+    expect((await PATCH(patchReq({ closure: "closed" }), ctx)).status).toBe(403);
+    expect(mUpdate).not.toHaveBeenCalled();
+  });
+
   it("200자를 넘는 내용은 400", async () => {
     expect((await PATCH(patchReq({ content: "가".repeat(201) }), ctx)).status).toBe(400);
   });
@@ -127,5 +164,19 @@ describe("학생 질문 삭제 가드 (반응 전까지만)", () => {
   it("다른 학생의 질문은 삭제할 수 없다", async () => {
     mFind.mockResolvedValue(cleanQuestion({ authorId: "s2" }));
     expect((await DELETE(delReq, ctx)).status).toBe(403);
+  });
+
+  it("현재 수업 대상에서 제외되면 자기 질문도 삭제할 수 없다", async () => {
+    mFind.mockResolvedValue(cleanQuestion({ session: removedSession }));
+
+    expect((await DELETE(delReq, ctx)).status).toBe(403);
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("알 수 없는 역할은 작성자 번호가 같아도 질문을 삭제할 수 없다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "s1", role: "UNKNOWN" } });
+
+    expect((await DELETE(delReq, ctx)).status).toBe(403);
+    expect(mTx).not.toHaveBeenCalled();
   });
 });

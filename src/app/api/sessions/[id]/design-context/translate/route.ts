@@ -6,6 +6,7 @@ import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { getRequestLocale, DEFAULT_LOCALE } from "@/lib/locale";
 import { contentHash, translateTexts } from "@/lib/translate";
 import { logger } from "@/lib/logger";
+import { studentCanAccessSession } from "@/lib/session-access";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -78,7 +79,7 @@ export async function POST(req: Request, { params }: Params) {
   const { id } = await params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
-  const user = session.user as { id: string; role?: string; grade?: string; className?: string };
+  const user = session.user as { id: string; role?: string };
 
   const targetLocale = getRequestLocale(req);
   if (targetLocale === DEFAULT_LOCALE) {
@@ -96,21 +97,28 @@ export async function POST(req: Request, { params }: Params) {
       targetClassName: true,
       targetStudentId: true,
       targetStudentIds: true,
+      teacher: {
+        select: {
+          school: true,
+          teacherClasses: { select: { grade: true, className: true } },
+        },
+      },
     },
   });
-  if (!qs?.unitDesignId) return NextResponse.json({ context: null });
+  if (!qs) return NextResponse.json({ context: null });
 
-  const targetIds = Array.isArray(qs.targetStudentIds) ? (qs.targetStudentIds as string[]) : [];
   const isOwnerTeacher = user.role === "TEACHER" && qs.teacherId === user.id;
-  const isTargetStudent = user.role !== "TEACHER" && (
-    qs.targetType === "ALL" ||
-    (qs.targetType === "CLASS" && qs.targetGrade === user.grade && qs.targetClassName === user.className) ||
-    (qs.targetType === "STUDENT" && qs.targetStudentId === user.id) ||
-    (qs.targetType === "CUSTOM" && targetIds.includes(user.id))
-  );
+  const student = !isOwnerTeacher && user.role === "STUDENT"
+    ? await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { id: true, role: true, school: true, grade: true, className: true },
+      })
+    : null;
+  const isTargetStudent = Boolean(student && studentCanAccessSession(qs, student));
   if (!isOwnerTeacher && !isTargetStudent) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
+  if (!qs.unitDesignId) return NextResponse.json({ context: null });
 
   const rows = await prisma.$queryRaw<
     {
@@ -128,7 +136,9 @@ export async function POST(req: Request, { params }: Params) {
   >`
     SELECT id, title, subject, grade_range, grade, area, core_idea,
            core_sentences, essential_questions, inquiry_questions
-    FROM unit_designs WHERE id = ${qs.unitDesignId} LIMIT 1
+    FROM unit_designs
+    WHERE id = ${qs.unitDesignId} AND teacher_id = ${qs.teacherId}
+    LIMIT 1
   `;
   const design = rows[0];
   if (!design) return NextResponse.json({ context: null });

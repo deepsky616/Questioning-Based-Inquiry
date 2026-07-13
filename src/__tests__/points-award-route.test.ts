@@ -5,6 +5,8 @@ const txMocks = vi.hoisted(() => ({
   pointLogFindMany: vi.fn(),
   pointLogCreate: vi.fn(),
   pointLogCreateMany: vi.fn(),
+  userFindUnique: vi.fn(),
+  userFindMany: vi.fn(),
   userUpdate: vi.fn(),
 }));
 
@@ -15,6 +17,7 @@ vi.mock("@/lib/game-room-store", () => ({ loadGameRoom: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   prisma: {
     pointLog: { findMany: vi.fn() },
+    user: { findMany: vi.fn(), findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -32,11 +35,15 @@ const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mGenerateJson = generateJson as unknown as ReturnType<typeof vi.fn>;
 const mLoadGameRoom = loadGameRoom as unknown as ReturnType<typeof vi.fn>;
 const mFindMany = prisma.pointLog.findMany as unknown as ReturnType<typeof vi.fn>;
+const mUserFindMany = prisma.user.findMany as unknown as ReturnType<typeof vi.fn>;
+const mUserFindUnique = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mTx = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
 const txQueryRaw = txMocks.queryRaw;
 const txPointLogFindMany = txMocks.pointLogFindMany;
 const txPointLogCreate = txMocks.pointLogCreate;
 const txPointLogCreateMany = txMocks.pointLogCreateMany;
+const txUserFindUnique = txMocks.userFindUnique;
+const txUserFindMany = txMocks.userFindMany;
 const txUserUpdate = txMocks.userUpdate;
 const txClient = {
   $queryRaw: txQueryRaw,
@@ -45,7 +52,11 @@ const txClient = {
     create: txPointLogCreate,
     createMany: txPointLogCreateMany,
   },
-  user: { update: txUserUpdate },
+  user: {
+    findUnique: txUserFindUnique,
+    findMany: txUserFindMany,
+    update: txUserUpdate,
+  },
 };
 
 const awardReq = (body: unknown) =>
@@ -58,24 +69,28 @@ const awardReq = (body: unknown) =>
 function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
   return {
     code: "1234",
-    gameId: "dice",
+    gameId: "relay",
     hostId: "t1",
     status: "ended",
     players: [{ id: "s1", name: "학생", isHost: false, joinedAt: 1 }],
     topic: "우주",
-    chain: [],
+    chain: [
+      { question: "왜 별이 보일까요?", playerId: "s1", playerName: "학생" },
+      { question: "별은 무엇일까요?", playerId: "s1", playerName: "학생" },
+    ],
     turnIndex: 0,
     gameState: {},
-    version: 1,
+    version: 10,
     createdAt: 100,
     updatedAt: 100,
     pointAwardKeyVersion: 1,
+    pointEvidenceVersion: 1,
     ...overrides,
   };
 }
 
 const BODY = {
-  gameId: "dice",
+  gameId: "relay",
   roomCode: "1234",
   roomCreatedAt: 100,
   topic: "우주",
@@ -102,20 +117,44 @@ beforeEach(() => {
   txPointLogFindMany.mockReset();
   txPointLogCreate.mockReset();
   txPointLogCreateMany.mockReset();
+  txUserFindUnique.mockReset();
+  txUserFindMany.mockReset();
   txUserUpdate.mockReset();
   mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
   mGenerateJson.mockResolvedValue({ bonuses: [] });
   mLoadGameRoom.mockResolvedValue(makeRoom());
   mFindMany.mockResolvedValue([]);
+  mUserFindUnique.mockResolvedValue({ school: "별빛초", teacherClasses: [] });
+  mUserFindMany.mockResolvedValue([{
+    id: "s1",
+    role: "STUDENT",
+    school: "별빛초",
+    grade: "3",
+    className: "1",
+  }]);
   txQueryRaw.mockImplementation(async (strings: TemplateStringsArray) => {
     const sql = strings.join("?");
     if (sql.includes("pg_advisory_xact_lock")) return [{ locked: true }];
     if (sql.includes('FROM "game_rooms"')) return [{ data: makeRoom() }];
+    if (sql.includes('FROM "users"')) return [{ id: "t1" }, { id: "s1" }];
+    if (sql.includes('FROM "teacher_classes"')) return [];
     throw new Error(`알 수 없는 거래 쿼리: ${sql}`);
   });
   txPointLogFindMany.mockResolvedValue([]);
   txPointLogCreate.mockResolvedValue({});
   txPointLogCreateMany.mockResolvedValue({ count: 0 });
+  txUserFindUnique.mockResolvedValue({
+    role: "TEACHER",
+    school: "별빛초",
+    teacherClasses: [],
+  });
+  txUserFindMany.mockResolvedValue([{
+    id: "s1",
+    role: "STUDENT",
+    school: "별빛초",
+    grade: "3",
+    className: "1",
+  }]);
   txUserUpdate.mockResolvedValue({});
   mTx.mockImplementation(async (input: unknown) => {
     if (typeof input !== "function") return [];
@@ -128,7 +167,7 @@ describe("포인트 지급 요청 검증", () => {
     mAuth.mockResolvedValue(null);
     expect((await POST(awardReq(BODY))).status).toBe(401);
 
-    mAuth.mockResolvedValue({ user: { id: "t1" } });
+    mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
     expect((await POST(awardReq({ gameId: "dice" }))).status).toBe(400);
   });
 
@@ -153,7 +192,7 @@ describe("포인트 지급 요청 검증", () => {
   it.each([
     ["없으면", null],
     ["코드가 다르면", makeRoom({ code: "5678" })],
-    ["게임이 다르면", makeRoom({ gameId: "relay" })],
+    ["게임이 다르면", makeRoom({ gameId: "dice" })],
     ["생성 시각이 다르면", makeRoom({ createdAt: 200 })],
   ])("현재 방이 %s 409이고 분석하거나 쓰지 않는다", async (_case, room) => {
     mLoadGameRoom.mockResolvedValue(room);
@@ -164,6 +203,189 @@ describe("포인트 지급 요청 검증", () => {
     expect(mGenerateJson).not.toHaveBeenCalled();
     expect(mTx).not.toHaveBeenCalled();
   });
+
+  it("방장이 아니면 종료된 방의 지급을 요청할 수 없다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "t2", role: "TEACHER" } });
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(403);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("학생이 자기 방의 방장이고 저장 상태를 채워도 지급할 수 없다", async () => {
+    const studentRoom = makeRoom({
+      hostId: "s1",
+      players: [{ id: "s1", name: "학생", isHost: true, joinedAt: 1 }],
+    });
+    mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
+    mLoadGameRoom.mockResolvedValue(studentRoom);
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(403);
+    expect(mLoadGameRoom).not.toHaveBeenCalled();
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
+    expect(txUserUpdate).not.toHaveBeenCalled();
+  });
+
+  it("끝나지 않은 방은 점수를 지급하지 않는다", async () => {
+    mLoadGameRoom.mockResolvedValue(makeRoom({ status: "playing" }));
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(409);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it.each(["dice", "kaba", "ladder", "story-dice", "memory"])(
+    "서버가 활동을 직접 기록하지 않는 %s 놀이는 점수를 지급하지 않는다",
+    async (gameId) => {
+      mLoadGameRoom.mockResolvedValue(makeRoom({ gameId }));
+
+      const res = await POST(awardReq({ ...BODY, gameId }));
+
+      expect(res.status).toBe(409);
+      expect(mGenerateJson).not.toHaveBeenCalled();
+      expect(mTx).not.toHaveBeenCalled();
+      expect(txPointLogCreateMany).not.toHaveBeenCalled();
+      expect(txUserUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("증거 버전이 없는 이전 이어 말하기 방은 점수를 지급하지 않는다", async () => {
+    mLoadGameRoom.mockResolvedValue(
+      makeRoom({ pointEvidenceVersion: undefined }),
+    );
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(409);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("서버 질문 형식에 맞지 않는 저장 질문은 점수를 지급하지 않는다", async () => {
+    mLoadGameRoom.mockResolvedValue(
+      makeRoom({
+        chain: [
+          { question: "1", playerId: "s1", playerName: "학생" },
+        ],
+      }),
+    );
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(409);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("요청의 가짜 참가자와 부풀린 기여를 무시하고 저장된 방 상태로 계산한다", async () => {
+    const forgedBody = {
+      ...BODY,
+      topic: "바꾼 주제",
+      contributions: [
+        {
+          studentId: "attacker-target",
+          studentName: "가짜 학생",
+          validQuestions: 999999,
+          questions: ["가짜 질문"],
+          isWinner: true,
+        },
+      ],
+    };
+
+    const res = await POST(awardReq(forgedBody));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s1", bonusType: "VALID_QUESTIONS", points: 6 }),
+    ]));
+    expect(data.awards).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "attacker-target" }),
+    ]));
+    expect(txUserUpdate).toHaveBeenCalledTimes(1);
+    expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "s1" } }));
+    expect(mGenerateJson.mock.calls[0][0].prompt).toContain("우주");
+    expect(mGenerateJson.mock.calls[0][0].prompt).not.toContain("가짜 학생");
+    expect(mGenerateJson.mock.calls[0][0].prompt).not.toContain("999999");
+  });
+
+  it("방 명단에 있어도 실제 학생 계정이 아니면 지급하지 않는다", async () => {
+    mUserFindMany.mockResolvedValue([]);
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(409);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("교사의 담당 학급 밖 학생이 방에 있으면 지급하지 않는다", async () => {
+    mUserFindUnique.mockResolvedValue({
+      school: "별빛초",
+      teacherClasses: [{ grade: "3", className: "1" }],
+    });
+    mUserFindMany.mockResolvedValue([{
+      id: "s1",
+      role: "STUDENT",
+      school: "별빛초",
+      grade: "3",
+      className: "2",
+    }]);
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(403);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("담당 학급이 없는 교사는 같은 학교 학생에게 지급할 수 있다", async () => {
+    mUserFindUnique.mockResolvedValue({ school: "별빛초", teacherClasses: [] });
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(200);
+    expect(mUserFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: { in: ["s1"] } },
+    }));
+    expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "s1" },
+    }));
+  });
+
+  it("교사 방장은 점수 대상에서 빼고 담당 학생에게만 지급한다", async () => {
+    const teacherRoom = makeRoom({
+      players: [
+        { id: "t1", name: "교사", isHost: true, joinedAt: 1 },
+        { id: "s1", name: "학생", isHost: false, joinedAt: 2 },
+      ],
+    });
+    mLoadGameRoom.mockResolvedValue(teacherRoom);
+    txQueryRaw
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockResolvedValueOnce([{ data: teacherRoom }]);
+
+    const data = await (await POST(awardReq(BODY))).json();
+
+    expect(data.awards).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "t1" }),
+    ]));
+    expect(data.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s1" }),
+    ]));
+    expect(txUserUpdate).toHaveBeenCalledTimes(1);
+    expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "s1" },
+    }));
+  });
 });
 
 describe("포인트 지급 수명별 중복 조회", () => {
@@ -172,10 +394,10 @@ describe("포인트 지급 수명별 중복 조회", () => {
 
     expect(res.status).toBe(200);
     expect(mFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { gameId: "dice", roomCode: "room:1234:100" },
+      where: { gameId: "relay", roomCode: "room:1234:100" },
     }));
     expect(txPointLogFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { gameId: "dice", roomCode: "room:1234:100" },
+      where: { gameId: "relay", roomCode: "room:1234:100" },
     }));
     expect(txPointLogCreateMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
@@ -195,7 +417,7 @@ describe("포인트 지급 수명별 중복 조회", () => {
 
     expect(mFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        gameId: "dice",
+        gameId: "relay",
         OR: expect.arrayContaining([
           { roomCode: "room:1234:100" },
           { roomCode: "1234", createdAt: { gte: new Date(100) } },
@@ -204,7 +426,7 @@ describe("포인트 지급 수명별 중복 조회", () => {
     }));
     expect(txPointLogFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
-        gameId: "dice",
+        gameId: "relay",
         OR: expect.arrayContaining([
           { roomCode: "room:1234:100" },
           { roomCode: "1234", createdAt: { gte: new Date(100) } },
@@ -234,6 +456,218 @@ describe("포인트 지급 수명별 중복 조회", () => {
     expect(mGenerateJson).not.toHaveBeenCalled();
     expect(mTx).not.toHaveBeenCalled();
   });
+
+  it("기존 지급 기록이 있어도 현재 담당 범위 밖 학생이면 반환하지 않는다", async () => {
+    mUserFindUnique.mockResolvedValue({
+      school: "별빛초",
+      teacherClasses: [{ grade: "3", className: "1" }],
+    });
+    mUserFindMany.mockResolvedValue([{
+      id: "s1",
+      role: "STUDENT",
+      school: "별빛초",
+      grade: "3",
+      className: "2",
+    }]);
+    mFindMany.mockResolvedValue([{
+      id: "old-log",
+      studentId: "s1",
+      points: 5,
+    }]);
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(403);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("기존 지급 기록의 학생이 현재 방 참가자가 아니면 반환하지 않는다", async () => {
+    mFindMany.mockResolvedValue([{
+      id: "old-log",
+      studentId: "outside-student",
+      points: 5,
+    }]);
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(403);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+});
+
+describe("저장된 놀이 상태 계산", () => {
+  it.each([
+    [
+      "relay",
+      {},
+      [
+        { question: "첫 질문인가요?", playerId: "s1", playerName: "학생" },
+        { question: "둘째 질문인가요?", playerId: "s1", playerName: "학생" },
+      ],
+      6,
+    ],
+  ])("%s는 요청값이 아닌 저장 상태를 점수로 바꾼다", async (
+    gameId,
+    gameState,
+    chain,
+    expectedPoints,
+  ) => {
+    const gameRoom = makeRoom({ gameId, gameState, chain });
+    mLoadGameRoom.mockResolvedValue(gameRoom);
+    txQueryRaw
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockResolvedValueOnce([{ data: gameRoom }]);
+
+    const res = await POST(awardReq({ ...BODY, gameId }));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "VALID_QUESTIONS",
+        points: expectedPoints,
+      }),
+    ]));
+  });
+
+  const repeatedStateCases: Array<[
+    string,
+    Record<string, unknown>,
+    GameRoom["chain"],
+  ]> = [
+    [
+      "relay",
+      {},
+      [
+        { question: "같은 질문인가요?", playerId: "s1", playerName: "학생" },
+        { question: " 같은   질문인가요? ", playerId: "s1", playerName: "학생" },
+      ],
+    ],
+  ];
+
+  it.each(repeatedStateCases)(
+    "%s의 같은 활동 반복 기록은 지급하지 않는다",
+    async (gameId, gameState, chain) => {
+      const gameRoom = makeRoom({ gameId, gameState, chain, version: 20 });
+      mLoadGameRoom.mockResolvedValue(gameRoom);
+
+      const res = await POST(awardReq({ ...BODY, gameId }));
+
+      expect(res.status).toBe(409);
+      expect(mGenerateJson).not.toHaveBeenCalled();
+      expect(mTx).not.toHaveBeenCalled();
+      expect(txPointLogCreateMany).not.toHaveBeenCalled();
+      expect(txUserUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  const overLimitStateCases: Array<[
+    string,
+    Record<string, unknown>,
+    GameRoom["chain"],
+  ]> = [
+    [
+      "relay",
+      {},
+      Array.from({ length: 31 }, (_, index) => ({
+        question: `질문 ${index}인가요?`,
+        playerId: "s1",
+        playerName: "학생",
+      })),
+    ],
+  ];
+
+  it.each(overLimitStateCases)(
+    "%s의 학생별 활동 상한을 넘는 한 번의 저장 상태는 지급하지 않는다",
+    async (gameId, gameState, chain) => {
+      const gameRoom = makeRoom({ gameId, gameState, chain, version: 100 });
+      mLoadGameRoom.mockResolvedValue(gameRoom);
+
+      const res = await POST(awardReq({ ...BODY, gameId }));
+
+      expect(res.status).toBe(409);
+      expect(mGenerateJson).not.toHaveBeenCalled();
+      expect(mTx).not.toHaveBeenCalled();
+      expect(txPointLogCreateMany).not.toHaveBeenCalled();
+      expect(txUserUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("학생별 상한 안이어도 방 전체 활동 상한을 넘으면 지급하지 않는다", async () => {
+    const students = Array.from({ length: 5 }, (_, index) => ({
+      id: `s${index + 1}`,
+      role: "STUDENT",
+      school: "별빛초",
+      grade: "3",
+      className: "1",
+    }));
+    const players = [
+      { id: "t1", name: "교사", isHost: true, joinedAt: 1 },
+      ...students.map((student, index) => ({
+        id: student.id,
+        name: `학생 ${index + 1}`,
+        isHost: false,
+        joinedAt: index + 2,
+      })),
+    ];
+    const chain = students.flatMap((student) =>
+      Array.from({ length: 25 }, (_, index) => ({
+        question: `${student.id} 질문 ${index}인가요?`,
+        playerId: student.id,
+        playerName: student.id,
+      })),
+    );
+    const gameRoom = makeRoom({
+      gameId: "relay",
+      players,
+      chain,
+      version: 200,
+    });
+    mUserFindMany.mockResolvedValue(students);
+    mLoadGameRoom.mockResolvedValue(gameRoom);
+
+    const res = await POST(awardReq({ ...BODY, gameId: "relay" }));
+
+    expect(res.status).toBe(409);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
+    expect(txUserUpdate).not.toHaveBeenCalled();
+  });
+
+  const versionStateCases: Array<[
+    string,
+    Record<string, unknown>,
+    GameRoom["chain"],
+  ]> = [
+    [
+      "relay",
+      {},
+      [
+        { question: "질문 하나인가요?", playerId: "s1", playerName: "학생" },
+        { question: "질문 둘인가요?", playerId: "s1", playerName: "학생" },
+      ],
+    ],
+  ];
+
+  it.each(versionStateCases)(
+    "%s의 활동 수가 방 버전보다 많으면 지급하지 않는다",
+    async (gameId, gameState, chain) => {
+      const gameRoom = makeRoom({ gameId, gameState, chain, version: 1 });
+      mLoadGameRoom.mockResolvedValue(gameRoom);
+
+      const res = await POST(awardReq({ ...BODY, gameId }));
+
+      expect(res.status).toBe(409);
+      expect(mGenerateJson).not.toHaveBeenCalled();
+      expect(mTx).not.toHaveBeenCalled();
+      expect(txPointLogCreateMany).not.toHaveBeenCalled();
+      expect(txUserUpdate).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("포인트 지급 저장", () => {
@@ -279,7 +713,7 @@ describe("포인트 지급 저장", () => {
   it("잠금과 방 공유 잠금 뒤 같은 수명 기록을 다시 확인하고 쓴다", async () => {
     await POST(awardReq(BODY));
 
-    expect(txQueryRaw).toHaveBeenCalledTimes(2);
+    expect(txQueryRaw).toHaveBeenCalledTimes(4);
     const [lockStrings, ...lockValues] = txQueryRaw.mock.calls[0] as [
       TemplateStringsArray,
       ...unknown[],
@@ -289,7 +723,7 @@ describe("포인트 지급 저장", () => {
       ...unknown[],
     ];
     expect(lockStrings.join("?")).toContain("pg_advisory_xact_lock");
-    expect(lockValues).toContain("dice:room:1234:100");
+    expect(lockValues).toContain("relay:room:1234:100");
     expect(roomStrings.join("?")).toContain('FROM "game_rooms"');
     expect(roomStrings.join("?")).toContain("FOR SHARE");
     expect(roomValues).toContain("1234");
@@ -299,6 +733,36 @@ describe("포인트 지급 저장", () => {
       .toBeLessThan(txPointLogCreateMany.mock.invocationCallOrder[0]);
     expect(txPointLogCreateMany.mock.invocationCallOrder[0])
       .toBeLessThan(txUserUpdate.mock.invocationCallOrder[0]);
+  });
+
+  it("쓰기 직전 교사 담당 학급이 바뀌면 현재 범위로 다시 검사한다", async () => {
+    txUserFindUnique.mockResolvedValue({
+      role: "TEACHER",
+      school: "별빛초",
+      teacherClasses: [{ grade: "3", className: "2" }],
+    });
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(403);
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
+    expect(txUserUpdate).not.toHaveBeenCalled();
+  });
+
+  it("교사와 담당 학급 및 참가 학생 행을 잠그고 직렬 실행으로 지급한다", async () => {
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(200);
+    const sqlCalls = txQueryRaw.mock.calls.map((call) =>
+      (call[0] as TemplateStringsArray).join("?"),
+    );
+    expect(sqlCalls.some((sql) =>
+      sql.includes('FROM "users"') && sql.includes("FOR SHARE")
+    )).toBe(true);
+    expect(sqlCalls.some((sql) =>
+      sql.includes('FROM "teacher_classes"') && sql.includes("FOR SHARE")
+    )).toBe(true);
+    expect(mTx.mock.calls[0][1]).toEqual({ isolationLevel: "Serializable" });
   });
 
   it("첫 확인 뒤 방 수명이 바뀌면 409이고 쓰지 않는다", async () => {
@@ -313,16 +777,49 @@ describe("포인트 지급 저장", () => {
     expect(txUserUpdate).not.toHaveBeenCalled();
   });
 
-  it("잠금 뒤 기존 지급이 생기면 학생 목록이 달라도 새로 쓰지 않는다", async () => {
+  it("잠금 전에 놀이 상태 버전이 바뀌면 409이고 쓰지 않는다", async () => {
+    txQueryRaw
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockResolvedValueOnce([{ data: makeRoom({ version: 2 }) }]);
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(409);
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
+    expect(txUserUpdate).not.toHaveBeenCalled();
+  });
+
+  it("잠금 뒤 기존 지급의 학생이 현재 방 참가자가 아니면 반환하지 않는다", async () => {
     txPointLogFindMany.mockResolvedValue([{
       id: "existing",
       studentId: "다른학생",
       points: 5,
     }]);
 
-    const data = await (await POST(awardReq(BODY))).json();
+    const res = await POST(awardReq(BODY));
 
-    expect(data.alreadyAwarded).toBe(true);
+    expect(res.status).toBe(403);
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
+    expect(txUserUpdate).not.toHaveBeenCalled();
+  });
+
+  it("잠금 뒤 기존 지급이 생겨도 현재 담당 범위를 다시 확인한다", async () => {
+    txPointLogFindMany.mockResolvedValue([{
+      id: "existing",
+      studentId: "s1",
+      points: 5,
+    }]);
+    txUserFindMany.mockResolvedValue([{
+      id: "s1",
+      role: "STUDENT",
+      school: "다른학교",
+      grade: "3",
+      className: "1",
+    }]);
+
+    const res = await POST(awardReq(BODY));
+
+    expect(res.status).toBe(403);
     expect(txPointLogCreateMany).not.toHaveBeenCalled();
     expect(txUserUpdate).not.toHaveBeenCalled();
   });
@@ -333,11 +830,26 @@ describe("포인트 지급 저장", () => {
     );
     mFindMany
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: "log1", points: 5 }]);
+      .mockResolvedValueOnce([{ id: "log1", studentId: "s1", points: 5 }]);
 
     const data = await (await POST(awardReq(BODY))).json();
 
     expect(data.alreadyAwarded).toBe(true);
+  });
+
+  it("동시 충돌 뒤 현재 방 밖 학생 기록은 반환하지 않는다", async () => {
+    mTx.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "5" }),
+    );
+    mFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        id: "log1",
+        studentId: "outside-student",
+        points: 5,
+      }]);
+
+    expect((await POST(awardReq(BODY))).status).toBe(403);
   });
 
   it("unique 충돌 뒤 현재 수명 기록이 비어 있으면 500이다", async () => {
@@ -355,5 +867,16 @@ describe("포인트 지급 저장", () => {
     mTx.mockRejectedValue(new Error("db down"));
 
     expect((await POST(awardReq(BODY))).status).toBe(500);
+  });
+
+  it("직렬 실행 충돌은 다시 시도할 수 있도록 409로 응답한다", async () => {
+    mTx.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("retry", {
+        code: "P2034",
+        clientVersion: "5",
+      }),
+    );
+
+    expect((await POST(awardReq(BODY))).status).toBe(409);
   });
 });

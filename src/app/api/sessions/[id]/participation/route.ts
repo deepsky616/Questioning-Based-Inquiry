@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { compareByClassAndNumber } from "@/lib/student-sort";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { studentWhereForSessionTarget } from "@/lib/session-access";
 
 export async function GET(
   _req: Request,
@@ -55,34 +56,19 @@ export async function GET(
       },
     });
 
-    const classes = teacher?.teacherClasses ?? [];
-    // 같은 학교 학생만(다른 학교의 동일 학년·반 학생이 섞이지 않도록)
-    const schoolFilter = teacher?.school ? { school: teacher.school } : {};
-
-    // 6. 이 세션의 배포 대상 학생만 조회 — 세션과 무관한 학생이 목록에 섞이지 않도록
-    //    ALL: 담당 학급 전체 / CLASS: 해당 학급 / STUDENT·CUSTOM: 지정 학생
-    const targetIds = Array.isArray(questionSession.targetStudentIds)
-      ? (questionSession.targetStudentIds as string[])
-      : [];
-    const studentWhere =
-      questionSession.targetType === "CLASS" && questionSession.targetGrade && questionSession.targetClassName
-        ? {
-            role: "STUDENT" as const,
-            ...schoolFilter,
-            grade: questionSession.targetGrade,
-            className: questionSession.targetClassName,
-          }
-        : questionSession.targetType === "STUDENT" && questionSession.targetStudentId
-        ? { role: "STUDENT" as const, id: questionSession.targetStudentId }
-        : questionSession.targetType === "CUSTOM" && targetIds.length > 0
-        ? { role: "STUDENT" as const, id: { in: targetIds } }
-        : {
-            role: "STUDENT" as const,
-            ...schoolFilter,
-            ...(classes.length > 0 && {
-              OR: classes.map((c) => ({ grade: c.grade, className: c.className })),
-            }),
-          };
+    // 6. 교사의 학교·담당 학급 범위와 이 수업의 배포 대상을 함께 적용한다.
+    const teacherScope = teacher?.school
+      ? { school: teacher.school, classes: teacher.teacherClasses }
+      : null;
+    const studentWhere = teacherScope
+      ? studentWhereForSessionTarget(teacherScope, questionSession)
+      : null;
+    if (!studentWhere) {
+      return NextResponse.json(
+        { error: "질문수업 대상을 조회할 권한이 없습니다" },
+        { status: 403 },
+      );
+    }
 
     const students = await prisma.user.findMany({
       where: studentWhere,
@@ -144,7 +130,7 @@ export async function GET(
     return NextResponse.json({
       sessionId: id,
       totalStudents: students.length,
-      submittedCount: submittedIds.size,
+      submittedCount: studentList.filter((student) => student.hasQuestion).length,
       students: studentList,
     });
   } catch (error) {

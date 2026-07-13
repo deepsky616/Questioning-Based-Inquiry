@@ -10,6 +10,10 @@ vi.mock("@/lib/resolve-ai-config", () => ({
 }));
 vi.mock("@/lib/db", () => ({
   prisma: {
+    user: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+    },
     $queryRaw: vi.fn(),
     $queryRawUnsafe: vi.fn(),
     $executeRawUnsafe: vi.fn(),
@@ -36,6 +40,7 @@ const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
 const mockQueryRawUnsafe = prisma.$queryRawUnsafe as ReturnType<typeof vi.fn>;
 const mockExecRaw = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
+const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockSessionCreate = prisma.questionSession.create as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.systemConfig.findUnique as ReturnType<typeof vi.fn>;
 
@@ -74,6 +79,10 @@ function makeDesignSessionRequest(
 beforeEach(() => {
   vi.clearAllMocks();
   aiState.apiKey = "test-api-key";
+  mockUserFindUnique.mockResolvedValue({
+    school: "한빛초",
+    teacherClasses: [{ grade: "5", className: "1" }],
+  });
 });
 
 // ─── GET /api/unit-design ─────────────────────────────────────────────────────

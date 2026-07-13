@@ -4,6 +4,10 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { validateBulkFeedback } from "@/lib/questions";
+import {
+  loadTeacherStudentScope,
+  studentWhereForTeacherScope,
+} from "@/lib/teacher-student-access";
 
 const schema = z.object({
   questionIds: z.array(z.string()).min(1),
@@ -32,12 +36,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
-    // 존재하는 질문 ID만 필터링
+    const teacherScope = await loadTeacherStudentScope(userId);
+    if (!teacherScope) {
+      return NextResponse.json({ error: "질문 접근 권한이 없습니다" }, { status: 403 });
+    }
+
+    // 담당 범위 안에 존재하는 질문 ID만 필터링
     const existingQuestions = await prisma.question.findMany({
-      where: { id: { in: questionIds } },
+      where: {
+        id: { in: questionIds },
+        author: studentWhereForTeacherScope(teacherScope),
+      },
       select: { id: true },
     });
     const validIds = existingQuestions.map((q) => q.id);
+    if (validIds.length === 0) {
+      return NextResponse.json({ error: "질문 접근 권한이 없습니다" }, { status: 403 });
+    }
 
     // 단일 트랜잭션으로 모든 댓글 동시 생성
     const comments = await prisma.$transaction(

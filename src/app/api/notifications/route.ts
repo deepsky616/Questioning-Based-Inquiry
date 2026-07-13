@@ -1,6 +1,34 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { sessionWhereForStudent } from "@/lib/session-access";
+
+async function notificationRecipientWhere(
+  userId: string,
+  role: string | undefined,
+): Promise<Prisma.AppNotificationWhereInput | null> {
+  if (role !== "STUDENT") return { recipientId: userId };
+
+  const student = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, school: true, grade: true, className: true },
+  });
+  const sessionScope = student ? sessionWhereForStudent(student) : null;
+  if (!sessionScope) return null;
+
+  const sessions = await prisma.questionSession.findMany({
+    where: { AND: [sessionScope, { isActive: true }] },
+    select: { id: true },
+  });
+  return {
+    recipientId: userId,
+    OR: [
+      { sessionId: null },
+      { sessionId: { in: sessions.map((item) => item.id) } },
+    ],
+  };
+}
 
 export async function GET() {
   const session = await auth();
@@ -9,10 +37,14 @@ export async function GET() {
   }
 
   const { id: userId, role } = session.user as { id: string; role?: string };
+  const recipientWhere = await notificationRecipientWhere(userId, role);
+  if (!recipientWhere) {
+    return NextResponse.json({ error: "알림을 조회할 권한이 없습니다" }, { status: 403 });
+  }
   const readSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const [unreadNotifications, readNotifications, unreadCount, unreadSessionReminders] = await Promise.all([
     prisma.appNotification.findMany({
-      where: { recipientId: userId, readAt: null },
+      where: { ...recipientWhere, readAt: null },
       orderBy: { updatedAt: "desc" },
       take: 20,
       select: {
@@ -30,7 +62,7 @@ export async function GET() {
     }),
     prisma.appNotification.findMany({
       where: {
-        recipientId: userId,
+        ...recipientWhere,
         readAt: { gte: readSince },
       },
       orderBy: { readAt: "desc" },
@@ -49,12 +81,12 @@ export async function GET() {
       },
     }),
     prisma.appNotification.count({
-      where: { recipientId: userId, readAt: null },
+      where: { ...recipientWhere, readAt: null },
     }),
     role === "STUDENT"
       ? prisma.appNotification.findMany({
           where: {
-            recipientId: userId,
+            ...recipientWhere,
             readAt: null,
             type: "SESSION_REMINDER",
             sessionId: { not: null },

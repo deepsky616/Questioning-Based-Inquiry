@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/api-rate-limit";
+import {
+  isValidQuestionForm,
+  normalizeQuestionActivity,
+  RELAY_ACTIVITY_LIMITS,
+} from "@/lib/points-policy";
 import type {
   GameRoom,
   RoomChainItem,
@@ -21,9 +27,36 @@ type Params = { params: Promise<{ code: string }> };
 const ROOM_CONFLICT_MESSAGE =
   "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.";
 const MEMBERSHIP_WRITE_ATTEMPTS = 3;
+const MEMBER_STATE_ACTIONS = new Set([
+  "update-state",
+  "set-state",
+  "next-turn",
+]);
+const VERSIONED_ACTIONS = new Set([
+  "start",
+  "update-state",
+  "set-state",
+  "next-turn",
+  "set-topic",
+  "add-question",
+  "end",
+  "restart",
+]);
 
 function isRequestBody(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isRoomMember(room: GameRoom, userId: string) {
+  return room.players.some((player) => player.id === userId);
+}
+
+function isValidExpectedVersion(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value > 0
+  );
 }
 
 function roomConflict(room: GameRoom) {
@@ -212,9 +245,18 @@ export async function GET(
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
+  const userId = (session.user as { id: string }).id;
+  const limited = checkRateLimit(`game-room-read:${userId}`, 120);
+  if (limited) return limited;
   const room = await loadGameRoom(code);
   if (!room) {
     return NextResponse.json({ error: "방을 찾을 수 없습니다" }, { status: 404 });
+  }
+  if (!isRoomMember(room, userId)) {
+    return NextResponse.json(
+      { error: "방 참가자만 확인할 수 있어요" },
+      { status: 403 },
+    );
   }
   return NextResponse.json({ room });
 }
@@ -236,6 +278,10 @@ export async function PATCH(
   const body = isRequestBody(parsedBody) ? parsedBody : {};
   const action = typeof body.action === "string" ? body.action : "";
   const expectedVersion = body.expectedVersion;
+  const limited = action === "join"
+    ? checkRateLimit(`game-room-join:${userId}`, 10)
+    : checkRateLimit(`game-room-write:${userId}`, 120);
+  if (limited) return limited;
 
   let room = await loadGameRoom(code);
   if (!room) {
@@ -243,6 +289,24 @@ export async function PATCH(
   }
 
   if (action === "join") return joinRoom(room, userId, userName);
+  if (action === "leave" && !isRoomMember(room, userId)) {
+    return NextResponse.json({ room: null });
+  }
+  if (MEMBER_STATE_ACTIONS.has(action) && !isRoomMember(room, userId)) {
+    return NextResponse.json(
+      { error: "방 참가자만 변경할 수 있어요" },
+      { status: 403 },
+    );
+  }
+  if (
+    VERSIONED_ACTIONS.has(action) &&
+    !isValidExpectedVersion(expectedVersion)
+  ) {
+    return NextResponse.json(
+      { error: "올바른 expectedVersion이 필요합니다" },
+      { status: 400 },
+    );
+  }
   if (
     body.expectedCreatedAt !== undefined &&
     body.expectedCreatedAt !== room.createdAt
@@ -271,6 +335,21 @@ export async function PATCH(
     }
 
     case "update-state": {
+      if (room.gameId === "relay" && room.hostId !== userId) {
+        return NextResponse.json(
+          { error: "방장만 이어 말하기 상태를 직접 바꿀 수 있어요" },
+          { status: 403 },
+        );
+      }
+      if (
+        (body.status === "playing" || body.status === "ended") &&
+        room.hostId !== userId
+      ) {
+        return NextResponse.json(
+          { error: "방장만 방 상태를 변경할 수 있어요" },
+          { status: 403 },
+        );
+      }
       if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
@@ -288,6 +367,12 @@ export async function PATCH(
     }
 
     case "set-state": {
+      if (room.hostId !== userId) {
+        return NextResponse.json(
+          { error: "방장만 상태를 설정할 수 있어요" },
+          { status: 403 },
+        );
+      }
       if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
@@ -301,6 +386,18 @@ export async function PATCH(
     }
 
     case "next-turn": {
+      if (room.hostId !== userId) {
+        return NextResponse.json(
+          { error: "방장만 차례를 넘길 수 있어요" },
+          { status: 403 },
+        );
+      }
+      if (room.status !== "playing") {
+        return NextResponse.json(
+          { error: "진행 중인 방에서만 차례를 넘길 수 있어요" },
+          { status: 409 },
+        );
+      }
       if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
@@ -326,6 +423,12 @@ export async function PATCH(
     }
 
     case "add-question": {
+      if (room.gameId !== "relay" || room.status !== "playing") {
+        return NextResponse.json(
+          { error: "진행 중인 이어 말하기에서만 질문을 추가할 수 있어요" },
+          { status: 409 },
+        );
+      }
       if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }
@@ -333,13 +436,37 @@ export async function PATCH(
       if (!question) {
         return NextResponse.json({ error: "질문이 비어있어요" }, { status: 400 });
       }
+      if (question.length > 200 || !isValidQuestionForm(question)) {
+        return NextResponse.json(
+          { error: "질문 형식으로 200자 이내에 작성해 주세요" },
+          { status: 400 },
+        );
+      }
+      if (room.chain.length >= RELAY_ACTIVITY_LIMITS.perRoom) {
+        return NextResponse.json(
+          { error: "한 방에서 저장할 수 있는 질문 수를 모두 사용했어요" },
+          { status: 400 },
+        );
+      }
+      if (
+        room.chain.filter((item) => item.playerId === userId).length >=
+          RELAY_ACTIVITY_LIMITS.perStudent
+      ) {
+        return NextResponse.json(
+          { error: "한 학생이 저장할 수 있는 질문 수를 모두 사용했어요" },
+          { status: 400 },
+        );
+      }
       // 현재 턴인 사람만 추가 가능
       const currentPlayer = room.players[room.turnIndex % room.players.length];
       if (!currentPlayer || currentPlayer.id !== userId) {
         return NextResponse.json({ error: "지금은 당신의 차례가 아니에요" }, { status: 409 });
       }
       // 중복 검사
-      if (room.chain.some((c) => c.question.trim() === question)) {
+      const normalizedQuestion = normalizeQuestionActivity(question);
+      if (room.chain.some((item) =>
+        normalizeQuestionActivity(item.question) === normalizedQuestion
+      )) {
         return NextResponse.json({ error: "이미 나온 질문이에요" }, { status: 400 });
       }
       const item: RoomChainItem = { question, playerId: userId, playerName: userName };

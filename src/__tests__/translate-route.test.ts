@@ -174,6 +174,10 @@ describe("POST /api/translate", () => {
         targetClassName: "1",
         targetStudentId: null,
         targetStudentIds: [],
+        teacher: {
+          school: "s",
+          teacherClasses: [{ grade: "5", className: "1" }],
+        },
       },
     ]);
     tc.mockResolvedValue([{ teacherId: "t1" }]);
@@ -190,5 +194,37 @@ describe("POST /api/translate", () => {
         "SESSION_TOPIC:s1": "Plant life cycles",
       },
     });
+  });
+
+  it("학생은 다른 학교의 같은 학년과 반 수업을 번역할 수 없다", async () => {
+    mUser.mockResolvedValue({ id: "st1", role: "STUDENT", school: "s", grade: "5", className: "1", teacherClasses: [] });
+    qs.mockResolvedValue([
+      {
+        id: "s1",
+        subject: "과학",
+        topic: "식물의 한살이",
+        teacherId: "t1",
+        targetType: "CLASS",
+        targetGrade: "5",
+        targetClassName: "1",
+        targetStudentId: null,
+        targetStudentIds: [],
+        teacher: {
+          school: "other-school",
+          teacherClasses: [{ grade: "5", className: "1" }],
+        },
+      },
+    ]);
+    tc.mockResolvedValue([{ teacherId: "t1" }]);
+    mResolve.mockResolvedValue({ apiKey: "k", model: "m" });
+
+    const res = await POST(req("en", [
+      { type: "SESSION_SUBJECT", id: "s1" },
+      { type: "SESSION_TOPIC", id: "s1" },
+    ]));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ translations: {} });
+    expect(mTranslate).not.toHaveBeenCalled();
   });
 });

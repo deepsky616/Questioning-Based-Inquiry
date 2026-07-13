@@ -7,6 +7,10 @@ import { sendBulkStudentSummaryEmail } from "@/lib/email";
 import { partitionStudents, buildStudentCreateData } from "@/lib/student-registration";
 import { formatErrorBody } from "@/lib/api-error";
 import { validatePasswordPolicy } from "@/lib/password-policy";
+import {
+  isClassInTeacherScope,
+  loadTeacherStudentScope,
+} from "@/lib/teacher-student-access";
 
 const bulkSchema = z.object({
   school: z.string().min(1),
@@ -32,6 +36,14 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { school, grade, className, defaultPassword, students } = bulkSchema.parse(body);
+    const teacherScope = await loadTeacherStudentScope(session.user.id);
+    if (
+      !teacherScope ||
+      teacherScope.school !== school ||
+      !isClassInTeacherScope(teacherScope, grade, className)
+    ) {
+      return NextResponse.json({ error: "담당 학교와 학급에만 학생을 등록할 수 있습니다" }, { status: 403 });
+    }
 
     const passwordError = validatePasswordPolicy(defaultPassword);
     if (passwordError) {

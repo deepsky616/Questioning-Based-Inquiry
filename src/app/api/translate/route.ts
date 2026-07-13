@@ -8,6 +8,7 @@ import { getRequestLocale, DEFAULT_LOCALE } from "@/lib/locale";
 import { contentHash, translateTexts } from "@/lib/translate";
 import { canViewQuestion, isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { logger } from "@/lib/logger";
+import { studentCanAccessSession } from "@/lib/session-access";
 
 const bodySchema = z.object({
   items: z
@@ -23,14 +24,26 @@ const bodySchema = z.object({
 
 const keyOf = (type: string, id: string) => `${type}:${id}`;
 
-function jsonStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
+const sessionAccessSelect = {
+  teacherId: true,
+  targetType: true,
+  targetGrade: true,
+  targetClassName: true,
+  targetStudentId: true,
+  targetStudentIds: true,
+  teacher: {
+    select: {
+      school: true,
+      teacherClasses: { select: { grade: true, className: true } },
+    },
+  },
+} as const;
 
 function canViewSession(
   viewer: {
     id: string;
     role: string | null;
+    school: string | null;
     grade: string | null;
     className: string | null;
   } | null,
@@ -41,26 +54,16 @@ function canViewSession(
     targetClassName: string | null;
     targetStudentId: string | null;
     targetStudentIds: unknown;
+    teacher: {
+      school: string | null;
+      teacherClasses: Array<{ grade: string; className: string }>;
+    };
   },
-  teacherIdsForStudentClass: Set<string>,
 ): boolean {
   if (!viewer) return false;
   if (viewer.role === "TEACHER") return session.teacherId === viewer.id;
   if (viewer.role !== "STUDENT") return false;
-  if (!teacherIdsForStudentClass.has(session.teacherId)) return false;
-  const targetStudentIds = jsonStringArray(session.targetStudentIds);
-  if (session.targetType === "ALL") return true;
-  if (session.targetType === "CLASS") {
-    return (
-      (session.targetGrade === viewer.grade && session.targetClassName === viewer.className) ||
-      targetStudentIds.includes(viewer.id)
-    );
-  }
-  if (session.targetType === "STUDENT") {
-    return session.targetStudentId === viewer.id || targetStudentIds.includes(viewer.id);
-  }
-  if (session.targetType === "CUSTOM") return targetStudentIds.includes(viewer.id);
-  return false;
+  return studentCanAccessSession(session, { ...viewer, role: "STUDENT" });
 }
 
 export async function POST(req: Request) {
@@ -99,7 +102,14 @@ export async function POST(req: Request) {
     qIds.length
       ? prisma.question.findMany({
           where: { id: { in: qIds } },
-          select: { id: true, content: true, isPublic: true, authorId: true, author: { select: authorSelect } },
+          select: {
+            id: true,
+            content: true,
+            isPublic: true,
+            authorId: true,
+            author: { select: authorSelect },
+            session: { select: sessionAccessSelect },
+          },
         })
       : [],
     cIds.length
@@ -108,7 +118,17 @@ export async function POST(req: Request) {
           select: {
             id: true, content: true, authorId: true, author: { select: { role: true } },
             question: {
-              select: { isPublic: true, authorId: true, author: { select: authorSelect }, session: { select: { commentsVisibleToPeers: true } } },
+              select: {
+                isPublic: true,
+                authorId: true,
+                author: { select: authorSelect },
+                session: {
+                  select: {
+                    commentsVisibleToPeers: true,
+                    ...sessionAccessSelect,
+                  },
+                },
+              },
             },
           },
         })
@@ -120,26 +140,11 @@ export async function POST(req: Request) {
             id: true,
             subject: true,
             topic: true,
-            teacherId: true,
-            targetType: true,
-            targetGrade: true,
-            targetClassName: true,
-            targetStudentId: true,
-            targetStudentIds: true,
+            ...sessionAccessSelect,
           },
         })
       : [],
   ]);
-
-  const teacherIdsForStudentClass = new Set<string>();
-  if (viewer?.role === "STUDENT" && viewer.grade && viewer.className && sessions.length > 0) {
-    const teacherIds = Array.from(new Set(sessions.map((session) => session.teacherId)));
-    const teacherClasses = await prisma.teacherClass.findMany({
-      where: { teacherId: { in: teacherIds }, grade: viewer.grade, className: viewer.className },
-      select: { teacherId: true },
-    });
-    teacherClasses.forEach((item) => teacherIdsForStudentClass.add(item.teacherId));
-  }
 
   const originals = new Map<string, string>();
   for (const q of questions) {
@@ -151,7 +156,7 @@ export async function POST(req: Request) {
       isCommentVisibleToViewer({
         viewerRole: viewer?.role ?? "",
         viewerId: userId,
-        commentsVisibleToPeers: c.question.session?.commentsVisibleToPeers ?? false,
+        commentsVisibleToPeers: c.question.session?.commentsVisibleToPeers ?? true,
         commentAuthorId: c.authorId,
         commentAuthorRole: c.author.role,
         questionAuthorId: c.question.authorId,
@@ -159,7 +164,7 @@ export async function POST(req: Request) {
     if (canSee) originals.set(keyOf("COMMENT", c.id), c.content);
   }
   for (const session of sessions) {
-    if (!canViewSession(viewer, session, teacherIdsForStudentClass)) continue;
+    if (!canViewSession(viewer, session)) continue;
     originals.set(keyOf("SESSION_SUBJECT", session.id), session.subject);
     if (session.topic.trim()) originals.set(keyOf("SESSION_TOPIC", session.id), session.topic);
   }

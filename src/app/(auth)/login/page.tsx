@@ -322,13 +322,14 @@ function LoginContent() {
       </CardContent>
       <CardFooter className="flex flex-col space-y-2">
         <div className="text-sm text-muted-foreground text-center">
-          {loginType === "teacher" ? t("noTeacherAccount") : t("noStudentAccount")}{" "}
-          <Link
-            href={loginType === "teacher" ? "/register?role=teacher" : "/register?role=student"}
-            className="text-primary hover:underline"
-          >
-            {loginType === "teacher" ? t("teacherSignup") : t("studentSignup")}
-          </Link>
+          {loginType === "teacher" ? (
+            <>
+              {t("noTeacherAccount")}{" "}
+              <Link href="/register" className="text-primary hover:underline">
+                {t("teacherSignup")}
+              </Link>
+            </>
+          ) : t("studentAccountFromTeacher")}
         </div>
       </CardFooter>
     </Card>

@@ -8,6 +8,8 @@ vi.mock("@/lib/db", () => ({
       count: vi.fn(),
       updateMany: vi.fn(),
     },
+    user: { findUnique: vi.fn() },
+    questionSession: { findMany: vi.fn() },
   },
 }));
 
@@ -20,6 +22,8 @@ const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mockFindMany = prisma.appNotification.findMany as unknown as ReturnType<typeof vi.fn>;
 const mockCount = prisma.appNotification.count as unknown as ReturnType<typeof vi.fn>;
 const mockUpdateMany = prisma.appNotification.updateMany as unknown as ReturnType<typeof vi.fn>;
+const mockUserFind = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
+const mockSessionFindMany = prisma.questionSession.findMany as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -27,6 +31,14 @@ beforeEach(() => {
   mockFindMany.mockResolvedValue([]);
   mockCount.mockResolvedValue(0);
   mockUpdateMany.mockResolvedValue({ count: 2 });
+  mockUserFind.mockResolvedValue({
+    id: "u1",
+    role: "STUDENT",
+    school: "한빛초",
+    grade: "5",
+    className: "1",
+  });
+  mockSessionFindMany.mockResolvedValue([{ id: "session-current" }]);
 });
 
 describe("알림 API", () => {
@@ -62,12 +74,29 @@ describe("알림 API", () => {
     expect(mockFindMany.mock.calls[2][0]).toMatchObject({
       where: {
         recipientId: "u1",
+        OR: [
+          { sessionId: null },
+          { sessionId: { in: ["session-current"] } },
+        ],
         readAt: null,
         type: "SESSION_REMINDER",
         sessionId: { not: null },
       },
       select: { id: true, sessionId: true, href: true },
     });
+    expect(mockSessionFindMany).toHaveBeenCalledOnce();
+    expect(mockFindMany.mock.calls.slice(0, 2).every(([args]) => (
+      args.where.OR?.[1]?.sessionId?.in?.[0] === "session-current"
+    ))).toBe(true);
+  });
+
+  it("학생 소속을 확인할 수 없으면 수업 알림을 조회하지 않는다", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1", role: "STUDENT" } });
+    mockUserFind.mockResolvedValue(null);
+
+    expect((await GET()).status).toBe(403);
+    expect(mockFindMany).not.toHaveBeenCalled();
+    expect(mockCount).not.toHaveBeenCalled();
   });
 
   it("PATCH(전체 읽음)는 본인의 안 읽은 알림만 갱신한다", async () => {

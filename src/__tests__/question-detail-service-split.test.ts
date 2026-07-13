@@ -9,10 +9,13 @@ describe("question detail route service split", () => {
     const serviceSource = readFileSync("src/lib/question-detail-service.ts", "utf8");
 
     expect(serviceSource).toContain("canTeacherManageQuestion");
+    expect(serviceSource).toContain("canEditQuestionForUser");
+    expect(serviceSource).toContain("canDeleteQuestionForUser");
     expect(serviceSource).toContain("getStudentQuestionEditBlockReason");
     expect(serviceSource).toContain("getStudentQuestionDeleteBlockReason");
 
-    expect(routeSource).toContain("canTeacherManageQuestion");
+    expect(routeSource).toContain("canEditQuestionForUser");
+    expect(routeSource).toContain("canDeleteQuestionForUser");
     expect(routeSource).toContain("getStudentQuestionEditBlockReason");
     expect(routeSource).toContain("getStudentQuestionDeleteBlockReason");
     expect(routeSource.split("\n").length).toBeLessThan(225);

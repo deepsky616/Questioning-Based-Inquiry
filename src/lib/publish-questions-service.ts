@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { cleanupQuestionTranslations } from "@/lib/translation-cleanup";
 import { normalizeSharedQuestions, type SharedQuestionItem } from "@/lib/shared-questions";
+import { studentCanAccessSession } from "@/lib/session-access-policy";
 
 interface PublishItem { type?: string; content: string; publishedAt?: string }
 
@@ -23,21 +24,64 @@ async function assertTeacherOwnsSession(sessionId: string, teacherId: string) {
 }
 
 export async function getPublishedQuestions(sessionId: string, userId: string) {
-  const [published, sessionRec] = await Promise.all([
-    prisma.question.findMany({
-      where: { sessionId, source: "TEACHER_SHARED" },
+  const [viewer, sessionRec] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
       select: {
-        id: true, content: true, inquiryType: true, closure: true, cognitive: true, createdAt: true,
-        _count: { select: { comments: true, likes: true } },
-        likes: { where: { userId }, select: { id: true } },
+        id: true,
+        role: true,
+        school: true,
+        grade: true,
+        className: true,
       },
-      orderBy: { createdAt: "asc" },
     }),
     prisma.questionSession.findUnique({
       where: { id: sessionId },
-      select: { likesVisibleToPeers: true, commentsVisibleToPeers: true },
+      select: {
+        teacherId: true,
+        likesVisibleToPeers: true,
+        commentsVisibleToPeers: true,
+        targetType: true,
+        targetGrade: true,
+        targetClassName: true,
+        targetStudentId: true,
+        targetStudentIds: true,
+        teacher: {
+          select: {
+            school: true,
+            teacherClasses: { select: { grade: true, className: true } },
+          },
+        },
+      },
     }),
   ]);
+
+  if (!sessionRec) {
+    throw new PublishQuestionsError("질문수업을 찾을 수 없습니다", 404);
+  }
+
+  const canRead =
+    viewer?.role === "TEACHER"
+      ? sessionRec.teacherId === viewer.id
+      : viewer?.role === "STUDENT" &&
+        studentCanAccessSession(sessionRec, {
+          id: viewer.id,
+          role: viewer.role,
+          school: viewer.school,
+          grade: viewer.grade,
+          className: viewer.className,
+        });
+  if (!canRead) throw new PublishQuestionsError("권한 없음", 403);
+
+  const published = await prisma.question.findMany({
+    where: { sessionId, source: "TEACHER_SHARED" },
+    select: {
+      id: true, content: true, inquiryType: true, closure: true, cognitive: true, createdAt: true,
+      _count: { select: { comments: true, likes: true } },
+      likes: { where: { userId }, select: { id: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
 
   return {
     published: published.map((q) => ({
@@ -48,8 +92,8 @@ export async function getPublishedQuestions(sessionId: string, userId: string) {
       myLike: q.likes.length > 0,
       createdAt: q.createdAt,
     })),
-    likesVisible: sessionRec?.likesVisibleToPeers ?? true,
-    commentsVisible: sessionRec?.commentsVisibleToPeers ?? true,
+    likesVisible: sessionRec.likesVisibleToPeers,
+    commentsVisible: sessionRec.commentsVisibleToPeers,
   };
 }
 

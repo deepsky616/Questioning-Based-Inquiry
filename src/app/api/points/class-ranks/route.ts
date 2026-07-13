@@ -15,9 +15,22 @@ export async function GET(req: NextRequest) {
 
   const me = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, role: true, school: true, grade: true, className: true },
+    select: {
+      id: true,
+      role: true,
+      school: true,
+      grade: true,
+      className: true,
+      teacherClasses: { select: { grade: true, className: true } },
+    },
   });
   if (!me) return NextResponse.json({ error: "사용자를 찾을 수 없습니다" }, { status: 404 });
+  if (me.role !== "TEACHER" && me.role !== "STUDENT") {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
+  if (!me.school) {
+    return NextResponse.json({ error: "소속 학교 정보가 없습니다" }, { status: 403 });
+  }
 
   const school = me.school;
   const grade = me.role === "TEACHER" ? req.nextUrl.searchParams.get("grade") : me.grade;
@@ -26,14 +39,23 @@ export async function GET(req: NextRequest) {
   if (!grade || !className) {
     return NextResponse.json({ klass: null, students: [], total: 0 });
   }
+  if (
+    me.role === "TEACHER" &&
+    me.teacherClasses.length > 0 &&
+    !me.teacherClasses.some(
+      (item) => item.grade === grade && item.className === className,
+    )
+  ) {
+    return NextResponse.json({ error: "담당 학급만 조회할 수 있습니다" }, { status: 403 });
+  }
 
   const [classStudents, schoolRows, allRows] = await Promise.all([
     prisma.user.findMany({
-      where: { role: "STUDENT", grade, className, ...(school ? { school } : {}) },
+      where: { role: "STUDENT", school, grade, className },
       select: { id: true, name: true, studentNumber: true, totalPoints: true },
     }),
     prisma.user.findMany({
-      where: { role: "STUDENT", ...(school ? { school } : {}) },
+      where: { role: "STUDENT", school },
       select: { totalPoints: true },
     }),
     prisma.user.findMany({ where: { role: "STUDENT" }, select: { totalPoints: true } }),

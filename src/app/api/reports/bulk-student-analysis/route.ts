@@ -7,6 +7,11 @@ import { logger } from "@/lib/logger";
 import { AiKeyMissingError } from "@/lib/ai";
 import { runStudentSessionAnalysis } from "@/lib/student-session-analysis";
 import { requireTeacherSession } from "@/lib/session-helpers";
+import {
+  isClassInTeacherScope,
+  loadTeacherStudentScope,
+} from "@/lib/teacher-student-access";
+import { sessionTargetsStudent } from "@/lib/session-targeting";
 
 // 한 번의 요청에서 실행할 최대 AI 분석 수(서버리스 타임아웃 회피). 클라이언트가 cursor로 반복 호출한다.
 const ANALYSES_PER_CALL = 3;
@@ -36,16 +41,19 @@ export async function POST(req: NextRequest) {
   const limited = checkRateLimit(`bulk-analysis:${userId}`, 120);
   if (limited) return limited;
 
-  // 담당 학급 검증
-  const owns = await prisma.teacherClass.findFirst({ where: { teacherId: userId, grade, className }, select: { id: true } });
-  if (!owns) return NextResponse.json({ error: "담당 학급이 아닙니다" }, { status: 403 });
-
-  const teacher = await prisma.user.findUnique({ where: { id: userId }, select: { school: true } });
-  const school = teacher?.school ?? null;
+  const teacherScope = await loadTeacherStudentScope(userId);
+  if (!teacherScope || !isClassInTeacherScope(teacherScope, grade, className)) {
+    return NextResponse.json({ error: "담당 학급이 아닙니다" }, { status: 403 });
+  }
 
   // 학급 학생(출석번호순 → 결정적 순서)
   const students = await prisma.user.findMany({
-    where: { role: "STUDENT", grade, className, ...(school ? { school } : {}) },
+    where: {
+      role: "STUDENT",
+      school: teacherScope.school,
+      grade,
+      className,
+    },
     select: { id: true },
     orderBy: [{ studentNumber: "asc" }, { id: "asc" }],
   });
@@ -54,9 +62,17 @@ export async function POST(req: NextRequest) {
   // 교사 소유 세션만(주어진 순서 유지)
   const ownedSessions = await prisma.questionSession.findMany({
     where: { id: { in: sessionIdsRaw }, teacherId: userId },
-    select: { id: true },
+    select: {
+      id: true,
+      targetType: true,
+      targetGrade: true,
+      targetClassName: true,
+      targetStudentId: true,
+      targetStudentIds: true,
+    },
   });
   const ownedSet = new Set(ownedSessions.map((s) => s.id));
+  const ownedById = new Map(ownedSessions.map((item) => [item.id, item]));
   const sessionIds = sessionIdsRaw.filter((id) => ownedSet.has(id));
 
   if (studentIds.length === 0 || sessionIds.length === 0) {
@@ -87,7 +103,14 @@ export async function POST(req: NextRequest) {
   const pairs: { sessionId: string; studentId: string }[] = [];
   for (const sid of studentIds) {
     for (const sessId of sessionIds) {
-      if (participated.has(`${sessId}|${sid}`)) pairs.push({ sessionId: sessId, studentId: sid });
+      const targetSession = ownedById.get(sessId);
+      if (
+        targetSession &&
+        sessionTargetsStudent(targetSession, { id: sid, grade, className }) &&
+        participated.has(`${sessId}|${sid}`)
+      ) {
+        pairs.push({ sessionId: sessId, studentId: sid });
+      }
     }
   }
   const total = pairs.length;

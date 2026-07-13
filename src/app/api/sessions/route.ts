@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireTeacherSession } from "@/lib/session-helpers";
 import { isValidSessionDateString } from "@/lib/sessions";
+import { teacherCanUseSessionTarget } from "@/lib/session-access";
+import { sessionTargetsStudent } from "@/lib/session-targeting";
 import { z } from "zod";
 
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
@@ -22,42 +24,16 @@ const createSchema = z.object({
   isActive: z.boolean().optional().default(true),
 });
 
-function jsonStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-}
-
-function sessionTargetsStudent(
-  session: {
-    targetType: string;
-    targetGrade: string | null;
-    targetClassName: string | null;
-    targetStudentId: string | null;
-    targetStudentIds: unknown;
-  },
-  student: { id: string; grade: string | null; className: string | null },
-) {
-  const targetStudentIds = jsonStringArray(session.targetStudentIds);
-  if (session.targetType === "ALL") return true;
-  if (session.targetType === "CLASS") {
-    return (
-      (session.targetGrade === student.grade && session.targetClassName === student.className) ||
-      targetStudentIds.includes(student.id)
-    );
-  }
-  if (session.targetType === "STUDENT") {
-    return session.targetStudentId === student.id || targetStudentIds.includes(student.id);
-  }
-  if (session.targetType === "CUSTOM") return targetStudentIds.includes(student.id);
-  return false;
-}
-
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
 
-  const user = session.user as { id: string; role?: string; grade?: string; className?: string };
+  const user = session.user as { id: string; role?: string };
+  if (user.role !== "TEACHER" && user.role !== "STUDENT") {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
   const scheduleOnly = new URL(req.url).searchParams.get("view") === "schedule";
 
   if (user.role === "TEACHER") {
@@ -153,30 +129,45 @@ export async function GET(req: Request) {
     return NextResponse.json(sessionsWithParticipation);
   }
 
-  // 학생: 같은 학년·반을 담당하는 교사의 세션만 반환
-  if (!user.grade || !user.className) {
+  // 학생: DB의 최신 소속 정보를 기준으로 같은 학교·학년·반 담당 교사의 세션만 반환
+  const student = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { id: true, school: true, grade: true, className: true },
+  });
+  if (!student?.school || !student.grade || !student.className) {
     return NextResponse.json([]);
   }
 
-  const teacherClasses = await prisma.teacherClass.findMany({
-    where: { grade: user.grade, className: user.className },
-    select: { teacherId: true },
+  const teachers = await prisma.user.findMany({
+    where: {
+      role: "TEACHER",
+      school: student.school,
+      OR: [
+        {
+          teacherClasses: {
+            some: { grade: student.grade, className: student.className },
+          },
+        },
+        { teacherClasses: { none: {} } },
+      ],
+    },
+    select: { id: true },
   });
 
-  if (teacherClasses.length === 0) {
-    return NextResponse.json([]);
-  }
-
-  const teacherIds = teacherClasses.map((tc) => tc.teacherId);
+  const teacherIds = teachers.map((teacher) => teacher.id);
   const sessions = await prisma.questionSession.findMany({
     where: {
       teacherId: { in: teacherIds },
+      teacher: { school: student.school },
       isActive: true,
       OR: [
         { targetType: "ALL" },
-        { targetType: "CLASS", targetGrade: user.grade, targetClassName: user.className },
-        { targetType: "STUDENT", targetStudentId: user.id },
-        { targetType: "CUSTOM", targetStudentIds: { array_contains: user.id } },
+        { targetType: "CLASS", targetGrade: student.grade, targetClassName: student.className },
+        { targetType: "STUDENT", targetStudentId: student.id },
+        {
+          targetType: { in: ["CLASS", "STUDENT", "CUSTOM"] },
+          targetStudentIds: { array_contains: student.id },
+        },
       ],
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -195,6 +186,17 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { date, subject, topic, targetType, targetGrade, targetClassName, targetStudentId, targetStudentIds, defaultQuestionPublic, likesVisibleToPeers, commentsVisibleToPeers, isActive } =
       createSchema.parse(body);
+
+    const canUseTarget = await teacherCanUseSessionTarget(authResult.user.id, {
+      targetType,
+      targetGrade: targetGrade ?? null,
+      targetClassName: targetClassName ?? null,
+      targetStudentId: targetStudentId ?? null,
+      targetStudentIds,
+    });
+    if (!canUseTarget) {
+      return NextResponse.json({ error: "질문수업 대상을 지정할 권한이 없습니다" }, { status: 403 });
+    }
 
     const newSession = await prisma.questionSession.create({
       data: {

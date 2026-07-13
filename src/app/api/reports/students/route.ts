@@ -3,6 +3,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { compareStudentNumber } from "@/lib/student-sort";
 import { buildStudentReport } from "@/lib/student-report";
+import {
+  isClassInTeacherScope,
+  loadTeacherStudentScope,
+} from "@/lib/teacher-student-access";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -18,21 +22,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "학년과 반이 필요합니다" }, { status: 400 });
   }
 
-  const ownedClass = await prisma.teacherClass.findFirst({
-    where: { teacherId, grade, className },
-    select: { id: true },
-  });
-  if (!ownedClass) {
+  const teacherScope = await loadTeacherStudentScope(teacherId);
+  if (!teacherScope) {
+    return NextResponse.json({ error: "학생 보고서 조회 권한이 없습니다" }, { status: 403 });
+  }
+  if (!isClassInTeacherScope(teacherScope, grade, className)) {
     return NextResponse.json({ error: "담당 학급만 출력할 수 있습니다" }, { status: 403 });
   }
 
-  const teacher = await prisma.user.findUnique({
-    where: { id: teacherId },
-    select: { school: true },
-  });
-  const school = teacher?.school ?? null;
   const students = await prisma.user.findMany({
-    where: { role: "STUDENT", grade, className, ...(school ? { school } : {}) },
+    where: {
+      role: "STUDENT",
+      school: teacherScope.school,
+      grade,
+      className,
+    },
     select: { id: true, studentNumber: true },
   });
   students.sort((a, b) => compareStudentNumber(a.studentNumber, b.studentNumber));

@@ -25,23 +25,40 @@ export async function GET(req: NextRequest) {
       name: true,
       totalPoints: true,
       role: true,
+      teacherClasses: { select: { grade: true, className: true } },
     },
   });
   if (!me) return NextResponse.json({ error: "사용자를 찾을 수 없습니다" }, { status: 404 });
+  if (me.role !== "TEACHER" && me.role !== "STUDENT") {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
+  if (!me.school) {
+    return NextResponse.json({ error: "소속 학교 정보가 없습니다" }, { status: 403 });
+  }
 
   const scope = req.nextUrl.searchParams.get("scope") ?? "class"; // class | school | all
   const filterGrade = req.nextUrl.searchParams.get("grade");
   const filterClass = req.nextUrl.searchParams.get("className");
 
   const where: Record<string, unknown> = { role: "STUDENT" };
-  if (scope !== "all" && me.school) where.school = me.school;
+  if (scope !== "all") where.school = me.school;
   if (scope === "class") {
-    const grade = filterGrade ?? me.grade;
-    const className = filterClass ?? me.className;
-    if (grade && className) {
-      where.grade = grade;
-      where.className = className;
+    const grade = me.role === "TEACHER" ? filterGrade : me.grade;
+    const className = me.role === "TEACHER" ? filterClass : me.className;
+    if (!grade || !className) {
+      return NextResponse.json({ error: "학급 정보가 필요합니다" }, { status: 400 });
     }
+    if (
+      me.role === "TEACHER" &&
+      me.teacherClasses.length > 0 &&
+      !me.teacherClasses.some(
+        (item) => item.grade === grade && item.className === className,
+      )
+    ) {
+      return NextResponse.json({ error: "담당 학급만 조회할 수 있습니다" }, { status: 403 });
+    }
+    where.grade = grade;
+    where.className = className;
   }
 
   const [students, total] = await Promise.all([

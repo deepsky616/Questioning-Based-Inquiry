@@ -10,9 +10,10 @@ vi.mock("@/lib/translate", async (importActual) => {
 });
 vi.mock("@/lib/db", () => ({
   prisma: {
-    questionSession: { findFirst: vi.fn() },
+    questionSession: { findFirst: vi.fn(), findUnique: vi.fn() },
     sessionAnalysis: { findUnique: vi.fn() },
     translation: { findUnique: vi.fn(), upsert: vi.fn() },
+    user: { findUnique: vi.fn() },
   },
 }));
 
@@ -26,9 +27,11 @@ const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mResolve = resolveUserAiConfig as unknown as ReturnType<typeof vi.fn>;
 const mTranslate = translateTexts as unknown as ReturnType<typeof vi.fn>;
 const mSession = prisma.questionSession.findFirst as unknown as ReturnType<typeof vi.fn>;
+const mSessionFind = prisma.questionSession.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mSessionAnalysis = prisma.sessionAnalysis.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mFind = prisma.translation.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mUpsert = prisma.translation.upsert as unknown as ReturnType<typeof vi.fn>;
+const mUserFind = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 
 function req(locale: string, body: unknown) {
   return new Request("http://localhost/api/reports/session-analysis/translate", {
@@ -44,7 +47,26 @@ beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
   mSession.mockResolvedValue({ id: "s1" });
-  mSessionAnalysis.mockResolvedValue({ id: "a1" });
+  mSessionFind.mockResolvedValue({
+    teacherId: "t1",
+    targetType: "CLASS",
+    targetGrade: "5",
+    targetClassName: "1",
+    targetStudentId: null,
+    targetStudentIds: [],
+    teacher: {
+      school: "한빛초",
+      teacherClasses: [{ grade: "5", className: "1" }],
+    },
+  });
+  mSessionAnalysis.mockResolvedValue({ id: "a1", result: BODY.fields });
+  mUserFind.mockResolvedValue({
+    id: "st1",
+    role: "STUDENT",
+    school: "한빛초",
+    grade: "5",
+    className: "1",
+  });
   mFind.mockResolvedValue(null);
   mUpsert.mockResolvedValue({});
   mResolve.mockResolvedValue({ apiKey: "k", model: "gemini-2.5-flash-lite" });
@@ -70,8 +92,44 @@ describe("POST session-analysis translate", () => {
     expect(data.fields).toEqual({ summary: "Summary", insights: "Suggestion" });
     expect(mSessionAnalysis).toHaveBeenCalledWith({
       where: { sessionId_scope_studentId: { sessionId: "s1", scope: "student", studentId: "st1" } },
-      select: { id: true },
+      select: { id: true, result: true },
     });
+  });
+
+  it("학생이 현재 수업 대상에서 제외되면 저장 분석이 있어도 번역할 수 없다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "st1", role: "STUDENT" } });
+    mSessionFind.mockResolvedValue({
+      teacherId: "t1",
+      targetType: "STUDENT",
+      targetGrade: null,
+      targetClassName: null,
+      targetStudentId: "student-other",
+      targetStudentIds: ["student-other"],
+      teacher: {
+        school: "한빛초",
+        teacherClasses: [{ grade: "5", className: "1" }],
+      },
+    });
+
+    expect((await POST(req("en", { ...BODY, cacheKey: "student-self" }))).status).toBe(403);
+    expect(mTranslate).not.toHaveBeenCalled();
+    expect(mUpsert).not.toHaveBeenCalled();
+  });
+
+  it("학생은 저장 분석과 다른 자료나 교사용 캐시 키를 번역할 수 없다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "st1", role: "STUDENT" } });
+
+    const arbitrary = await POST(req("en", {
+      ...BODY,
+      cacheKey: "student-self",
+      fields: { summary: "임의로 만든 자료" },
+    }));
+    expect(arbitrary.status).toBe(400);
+
+    const teacherCache = await POST(req("en", BODY));
+    expect(teacherCache.status).toBe(403);
+    expect(mTranslate).not.toHaveBeenCalled();
+    expect(mUpsert).not.toHaveBeenCalled();
   });
 
   it("학생 본인 저장 분석이 없으면 404", async () => {

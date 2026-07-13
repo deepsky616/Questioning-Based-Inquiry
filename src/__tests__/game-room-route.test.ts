@@ -6,11 +6,13 @@ const mocks = vi.hoisted(() => ({
   loadGameRoom: vi.fn(),
   saveGameRoom: vi.fn(),
   deleteGameRoom: vi.fn(),
+  checkRateLimit: vi.fn((): Response | null => null),
   recordMemoryRoll: vi.fn(),
   settleMemoryRollingRoom: vi.fn((room: GameRoom) => room),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: mocks.checkRateLimit }));
 vi.mock("@/lib/game-room-store", () => ({
   loadGameRoom: mocks.loadGameRoom,
   saveGameRoom: mocks.saveGameRoom,
@@ -23,7 +25,7 @@ vi.mock("@/lib/memory-room-roll", () => ({
   settleMemoryRollingRoom: mocks.settleMemoryRollingRoom,
 }));
 
-import { PATCH } from "@/app/api/question-games/rooms/[code]/route";
+import { GET, PATCH } from "@/app/api/question-games/rooms/[code]/route";
 
 function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
   return {
@@ -56,6 +58,13 @@ function patch(body: Record<string, unknown>) {
   );
 }
 
+function get() {
+  return GET(
+    new Request("http://localhost/api/question-games/rooms/1234") as never,
+    { params: Promise.resolve({ code: "1234" }) },
+  );
+}
+
 beforeEach(() => {
   mocks.auth.mockReset().mockResolvedValue({
     user: { id: "user-1", name: "학생" },
@@ -63,6 +72,7 @@ beforeEach(() => {
   mocks.loadGameRoom.mockReset();
   mocks.saveGameRoom.mockReset();
   mocks.deleteGameRoom.mockReset();
+  mocks.checkRateLimit.mockReset().mockReturnValue(null);
   mocks.recordMemoryRoll.mockReset();
   mocks.settleMemoryRollingRoom
     .mockReset()
@@ -111,8 +121,13 @@ describe("일반 게임 동작 충돌", () => {
   it.each(cases)(
     "%s 저장 충돌은 최신 방과 409를 반환한다",
     async (action, extra) => {
-      const current = makeRoom();
-      const latest = makeRoom({ version: 2, topic: "최신" });
+      const current = makeRoom({ gameId: "relay", status: "playing" });
+      const latest = makeRoom({
+        gameId: "relay",
+        status: "playing",
+        version: 2,
+        topic: "최신",
+      });
       mocks.loadGameRoom.mockResolvedValue(current);
       mocks.saveGameRoom.mockResolvedValue({ kind: "conflict", room: latest });
 
@@ -663,7 +678,7 @@ it("마지막 주사위가 놀이 단계로 바뀐 뒤 나가기 재시도는 �
   expect(retried.gameState).not.toHaveProperty("lastReveal");
 });
 
-it("이미 나간 사용자도 메모리 완료 후보가 생기면 저장한다", async () => {
+it("이미 나간 사용자는 메모리 완료 후보를 저장하거나 방 상태를 받지 않는다", async () => {
   const room = makeRoom({
     gameId: "memory",
     hostId: "other",
@@ -695,11 +710,12 @@ it("이미 나간 사용자도 메모리 완료 후보가 생기면 저장한다
   const response = await patch({ action: "leave" });
 
   expect(response.status).toBe(200);
-  expect(mocks.settleMemoryRollingRoom).toHaveBeenCalledWith(room);
-  expect(mocks.saveGameRoom).toHaveBeenCalledWith(settled);
+  await expect(response.json()).resolves.toEqual({ room: null });
+  expect(mocks.settleMemoryRollingRoom).not.toHaveBeenCalled();
+  expect(mocks.saveGameRoom).not.toHaveBeenCalled();
 });
 
-it("이미 나간 사용자의 메모리 완료 저장 충돌도 최신 방에서 다시 판정한다", async () => {
+it("이미 나간 사용자는 메모리 상태 재판정을 시작하지 않는다", async () => {
   const current = makeRoom({
     gameId: "memory",
     hostId: "other",
@@ -738,10 +754,9 @@ it("이미 나간 사용자의 메모리 완료 저장 충돌도 최신 방에�
   const response = await patch({ action: "leave" });
 
   expect(response.status).toBe(200);
-  expect(mocks.settleMemoryRollingRoom).toHaveBeenNthCalledWith(1, current);
-  expect(mocks.settleMemoryRollingRoom).toHaveBeenNthCalledWith(2, latest);
-  expect(mocks.saveGameRoom).toHaveBeenNthCalledWith(1, firstSettlement);
-  expect(mocks.saveGameRoom).toHaveBeenNthCalledWith(2, retriedSettlement);
+  await expect(response.json()).resolves.toEqual({ room: null });
+  expect(mocks.settleMemoryRollingRoom).not.toHaveBeenCalled();
+  expect(mocks.saveGameRoom).not.toHaveBeenCalled();
 });
 
 it("마지막 메모리 참가자 나가기는 완료 판정 없이 조건부 삭제한다", async () => {
@@ -872,7 +887,8 @@ it("이미 나간 사용자는 저장하지 않고 성공한다", async () => {
   const response = await patch({ action: "leave" });
 
   expect(response.status).toBe(200);
-  expect(mocks.settleMemoryRollingRoom).toHaveBeenCalledWith(room);
+  await expect(response.json()).resolves.toEqual({ room: null });
+  expect(mocks.settleMemoryRollingRoom).not.toHaveBeenCalled();
   expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
 });
@@ -1039,6 +1055,172 @@ it("로그인하지 않은 요청은 401을 반환한다", async () => {
   expect(mocks.loadGameRoom).not.toHaveBeenCalled();
 });
 
+describe("방 참가 경계", () => {
+  it("참가 시도는 방 번호와 무관한 사용자별 제한을 먼저 적용한다", async () => {
+    mocks.checkRateLimit.mockReturnValueOnce(
+      Response.json({ error: "요청이 너무 많습니다" }, { status: 429 }),
+    );
+
+    const response = await patch({ action: "join" });
+
+    expect(response.status).toBe(429);
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith("game-room-join:user-1", 10);
+    expect(mocks.loadGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("방 조회는 정상 폴링용 사용자 제한을 적용한다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(makeRoom());
+
+    await get();
+
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith("game-room-read:user-1", 120);
+  });
+
+  it("참가하지 않은 사용자는 방 전체 상태를 조회할 수 없다", async () => {
+    mocks.auth.mockResolvedValue({
+      user: { id: "other", name: "다른 학생" },
+    });
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({ gameState: { answer: "공개하면 안 되는 상태" } }),
+    );
+
+    const response = await get();
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "방 참가자만 확인할 수 있어요",
+    });
+  });
+
+  it("참가자는 방 전체 상태를 조회할 수 있다", async () => {
+    const room = makeRoom({ gameState: { score: 2 } });
+    mocks.loadGameRoom.mockResolvedValue(room);
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ room });
+  });
+
+  it.each(["update-state", "set-state", "next-turn"])(
+    "참가하지 않은 사용자의 %s 요청은 403을 반환한다",
+    async (action) => {
+      mocks.auth.mockResolvedValue({
+        user: { id: "other", name: "다른 학생" },
+      });
+      mocks.loadGameRoom.mockResolvedValue(makeRoom());
+
+      const response = await patch({
+        action,
+        expectedVersion: 1,
+        patch: { score: 1 },
+        state: { score: 1 },
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: "방 참가자만 변경할 수 있어요",
+      });
+      expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe("방 상태 쓰기 권한", () => {
+  const versionedActions: Array<[string, Record<string, unknown>]> = [
+    ["start", {}],
+    ["update-state", { patch: { score: 1 } }],
+    ["set-state", { state: { score: 1 } }],
+    ["next-turn", {}],
+    ["set-topic", { topic: "물" }],
+    ["add-question", { question: "왜 그럴까?" }],
+    ["end", {}],
+    ["restart", {}],
+  ];
+
+  it.each(versionedActions)(
+    "%s 요청은 expectedVersion이 없으면 400을 반환한다",
+    async (action, extra) => {
+      mocks.loadGameRoom.mockResolvedValue(makeRoom());
+
+      const response = await patch({ action, ...extra });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "올바른 expectedVersion이 필요합니다",
+      });
+      expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["1", 1.5, 0, -1])(
+    "잘못된 expectedVersion %s는 400을 반환한다",
+    async (expectedVersion) => {
+      mocks.loadGameRoom.mockResolvedValue(makeRoom());
+
+      const response = await patch({
+        action: "update-state",
+        expectedVersion,
+        patch: { score: 1 },
+      });
+
+      expect(response.status).toBe(400);
+      expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    },
+  );
+
+  it("방장이 아닌 참가자는 전체 상태를 교체할 수 없다", async () => {
+    mocks.auth.mockResolvedValue({
+      user: { id: "member", name: "참가자" },
+    });
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({
+        players: [
+          { id: "user-1", name: "방장", isHost: true, joinedAt: 1 },
+          { id: "member", name: "참가자", isHost: false, joinedAt: 2 },
+        ],
+      }),
+    );
+
+    const response = await patch({
+      action: "set-state",
+      expectedVersion: 1,
+      state: { score: 99 },
+    });
+
+    expect(response.status).toBe(403);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it.each(["playing", "ended"])(
+    "방장이 아닌 참가자는 update-state로 방 상태를 %s로 바꿀 수 없다",
+    async (status) => {
+      mocks.auth.mockResolvedValue({
+        user: { id: "member", name: "참가자" },
+      });
+      mocks.loadGameRoom.mockResolvedValue(
+        makeRoom({
+          status: status === "playing" ? "ended" : "playing",
+          players: [
+            { id: "user-1", name: "방장", isHost: true, joinedAt: 1 },
+            { id: "member", name: "참가자", isHost: false, joinedAt: 2 },
+          ],
+        }),
+      );
+
+      const response = await patch({
+        action: "update-state",
+        expectedVersion: 1,
+        patch: { phase: "done" },
+        status,
+      });
+
+      expect(response.status).toBe(403);
+      expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    },
+  );
+});
+
 describe("기존 권한과 게임 규칙", () => {
   it.each(["start", "set-topic", "end", "restart"])(
     "방장이 아닌 사용자의 %s 요청은 403을 반환한다",
@@ -1092,6 +1274,8 @@ describe("기존 권한과 게임 규칙", () => {
   it("현재 차례가 아닌 사용자는 질문을 추가할 수 없다", async () => {
     mocks.loadGameRoom.mockResolvedValue(
       makeRoom({
+        gameId: "relay",
+        status: "playing",
         hostId: "other",
         players: [
           { id: "other", name: "다른 학생", isHost: true, joinedAt: 1 },
@@ -1110,9 +1294,87 @@ describe("기존 권한과 게임 규칙", () => {
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
+  it("종료된 이어 말하기에는 질문을 추가할 수 없다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({ gameId: "relay", status: "ended" }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room,
+    }));
+
+    const response = await patch({
+      action: "add-question",
+      expectedVersion: 1,
+      question: "종료 뒤 만든 질문",
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("방장이 아닌 참가자는 이어 말하기 차례를 임의로 넘길 수 없다", async () => {
+    mocks.auth.mockResolvedValue({
+      user: { id: "member", name: "참가자" },
+    });
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({
+        gameId: "relay",
+        status: "playing",
+        players: [
+          { id: "user-1", name: "방장", isHost: true, joinedAt: 1 },
+          { id: "member", name: "참가자", isHost: false, joinedAt: 2 },
+        ],
+      }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room,
+    }));
+
+    const response = await patch({
+      action: "next-turn",
+      expectedVersion: 1,
+    });
+
+    expect(response.status).toBe(403);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("방장이 아닌 참가자는 이어 말하기 상태를 직접 갱신할 수 없다", async () => {
+    mocks.auth.mockResolvedValue({
+      user: { id: "member", name: "참가자" },
+    });
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({
+        gameId: "relay",
+        status: "playing",
+        players: [
+          { id: "user-1", name: "방장", isHost: true, joinedAt: 1 },
+          { id: "member", name: "참가자", isHost: false, joinedAt: 2 },
+        ],
+      }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room,
+    }));
+
+    const response = await patch({
+      action: "update-state",
+      expectedVersion: 1,
+      patch: {},
+    });
+
+    expect(response.status).toBe(403);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
   it("이미 나온 질문을 다시 추가할 수 없다", async () => {
     mocks.loadGameRoom.mockResolvedValue(
       makeRoom({
+        gameId: "relay",
+        status: "playing",
         chain: [
           {
             question: "왜 그럴까?",
@@ -1127,6 +1389,115 @@ describe("기존 권한과 게임 규칙", () => {
       action: "add-question",
       expectedVersion: 1,
       question: "왜 그럴까?",
+    });
+
+    expect(response.status).toBe(400);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("공백과 대소문자만 다른 같은 질문을 다시 저장할 수 없다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({
+        gameId: "relay",
+        status: "playing",
+        chain: [
+          {
+            question: "Why  is the sky blue?",
+            playerId: "user-1",
+            playerName: "학생",
+          },
+        ],
+      }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room,
+    }));
+
+    const response = await patch({
+      action: "add-question",
+      expectedVersion: 1,
+      question: "why is the sky blue?",
+    });
+
+    expect(response.status).toBe(400);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("한 학생은 이어 말하기 질문을 30개보다 많이 저장할 수 없다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({
+        gameId: "relay",
+        status: "playing",
+        chain: Array.from({ length: 30 }, (_, index) => ({
+          question: `${index + 1}번째 질문인가요?`,
+          playerId: "user-1",
+          playerName: "학생",
+        })),
+      }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room,
+    }));
+
+    const response = await patch({
+      action: "add-question",
+      expectedVersion: 1,
+      question: "31번째 질문인가요?",
+    });
+
+    expect(response.status).toBe(400);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("이어 말하기 방에는 질문을 120개보다 많이 저장할 수 없다", async () => {
+    const players = Array.from({ length: 8 }, (_, index) => ({
+      id: index === 0 ? "user-1" : `user-${index + 1}`,
+      name: `학생 ${index + 1}`,
+      isHost: index === 0,
+      joinedAt: index + 1,
+    }));
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({
+        gameId: "relay",
+        status: "playing",
+        players,
+        chain: Array.from({ length: 120 }, (_, index) => ({
+          question: `${index + 1}번째 탐구 질문인가요?`,
+          playerId: players[index % players.length].id,
+          playerName: players[index % players.length].name,
+        })),
+      }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room,
+    }));
+
+    const response = await patch({
+      action: "add-question",
+      expectedVersion: 1,
+      question: "121번째 탐구 질문인가요?",
+    });
+
+    expect(response.status).toBe(400);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("질문 형식이 아닌 짧은 답은 이어 말하기에 저장하지 않는다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({ gameId: "relay", status: "playing" }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room,
+    }));
+
+    const response = await patch({
+      action: "add-question",
+      expectedVersion: 1,
+      question: "1",
     });
 
     expect(response.status).toBe(400);

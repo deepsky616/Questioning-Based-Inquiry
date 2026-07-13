@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { teacherCanUseSessionTarget } from "@/lib/session-access";
 import { isValidSessionDateString } from "@/lib/sessions";
 
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
@@ -63,6 +64,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const design = rows[0];
     if (!design || design.teacher_id !== teacherId) {
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+    }
+
+    const canUseTarget = await teacherCanUseSessionTarget(teacherId, {
+      targetType: data.targetType,
+      targetGrade: data.targetGrade ?? null,
+      targetClassName: data.targetClassName ?? null,
+      targetStudentId: data.targetStudentId ?? null,
+      targetStudentIds: data.targetStudentIds,
+    });
+    if (!canUseTarget) {
+      return NextResponse.json({ error: "수업 대상을 선택할 권한이 없습니다" }, { status: 403 });
     }
 
     const savedQuestions = Array.isArray(design.inquiry_questions)

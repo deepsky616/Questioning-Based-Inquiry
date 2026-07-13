@@ -14,7 +14,25 @@ const student: AuthorInfo = { role: "STUDENT", school: "한빛초", grade: "5", 
 const teacherOf = (classes: { grade: string; className: string }[], school = "한빛초"): Viewer => ({
   id: "t1", role: "TEACHER", school, teacherClasses: classes,
 });
-const studentViewer = (id: string): Viewer => ({ id, role: "STUDENT", school: "한빛초", teacherClasses: [] });
+const studentViewer = (
+  id: string,
+  school = "한빛초",
+  grade = "5",
+  className = "1",
+): Viewer => ({ id, role: "STUDENT", school, grade, className, teacherClasses: [] });
+
+const individualSession = (targetStudentId: string) => ({
+  teacherId: "t1",
+  targetType: "STUDENT",
+  targetGrade: null,
+  targetClassName: null,
+  targetStudentId,
+  targetStudentIds: [targetStudentId],
+  teacher: {
+    school: "한빛초",
+    teacherClasses: [{ grade: "5", className: "1" }],
+  },
+});
 
 describe("teacherCanSeeAuthor", () => {
   it("담당 학급 교사는 해당 학생을 본다", () => {
@@ -32,19 +50,41 @@ describe("teacherCanSeeAuthor", () => {
 });
 
 describe("canViewQuestion", () => {
-  const q = (over: Partial<{ isPublic: boolean; authorId: string }> = {}) => ({
+  const q = (over: Partial<{ isPublic: boolean; authorId: string; session: ReturnType<typeof individualSession> | null }> = {}) => ({
     isPublic: false, authorId: "s1", author: student, ...over,
   });
-  it("공개 질문은 누구나", () => {
+  it("같은 학급 학생의 공개 질문은 볼 수 있다", () => {
     expect(canViewQuestion(studentViewer("other"), q({ isPublic: true }))).toBe(true);
+  });
+  it("다른 학교나 다른 학급 학생의 공개 질문은 볼 수 없다", () => {
+    expect(canViewQuestion(studentViewer("other", "다른초"), q({ isPublic: true }))).toBe(false);
+    expect(canViewQuestion(studentViewer("other", "한빛초", "6", "2"), q({ isPublic: true }))).toBe(false);
   });
   it("비공개 질문은 작성자 본인만(학생)", () => {
     expect(canViewQuestion(studentViewer("s1"), q())).toBe(true);
     expect(canViewQuestion(studentViewer("other"), q())).toBe(false);
   });
+  it("알 수 없는 역할은 작성자 번호가 같아도 질문을 볼 수 없다", () => {
+    expect(canViewQuestion(
+      { ...studentViewer("s1"), role: "UNKNOWN" },
+      q(),
+    )).toBe(false);
+  });
   it("비공개 질문은 담당 교사만, 다른 학급 교사는 불가", () => {
     expect(canViewQuestion(teacherOf([{ grade: "5", className: "1" }]), q())).toBe(true);
     expect(canViewQuestion(teacherOf([{ grade: "6", className: "2" }]), q())).toBe(false);
+  });
+  it("같은 학급 공개 질문이어도 질문수업 대상이 아니면 볼 수 없다", () => {
+    expect(canViewQuestion(
+      studentViewer("s2"),
+      q({ isPublic: true, session: individualSession("s3") }),
+    )).toBe(false);
+  });
+  it("자기 질문이어도 현재 질문수업 대상에서 제외되면 볼 수 없다", () => {
+    expect(canViewQuestion(
+      studentViewer("s1"),
+      q({ session: individualSession("s3") }),
+    )).toBe(false);
   });
 });
 
@@ -87,6 +127,20 @@ describe("canCommentOnQuestion", () => {
     expect(canCommentOnQuestion(teacherOf([{ grade: "5", className: "1" }]), privateQuestion)).toBe(true);
     expect(canCommentOnQuestion({ ...studentViewer("s1"), grade: "5", className: "1" }, privateQuestion)).toBe(true);
     expect(canCommentOnQuestion({ ...studentViewer("s2"), grade: "5", className: "1" }, privateQuestion)).toBe(false);
+  });
+
+  it("학생은 질문수업 대상이 아닌 공개 질문에 댓글을 쓸 수 없다", () => {
+    expect(canCommentOnQuestion(
+      studentViewer("s2"),
+      { ...studentQuestion(), session: individualSession("s3") },
+    )).toBe(false);
+  });
+
+  it("자기 질문이어도 현재 질문수업 대상에서 제외되면 댓글을 쓸 수 없다", () => {
+    expect(canCommentOnQuestion(
+      studentViewer("s1"),
+      { ...studentQuestion(), session: individualSession("s3") },
+    )).toBe(false);
   });
 });
 

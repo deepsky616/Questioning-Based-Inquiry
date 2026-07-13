@@ -5,7 +5,7 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     pointLog: { findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     questionSession: { findMany: vi.fn() },
-    user: { update: vi.fn() },
+    user: { findUnique: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -19,6 +19,9 @@ import { POST } from "@/app/api/teacher/points/decide/route";
 const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mLogs = prisma.pointLog.findMany as unknown as ReturnType<typeof vi.fn>;
 const mSessions = prisma.questionSession.findMany as unknown as ReturnType<typeof vi.fn>;
+const mUser = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
+const mUserUpdate = prisma.user.update as unknown as ReturnType<typeof vi.fn>;
+const mPointUpdateMany = prisma.pointLog.updateMany as unknown as ReturnType<typeof vi.fn>;
 const mTx = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
 
 const req = (body: unknown) =>
@@ -32,10 +35,19 @@ beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
   mLogs.mockResolvedValue([
-    { id: "log1", studentId: "s1", sessionId: "sess1", points: 0, bonusType: "AI_DUPLICATE_FLAGGED", student: { id: "s1" } },
+    { id: "log1", studentId: "s1", sessionId: "sess1", points: 0, bonusType: "AI_DUPLICATE_FLAGGED", student: { id: "s1", role: "STUDENT", school: "우리학교", grade: "5", className: "1" } },
   ]);
   mSessions.mockResolvedValue([{ id: "sess1" }]);
-  mTx.mockResolvedValue([]);
+  mUser.mockResolvedValue({
+    school: "우리학교",
+    teacherClasses: [{ grade: "5", className: "1" }],
+  });
+  mPointUpdateMany.mockResolvedValue({ count: 1 });
+  mUserUpdate.mockResolvedValue({ id: "s1" });
+  mTx.mockImplementation(async (callback: unknown) => {
+    const run = callback as (tx: typeof prisma) => Promise<unknown>;
+    return run(prisma);
+  });
 });
 
 // 경고 항목에 점수 수정(구제)을 개방하면서 함께 추가한 서버 범위 검증
@@ -61,20 +73,20 @@ describe("포인트 승인 — 수정 점수 범위 검증", () => {
 
   it("경고(FLAGGED) 행을 구제 승인하면 유형이 교사 보정으로 전환된다", async () => {
     mLogs.mockResolvedValue([
-      { id: "log1", studentId: "s1", sessionId: "sess1", points: 0, bonusType: "AI_DUPLICATE_FLAGGED", student: { id: "s1" } },
+      { id: "log1", studentId: "s1", sessionId: "sess1", points: 0, bonusType: "AI_DUPLICATE_FLAGGED", student: { id: "s1", role: "STUDENT", school: "우리학교", grade: "5", className: "1" } },
     ]);
     await POST(req({ ids: ["log1"], decision: "APPROVE", overridePoints: 3 }));
-    const update = (prisma.pointLog.update as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const update = mPointUpdateMany.mock.calls[0][0];
     expect(update.data.bonusType).toBe("TEACHER_ADJUSTED");
     expect(update.data.points).toBe(3);
   });
 
   it("일반 보너스 행의 수정 승인은 유형을 바꾸지 않는다", async () => {
     mLogs.mockResolvedValue([
-      { id: "log1", studentId: "s1", sessionId: "sess1", points: 3, bonusType: "AI_DEEP_QUESTION", student: { id: "s1" } },
+      { id: "log1", studentId: "s1", sessionId: "sess1", points: 3, bonusType: "AI_DEEP_QUESTION", student: { id: "s1", role: "STUDENT", school: "우리학교", grade: "5", className: "1" } },
     ]);
     await POST(req({ ids: ["log1"], decision: "APPROVE", overridePoints: 4 }));
-    const update = (prisma.pointLog.update as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const update = mPointUpdateMany.mock.calls[0][0];
     expect(update.data.bonusType).toBeUndefined();
     expect(update.data.points).toBe(4);
   });

@@ -26,13 +26,24 @@ export async function GET() {
 
   const teacher = await prisma.user.findUnique({
     where: { id: teacherId },
-    select: { teacherClasses: { select: { grade: true, className: true } } },
+    select: {
+      school: true,
+      teacherClasses: { select: { grade: true, className: true } },
+    },
   });
-  const classes = teacher?.teacherClasses ?? [];
-  if (classes.length === 0) return NextResponse.json({ byGame: {} });
+  if (!teacher?.school) {
+    return NextResponse.json({ error: "담당 학교 정보가 없습니다" }, { status: 403 });
+  }
+  const classes = teacher.teacherClasses;
 
   const students = await prisma.user.findMany({
-    where: { role: "STUDENT", OR: classes.map((c) => ({ grade: c.grade, className: c.className })) },
+    where: {
+      role: "STUDENT",
+      school: teacher.school,
+      ...(classes.length > 0
+        ? { OR: classes.map((c) => ({ grade: c.grade, className: c.className })) }
+        : {}),
+    },
     select: { id: true, name: true, studentNumber: true },
   });
   const studentMap = new Map(students.map((s) => [s.id, s]));

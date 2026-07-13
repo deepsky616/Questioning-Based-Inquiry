@@ -45,6 +45,18 @@ function req(body: unknown) {
 }
 
 const studentAuthor = { role: "STUDENT", school: "한빛초", grade: "5", className: "1" };
+const classSession = {
+  teacherId: "t1",
+  targetType: "CLASS",
+  targetGrade: "5",
+  targetClassName: "1",
+  targetStudentId: null,
+  targetStudentIds: [],
+  teacher: {
+    school: "한빛초",
+    teacherClasses: [{ grade: "5", className: "1" }],
+  },
+};
 const teacherViewer = (classes = [{ grade: "5", className: "1" }]) => ({
   id: "t1",
   role: "TEACHER",
@@ -71,7 +83,7 @@ describe("GET /api/questions/[id]/comments", () => {
       isPublic: true,
       authorId: "s1",
       author: studentAuthor,
-      session: { isActive: true, commentsVisibleToPeers: true },
+      session: { ...classSession, isActive: true, commentsVisibleToPeers: true },
     });
 
     const res = await getComments(new Request("http://localhost/api/test"), {
@@ -90,7 +102,7 @@ describe("GET /api/questions/[id]/comments", () => {
       isPublic: true,
       authorId: "s1",
       author: studentAuthor,
-      session: { isActive: true, commentsVisibleToPeers: false },
+      session: { ...classSession, isActive: true, commentsVisibleToPeers: false },
     });
     commentMany.mockResolvedValue([
       { id: "c-teacher", content: "교사 댓글", author: { id: "t1", name: "교사", role: "TEACHER" } },
@@ -106,6 +118,29 @@ describe("GET /api/questions/[id]/comments", () => {
     expect(res.status).toBe(200);
     expect(data.map((comment: { id: string }) => comment.id)).toEqual(["c-teacher", "c-me"]);
   });
+
+  it("수업에 속하지 않은 공개 질문은 같은 학급 학생 댓글을 보여준다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "s2", role: "STUDENT" } });
+    userFind.mockResolvedValue({ id: "s2", role: "STUDENT", school: "한빛초", grade: "5", className: "1", teacherClasses: [] });
+    questionFind.mockResolvedValue({
+      id: "q1",
+      isPublic: true,
+      authorId: "s1",
+      author: studentAuthor,
+      session: null,
+    });
+    commentMany.mockResolvedValue([
+      { id: "c-other", content: "친구 댓글", author: { id: "s3", name: "친구", role: "STUDENT" } },
+    ]);
+
+    const res = await getComments(new Request("http://localhost/api/test"), {
+      params: Promise.resolve({ id: "q1" }),
+    });
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.map((comment: { id: string }) => comment.id)).toEqual(["c-other"]);
+  });
 });
 
 describe("POST /api/questions/[id]/comments", () => {
@@ -117,7 +152,7 @@ describe("POST /api/questions/[id]/comments", () => {
       isPublic: true,
       authorId: "s1",
       author: studentAuthor,
-      session: { isActive: true },
+      session: { ...classSession, isActive: true },
     });
 
     const res = await postComment(req({ content: "좋은 질문이에요" }), {
@@ -136,7 +171,7 @@ describe("POST /api/questions/[id]/comments", () => {
       isPublic: false,
       authorId: "s1",
       author: studentAuthor,
-      session: { isActive: true },
+      session: { ...classSession, isActive: true },
     });
 
     const res = await postComment(req({ content: "선생님 답변" }), {
@@ -191,6 +226,52 @@ describe("PATCH /api/questions/[id]/comments/[commentId]", () => {
     expect(res.status).toBe(403);
     expect(commentUpdate).not.toHaveBeenCalled();
   });
+
+  it("현재 수업 대상에서 제외된 학생은 자기 댓글을 수정할 수 없다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
+    userFind.mockResolvedValue({ id: "s1", role: "STUDENT", school: "한빛초", grade: "5", className: "1", teacherClasses: [] });
+    commentFind.mockResolvedValue({
+      authorId: "s1",
+      questionId: "q1",
+      question: {
+        isPublic: true,
+        authorId: "s2",
+        author: studentAuthor,
+        session: {
+          ...classSession,
+          targetType: "STUDENT",
+          targetGrade: null,
+          targetClassName: null,
+          targetStudentId: "s2",
+          targetStudentIds: ["s2"],
+        },
+      },
+    });
+
+    const res = await patchComment(req({ content: "수정 시도" }), {
+      params: Promise.resolve({ id: "q1", commentId: "c1" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(commentUpdate).not.toHaveBeenCalled();
+  });
+
+  it("알 수 없는 역할은 작성자 번호가 같아도 댓글을 수정할 수 없다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "s1", role: "UNKNOWN" } });
+    userFind.mockResolvedValue({ id: "s1", role: "UNKNOWN", school: "한빛초", grade: "5", className: "1", teacherClasses: [] });
+    commentFind.mockResolvedValue({
+      authorId: "s1",
+      questionId: "q1",
+      question: { isPublic: true, authorId: "s2", author: studentAuthor, session: null },
+    });
+
+    const res = await patchComment(req({ content: "수정 시도" }), {
+      params: Promise.resolve({ id: "q1", commentId: "c1" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(commentUpdate).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/questions/[id]/comments/[commentId]", () => {
@@ -225,6 +306,35 @@ describe("DELETE /api/questions/[id]/comments/[commentId]", () => {
     });
 
     expect(res.status).toBe(404);
+    expect(commentDelete).not.toHaveBeenCalled();
+  });
+
+  it("현재 수업 대상에서 제외된 학생은 자기 댓글도 삭제할 수 없다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
+    userFind.mockResolvedValue({ id: "s1", role: "STUDENT", school: "한빛초", grade: "5", className: "1", teacherClasses: [] });
+    commentFind.mockResolvedValue({
+      authorId: "s1",
+      questionId: "q1",
+      question: {
+        isPublic: true,
+        authorId: "s2",
+        author: studentAuthor,
+        session: {
+          ...classSession,
+          targetType: "STUDENT",
+          targetGrade: null,
+          targetClassName: null,
+          targetStudentId: "s2",
+          targetStudentIds: ["s2"],
+        },
+      },
+    });
+
+    const res = await deleteComment(new Request("http://localhost/api/test"), {
+      params: Promise.resolve({ id: "q1", commentId: "c1" }),
+    });
+
+    expect(res.status).toBe(403);
     expect(commentDelete).not.toHaveBeenCalled();
   });
 });

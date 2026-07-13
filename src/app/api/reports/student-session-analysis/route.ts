@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { AiKeyMissingError } from "@/lib/ai";
 import { runStudentSessionAnalysis } from "@/lib/student-session-analysis";
 import { requireTeacherSession } from "@/lib/session-helpers";
+import { sessionTargetsStudent } from "@/lib/session-targeting";
+import {
+  isStudentInTeacherScope,
+  loadTeacherStudentScope,
+} from "@/lib/teacher-student-access";
 
 const bodySchema = z.object({
   sessionId: z.string().min(1),
@@ -27,6 +33,34 @@ export async function POST(req: NextRequest) {
   if (limited) return limited;
 
   try {
+    const [questionSession, teacherScope, targetStudent] = await Promise.all([
+      prisma.questionSession.findUnique({
+        where: { id: sessionId },
+        select: {
+          teacherId: true,
+          targetType: true,
+          targetGrade: true,
+          targetClassName: true,
+          targetStudentId: true,
+          targetStudentIds: true,
+        },
+      }),
+      loadTeacherStudentScope(userId),
+      prisma.user.findUnique({
+        where: { id: targetId },
+        select: { id: true, role: true, school: true, grade: true, className: true },
+      }),
+    ]);
+    if (
+      questionSession?.teacherId !== userId ||
+      !teacherScope ||
+      !targetStudent ||
+      !isStudentInTeacherScope(teacherScope, targetStudent) ||
+      !sessionTargetsStudent(questionSession, targetStudent)
+    ) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+    }
+
     const res = await runStudentSessionAnalysis({ studentId: targetId, sessionId, req });
     if (!res) return NextResponse.json({ error: "이 수업에서 한 활동이 없어요" }, { status: 400 });
     return NextResponse.json({ ...res.result, totals: res.totals });

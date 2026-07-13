@@ -1,6 +1,11 @@
 // 질문·댓글 열람 권한 판정 (순수 함수). API 라우트(목록·단건·번역)에서 공통 사용해
 // "다른 학급 교사", "댓글 비공개 세션 학생" 등의 권한 규칙을 한곳에서 일관되게 적용한다.
 
+import {
+  studentCanAccessSession,
+  type SessionAccessRecord,
+} from "@/lib/session-access-policy";
+
 export interface AuthorInfo {
   role: string;
   school: string | null;
@@ -17,7 +22,12 @@ export interface Viewer {
   teacherClasses: { grade: string; className: string }[];
 }
 
-type QuestionAccessInfo = { isPublic: boolean; authorId: string; author: AuthorInfo | null };
+type QuestionAccessInfo = {
+  isPublic: boolean;
+  authorId: string;
+  author: AuthorInfo | null;
+  session?: SessionAccessRecord | null;
+};
 
 /** 교사가 해당 학생 작성자를 볼 수 있는가: 같은 학교 + (담당 학급 없으면 학교 전체 / 있으면 해당 학급) */
 export function teacherCanSeeAuthor(viewer: Viewer | null | undefined, author: AuthorInfo | null | undefined): boolean {
@@ -27,13 +37,41 @@ export function teacherCanSeeAuthor(viewer: Viewer | null | undefined, author: A
   return viewer.teacherClasses.some((tc) => tc.grade === author.grade && tc.className === author.className);
 }
 
-/** 질문 열람 가능: 공개 / 본인 작성 / 담당 학급 교사 */
+/** 질문 열람 가능: 본인 / 담당 학급 교사 / 같은 학급 공개 질문 / 같은 학교 교사 공개 질문 */
 export function canViewQuestion(
   viewer: Viewer | null | undefined,
   q: QuestionAccessInfo,
 ): boolean {
   if (!viewer) return false;
-  return q.isPublic || q.authorId === viewer.id || teacherCanSeeAuthor(viewer, q.author);
+  if (viewer.role !== "TEACHER" && viewer.role !== "STUDENT") return false;
+  if (
+    viewer.role === "STUDENT" &&
+    q.session &&
+    !studentCanAccessSession(q.session, {
+      id: viewer.id,
+      role: viewer.role,
+      school: viewer.school,
+      grade: viewer.grade ?? null,
+      className: viewer.className ?? null,
+    })
+  ) {
+    return false;
+  }
+  if (q.authorId === viewer.id) return true;
+  if (viewer.role === "TEACHER") return teacherCanSeeAuthor(viewer, q.author);
+  if (viewer.role !== "STUDENT" || !q.isPublic || !q.author || !viewer.school) return false;
+
+  if (q.author.role === "STUDENT") {
+    return Boolean(
+      viewer.grade &&
+      viewer.className &&
+      viewer.school === q.author.school &&
+      viewer.grade === q.author.grade &&
+      viewer.className === q.author.className,
+    );
+  }
+
+  return q.author.role === "TEACHER" && viewer.school === q.author.school;
 }
 
 /** 교사가 질문과 그 댓글을 관리할 수 있는가. */
@@ -54,26 +92,7 @@ export function canCommentOnQuestion(
   if (!viewer) return false;
   if (viewer.role === "TEACHER") return canModerateQuestion(viewer, q);
   if (viewer.role !== "STUDENT") return false;
-
-  if (q.authorId === viewer.id) return true;
-  if (!q.isPublic || !q.author) return false;
-
-  if (q.author.role === "STUDENT") {
-    return Boolean(
-      viewer.school &&
-      viewer.grade &&
-      viewer.className &&
-      viewer.school === q.author.school &&
-      viewer.grade === q.author.grade &&
-      viewer.className === q.author.className,
-    );
-  }
-
-  if (q.author.role === "TEACHER") {
-    return Boolean(viewer.school && viewer.school === q.author.school);
-  }
-
-  return false;
+  return canViewQuestion(viewer, q);
 }
 
 /**

@@ -37,8 +37,12 @@ export async function GET(
   const { id } = await params;
   const session = await auth();
   if (!session?.user) return unauthorized();
-  const data = await getPublishedQuestions(id, (session.user as { id: string }).id);
-  return NextResponse.json(data);
+  try {
+    const data = await getPublishedQuestions(id, (session.user as { id: string }).id);
+    return NextResponse.json(data);
+  } catch (error) {
+    return serviceError(error);
+  }
 }
 
 export async function POST(

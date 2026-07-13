@@ -6,6 +6,14 @@ import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilte
 import { isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { sendQuestionNotificationEmail } from "@/lib/email";
 import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
+import {
+  loadTeacherStudentScope,
+  studentWhereForTeacherScope,
+} from "@/lib/teacher-student-access";
+import {
+  sessionWhereForStudent,
+  studentCanAccessSession,
+} from "@/lib/session-access";
 
 const closureSchema = z.enum(["closed", "open"]);
 const cognitiveSchema = z.enum(["factual", "conceptual", "controversial"]);
@@ -54,46 +62,70 @@ async function applyQuestionAccessScope(
 
   if (role === "TEACHER") {
     const teacherId = requireUserId(sessionUser);
-    const teacher = await prisma.user.findUnique({
-      where: { id: teacherId },
-      select: {
-        school: true,
-        teacherClasses: { select: { grade: true, className: true } },
-      },
-    });
-    if (teacher) {
-      const classes = teacher.teacherClasses;
-      if (classes.length > 0) {
-        where.author = {
-          role: "STUDENT",
-          OR: classes.map((item) => ({ grade: item.grade, className: item.className })),
-        };
-      } else if (teacher.school) {
-        where.author = { role: "STUDENT", school: teacher.school };
-      }
+    const teacherScope = await loadTeacherStudentScope(teacherId);
+    if (!teacherScope) {
+      throw new QuestionRouteError("교사 소속 학교 정보가 필요합니다", 403);
     }
+    where.author = studentWhereForTeacherScope(teacherScope);
   }
 
   if (role === "STUDENT") {
     const studentId = requireUserId(sessionUser);
     const requestedSessionId = searchParams.get("sessionId");
     const requestedAuthorId = searchParams.get("authorId");
+    const me = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { id: true, role: true, school: true, grade: true, className: true },
+    });
 
-    if (requestedAuthorId !== studentId) {
-      const me = await prisma.user.findUnique({
-        where: { id: studentId },
-        select: { school: true, grade: true, className: true },
+    if (requestedSessionId && requestedSessionId !== "all" && requestedSessionId !== "none") {
+      const requestedSession = await prisma.questionSession.findUnique({
+        where: { id: requestedSessionId },
+        select: {
+          teacherId: true,
+          targetType: true,
+          targetGrade: true,
+          targetClassName: true,
+          targetStudentId: true,
+          targetStudentIds: true,
+          teacher: {
+            select: {
+              school: true,
+              teacherClasses: { select: { grade: true, className: true } },
+            },
+          },
+        },
       });
-      if (me?.school && me.grade && me.className) {
-        where.author = {
-          OR: [
-            { id: studentId },
-            { role: "STUDENT", school: me.school, grade: me.grade, className: me.className },
-            { role: "TEACHER", school: me.school },
-          ],
-        };
+      if (!me || !requestedSession || !studentCanAccessSession(requestedSession, me)) {
+        throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
+      }
+    }
+
+    const sessionScope = me ? sessionWhereForStudent(me) : null;
+    const sessionVisibility: Prisma.QuestionWhereInput[] = [
+      { sessionId: null },
+      ...(sessionScope ? [{ session: sessionScope }] : []),
+    ];
+
+    if (requestedAuthorId === studentId) {
+      where.OR = sessionVisibility;
+    } else {
+      if (me?.school && me.grade && me.className && sessionScope) {
+        where.OR = [
+          { authorId: studentId, OR: sessionVisibility },
+          {
+            isPublic: true,
+            author: {
+              OR: [
+                { role: "STUDENT", school: me.school, grade: me.grade, className: me.className },
+                { role: "TEACHER", school: me.school },
+              ],
+            },
+            OR: sessionVisibility,
+          },
+        ];
       } else {
-        where.author = { id: studentId };
+        where.OR = [{ authorId: studentId, sessionId: null }];
       }
 
       const hasDetailFilter = Boolean(
@@ -275,7 +307,18 @@ export async function getStudentDashboardQuestionSummary(sessionUser: QuestionRo
   }
 
   const studentId = requireUserId(sessionUser);
-  const where = { authorId: studentId };
+  const student = await prisma.user.findUnique({
+    where: { id: studentId },
+    select: { id: true, role: true, school: true, grade: true, className: true },
+  });
+  const sessionScope = student ? sessionWhereForStudent(student) : null;
+  if (!sessionScope) {
+    throw new QuestionRouteError("학생 소속 정보를 확인할 수 없습니다", 403);
+  }
+  const where: Prisma.QuestionWhereInput = {
+    authorId: studentId,
+    OR: [{ sessionId: null }, { session: sessionScope }],
+  };
   const [recent, closureGroups, cognitiveGroups, answeredSessions] = await Promise.all([
     prisma.question.findMany({
       where,
@@ -301,7 +344,7 @@ export async function getStudentDashboardQuestionSummary(sessionUser: QuestionRo
     }),
     prisma.question.groupBy({
       by: ["sessionId"],
-      where: { authorId: studentId, sessionId: { not: null } },
+      where: { ...where, sessionId: { not: null } },
       orderBy: { sessionId: "asc" },
     }),
   ]);
@@ -345,6 +388,33 @@ export async function getStudentSessionQuestion(
   const sessionId = new URL(req.url).searchParams.get("sessionId")?.trim();
   if (!sessionId) {
     throw new QuestionRouteError("질문수업 정보가 필요합니다", 400);
+  }
+
+  const [student, questionSession] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: studentId },
+      select: { id: true, role: true, school: true, grade: true, className: true },
+    }),
+    prisma.questionSession.findUnique({
+      where: { id: sessionId },
+      select: {
+        teacherId: true,
+        targetType: true,
+        targetGrade: true,
+        targetClassName: true,
+        targetStudentId: true,
+        targetStudentIds: true,
+        teacher: {
+          select: {
+            school: true,
+            teacherClasses: { select: { grade: true, className: true } },
+          },
+        },
+      },
+    }),
+  ]);
+  if (!student || !questionSession || !studentCanAccessSession(questionSession, student)) {
+    throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
   }
 
   const existingQuestion = await prisma.question.findFirst({
@@ -590,13 +660,46 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
   const selectedSession = data.sessionId
     ? await prisma.questionSession.findUnique({
         where: { id: data.sessionId },
-        select: { defaultQuestionPublic: true, isActive: true },
+        select: {
+          defaultQuestionPublic: true,
+          isActive: true,
+          teacherId: true,
+          targetType: true,
+          targetGrade: true,
+          targetClassName: true,
+          targetStudentId: true,
+          targetStudentIds: true,
+          teacher: {
+            select: {
+              school: true,
+              teacherClasses: { select: { grade: true, className: true } },
+            },
+          },
+        },
       })
     : null;
 
   const userRole = sessionUser.role ?? undefined;
+  if (data.sessionId && !selectedSession) {
+    throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
+  }
   if (selectedSession && !selectedSession.isActive && userRole !== "TEACHER") {
     throw new QuestionRouteError("비활성화된 수업에서는 질문을 작성할 수 없습니다", 403);
+  }
+  if (selectedSession && userRole === "TEACHER" && selectedSession.teacherId !== userId) {
+    throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
+  }
+  if (selectedSession && userRole === "STUDENT") {
+    const student = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, school: true, grade: true, className: true },
+    });
+    if (!student || !studentCanAccessSession(selectedSession, student)) {
+      throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
+    }
+  }
+  if (selectedSession && userRole !== "TEACHER" && userRole !== "STUDENT") {
+    throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
   }
 
   const normalized = normalizeContent(data.content);

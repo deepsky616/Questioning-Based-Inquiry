@@ -15,23 +15,48 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
+  if ((session.user as { role?: string }).role !== "STUDENT") {
+    return NextResponse.json({ error: "학생만 접근할 수 있습니다" }, { status: 403 });
+  }
 
   const userId = (session.user as { id: string }).id;
 
   const student = await prisma.user.findUnique({
     where: { id: userId },
-    select: { grade: true, className: true },
+    select: {
+      id: true,
+      role: true,
+      school: true,
+      grade: true,
+      className: true,
+    },
   });
+  if (
+    student?.role !== "STUDENT" ||
+    !student.school ||
+    !student.grade ||
+    !student.className
+  ) {
+    return NextResponse.json({ error: "학생 소속 정보를 확인할 수 없습니다" }, { status: 403 });
+  }
 
   // 학생의 담당 선생님 찾기
-  let teacherIds: string[] = [];
-  if (student?.grade && student?.className) {
-    const teacherClasses = await prisma.teacherClass.findMany({
-      where: { grade: student.grade, className: student.className },
-      select: { teacherId: true },
-    });
-    teacherIds = teacherClasses.map((tc) => tc.teacherId);
-  }
+  const teachers = await prisma.user.findMany({
+    where: {
+      role: "TEACHER",
+      school: student.school,
+      OR: [
+        {
+          teacherClasses: {
+            some: { grade: student.grade, className: student.className },
+          },
+        },
+        { teacherClasses: { none: {} } },
+      ],
+    },
+    select: { id: true },
+  });
+  const teacherIds = teachers.map((teacher) => teacher.id);
 
   // 선생님 없으면 기본 게임 전체 노출
   if (teacherIds.length === 0) {

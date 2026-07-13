@@ -34,7 +34,25 @@ export async function GET(_req: Request, { params }: Params) {
       where: { id },
       include: {
         author: { select: { id: true, role: true, school: true, grade: true, className: true } },
-        session: { select: { id: true, isActive: true, commentsVisibleToPeers: true } },
+        session: {
+          select: {
+            id: true,
+            isActive: true,
+            commentsVisibleToPeers: true,
+            teacherId: true,
+            targetType: true,
+            targetGrade: true,
+            targetClassName: true,
+            targetStudentId: true,
+            targetStudentIds: true,
+            teacher: {
+              select: {
+                school: true,
+                teacherClasses: { select: { grade: true, className: true } },
+              },
+            },
+          },
+        },
       },
     }),
   ]);
@@ -46,7 +64,7 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
   }
 
-  const peersVisible = question.session?.commentsVisibleToPeers ?? false;
+  const peersVisible = question.session?.commentsVisibleToPeers ?? true;
   const comments = await prisma.comment.findMany({
     where: { questionId: id },
     include: { author: { select: { id: true, name: true, role: true } } },
@@ -104,7 +122,23 @@ export async function POST(req: Request, { params }: Params) {
         where: { id },
         include: {
           author: { select: { role: true, school: true, grade: true, className: true } },
-          session: { select: { isActive: true } },
+          session: {
+            select: {
+              isActive: true,
+              teacherId: true,
+              targetType: true,
+              targetGrade: true,
+              targetClassName: true,
+              targetStudentId: true,
+              targetStudentIds: true,
+              teacher: {
+                select: {
+                  school: true,
+                  teacherClasses: { select: { grade: true, className: true } },
+                },
+              },
+            },
+          },
         },
       }),
     ]);

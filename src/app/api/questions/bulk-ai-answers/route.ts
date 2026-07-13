@@ -8,6 +8,10 @@ import { buildAnswerPrompt } from "@/lib/ai-prompts";
 import { validateBulkAiRequest } from "@/lib/questions";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { generateText } from "@/lib/ai";
+import {
+  loadTeacherStudentScope,
+  studentWhereForTeacherScope,
+} from "@/lib/teacher-student-access";
 
 const schema = z.object({
   questionIds: z.array(z.string()).min(1),
@@ -38,6 +42,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: validationError }, { status: 400 });
     }
 
+    const teacherScope = await loadTeacherStudentScope(userId);
+    if (!teacherScope) {
+      return NextResponse.json({ error: "질문 접근 권한이 없습니다" }, { status: 403 });
+    }
+
+    const questions = await prisma.question.findMany({
+      where: {
+        id: { in: questionIds },
+        author: studentWhereForTeacherScope(teacherScope),
+      },
+      select: { id: true, content: true, context: true, closure: true, cognitive: true },
+    });
+    if (questions.length === 0) {
+      return NextResponse.json({ error: "질문 접근 권한이 없습니다" }, { status: 403 });
+    }
+
     const aiCfg = await resolveUserAiConfig(userId);
     if (!aiCfg.apiKey) {
       return NextResponse.json(
@@ -46,11 +66,6 @@ export async function POST(req: Request) {
       );
     }
     const apiKey = aiCfg.apiKey;
-
-    const questions = await prisma.question.findMany({
-      where: { id: { in: questionIds } },
-      select: { id: true, content: true, context: true, closure: true, cognitive: true },
-    });
 
     // 각 질문에 대해 AI 답변 동시 생성 (통합 AI 호출 계층에서 모델 자동 선택·재시도)
     const aiResults = await Promise.allSettled(

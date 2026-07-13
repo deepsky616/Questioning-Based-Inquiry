@@ -246,7 +246,7 @@ describe("deleteGameRoom", () => {
 });
 
 describe("createGameRoom", () => {
-  it("새 방은 포인트 지급 키 버전 1을 저장한다", async () => {
+  it("새 방은 포인트 지급 키와 활동 증거 버전 1을 저장한다", async () => {
     prismaMock.gameRoom.create.mockResolvedValue({});
 
     const room = await createGameRoom({
@@ -256,9 +256,13 @@ describe("createGameRoom", () => {
     });
 
     expect(room?.pointAwardKeyVersion).toBe(1);
+    expect(room?.pointEvidenceVersion).toBe(1);
     expect(prismaMock.gameRoom.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        data: expect.objectContaining({ pointAwardKeyVersion: 1 }),
+        data: expect.objectContaining({
+          pointAwardKeyVersion: 1,
+          pointEvidenceVersion: 1,
+        }),
       }),
     });
   });

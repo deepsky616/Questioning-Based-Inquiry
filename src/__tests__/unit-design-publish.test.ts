@@ -7,6 +7,8 @@ vi.mock("@/lib/db", () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    unitDesign: { findFirst: vi.fn() },
+    user: { findUnique: vi.fn(), findMany: vi.fn() },
   },
 }));
 
@@ -17,6 +19,9 @@ import { PATCH } from "@/app/api/sessions/[id]/route";
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.questionSession.findUnique as ReturnType<typeof vi.fn>;
 const mockUpdate = prisma.questionSession.update as ReturnType<typeof vi.fn>;
+const mockUnitDesignFindFirst = prisma.unitDesign.findFirst as ReturnType<typeof vi.fn>;
+const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
+const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
 
 const TEACHER_SESSION = { user: { id: "teacher-1", role: "TEACHER" } };
 
@@ -35,7 +40,24 @@ function makeCtx(id = "session-1") {
 beforeEach(() => {
   vi.clearAllMocks();
   mockAuth.mockResolvedValue(TEACHER_SESSION);
-  mockFindUnique.mockResolvedValue({ id: "session-1", teacherId: "teacher-1" });
+  mockFindUnique.mockResolvedValue({
+    id: "session-1",
+    teacherId: "teacher-1",
+    targetType: "ALL",
+    targetGrade: null,
+    targetClassName: null,
+    targetStudentId: null,
+    targetStudentIds: [],
+  });
+  mockUnitDesignFindFirst.mockResolvedValue({ id: "unit-design-1" });
+  mockUserFindUnique.mockResolvedValue({
+    school: "테스트학교",
+    teacherClasses: [{ grade: "5", className: "1" }],
+  });
+  mockUserFindMany.mockResolvedValue([
+    { id: "student-1", role: "STUDENT", school: "테스트학교", grade: "5", className: "1" },
+    { id: "student-2", role: "STUDENT", school: "테스트학교", grade: "5", className: "1" },
+  ]);
   mockUpdate.mockImplementation(async ({ data }) => ({ id: "session-1", ...data }));
 });
 

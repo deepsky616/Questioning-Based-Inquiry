@@ -5,6 +5,7 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     questionSession: { create: vi.fn() },
     question: { create: vi.fn() },
+    user: { findUnique: vi.fn(), findMany: vi.fn() },
     teacherClass: { findMany: vi.fn() },
     $queryRaw: vi.fn().mockResolvedValue([{
       id: "ud-1",
@@ -23,6 +24,7 @@ import { POST as createSessionFromDesign } from "@/app/api/unit-design/[id]/sess
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockSessionCreate = prisma.questionSession.create as ReturnType<typeof vi.fn>;
+const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 
 const TEACHER_SESSION = {
   user: { id: "teacher-1", role: "TEACHER", name: "교사" },
@@ -42,6 +44,7 @@ const makeCtx = (id: string) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockSessionCreate.mockResolvedValue({ id: "qs-1" });
+  mockUserFindUnique.mockResolvedValue({ school: "테스트학교", teacherClasses: [] });
 });
 
 // ─── POST /api/sessions ───────────────────────────────────────────────────────

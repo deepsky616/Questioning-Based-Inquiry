@@ -4,6 +4,10 @@ import { prisma } from "@/lib/db";
 import { buildActivityReport } from "@/lib/report-stats";
 import { summarizeClassSessionActivity } from "@/lib/report-session-activity";
 import { compareStudentNumber } from "@/lib/student-sort";
+import {
+  isClassInTeacherScope,
+  loadTeacherStudentScope,
+} from "@/lib/teacher-student-access";
 
 // 학급 활동 리포트(교사용)
 //  - grade/className 미지정: 교사의 담당 학급 목록 반환(선택용)
@@ -15,34 +19,68 @@ export async function GET(req: NextRequest) {
   if (role !== "TEACHER") return NextResponse.json({ error: "교사만 가능" }, { status: 403 });
   const teacherId = (session.user as { id: string }).id;
 
-  const teacher = await prisma.user.findUnique({ where: { id: teacherId }, select: { school: true } });
-  const school = teacher?.school ?? null;
+  const teacherScope = await loadTeacherStudentScope(teacherId);
+  if (!teacherScope) {
+    return NextResponse.json({ error: "학급 보고서 조회 권한이 없습니다" }, { status: 403 });
+  }
+  const school = teacherScope.school;
 
   const grade = req.nextUrl.searchParams.get("grade");
   const className = req.nextUrl.searchParams.get("className");
 
   // 학급 미지정 → 담당 학급 목록(학생 수 포함)
   if (!grade || !className) {
-    const classes = await prisma.teacherClass.findMany({
-      where: { teacherId },
-      select: { grade: true, className: true },
-      orderBy: [{ grade: "asc" }, { className: "asc" }],
-    });
+    if (teacherScope.classes.length === 0) {
+      const groupedClasses = await prisma.user.groupBy({
+        by: ["grade", "className"],
+        where: {
+          role: "STUDENT",
+          school,
+          grade: { not: null },
+          className: { not: null },
+        },
+        _count: { _all: true },
+      });
+      const classes = groupedClasses
+        .flatMap((item) =>
+          item.grade?.trim() && item.className?.trim()
+            ? [{
+                grade: item.grade,
+                className: item.className,
+                studentCount: item._count._all,
+              }]
+            : [],
+        )
+        .sort(
+          (left, right) =>
+            left.grade.localeCompare(right.grade) ||
+            left.className.localeCompare(right.className),
+        );
+      return NextResponse.json({ scope: "class-list", classes });
+    }
+
+    const classes = [...teacherScope.classes].sort(
+      (left, right) => left.grade.localeCompare(right.grade) || left.className.localeCompare(right.className),
+    );
     const withCounts = await Promise.all(
       classes.map(async (c) => ({
         grade: c.grade,
         className: c.className,
         studentCount: await prisma.user.count({
-          where: { role: "STUDENT", grade: c.grade, className: c.className, ...(school ? { school } : {}) },
+          where: { role: "STUDENT", school, grade: c.grade, className: c.className },
         }),
       })),
     );
     return NextResponse.json({ scope: "class-list", classes: withCounts });
   }
 
+  if (!isClassInTeacherScope(teacherScope, grade, className)) {
+    return NextResponse.json({ error: "담당 학급만 조회할 수 있습니다" }, { status: 403 });
+  }
+
   // 해당 학급 학생들
   const students = await prisma.user.findMany({
-    where: { role: "STUDENT", grade, className, ...(school ? { school } : {}) },
+    where: { role: "STUDENT", school, grade, className },
     select: { id: true, name: true, studentNumber: true },
   });
   // 번호순 정렬 — studentNumber는 문자열이라 DB 사전순("10"<"2")을 피해 숫자로 비교
@@ -72,15 +110,20 @@ export async function GET(req: NextRequest) {
         { questions: { some: { likes: { some: { userId: { in: ids } } } } } },
       ],
     },
-    select: { id: true, date: true, subject: true, topic: true },
+    select: { id: true, teacherId: true, date: true, subject: true, topic: true },
     orderBy: { date: "desc" },
   });
 
   // 저장된 세션 AI 분석(학급 전체 관점)을 동봉 → 어느 브라우저·기기에서도 마지막 분석 표시
-  const analyses = await prisma.sessionAnalysis.findMany({
-    where: { sessionId: { in: sessions.map((s) => s.id) }, scope: "class", studentId: "" },
-    select: { sessionId: true, result: true },
-  });
+  const ownedSessionIds = sessions
+    .filter((item) => item.teacherId === teacherId)
+    .map((item) => item.id);
+  const analyses = ownedSessionIds.length > 0
+    ? await prisma.sessionAnalysis.findMany({
+        where: { sessionId: { in: ownedSessionIds }, scope: "class", studentId: "" },
+        select: { sessionId: true, result: true },
+      })
+    : [];
   const analysisBySession = new Map(analyses.map((a) => [a.sessionId, a.result]));
   const sessionIds = sessions.map((s) => s.id);
   const sessionQuestions = sessionIds.length > 0
@@ -114,10 +157,10 @@ export async function GET(req: NextRequest) {
     })),
     comments: sessionComments,
   });
-  const sessionsWithAnalysis = sessions.map((s) => ({
-    ...s,
-    ...(activityBySession.get(s.id) ?? {}),
-    analysis: analysisBySession.get(s.id) ?? null,
+  const sessionsWithAnalysis = sessions.map(({ teacherId: _teacherId, ...item }) => ({
+    ...item,
+    ...(activityBySession.get(item.id) ?? {}),
+    analysis: analysisBySession.get(item.id) ?? null,
   }));
 
   // 학생별 롤업(쓴 활동 기준)

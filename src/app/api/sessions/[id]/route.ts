@@ -3,6 +3,10 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireTeacherSession } from "@/lib/session-helpers";
+import {
+  teacherCanUseSessionTarget,
+  teacherOwnsUnitDesign,
+} from "@/lib/session-access";
 import { isValidSessionDateString } from "@/lib/sessions";
 import { z } from "zod";
 
@@ -41,6 +45,32 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
     const body = await req.json();
     const data = updateSchema.parse(body);
+    const targetChanged = [
+      "targetType",
+      "targetGrade",
+      "targetClassName",
+      "targetStudentId",
+      "targetStudentIds",
+    ].some((field) => Object.prototype.hasOwnProperty.call(data, field));
+    if (targetChanged) {
+      const canUseTarget = await teacherCanUseSessionTarget(authResult.user.id, {
+        targetType: data.targetType ?? existing.targetType,
+        targetGrade: data.targetGrade !== undefined ? data.targetGrade : existing.targetGrade,
+        targetClassName: data.targetClassName !== undefined ? data.targetClassName : existing.targetClassName,
+        targetStudentId: data.targetStudentId !== undefined ? data.targetStudentId : existing.targetStudentId,
+        targetStudentIds: data.targetStudentIds !== undefined ? data.targetStudentIds : existing.targetStudentIds,
+      });
+      if (!canUseTarget) {
+        return NextResponse.json({ error: "질문수업 대상을 지정할 권한이 없습니다" }, { status: 403 });
+      }
+    }
+    if (
+      data.unitDesignId !== undefined &&
+      !(await teacherOwnsUnitDesign(authResult.user.id, data.unitDesignId))
+    ) {
+      return NextResponse.json({ error: "탐구설계를 연결할 권한이 없습니다" }, { status: 403 });
+    }
+
     const { sharedQuestions, targetStudentIds, ...scalarData } = data;
     const updateData: Prisma.QuestionSessionUpdateInput = {
       ...scalarData,

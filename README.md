@@ -45,12 +45,15 @@ npm run dev
 DATABASE_URL="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres?pgbouncer=true&connection_limit=1"
 NEXTAUTH_SECRET="your-secret-key"
 NEXTAUTH_URL="http://localhost:3000"
+TEACHER_REGISTRATION_CODE="replace-with-at-least-12-random-characters"
 GOOGLE_API_KEY="your-gemini-api-key"
 RESEND_API_KEY="re_your_api_key"
 RESEND_FROM_EMAIL="Question Lab <noreply@your-domain.com>"
 ```
 
 `RESEND_API_KEY` and `RESEND_FROM_EMAIL` are optional in development. If either value is missing, the app skips email sending and keeps the main request successful.
+
+`TEACHER_REGISTRATION_CODE` must be at least 12 characters. Public teacher registration is denied when it is missing, and student accounts are created by an authenticated teacher from student management.
 
 ### Supabase Free setup
 

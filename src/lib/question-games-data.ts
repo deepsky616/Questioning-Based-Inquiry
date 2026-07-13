@@ -180,6 +180,7 @@ export interface GameRoom {
   createdAt: number;
   updatedAt: number;
   pointAwardKeyVersion?: 1;
+  pointEvidenceVersion?: 1;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -237,7 +238,9 @@ export function isGameRoom(value: unknown): value is GameRoom {
     isNonNegativeNumber(value.createdAt) &&
     isNonNegativeNumber(value.updatedAt) &&
     (value.pointAwardKeyVersion === undefined ||
-      value.pointAwardKeyVersion === 1)
+      value.pointAwardKeyVersion === 1) &&
+    (value.pointEvidenceVersion === undefined ||
+      value.pointEvidenceVersion === 1)
   );
 }
 

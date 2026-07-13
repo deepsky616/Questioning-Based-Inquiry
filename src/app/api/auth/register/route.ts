@@ -2,6 +2,7 @@ import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { sendTeacherWelcomeEmail } from "@/lib/email";
 import { validatePasswordPolicy } from "@/lib/password-policy";
@@ -29,9 +30,18 @@ const teacherSchema = z.object({
     })
   ).min(1, "담당 학급을 1개 이상 추가해 주세요"),
   password: z.string().min(1, "비밀번호를 입력해 주세요"),
+  registrationCode: z.string().max(256).optional(),
 });
 
 const registerSchema = z.discriminatedUnion("role", [studentSchema, teacherSchema]);
+
+function hasValidTeacherRegistrationCode(value: string | undefined): boolean {
+  const expected = process.env.TEACHER_REGISTRATION_CODE;
+  if (!expected || expected.length < 12 || !value) return false;
+  const expectedBuffer = Buffer.from(expected);
+  const valueBuffer = Buffer.from(value);
+  return expectedBuffer.length === valueBuffer.length && timingSafeEqual(expectedBuffer, valueBuffer);
+}
 
 export async function POST(req: Request) {
   // 레이트 리밋: IP당 분당 30회 (봇 대량 가입 방지. 학교 NAT 뒤에서 한 학급이
@@ -43,46 +53,43 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = registerSchema.parse(body);
 
+    if (data.role === "STUDENT") {
+      return NextResponse.json(
+        { error: "학생 계정은 담당 교사가 학생 관리에서 등록해야 합니다" },
+        { status: 403 },
+      );
+    }
+    if (!hasValidTeacherRegistrationCode(data.registrationCode)) {
+      return NextResponse.json({ error: "교사 가입 코드가 올바르지 않습니다" }, { status: 403 });
+    }
+
     const policyError = validatePasswordPolicy(data.password);
     if (policyError) return NextResponse.json({ error: policyError }, { status: 400 });
 
-    if (data.role === "STUDENT") {
-      const existingStudent = await prisma.user.findFirst({
-        where: { role: "STUDENT", school: data.school, grade: data.grade, className: data.className, studentNumber: data.studentNumber },
-      });
-      if (existingStudent) {
-        return NextResponse.json({ error: "이미 등록된 학생입니다" }, { status: 400 });
-      }
-    } else {
-      const existingTeacher = await prisma.user.findUnique({ where: { email: data.email } });
-      if (existingTeacher) {
-        return NextResponse.json({ error: "이미 등록된 교사입니다" }, { status: 400 });
-      }
+    const existingTeacher = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existingTeacher) {
+      return NextResponse.json({ error: "이미 등록된 교사입니다" }, { status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 12);
 
     const user = await prisma.user.create({
       data: {
-        ...(data.role === "TEACHER" ? { email: data.email } : {}),
+        email: data.email,
         password: hashedPassword,
         name: data.name,
-        role: data.role,
+        role: "TEACHER",
         school: data.school,
-        grade: data.role === "STUDENT" ? data.grade : null,
-        className: data.role === "STUDENT" ? data.className : null,
-        studentNumber: data.role === "STUDENT" ? data.studentNumber : null,
-        ...(data.role === "TEACHER"
-          ? {
-              teacherClasses: {
-                create: data.teacherClasses.map((c) => ({
-                  id: `tc_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-                  grade: c.grade.trim(),
-                  className: c.className.trim(),
-                })),
-              },
-            }
-          : {}),
+        grade: null,
+        className: null,
+        studentNumber: null,
+        teacherClasses: {
+          create: data.teacherClasses.map((c) => ({
+            id: `tc_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            grade: c.grade.trim(),
+            className: c.className.trim(),
+          })),
+        },
       },
     });
 

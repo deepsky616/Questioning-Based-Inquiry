@@ -4,6 +4,7 @@ vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   prisma: {
     questionSession: { findUnique: vi.fn() },
+    user: { findUnique: vi.fn() },
     $queryRaw: vi.fn(),
   },
 }));
@@ -14,7 +15,15 @@ import { GET } from "@/app/api/sessions/[id]/design-context/route";
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.questionSession.findUnique as ReturnType<typeof vi.fn>;
+const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
+
+const TEACHER_SCOPE = {
+  teacher: {
+    school: "테스트학교",
+    teacherClasses: [{ grade: "4", className: "2" }],
+  },
+};
 
 const DESIGN_ROW = {
   title: "광합성",
@@ -62,21 +71,24 @@ describe("GET design-context 권한", () => {
 
   it("대상 학생(ALL)은 참고자료를 받는다", async () => {
     mockAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT", grade: "4", className: "2" } });
-    mockFindUnique.mockResolvedValue({ unitDesignId: "ud1", date: "2026-05-01", teacherId: "t1", targetType: "ALL", targetGrade: null, targetClassName: null, targetStudentId: null, targetStudentIds: [] });
+    mockUserFindUnique.mockResolvedValue({ id: "s1", role: "STUDENT", school: "테스트학교", grade: "4", className: "2" });
+    mockFindUnique.mockResolvedValue({ ...TEACHER_SCOPE, unitDesignId: "ud1", date: "2026-05-01", teacherId: "t1", targetType: "ALL", targetGrade: null, targetClassName: null, targetStudentId: null, targetStudentIds: [] });
     const res = await GET(req, ctx);
     expect(res.status).toBe(200);
   });
 
   it("대상이 아닌 학생(다른 반 CLASS)은 403", async () => {
     mockAuth.mockResolvedValue({ user: { id: "s9", role: "STUDENT", grade: "4", className: "9" } });
-    mockFindUnique.mockResolvedValue({ unitDesignId: "ud1", date: "2026-05-01", teacherId: "t1", targetType: "CLASS", targetGrade: "4", targetClassName: "2", targetStudentId: null, targetStudentIds: [] });
+    mockUserFindUnique.mockResolvedValue({ id: "s9", role: "STUDENT", school: "테스트학교", grade: "4", className: "9" });
+    mockFindUnique.mockResolvedValue({ ...TEACHER_SCOPE, unitDesignId: "ud1", date: "2026-05-01", teacherId: "t1", targetType: "CLASS", targetGrade: "4", targetClassName: "2", targetStudentId: null, targetStudentIds: [] });
     const res = await GET(req, ctx);
     expect(res.status).toBe(403);
   });
 
   it("CUSTOM 대상에 포함된 학생은 참고자료를 받는다", async () => {
     mockAuth.mockResolvedValue({ user: { id: "s5", role: "STUDENT", grade: "4", className: "2" } });
-    mockFindUnique.mockResolvedValue({ unitDesignId: "ud1", date: "2026-05-01", teacherId: "t1", targetType: "CUSTOM", targetGrade: null, targetClassName: null, targetStudentId: null, targetStudentIds: ["s5", "s6"] });
+    mockUserFindUnique.mockResolvedValue({ id: "s5", role: "STUDENT", school: "테스트학교", grade: "4", className: "2" });
+    mockFindUnique.mockResolvedValue({ ...TEACHER_SCOPE, unitDesignId: "ud1", date: "2026-05-01", teacherId: "t1", targetType: "CUSTOM", targetGrade: null, targetClassName: null, targetStudentId: null, targetStudentIds: ["s5", "s6"] });
     const res = await GET(req, ctx);
     expect(res.status).toBe(200);
   });

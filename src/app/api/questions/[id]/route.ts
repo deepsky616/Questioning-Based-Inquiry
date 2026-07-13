@@ -2,15 +2,17 @@ import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { canPatchQuestion } from "@/lib/questions";
 import { normalizeContent } from "@/lib/content-normalize";
 import { checkProfanity } from "@/lib/profanity";
 import { cleanupQuestionTranslations } from "@/lib/translation-cleanup";
 import {
-  canTeacherManageQuestion,
+  canDeleteQuestionForUser,
+  canEditQuestionForUser,
   getStudentQuestionDeleteBlockReason,
   getStudentQuestionEditBlockReason,
+  loadQuestionAccessContext,
 } from "@/lib/question-detail-service";
+import { canViewQuestion, isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { z } from "zod";
 
 const patchQuestionSchema = z.object({
@@ -25,11 +27,20 @@ const patchQuestionSchema = z.object({
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function GET(req: Request, { params }: Params) {
+export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+  }
+
+  const userId = (session.user as { id: string }).id;
+  const access = await loadQuestionAccessContext(userId, id);
+  if (!access.question) {
+    return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
+  }
+  if (!canViewQuestion(access.viewer, access.question)) {
+    return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
   }
 
   const question = await prisma.question.findUnique({
@@ -48,11 +59,13 @@ export async function GET(req: Request, { params }: Params) {
             select: {
               id: true,
               name: true,
+              role: true,
             },
           },
         },
         orderBy: { createdAt: "asc" },
       },
+      session: { select: { commentsVisibleToPeers: true } },
     },
   });
 
@@ -60,19 +73,20 @@ export async function GET(req: Request, { params }: Params) {
     return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  const userRole = (session.user as { id: string; role?: string }).role;
-  const userId = (session.user as { id: string; role?: string }).id;
-
-  // 비공개 질문은 작성자 본인 또는 담당 학급 교사만 열람 가능(아무 교사나 X)
-  if (
-    !question.isPublic &&
-    question.authorId !== userId &&
-    !(userRole === "TEACHER" && (await canTeacherManageQuestion(userId, id)))
-  ) {
-    return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
-  }
-
-  return NextResponse.json(question);
+  const visibleComments = question.comments
+    .filter((comment) => isCommentVisibleToViewer({
+      viewerRole: access.viewer?.role ?? "",
+      viewerId: userId,
+      commentsVisibleToPeers: question.session?.commentsVisibleToPeers ?? true,
+      commentAuthorId: comment.author.id,
+      commentAuthorRole: comment.author.role,
+      questionAuthorId: question.authorId,
+    }))
+    .map(({ author, ...comment }) => ({
+      ...comment,
+      author: { id: author.id, name: author.name },
+    }));
+  return NextResponse.json({ ...question, session: undefined, comments: visibleComments });
 }
 
 export async function PATCH(req: Request, { params }: Params) {
@@ -102,11 +116,9 @@ export async function PATCH(req: Request, { params }: Params) {
       return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
     }
 
-    if (!canPatchQuestion(userRole, userId, existing.authorId, patchedFields)) {
-      return NextResponse.json({ error: "수정 권한이 없습니다" }, { status: 403 });
-    }
-
-    if (userRole === "TEACHER" && !(await canTeacherManageQuestion(userId, id))) {
+    if (!(await canEditQuestionForUser({
+      role: userRole, userId, questionId: id, authorId: existing.authorId, fields: patchedFields,
+    }))) {
       return NextResponse.json({ error: "수정 권한이 없습니다" }, { status: 403 });
     }
 
@@ -177,7 +189,9 @@ export async function DELETE(req: Request, { params }: Params) {
     return NextResponse.json({ error: "질문을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  if (question.authorId !== userId && userRole !== "TEACHER") {
+  if (!(await canDeleteQuestionForUser({
+    role: userRole, userId, questionId: id, authorId: question.authorId,
+  }))) {
     return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
   }
 
@@ -187,11 +201,6 @@ export async function DELETE(req: Request, { params }: Params) {
     if (blockReason) {
       return NextResponse.json({ error: blockReason }, { status: 403 });
     }
-  }
-
-  // 교사는 담당 학급 질문만 삭제 가능(수정 권한 검사와 동일)
-  if (userRole === "TEACHER" && !(await canTeacherManageQuestion(userId, id))) {
-    return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
   }
 
   // 번역 캐시 정리(삭제 전 호출 — 댓글 id 확보)

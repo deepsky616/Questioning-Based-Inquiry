@@ -177,3 +177,55 @@ export function buildTargetLabel(params: {
   }
   return "전체 담당 학급";
 }
+
+interface SessionTarget {
+  targetType: string;
+  targetGrade: string | null;
+  targetClassName: string | null;
+  targetStudentId: string | null;
+  targetStudentIds: unknown;
+}
+
+interface TargetStudent {
+  id: string;
+  grade: string | null;
+  className: string | null;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+export function sessionTargetsStudent(
+  session: SessionTarget,
+  student: TargetStudent,
+): boolean {
+  const targetStudentIds = stringArray(session.targetStudentIds);
+  if (session.targetType === "ALL") return true;
+  if (session.targetType === "CLASS") {
+    const classMatches = Boolean(
+      session.targetGrade &&
+      session.targetClassName &&
+      student.grade &&
+      student.className &&
+      session.targetGrade === student.grade &&
+      session.targetClassName === student.className,
+    );
+    return (
+      classMatches ||
+      targetStudentIds.includes(student.id)
+    );
+  }
+  if (session.targetType === "STUDENT") {
+    return (
+      session.targetStudentId === student.id ||
+      targetStudentIds.includes(student.id)
+    );
+  }
+  if (session.targetType === "CUSTOM") {
+    return targetStudentIds.includes(student.id);
+  }
+  return false;
+}

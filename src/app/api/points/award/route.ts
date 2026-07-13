@@ -9,13 +9,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
 
-  const userId = (session.user as { id: string }).id;
+  const currentUser = session.user as { id: string; role?: string };
+  if (currentUser.role !== "TEACHER") {
+    return NextResponse.json(
+      { error: "교사만 질문놀이 점수를 지급할 수 있습니다" },
+      { status: 403 },
+    );
+  }
+
+  const userId = currentUser.id;
   const limited = checkRateLimit(`points-award:${userId}`, 10);
   if (limited) return limited;
 
   try {
     const body = await req.json().catch(() => ({}));
-    const result = await awardGamePoints(body, userId);
+    const result = await awardGamePoints(body, userId, currentUser.role);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof PointAwardError) {

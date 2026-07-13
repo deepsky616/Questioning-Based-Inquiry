@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getRequestLocale } from "@/lib/locale";
+import { studentCanAccessSession } from "@/lib/session-access-policy";
 import { requireTeacherSession } from "@/lib/session-helpers";
 
 const analysisResultSchema = z
@@ -40,8 +41,49 @@ export async function PATCH(req: NextRequest) {
   const studentId = scope === "student" ? parsed.data.studentId ?? "" : "";
 
   // 세션이 이 교사 소유인지 확인
-  const owned = await prisma.questionSession.findUnique({ where: { id: sessionId }, select: { teacherId: true } });
+  const owned = await prisma.questionSession.findUnique({
+    where: { id: sessionId },
+    select: {
+      teacherId: true,
+      targetType: true,
+      targetGrade: true,
+      targetClassName: true,
+      targetStudentId: true,
+      targetStudentIds: true,
+      teacher: {
+        select: {
+          school: true,
+          teacherClasses: { select: { grade: true, className: true } },
+        },
+      },
+    },
+  });
   if (!owned || owned.teacherId !== userId) return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+
+  if (scope === "student") {
+    const targetStudent = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: {
+        id: true,
+        role: true,
+        school: true,
+        grade: true,
+        className: true,
+      },
+    });
+    if (
+      !targetStudent ||
+      !studentCanAccessSession(owned, {
+        id: targetStudent.id,
+        role: targetStudent.role ?? "",
+        school: targetStudent.school,
+        grade: targetStudent.grade,
+        className: targetStudent.className,
+      })
+    ) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+    }
+  }
 
   const stored = result as Prisma.InputJsonValue;
   try {
