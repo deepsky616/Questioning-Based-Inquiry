@@ -9,13 +9,25 @@ import type { ClassificationResult } from "./types";
 
 interface StudentAskResultCardProps {
   result: ClassificationResult;
+  analyzedContent: string;
+  analysisCurrent: boolean;
   saveComplete: boolean;
   isSaving: boolean;
   onRewrite: () => void;
+  onUseImprovedExample: (content: string) => void;
   onSave: () => void;
 }
 
-export function StudentAskResultCard({ result, saveComplete, isSaving, onRewrite, onSave }: StudentAskResultCardProps) {
+export function StudentAskResultCard({
+  result,
+  analyzedContent,
+  analysisCurrent,
+  saveComplete,
+  isSaving,
+  onRewrite,
+  onUseImprovedExample,
+  onSave,
+}: StudentAskResultCardProps) {
   const t = useTranslations("ask");
 
   return (
@@ -24,6 +36,16 @@ export function StudentAskResultCard({ result, saveComplete, isSaving, onRewrite
         <CardTitle>{t("resultHeader")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {!analysisCurrent && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
+            <p className="text-sm font-semibold">{t("reanalyzeBeforeSave")}</p>
+            <details className="mt-2 text-sm">
+              <summary className="cursor-pointer font-medium">{t("previousQuestion")}</summary>
+              <p className="mt-2 text-amber-700 dark:text-amber-300">{analyzedContent}</p>
+            </details>
+          </div>
+        )}
+
         {result.inappropriate && (
           <div className="p-4 rounded-lg border border-red-300 bg-red-50 dark:bg-red-950/40">
             <p className="text-sm font-bold text-red-700">{t("inappropriateDetected")}</p>
@@ -78,6 +100,14 @@ export function StudentAskResultCard({ result, saveComplete, isSaving, onRewrite
             <div className="text-sm font-medium text-green-800 mb-2">{t("improvedTitle")}</div>
             <p className="text-green-900 font-medium">&ldquo;{result.improvedExample}&rdquo;</p>
             <p className="text-xs text-green-600 mt-1">{t("improveHint")}</p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-3 h-10"
+              onClick={() => onUseImprovedExample(result.improvedExample!)}
+            >
+              {t("useImprovedExample")}
+            </Button>
           </div>
         )}
 
@@ -90,7 +120,12 @@ export function StudentAskResultCard({ result, saveComplete, isSaving, onRewrite
             {t("rewriteQuestion")}
           </Button>
           {!saveComplete && (
-            <Button onClick={onSave} disabled={isSaving} variant="gradient" className="h-11 flex-1 text-base font-semibold">
+            <Button
+              onClick={onSave}
+              disabled={isSaving || !analysisCurrent}
+              variant="gradient"
+              className="h-11 flex-1 text-base font-semibold"
+            >
               {isSaving ? t("saving") : t("saveQuestion")}
             </Button>
           )}

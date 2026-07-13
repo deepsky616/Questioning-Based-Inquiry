@@ -10,6 +10,7 @@ import { getSessionUser } from "@/lib/auth-helpers";
 import { appNotificationQueryKeys } from "@/lib/app-notifications";
 import { useStudentSessions } from "@/lib/app-queries";
 import { consumePracticeDraft } from "@/lib/practice-draft";
+import { isAnalysisCurrent, type AnalysisSnapshot } from "@/lib/student-ask-analysis";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
 import { StudentAskCompletionCard } from "./StudentAskCompletionCard";
@@ -48,6 +49,9 @@ function AskContent() {
   const searchParams = useSearchParams();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const draftAppliedRef = useRef(false);
+  const analysisRequestRef = useRef(0);
+  const contentRef = useRef("");
+  const selectedSessionIdRef = useRef("");
   const { data: authSession } = useSession();
   const user = getSessionUser(authSession);
   const taskParam = searchParams.get("task");
@@ -66,7 +70,7 @@ function AskContent() {
   const [existingQuestion, setExistingQuestion] = useState<{ id: string; content: string } | null>(null);
   const [isCheckingExisting, setIsCheckingExisting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<ClassificationResult | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisSnapshot<ClassificationResult> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
@@ -85,6 +89,16 @@ function AskContent() {
   const [filterSubject, setFilterSubject] = useState("");
   const [filterTopic, setFilterTopic] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const result = analysis?.result ?? null;
+  const analysisCurrent = isAnalysisCurrent(content, analysis);
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
+
+  useEffect(() => {
+    selectedSessionIdRef.current = selectedSessionId;
+  }, [selectedSessionId]);
 
   useEffect(() => {
     if (!user.id || draftAppliedRef.current || searchParams.get("draft") !== "practice") return;
@@ -196,8 +210,10 @@ function AskContent() {
   }, [filteredSessions, questionSessionIds]);
 
   const selectSession = (id: string) => {
+    analysisRequestRef.current += 1;
+    setIsLoading(false);
     setSelectedSessionId(id);
-    setResult(null); // issue #5: 세션 변경 시 분류 결과 초기화
+    setAnalysis(null); // issue #5: 세션 변경 시 분류 결과 초기화
     setSaveComplete(false);
 
     requestAnimationFrame(() => textareaRef.current?.focus());
@@ -242,7 +258,7 @@ function AskContent() {
   }, [selectedSessionId, user.id]);
 
   const canAsk = sessionsLoaded && !sessionsError && sessions.length > 0 && !!selectedSessionId;
-  const currentStep = result ? 3 : content.trim().length > 0 ? 2 : 1;
+  const currentStep = analysisCurrent ? 3 : content.trim().length > 0 ? 2 : 1;
   const flowSteps = [
     { step: 1, label: t("stepSession") },
     { step: 2, label: t("stepQuestion") },
@@ -250,40 +266,48 @@ function AskContent() {
   ];
 
   const handleClassify = async () => {
+    const normalized = content.trim();
     // issue #3: handler 단에서도 세션 필수 검증
     if (!canAsk) return;
-    if (content.trim().length === 0) {
+    if (!normalized) {
       toast({ variant: "destructive", description: t("enterQuestion") });
       return;
     }
 
+    const requestId = ++analysisRequestRef.current;
     setSaveComplete(false);
     setIsLoading(true);
     try {
       const res = await fetch("/api/classify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content: normalized }),
       });
+      const data = await res.json();
 
+      if (analysisRequestRef.current !== requestId) return;
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || t("classifyFailed"));
+        throw new Error(data.error || t("classifyFailed"));
       }
 
-      const data = await res.json();
-      setResult(data);
+      setAnalysis({ content: normalized, result: data });
     } catch (error: unknown) {
+      if (analysisRequestRef.current !== requestId) return;
       const msg = error instanceof Error ? error.message : t("classifyError");
       toast({ variant: "destructive", description: msg });
     } finally {
-      setIsLoading(false);
+      if (analysisRequestRef.current === requestId) setIsLoading(false);
     }
   };
 
   const handleSave = async () => {
     // issue #3: handler 단에서도 세션 필수 검증
-    if (!canAsk || !result) return;
+    if (!canAsk || !analysis || !isAnalysisCurrent(content, analysis)) {
+      toast({ variant: "destructive", description: t("reanalyzeBeforeSave") });
+      return;
+    }
+    const savedAnalysis = analysis;
+    const savedSessionId = selectedSessionId;
 
     setIsSaving(true);
     try {
@@ -291,25 +315,29 @@ function AskContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          content,
-          closure: result.closure,
-          cognitive: result.cognitive,
-          closureScore: result.closureScore,
-          cognitiveScore: result.cognitiveScore,
-          sessionId: selectedSessionId,
-          flagged: result.inappropriate ?? false,
-          flagReason: result.inappropriateReason ?? "",
+          content: savedAnalysis.content,
+          closure: savedAnalysis.result.closure,
+          cognitive: savedAnalysis.result.cognitive,
+          closureScore: savedAnalysis.result.closureScore,
+          cognitiveScore: savedAnalysis.result.cognitiveScore,
+          sessionId: savedSessionId,
+          flagged: savedAnalysis.result.inappropriate ?? false,
+          flagReason: savedAnalysis.result.inappropriateReason ?? "",
         }),
       });
 
       if (!res.ok) throw new Error(t("saveFailed"));
       const saved = await res.json().catch(() => null);
+      setQuestionSessionIds((prev) => new Set(prev).add(savedSessionId));
+      queryClient.invalidateQueries({ queryKey: appNotificationQueryKeys.student });
+      if (
+        selectedSessionIdRef.current !== savedSessionId ||
+        !isAnalysisCurrent(contentRef.current, savedAnalysis)
+      ) return;
       setExistingQuestion({
         id: typeof saved?.id === "string" ? saved.id : existingQuestion?.id ?? "saved",
-        content,
+        content: savedAnalysis.content,
       });
-      setQuestionSessionIds((prev) => new Set(prev).add(selectedSessionId));
-      queryClient.invalidateQueries({ queryKey: appNotificationQueryKeys.student });
       setSaveComplete(true);
     } catch {
       toast({ variant: "destructive", description: t("saveError") });
@@ -319,15 +347,19 @@ function AskContent() {
   };
 
   const writeAnotherInSameSession = () => {
+    analysisRequestRef.current += 1;
+    setIsLoading(false);
     setContent("");
-    setResult(null);
+    setAnalysis(null);
     setSaveComplete(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const chooseAnotherSession = () => {
+    analysisRequestRef.current += 1;
+    setIsLoading(false);
     setContent("");
-    setResult(null);
+    setAnalysis(null);
     setSaveComplete(false);
     setFilterDate("");
     setFilterSubject("");
@@ -418,7 +450,11 @@ function AskContent() {
         textareaRef={textareaRef}
         canAsk={canAsk}
         isLoading={isLoading}
-        onContentChange={setContent}
+        hasAnalysis={Boolean(analysis)}
+        onContentChange={(value) => {
+          setContent(value);
+          setSaveComplete(false);
+        }}
         onAnalyze={handleClassify}
         sessionSelector={
           <StudentAskSessionSelector
@@ -457,12 +493,18 @@ function AskContent() {
       {result && (
         <StudentAskResultCard
           result={result}
+          analyzedContent={analysis!.content}
+          analysisCurrent={analysisCurrent}
           saveComplete={saveComplete}
           isSaving={isSaving}
           onRewrite={() => {
-            setResult(null);
-            setContent("");
             setSaveComplete(false);
+            requestAnimationFrame(() => textareaRef.current?.focus());
+          }}
+          onUseImprovedExample={(improvedExample) => {
+            setContent(improvedExample.trim().slice(0, 200));
+            setSaveComplete(false);
+            requestAnimationFrame(() => textareaRef.current?.focus());
           }}
           onSave={handleSave}
         />

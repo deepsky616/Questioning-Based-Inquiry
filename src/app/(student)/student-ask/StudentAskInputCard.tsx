@@ -27,6 +27,7 @@ interface StudentAskInputCardProps {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   canAsk: boolean;
   isLoading: boolean;
+  hasAnalysis: boolean;
   onContentChange: (value: string) => void;
   onAnalyze: () => void;
 }
@@ -46,6 +47,7 @@ export function StudentAskInputCard({
   textareaRef,
   canAsk,
   isLoading,
+  hasAnalysis,
   onContentChange,
   onAnalyze,
 }: StudentAskInputCardProps) {
@@ -145,7 +147,7 @@ export function StudentAskInputCard({
               variant="gradient"
               className="h-12 w-full text-base font-semibold"
             >
-              {isLoading ? t("analyzing") : t("analyze")}
+              {isLoading ? t("analyzing") : hasAnalysis ? t("reanalyze") : t("analyze")}
             </Button>
           </div>
 
