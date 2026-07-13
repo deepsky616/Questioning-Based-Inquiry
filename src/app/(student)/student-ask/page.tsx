@@ -11,6 +11,8 @@ import { appNotificationQueryKeys, useAppNotifications } from "@/lib/app-notific
 import { useStudentSessions } from "@/lib/app-queries";
 import { consumePracticeDraft } from "@/lib/practice-draft";
 import { isAnalysisCurrent, type AnalysisSnapshot } from "@/lib/student-ask-analysis";
+import { isDashboardActionableSessionDate } from "@/lib/dashboard-priority-tasks";
+import { localDateKey } from "@/lib/dashboard-question-class-schedule";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
 import { StudentAskCompletionCard } from "./StudentAskCompletionCard";
@@ -199,10 +201,7 @@ function AskContent() {
     return () => window.removeEventListener("focus", onFocus);
   }, [selectedSessionId, sessions, fetchDesignContext]);
 
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }, []);
+  const todayStr = localDateKey();
   const teacherRequestSessionIds = useMemo(
     () => new Set(
       notificationQuery.notifications
@@ -217,7 +216,13 @@ function AskContent() {
       const needsQuestion = !questionSessionIds.has(session.id) && !teacherRequestSessionIds.has(session.id);
       if (taskScope === "today-unasked") return session.date === todayStr && needsQuestion;
       if (taskScope === "future-unasked") return session.date > todayStr && needsQuestion;
-      if (taskScope === "past-unasked") return session.date < todayStr && needsQuestion;
+      if (taskScope === "past-unasked") {
+        return (
+          session.date < todayStr &&
+          isDashboardActionableSessionDate(session.date, todayStr) &&
+          needsQuestion
+        );
+      }
       if (taskScope === "shared") return (session.sharedQuestions?.length ?? 0) > 0;
       return true;
     });

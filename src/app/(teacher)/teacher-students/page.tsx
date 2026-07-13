@@ -142,7 +142,7 @@ export default function StudentsPage() {
       !attentionFilterOn ||
       (questionActivityStatsQuery.isSuccess && (
         !activeStudentIdsForFilter.has(s.id) ||
-        (s.sessionProgress?.remaining ?? 0) > 0
+        (s.sessionProgress?.actionableRemaining ?? 0) > 0
       ));
     const matchProgress =
       progressFilter === "all" ||

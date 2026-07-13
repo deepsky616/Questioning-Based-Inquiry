@@ -32,8 +32,8 @@ describe("질문 학습과 질문 연습의 구성 경계", () => {
   });
 
   it("요약은 승인된 자료에서 닫힌 질문과 열린 질문의 차이를 읽는다", () => {
-    expect(summary).toContain("QUESTION_ANSWER_RANGE_GUIDE.closed.definition");
-    expect(summary).toContain("QUESTION_ANSWER_RANGE_GUIDE.open.definition");
+    expect(summary).toContain("content.answerRangeGuide.closed.definition");
+    expect(summary).toContain("content.answerRangeGuide.open.definition");
   });
 
   it("연습 요약은 기존 질문 유형 알아보기 이름을 유지한다", () => {

@@ -41,6 +41,52 @@ async function fulfillReadOnly(
   await route.fulfill({ json: body });
 }
 
+function questionReadResponse(requestUrl: string): unknown {
+  const searchParams = new URL(requestUrl).searchParams;
+  const view = searchParams.get("view");
+
+  if (view === "dashboard") {
+    return {
+      recent: [],
+      stats: {
+        total: 0,
+        byClosure: { closed: 0, open: 0 },
+        byCognitive: { factual: 0, conceptual: 0, controversial: 0 },
+      },
+      answeredSessionIds: [],
+    };
+  }
+  if (view === "page") {
+    return {
+      items: [],
+      pageInfo: {
+        page: Number(searchParams.get("page") ?? 1),
+        pageSize: Number(searchParams.get("pageSize") ?? 30),
+        total: 0,
+        totalPages: 1,
+      },
+      summary: {
+        total: 0,
+        closure: { closed: 0, open: 0 },
+        cognitive: { factual: 0, conceptual: 0, controversial: 0 },
+        flagged: 0,
+      },
+    };
+  }
+  return [];
+}
+
+async function fulfillQuestionRead(
+  route: Route,
+  unexpectedWrites: UnexpectedWrite[],
+) {
+  return fulfillReadOnly(
+    route,
+    questionReadResponse(route.request().url()),
+    unexpectedWrites,
+  );
+}
+
 async function loginAsTeacher(
   page: Page,
   teacher: QuestionLearningTeacherFixture,
@@ -112,6 +158,9 @@ async function stubTeacherReads(
       unexpectedWrites,
     ),
   );
+  await page.route("**/api/questions**", (route) =>
+    fulfillQuestionRead(route, unexpectedWrites),
+  );
   await page.route("**/api/sessions**", (route) =>
     fulfillReadOnly(
       route,
@@ -121,6 +170,14 @@ async function stubTeacherReads(
           date: localDate(0),
           subject: "과학",
           topic: "물질의 변화",
+          isActive: true,
+          participation: { total: 1, submitted: 0, missing: 1, percent: 0 },
+        },
+        {
+          id: "e2e-teacher-today-second-class",
+          date: localDate(0),
+          subject: "사회",
+          topic: "지역의 변화",
           isActive: true,
           participation: { total: 1, submitted: 0, missing: 1, percent: 0 },
         },
@@ -179,8 +236,8 @@ async function stubStudentReads(
     },
   ];
 
-  await page.route("**/api/questions?**", (route) =>
-    fulfillReadOnly(route, [], unexpectedWrites),
+  await page.route("**/api/questions**", (route) =>
+    fulfillQuestionRead(route, unexpectedWrites),
   );
   await page.route("**/api/sessions**", (route) =>
     fulfillReadOnly(route, sessions, unexpectedWrites),
@@ -201,6 +258,9 @@ async function stubStudentReads(
       { scope: "test", me: { rank: null, totalPoints: 0 } },
       unexpectedWrites,
     ),
+  );
+  await page.route("**/api/config**", (route) =>
+    fulfillReadOnly(route, { configured: false }, unexpectedWrites),
   );
 }
 
@@ -336,12 +396,19 @@ test.describe("질문수업 통합 흐름", () => {
     const scheduleRow = await expectScheduleRow(
       page,
       "우선 확인",
-      /오늘 질문수업.*1개.*과학.*물질의 변화/,
+      /오늘 질문수업.*2개.*과학.*물질의 변화.*질문수업 목록 펼치기/,
     );
     await expectNoHorizontalOverflow(page);
 
     await scheduleRow.click();
-    await expect(page).toHaveURL(/\/teacher-sessions\?session=e2e-teacher-today-class$/);
+    await expect(scheduleRow).toHaveAttribute("aria-expanded", "true");
+    await scheduleRow
+      .locator("..")
+      .getByRole("button", { name: "사회 지역의 변화", exact: true })
+      .click();
+    await expect(page).toHaveURL(
+      /\/teacher-sessions\?session=e2e-teacher-today-second-class$/,
+    );
     await expectQuestionClassNavActive(page);
 
     const primaryAction = page.getByTestId("question-class-primary-action");
@@ -386,12 +453,25 @@ test.describe("질문수업 통합 흐름", () => {
       "선생님 요청 1개",
       "최근 놓친 수업 1개",
     ]);
-    await expectScheduleRow(
+    const scheduleRow = await expectScheduleRow(
       page,
       "지금 할 일",
-      /오늘 질문수업.*질문 필요 2개.*과학.*선생님 요청 수업/,
+      /오늘 질문수업.*질문 필요 2개.*과학.*선생님 요청 수업.*질문수업 목록 펼치기/,
     );
     await expectNoHorizontalOverflow(page);
+
+    await scheduleRow.click();
+    await expect(scheduleRow).toHaveAttribute("aria-expanded", "true");
+    await scheduleRow
+      .locator("..")
+      .getByRole("button", {
+        name: "사회 오늘 질문할 수업 질문 필요",
+        exact: true,
+      })
+      .click();
+    await expect(page).toHaveURL(
+      /\/student-ask\?sessionId=e2e-question-class-today$/,
+    );
     expect(unexpectedWrites).toEqual([]);
   });
 });

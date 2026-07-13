@@ -16,18 +16,25 @@ import { TeacherQuestionListPanel } from "./TeacherQuestionListPanel";
 import { TeacherQuestionSessionSelector } from "./TeacherQuestionSessionSelector";
 import { TeacherQuestionStatsCard } from "./TeacherQuestionStatsCard";
 import { TeacherQuestionTopTabs, type TeacherQuestionTopTab } from "./TeacherQuestionTopTabs";
-import type { QuestionSession, Question, BulkPreview } from "./types";
+import type { QuestionSession, Question, BulkPreview, TeacherQuestionPageResponse } from "./types";
 import type { SortField, SortDir } from "@/components/shared/QuestionClassificationStats";
-import { matchesCognitiveCategory } from "@/lib/question-labels";
-import { QUESTION_LIST_MAX } from "@/lib/questions";
 import { getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions } from "@/lib/app-queries";
-import { APP_DATA_REFETCH_MS } from "@/lib/query-refresh";
+import { visibleReportRefetchInterval } from "@/lib/query-refresh";
 import { teacherAlertQueryKeys } from "@/lib/teacher-alert-counts";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
+import { buildTeacherQuestionPagePath } from "@/lib/teacher-question-page-query";
+
+const TEACHER_QUESTION_PAGE_SIZE = 30;
+const EMPTY_QUESTION_PAGE: TeacherQuestionPageResponse = {
+  items: [],
+  pageInfo: { page: 1, pageSize: TEACHER_QUESTION_PAGE_SIZE, total: 0, totalPages: 1 },
+  summary: { total: 0, closure: { closed: 0, open: 0 },
+    cognitive: { factual: 0, conceptual: 0, controversial: 0 }, flagged: 0 },
+};
 
 export default function QuestionsPage() {
   const tPages = useTranslations("pages");
@@ -39,9 +46,7 @@ export default function QuestionsPage() {
   const ct = useContentTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [questions, setQuestions] = useState<Question[]>([]);
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [filterClosure, setFilterClosure] = useState<"all" | "closed" | "open">("all");
   const [filterCognitive, setFilterCognitive] = useState<"all" | "factual" | "conceptual" | "controversial">("all");
@@ -56,7 +61,7 @@ export default function QuestionsPage() {
   const [showBulkSuccess, setShowBulkSuccess] = useState(false);
 
   const { data: sessions = [] } = useTeacherSessions<QuestionSession>();
-  const [selectedSessionId, setSelectedSessionId] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState("all");
 
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
@@ -66,6 +71,8 @@ export default function QuestionsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [expandedCommentId, setExpandedCommentId] = useState<string | null>(null);
   const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
@@ -93,55 +100,54 @@ export default function QuestionsPage() {
     setShowBulkSuccess(false);
   };
 
-  const fetchQuestions = useCallback((
-    sessionId: string,
-    opts?: { date?: string; subject?: string; topic?: string; sortField?: SortField; sortDir?: SortDir; silent?: boolean }
-  ) => {
-    if (!opts?.silent) setIsLoading(true);
-    const params = new URLSearchParams();
-    if (sessionId && sessionId !== "all") params.append("sessionId", sessionId);
-    if (opts?.date) params.append("date", opts.date);
-    if (opts?.subject) params.append("subject", opts.subject);
-    if (opts?.topic) params.append("topic", opts.topic);
-    const field = opts?.sortField ?? sortField;
-    const dir = opts?.sortDir ?? sortDir;
-    const sortParam = field === "student" ? "studentSort" : field === "comment" ? "commentSort" : "likeSort";
-    params.append(sortParam, dir);
-    fetch(`/api/questions?${params}`)
-      .then((r) => r.json())
-      .then(setQuestions)
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
-  }, [sortField, sortDir]);
-
   useEffect(() => {
-    // 세션 목록은 useQuery가 담당. 여기선 기본 선택(전체)과 질문 목록만 초기화한다.
-    setSelectedSessionId("all");
-    fetchQuestions("all");
-    // 최초 1회만 실행. (fetchQuestions가 정렬 상태로 재생성돼도 선택 세션이 초기화되지 않도록 deps 비움)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
-  // 질문 목록도 주기 폴링(12초)+창 포커스 재조회 — 학생의 질문 작성·수정·삭제가
-  // 교사가 조작하지 않아도 자동 반영되도록(세션 목록 폴링과 동일 정책)
-  useEffect(() => {
-    const refetch = () => {
-      if (document.visibilityState !== "visible") return;
-      fetchQuestions(selectedSessionId || "all", {
-        date: filterDate || undefined,
-        subject: filterSubject || undefined,
-        topic: filterTopic || undefined,
-        silent: true, // 백그라운드 재조회 — 로딩 표시로 화면이 깜빡이지 않게
-      });
-    };
-    const timer = window.setInterval(refetch, APP_DATA_REFETCH_MS);
-    window.addEventListener("focus", refetch);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", refetch);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSessionId, filterDate, filterSubject, filterTopic, sortField, sortDir]);
+  const questionsQuery = useQuery<TeacherQuestionPageResponse>({
+    queryKey: [
+      "teacher-question-page",
+      selectedSessionId,
+      filterDate,
+      filterSubject,
+      filterTopic,
+      filterClosure,
+      filterCognitive,
+      showFlaggedOnly,
+      sortField,
+      sortDir,
+      debouncedSearch,
+      page,
+    ],
+    queryFn: async () => {
+      const response = await fetch(buildTeacherQuestionPagePath({
+        selectedSessionId,
+        filterDate,
+        filterSubject,
+        filterTopic,
+        filterClosure,
+        filterCognitive,
+        showFlaggedOnly,
+        search: debouncedSearch,
+        sortField,
+        sortDir,
+        page,
+        pageSize: TEACHER_QUESTION_PAGE_SIZE,
+      }));
+      if (!response.ok) throw new Error("질문을 불러오지 못했습니다");
+      return response.json();
+    },
+    enabled: topTab === "questions",
+    placeholderData: (previous) => previous,
+    refetchInterval: visibleReportRefetchInterval,
+    refetchOnWindowFocus: true,
+  });
+  const questionPage = questionsQuery.data ?? EMPTY_QUESTION_PAGE;
+  const questions = questionPage.items;
+  const { pageInfo, summary } = questionPage;
+  const isLoading = questionsQuery.isPending || questionsQuery.isPlaceholderData;
+  const reloadQuestions = () => questionsQuery.refetch();
 
   // 배포 삭제·재배포 후 세션 목록(sharedQuestions)을 최신화한다(선택/조회 상태는 유지).
   // 공유 쿼리를 무효화하면 teacher-sessions에도 반영된다.
@@ -154,17 +160,10 @@ export default function QuestionsPage() {
 
   const handleSessionChange = (val: string) => {
     setSelectedSessionId(val);
+    setPage(1);
+    setExpandedCommentId(null);
     // 참여 현황·AI 분석은 각 섹션 컴포넌트가 key=세션id로 리마운트되며 초기화된다
     resetBulkState();
-    if (val === "all") {
-      fetchQuestions("all", {
-        date: filterDate || undefined,
-        subject: filterSubject || undefined,
-        topic: filterTopic || undefined,
-      });
-    } else {
-      fetchQuestions(val);
-    }
   };
 
   // 날짜·교과·주제 필터로 세션 목록을 좁힌다(질문 직접 조회가 아니라 세션을 고르는 보조 필터)
@@ -180,25 +179,20 @@ export default function QuestionsPage() {
     topic: filterTopic || undefined,
   }).filter((s) => !curriculumSessionIds.has(s.id));
 
-  // 필터 변경 반영: 전체 세션이면 좁혀진 범위로 다시 조회, 특정 세션이면 목록 밖일 때 첫 세션으로 보정
+  // 특정 세션이 보조 필터 결과에서 빠지면 첫 세션으로 보정한다.
   useEffect(() => {
-    // 마운트 직후 초기 상태("")에서는 보정하지 않는다. 다른 페이지에서 세션 캐시를 채워온 경우
-    // "all" 초기화 effect가 반영되기 전에 이 effect가 첫 세션을 잘못 선택하는 문제 방지.
-    if (!selectedSessionId) return;
-    if (selectedSessionId === "all") {
-      fetchQuestions("all", {
-        date: filterDate || undefined,
-        subject: filterSubject || undefined,
-        topic: filterTopic || undefined,
-      });
-      return;
-    }
+    if (selectedSessionId === "all") return;
     if (filteredSessions.length === 0) return;
     if (!filteredSessions.some((s) => s.id === selectedSessionId)) {
       handleSessionChange(filteredSessions[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterDate, filterSubject, filterTopic]);
+
+  useEffect(() => {
+    if (page <= pageInfo.totalPages) return;
+    setPage(pageInfo.totalPages);
+  }, [page, pageInfo.totalPages]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -235,15 +229,13 @@ export default function QuestionsPage() {
       const failed = results.filter(
         (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok),
       ).length;
-      const removed = new Set(ids);
-      setQuestions((prev) => prev.filter((q) => !removed.has(q.id)));
       clearSelection();
       if (failed > 0) {
         toast({ variant: "destructive", description: t("bulkDeletePartial", { count: failed }) });
       } else {
         toast({ variant: "success", description: t("bulkDeleteDone", { count: ids.length }) });
       }
-      fetchQuestions(selectedSessionId);
+      await reloadQuestions();
     } finally {
       setIsBulkDeleting(false);
     }
@@ -359,7 +351,7 @@ export default function QuestionsPage() {
         setSelectedIds(new Set());
         setBulkMsg(null);
         setShowBulkSuccess(false);
-        fetchQuestions(selectedSessionId);
+        void reloadQuestions();
       }, 2000);
     } catch (err) {
       setBulkMsg({ type: "error", text: err instanceof Error ? err.message : t("sendFailedMsg") });
@@ -370,9 +362,6 @@ export default function QuestionsPage() {
 
   const handleToggleQuestionPublic = async (question: Question) => {
     const nextPublic = !question.isPublic;
-    setQuestions((prev) =>
-      prev.map((q) => (q.id === question.id ? { ...q, isPublic: nextPublic } : q))
-    );
     try {
       const res = await fetch(`/api/questions/${question.id}`, {
         method: "PATCH",
@@ -380,10 +369,9 @@ export default function QuestionsPage() {
         body: JSON.stringify({ isPublic: nextPublic }),
       });
       if (!res.ok) throw new Error(t("publicUpdateFailed"));
+      await reloadQuestions();
     } catch {
-      setQuestions((prev) =>
-        prev.map((q) => (q.id === question.id ? { ...q, isPublic: question.isPublic } : q))
-      );
+      toast({ variant: "destructive", description: t("publicUpdateFailed") });
     }
   };
 
@@ -392,8 +380,8 @@ export default function QuestionsPage() {
     try {
       const res = await fetch(`/api/questions/${question.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      setQuestions((prev) => prev.filter((q) => q.id !== question.id));
       if (selectedQuestion?.id === question.id) setSelectedQuestion(null);
+      await reloadQuestions();
     } catch {
       toast({ variant: "destructive", description: t("deleteFailed") });
     }
@@ -407,31 +395,16 @@ export default function QuestionsPage() {
         body: JSON.stringify({ flagged: false }),
       });
       if (!res.ok) throw new Error();
-      setQuestions((prev) => prev.map((q) => (q.id === question.id ? { ...q, flagged: false } : q)));
+      await reloadQuestions();
       queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.flagged });
     } catch {
       toast({ variant: "destructive", description: t("processFailed") });
     }
   };
 
-  const searchKeyword = search.trim().toLowerCase();
-  // 탐구질문 생성 세션의 질문은 조회 대상에서 제외
-  const visibleQuestions = questions.filter((q) => !curriculumSessionIds.has(q.session?.id ?? q.sessionId ?? ""));
-  const filtered = searchKeyword
-    ? visibleQuestions.filter(
-        (q) =>
-          q.content.toLowerCase().includes(searchKeyword) ||
-          q.author.name.toLowerCase().includes(searchKeyword),
-      )
-    : visibleQuestions;
-
-  // 분류1(닫힌/열린)·분류2(사실/개념/논쟁) 필터를 적용한 표시용 목록
-  const displayed = filtered.filter((q) =>
-    (filterClosure === "all" || q.closure === filterClosure) &&
-    (filterCognitive === "all" || matchesCognitiveCategory(q.cognitive, filterCognitive)) &&
-    (!showFlaggedOnly || q.flagged || (q.comments?.some((c) => c.flagged) ?? false))
-  );
-  const flaggedCount = filtered.filter((q) => q.flagged || (q.comments?.some((c) => c.flagged) ?? false)).length;
+  const filtered = questions;
+  const displayed = questions;
+  const flaggedCount = summary.flagged;
 
   const currentSession = sessions.find((s) => s.id === selectedSessionId);
   const isAll = selectedSessionId === "all";
@@ -462,9 +435,21 @@ export default function QuestionsPage() {
         filterDate={filterDate}
         filterSubject={filterSubject}
         filterTopic={filterTopic}
-        onFilterDateChange={setFilterDate}
-        onFilterSubjectChange={setFilterSubject}
-        onFilterTopicChange={setFilterTopic}
+        onFilterDateChange={(value) => {
+          setFilterDate(value);
+          setPage(1);
+          resetBulkState();
+        }}
+        onFilterSubjectChange={(value) => {
+          setFilterSubject(value);
+          setPage(1);
+          resetBulkState();
+        }}
+        onFilterTopicChange={(value) => {
+          setFilterTopic(value);
+          setPage(1);
+          resetBulkState();
+        }}
         onSessionChange={handleSessionChange}
         labels={{
           noSessions: t("noSessions"),
@@ -498,12 +483,12 @@ export default function QuestionsPage() {
       {currentSession && <SessionReferencePanel sessionId={currentSession.id} />}
 
       {/* 질문 분류 통계 현황 (비율 막대, 표시 전용) */}
-      {hasQuestionList && (
+      {hasQuestionList && !questionsQuery.isError && (
         <TeacherQuestionStatsCard
-          questions={filtered}
+          stats={summary}
           labels={{
             title: t("statsTitle"),
-            countSuffix: t("statsCountSuffix", { count: filtered.length }),
+            countSuffix: t("statsCountSuffix", { count: summary.total }),
             category1: tCls("category1"),
             category2: tCls("category2"),
             closure: tCls("closure"),
@@ -522,17 +507,14 @@ export default function QuestionsPage() {
         />
       )}
 
-      {questions.length >= QUESTION_LIST_MAX && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          {t("listTruncated", { max: QUESTION_LIST_MAX })}
-        </p>
-      )}
-
       <TeacherQuestionListPanel
         hasQuestionList={hasQuestionList}
         isLoading={isLoading}
+        isError={questionsQuery.isError}
         filtered={filtered}
         displayed={displayed}
+        totalCount={pageInfo.total}
+        pageInfo={pageInfo}
         search={search}
         showFlaggedOnly={showFlaggedOnly}
         flaggedCount={flaggedCount}
@@ -545,18 +527,37 @@ export default function QuestionsPage() {
         expandedCommentId={expandedCommentId}
         commentCountOverride={commentCountOverride}
         contentTranslation={ct}
-        onSearchChange={setSearch}
-        onToggleFlaggedOnly={() => setShowFlaggedOnly((value) => !value)}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPage(1);
+          resetBulkState();
+        }}
+        onToggleFlaggedOnly={() => {
+          setShowFlaggedOnly((value) => !value);
+          setPage(1);
+          resetBulkState();
+        }}
         onSortChange={(field, dir) => {
           setSortField(field);
           setSortDir(dir);
-          fetchQuestions(selectedSessionId, { sortField: field, sortDir: dir });
+          setPage(1);
+          resetBulkState();
         }}
-        onFilterClosureChange={setFilterClosure}
-        onFilterCognitiveChange={setFilterCognitive}
+        onFilterClosureChange={(value) => {
+          setFilterClosure(value);
+          setPage(1);
+          resetBulkState();
+        }}
+        onFilterCognitiveChange={(value) => {
+          setFilterCognitive(value);
+          setPage(1);
+          resetBulkState();
+        }}
         onResetClassificationFilters={() => {
           setFilterClosure("all");
           setFilterCognitive("all");
+          setPage(1);
+          resetBulkState();
         }}
         onSelectAll={selectAll}
         onClearSelection={clearSelection}
@@ -567,6 +568,12 @@ export default function QuestionsPage() {
         onToggleQuestionPublic={handleToggleQuestionPublic}
         onEditQuestion={setSelectedQuestion}
         onDeleteQuestion={handleDeleteQuestion}
+        onPageChange={(nextPage) => {
+          setPage(nextPage);
+          setExpandedCommentId(null);
+          resetBulkState();
+        }}
+        onQuestionsRetry={() => void questionsQuery.refetch()}
       />
 
         </div>
@@ -602,7 +609,7 @@ export default function QuestionsPage() {
       <QuestionEditDialog
         question={selectedQuestion}
         onClose={() => setSelectedQuestion(null)}
-        onSaved={() => fetchQuestions(selectedSessionId)}
+        onSaved={() => void reloadQuestions()}
       />
 
       <AiAnswerPreviewDialog

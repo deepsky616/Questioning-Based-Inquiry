@@ -6,6 +6,33 @@ export interface DashboardQuestionClassSession {
   subject: string;
   topic: string;
   isActive?: boolean;
+  targetType?: string | null;
+  targetGrade?: string | null;
+  targetClassName?: string | null;
+  targetStudentId?: string | null;
+  targetStudentIds?: unknown;
+}
+
+export interface DashboardQuestionClassScope {
+  grade: string;
+  className: string;
+  studentIds: ReadonlySet<string>;
+}
+
+type DashboardQueryStatus = "pending" | "success" | "error";
+
+export function resolveDashboardScheduleStatus({
+  schedule,
+  scope,
+  requiresScope,
+}: {
+  schedule: DashboardQueryStatus;
+  scope: DashboardQueryStatus;
+  requiresScope: boolean;
+}): "loading" | "ready" | "error" {
+  if (schedule === "error" || (requiresScope && scope === "error")) return "error";
+  if (schedule === "success" && (!requiresScope || scope === "success")) return "ready";
+  return "loading";
 }
 
 export type DashboardQuestionClassSchedule<TSession extends DashboardQuestionClassSession> = {
@@ -14,6 +41,7 @@ export type DashboardQuestionClassSchedule<TSession extends DashboardQuestionCla
   totalCount: number;
   needsQuestionCount: number | null;
   primarySession: TSession | null;
+  selectableSessions: TSession[];
 };
 
 export function localDateKey(date = new Date()): string {
@@ -24,20 +52,53 @@ export function localDateKey(date = new Date()): string {
   ].join("-");
 }
 
+function jsonStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+export function dashboardSessionMatchesClass(
+  session: DashboardQuestionClassSession,
+  scope: DashboardQuestionClassScope,
+): boolean {
+  if (!session.targetType || session.targetType === "ALL") return true;
+  const targetStudentIds = jsonStringArray(session.targetStudentIds);
+  const targetsScopedStudent = targetStudentIds.some((id) => scope.studentIds.has(id));
+
+  if (session.targetType === "CLASS" || session.targetType === "CUSTOM") {
+    return (
+      (session.targetGrade === scope.grade && session.targetClassName === scope.className) ||
+      targetsScopedStudent
+    );
+  }
+  if (session.targetType === "STUDENT") {
+    return (
+      Boolean(session.targetStudentId && scope.studentIds.has(session.targetStudentId)) ||
+      targetsScopedStudent
+    );
+  }
+  return false;
+}
+
 export function buildDashboardQuestionClassSchedule<
   TSession extends DashboardQuestionClassSession,
 >({
   sessions,
   today,
   completedSessionIds,
+  classScope,
 }: {
   sessions: TSession[];
   today: string;
   completedSessionIds?: ReadonlySet<string>;
+  classScope?: DashboardQuestionClassScope;
 }): DashboardQuestionClassSchedule<TSession> {
   const eligibleSessions = sessions.filter(
     (session) =>
-      session.isActive !== false && isValidSessionDateString(session.date),
+      session.isActive !== false &&
+      isValidSessionDateString(session.date) &&
+      (!classScope || dashboardSessionMatchesClass(session, classScope)),
   );
   const todaySessions = eligibleSessions.filter(
     (session) => session.date === today,
@@ -47,6 +108,12 @@ export function buildDashboardQuestionClassSchedule<
     const needsQuestion = completedSessionIds
       ? todaySessions.filter((session) => !completedSessionIds.has(session.id))
       : [];
+    const selectableSessions = completedSessionIds
+      ? [
+          ...needsQuestion,
+          ...todaySessions.filter((session) => completedSessionIds.has(session.id)),
+        ]
+      : todaySessions;
 
     return {
       kind: "today",
@@ -54,6 +121,7 @@ export function buildDashboardQuestionClassSchedule<
       totalCount: todaySessions.length,
       needsQuestionCount: completedSessionIds ? needsQuestion.length : null,
       primarySession: needsQuestion[0] ?? todaySessions[0],
+      selectableSessions,
     };
   }
 
@@ -69,6 +137,7 @@ export function buildDashboardQuestionClassSchedule<
       totalCount: 0,
       needsQuestionCount: null,
       primarySession: null,
+      selectableSessions: [],
     };
   }
 
@@ -78,6 +147,12 @@ export function buildDashboardQuestionClassSchedule<
   const needsQuestion = completedSessionIds
     ? nearestSessions.filter((session) => !completedSessionIds.has(session.id))
     : [];
+  const selectableSessions = completedSessionIds
+    ? [
+        ...needsQuestion,
+        ...nearestSessions.filter((session) => completedSessionIds.has(session.id)),
+      ]
+    : nearestSessions;
 
   return {
     kind: "upcoming",
@@ -85,5 +160,6 @@ export function buildDashboardQuestionClassSchedule<
     totalCount: nearestSessions.length,
     needsQuestionCount: completedSessionIds ? needsQuestion.length : null,
     primarySession: needsQuestion[0] ?? nearestSessions[0],
+    selectableSessions,
   };
 }

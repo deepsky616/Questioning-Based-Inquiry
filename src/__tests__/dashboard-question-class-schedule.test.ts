@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildDashboardQuestionClassSchedule,
   localDateKey,
+  resolveDashboardScheduleStatus,
 } from "@/lib/dashboard-question-class-schedule";
 
 const sessions = [
@@ -62,6 +63,10 @@ describe("대시보드 질문수업 일정", () => {
     expect(result.totalCount).toBe(2);
     expect(result.needsQuestionCount).toBe(1);
     expect(result.primarySession?.id).toBe("today-needed");
+    expect(result.selectableSessions.map((session) => session.id)).toEqual([
+      "today-needed",
+      "today-complete",
+    ]);
   });
 
   it("오늘 수업이 없으면 지난 수업과 비활성 수업을 빼고 가장 가까운 예정일을 고른다", () => {
@@ -98,10 +103,75 @@ describe("대시보드 질문수업 일정", () => {
       totalCount: 0,
       needsQuestionCount: null,
       primarySession: null,
+      selectableSessions: [],
     });
   });
 
   it("현지 날짜를 날짜 이동 없이 일정 식별값으로 바꾼다", () => {
     expect(localDateKey(new Date(2026, 6, 13, 23, 30))).toBe("2026-07-13");
+  });
+
+  it("교사가 선택한 학급을 대상으로 하는 일정만 센다", () => {
+    const result = buildDashboardQuestionClassSchedule({
+      sessions: [
+        {
+          id: "all",
+          date: "2026-07-13",
+          subject: "국어",
+          topic: "전체 수업",
+          targetType: "ALL",
+          targetGrade: null,
+          targetClassName: null,
+          targetStudentIds: [],
+        },
+        {
+          id: "other-class",
+          date: "2026-07-13",
+          subject: "과학",
+          topic: "다른 반 수업",
+          targetType: "CLASS",
+          targetGrade: "5",
+          targetClassName: "1",
+          targetStudentIds: ["student-1"],
+        },
+        {
+          id: "selected-student",
+          date: "2026-07-13",
+          subject: "사회",
+          topic: "선택 학생 수업",
+          targetType: "STUDENT",
+          targetGrade: null,
+          targetClassName: null,
+          targetStudentIds: ["student-2"],
+        },
+      ],
+      today: "2026-07-13",
+      classScope: {
+        grade: "5",
+        className: "2",
+        studentIds: new Set(["student-2"]),
+      },
+    });
+
+    expect(result.totalCount).toBe(2);
+    expect(result.primarySession?.id).toBe("all");
+  });
+
+  it("선택 학급 학생 범위가 준비되기 전에는 일정을 준비 중으로 둔다", () => {
+    expect(resolveDashboardScheduleStatus({
+      schedule: "success",
+      scope: "pending",
+      requiresScope: true,
+    })).toBe("loading");
+    expect(resolveDashboardScheduleStatus({
+      schedule: "success",
+      scope: "error",
+      requiresScope: true,
+    })).toBe("error");
+    expect(resolveDashboardScheduleStatus({
+      schedule: "success",
+      scope: "pending",
+      requiresScope: false,
+    })).toBe("ready");
   });
 });

@@ -41,4 +41,10 @@ describe("student dashboard split", () => {
     expect(pageSource).toContain("firstTeacherRequestGroup.map((item) => markNotificationRead(item.id))");
     expect(pageSource).toContain("firstTeacherRequest.href ??");
   });
+
+  it("최근 질문과 전체 통계는 대시보드 전용 요약 응답으로 불러온다", () => {
+    expect(pageSource).toContain("view=dashboard");
+    expect(pageSource).toContain("answeredSessionIds");
+    expect(pageSource).not.toContain("allQuestions.filter");
+  });
 });

@@ -23,4 +23,20 @@ describe("teacher questions page structure", () => {
   it("keeps the main page below the large component threshold", () => {
     expect(pageSource.split("\n").length).toBeLessThan(850);
   });
+
+  it("교사 질문 목록은 경량 페이지 응답과 페이지 정보를 사용한다", () => {
+    expect(pageSource).toContain("buildTeacherQuestionPagePath");
+    expect(pageSource).toContain("pageInfo");
+    expect(pageSource).not.toContain("QUESTION_LIST_MAX");
+  });
+
+  it("교사 질문 조회 실패를 빈 목록과 구분하고 다시 시도할 수 있다", () => {
+    expect(pageSource).toContain("questionsQuery.isError");
+    expect(pageSource).toContain("onQuestionsRetry");
+  });
+
+  it("교사 질문 페이지의 무거운 집계는 리포트 주기로만 자동 갱신한다", () => {
+    expect(pageSource).toContain("visibleReportRefetchInterval");
+    expect(pageSource).not.toContain("visibleDataRefetchInterval");
+  });
 });

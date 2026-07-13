@@ -5,13 +5,16 @@ import { useTranslations } from "next-intl";
 import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import type { useContentTranslation } from "@/components/shared/use-content-translation";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 import {
   QuestionSortControl,
   type SortDir,
   type SortField,
 } from "@/components/shared/QuestionClassificationStats";
-import type { Question } from "./types";
+import type { Question, QuestionPageInfo } from "./types";
 import { TeacherQuestionTable } from "./TeacherQuestionTable";
+import { TeacherQuestionPageNavigation } from "./TeacherQuestionPageNavigation";
 
 type ClosureFilter = "all" | "closed" | "open";
 type CognitiveFilter = "all" | "factual" | "conceptual" | "controversial";
@@ -19,8 +22,11 @@ type CognitiveFilter = "all" | "factual" | "conceptual" | "controversial";
 interface TeacherQuestionListPanelProps {
   hasQuestionList: boolean;
   isLoading: boolean;
+  isError: boolean;
   filtered: Question[];
   displayed: Question[];
+  totalCount: number;
+  pageInfo: QuestionPageInfo;
   search: string;
   showFlaggedOnly: boolean;
   flaggedCount: number;
@@ -48,13 +54,18 @@ interface TeacherQuestionListPanelProps {
   onToggleQuestionPublic: (question: Question) => void;
   onEditQuestion: (question: Question) => void;
   onDeleteQuestion: (question: Question) => void;
+  onPageChange: (page: number) => void;
+  onQuestionsRetry: () => void;
 }
 
 export function TeacherQuestionListPanel({
   hasQuestionList,
   isLoading,
+  isError,
   filtered,
   displayed,
+  totalCount,
+  pageInfo,
   search,
   showFlaggedOnly,
   flaggedCount,
@@ -82,6 +93,8 @@ export function TeacherQuestionListPanel({
   onToggleQuestionPublic,
   onEditQuestion,
   onDeleteQuestion,
+  onPageChange,
+  onQuestionsRetry,
 }: TeacherQuestionListPanelProps) {
   const t = useTranslations("teacherQ");
   const tc = useTranslations("common");
@@ -102,7 +115,7 @@ export function TeacherQuestionListPanel({
           <h3 className="text-base font-semibold leading-none tracking-tight text-foreground">
             {t("listTitle")}{" "}
             <span className="text-xs font-normal text-muted-foreground">
-              {t("listCountSuffix", { count: filtered.length })}
+              {t("listCountSuffix", { count: totalCount })}
             </span>
           </h3>
           <Input
@@ -131,7 +144,15 @@ export function TeacherQuestionListPanel({
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div role="alert" className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-destructive">{t("listLoadError")}</p>
+          <Button type="button" variant="outline" size="sm" onClick={onQuestionsRetry}>
+            <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+            {t("listRetry")}
+          </Button>
+        </div>
+      ) : isLoading ? (
         <div className="text-center py-16 text-muted-foreground">{tc("loading")}</div>
       ) : (
         <>
@@ -188,6 +209,17 @@ export function TeacherQuestionListPanel({
             onToggleQuestionPublic={onToggleQuestionPublic}
             onEditQuestion={onEditQuestion}
             onDeleteQuestion={onDeleteQuestion}
+          />
+          <TeacherQuestionPageNavigation
+            page={pageInfo.page}
+            totalPages={pageInfo.totalPages}
+            total={pageInfo.total}
+            onPageChange={onPageChange}
+            labels={{
+              previous: t("pagePrevious"),
+              next: t("pageNext"),
+              status: (page, totalPages, total) => t("pageStatus", { page, totalPages, total }),
+            }}
           />
         </>
       )}

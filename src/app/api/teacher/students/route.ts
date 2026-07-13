@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { compareByClassAndNumber } from "@/lib/student-sort";
+import { buildStudentSessionProgress } from "@/lib/dashboard-priority-tasks";
+import { isValidSessionDateString } from "@/lib/sessions";
+import { localDateKey } from "@/lib/dashboard-question-class-schedule";
 
 function jsonStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
@@ -18,6 +21,10 @@ export async function GET() {
   }
 
   const teacherId = (session.user as { id: string }).id;
+  const requestedToday = new URL(req.url).searchParams.get("today") ?? "";
+  const today = isValidSessionDateString(requestedToday)
+    ? requestedToday
+    : localDateKey();
 
   const teacher = await prisma.user.findUnique({
     where: { id: teacherId },
@@ -74,6 +81,7 @@ export async function GET() {
           where: { teacherId, isActive: true },
           select: {
             id: true,
+            date: true,
             targetType: true,
             targetGrade: true,
             targetClassName: true,
@@ -122,10 +130,6 @@ export async function GET() {
     students: students.map((s) => {
       const visibleSessions = visibleSessionsFor(s);
       const answered = answeredByStudent.get(s.id) ?? new Set<string>();
-      const completed = visibleSessions.filter((item) => answered.has(item.id)).length;
-      const total = visibleSessions.length;
-      const remaining = Math.max(total - completed, 0);
-      const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
       return {
         id: s.id,
         name: s.name,
@@ -138,7 +142,11 @@ export async function GET() {
         pointLogCount: s._count.pointLogs,
         totalPoints: s.totalPoints,
         lastActivityAt: lastActivity.has(s.id) ? new Date(lastActivity.get(s.id)!).toISOString() : null,
-        sessionProgress: { total, completed, remaining, percent },
+        sessionProgress: buildStudentSessionProgress({
+          sessions: visibleSessions,
+          completedSessionIds: answered,
+          today,
+        }),
       };
     }),
     teacherClasses,

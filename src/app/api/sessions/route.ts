@@ -72,6 +72,11 @@ export async function GET(req: Request) {
           topic: true,
           isActive: true,
           createdAt: true,
+          targetType: true,
+          targetGrade: true,
+          targetClassName: true,
+          targetStudentId: true,
+          targetStudentIds: true,
         },
       });
       return NextResponse.json(sessions);

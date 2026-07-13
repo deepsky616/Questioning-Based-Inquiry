@@ -6,6 +6,7 @@ import {
   visibleDataRefetchInterval,
   visibleNotificationRefetchInterval,
 } from "@/lib/query-refresh";
+import { localDateKey } from "@/lib/dashboard-question-class-schedule";
 
 export const appQueryKeys = {
   teacherSessions: ["teacher-sessions"] as const,
@@ -35,7 +36,8 @@ async function fetchSessions<TSession extends BasicSession>(href = "/api/session
 }
 
 async function fetchTeacherStudents<TStudent, TClass>(): Promise<TeacherStudentListResponse<TStudent, TClass>> {
-  const res = await fetch("/api/teacher/students");
+  const params = new URLSearchParams({ today: localDateKey() });
+  const res = await fetch(`/api/teacher/students?${params}`);
   if (!res.ok) throw new Error("학생 목록을 불러오지 못했습니다");
   const data = await res.json();
   return {

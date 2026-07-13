@@ -14,7 +14,7 @@ import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { getSessionUser } from "@/lib/auth-helpers";
-import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
+import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
 import PointsCard from "@/components/shared/PointsCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
@@ -24,6 +24,7 @@ import {
 import { useStudentSessions } from "@/lib/app-queries";
 import {
   buildStudentPriorityCounts,
+  isDashboardActionableSessionDate,
   selectActionableSessionReminders,
 } from "@/lib/dashboard-priority-tasks";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
@@ -40,7 +41,6 @@ interface Question {
   closure: string;
   cognitive: string;
   createdAt: string;
-  sessionId?: string | null;
 }
 
 interface Stats {
@@ -48,6 +48,18 @@ interface Stats {
   byClosure: { closed: number; open: number };
   byCognitive: { factual: number; conceptual: number; controversial: number };
 }
+
+interface StudentDashboardQuestionData {
+  recent: Question[];
+  stats: Stats;
+  answeredSessionIds: string[];
+}
+
+const EMPTY_STATS: Stats = {
+  total: 0,
+  byClosure: { closed: 0, open: 0 },
+  byCognitive: { factual: 0, conceptual: 0, controversial: 0 },
+};
 
 interface StudentSession {
   id: string;
@@ -76,10 +88,10 @@ function StudentDashboard() {
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
   // 내 질문/통계는 react-query로 주기 폴링(12초)+포커스 재조회.
-  const questionsQuery = useQuery<Question[]>({
+  const questionsQuery = useQuery<StudentDashboardQuestionData>({
     queryKey: ["student-dashboard-questions", user.id],
     queryFn: async () => {
-      const r = await fetch(`/api/questions?authorId=${user.id}`);
+      const r = await fetch("/api/questions?view=dashboard");
       if (!r.ok) throw new Error("질문을 불러오지 못했습니다");
       return r.json();
     },
@@ -87,7 +99,7 @@ function StudentDashboard() {
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
-  const { data: allQuestions = [], isLoading } = questionsQuery;
+  const { data: questionData, isLoading } = questionsQuery;
   const sessionsQuery = useStudentSessions<StudentSession>({ userId: user.id });
   const { data: sessions = [] } = sessionsQuery;
   const notificationQuery = useAppNotifications({
@@ -96,27 +108,14 @@ function StudentDashboard() {
   });
   const { notifications, markRead: markNotificationRead } = notificationQuery;
 
-  const questions = allQuestions.slice(0, 5);
-  const stats: Stats = {
-    total: allQuestions.length,
-    byClosure: {
-      closed: allQuestions.filter((q) => q.closure === "closed").length,
-      open: allQuestions.filter((q) => q.closure === "open").length,
-    },
-    byCognitive: {
-      factual: allQuestions.filter((q) => matchesCognitiveCategory(q.cognitive, "factual")).length,
-      conceptual: allQuestions.filter((q) => matchesCognitiveCategory(q.cognitive, "conceptual")).length,
-      controversial: allQuestions.filter((q) => matchesCognitiveCategory(q.cognitive, "controversial")).length,
-    },
-  };
+  const questions = questionData?.recent ?? [];
+  const stats = questionData?.stats ?? EMPTY_STATS;
   const todayStr = localDateKey();
   const questionSessionIds = useMemo(
     () => new Set(
-      allQuestions
-        .map((question) => question.sessionId)
-        .filter((id): id is string => Boolean(id)),
+      questionData?.answeredSessionIds ?? [],
     ),
-    [allQuestions],
+    [questionData?.answeredSessionIds],
   );
   const availableSessionIds = useMemo(
     () => new Set(
@@ -142,7 +141,8 @@ function StudentDashboard() {
     (item) =>
       item.isActive !== false &&
       isValidSessionDateString(item.date) &&
-      item.date < todayStr,
+      item.date < todayStr &&
+      isDashboardActionableSessionDate(item.date, todayStr),
   );
   const todayUnaskedSessionIds = todaySessions
     .filter((item) => !questionSessionIds.has(item.id))
@@ -205,6 +205,15 @@ function StudentDashboard() {
       href: `/student-ask?sessionId=${encodeURIComponent(scheduleSession.id)}`,
     };
   })();
+  const studentScheduleChoices = studentSchedule.selectableSessions.map((session) => ({
+    id: session.id,
+    label: session.subject.trim() || t("scheduleTodayTitle"),
+    countLabel: questionSessionIds.has(session.id)
+      ? t("scheduleQuestionComplete")
+      : t("scheduleQuestionNeeded"),
+    detail: session.topic.trim(),
+    href: `/student-ask?sessionId=${encodeURIComponent(session.id)}`,
+  }));
   const taskStatus: "loading" | "ready" | "error" =
     questionsQuery.isError || sessionsQuery.isError || notificationQuery.isError
       ? "error"
@@ -278,6 +287,7 @@ function StudentDashboard() {
                 schedule={{
                   status: scheduleStatus,
                   item: studentScheduleItem,
+                  choices: studentScheduleChoices,
                   onSelect: (item) => router.push(item.href),
                   onRetry: () => {
                     void Promise.all([
@@ -290,6 +300,8 @@ function StudentDashboard() {
                     loading: t("scheduleLoading"),
                     error: t("scheduleLoadError"),
                     retry: t("scheduleRetry"),
+                    expand: t("scheduleExpand"),
+                    collapse: t("scheduleCollapse"),
                   },
                 }}
               />

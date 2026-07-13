@@ -4,6 +4,12 @@ export interface Student {
   studentNumber: string; school: string;
   questionCount: number; commentCount: number; pointLogCount: number; totalPoints: number;
   lastActivityAt?: string | null;
-  sessionProgress?: { total: number; completed: number; remaining: number; percent: number };
+  sessionProgress?: {
+    total: number;
+    completed: number;
+    remaining: number;
+    percent: number;
+    actionableRemaining?: number;
+  };
 }
 export interface TeacherClass { grade: string; className: string }

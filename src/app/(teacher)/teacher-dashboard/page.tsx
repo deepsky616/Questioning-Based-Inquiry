@@ -19,6 +19,7 @@ import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 import {
   buildDashboardQuestionClassSchedule,
   localDateKey,
+  resolveDashboardScheduleStatus,
 } from "@/lib/dashboard-question-class-schedule";
 import { teacherAlertQueryOptions } from "@/lib/teacher-alert-counts";
 
@@ -57,7 +58,13 @@ interface TeacherStudent {
   questionCount: number;
   commentCount: number;
   lastActivityAt: string | null;
-  sessionProgress?: { total: number; completed: number; remaining: number; percent: number };
+  sessionProgress?: {
+    total: number;
+    completed: number;
+    remaining: number;
+    percent: number;
+    actionableRemaining?: number;
+  };
 }
 
 interface TeacherDashboardSession {
@@ -67,6 +74,11 @@ interface TeacherDashboardSession {
   subject: string;
   topic: string;
   isActive: boolean;
+  targetType?: string | null;
+  targetGrade?: string | null;
+  targetClassName?: string | null;
+  targetStudentId?: string | null;
+  targetStudentIds?: unknown;
 }
 
 // 학급 Select에서 사용할 복합 키 (grade|className)
@@ -119,13 +131,27 @@ function TeacherDashboard() {
   const { data: teacherStudentData } = teacherStudentsQuery;
   const teacherStudents = useMemo(() => teacherStudentData?.students ?? [], [teacherStudentData]);
   const today = localDateKey();
+  const selectedClassScheduleScope = useMemo(() => {
+    if (selectedClass === "all") return undefined;
+    const [grade, className] = selectedClass.split("|");
+    return {
+      grade,
+      className,
+      studentIds: new Set(
+        teacherStudents
+          .filter((student) => student.grade === grade && student.className === className)
+          .map((student) => student.id),
+      ),
+    };
+  }, [selectedClass, teacherStudents]);
   const teacherSchedule = useMemo(
     () =>
       buildDashboardQuestionClassSchedule({
         sessions: teacherSessionsQuery.data ?? [],
         today,
+        classScope: selectedClassScheduleScope,
       }),
-    [teacherSessionsQuery.data, today],
+    [selectedClassScheduleScope, teacherSessionsQuery.data, today],
   );
 
   // 학급 변경 시 선택값이 새 목록에 없으면 "전체"로 초기화
@@ -176,11 +202,19 @@ function TeacherDashboard() {
     const [grade, className] = selectedClass.split("|");
     return `${stats.school ? `${stats.school} ` : ""}${t("gradeClass", { grade, className })}`;
   })();
-  const scheduleStatus: "loading" | "ready" | "error" = teacherSessionsQuery.isError
-    ? "error"
-    : teacherSessionsQuery.isSuccess
-      ? "ready"
-      : "loading";
+  const scheduleStatus = resolveDashboardScheduleStatus({
+    schedule: teacherSessionsQuery.isError
+      ? "error"
+      : teacherSessionsQuery.isSuccess
+        ? "success"
+        : "pending",
+    scope: teacherStudentsQuery.isError
+      ? "error"
+      : teacherStudentsQuery.isSuccess
+        ? "success"
+        : "pending",
+    requiresScope: selectedClass !== "all",
+  });
   const teacherScheduleItem = (() => {
     const session = teacherSchedule.primarySession;
     if (!session || !teacherSchedule.date || teacherSchedule.kind === "empty") return null;
@@ -204,6 +238,13 @@ function TeacherDashboard() {
       href: `/teacher-sessions?session=${encodeURIComponent(session.id)}`,
     };
   })();
+  const teacherScheduleChoices = teacherSchedule.selectableSessions.map((session) => ({
+    id: session.id,
+    label: session.subject.trim() || t("scheduleTodayTitle"),
+    countLabel: "",
+    detail: session.topic.trim(),
+    href: `/teacher-sessions?session=${encodeURIComponent(session.id)}`,
+  }));
   const taskStatus =
     statsQuery.isError || pendingPointQuery.isError || flaggedQuery.isError || teacherStudentsQuery.isError
       ? "error"
@@ -217,7 +258,7 @@ function TeacherDashboard() {
         students: scopedStudents.map((student) => ({
           id: student.id,
           hasQuestion: activeStudentIds.has(student.id),
-          remainingSessionCount: student.sessionProgress?.remaining ?? 0,
+          remainingSessionCount: student.sessionProgress?.actionableRemaining ?? 0,
         })),
       })
     : [];
@@ -298,13 +339,19 @@ function TeacherDashboard() {
         schedule={{
           status: scheduleStatus,
           item: teacherScheduleItem,
+          choices: teacherScheduleChoices,
           onSelect: (item) => router.push(item.href),
-          onRetry: () => void teacherSessionsQuery.refetch(),
+          onRetry: () => {
+            void teacherSessionsQuery.refetch();
+            if (selectedClass !== "all") void teacherStudentsQuery.refetch();
+          },
           labels: {
             empty: t("scheduleEmpty"),
             loading: t("scheduleLoading"),
             error: t("scheduleLoadError"),
             retry: t("scheduleRetry"),
+            expand: t("scheduleExpand"),
+            collapse: t("scheduleCollapse"),
           },
         }}
         labels={{

@@ -49,6 +49,11 @@ describe("교사 대시보드 일정 조회", () => {
         topic: true,
         isActive: true,
         createdAt: true,
+        targetType: true,
+        targetGrade: true,
+        targetClassName: true,
+        targetStudentId: true,
+        targetStudentIds: true,
       },
     });
     expect(prisma.user.findUnique).not.toHaveBeenCalled();

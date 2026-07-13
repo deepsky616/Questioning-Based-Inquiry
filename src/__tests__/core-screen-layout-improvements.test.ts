@@ -58,6 +58,9 @@ describe("core screen layout improvements", () => {
     expect(teacherDashboard).not.toContain('t("taskNoQuestionsTitle")');
     expect(teacherDashboard).not.toContain('t("taskUnfinishedSessionsTitle")');
     expect(teacherDashboard).not.toContain('t("taskDecliningTitle")');
+    expect(teacherDashboard).toContain(
+      'if (selectedClass !== "all") void teacherStudentsQuery.refetch();',
+    );
   });
 
   it("keeps teacher curriculum page width aligned with dashboard", () => {

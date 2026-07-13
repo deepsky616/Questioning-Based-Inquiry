@@ -2,11 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
-import { summarizeQuestionTypes } from "@/lib/stats-calc";
-import type { Question } from "./types";
+import type { QuestionClassificationSummary } from "./types";
 
 interface TeacherQuestionStatsCardProps {
-  questions: Question[];
+  stats: QuestionClassificationSummary;
   labels: {
     title: string;
     countSuffix: string;
@@ -27,8 +26,7 @@ interface TeacherQuestionStatsCardProps {
   };
 }
 
-export function TeacherQuestionStatsCard({ questions, labels }: TeacherQuestionStatsCardProps) {
-  const stats = summarizeQuestionTypes(questions);
+export function TeacherQuestionStatsCard({ stats, labels }: TeacherQuestionStatsCardProps) {
   const pct = (count: number) => (stats.total ? Math.round((count / stats.total) * 100) : 0);
   const bar = (name: string, value: number, color: string, desc: string) => (
     <div key={name} className="mb-2 w-full px-1.5">

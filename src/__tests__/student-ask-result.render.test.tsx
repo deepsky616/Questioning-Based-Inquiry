@@ -200,6 +200,46 @@ describe("학생 질문 분석 결과", () => {
     expect(screen.getByText("전체 1개 중 0개 작성 완료, 1개 남음")).toBeInTheDocument();
   });
 
+  it("최근 놓친 수업 범위에서 30일보다 오래된 수업은 제외한다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const recentDate = new Date();
+    recentDate.setDate(recentDate.getDate() - 1);
+    const oldDate = new Date();
+    oldDate.setDate(oldDate.getDate() - 31);
+    const dateKey = (date: Date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    appState.search = "task=past-unasked";
+    appState.sessions = [
+      {
+        id: "recent-session",
+        date: dateKey(recentDate),
+        subject: "과학",
+        topic: "최근 수업",
+        teacher: { name: "선생님" },
+        sharedQuestions: [],
+        defaultQuestionPublic: false,
+      },
+      {
+        id: "old-session",
+        date: dateKey(oldDate),
+        subject: "사회",
+        topic: "오래된 수업",
+        teacher: { name: "선생님" },
+        sharedQuestions: [],
+        defaultQuestionPublic: false,
+      },
+    ];
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({ ok: true, json: async () => [] } as Response),
+    ));
+
+    renderWithIntl(<AskPage />);
+
+    expect((await screen.findAllByText("최근 수업")).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("오래된 수업")).toHaveLength(0);
+    expect(screen.getByText("전체 1개 중 0개 작성 완료, 1개 남음")).toBeInTheDocument();
+  });
+
   it("오늘 미작성 범위에서 알림 조회가 실패하면 오류 화면을 표시한다", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     appState.search = "task=today-unasked";

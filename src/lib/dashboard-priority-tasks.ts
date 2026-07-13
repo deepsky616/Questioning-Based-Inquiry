@@ -1,3 +1,5 @@
+import { isValidSessionDateString } from "@/lib/sessions";
+
 export type PriorityCountKey =
   | "flagged"
   | "points"
@@ -27,6 +29,55 @@ export interface StudentPriorityInput {
   }>;
   todayUnaskedSessionIds: string[];
   pastUnaskedSessionIds: string[];
+}
+
+export const DASHBOARD_MISSED_SESSION_LOOKBACK_DAYS = 30;
+
+function dateKeyDaysBefore(dateKey: string, days: number): string | null {
+  if (!isValidSessionDateString(dateKey)) return null;
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day - days));
+  return [
+    date.getUTCFullYear(),
+    String(date.getUTCMonth() + 1).padStart(2, "0"),
+    String(date.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+export function isDashboardActionableSessionDate(
+  sessionDate: string,
+  today: string,
+): boolean {
+  if (!isValidSessionDateString(sessionDate)) return false;
+  const oldestDate = dateKeyDaysBefore(today, DASHBOARD_MISSED_SESSION_LOOKBACK_DAYS);
+  return Boolean(oldestDate && sessionDate >= oldestDate && sessionDate <= today);
+}
+
+export function buildStudentSessionProgress({
+  sessions,
+  completedSessionIds,
+  today,
+}: {
+  sessions: Array<{ id: string; date: string }>;
+  completedSessionIds: ReadonlySet<string>;
+  today: string;
+}) {
+  const completed = sessions.filter((session) => completedSessionIds.has(session.id)).length;
+  const total = sessions.length;
+  const remaining = Math.max(total - completed, 0);
+  const actionableRemaining = sessions.filter(
+    (session) =>
+      !completedSessionIds.has(session.id) &&
+      isDashboardActionableSessionDate(session.date, today),
+  ).length;
+
+  return {
+    total,
+    completed,
+    remaining,
+    percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+    actionableRemaining,
+  };
 }
 
 export function selectActionableSessionReminders<

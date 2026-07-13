@@ -20,6 +20,8 @@ const scheduleLabels = {
   loading: "질문수업 일정을 불러오는 중입니다.",
   error: "질문수업 일정을 불러오지 못했습니다.",
   retry: "질문수업 일정 다시 불러오기",
+  expand: "질문수업 목록 펼치기",
+  collapse: "질문수업 목록 접기",
 };
 
 const emptySchedule = {

@@ -4,6 +4,8 @@ import { logger } from "@/lib/logger";
 import { auth } from "@/lib/auth";
 import {
   createQuestionForUser,
+  getStudentDashboardQuestionSummary,
+  listTeacherQuestionPage,
   listQuestionsForUser,
   QuestionRouteError,
 } from "@/lib/question-route-service";
@@ -15,7 +17,12 @@ export async function GET(req: Request) {
   }
 
   try {
-    const questions = await listQuestionsForUser(req, session.user);
+    const view = new URL(req.url).searchParams.get("view");
+    const questions = view === "dashboard"
+      ? await getStudentDashboardQuestionSummary(session.user)
+      : view === "page"
+        ? await listTeacherQuestionPage(req, session.user)
+        : await listQuestionsForUser(req, session.user);
     return NextResponse.json(questions);
   } catch (error) {
     if (error instanceof QuestionRouteError) {

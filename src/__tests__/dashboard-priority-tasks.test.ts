@@ -1,11 +1,42 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildStudentSessionProgress,
   buildStudentPriorityCounts,
   buildTeacherPriorityCounts,
+  isDashboardActionableSessionDate,
   selectActionableSessionReminders,
 } from "@/lib/dashboard-priority-tasks";
 
 describe("dashboard priority tasks", () => {
+  it("오늘과 최근 30일 수업만 대시보드 미작성 대상으로 본다", () => {
+    expect(isDashboardActionableSessionDate("2026-07-13", "2026-07-13")).toBe(true);
+    expect(isDashboardActionableSessionDate("2026-06-13", "2026-07-13")).toBe(true);
+    expect(isDashboardActionableSessionDate("2026-06-12", "2026-07-13")).toBe(false);
+    expect(isDashboardActionableSessionDate("2026-07-14", "2026-07-13")).toBe(false);
+    expect(isDashboardActionableSessionDate("2026-02-30", "2026-07-13")).toBe(false);
+  });
+
+  it("전체 진행도는 유지하면서 미래와 오래된 미작성 수업을 지도 필요 수에서 뺀다", () => {
+    expect(
+      buildStudentSessionProgress({
+        sessions: [
+          { id: "old", date: "2026-06-12" },
+          { id: "recent", date: "2026-06-13" },
+          { id: "today", date: "2026-07-13" },
+          { id: "future", date: "2026-07-14" },
+        ],
+        completedSessionIds: new Set(["recent"]),
+        today: "2026-07-13",
+      }),
+    ).toEqual({
+      total: 4,
+      completed: 1,
+      remaining: 3,
+      percent: 25,
+      actionableRemaining: 1,
+    });
+  });
+
   it("교사 할 일을 정해진 우선순위로 집계한다", () => {
     expect(
       buildTeacherPriorityCounts({

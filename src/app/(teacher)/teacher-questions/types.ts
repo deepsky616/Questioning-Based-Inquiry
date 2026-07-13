@@ -38,7 +38,28 @@ export interface Question {
   comments?: Array<{ id: string; content: string; author: { id?: string; name: string }; createdAt: string; flagged?: boolean; flagReason?: string }>;
   likeCount: number;
   commentCount?: number;
+  hasFlaggedComment?: boolean;
   likedBy?: Array<{ id: string; name: string }>;
+}
+
+export interface QuestionClassificationSummary {
+  total: number;
+  closure: { closed: number; open: number };
+  cognitive: { factual: number; conceptual: number; controversial: number };
+  flagged: number;
+}
+
+export interface QuestionPageInfo {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface TeacherQuestionPageResponse {
+  items: Question[];
+  pageInfo: QuestionPageInfo;
+  summary: QuestionClassificationSummary;
 }
 
 // AI 답변 미리보기 한 건 (전송 전 교사 확인 플로우)
