@@ -13,6 +13,8 @@ vi.mock("@/lib/db", () => ({
     user: { findUnique: vi.fn() },
     question: { findMany: vi.fn() },
     comment: { findMany: vi.fn() },
+    questionSession: { findMany: vi.fn() },
+    teacherClass: { findMany: vi.fn() },
     translation: { findMany: vi.fn(), upsert: vi.fn() },
   },
 }));
@@ -29,6 +31,8 @@ const mTranslate = translateTexts as unknown as ReturnType<typeof vi.fn>;
 const mUser = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 const q = prisma.question.findMany as unknown as ReturnType<typeof vi.fn>;
 const c = prisma.comment.findMany as unknown as ReturnType<typeof vi.fn>;
+const qs = prisma.questionSession.findMany as unknown as ReturnType<typeof vi.fn>;
+const tc = prisma.teacherClass.findMany as unknown as ReturnType<typeof vi.fn>;
 const tFind = prisma.translation.findMany as unknown as ReturnType<typeof vi.fn>;
 const tUpsert = prisma.translation.upsert as unknown as ReturnType<typeof vi.fn>;
 
@@ -54,6 +58,8 @@ beforeEach(() => {
   mUser.mockResolvedValue({ id: "u1", role: "TEACHER", school: "s", grade: null, className: null, teacherClasses: [] });
   q.mockResolvedValue([]);
   c.mockResolvedValue([]);
+  qs.mockResolvedValue([]);
+  tc.mockResolvedValue([]);
   tFind.mockResolvedValue([]);
   tUpsert.mockResolvedValue({});
 });
@@ -124,5 +130,65 @@ describe("POST /api/translate", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ translations: {} });
     expect(mTranslate).not.toHaveBeenCalled();
+  });
+
+  it("교사는 본인 세션 교과와 주제를 번역할 수 있다", async () => {
+    qs.mockResolvedValue([
+      {
+        id: "s1",
+        subject: "수학",
+        topic: "수의 규칙과 관계",
+        teacherId: "u1",
+        targetType: "ALL",
+        targetGrade: null,
+        targetClassName: null,
+        targetStudentId: null,
+        targetStudentIds: [],
+      },
+    ]);
+    mResolve.mockResolvedValue({ apiKey: "k", model: "m" });
+    mTranslate.mockResolvedValue(["Math", "Number patterns and relationships"]);
+    const res = await POST(req("en", [
+      { type: "SESSION_SUBJECT", id: "s1" },
+      { type: "SESSION_TOPIC", id: "s1" },
+    ]));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      translations: {
+        "SESSION_SUBJECT:s1": "Math",
+        "SESSION_TOPIC:s1": "Number patterns and relationships",
+      },
+    });
+  });
+
+  it("학생은 담당 학급 수업의 교과와 주제를 번역할 수 있다", async () => {
+    mUser.mockResolvedValue({ id: "st1", role: "STUDENT", school: "s", grade: "5", className: "1", teacherClasses: [] });
+    qs.mockResolvedValue([
+      {
+        id: "s1",
+        subject: "과학",
+        topic: "식물의 한살이",
+        teacherId: "t1",
+        targetType: "CLASS",
+        targetGrade: "5",
+        targetClassName: "1",
+        targetStudentId: null,
+        targetStudentIds: [],
+      },
+    ]);
+    tc.mockResolvedValue([{ teacherId: "t1" }]);
+    mResolve.mockResolvedValue({ apiKey: "k", model: "m" });
+    mTranslate.mockResolvedValue(["Science", "Plant life cycles"]);
+    const res = await POST(req("en", [
+      { type: "SESSION_SUBJECT", id: "s1" },
+      { type: "SESSION_TOPIC", id: "s1" },
+    ]));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      translations: {
+        "SESSION_SUBJECT:s1": "Science",
+        "SESSION_TOPIC:s1": "Plant life cycles",
+      },
+    });
   });
 });

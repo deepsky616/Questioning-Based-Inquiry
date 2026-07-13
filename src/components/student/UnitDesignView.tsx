@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { CalendarDays } from "lucide-react";
@@ -120,6 +121,7 @@ export function UnitDesignView() {
     () => sortSessionsDesc(rawSessions).filter((session) => (session.sharedQuestions?.length ?? 0) > 0),
     [rawSessions],
   );
+  const sessionText = useSessionMetaTranslation(sessions);
 
   // 첫 세션 자동 선택
   useEffect(() => {
@@ -162,7 +164,7 @@ export function UnitDesignView() {
     date: filterDate || undefined,
     subject: filterSubject || undefined,
     topic: filterTopic || undefined,
-  }).filter((s) => !searchLc || buildSessionLabel(s.date, s.subject, s.topic).toLowerCase().includes(searchLc));
+  }).filter((s) => !searchLc || buildSessionLabel(s.date, s.subject, s.topic).toLowerCase().includes(searchLc) || sessionText.label(s).toLowerCase().includes(searchLc));
   const sortedSessions = sort === "asc" ? sortSessionsAsc(filteredSessions) : sortSessionsDesc(filteredSessions);
   const activeSessions = sortedSessions.filter((s) => isSessionAvailable(s.date));
   const pastSessions = sortedSessions.filter((s) => !isSessionAvailable(s.date));
@@ -258,7 +260,7 @@ export function UnitDesignView() {
                       className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
                     >
                       <option value="">{allLabel}</option>
-                      {options.map((o) => <option key={o} value={o}>{o}</option>)}
+                      {options.map((o) => <option key={o} value={o}>{i === 0 ? sessionText.subjectOption(o) : sessionText.topicOption(o)}</option>)}
                     </select>
                   ))}
                   {hasFilter && (
@@ -313,7 +315,7 @@ export function UnitDesignView() {
                               <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-foreground">
-                                  {buildSessionLabel(session.date, session.subject, session.topic)}
+                                  {sessionText.label(session)}
                                 </p>
                                 <p className="mt-1 text-xs text-muted-foreground">
                                   {t("questionCount", { count: session.sharedQuestions?.length ?? 0 })}
@@ -337,7 +339,7 @@ export function UnitDesignView() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">
-                      {buildSessionLabel(selectedSession.date, selectedSession.subject, selectedSession.topic)}
+                      {sessionText.label(selectedSession)}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {t("sessionPosition", {
@@ -383,7 +385,7 @@ export function UnitDesignView() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle className="text-base">
                     {selectedSession
-                      ? buildSessionLabel(selectedSession.date, selectedSession.subject, selectedSession.topic)
+                      ? sessionText.label(selectedSession)
                       : t("fallbackTitle")}
                   </CardTitle>
                   <TranslateAllButton

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { formatDateTime } from "@/lib/datetime";
 import {
   CLOSURE_LABEL,
@@ -24,8 +25,8 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel } from "@/lib/sessions";
 import type { Question } from "./types";
+import { TeacherQuestionLikeCount } from "./TeacherQuestionLikeCount";
 
 interface TeacherQuestionTableProps {
   list: Question[];
@@ -66,6 +67,11 @@ export function TeacherQuestionTable({
   const tc = useTranslations("common");
   const tTarget = useTranslations("targetSelector");
   const allChecked = list.length > 0 && list.every((question) => selectedIds.has(question.id));
+  const sessionsForTranslation = useMemo(
+    () => list.map((question) => question.session).filter((session): session is NonNullable<Question["session"]> => Boolean(session)),
+    [list],
+  );
+  const sessionText = useSessionMetaTranslation(sessionsForTranslation);
 
   if (list.length === 0) {
     return <EmptyState icon="🔍" title={t("noQuestions")} />;
@@ -84,7 +90,7 @@ export function TeacherQuestionTable({
           {tTarget("selectAll")}
         </label>
         {list.map((question) => {
-          const commentCount = commentCountOverride[question.id] ?? question.comments?.length ?? 0;
+          const commentCount = commentCountOverride[question.id] ?? question.commentCount ?? question.comments?.length ?? 0;
           return (
             <div
               key={question.id}
@@ -145,7 +151,7 @@ export function TeacherQuestionTable({
                     {selectedSessionId === "all" && question.session && (
                       <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                         <span>📚</span>
-                        <span>{buildSessionLabel(question.session.date, question.session.subject, question.session.topic)}</span>
+                        <span>{sessionText.label(question.session)}</span>
                       </span>
                     )}
                     <span className="inline-flex items-center gap-1">
@@ -201,7 +207,7 @@ export function TeacherQuestionTable({
                 <div className="mt-3 rounded-lg bg-muted/30 p-3">
                   <CommentThread
                     questionId={question.id}
-                    preloaded={question.comments ?? []}
+                    preloaded={question.comments}
                     canModerate
                     onCountChange={(count) => onCommentCountChange(question.id, count)}
                   />
@@ -289,7 +295,7 @@ export function TeacherQuestionTable({
                       {selectedSessionId === "all" && question.session && (
                         <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                           <span>📚</span>
-                          <span>{buildSessionLabel(question.session.date, question.session.subject, question.session.topic)}</span>
+                          <span>{sessionText.label(question.session)}</span>
                         </span>
                       )}
                       <span className="inline-flex items-center gap-1">
@@ -299,19 +305,13 @@ export function TeacherQuestionTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <div className="group relative inline-block">
-                      <span className="flex items-center gap-1 text-sm font-medium text-rose-500">
-                        ❤️ {question.likeCount}
-                      </span>
-                      {(question.likedBy?.length ?? 0) > 0 && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 z-10 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 w-36 shadow-lg">
-                          <p className="font-semibold mb-1">{t("likedByStudents")}</p>
-                          {question.likedBy!.map((user) => (
-                            <p key={user.id} className="truncate">{user.name}</p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <TeacherQuestionLikeCount
+                      questionId={question.id}
+                      likeCount={question.likeCount}
+                      initialLikedBy={question.likedBy}
+                      likeCountLabel={t("likeCountLabel", { count: question.likeCount })}
+                      likedByLabel={t("likedByStudents")}
+                    />
                   </TableCell>
                   <TableCell className="text-center">
                     <button
@@ -320,7 +320,7 @@ export function TeacherQuestionTable({
                       className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-800"
                       title={t("commentTooltip")}
                     >
-                      💬 {commentCountOverride[question.id] ?? question.comments?.length ?? 0}
+                      💬 {commentCountOverride[question.id] ?? question.commentCount ?? question.comments?.length ?? 0}
                     </button>
                   </TableCell>
                   <TableCell>
@@ -359,7 +359,7 @@ export function TeacherQuestionTable({
                     <TableCell colSpan={7} className="bg-muted/30 px-6 py-4">
                       <CommentThread
                         questionId={question.id}
-                        preloaded={question.comments ?? []}
+                        preloaded={question.comments}
                         canModerate
                         onCountChange={(count) => onCommentCountChange(question.id, count)}
                       />

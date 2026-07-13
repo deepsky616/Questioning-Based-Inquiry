@@ -13,9 +13,9 @@ import {
 } from "@/components/ui/select";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { groupSharedQuestions } from "@/lib/shared-questions";
 import {
-  buildSessionLabel,
   filterSessions,
   getSessionFilterOptions,
   groupSessionDatesByMonth,
@@ -44,6 +44,7 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
   const t = useTranslations("teacherQ");
   const tc = useTranslations("common");
   const tSess = useTranslations("sessions");
+  const sessionText = useSessionMetaTranslation(sessions);
   const confirm = useConfirm();
   const { toast } = useToast();
 
@@ -184,7 +185,7 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                     <optgroup key={group.key} label={`${group.label} (${group.sessions.length})`}>
                       {group.sessions.map((session) => (
                         <option key={session.id} value={session.id}>
-                          {buildSessionLabel(session.date, session.subject, session.topic)}
+                          {sessionText.label(session)}
                         </option>
                       ))}
                     </optgroup>
@@ -244,7 +245,7 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                 <button type="button" onClick={() => toggleDeploy(s.id)} aria-expanded={openDeploy.has(s.id)} className="min-w-0 flex-1 text-left">
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
                     <CollapseChevron open={openDeploy.has(s.id)} />
-                    <span className="truncate">{buildSessionLabel(s.date, s.subject, s.topic)}</span>
+                    <span className="truncate">{sessionText.label(s)}</span>
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {t("statQuestions", { count: s.sharedQuestions?.length ?? 0 })}

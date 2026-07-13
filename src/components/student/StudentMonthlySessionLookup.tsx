@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  buildSessionLabel,
   groupSessionDatesByMonth,
   groupSessionsByMonth,
   isInquiryDesignSession,
   type SortableSession,
 } from "@/lib/sessions";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 
 export function StudentMonthlyDateSelect({
   dates,
@@ -73,6 +73,7 @@ export function StudentMonthlySessionLookup<T extends LookupSession>({
   };
 }) {
   const sessionMonthGroups = groupSessionsByMonth(sessions);
+  const sessionText = useSessionMetaTranslation(sessions);
 
   if (sessions.length === 0) {
     return (
@@ -98,7 +99,7 @@ export function StudentMonthlySessionLookup<T extends LookupSession>({
               isInquiryDesignSession(session) ? labels.inquiryClass : "",
               completed && labels.completed ? labels.completed : "",
             ].filter(Boolean);
-            const label = buildSessionLabel(session.date, session.subject, session.topic);
+            const label = sessionText.label(session);
 
             return (
               <option key={session.id} value={session.id}>

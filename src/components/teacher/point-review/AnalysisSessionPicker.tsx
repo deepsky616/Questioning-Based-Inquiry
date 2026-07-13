@@ -5,8 +5,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { useTranslations } from "next-intl";
-import { buildSessionLabel } from "@/lib/sessions";
 import { MAX_ANALYZE_SESSIONS } from "./types";
 import type { usePointReview } from "./usePointReview";
 
@@ -27,6 +27,7 @@ export function AnalysisSessionPicker({ review }: { review: Review }) {
     message,
     loadPending,
   } = review;
+  const sessionText = useSessionMetaTranslation(sessionMonthGroups.flatMap((group) => group.sessions));
 
   return (
     <Card>
@@ -91,7 +92,7 @@ export function AnalysisSessionPicker({ review }: { review: Review }) {
                             {active ? "✓" : ""}
                           </span>
                           <span className="min-w-0 flex-1 truncate font-medium">
-                            {buildSessionLabel(session.date, session.subject, session.topic)}
+                            {sessionText.label(session)}
                           </span>
                         </span>
                         {count > 0 && (

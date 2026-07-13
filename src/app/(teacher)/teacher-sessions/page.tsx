@@ -291,6 +291,7 @@ function TeacherSessionsPageContent() {
             />
             <TeacherSessionListControls
               filterOptions={filterOptions}
+              sessions={sessions}
               filterDate={listFilterDate}
               filterSubject={listFilterSubject}
               filterTopic={listFilterTopic}

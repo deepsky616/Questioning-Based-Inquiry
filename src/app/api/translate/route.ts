@@ -13,7 +13,7 @@ const bodySchema = z.object({
   items: z
     .array(
       z.object({
-        type: z.enum(["QUESTION", "COMMENT"]),
+        type: z.enum(["QUESTION", "COMMENT", "SESSION_SUBJECT", "SESSION_TOPIC"]),
         id: z.string().min(1),
       }),
     )
@@ -22,6 +22,46 @@ const bodySchema = z.object({
 });
 
 const keyOf = (type: string, id: string) => `${type}:${id}`;
+
+function jsonStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function canViewSession(
+  viewer: {
+    id: string;
+    role: string | null;
+    grade: string | null;
+    className: string | null;
+  } | null,
+  session: {
+    teacherId: string;
+    targetType: string;
+    targetGrade: string | null;
+    targetClassName: string | null;
+    targetStudentId: string | null;
+    targetStudentIds: unknown;
+  },
+  teacherIdsForStudentClass: Set<string>,
+): boolean {
+  if (!viewer) return false;
+  if (viewer.role === "TEACHER") return session.teacherId === viewer.id;
+  if (viewer.role !== "STUDENT") return false;
+  if (!teacherIdsForStudentClass.has(session.teacherId)) return false;
+  const targetStudentIds = jsonStringArray(session.targetStudentIds);
+  if (session.targetType === "ALL") return true;
+  if (session.targetType === "CLASS") {
+    return (
+      (session.targetGrade === viewer.grade && session.targetClassName === viewer.className) ||
+      targetStudentIds.includes(viewer.id)
+    );
+  }
+  if (session.targetType === "STUDENT") {
+    return session.targetStudentId === viewer.id || targetStudentIds.includes(viewer.id);
+  }
+  if (session.targetType === "CUSTOM") return targetStudentIds.includes(viewer.id);
+  return false;
+}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -46,9 +86,12 @@ export async function POST(req: Request) {
   // 질문·댓글만 번역 대상에 포함한다(공개/본인/담당 학급 교사/댓글 공개 규칙).
   const qIds = items.filter((i) => i.type === "QUESTION").map((i) => i.id);
   const cIds = items.filter((i) => i.type === "COMMENT").map((i) => i.id);
+  const sessionIds = items
+    .filter((i) => i.type === "SESSION_SUBJECT" || i.type === "SESSION_TOPIC")
+    .map((i) => i.id);
 
   const authorSelect = { role: true, school: true, grade: true, className: true } as const;
-  const [viewer, questions, comments] = await Promise.all([
+  const [viewer, questions, comments, sessions] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, role: true, school: true, grade: true, className: true, teacherClasses: { select: { grade: true, className: true } } },
@@ -70,7 +113,33 @@ export async function POST(req: Request) {
           },
         })
       : [],
+    sessionIds.length
+      ? prisma.questionSession.findMany({
+          where: { id: { in: sessionIds } },
+          select: {
+            id: true,
+            subject: true,
+            topic: true,
+            teacherId: true,
+            targetType: true,
+            targetGrade: true,
+            targetClassName: true,
+            targetStudentId: true,
+            targetStudentIds: true,
+          },
+        })
+      : [],
   ]);
+
+  const teacherIdsForStudentClass = new Set<string>();
+  if (viewer?.role === "STUDENT" && viewer.grade && viewer.className && sessions.length > 0) {
+    const teacherIds = Array.from(new Set(sessions.map((session) => session.teacherId)));
+    const teacherClasses = await prisma.teacherClass.findMany({
+      where: { teacherId: { in: teacherIds }, grade: viewer.grade, className: viewer.className },
+      select: { teacherId: true },
+    });
+    teacherClasses.forEach((item) => teacherIdsForStudentClass.add(item.teacherId));
+  }
 
   const originals = new Map<string, string>();
   for (const q of questions) {
@@ -89,6 +158,11 @@ export async function POST(req: Request) {
       });
     if (canSee) originals.set(keyOf("COMMENT", c.id), c.content);
   }
+  for (const session of sessions) {
+    if (!canViewSession(viewer, session, teacherIdsForStudentClass)) continue;
+    originals.set(keyOf("SESSION_SUBJECT", session.id), session.subject);
+    if (session.topic.trim()) originals.set(keyOf("SESSION_TOPIC", session.id), session.topic);
+  }
 
   // 캐시 조회
   const cached = await prisma.translation.findMany({
@@ -103,7 +177,7 @@ export async function POST(req: Request) {
   const cacheByKey = new Map(cached.map((t) => [keyOf(t.sourceType, t.sourceId), t]));
 
   const out: Record<string, string> = {};
-  const misses: { type: "QUESTION" | "COMMENT"; id: string; text: string; hash: string }[] = [];
+  const misses: { type: "QUESTION" | "COMMENT" | "SESSION_SUBJECT" | "SESSION_TOPIC"; id: string; text: string; hash: string }[] = [];
 
   for (const item of items) {
     const k = keyOf(item.type, item.id);

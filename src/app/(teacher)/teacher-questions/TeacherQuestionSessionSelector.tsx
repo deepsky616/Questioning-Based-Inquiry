@@ -7,7 +7,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { buildSessionLabel, groupSessionDatesByMonth, groupSessionsByMonth } from "@/lib/sessions";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
+import { groupSessionDatesByMonth, groupSessionsByMonth } from "@/lib/sessions";
 import type { QuestionSession } from "./types";
 
 interface SessionFilterOptions {
@@ -62,6 +63,7 @@ export function TeacherQuestionSessionSelector({
 }: TeacherQuestionSessionSelectorProps) {
   const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   const sessionMonthGroups = groupSessionsByMonth(filteredSessions);
+  const sessionText = useSessionMetaTranslation(sessions);
 
   if (sessions.length === 0) {
     return (
@@ -103,7 +105,7 @@ export function TeacherQuestionSessionSelector({
               <SelectItem value="__all__">{labels.allSubjects}</SelectItem>
               {filterOptions.subjects.map((subject) => (
                 <SelectItem key={subject} value={subject}>
-                  {subject}
+                  {sessionText.subjectOption(subject)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -120,7 +122,7 @@ export function TeacherQuestionSessionSelector({
               <SelectItem value="__all__">{labels.allTopics}</SelectItem>
               {filterOptions.topics.map((topic) => (
                 <SelectItem key={topic} value={topic}>
-                  {topic}
+                  {sessionText.topicOption(topic)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -143,7 +145,7 @@ export function TeacherQuestionSessionSelector({
                 <optgroup key={group.key} label={`${group.label} (${group.sessions.length})`}>
                   {group.sessions.map((session) => (
                     <option key={session.id} value={session.id}>
-                      {buildSessionLabel(session.date, session.subject, session.topic)}
+                      {sessionText.label(session)}
                     </option>
                   ))}
                 </optgroup>

@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useSessionMetaTranslation, type SessionMetaText } from "@/components/shared/use-session-meta-translation";
 import { groupSessionDatesByMonth } from "@/lib/sessions";
 
 export type SessionListSort = "desc" | "asc" | "missingDesc";
@@ -13,6 +14,7 @@ interface TeacherSessionListControlsProps {
     subjects: string[];
     topics: string[];
   };
+  sessions: SessionMetaText[];
   filterDate: string;
   filterSubject: string;
   filterTopic: string;
@@ -30,6 +32,7 @@ interface TeacherSessionListControlsProps {
 
 export function TeacherSessionListControls({
   filterOptions,
+  sessions,
   filterDate,
   filterSubject,
   filterTopic,
@@ -48,6 +51,7 @@ export function TeacherSessionListControls({
   const tc = useTranslations("common");
   const hasFilter = Boolean(filterDate || filterSubject || filterTopic || search || participationFilter !== "all");
   const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
+  const sessionText = useSessionMetaTranslation(sessions);
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-4 lg:gap-y-2">
@@ -79,14 +83,14 @@ export function TeacherSessionListControls({
           <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allSubjects")} /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
-            {filterOptions.subjects.map((subject) => <SelectItem key={subject} value={subject}>{subject}</SelectItem>)}
+            {filterOptions.subjects.map((subject) => <SelectItem key={subject} value={subject}>{sessionText.subjectOption(subject)}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterTopic || "__all__"} onValueChange={(v) => onFilterTopic(v === "__all__" ? "" : v)}>
           <SelectTrigger className="h-10 w-full bg-background text-sm"><SelectValue placeholder={t("allTopics")} /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">{t("allTopics")}</SelectItem>
-            {filterOptions.topics.map((topic) => <SelectItem key={topic} value={topic}>{topic}</SelectItem>)}
+            {filterOptions.topics.map((topic) => <SelectItem key={topic} value={topic}>{sessionText.topicOption(topic)}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={participationFilter} onValueChange={(value) => onParticipationFilter(value as SessionParticipationFilter)}>

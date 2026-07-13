@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
-import { buildSessionLabel, groupSessionDatesByMonth, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
+import { groupSessionDatesByMonth, groupSessionsByMonth, isInquiryDesignSession } from "@/lib/sessions";
 import { useTranslations } from "next-intl";
 import type { AskTaskScope, QuestionSession } from "./types";
 
@@ -67,6 +68,7 @@ export function StudentAskSessionSelector({
   getSessionDateBadge,
 }: StudentAskSessionSelectorProps) {
   const t = useTranslations("ask");
+  const sessionText = useSessionMetaTranslation(filteredSessions);
   const dateMonthGroups = groupSessionDatesByMonth(filterOptions.dates);
   // 학생의 용무는 대부분 오늘·예정 수업 — 지난 세션은 월별로 접어 소음을 줄인다
   const upcomingSessions = filteredSessions.filter((s) => s.date >= todayStr);
@@ -142,7 +144,7 @@ export function StudentAskSessionSelector({
           >
             <option value="">{t("allSubjects")}</option>
             {filterOptions.subjects.map((subject) => (
-              <option key={subject} value={subject}>{subject}</option>
+              <option key={subject} value={subject}>{sessionText.subjectOption(subject)}</option>
             ))}
           </select>
           <select
@@ -153,7 +155,7 @@ export function StudentAskSessionSelector({
           >
             <option value="">{t("allTopics")}</option>
             {filterOptions.topics.map((topic) => (
-              <option key={topic} value={topic}>{topic}</option>
+              <option key={topic} value={topic}>{sessionText.topicOption(topic)}</option>
             ))}
           </select>
         </div>
@@ -172,7 +174,7 @@ export function StudentAskSessionSelector({
               <optgroup key={group.key} label={`${group.label} (${group.sessions.length}개)`}>
                 {group.sessions.map((session) => (
                   <option key={session.id} value={session.id}>
-                    {buildSessionLabel(session.date, session.subject, session.topic)}
+                    {sessionText.label(session)}
                     {isInquiryDesignSession(session) ? ` · ${t("inquiryClassTag")}` : ""}
                   </option>
                 ))}
@@ -238,9 +240,9 @@ export function StudentAskSessionSelector({
                       )}
                     </div>
                     <div className="mt-2 space-y-1">
-                      <p className="line-clamp-1 text-sm font-semibold">{session.subject}</p>
+                      <p className="line-clamp-1 text-sm font-semibold">{sessionText.subject(session)}</p>
                       <p className="line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
-                        {session.topic.trim() || t("emptyTopic")}
+                        {sessionText.topic(session).trim() || t("emptyTopic")}
                       </p>
                       <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                         <span>{session.date}</span>

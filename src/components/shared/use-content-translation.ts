@@ -6,7 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/use-toast";
 
 export interface TranslatableItem {
-  type: "QUESTION" | "COMMENT";
+  type: "QUESTION" | "COMMENT" | "SESSION_SUBJECT" | "SESSION_TOPIC";
   id: string;
 }
 

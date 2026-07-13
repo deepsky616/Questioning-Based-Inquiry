@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { buildSessionLabel } from "@/lib/sessions";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { usePointReview } from "@/components/teacher/point-review/usePointReview";
 import { AnalysisSessionPicker } from "@/components/teacher/point-review/AnalysisSessionPicker";
@@ -57,13 +57,18 @@ export function PointReviewView({ classFilter }: { classFilter?: PointReviewClas
     focusStudentName,
     focusedPending,
   } = review;
+  const sessionText = useSessionMetaTranslation(reviewFilteredSessions);
 
   // 세션 그룹 헤더 + 행 목록 (중복 가능성·추천 보너스 공용)
   const renderGroups = (rows: PendingLog[]) =>
     groupBySession(rows).map((group) => (
       <div key={group.key} className="space-y-2">
         <div className="flex flex-wrap items-center gap-2 border-b pb-1.5">
-          <p className="text-sm font-semibold text-foreground">{group.label}</p>
+          <p className="text-sm font-semibold text-foreground">
+            {reviewFilteredSessions.find((session) => session.id === group.key)
+              ? sessionText.label(reviewFilteredSessions.find((session) => session.id === group.key)!)
+              : group.label}
+          </p>
           <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
             {t("groupPendingCount", { count: group.rows.length })}
           </span>
@@ -151,7 +156,7 @@ export function PointReviewView({ classFilter }: { classFilter?: PointReviewClas
                     <SelectContent>
                       <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
                       {reviewSubjectOptions.map((subject) => (
-                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                        <SelectItem key={subject} value={subject}>{sessionText.subjectOption(subject)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -172,7 +177,7 @@ export function PointReviewView({ classFilter }: { classFilter?: PointReviewClas
                     <SelectContent>
                       <SelectItem value="__all__">{t("allTopics")}</SelectItem>
                       {reviewTopicOptions.map((topic) => (
-                        <SelectItem key={topic} value={topic}>{topic}</SelectItem>
+                        <SelectItem key={topic} value={topic}>{sessionText.topicOption(topic)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -192,11 +197,11 @@ export function PointReviewView({ classFilter }: { classFilter?: PointReviewClas
                     ) : (
                       <>
                         <option value="all">{t("allSessions")}</option>
-                        {reviewSessionMonthGroups.map((group) => (
+                            {reviewSessionMonthGroups.map((group) => (
                           <optgroup key={group.key} label={`${group.label} (${group.sessions.length})`}>
                             {group.sessions.map((session) => (
                               <option key={session.id} value={session.id}>
-                                {buildSessionLabel(session.date, session.subject, session.topic)}
+                                {sessionText.label(session)}
                               </option>
                             ))}
                           </optgroup>

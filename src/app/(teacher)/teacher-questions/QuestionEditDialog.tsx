@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { buildSessionLabel } from "@/lib/sessions";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { normalizeCognitiveType } from "@/lib/question-labels";
 import type { Question } from "./types";
 
@@ -30,6 +30,7 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
   const t = useTranslations("teacherQ");
   const tCls = useTranslations("classification");
   const tc = useTranslations("common");
+  const sessionText = useSessionMetaTranslation(question?.session ? [question.session] : []);
 
   const [closure, setClosure] = useState("");
   const [cognitive, setCognitive] = useState("");
@@ -117,7 +118,7 @@ export function QuestionEditDialog({ question, onClose, onSaved }: QuestionEditD
               </p>
               {question.session && (
                 <p className="text-xs text-indigo-600 mt-1">
-                  {t("sessionPrefix")}{buildSessionLabel(question.session.date, question.session.subject, question.session.topic)}
+                  {t("sessionPrefix")}{sessionText.label(question.session)}
                 </p>
               )}
             </div>

@@ -25,8 +25,8 @@ export default function TeacherPracticePrintGuidePage() {
         </Button>
       </div>
 
-      <article className="question-practice-print rounded-xl border bg-white p-6 text-slate-950 shadow-sm print:border-0 print:p-0 print:shadow-none">
-        <header className="border-b border-slate-300 pb-5">
+      <article className="question-practice-print rounded-xl border bg-white p-6 text-slate-950 shadow-sm [color-scheme:light] dark:bg-white dark:text-slate-950 print:border-0 print:p-0 print:shadow-none">
+        <div className="border-b border-slate-300 pb-5">
           <p className="text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">{guide.eyebrow}</p>
           <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
             <div className="max-w-3xl">
@@ -47,7 +47,7 @@ export default function TeacherPracticePrintGuidePage() {
           <p className="mt-4 rounded-md bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 print:bg-indigo-50">
             {guide.teacherNote}
           </p>
-        </header>
+        </div>
 
         <section className="mt-6 space-y-4">
           <h2 className="text-xl font-extrabold text-slate-950">{guide.guideTitle}</h2>

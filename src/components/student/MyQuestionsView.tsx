@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
 import { useSession } from "next-auth/react";
@@ -28,7 +29,7 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { StudentMonthlyDateSelect, StudentMonthlySessionLookup } from "@/components/student/StudentMonthlySessionLookup";
 import {
@@ -86,6 +87,7 @@ export function MyQuestionsView() {
   const [search, setSearch] = useState("");
   const { data: rawSessions = [] } = useStudentSessions<QuestionSession>({ userId: user.id });
   const sessions = useMemo(() => sortSessionsDesc(rawSessions), [rawSessions]);
+  const sessionText = useSessionMetaTranslation(sessions);
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(null);
   const [commentCountOverride, setCommentCountOverride] = useState<Record<string, number>>({});
   // 내 질문 수정(반응이 달리기 전까지만) — 저장 시 자동 재분류
@@ -299,7 +301,7 @@ export function MyQuestionsView() {
                 {selectedSessionId === "all" && q.session && (
                   <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                     <span>📚</span>
-                    <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
+                    <span>{sessionText.label(q.session)}</span>
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1">
@@ -429,7 +431,7 @@ export function MyQuestionsView() {
                       {selectedSessionId === "all" && q.session && (
                         <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                           <span>📚</span>
-                          <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
+                          <span>{sessionText.label(q.session)}</span>
                         </span>
                       )}
                       <span className="inline-flex items-center gap-1">
@@ -537,7 +539,7 @@ export function MyQuestionsView() {
                 <SelectTrigger className="h-11 bg-background text-sm"><SelectValue placeholder={tEx("all")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{tEx("allSubjects")}</SelectItem>
-                  {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{sessionText.subjectOption(s)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -547,7 +549,7 @@ export function MyQuestionsView() {
                 <SelectTrigger className="h-11 bg-background text-sm"><SelectValue placeholder={tEx("all")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{tEx("allTopics")}</SelectItem>
-                  {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{sessionText.topicOption(t)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -602,7 +604,7 @@ export function MyQuestionsView() {
                 <span className="font-semibold">{t("remainingSessionLabel")}</span>
                 {sessionProgress.remainingSessions.map((s) => (
                   <span key={s.id} className="rounded-full bg-white px-2 py-1 dark:bg-emerald-950">
-                    {buildSessionLabel(s.date, s.subject, s.topic)}
+                    {sessionText.label(s)}
                   </span>
                 ))}
               </div>

@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import DatePicker from "@/components/shared/DatePicker";
 import { useToast } from "@/components/ui/use-toast";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { formatDateTime } from "@/lib/datetime";
-import { buildSessionLabel } from "@/lib/sessions";
 import { buildTargetLabel } from "@/lib/session-targeting";
 import type { QuestionSession } from "./types";
 
@@ -58,6 +58,7 @@ export function TeacherSessionRow({
   const t = useTranslations("sessions");
   const tc = useTranslations("common");
   const tSeq = useTranslations("sequencePanel");
+  const sessionText = useSessionMetaTranslation([session]);
   const { toast } = useToast();
   const isDesignSession = !!session.unitDesignId;
   const rowRef = useRef<HTMLDivElement>(null);
@@ -150,7 +151,7 @@ export function TeacherSessionRow({
           <span className={`h-2 w-2 shrink-0 rounded-full ${session.isActive ? "bg-green-500" : "bg-gray-300 dark:bg-gray-600"}`} />
           <div className="min-w-0">
             <p className={`line-clamp-2 text-sm font-medium lg:truncate ${session.isActive ? "text-foreground" : "text-muted-foreground"}`}>
-              {buildSessionLabel(session.date, session.subject, session.topic)}
+              {sessionText.label(session)}
             </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-2">
               {!session.isActive && (

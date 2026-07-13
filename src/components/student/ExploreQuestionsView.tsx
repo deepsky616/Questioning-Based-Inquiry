@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, compareByStudent, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
@@ -14,7 +15,7 @@ import {
   COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { buildSessionLabel, sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
@@ -51,7 +52,7 @@ interface Question {
   myLike: boolean;
   likesVisibleToPeers?: boolean;
   commentsVisibleToPeers?: boolean;
-  session?: { date: string; subject: string; topic: string } | null;
+  session?: { id: string; date: string; subject: string; topic: string } | null;
 }
 
 
@@ -117,6 +118,7 @@ function QuestionCard({
   commentsEnabled,
   showSession,
   ct,
+  sessionLabel,
 }: {
   q: Question;
   onLikeChange: (questionId: string, newCount: number, myLike: boolean) => void;
@@ -124,6 +126,7 @@ function QuestionCard({
   commentsEnabled: boolean;
   showSession: boolean;
   ct: ReturnType<typeof useContentTranslation>;
+  sessionLabel: (session: NonNullable<Question["session"]>) => string;
 }) {
   const t = useTranslations("explore");
   const [showComments, setShowComments] = useState(false);
@@ -206,7 +209,7 @@ function QuestionCard({
               {showSession && q.session && (
                 <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5">
                   <span>📚</span>
-                  <span>{buildSessionLabel(q.session.date, q.session.subject, q.session.topic)}</span>
+                  <span>{sessionLabel(q.session)}</span>
                 </span>
               )}
               <span className="inline-flex items-center gap-1">
@@ -271,6 +274,7 @@ export function ExploreQuestionsView() {
   const user = getSessionUser(session);
   const { data: rawSessions = [] } = useStudentSessions<QuestionSession>({ userId: user.id });
   const sessions = useMemo(() => sortSessionsDesc(rawSessions), [rawSessions]);
+  const sessionText = useSessionMetaTranslation(sessions);
   const [selectedSessionId, setSelectedSessionId] = useState("all");
   const [search, setSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
@@ -361,7 +365,7 @@ export function ExploreQuestionsView() {
         {list.map((q) => (
           <QuestionCard key={q.id} q={q} onLikeChange={handleLikeChange}
             likesEnabled={exploreCfg.likesEnabled} commentsEnabled={exploreCfg.commentsEnabled}
-            showSession={selectedSessionId === "all"} ct={ct} />
+            showSession={selectedSessionId === "all"} ct={ct} sessionLabel={sessionText.label} />
         ))}
       </div>
     );
@@ -397,7 +401,7 @@ export function ExploreQuestionsView() {
                 <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={t("all")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("allSubjects")}</SelectItem>
-                  {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {filterOptions.subjects.map((s) => <SelectItem key={s} value={s}>{sessionText.subjectOption(s)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -407,7 +411,7 @@ export function ExploreQuestionsView() {
                 <SelectTrigger className="h-8 text-sm bg-background"><SelectValue placeholder={t("all")} /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">{t("allTopics")}</SelectItem>
-                  {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {filterOptions.topics.map((t) => <SelectItem key={t} value={t}>{sessionText.topicOption(t)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

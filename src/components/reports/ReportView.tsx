@@ -10,6 +10,7 @@ import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { formatDateTime } from "@/lib/datetime";
 import { groupSessionsByMonth } from "@/lib/sessions";
 import { getAnalysisFreshness } from "@/lib/report-analysis-freshness";
@@ -66,7 +67,7 @@ export interface SessionAnalysisResult {
   analysisModel?: string;
 }
 
-type SessionTranslationFields = Partial<Record<keyof SessionAnalysisResult | "sessionTitle", string>>;
+type SessionTranslationFields = Partial<Record<keyof SessionAnalysisResult, string>>;
 
 export interface ReportViewProps {
   scope: "student" | "class";
@@ -171,6 +172,7 @@ export function ReportView({
   const tooltipText = dark ? "#e5e7eb" : "#111827";
   // ── 수업 세션별 분석 (기간 필터 + 전체 분석) ──
   const allSessions = useMemo(() => sessions ?? [], [sessions]);
+  const sessionText = useSessionMetaTranslation(allSessions);
   // period="ALL"이면 전체, 그 외엔 특정 주/월 키. 상단 토글(range)과 함께 상단에서 선택한다.
   const [period, setPeriod] = useState<string>("ALL");
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -197,7 +199,7 @@ export function ReportView({
     setTrFields((p) => { const n = { ...p }; delete n[id]; return n; });
     setTrShown((p) => ({ ...p, [id]: false }));
   };
-  const toggleTranslate = async (id: string, sessionTitle: string) => {
+  const toggleTranslate = async (id: string) => {
     if (trShown[id]) {
       setTrShown((p) => ({ ...p, [id]: false }));
       return;
@@ -215,7 +217,6 @@ export function ReportView({
         const value = r[key];
         if (typeof value === "string" && value.trim()) fields[key] = value;
       }
-      if (sessionTitle.trim()) fields.sessionTitle = sessionTitle;
       const body = {
         sessionId: id,
         cacheKey: analysisCacheKey ?? "class",
@@ -532,11 +533,7 @@ export function ReportView({
                   const r = res[s.id];
                   const rv = r && trShown[s.id] ? { ...r, ...trFields[s.id] } : r;
                   const freshness = r ? getAnalysisFreshness(s, r) : null;
-                  const sessionTitle = `${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
-                  const visibleSessionTitle = trShown[s.id] && trFields[s.id]?.sessionTitle
-                    ? trFields[s.id].sessionTitle
-                    : sessionTitle;
-                  const label = `${s.date} · ${visibleSessionTitle}`;
+                  const label = sessionText.compactLabel(s);
                   const blocks: [string, string | undefined][] = [
                     [t("secSummary"), rv?.summary], [t("secBalance"), rv?.balanceInsights], [t("secBest"), rv?.bestQuestion],
                     [t("secGrowth"), rv?.growthInsights], [t("secRewrite"), rv?.rewriteExample], [t("secEngagement"), rv?.engagementInsights],
@@ -575,7 +572,7 @@ export function ReportView({
                       <>
                         {canTranslate && r && !busy[s.id] && (
                           <button
-                            onClick={() => toggleTranslate(s.id, sessionTitle)}
+                            onClick={() => toggleTranslate(s.id)}
                             disabled={trBusy[s.id]}
                             className="no-print shrink-0 rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-60"
                           >

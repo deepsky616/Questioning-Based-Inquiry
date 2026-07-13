@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { buildSessionLabel } from "@/lib/sessions";
+import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import type { QuestionSession } from "./types";
 
 interface StudentAskCompletionCardProps {
@@ -21,6 +21,7 @@ export function StudentAskCompletionCard({
   onChooseAnotherSession,
 }: StudentAskCompletionCardProps) {
   const t = useTranslations("ask");
+  const sessionText = useSessionMetaTranslation(selectedSession ? [selectedSession] : []);
 
   return (
     <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-950/30">
@@ -28,7 +29,7 @@ export function StudentAskCompletionCard({
         <CardTitle className="text-emerald-800 dark:text-emerald-100">{t("saveCompleteTitle")}</CardTitle>
         <CardDescription className="text-emerald-700 dark:text-emerald-200">
           {selectedSession
-            ? t("saveCompleteDescWithSession", { session: buildSessionLabel(selectedSession.date, selectedSession.subject, selectedSession.topic) })
+            ? t("saveCompleteDescWithSession", { session: sessionText.label(selectedSession) })
             : t("saveCompleteDesc")}
         </CardDescription>
       </CardHeader>
