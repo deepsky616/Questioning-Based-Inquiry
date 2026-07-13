@@ -16,7 +16,6 @@ const TEACHER_PAGES = [
   { href: "/teacher-dashboard", key: "dashboard" },
   { href: "/teacher-question-learning", key: "questionLearning" },
   { href: "/teacher-practice", key: "practice" },
-  { href: "/teacher-curriculum", key: "curriculum" },
   { href: "/teacher-sessions", key: "sessions" },
   { href: "/teacher-questions", key: "questions" },
   { href: "/teacher-question-play", key: "questionPlay" },
@@ -27,7 +26,11 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
   const user = getSessionUser(session);
   const router = useRouter();
   const t = useTranslations("nav");
-  const pages = TEACHER_PAGES.map((p) => ({ href: p.href, label: t(p.key) }));
+  const pages = TEACHER_PAGES.map((p) => ({
+    href: p.href,
+    label: t(p.key),
+    ...(p.href === "/teacher-sessions" ? { aliases: ["/teacher-curriculum"] } : {}),
+  }));
 
   useEffect(() => {
     if (status === "unauthenticated") {

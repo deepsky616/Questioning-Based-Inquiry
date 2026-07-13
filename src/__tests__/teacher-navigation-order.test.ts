@@ -50,11 +50,11 @@ describe("teacher navigation order", () => {
       { href: "/teacher-dashboard", key: "dashboard" },
       { href: "/teacher-question-learning", key: "questionLearning" },
       { href: "/teacher-practice", key: "practice" },
-      { href: "/teacher-curriculum", key: "curriculum" },
       { href: "/teacher-sessions", key: "sessions" },
       { href: "/teacher-questions", key: "questions" },
       { href: "/teacher-question-play", key: "questionPlay" },
     ]);
+    expect(layoutSource).toContain('aliases: ["/teacher-curriculum"]');
   });
 
   it("교사 설정과 학생 관리를 상단 계정 메뉴에서 접근할 수 있다", () => {

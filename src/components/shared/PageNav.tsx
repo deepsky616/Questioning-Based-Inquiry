@@ -4,15 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { isNavPageActive, type NavPage } from "@/components/shared/AppNav";
 
 interface PageNavProps {
-  pages: { href: string; label: string }[];
+  pages: NavPage[];
 }
 
 export function PageNav({ pages }: PageNavProps) {
   const t = useTranslations("chrome");
   const pathname = usePathname();
-  const currentIndex = pages.findIndex((p) => p.href === pathname);
+  const currentIndex = pages.findIndex((page) => isNavPageActive(pathname, page));
   const home = pages[0];
   const prev = currentIndex > 0 ? pages[currentIndex - 1] : null;
   const next = currentIndex < pages.length - 1 ? pages[currentIndex + 1] : null;

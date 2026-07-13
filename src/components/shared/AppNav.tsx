@@ -15,6 +15,13 @@ import { cn } from "@/lib/utils";
 export interface NavPage {
   href: string;
   label: string;
+  aliases?: readonly string[];
+}
+
+export function isNavPageActive(pathname: string, page: NavPage) {
+  return [page.href, ...(page.aliases ?? [])].some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
 }
 
 export interface AccountNavLinks {
@@ -46,7 +53,7 @@ function InlineNav({
   moreLabel,
 }: {
   pages: NavPage[];
-  isActive: (href: string) => boolean;
+  isActive: (page: NavPage) => boolean;
   moreLabel: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,12 +97,12 @@ function InlineNav({
 
   const visible = pages.slice(0, visibleCount);
   const overflow = pages.slice(visibleCount);
-  const overflowActive = overflow.some((p) => isActive(p.href));
+  const overflowActive = overflow.some(isActive);
 
-  const linkClass = (href: string) =>
+  const linkClass = (page: NavPage) =>
     cn(
       "shrink-0 whitespace-nowrap px-2.5 py-2 rounded-md text-sm font-medium transition-colors",
-      isActive(href)
+      isActive(page)
         ? "bg-muted text-primary"
         : "text-muted-foreground hover:text-primary hover:bg-muted/60",
     );
@@ -112,7 +119,7 @@ function InlineNav({
       </div>
 
       {visible.map((p) => (
-        <Link key={p.href} href={p.href} className={linkClass(p.href)}>
+        <Link key={p.href} href={p.href} className={linkClass(p)}>
           {p.label}
         </Link>
       ))}
@@ -141,7 +148,7 @@ function InlineNav({
                 onClick={() => setMoreOpen(false)}
                 className={cn(
                   "block px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive(p.href)
+                  isActive(p)
                     ? "bg-muted text-primary"
                     : "text-muted-foreground hover:text-primary hover:bg-muted/60",
                 )}
@@ -181,7 +188,7 @@ export function AppNav({
   const [accountOpen, setAccountOpen] = useState(false);
   const t = useTranslations("nav");
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+  const isActive = (page: NavPage) => isNavPageActive(pathname, page);
   const classInfo = [
     accountProfile?.grade ? t("gradeValue", { grade: accountProfile.grade }) : null,
     accountProfile?.className ? t("classValue", { className: accountProfile.className }) : null,
@@ -316,7 +323,7 @@ export function AppNav({
                 onClick={() => setOpen(false)}
                 className={cn(
                   "block px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive(p.href)
+                  isActive(p)
                     ? "bg-muted text-primary"
                     : "text-muted-foreground hover:text-primary hover:bg-muted/60",
                 )}
