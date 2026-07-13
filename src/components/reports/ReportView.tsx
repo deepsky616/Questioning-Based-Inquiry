@@ -66,6 +66,8 @@ export interface SessionAnalysisResult {
   analysisModel?: string;
 }
 
+type SessionTranslationFields = Partial<Record<keyof SessionAnalysisResult | "sessionTitle", string>>;
+
 export interface ReportViewProps {
   scope: "student" | "class";
   title: string;
@@ -186,8 +188,8 @@ export function ReportView({
   const [savingEdit, setSavingEdit] = useState(false);
   // 분석 결과 번역(ko 외 로케일에서 세션별 원문/번역 전환)
   const tT = useTranslations("translate");
-  const canTranslate = locale !== "ko" && canAnalyze;
-  const [trFields, setTrFields] = useState<Record<string, SessionAnalysisResult>>({});
+  const canTranslate = locale !== "ko";
+  const [trFields, setTrFields] = useState<Record<string, SessionTranslationFields>>({});
   const [trShown, setTrShown] = useState<Record<string, boolean>>({});
   const [trBusy, setTrBusy] = useState<Record<string, boolean>>({});
   // 재분석·수정으로 원문이 바뀌면 이전 번역을 버린다(서버 캐시는 해시로 자동 무효화)
@@ -195,7 +197,7 @@ export function ReportView({
     setTrFields((p) => { const n = { ...p }; delete n[id]; return n; });
     setTrShown((p) => ({ ...p, [id]: false }));
   };
-  const toggleTranslate = async (id: string) => {
+  const toggleTranslate = async (id: string, sessionTitle: string) => {
     if (trShown[id]) {
       setTrShown((p) => ({ ...p, [id]: false }));
       return;
@@ -208,12 +210,16 @@ export function ReportView({
     if (!r || trBusy[id]) return;
     setTrBusy((p) => ({ ...p, [id]: true }));
     try {
+      const fields: Record<string, string> = {};
+      for (const key of getReportEditFieldKeys(scope)) {
+        const value = r[key];
+        if (typeof value === "string" && value.trim()) fields[key] = value;
+      }
+      if (sessionTitle.trim()) fields.sessionTitle = sessionTitle;
       const body = {
         sessionId: id,
         cacheKey: analysisCacheKey ?? "class",
-        fields: Object.fromEntries(
-          Object.entries(r).filter(([, v]) => typeof v === "string" && v.trim()),
-        ),
+        fields,
       };
       const resp = await fetch("/api/reports/session-analysis/translate", {
         method: "POST",
@@ -486,7 +492,7 @@ export function ReportView({
         <div className="report-analysis-panel rounded-xl border bg-card p-4">
           <ReportSessionAnalysisToolbar
             title={t("aiSessionTitle")}
-            description={t("aiSessionDesc")}
+            description={canAnalyze ? t("aiSessionDesc") : ""}
             analyzeAllLabel={t("analyzeAll")}
             canAnalyze={canAnalyze}
             analyzingAll={analyzingAll}
@@ -526,7 +532,11 @@ export function ReportView({
                   const r = res[s.id];
                   const rv = r && trShown[s.id] ? { ...r, ...trFields[s.id] } : r;
                   const freshness = r ? getAnalysisFreshness(s, r) : null;
-                  const label = `${s.date} · ${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
+                  const sessionTitle = `${s.subject}${s.topic ? ` - ${s.topic}` : ""}`;
+                  const visibleSessionTitle = trShown[s.id] && trFields[s.id]?.sessionTitle
+                    ? trFields[s.id].sessionTitle
+                    : sessionTitle;
+                  const label = `${s.date} · ${visibleSessionTitle}`;
                   const blocks: [string, string | undefined][] = [
                     [t("secSummary"), rv?.summary], [t("secBalance"), rv?.balanceInsights], [t("secBest"), rv?.bestQuestion],
                     [t("secGrowth"), rv?.growthInsights], [t("secRewrite"), rv?.rewriteExample], [t("secEngagement"), rv?.engagementInsights],
@@ -565,7 +575,7 @@ export function ReportView({
                       <>
                         {canTranslate && r && !busy[s.id] && (
                           <button
-                            onClick={() => toggleTranslate(s.id)}
+                            onClick={() => toggleTranslate(s.id, sessionTitle)}
                             disabled={trBusy[s.id]}
                             className="no-print shrink-0 rounded-md border border-indigo-300 px-2.5 py-1 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-60"
                           >

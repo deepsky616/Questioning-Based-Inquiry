@@ -388,10 +388,10 @@ export function ReportSessionAnalysisToolbar({
   return (
     <>
       <p className="mb-1 text-sm font-bold text-foreground">{title}</p>
-      <p className="mb-3 text-xs text-muted-foreground">{description}</p>
-      <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
-        <span className="text-xs font-semibold text-foreground">{analyzeAllLabel}</span>
-        {canAnalyze && (
+      {description && <p className="mb-3 text-xs text-muted-foreground">{description}</p>}
+      {canAnalyze && (
+        <div className="no-print mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
+          <span className="text-xs font-semibold text-foreground">{analyzeAllLabel}</span>
           <Button size="sm" disabled={analyzingAll || filteredSessionCount === 0} onClick={onAnalyzeAll} className="font-semibold">
             {analyzingAll
               ? labels.analyzing
@@ -399,8 +399,7 @@ export function ReportSessionAnalysisToolbar({
                 ? labels.analyzeAllStudent(filteredSessionCount)
                 : labels.analyzeAllClass(filteredSessionCount)}
           </Button>
-        )}
-        {canAnalyze && bulkEnabled && (
+          {bulkEnabled && (
           <>
             <Button
               size="sm"
@@ -418,8 +417,9 @@ export function ReportSessionAnalysisToolbar({
               </button>
             )}
           </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
       {canAnalyze && bulkEnabled && bulkNote && !bulkRunning && (
         <p className="no-print -mt-1 text-xs text-muted-foreground">{bulkNote}</p>
       )}

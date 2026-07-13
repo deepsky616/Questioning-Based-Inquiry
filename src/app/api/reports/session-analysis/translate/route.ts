@@ -23,8 +23,8 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   const user = session.user as { id: string; role?: string };
-  if (user.role !== "TEACHER") {
-    return NextResponse.json({ error: "교사만 사용할 수 있습니다" }, { status: 403 });
+  if (user.role !== "TEACHER" && user.role !== "STUDENT") {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
 
   const targetLocale = getRequestLocale(req);
@@ -38,13 +38,23 @@ export async function POST(req: Request) {
   }
   const { sessionId, cacheKey, fields } = parsed.data;
 
-  // 본인 소유 세션의 분석만 번역 가능(임의 텍스트 번역 프록시로 오·남용 방지)
-  const owned = await prisma.questionSession.findFirst({
-    where: { id: sessionId, teacherId: user.id },
-    select: { id: true },
-  });
-  if (!owned) {
-    return NextResponse.json({ error: "질문수업을 찾을 수 없습니다" }, { status: 404 });
+  // 교사는 본인 소유 수업, 학생은 본인에게 저장된 학생별 분석만 번역 가능하다.
+  if (user.role === "TEACHER") {
+    const owned = await prisma.questionSession.findFirst({
+      where: { id: sessionId, teacherId: user.id },
+      select: { id: true },
+    });
+    if (!owned) {
+      return NextResponse.json({ error: "질문수업을 찾을 수 없습니다" }, { status: 404 });
+    }
+  } else {
+    const ownAnalysis = await prisma.sessionAnalysis.findUnique({
+      where: { sessionId_scope_studentId: { sessionId, scope: "student", studentId: user.id } },
+      select: { id: true },
+    });
+    if (!ownAnalysis) {
+      return NextResponse.json({ error: "질문수업 분석을 찾을 수 없습니다" }, { status: 404 });
+    }
   }
 
   const entries = Object.entries(fields).filter(([, v]) => v.trim().length > 0);

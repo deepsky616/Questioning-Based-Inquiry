@@ -11,6 +11,7 @@ vi.mock("@/lib/translate", async (importActual) => {
 vi.mock("@/lib/db", () => ({
   prisma: {
     questionSession: { findFirst: vi.fn() },
+    sessionAnalysis: { findUnique: vi.fn() },
     translation: { findUnique: vi.fn(), upsert: vi.fn() },
   },
 }));
@@ -25,6 +26,7 @@ const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mResolve = resolveUserAiConfig as unknown as ReturnType<typeof vi.fn>;
 const mTranslate = translateTexts as unknown as ReturnType<typeof vi.fn>;
 const mSession = prisma.questionSession.findFirst as unknown as ReturnType<typeof vi.fn>;
+const mSessionAnalysis = prisma.sessionAnalysis.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mFind = prisma.translation.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mUpsert = prisma.translation.upsert as unknown as ReturnType<typeof vi.fn>;
 
@@ -42,6 +44,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
   mSession.mockResolvedValue({ id: "s1" });
+  mSessionAnalysis.mockResolvedValue({ id: "a1" });
   mFind.mockResolvedValue(null);
   mUpsert.mockResolvedValue({});
   mResolve.mockResolvedValue({ apiKey: "k", model: "gemini-2.5-flash-lite" });
@@ -54,9 +57,27 @@ describe("POST session-analysis translate", () => {
     expect((await POST(req("en", BODY))).status).toBe(401);
   });
 
-  it("학생은 403", async () => {
-    mAuth.mockResolvedValue({ user: { id: "st1", role: "STUDENT" } });
+  it("지원하지 않는 권한은 403", async () => {
+    mAuth.mockResolvedValue({ user: { id: "u1", role: "PARENT" } });
     expect((await POST(req("en", BODY))).status).toBe(403);
+  });
+
+  it("학생은 본인 저장 분석이 있으면 번역할 수 있다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "st1", role: "STUDENT" } });
+    const res = await POST(req("en", { ...BODY, cacheKey: "student-self" }));
+    const data = await res.json();
+    expect(res.status).toBe(200);
+    expect(data.fields).toEqual({ summary: "Summary", insights: "Suggestion" });
+    expect(mSessionAnalysis).toHaveBeenCalledWith({
+      where: { sessionId_scope_studentId: { sessionId: "s1", scope: "student", studentId: "st1" } },
+      select: { id: true },
+    });
+  });
+
+  it("학생 본인 저장 분석이 없으면 404", async () => {
+    mAuth.mockResolvedValue({ user: { id: "st1", role: "STUDENT" } });
+    mSessionAnalysis.mockResolvedValue(null);
+    expect((await POST(req("en", { ...BODY, cacheKey: "student-self" }))).status).toBe(404);
   });
 
   it("남의 세션이면 404 (번역 프록시 오남용 방지)", async () => {
