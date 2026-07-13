@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TeacherReportsView } from "@/components/teacher/TeacherReportsView";
 import { TeacherDashboardFilters } from "./TeacherDashboardFilters";
-import { TeacherDashboardTabs } from "./TeacherDashboardTabs";
 import { TeacherStudentStatsCard } from "./TeacherStudentStatsCard";
 import { TeacherTodayTasksCard, type TeacherTaskItem } from "./TeacherTodayTasksCard";
 import { StatBar } from "@/components/shared/StatBar";
@@ -78,8 +77,6 @@ function TeacherDashboard() {
   const [highlightStudentStats, setHighlightStudentStats] = useState(false);
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
-  const setTab = (v: "overview" | "reports") =>
-    router.replace(v === "reports" ? "/teacher-dashboard?tab=reports" : "/teacher-dashboard", { scroll: false });
   const [period, setPeriod] = useState("month");
   const [selectedClass, setSelectedClass] = useState("all");
 
@@ -250,12 +247,6 @@ function TeacherDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader title={tPages("teacherDashboard.title")} description={tPages("teacherDashboard.description")} />
-
-      <TeacherDashboardTabs
-        value={tab}
-        onChange={setTab}
-        labels={{ overview: t("tabOverview"), reports: t("tabReports") }}
-      />
 
       {tab === "reports" ? (
         <TeacherReportsView />

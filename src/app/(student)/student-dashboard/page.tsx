@@ -69,14 +69,11 @@ function StudentDashboard() {
   const user = getSessionUser(session);
   const tCls = useTranslations("classification");
   const t = useTranslations("studentDash");
-  const tDash = useTranslations("dashboard");
   const router = useRouter();
   const pointsSectionRef = useRef<HTMLDivElement | null>(null);
   const [highlightPoints, setHighlightPoints] = useState(false);
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
-  const setTab = (v: "overview" | "reports") =>
-    router.replace(v === "reports" ? "/student-dashboard?tab=reports" : "/student-dashboard", { scroll: false });
   // 내 질문/통계는 react-query로 주기 폴링(12초)+포커스 재조회.
   const { data: allQuestions = [], isLoading } = useQuery<Question[]>({
     queryKey: ["student-dashboard-questions", user.id],
@@ -245,22 +242,6 @@ function StudentDashboard() {
           {t("greeting", { name: user.name ?? "" })}
         </h2>
         <p className="text-sm leading-6 text-muted-foreground md:text-base">{t("greetingSub")}</p>
-      </div>
-
-      {/* 개요 / 상세 리포트 탭 */}
-      <div className="flex w-full overflow-hidden rounded-md border sm:w-fit">
-        {(["overview", "reports"] as const).map((v, i) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => setTab(v)}
-            className={`h-11 flex-1 px-4 text-sm font-medium transition-colors sm:flex-none ${i > 0 ? "border-l" : ""} ${
-              tab === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {v === "overview" ? tDash("tabOverview") : tDash("tabReports")}
-          </button>
-        ))}
       </div>
 
       {tab === "reports" ? (
