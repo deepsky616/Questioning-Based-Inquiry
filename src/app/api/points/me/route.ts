@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { normalizePointReasonForDisplay } from "@/lib/point-reason-label";
 
 export async function GET() {
   const session = await auth();
@@ -29,6 +30,9 @@ export async function GET() {
 
   return NextResponse.json({
     totalPoints: user?.totalPoints ?? 0,
-    recent: recentLogs,
+    recent: recentLogs.map((log) => ({
+      ...log,
+      reason: normalizePointReasonForDisplay(log.reason),
+    })),
   });
 }

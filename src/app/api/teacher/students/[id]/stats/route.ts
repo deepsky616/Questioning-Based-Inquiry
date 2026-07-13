@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
+import { normalizePointReasonForDisplay } from "@/lib/point-reason-label";
 
 interface RawEvent { type: "question" | "comment" | "point"; createdAt: string; weight: number; meta?: Record<string, unknown> }
 type Params = { params: Promise<{ id: string }> };
@@ -129,6 +130,9 @@ export async function GET(
     events,
     recentQuestions: questions.slice(0, 10),
     recentComments: comments.slice(0, 10),
-    recentPoints: pointLogs.slice(0, 20),
+    recentPoints: pointLogs.slice(0, 20).map((log) => ({
+      ...log,
+      reason: normalizePointReasonForDisplay(log.reason),
+    })),
   });
 }

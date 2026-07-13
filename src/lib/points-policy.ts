@@ -121,6 +121,9 @@ export function shouldShowPointReason(
 const ACTIVITY_EMOJI: Record<string, string> = {
   QUESTION_WRITE: "✏️",
   COMMENT_WRITE: "💬",
+  PRACTICE_QUIZ: "✅",
+  PRACTICE_TRANSFORM: "🔁",
+  PRACTICE_CREATE: "✏️",
   PARTICIPATION: "✋",
   VALID_QUESTIONS: "❓",
   COMPLETION: "✅",

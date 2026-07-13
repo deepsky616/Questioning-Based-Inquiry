@@ -33,6 +33,24 @@ describe("학생 포인트 내역 — 확정 지급만 노출", () => {
     expect(where.NOT).toEqual({ bonusType: { contains: "FLAGGED" } });
   });
 
+  it("질문 연습 포인트 사유의 내부 코드를 한국어 표시 문구로 정리한다", async () => {
+    mLogs.mockResolvedValue([
+      {
+        id: "p1",
+        gameId: "PRACTICE",
+        roomCode: "quiz:q56:cognitive:2026-07-13",
+        bonusType: "PRACTICE_QUIZ",
+        points: 1,
+        reason: "질문 연습: 분류 정답 (q56/cognitive)",
+        status: "APPROVED",
+        createdAt: new Date("2026-07-13T00:00:00.000Z"),
+      },
+    ]);
+
+    const data = await (await GET()).json();
+    expect(data.recent[0].reason).toBe("질문 연습: 사실적·개념적·논쟁적 질문 분류 정답");
+  });
+
   it("비로그인은 401", async () => {
     mAuth.mockResolvedValue(null);
     expect((await GET()).status).toBe(401);

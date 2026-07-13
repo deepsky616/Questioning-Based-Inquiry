@@ -27,6 +27,11 @@ import {
   clampToDailyCap,
 } from "@/lib/practice-points";
 import { rowsToBank, type MergedCustomBank } from "@/lib/practice-custom";
+import {
+  practiceCreatePointReason,
+  practiceQuizPointReason,
+  practiceTransformPointReason,
+} from "@/lib/point-reason-label";
 
 // 질문 연습 판정 + 포인트 지급.
 // 채점을 서버가 다시 수행하므로 클라이언트 값은 신뢰하지 않는다.
@@ -208,7 +213,7 @@ export async function POST(req: Request) {
         "PRACTICE_QUIZ",
         buildPracticeDedupeKey("quiz", `${item.id}:${body.quizType}`),
         PRACTICE_POINTS.QUIZ_CORRECT,
-        `질문 연습: 분류 정답 (${item.id}/${body.quizType})`,
+        practiceQuizPointReason(body.quizType),
       );
       return NextResponse.json({ correct, ...award });
     }
@@ -233,7 +238,7 @@ export async function POST(req: Request) {
         "PRACTICE_TRANSFORM",
         buildPracticeDedupeKey("transform", item.id),
         PRACTICE_POINTS.TARGET_ACHIEVED,
-        `질문 연습: 질문 바꾸기 성공 (${item.id})`,
+        practiceTransformPointReason(item.target),
       );
       return NextResponse.json({ classification, achieved, ...award });
     }
@@ -258,7 +263,7 @@ export async function POST(req: Request) {
         "PRACTICE_CREATE",
         buildPracticeDedupeKey("create", `${topic.id}:${body.target}`),
         PRACTICE_POINTS.TARGET_ACHIEVED,
-        `질문 연습: 질문 만들기 성공 (${topic.id}/${body.target})`,
+        practiceCreatePointReason(body.target),
       );
       return NextResponse.json({ classification, achieved, ...award });
     }
@@ -281,7 +286,9 @@ export async function POST(req: Request) {
         ? buildPracticeDedupeKey("transform", `ai-${contentHash(body.source)}`)
         : buildPracticeDedupeKey("create", `ai-${contentHash(body.passage)}:${body.target}`),
       PRACTICE_POINTS.TARGET_ACHIEVED,
-      isTransformAi ? "질문 연습: 질문 바꾸기 성공 (AI 출제)" : "질문 연습: 질문 만들기 성공 (AI 출제)",
+      isTransformAi
+        ? practiceTransformPointReason(body.target, true)
+        : practiceCreatePointReason(body.target, true),
     );
     return NextResponse.json({ classification, achieved, ...award });
   } catch (error) {
