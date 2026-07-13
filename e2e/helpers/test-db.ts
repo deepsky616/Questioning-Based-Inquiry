@@ -18,6 +18,7 @@ export const E2E_QUESTION_CONTENT_PREFIX = "E2E-학생질문-";
 // 동일 학교·학년·반·번호 로그인 충돌)을 원천적으로 막는다.
 const STUDENT_EMAIL_BASE = "e2e.student.ask";
 const QUESTION_LEARNING_TEACHER_EMAIL_BASE = "e2e.teacher.learning";
+const QUESTION_LEARNING_STUDENT_EMAIL_BASE = "e2e.student.learning";
 // 스펙×프로젝트 조합마다 번호를 달리한다(로그인이 학교·학년·반·번호로 계정을 찾으므로)
 const STUDENT_NUMBER_BY_KEY: Record<string, string> = {
   "ask-chromium": "71",
@@ -60,10 +61,29 @@ export interface StudentAskFlowFixture {
 export interface QuestionLearningTeacherFixture {
   email: string;
   password: string;
+  school: string;
+  grade: string;
+  className: string;
+  student: {
+    id: string;
+    name: string;
+  };
 }
 
 function questionLearningTeacherEmailFor(key: string): string {
   return `${QUESTION_LEARNING_TEACHER_EMAIL_BASE}.${key}@example.com`;
+}
+
+function questionLearningStudentEmailFor(key: string): string {
+  return `${QUESTION_LEARNING_STUDENT_EMAIL_BASE}.${key}@example.com`;
+}
+
+function questionLearningSchoolFor(key: string): string {
+  return `E2E질문학습학교-${key}`;
+}
+
+function questionLearningClassFor(key: string): string {
+  return `질문학습-${key}`;
 }
 
 function loadDatabaseUrl(): string {
@@ -129,35 +149,114 @@ export async function prepareTestTeacher(): Promise<string> {
   }
 }
 
-/** 질문학습 병렬 화면 시험용 독립 교사 계정을 준비한다. */
+async function cleanupQuestionLearningStudentWithClient(
+  prisma: PrismaClient,
+  key: string,
+): Promise<void> {
+  const student = await prisma.user.findUnique({
+    where: { email: questionLearningStudentEmailFor(key) },
+    select: { id: true },
+  });
+  if (!student) return;
+
+  await prisma.practiceAttempt.deleteMany({ where: { studentId: student.id } });
+  await ignoreMissingTable(() =>
+    prisma.appNotification.deleteMany({
+      where: { OR: [{ recipientId: student.id }, { senderId: student.id }] },
+    }),
+  );
+  await prisma.pointLog.deleteMany({ where: { studentId: student.id } });
+  await prisma.user.deleteMany({ where: { id: student.id } });
+}
+
+/** 질문학습 병렬 화면 시험용 독립 교사와 담당 학생을 준비한다. */
 export async function prepareQuestionLearningTeacher(key: string): Promise<QuestionLearningTeacherFixture> {
   const prisma = client();
   try {
     const email = questionLearningTeacherEmailFor(key);
+    const school = questionLearningSchoolFor(key);
+    const grade = "6";
+    const className = questionLearningClassFor(key);
     const password = `E2e!${randomBytes(9).toString("hex")}`;
     const hashed = await bcrypt.hash(password, 12);
-    await prisma.user.upsert({
+    await cleanupQuestionLearningStudentWithClient(prisma, key);
+
+    const teacher = await prisma.user.upsert({
       where: { email },
       create: {
         email,
         password: hashed,
         name: `E2E질문학습교사-${key}`,
         role: "TEACHER",
-        school: "E2E테스트초",
+        school,
       },
-      update: { password: hashed },
+      update: {
+        password: hashed,
+        name: `E2E질문학습교사-${key}`,
+        role: "TEACHER",
+        school,
+        grade: null,
+        className: null,
+        studentNumber: null,
+      },
+      select: { id: true },
     });
-    return { email, password };
+    await prisma.teacherClass.deleteMany({ where: { teacherId: teacher.id } });
+    await prisma.teacherClass.create({
+      data: { teacherId: teacher.id, grade, className },
+    });
+
+    const studentName = `E2E진단학생-${key}`;
+    const student = await prisma.user.upsert({
+      where: { email: questionLearningStudentEmailFor(key) },
+      create: {
+        email: questionLearningStudentEmailFor(key),
+        password: hashed,
+        name: studentName,
+        role: "STUDENT",
+        school,
+        grade,
+        className,
+        studentNumber: "1",
+        totalPoints: 0,
+      },
+      update: {
+        password: hashed,
+        name: studentName,
+        role: "STUDENT",
+        school,
+        grade,
+        className,
+        studentNumber: "1",
+        totalPoints: 0,
+      },
+      select: { id: true, name: true },
+    });
+    return {
+      email,
+      password,
+      school,
+      grade,
+      className,
+      student,
+    };
   } finally {
     await prisma.$disconnect();
   }
 }
 
-/** 질문학습 화면 시험이 만든 독립 교사 계정만 삭제한다. */
+/** 질문학습 화면 시험 자료를 학생 시도, 학생, 교사 순서로 삭제한다. */
 export async function cleanupQuestionLearningTeacher(key: string): Promise<void> {
   const prisma = client();
   try {
-    await prisma.user.deleteMany({ where: { email: questionLearningTeacherEmailFor(key) } });
+    await cleanupQuestionLearningStudentWithClient(prisma, key);
+    const teacher = await prisma.user.findUnique({
+      where: { email: questionLearningTeacherEmailFor(key) },
+      select: { id: true },
+    });
+    if (!teacher) return;
+    await prisma.teacherClass.deleteMany({ where: { teacherId: teacher.id } });
+    await prisma.user.deleteMany({ where: { id: teacher.id } });
   } finally {
     await prisma.$disconnect();
   }
