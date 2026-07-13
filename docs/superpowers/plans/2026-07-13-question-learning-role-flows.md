@@ -27,7 +27,7 @@
 
 ## 1단계: 학습, 연습, 실제 질문 작성 연결
 
-### 작업 1: 역할별 질문학습 완료 행동과 교사용 수업 활용
+### Task 1: 역할별 질문학습 완료 행동과 교사용 수업 활용
 
 **파일:**
 - 생성: `src/lib/question-teaching-guide-data.ts`
@@ -290,7 +290,7 @@ git add src/lib/question-teaching-guide-data.ts src/components/teacher/TeacherQu
 git commit -m "feat(learning): tailor completion flows by role"
 ```
 
-### 작업 2: 학생별 연습 질문 초안 전달
+### Task 2: 학생별 연습 질문 초안 전달
 
 **파일:**
 - 생성: `src/lib/practice-draft.ts`
@@ -486,7 +486,7 @@ git add src/lib/practice-draft.ts src/components/shared/QuestionPracticeView.tsx
 git commit -m "feat(practice): hand student questions into class sessions"
 ```
 
-### 작업 3: 피드백을 유지하는 안전한 다시 쓰기
+### Task 3: 피드백을 유지하는 안전한 다시 쓰기
 
 **파일:**
 - 생성: `src/lib/student-ask-analysis.ts`
@@ -638,7 +638,7 @@ git add src/lib/student-ask-analysis.ts src/app/'(student)'/student-ask/page.tsx
 git commit -m "fix(ask): preserve feedback through question rewrites"
 ```
 
-### 작업 4: 1단계 통합 검증
+### Task 4: 1단계 통합 검증
 
 **파일:**
 - 생성 시험: `e2e/question-learning-flow.spec.ts`
@@ -696,7 +696,7 @@ git commit -m "test(learning): cover role-based question flows"
 
 ## 2단계: 기존 시도를 이용한 학생과 교사 진단
 
-### 작업 5: 진단 집계와 추천 순수 함수
+### Task 5: 진단 집계와 추천 순수 함수
 
 **파일:**
 - 생성: `src/lib/practice-diagnostics.ts`
@@ -822,7 +822,7 @@ git add src/lib/practice-diagnostics.ts src/__tests__/practice-diagnostics.test.
 git commit -m "feat(practice): derive mastery from recent attempts"
 ```
 
-### 작업 6: 학생 개인 진단과 맞춤 연습 이동
+### Task 6: 학생 개인 진단과 맞춤 연습 이동
 
 **파일:**
 - 생성: `src/lib/practice-selection.ts`
@@ -961,7 +961,7 @@ git add src/lib/practice-selection.ts src/app/api/practice/progress/route.ts src
 git commit -m "feat(practice): recommend exercises from student mastery"
 ```
 
-### 작업 7: 교사 학급 진단과 수업 활용 연결
+### Task 7: 교사 학급 진단과 수업 활용 연결
 
 **파일:**
 - 수정: `src/app/api/teacher/practice-stats/route.ts`
@@ -1094,7 +1094,7 @@ git add src/app/api/teacher/practice-stats/route.ts src/app/'(teacher)'/teacher-
 git commit -m "feat(teacher): diagnose class question practice"
 ```
 
-### 작업 8: 2단계 통합 검증과 마무리
+### Task 8: 2단계 통합 검증과 마무리
 
 **파일:**
 - 수정: `e2e/question-learning-flow.spec.ts`
