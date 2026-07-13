@@ -334,6 +334,62 @@
   }
 }
 
+/* 회원가입 화면은 이전 테마 설정과 분리된 밝은 인증 화면으로 유지 */
+@layer utilities {
+  .auth-register-surface {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    color: hsl(var(--foreground));
+    color-scheme: light;
+  }
+
+  .dark .auth-register-surface .bg-white {
+    background-color: #ffffff !important;
+  }
+  .dark .auth-register-surface .bg-indigo-100 {
+    background-color: #e0e7ff !important;
+  }
+  .dark .auth-register-surface .text-indigo-700,
+  .dark .auth-register-surface .text-indigo-600 {
+    color: #4338ca !important;
+  }
+  .dark .auth-register-surface .text-red-500 {
+    color: #ef4444 !important;
+  }
+  .dark .auth-register-surface .text-amber-600 {
+    color: #d97706 !important;
+  }
+  .dark .auth-register-surface input:not([type="checkbox"]):not([type="radio"]) {
+    background-color: hsl(var(--background)) !important;
+    color: hsl(var(--foreground)) !important;
+    border-color: hsl(var(--input)) !important;
+  }
+  .dark .auth-register-surface input::placeholder {
+    color: hsl(var(--muted-foreground)) !important;
+    opacity: 1;
+  }
+  .dark .auth-register-surface .shadow-sm {
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+  }
+}
+
 /* ── 활동 리포트 인쇄(PDF 저장) ── */
 @media print {
   /* 네비/헤더/버튼 등 리포트 외 요소 숨김 */

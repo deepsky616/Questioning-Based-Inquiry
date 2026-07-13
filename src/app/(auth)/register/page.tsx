@@ -101,7 +101,7 @@ function RegisterContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="auth-register-surface min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl text-center">Question Lab</CardTitle>
@@ -253,7 +253,7 @@ function RegisterContent() {
 export default function RegisterPage() {
   const t = useTranslations("auth");
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">{t("loading")}</div>}>
+    <Suspense fallback={<div className="auth-register-surface min-h-screen flex items-center justify-center text-muted-foreground">{t("loading")}</div>}>
       <RegisterContent />
     </Suspense>
   );
