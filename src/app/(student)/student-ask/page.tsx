@@ -7,7 +7,7 @@ import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
-import { appNotificationQueryKeys } from "@/lib/app-notifications";
+import { appNotificationQueryKeys, useAppNotifications } from "@/lib/app-notifications";
 import { useStudentSessions } from "@/lib/app-queries";
 import { consumePracticeDraft } from "@/lib/practice-draft";
 import { isAnalysisCurrent, type AnalysisSnapshot } from "@/lib/student-ask-analysis";
@@ -74,14 +74,16 @@ function AskContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
-  const {
-    data: sessions = [],
-    isLoading: isSessionsLoading,
-    isError: sessionsError,
-  } = useStudentSessions<QuestionSession>({ userId: user.id });
-  const sessionsLoaded = Boolean(user.id) && !isSessionsLoading;
+  const sessionsQuery = useStudentSessions<QuestionSession>({ userId: user.id });
+  const { data: sessions = [], isError: sessionsError } = sessionsQuery;
+  const sessionsLoaded = Boolean(user.id) && sessionsQuery.isSuccess;
+  const notificationQuery = useAppNotifications({
+    queryKey: appNotificationQueryKeys.student,
+    enabled: Boolean(user.id),
+  });
   const [questionSessionIds, setQuestionSessionIds] = useState<Set<string>>(new Set());
   const [questionsLoaded, setQuestionsLoaded] = useState(false);
+  const [questionsError, setQuestionsError] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
   const [designContext, setDesignContext] = useState<DesignContext | null>(null);
   const [showRef, setShowRef] = useState(true);
@@ -91,6 +93,10 @@ function AskContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const result = analysis?.result ?? null;
   const analysisCurrent = isAnalysisCurrent(content, selectedSessionId, analysis);
+  const needsQuestionScope = taskScope === "today-unasked" || taskScope === "future-unasked" || taskScope === "past-unasked";
+  const scopedTaskDataReady = !needsQuestionScope || (
+    questionsLoaded && notificationQuery.isSuccess
+  );
 
   const transitionSession = useCallback((id: string, focusInput = false) => {
     if (id !== selectedSessionId) {
@@ -131,7 +137,7 @@ function AskContent() {
   }, []);
 
   useEffect(() => {
-    if (!sessionsLoaded || sessionsError) return;
+    if (!sessionsLoaded || sessionsError || needsQuestionScope) return;
     const requestedSession = requestedSessionId
       ? sessions.find((item) => item.id === requestedSessionId)
       : null;
@@ -141,17 +147,25 @@ function AskContent() {
         : sessions[0]?.id ?? ""
     );
     transitionSession(nextSessionId);
-  }, [requestedSessionId, selectedSessionId, sessions, sessionsError, sessionsLoaded, transitionSession]);
+  }, [needsQuestionScope, requestedSessionId, selectedSessionId, sessions, sessionsError, sessionsLoaded, transitionSession]);
 
   useEffect(() => {
     if (!user.id) return;
     setQuestionsLoaded(false);
+    setQuestionsError(false);
+    setQuestionSessionIds(new Set());
     fetch(`/api/questions?authorId=${user.id}`)
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => {
+        if (!r.ok) throw new Error("questions failed");
+        return r.json();
+      })
       .then((questions: StudentQuestion[]) => {
         setQuestionSessionIds(new Set(questions.map((question) => question.sessionId).filter((id): id is string => Boolean(id))));
       })
-      .catch(() => setQuestionSessionIds(new Set()))
+      .catch(() => {
+        setQuestionSessionIds(new Set());
+        setQuestionsError(true);
+      })
       .finally(() => setQuestionsLoaded(true));
   }, [user.id]);
 
@@ -189,17 +203,25 @@ function AskContent() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }, []);
-  const needsQuestionScope = taskScope === "today-unasked" || taskScope === "future-unasked" || taskScope === "past-unasked";
+  const teacherRequestSessionIds = useMemo(
+    () => new Set(
+      notificationQuery.notifications
+        .filter((item) => item.type === "SESSION_REMINDER" && !item.readAt && item.sessionId)
+        .map((item) => item.sessionId as string),
+    ),
+    [notificationQuery.notifications],
+  );
   const scopedSessions = useMemo(() => {
-    if (needsQuestionScope && !questionsLoaded) return [];
+    if (!scopedTaskDataReady) return [];
     return sessions.filter((session) => {
-      if (taskScope === "today-unasked") return session.date === todayStr && !questionSessionIds.has(session.id);
-      if (taskScope === "future-unasked") return session.date > todayStr && !questionSessionIds.has(session.id);
-      if (taskScope === "past-unasked") return session.date < todayStr && !questionSessionIds.has(session.id);
+      const needsQuestion = !questionSessionIds.has(session.id) && !teacherRequestSessionIds.has(session.id);
+      if (taskScope === "today-unasked") return session.date === todayStr && needsQuestion;
+      if (taskScope === "future-unasked") return session.date > todayStr && needsQuestion;
+      if (taskScope === "past-unasked") return session.date < todayStr && needsQuestion;
       if (taskScope === "shared") return (session.sharedQuestions?.length ?? 0) > 0;
       return true;
     });
-  }, [needsQuestionScope, questionSessionIds, questionsLoaded, sessions, taskScope, todayStr]);
+  }, [questionSessionIds, scopedTaskDataReady, sessions, taskScope, teacherRequestSessionIds, todayStr]);
 
   // 날짜/교과/주제 필터로 좁힌 세션 목록
   const filterOptions = useMemo(() => getSessionFilterOptions(scopedSessions), [scopedSessions]);
@@ -237,7 +259,7 @@ function AskContent() {
 
   // 필터 변경 시 선택 세션 보정: 목록에 없으면 첫 세션으로, 목록이 비면 선택 해제
   useEffect(() => {
-    if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) return;
+    if (!sessionsLoaded || !scopedTaskDataReady) return;
     if (filteredSessions.length === 0) {
       if (selectedSessionId) transitionSession("");
       return;
@@ -245,7 +267,7 @@ function AskContent() {
     if (!filteredSessions.some((s) => s.id === selectedSessionId)) {
       transitionSession(filteredSessions[0].id, true);
     }
-  }, [filterDate, filterSubject, filterTopic, sessionsLoaded, questionsLoaded, needsQuestionScope, filteredSessions, selectedSessionId, transitionSession]);
+  }, [filterDate, filterSubject, filterTopic, sessionsLoaded, scopedTaskDataReady, filteredSessions, selectedSessionId, transitionSession]);
 
   useEffect(() => {
     setExistingQuestion(null);
@@ -260,7 +282,7 @@ function AskContent() {
       .finally(() => setIsCheckingExisting(false));
   }, [selectedSessionId, user.id]);
 
-  const canAsk = sessionsLoaded && !sessionsError && sessions.length > 0 && !!selectedSessionId;
+  const canAsk = sessionsLoaded && scopedTaskDataReady && !sessionsError && sessions.length > 0 && !!selectedSessionId;
   const currentStep = analysisCurrent ? 3 : content.trim().length > 0 ? 2 : 1;
   const flowSteps = [
     { step: 1, label: t("stepSession") },
@@ -375,22 +397,12 @@ function AskContent() {
     requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   };
 
-  // issue #1: 로딩 중에는 아무것도 표시하지 않음
-  if (!sessionsLoaded || (needsQuestionScope && !questionsLoaded)) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
-        </div>
-        <Card>
-          <CardContent className="p-6 text-center text-muted-foreground text-sm">{t("checkingSession")}</CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const scopedTaskDataError = needsQuestionScope && (
+    questionsError || notificationQuery.isError
+  );
 
   // issue #1 & #2: 네트워크 오류
-  if (sessionsError) {
+  if (sessionsError || scopedTaskDataError) {
     return (
       <div className="space-y-6">
         <div>
@@ -400,6 +412,20 @@ function AskContent() {
           <CardContent className="p-6 text-center text-red-700 text-sm">
             {t("loadSessionError")}
           </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // issue #1: 로딩 중에는 아무것도 표시하지 않음
+  if (!sessionsLoaded || !scopedTaskDataReady) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">{t("title")}</h2>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground text-sm">{t("checkingSession")}</CardContent>
         </Card>
       </div>
     );

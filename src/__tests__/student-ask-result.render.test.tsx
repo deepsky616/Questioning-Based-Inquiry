@@ -34,6 +34,15 @@ const appState = vi.hoisted(() => ({
       defaultQuestionPublic: false,
     },
   ],
+  notifications: [] as Array<{
+    id: string;
+    type: string;
+    sessionId: string | null;
+    readAt: string | null;
+  }>,
+  notificationIsLoading: false,
+  notificationIsError: false,
+  notificationIsSuccess: true,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -54,6 +63,19 @@ vi.mock("@/lib/app-queries", () => ({
     data: appState.sessions,
     isLoading: false,
     isError: false,
+    isSuccess: true,
+  }),
+}));
+
+vi.mock("@/lib/app-notifications", () => ({
+  appNotificationQueryKeys: {
+    student: ["student-notifications"],
+  },
+  useAppNotifications: () => ({
+    notifications: appState.notifications,
+    isLoading: appState.notificationIsLoading,
+    isError: appState.notificationIsError,
+    isSuccess: appState.notificationIsSuccess,
   }),
 }));
 
@@ -87,9 +109,112 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   appState.search = "";
+  appState.sessions = [
+    {
+      id: "session-1",
+      date: "2026-07-13",
+      subject: "과학",
+      topic: "날씨",
+      teacher: { name: "선생님" },
+      sharedQuestions: [],
+      defaultQuestionPublic: false,
+    },
+    {
+      id: "session-2",
+      date: "2026-07-14",
+      subject: "사회",
+      topic: "지역",
+      teacher: { name: "선생님" },
+      sharedQuestions: [],
+      defaultQuestionPublic: false,
+    },
+  ];
+  appState.notifications = [];
+  appState.notificationIsLoading = false;
+  appState.notificationIsError = false;
+  appState.notificationIsSuccess = true;
 });
 
 describe("학생 질문 분석 결과", () => {
+  it.each([
+    ["오늘", "today-unasked", 0],
+    ["지난", "past-unasked", -1],
+  ])("%s 미작성 범위가 준비된 뒤 교사 요청 수업을 제외한다", async (_label, taskScope, dayOffset) => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const sessionDate = new Date();
+    sessionDate.setDate(sessionDate.getDate() + dayOffset);
+    const sessionDateText = `${sessionDate.getFullYear()}-${String(sessionDate.getMonth() + 1).padStart(2, "0")}-${String(sessionDate.getDate()).padStart(2, "0")}`;
+    appState.search = `task=${taskScope}`;
+    appState.sessions = [
+      {
+        id: "requested-session",
+        date: sessionDateText,
+        subject: "과학",
+        topic: "요청 수업",
+        teacher: { name: "선생님" },
+        sharedQuestions: [],
+        defaultQuestionPublic: false,
+      },
+      {
+        id: "regular-session",
+        date: sessionDateText,
+        subject: "사회",
+        topic: "일반 수업",
+        teacher: { name: "선생님" },
+        sharedQuestions: [],
+        defaultQuestionPublic: false,
+      },
+    ];
+    appState.notifications = [
+      {
+        id: "request-1",
+        type: "SESSION_REMINDER",
+        sessionId: "requested-session",
+        readAt: null,
+      },
+    ];
+    appState.notificationIsLoading = true;
+    appState.notificationIsSuccess = false;
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      if (String(input) === "/api/config") {
+        return Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => [] } as Response);
+    }));
+
+    const view = renderWithIntl(<AskPage />);
+    expect(screen.getByText("수업 세션 확인 중...")).toBeInTheDocument();
+    expect(screen.queryAllByText("요청 수업")).toHaveLength(0);
+    expect(screen.queryAllByText("일반 수업")).toHaveLength(0);
+
+    appState.notificationIsLoading = false;
+    appState.notificationIsSuccess = true;
+    view.rerender(
+      <NextIntlClientProvider locale="ko" messages={ko as never} timeZone="Asia/Seoul">
+        <AskPage />
+      </NextIntlClientProvider>,
+    );
+
+    expect((await screen.findAllByText("일반 수업")).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("요청 수업")).toHaveLength(0);
+    expect(screen.getByText("전체 1개 중 0개 작성 완료, 1개 남음")).toBeInTheDocument();
+  });
+
+  it("오늘 미작성 범위에서 알림 조회가 실패하면 오류 화면을 표시한다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    appState.search = "task=today-unasked";
+    appState.notificationIsError = true;
+    appState.notificationIsSuccess = false;
+    vi.stubGlobal("fetch", vi.fn(() =>
+      Promise.resolve({ ok: true, json: async () => [] } as Response),
+    ));
+
+    renderWithIntl(<AskPage />);
+
+    expect(await screen.findByText("수업 세션 정보를 불러오지 못했습니다. 페이지를 새로고침해 주세요.")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/수업 세션 선택/)).not.toBeInTheDocument();
+  });
+
   it("수정된 질문에는 이전 피드백을 남기고 저장을 막으며 개선 예시를 전달한다", () => {
     const onRewrite = vi.fn();
     const onUseImprovedExample = vi.fn();
