@@ -415,6 +415,42 @@
   @page {
     margin: 14mm;
   }
+
+  /* 질문연습 학습지: 어두운 테마 상태에서 인쇄해도 글자·밑줄·테두리를 라이트 문서 색으로 고정 */
+  .question-practice-print {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    color-scheme: light !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .question-practice-print h1,
+  .question-practice-print h2,
+  .question-practice-print h3,
+  .question-practice-print h4,
+  .question-practice-print strong {
+    color: #020617 !important;
+  }
+  .question-practice-print p,
+  .question-practice-print li,
+  .question-practice-print span,
+  .question-practice-print div {
+    color: #334155 !important;
+  }
+  .question-practice-print .text-indigo-700,
+  .question-practice-print .text-indigo-900 {
+    color: #3730a3 !important;
+  }
+  .question-practice-print .border,
+  .question-practice-print .border-b {
+    border-color: #cbd5e1 !important;
+  }
+  .question-practice-print .bg-indigo-50 {
+    background: #eef2ff !important;
+  }
+  .question-practice-print .bg-slate-100 {
+    background: #f1f5f9 !important;
+  }
 }
 
 /* ── 인쇄 전용 리포트 문서('채점 결과 리포트' 양식: 보라 타이틀 밴드 + 라벤더 표 + 피드백 박스) ── */

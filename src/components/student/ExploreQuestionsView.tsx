@@ -10,9 +10,7 @@ import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-
 import { QuestionClassificationStats, ClassificationChips, QuestionSortControl, applyClassificationFilter, compareByStudent, type ClosureFilter, type CognitiveFilter, type SortField, type SortDir } from "@/components/shared/QuestionClassificationStats";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
-  CLOSURE_LABEL,
   CLOSURE_STYLE,
-  COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
 import { sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
@@ -129,9 +127,19 @@ function QuestionCard({
   sessionLabel: (session: NonNullable<Question["session"]>) => string;
 }) {
   const t = useTranslations("explore");
+  const tCls = useTranslations("classification");
   const [showComments, setShowComments] = useState(false);
   const [commentCount, setCommentCount] = useState(q.commentCount ?? 0);
   const isTeacherShared = q.source === "TEACHER_SHARED";
+  const closureLabel = (value: string) =>
+    value === "closed" ? tCls("closed.label")
+      : value === "open" ? tCls("open.label")
+      : value;
+  const cognitiveLabel = (value: string) =>
+    value === "factual" ? tCls("factual.label")
+      : value === "conceptual" ? tCls("conceptual.label")
+      : value === "controversial" ? tCls("controversial.label")
+      : value;
 
   return (
     <div
@@ -162,7 +170,7 @@ function QuestionCard({
             )}
             {isTeacherShared && q.inquiryType && (
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white text-indigo-600 border border-indigo-200">
-                {q.inquiryType}
+                {cognitiveLabel(q.inquiryType)}
               </span>
             )}
           </div>
@@ -181,10 +189,10 @@ function QuestionCard({
           )}
           <div className="flex gap-2 mt-2 flex-wrap items-center">
             <span className={`text-xs px-2 py-1 rounded break-keep text-center ${CLOSURE_STYLE[q.closure]}`}>
-              {CLOSURE_LABEL[q.closure]}
+              {closureLabel(q.closure)}
             </span>
             <span className={`text-xs px-2 py-1 rounded break-keep text-center ${COGNITIVE_STYLE[q.cognitive]}`}>
-              {COGNITIVE_LABEL[q.cognitive]}
+              {cognitiveLabel(q.cognitive)}
             </span>
           </div>
         </div>

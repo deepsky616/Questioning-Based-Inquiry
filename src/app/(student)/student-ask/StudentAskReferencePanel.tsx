@@ -7,7 +7,6 @@ import Link from "next/link";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import { Button } from "@/components/ui/button";
-import { COGNITIVE_LABEL } from "@/lib/question-labels";
 import { useTranslations } from "next-intl";
 import type { DesignContext, QuestionSession } from "./types";
 
@@ -27,7 +26,12 @@ export function StudentAskReferencePanel({
   onToggleReference,
 }: StudentAskReferencePanelProps) {
   const t = useTranslations("ask");
-  const typeLabel = COGNITIVE_LABEL;
+  const tCls = useTranslations("classification");
+  const typeLabel = (type: string) =>
+    type === "factual" ? tCls("factual.label")
+      : type === "conceptual" ? tCls("conceptual.label")
+      : type === "controversial" ? tCls("controversial.label")
+      : type;
 
   const sharedQuestions = Array.isArray(selectedSession?.sharedQuestions)
     ? selectedSession.sharedQuestions.filter((question) => question.content?.trim())
@@ -60,7 +64,7 @@ export function StudentAskReferencePanel({
             {sharedQuestions.map((question, index) => (
               <li key={index} className="flex items-start gap-2 text-sm text-indigo-800 dark:text-indigo-100">
                 <span className="shrink-0 mt-0.5 text-xs font-medium text-indigo-500">
-                  [{typeLabel[question.type] ?? question.type}]
+                  [{typeLabel(question.type)}]
                 </span>
                 <span>{question.content}</span>
               </li>
@@ -87,7 +91,13 @@ export function StudentAskReferencePanel({
               <CollapseChevron open={showReference} />
             </Button>
           </div>
-          {showReference && <DesignReferenceView data={designContext} className="mt-3" />}
+          {showReference && (
+            <DesignReferenceView
+              data={designContext}
+              sourceSessionId={selectedSession?.id}
+              className="mt-3"
+            />
+          )}
         </div>
       )}
     </div>

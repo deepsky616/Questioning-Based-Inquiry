@@ -59,6 +59,7 @@ export async function GET(_req: Request, { params }: Params) {
   const asArray = (v: unknown) => (Array.isArray(v) ? v : []);
   return NextResponse.json({
     context: {
+      id: qs.unitDesignId,
       title: d.title,
       sessionDate: qs.date,
       subject: d.subject,

@@ -24,9 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getSessionUser } from "@/lib/auth-helpers";
 import { useStudentSessions } from "@/lib/app-queries";
 import {
-  CLOSURE_LABEL,
   CLOSURE_STYLE,
-  COGNITIVE_LABEL,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
 import { sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
@@ -77,6 +75,7 @@ export function MyQuestionsView() {
   const t = useTranslations("myQuestions");
   const tEx = useTranslations("explore");
   const tAsk = useTranslations("ask");
+  const tCls = useTranslations("classification");
   const ct = useContentTranslation();
   const { data: session } = useSession();
   const user = getSessionUser(session);
@@ -244,6 +243,15 @@ export function MyQuestionsView() {
   const toggleComments = (questionId: string) => {
     setExpandedQuestionId((prev) => (prev === questionId ? null : questionId));
   };
+  const closureLabel = (value: string) =>
+    value === "closed" ? tCls("closed.label")
+      : value === "open" ? tCls("open.label")
+      : value;
+  const cognitiveLabel = (value: string) =>
+    value === "factual" ? tCls("factual.label")
+      : value === "conceptual" ? tCls("conceptual.label")
+      : value === "controversial" ? tCls("controversial.label")
+      : value;
 
   const QuestionRows = ({ list }: { list: Question[] }) =>
     list.length === 0 ? (
@@ -293,8 +301,8 @@ export function MyQuestionsView() {
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className={`rounded px-2 py-0.5 text-xs break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
-                <span className={`rounded px-2 py-0.5 text-xs break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
+                <span className={`rounded px-2 py-0.5 text-xs break-keep ${CLOSURE_STYLE[q.closure]}`}>{closureLabel(q.closure)}</span>
+                <span className={`rounded px-2 py-0.5 text-xs break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{cognitiveLabel(q.cognitive)}</span>
                 <span className={`rounded px-2 py-0.5 text-xs ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{q.isPublic ? t("public") : t("private")}</span>
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -422,8 +430,8 @@ export function MyQuestionsView() {
                     {ct.canTranslate && editingQuestionId !== q.id && <TranslateToggle item={{ type: "QUESTION", id: q.id }} ct={ct} className="mt-0.5" />}
                     {/* 분류·공개 배지를 내용 아래에(탐구 탭과 동일 톤) */}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{CLOSURE_LABEL[q.closure]}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{COGNITIVE_LABEL[q.cognitive]}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure]}`}>{closureLabel(q.closure)}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive]}`}>{cognitiveLabel(q.cognitive)}</span>
                       <span className={`text-xs px-2 py-0.5 rounded ${q.isPublic ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>{q.isPublic ? t("public") : t("private")}</span>
                     </div>
                     {/* 수업세션(📚 칩) · 작성일시(🕒) — 한눈에 구분 */}

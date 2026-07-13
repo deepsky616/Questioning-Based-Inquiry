@@ -46,7 +46,7 @@ export function SessionReferencePanel({
         {t("referenceTitle")}
         <CollapseChevron open={open} />
       </button>
-      {open && <DesignReferenceView data={ctx} className="mt-3" />}
+      {open && <DesignReferenceView data={ctx} sourceSessionId={sessionId} className="mt-3" />}
     </div>
   );
 }
