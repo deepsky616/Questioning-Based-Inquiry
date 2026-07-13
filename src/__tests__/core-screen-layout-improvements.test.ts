@@ -29,8 +29,10 @@ describe("core screen layout improvements", () => {
       studentDashboard.indexOf("{/* 분류 1"),
     );
     expect(studentDashboardTasksCard).toContain("student-dashboard-task-panel");
-    expect(studentDashboardTasksCard).toContain("student-dashboard-task-grid");
-    expect(studentDashboardTasksCard).toContain("min-h-[116px]");
+    expect(studentDashboardTasksCard).toContain("PriorityTaskList");
+    expect(studentDashboardTasksCard).not.toContain("student-dashboard-task-grid");
+    expect(studentDashboardTasksCard).not.toContain("min-h-[116px]");
+    expect(studentDashboardTasksCard).not.toContain("progressPercent");
     expect(myQuestionsView).toContain("my-questions-tablet-filters");
     expect(myQuestionsView).toContain("student-questions-tablet-list");
     expect(myQuestionsView).toContain("xl:hidden");

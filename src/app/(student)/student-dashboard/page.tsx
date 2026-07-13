@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo, useRef, useState } from "react";
+import { Suspense, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -17,12 +17,12 @@ import { getSessionUser } from "@/lib/auth-helpers";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
 import PointsCard from "@/components/shared/PointsCard";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { isSessionAvailable } from "@/lib/sessions";
 import {
   appNotificationQueryKeys,
   useAppNotifications,
 } from "@/lib/app-notifications";
 import { useStudentSessions } from "@/lib/app-queries";
+import { buildStudentPriorityCounts } from "@/lib/dashboard-priority-tasks";
 import { APP_DATA_REFETCH_MS, visibleDataRefetchInterval } from "@/lib/query-refresh";
 import { StudentDashboardTasksCard, type StudentDashboardTaskItem } from "./StudentDashboardTasksCard";
 
@@ -33,8 +33,6 @@ interface Question {
   cognitive: string;
   createdAt: string;
   sessionId?: string | null;
-  commentCount?: number;
-  comments?: unknown[];
 }
 
 interface Stats {
@@ -48,12 +46,6 @@ interface StudentSession {
   date: string;
   subject: string;
   topic: string;
-  sharedQuestions?: Array<{ content: string }>;
-}
-
-interface PointLog {
-  id: string;
-  createdAt: string;
 }
 
 export default function StudentDashboardPage() {
@@ -72,12 +64,10 @@ function StudentDashboard() {
   const t = useTranslations("studentDash");
   const tPages = useTranslations("pages");
   const router = useRouter();
-  const pointsSectionRef = useRef<HTMLDivElement | null>(null);
-  const [highlightPoints, setHighlightPoints] = useState(false);
   const searchParams = useSearchParams();
   const tab = searchParams.get("tab") === "reports" ? "reports" : "overview";
   // 내 질문/통계는 react-query로 주기 폴링(12초)+포커스 재조회.
-  const { data: allQuestions = [], isLoading } = useQuery<Question[]>({
+  const questionsQuery = useQuery<Question[]>({
     queryKey: ["student-dashboard-questions", user.id],
     queryFn: async () => {
       const r = await fetch(`/api/questions?authorId=${user.id}`);
@@ -88,23 +78,15 @@ function StudentDashboard() {
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
-  const { data: sessions = [] } = useStudentSessions<StudentSession>({ userId: user.id });
-  const { data: pointData } = useQuery<{ recent: PointLog[] }>({
-    queryKey: ["student-dashboard-points", user.id],
-    queryFn: async () => {
-      const r = await fetch("/api/points/me");
-      if (!r.ok) return { recent: [] };
-      return r.json();
-    },
-    enabled: Boolean(user.id),
-    refetchInterval: visibleDataRefetchInterval,
-    refetchOnWindowFocus: true,
-  });
-  const { notifications, markRead: markNotificationRead } = useAppNotifications({
+  const { data: allQuestions = [], isLoading } = questionsQuery;
+  const sessionsQuery = useStudentSessions<StudentSession>({ userId: user.id });
+  const { data: sessions = [] } = sessionsQuery;
+  const notificationQuery = useAppNotifications({
     queryKey: appNotificationQueryKeys.student,
     enabled: Boolean(user.id),
     refetchInterval: APP_DATA_REFETCH_MS,
   });
+  const { notifications, markRead: markNotificationRead } = notificationQuery;
 
   const questions = allQuestions.slice(0, 5);
   const stats: Stats = {
@@ -128,113 +110,82 @@ function StudentDashboard() {
     [allQuestions],
   );
   const todaySessions = sessions.filter((item) => item.date === todayStr);
-  const futureSessions = sessions.filter((item) => item.date > todayStr);
   const pastSessions = sessions.filter((item) => item.date < todayStr);
-  const todayUnaskedSessionCount = todaySessions.filter((item) => !questionSessionIds.has(item.id)).length;
-  const futureUnaskedSessionCount = futureSessions.filter((item) => !questionSessionIds.has(item.id)).length;
-  const pastUnaskedSessionCount = pastSessions.filter((item) => !questionSessionIds.has(item.id)).length;
-  const todayAskedSessionCount = todaySessions.length - todayUnaskedSessionCount;
-  const futureAskedSessionCount = futureSessions.length - futureUnaskedSessionCount;
-  const pastAskedSessionCount = pastSessions.length - pastUnaskedSessionCount;
-  const activeSessions = sessions.filter((item) => isSessionAvailable(item.date));
-  const sharedQuestionSessionCount = activeSessions.filter((item) => (item.sharedQuestions?.length ?? 0) > 0).length;
-  const commentedQuestionCount = allQuestions.filter((question) => (question.commentCount ?? question.comments?.length ?? 0) > 0).length;
-  const recentPointCount = (pointData?.recent ?? []).filter((log) => {
-    const time = new Date(log.createdAt).getTime();
-    if (Number.isNaN(time)) return false;
-    return Date.now() - time <= 7 * 24 * 60 * 60 * 1000;
-  }).length;
+  const todayUnaskedSessionIds = todaySessions
+    .filter((item) => !questionSessionIds.has(item.id))
+    .map((item) => item.id);
+  const pastUnaskedSessionIds = pastSessions
+    .filter((item) => !questionSessionIds.has(item.id))
+    .map((item) => item.id);
   const teacherRequestNotifications = notifications.filter(
     (item) =>
       item.type === "SESSION_REMINDER" &&
       !item.readAt &&
       (!item.sessionId || !questionSessionIds.has(item.sessionId)),
   );
-  const visibleTeacherRequests = teacherRequestNotifications.slice(0, 3);
-  const taskItems: StudentDashboardTaskItem[] = [
-    {
-      key: "todayUnasked",
-      title: t("taskTodayQuestionTitle"),
-      description: t("taskTodayQuestionDesc"),
-      count: todayUnaskedSessionCount,
-      progress: {
-        total: todaySessions.length,
-        completed: todayAskedSessionCount,
-        remaining: todayUnaskedSessionCount,
-      },
-      action: t("taskAsk"),
-      href: "/student-ask?task=today-unasked",
-      activeClass: "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-200",
-    },
-    {
-      key: "futureUnasked",
-      title: t("taskFutureQuestionTitle"),
-      description: t("taskFutureQuestionDesc"),
-      count: futureUnaskedSessionCount,
-      progress: {
-        total: futureSessions.length,
-        completed: futureAskedSessionCount,
-        remaining: futureUnaskedSessionCount,
-      },
-      action: t("taskAsk"),
-      href: "/student-ask?task=future-unasked",
-      activeClass: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-500/30 dark:bg-sky-950/30 dark:text-sky-200",
-    },
-    {
-      key: "pastUnasked",
-      title: t("taskPastQuestionTitle"),
-      description: t("taskPastQuestionDesc"),
-      count: pastUnaskedSessionCount,
-      progress: {
-        total: pastSessions.length,
-        completed: pastAskedSessionCount,
-        remaining: pastUnaskedSessionCount,
-      },
-      action: t("taskAsk"),
+  const teacherRequestGroups = Array.from(
+    teacherRequestNotifications.reduce((groups, item) => {
+      const key = item.sessionId ?? item.id;
+      groups.set(key, [...(groups.get(key) ?? []), item]);
+      return groups;
+    }, new Map<string, typeof teacherRequestNotifications>()),
+    ([, group]) => group,
+  );
+  const firstTeacherRequestGroup = teacherRequestGroups[0] ?? [];
+  const firstTeacherRequest = firstTeacherRequestGroup[0];
+  const taskStatus: "loading" | "ready" | "error" =
+    questionsQuery.isError || sessionsQuery.isError || notificationQuery.isError
+      ? "error"
+      : questionsQuery.isSuccess && sessionsQuery.isSuccess && notificationQuery.isSuccess
+        ? "ready"
+        : "loading";
+  const taskCounts = taskStatus === "ready"
+    ? buildStudentPriorityCounts({
+        teacherRequests: teacherRequestNotifications,
+        todayUnaskedSessionIds,
+        pastUnaskedSessionIds,
+      })
+    : [];
+  const taskItems: StudentDashboardTaskItem[] = taskCounts.map((item) => {
+    if (item.key === "teacherRequest") {
+      return {
+        key: item.key,
+        label: t("taskTeacherRequestTitle"),
+        countLabel: t("taskClassCount", { count: item.count }),
+        href: firstTeacherRequest?.href ?? "/student-ask",
+      };
+    }
+    if (item.key === "todayUnasked") {
+      return {
+        key: item.key,
+        label: t("taskTodayQuestionTitle"),
+        countLabel: t("taskClassCount", { count: item.count }),
+        href: "/student-ask?task=today-unasked",
+      };
+    }
+    return {
+      key: item.key,
+      label: t("taskPastQuestionTitle"),
+      countLabel: t("taskClassCount", { count: item.count }),
       href: "/student-ask?task=past-unasked",
-      activeClass: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-950/30 dark:text-rose-200",
-    },
-    {
-      key: "shared",
-      title: t("taskSharedTitle"),
-      description: t("taskSharedDesc"),
-      count: sharedQuestionSessionCount,
-      action: t("taskAsk"),
-      href: "/student-ask?task=shared",
-      activeClass: "border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 dark:border-purple-500/30 dark:bg-purple-950/30 dark:text-purple-200",
-    },
-    {
-      key: "comments",
-      title: t("taskCommentsTitle"),
-      description: t("taskCommentsDesc"),
-      count: commentedQuestionCount,
-      action: t("taskOpenQuestions"),
-      href: "/student-questions",
-      activeClass: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-200",
-    },
-    {
-      key: "points",
-      title: t("taskPointsTitle"),
-      description: t("taskPointsDesc"),
-      count: recentPointCount,
-      action: t("taskCheckPoints"),
-      href: "#points",
-      activeClass: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200",
-    },
-  ];
-  const hasStudentTasks = teacherRequestNotifications.length > 0 || taskItems.some((item) => item.count > 0);
-  const openTeacherRequest = async (item: (typeof visibleTeacherRequests)[number], href: string) => {
-    await markNotificationRead(item.id);
-    router.push(href);
-  };
-  const openTask = (item: StudentDashboardTaskItem) => {
-    if (item.key === "points") {
-      pointsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      setHighlightPoints(true);
-      window.setTimeout(() => setHighlightPoints(false), 1600);
+    };
+  });
+  const openTask = async (item: StudentDashboardTaskItem) => {
+    if (item.key === "teacherRequest" && firstTeacherRequest) {
+      await Promise.all(
+        firstTeacherRequestGroup.map((item) => markNotificationRead(item.id)),
+      );
+      router.push(firstTeacherRequest.href ?? `/student-ask${firstTeacherRequest.sessionId ? `?sessionId=${firstTeacherRequest.sessionId}` : ""}`);
       return;
     }
     router.push(item.href);
+  };
+  const retryTasks = () => {
+    void Promise.all([
+      questionsQuery.refetch(),
+      sessionsQuery.refetch(),
+      notificationQuery.refetch(),
+    ]);
   };
 
   return (
@@ -251,25 +202,16 @@ function StudentDashboard() {
         <>
           <div className="student-dashboard-tablet-overview">
             {/* 포인트 카드 */}
-            <div
-              ref={pointsSectionRef}
-              className={`student-dashboard-points-panel flex scroll-mt-24 flex-col gap-4 rounded-2xl transition-shadow ${
-                highlightPoints ? "shadow-[0_0_0_3px_rgba(245,158,11,0.55)]" : ""
-              }`}
-            >
+            <div className="student-dashboard-points-panel flex flex-col gap-4">
               <div className="min-h-0 flex-1">
                 <PointsCard />
               </div>
-              {!isLoading && (
-                <StudentDashboardTasksCard
-                  hasStudentTasks={hasStudentTasks}
-                  visibleTeacherRequests={visibleTeacherRequests}
-                  teacherRequestCount={teacherRequestNotifications.length}
-                  taskItems={taskItems}
-                  onTeacherRequestClick={openTeacherRequest}
-                  onTaskClick={openTask}
-                />
-              )}
+              <StudentDashboardTasksCard
+                status={taskStatus}
+                taskItems={taskItems}
+                onTaskClick={openTask}
+                onRetry={retryTasks}
+              />
               <Card className="student-dashboard-question-summary border-indigo-100 bg-indigo-50/70 dark:border-indigo-500/30 dark:bg-indigo-950/20">
                 <CardContent className="flex items-center justify-between gap-3 p-4">
                   <div>
