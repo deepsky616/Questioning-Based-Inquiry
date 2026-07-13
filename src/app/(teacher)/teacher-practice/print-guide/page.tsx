@@ -21,6 +21,30 @@ export default function TeacherPracticePrintGuidePage() {
     };
   }, []);
 
+  const printWorksheet = () => {
+    const root = document.documentElement;
+    const body = document.body;
+    const rootWasDark = root.classList.contains("dark");
+    const bodyWasDark = body.classList.contains("dark");
+
+    root.classList.remove("dark");
+    body.classList.remove("dark");
+    root.classList.add("question-practice-print-light");
+    body.classList.add("question-practice-print-light", "question-practice-print-mode");
+
+    const cleanup = () => {
+      body.classList.remove("question-practice-print-mode");
+      if (rootWasDark) root.classList.add("dark");
+      if (bodyWasDark) body.classList.add("dark");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup, { once: true });
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => window.print());
+    });
+  };
+
   return (
     <div className="question-practice-print-page mx-auto max-w-5xl space-y-5 bg-white text-slate-950 [color-scheme:light]">
       <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background/95 p-3 shadow-sm">
@@ -30,7 +54,7 @@ export default function TeacherPracticePrintGuidePage() {
             {guide.backButton}
           </Link>
         </Button>
-        <Button onClick={() => window.print()} className="gap-2 font-semibold">
+        <Button onClick={printWorksheet} className="gap-2 font-semibold">
           <Printer className="h-4 w-4" />
           {guide.printButton}
         </Button>

@@ -17,6 +17,11 @@ describe("질문연습 학습지 출력", () => {
 
   it("페이지는 학생 작성란과 활동별 답안 영역을 렌더링한다", () => {
     expect(pageSource).toContain("question-practice-print-light");
+    expect(pageSource).toContain("question-practice-print-mode");
+    expect(pageSource).toContain("root.classList.remove(\"dark\")");
+    expect(pageSource).toContain("body.classList.remove(\"dark\")");
+    expect(pageSource).toContain("requestAnimationFrame");
+    expect(pageSource).toContain("onClick={printWorksheet}");
     expect(pageSource).toContain("question-practice-print-page");
     expect(pageSource).toContain('style={{ colorScheme: "light" }}');
     expect(pageSource).toContain("qp-student-fields ml-auto");
@@ -38,6 +43,9 @@ describe("질문연습 학습지 출력", () => {
     expect(cssSource).toContain("color-scheme: light !important");
     expect(cssSource).toContain("html.question-practice-print-light");
     expect(cssSource).toContain("body.question-practice-print-light main");
+    expect(cssSource).toContain("body.question-practice-print-mode *");
+    expect(cssSource).toContain("visibility: hidden !important");
+    expect(cssSource).toContain("visibility: visible !important");
     expect(cssSource).toContain("body.question-practice-print-light main > div.mt-8.pt-4.border-t");
     expect(cssSource).toContain("mix-blend-mode: normal !important");
     expect(cssSource).toContain("text-shadow: none !important");

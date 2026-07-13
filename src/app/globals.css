@@ -403,6 +403,12 @@ body.question-practice-print-light main > div.mt-8.pt-4.border-t {
   display: none !important;
 }
 
+body.question-practice-print-mode {
+  background: #ffffff !important;
+  color: #111827 !important;
+  color-scheme: light !important;
+}
+
 .question-practice-print-page,
 .question-practice-print-page main,
 .question-practice-print-page .question-practice-print {
@@ -431,10 +437,26 @@ body.question-practice-print-light main > div.mt-8.pt-4.border-t {
   html.question-practice-print-light body,
   body.question-practice-print-light,
   body.question-practice-print-light main,
-  body.question-practice-print-light .question-practice-print-page {
+  body.question-practice-print-light .question-practice-print-page,
+  body.question-practice-print-mode {
     background: #ffffff !important;
     color: #111827 !important;
     color-scheme: light !important;
+  }
+  body.question-practice-print-mode * {
+    visibility: hidden !important;
+  }
+  body.question-practice-print-mode .question-practice-print,
+  body.question-practice-print-mode .question-practice-print * {
+    visibility: visible !important;
+  }
+  body.question-practice-print-mode .question-practice-print {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    box-shadow: none !important;
   }
   /* 차트·카드가 페이지 경계에서 잘리지 않도록 */
   .report-print .recharts-wrapper,
