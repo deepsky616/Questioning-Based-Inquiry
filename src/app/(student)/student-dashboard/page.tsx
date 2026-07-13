@@ -22,9 +22,17 @@ import {
   useAppNotifications,
 } from "@/lib/app-notifications";
 import { useStudentSessions } from "@/lib/app-queries";
-import { buildStudentPriorityCounts } from "@/lib/dashboard-priority-tasks";
-import { APP_DATA_REFETCH_MS, visibleDataRefetchInterval } from "@/lib/query-refresh";
+import {
+  buildStudentPriorityCounts,
+  selectActionableSessionReminders,
+} from "@/lib/dashboard-priority-tasks";
+import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 import { StudentDashboardTasksCard, type StudentDashboardTaskItem } from "./StudentDashboardTasksCard";
+import {
+  buildDashboardQuestionClassSchedule,
+  localDateKey,
+} from "@/lib/dashboard-question-class-schedule";
+import { isValidSessionDateString } from "@/lib/sessions";
 
 interface Question {
   id: string;
@@ -46,6 +54,7 @@ interface StudentSession {
   date: string;
   subject: string;
   topic: string;
+  isActive?: boolean;
 }
 
 export default function StudentDashboardPage() {
@@ -84,7 +93,6 @@ function StudentDashboard() {
   const notificationQuery = useAppNotifications({
     queryKey: appNotificationQueryKeys.student,
     enabled: Boolean(user.id),
-    refetchInterval: APP_DATA_REFETCH_MS,
   });
   const { notifications, markRead: markNotificationRead } = notificationQuery;
 
@@ -101,28 +109,56 @@ function StudentDashboard() {
       controversial: allQuestions.filter((q) => matchesCognitiveCategory(q.cognitive, "controversial")).length,
     },
   };
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  }, []);
+  const todayStr = localDateKey();
   const questionSessionIds = useMemo(
-    () => new Set(allQuestions.map((question) => question.sessionId).filter(Boolean)),
+    () => new Set(
+      allQuestions
+        .map((question) => question.sessionId)
+        .filter((id): id is string => Boolean(id)),
+    ),
     [allQuestions],
   );
-  const todaySessions = sessions.filter((item) => item.date === todayStr);
-  const pastSessions = sessions.filter((item) => item.date < todayStr);
+  const availableSessionIds = useMemo(
+    () => new Set(
+      sessions
+        .filter((item) => item.isActive !== false)
+        .map((item) => item.id),
+    ),
+    [sessions],
+  );
+  const studentSchedule = useMemo(
+    () =>
+      buildDashboardQuestionClassSchedule({
+        sessions,
+        today: todayStr,
+        completedSessionIds: questionSessionIds,
+      }),
+    [questionSessionIds, sessions, todayStr],
+  );
+  const todaySessions = sessions.filter(
+    (item) => item.isActive !== false && item.date === todayStr,
+  );
+  const pastSessions = sessions.filter(
+    (item) =>
+      item.isActive !== false &&
+      isValidSessionDateString(item.date) &&
+      item.date < todayStr,
+  );
   const todayUnaskedSessionIds = todaySessions
     .filter((item) => !questionSessionIds.has(item.id))
     .map((item) => item.id);
   const pastUnaskedSessionIds = pastSessions
     .filter((item) => !questionSessionIds.has(item.id))
     .map((item) => item.id);
-  const teacherRequestNotifications = notifications.filter(
-    (item) =>
-      item.type === "SESSION_REMINDER" &&
-      !item.readAt &&
-      (!item.sessionId || !questionSessionIds.has(item.sessionId)),
-  );
+  const reminderCandidates = notificationQuery.data?.unreadSessionReminders
+    ?? notifications.filter(
+      (item) => item.type === "SESSION_REMINDER" && !item.readAt,
+    );
+  const teacherRequestNotifications = selectActionableSessionReminders({
+    reminders: reminderCandidates,
+    availableSessionIds,
+    completedSessionIds: questionSessionIds,
+  });
   const teacherRequestGroups = Array.from(
     teacherRequestNotifications.reduce((groups, item) => {
       const key = item.sessionId ?? item.id;
@@ -133,6 +169,42 @@ function StudentDashboard() {
   );
   const firstTeacherRequestGroup = teacherRequestGroups[0] ?? [];
   const firstTeacherRequest = firstTeacherRequestGroup[0];
+  const scheduleStatus: "loading" | "ready" | "error" =
+    questionsQuery.isError || sessionsQuery.isError
+      ? "error"
+      : questionsQuery.isSuccess && sessionsQuery.isSuccess
+        ? "ready"
+        : "loading";
+  const studentScheduleItem = (() => {
+    const scheduleSession = studentSchedule.primarySession;
+    if (!scheduleSession || !studentSchedule.date || studentSchedule.kind === "empty") return null;
+    const [year, month, day] = studentSchedule.date.split("-");
+    const sessionTitle = [scheduleSession.subject.trim(), scheduleSession.topic.trim()]
+      .filter(Boolean)
+      .join(" · ");
+    const dateLabel = t("scheduleDate", {
+      year: Number(year),
+      month: Number(month),
+      day: Number(day),
+    });
+    const countLabel = studentSchedule.kind === "today"
+      ? (studentSchedule.needsQuestionCount ?? 0) > 0
+        ? t("scheduleNeedsQuestion", { count: studentSchedule.needsQuestionCount ?? 0 })
+        : t("scheduleQuestionsComplete")
+      : t("taskClassCount", { count: studentSchedule.totalCount });
+
+    return {
+      id: scheduleSession.id,
+      label: studentSchedule.kind === "today"
+        ? t("scheduleTodayTitle")
+        : t("scheduleUpcomingTitle"),
+      countLabel,
+      detail: studentSchedule.kind === "today"
+        ? sessionTitle
+        : `${dateLabel} · ${sessionTitle}`,
+      href: `/student-ask?sessionId=${encodeURIComponent(scheduleSession.id)}`,
+    };
+  })();
   const taskStatus: "loading" | "ready" | "error" =
     questionsQuery.isError || sessionsQuery.isError || notificationQuery.isError
       ? "error"
@@ -153,14 +225,6 @@ function StudentDashboard() {
         label: t("taskTeacherRequestTitle"),
         countLabel: t("taskClassCount", { count: item.count }),
         href: firstTeacherRequest?.href ?? "/student-ask",
-      };
-    }
-    if (item.key === "todayUnasked") {
-      return {
-        key: item.key,
-        label: t("taskTodayQuestionTitle"),
-        countLabel: t("taskClassCount", { count: item.count }),
-        href: "/student-ask?task=today-unasked",
       };
     }
     return {
@@ -211,6 +275,23 @@ function StudentDashboard() {
                 taskItems={taskItems}
                 onTaskClick={openTask}
                 onRetry={retryTasks}
+                schedule={{
+                  status: scheduleStatus,
+                  item: studentScheduleItem,
+                  onSelect: (item) => router.push(item.href),
+                  onRetry: () => {
+                    void Promise.all([
+                      questionsQuery.refetch(),
+                      sessionsQuery.refetch(),
+                    ]);
+                  },
+                  labels: {
+                    empty: t("scheduleEmpty"),
+                    loading: t("scheduleLoading"),
+                    error: t("scheduleLoadError"),
+                    retry: t("scheduleRetry"),
+                  },
+                }}
               />
               <Card className="student-dashboard-question-summary border-indigo-100 bg-indigo-50/70 dark:border-indigo-500/30 dark:bg-indigo-950/20">
                 <CardContent className="flex items-center justify-between gap-3 p-4">

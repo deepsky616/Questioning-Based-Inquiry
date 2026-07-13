@@ -8,6 +8,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DashboardQuestionClassRow,
+  type DashboardQuestionClassRowProps,
+} from "@/components/shared/DashboardQuestionClassRow";
 
 export interface TeacherTaskItem extends PriorityTaskListItem {
   href: string;
@@ -18,6 +22,7 @@ interface TeacherTodayTasksCardProps {
   status: "loading" | "ready" | "error";
   onTaskClick: (item: TeacherTaskItem) => void;
   onRetry: () => void;
+  schedule: DashboardQuestionClassRowProps;
   labels: {
     title: string;
     description: string;
@@ -33,6 +38,7 @@ export function TeacherTodayTasksCard({
   status,
   onTaskClick,
   onRetry,
+  schedule,
   labels,
 }: TeacherTodayTasksCardProps) {
   return (
@@ -42,6 +48,8 @@ export function TeacherTodayTasksCard({
         <p className="mt-1 text-xs text-muted-foreground">{labels.description}</p>
       </CardHeader>
       <CardContent>
+        <DashboardQuestionClassRow {...schedule} />
+
         {status === "loading" && (
           <div role="status" aria-label={labels.loading} className="space-y-3 py-1">
             <p className="text-sm text-muted-foreground">{labels.loading}</p>

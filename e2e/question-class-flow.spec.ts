@@ -45,13 +45,8 @@ async function loginAsTeacher(
   page: Page,
   teacher: QuestionLearningTeacherFixture,
 ) {
-  await page.goto("/login");
-
-  await expect(async () => {
-    await page.getByRole("tab", { name: "학생 로그인", exact: true }).click();
-    await expect(page.locator("#s-school")).toBeVisible({ timeout: 1_000 });
-  }).toPass({ timeout: 30_000 });
-  await page.getByRole("tab", { name: "교사 로그인", exact: true }).click();
+  await page.goto("/login?type=teacher");
+  await expect(page.locator("#t-email")).toBeVisible({ timeout: 30_000 });
   await page.locator("#t-email").fill(teacher.email);
   await page.locator("#t-password").fill(teacher.password);
   await page.getByRole("button", { name: "교사 로그인", exact: true }).click();
@@ -118,7 +113,20 @@ async function stubTeacherReads(
     ),
   );
   await page.route("**/api/sessions**", (route) =>
-    fulfillReadOnly(route, [], unexpectedWrites),
+    fulfillReadOnly(
+      route,
+      [
+        {
+          id: "e2e-teacher-today-class",
+          date: localDate(0),
+          subject: "과학",
+          topic: "물질의 변화",
+          isActive: true,
+          participation: { total: 1, submitted: 0, missing: 1, percent: 0 },
+        },
+      ],
+      unexpectedWrites,
+    ),
   );
   await page.route("**/api/unit-design**", (route) =>
     fulfillReadOnly(route, [], unexpectedWrites),
@@ -205,13 +213,29 @@ async function expectPriorityRows(
     .getByRole("heading", { name: title, exact: true })
     .locator("..")
     .locator("..");
-  const rows = card.getByRole("button");
+  const rows = card.getByTestId("priority-task-list").getByRole("button");
 
   await expect(rows).toHaveCount(expectedNames.length);
   for (const [index, name] of expectedNames.entries()) {
     await expect(rows.nth(index)).toBeVisible();
     await expect(rows.nth(index)).toHaveAccessibleName(name);
   }
+}
+
+async function expectScheduleRow(
+  page: Page,
+  cardTitle: string,
+  expectedName: RegExp,
+) {
+  const card = page
+    .getByRole("heading", { name: cardTitle, exact: true })
+    .locator("..")
+    .locator("..");
+  const row = card.getByTestId("dashboard-question-class-row");
+
+  await expect(row).toBeVisible();
+  await expect(row).toHaveAccessibleName(expectedName);
+  return row;
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -309,10 +333,15 @@ test.describe("질문수업 통합 흐름", () => {
       "검토할 추천 포인트 1건",
       "지도가 필요한 학생 1명",
     ]);
+    const scheduleRow = await expectScheduleRow(
+      page,
+      "우선 확인",
+      /오늘 질문수업.*1개.*과학.*물질의 변화/,
+    );
     await expectNoHorizontalOverflow(page);
 
-    await page.goto("/teacher-sessions");
-    await expect(page).toHaveURL(/\/teacher-sessions(?:\?|$)/);
+    await scheduleRow.click();
+    await expect(page).toHaveURL(/\/teacher-sessions\?session=e2e-teacher-today-class$/);
     await expectQuestionClassNavActive(page);
 
     const primaryAction = page.getByTestId("question-class-primary-action");
@@ -342,7 +371,7 @@ test.describe("질문수업 통합 흐름", () => {
     expect(unexpectedWrites).toEqual([]);
   });
 
-  test("학생이 중복 없이 세 가지 우선 할 일을 본다", async ({ page }) => {
+  test("학생이 오늘 일정과 중복 없는 두 가지 우선 할 일을 본다", async ({ page }) => {
     const unexpectedWrites: UnexpectedWrite[] = [];
     await stubStudentReads(page, unexpectedWrites);
     await loginAsStudent(page, {
@@ -355,9 +384,13 @@ test.describe("질문수업 통합 흐름", () => {
 
     await expectPriorityRows(page, "지금 할 일", [
       "선생님 요청 1개",
-      "오늘 질문할 수업 1개",
       "최근 놓친 수업 1개",
     ]);
+    await expectScheduleRow(
+      page,
+      "지금 할 일",
+      /오늘 질문수업.*질문 필요 2개.*과학.*선생님 요청 수업/,
+    );
     await expectNoHorizontalOverflow(page);
     expect(unexpectedWrites).toEqual([]);
   });

@@ -15,6 +15,21 @@ const teacherLabels = {
   retry: "다시 불러오기",
 };
 
+const scheduleLabels = {
+  empty: "예정 질문수업 없음",
+  loading: "질문수업 일정을 불러오는 중입니다.",
+  error: "질문수업 일정을 불러오지 못했습니다.",
+  retry: "질문수업 일정 다시 불러오기",
+};
+
+const emptySchedule = {
+  status: "ready" as const,
+  item: null,
+  onSelect: vi.fn(),
+  onRetry: vi.fn(),
+  labels: scheduleLabels,
+};
+
 describe("PriorityTaskList", () => {
   it("우선순위 순서대로 최대 세 항목만 보여 준다", () => {
     render(
@@ -56,6 +71,7 @@ describe("TeacherTodayTasksCard", () => {
       onTaskClick: vi.fn(),
       onRetry: vi.fn(),
       labels: teacherLabels,
+      schedule: emptySchedule,
     };
     const view = render(<TeacherTodayTasksCard {...props} status="loading" />);
 
@@ -75,10 +91,70 @@ describe("TeacherTodayTasksCard", () => {
         onTaskClick={vi.fn()}
         onRetry={onRetry}
         labels={teacherLabels}
+        schedule={emptySchedule}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: teacherLabels.retry }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("일정 한 줄을 작업 최대 세 줄과 별도로 보여 주고 선택할 수 있다", () => {
+    const onScheduleSelect = vi.fn();
+    const scheduleItem = {
+      id: "session-1",
+      label: "오늘 질문수업",
+      countLabel: "1개",
+      detail: "과학 · 물질의 변화",
+      href: "/teacher-sessions?session=session-1",
+    };
+    render(
+      <TeacherTodayTasksCard
+        taskItems={[
+          { key: "flagged", label: "부적절 의심 활동", countLabel: "3건", href: "/one" },
+          { key: "points", label: "검토할 추천 포인트", countLabel: "2건", href: "/two" },
+          { key: "attention", label: "지도가 필요한 학생", countLabel: "5명", href: "/three" },
+        ]}
+        status="ready"
+        onTaskClick={vi.fn()}
+        onRetry={vi.fn()}
+        labels={teacherLabels}
+        schedule={{
+          status: "ready",
+          item: scheduleItem,
+          onSelect: onScheduleSelect,
+          onRetry: vi.fn(),
+          labels: scheduleLabels,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("priority-task-list").getElementsByTagName("button")).toHaveLength(3);
+    fireEvent.click(screen.getByTestId("dashboard-question-class-row"));
+    expect(onScheduleSelect).toHaveBeenCalledWith(scheduleItem);
+  });
+
+  it("일정 조회가 실패해도 준비된 중요 작업을 숨기지 않는다", () => {
+    render(
+      <TeacherTodayTasksCard
+        taskItems={[
+          { key: "flagged", label: "부적절 의심 활동", countLabel: "1건", href: "/one" },
+        ]}
+        status="ready"
+        onTaskClick={vi.fn()}
+        onRetry={vi.fn()}
+        labels={teacherLabels}
+        schedule={{
+          status: "error",
+          item: null,
+          onSelect: vi.fn(),
+          onRetry: vi.fn(),
+          labels: scheduleLabels,
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(scheduleLabels.error);
+    expect(screen.getByRole("button", { name: /부적절 의심 활동.*1건/ })).toBeVisible();
   });
 });

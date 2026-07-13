@@ -19,7 +19,7 @@ export function PriorityTaskList<TItem extends PriorityTaskListItem>({
   onSelect,
 }: PriorityTaskListProps<TItem>) {
   return (
-    <div className="divide-y divide-border">
+    <div data-testid="priority-task-list" className="divide-y divide-border">
       {items.slice(0, 3).map((item) => (
         <button
           key={item.key}

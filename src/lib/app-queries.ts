@@ -2,10 +2,14 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { sortSessionsDesc } from "@/lib/sessions";
-import { visibleDataRefetchInterval } from "@/lib/query-refresh";
+import {
+  visibleDataRefetchInterval,
+  visibleNotificationRefetchInterval,
+} from "@/lib/query-refresh";
 
 export const appQueryKeys = {
   teacherSessions: ["teacher-sessions"] as const,
+  teacherDashboardSchedule: ["teacher-sessions", "dashboard-schedule"] as const,
   teacherStudents: ["teacher-students"] as const,
   studentSessions: (userId: string) => ["student-sessions", userId] as const,
 };
@@ -23,8 +27,8 @@ export interface TeacherStudentListResponse<TStudent, TClass> {
   teacherClasses: TClass[];
 }
 
-async function fetchSessions<TSession extends BasicSession>(): Promise<TSession[]> {
-  const res = await fetch("/api/sessions");
+async function fetchSessions<TSession extends BasicSession>(href = "/api/sessions"): Promise<TSession[]> {
+  const res = await fetch(href);
   if (!res.ok) throw new Error("질문수업을 불러오지 못했습니다");
   const data = await res.json();
   return Array.isArray(data) ? data : [];
@@ -45,6 +49,16 @@ export function useTeacherSessions<TSession extends BasicSession>() {
     queryKey: appQueryKeys.teacherSessions,
     queryFn: async () => sortSessionsDesc(await fetchSessions<TSession>()),
     refetchInterval: visibleDataRefetchInterval,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useTeacherDashboardSchedule<TSession extends BasicSession>() {
+  return useQuery<TSession[]>({
+    queryKey: appQueryKeys.teacherDashboardSchedule,
+    queryFn: async () =>
+      sortSessionsDesc(await fetchSessions<TSession>("/api/sessions?view=schedule")),
+    refetchInterval: visibleNotificationRefetchInterval,
     refetchOnWindowFocus: true,
   });
 }

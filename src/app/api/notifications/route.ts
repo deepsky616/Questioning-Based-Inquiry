@@ -8,12 +8,12 @@ export async function GET() {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
 
-  const userId = (session.user as { id: string }).id;
+  const { id: userId, role } = session.user as { id: string; role?: string };
   const readSince = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [unreadNotifications, readNotifications, unreadCount] = await Promise.all([
+  const [unreadNotifications, readNotifications, unreadCount, unreadSessionReminders] = await Promise.all([
     prisma.appNotification.findMany({
       where: { recipientId: userId, readAt: null },
-      orderBy: { createdAt: "desc" },
+      orderBy: { updatedAt: "desc" },
       take: 20,
       select: {
         id: true,
@@ -25,6 +25,7 @@ export async function GET() {
         metadata: true,
         readAt: true,
         createdAt: true,
+        updatedAt: true,
       },
     }),
     prisma.appNotification.findMany({
@@ -44,15 +45,32 @@ export async function GET() {
         metadata: true,
         readAt: true,
         createdAt: true,
+        updatedAt: true,
       },
     }),
     prisma.appNotification.count({
       where: { recipientId: userId, readAt: null },
     }),
+    role === "STUDENT"
+      ? prisma.appNotification.findMany({
+          where: {
+            recipientId: userId,
+            readAt: null,
+            type: "SESSION_REMINDER",
+            sessionId: { not: null },
+          },
+          orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            sessionId: true,
+            href: true,
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
   const notifications = [...unreadNotifications, ...readNotifications].slice(0, 20);
-  return NextResponse.json({ notifications, unreadCount });
+  return NextResponse.json({ notifications, unreadCount, unreadSessionReminders });
 }
 
 export async function PATCH() {

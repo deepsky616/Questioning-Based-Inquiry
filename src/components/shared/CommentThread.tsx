@@ -12,6 +12,7 @@ import { getSessionUser } from "@/lib/auth-helpers";
 import { formatDateTime } from "@/lib/datetime";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { teacherAlertQueryKeys } from "@/lib/teacher-alert-counts";
 
 export interface ThreadComment {
   id: string;
@@ -105,7 +106,7 @@ export function CommentThread({
       if (!res.ok) throw new Error();
       setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, flagged: false } : c)));
       // 알림 벨의 부적절 의심 카운트 즉시 갱신
-      queryClient.invalidateQueries({ queryKey: ["flagged-count"] });
+      queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.flagged });
     } catch {
       // 무시
     }

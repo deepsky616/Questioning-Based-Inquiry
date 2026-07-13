@@ -32,7 +32,11 @@ export function StudentNotificationBell() {
     href: item.href,
     label: renderMessage(item),
     icon: <MessageSquareText className="h-4 w-4 text-indigo-500" />,
-    meta: formatShortDateTime(item.createdAt),
+    meta: formatShortDateTime(
+      item.type === "SESSION_REMINDER" && !item.readAt
+        ? item.updatedAt ?? item.createdAt
+        : item.createdAt,
+    ),
     unread: !item.readAt,
     tone: "default",
     onClick: () => markRead(item.id),

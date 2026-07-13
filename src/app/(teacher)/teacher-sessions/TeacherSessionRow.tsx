@@ -88,7 +88,7 @@ export function TeacherSessionRow({
   }, [isHighlighted]);
 
   const handleSendReminder = async () => {
-    if (missingCount <= 0 || sendingReminder) return;
+    if (!session.isActive || missingCount <= 0 || sendingReminder) return;
     setSendingReminder(true);
     try {
       const res = await fetch(`/api/sessions/${session.id}/remind`, { method: "POST" });
@@ -218,7 +218,8 @@ export function TeacherSessionRow({
                         <button
                           type="button"
                           onClick={handleSendReminder}
-                          disabled={sendingReminder}
+                          disabled={sendingReminder || !session.isActive}
+                          title={!session.isActive ? t("reminderInactive") : undefined}
                           className="inline-flex h-7 items-center rounded-md border border-indigo-200 bg-white px-2 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-200 dark:hover:bg-indigo-900/50"
                         >
                           {sendingReminder ? t("reminderSending") : t("reminderSend")}

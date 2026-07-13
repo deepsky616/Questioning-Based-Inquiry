@@ -23,6 +23,7 @@ import { QUESTION_LIST_MAX } from "@/lib/questions";
 import { getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions } from "@/lib/app-queries";
 import { APP_DATA_REFETCH_MS } from "@/lib/query-refresh";
+import { teacherAlertQueryKeys } from "@/lib/teacher-alert-counts";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { useToast } from "@/components/ui/use-toast";
@@ -407,7 +408,7 @@ export default function QuestionsPage() {
       });
       if (!res.ok) throw new Error();
       setQuestions((prev) => prev.map((q) => (q.id === question.id ? { ...q, flagged: false } : q)));
-      queryClient.invalidateQueries({ queryKey: ["flagged-count"] });
+      queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.flagged });
     } catch {
       toast({ variant: "destructive", description: t("processFailed") });
     }

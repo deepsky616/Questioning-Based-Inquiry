@@ -51,15 +51,32 @@ function sessionTargetsStudent(
   return false;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
 
   const user = session.user as { id: string; role?: string; grade?: string; className?: string };
+  const scheduleOnly = new URL(req.url).searchParams.get("view") === "schedule";
 
   if (user.role === "TEACHER") {
+    if (scheduleOnly) {
+      const sessions = await prisma.questionSession.findMany({
+        where: { teacherId: user.id, isActive: true },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        select: {
+          id: true,
+          date: true,
+          subject: true,
+          topic: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
+      return NextResponse.json(sessions);
+    }
+
     const [sessions, teacher] = await Promise.all([
       prisma.questionSession.findMany({
         where: { teacherId: user.id },

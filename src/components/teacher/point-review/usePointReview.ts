@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
+import { teacherAlertQueryKeys } from "@/lib/teacher-alert-counts";
 import {
   buildSessionLabel,
   filterSessions,
@@ -152,8 +153,8 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
       });
       setMessage(decision === "APPROVE" ? t("resultApproved", { count: targetIds.length }) : t("resultRejected", { count: targetIds.length }));
       loadPending();
-      queryClient.invalidateQueries({ queryKey: ["pending-review-count"] });
-      queryClient.invalidateQueries({ queryKey: ["flagged-count"] });
+      queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.pendingPoints });
+      queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.flagged });
     } catch {} finally { setBusy(false); }
   }
 
@@ -167,7 +168,7 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
       });
       setMessage(t("overrideApproved", { points }));
       loadPending();
-      queryClient.invalidateQueries({ queryKey: ["pending-review-count"] });
+      queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.pendingPoints });
     } catch {} finally { setBusy(false); }
   }
 

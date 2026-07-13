@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslations } from "next-intl";
+import {
+  DashboardQuestionClassRow,
+  type DashboardQuestionClassRowProps,
+} from "@/components/shared/DashboardQuestionClassRow";
 
 export interface StudentDashboardTaskItem extends PriorityTaskListItem {
   href: string;
@@ -19,6 +23,7 @@ interface StudentDashboardTasksCardProps {
   taskItems: StudentDashboardTaskItem[];
   onTaskClick: (item: StudentDashboardTaskItem) => void;
   onRetry: () => void;
+  schedule: DashboardQuestionClassRowProps;
 }
 
 export function StudentDashboardTasksCard({
@@ -26,6 +31,7 @@ export function StudentDashboardTasksCard({
   taskItems,
   onTaskClick,
   onRetry,
+  schedule,
 }: StudentDashboardTasksCardProps) {
   const t = useTranslations("studentDash");
 
@@ -36,6 +42,10 @@ export function StudentDashboardTasksCard({
         <p className="mt-1 text-xs text-muted-foreground">{t("todayTasksDesc")}</p>
       </CardHeader>
       <CardContent>
+        {!(status === "error" && schedule.status === "error") && (
+          <DashboardQuestionClassRow {...schedule} />
+        )}
+
         {status === "loading" && (
           <div role="status" aria-label={t("taskLoading")} className="space-y-3 py-1">
             <p className="text-sm text-muted-foreground">{t("taskLoading")}</p>

@@ -8,21 +8,8 @@ import { NotificationBellMenu, type NotificationMenuItem } from "@/components/sh
 import { useTranslations } from "next-intl";
 import { formatShortDateTime } from "@/lib/datetime";
 import { appNotificationQueryKeys, useAppNotifications } from "@/lib/app-notifications";
-import { APP_NOTIFICATION_POLL_MS, visibleNotificationRefetchInterval } from "@/lib/query-refresh";
-
-interface FlaggedCount { total: number; questions: number; comments: number }
-
-async function fetchFlaggedCount(): Promise<FlaggedCount> {
-  const res = await fetch("/api/teacher/flagged-count");
-  if (!res.ok) throw new Error("flagged-count 실패");
-  return res.json();
-}
-async function fetchPendingCount(): Promise<number> {
-  const res = await fetch("/api/teacher/points/pending-count");
-  if (!res.ok) return 0;
-  const d = await res.json();
-  return typeof d.count === "number" ? d.count : 0;
-}
+import { APP_NOTIFICATION_POLL_MS } from "@/lib/query-refresh";
+import { teacherAlertQueryOptions } from "@/lib/teacher-alert-counts";
 
 /**
  * 교사 알림 센터 — 두 가지 검토 항목을 한 벨로 모은다.
@@ -37,18 +24,8 @@ export function NotificationBell() {
   const prevRef = useRef<number | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data: flagged } = useQuery({
-    queryKey: ["flagged-count"],
-    queryFn: fetchFlaggedCount,
-    refetchInterval: visibleNotificationRefetchInterval,
-    refetchOnWindowFocus: true,
-  });
-  const { data: pending } = useQuery({
-    queryKey: ["pending-review-count"],
-    queryFn: fetchPendingCount,
-    refetchInterval: visibleNotificationRefetchInterval,
-    refetchOnWindowFocus: true,
-  });
+  const { data: flagged } = useQuery(teacherAlertQueryOptions.flagged());
+  const { data: pending } = useQuery(teacherAlertQueryOptions.pendingPoints());
   const {
     notifications: savedNotifications,
     unreadCount: unreadSavedCount,
@@ -60,7 +37,7 @@ export function NotificationBell() {
   });
 
   const flaggedCount = flagged?.total ?? 0;
-  const pendingCount = pending ?? 0;
+  const pendingCount = pending?.count ?? 0;
   const total = flaggedCount + pendingCount + unreadSavedCount;
 
   const calculatedItems: NotificationMenuItem[] = [

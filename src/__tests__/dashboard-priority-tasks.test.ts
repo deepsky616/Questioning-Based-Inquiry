@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildStudentPriorityCounts,
   buildTeacherPriorityCounts,
+  selectActionableSessionReminders,
 } from "@/lib/dashboard-priority-tasks";
 
 describe("dashboard priority tasks", () => {
@@ -34,7 +35,6 @@ describe("dashboard priority tasks", () => {
       }),
     ).toEqual([
       { key: "teacherRequest", count: 1 },
-      { key: "todayUnasked", count: 1 },
       { key: "pastUnasked", count: 1 },
     ]);
   });
@@ -83,16 +83,30 @@ describe("dashboard priority tasks", () => {
     ).toEqual([{ key: "teacherRequest", count: 2 }]);
   });
 
-  it("오늘과 지난 목록에 같은 수업이 있으면 오늘 수업으로만 센다", () => {
+  it("오늘 미작성 수업은 일정 줄로 넘기고 지난 목록과도 겹치지 않게 센다", () => {
     expect(
       buildStudentPriorityCounts({
         teacherRequests: [],
         todayUnaskedSessionIds: ["shared", "today"],
         pastUnaskedSessionIds: ["shared", "past"],
       }),
-    ).toEqual([
-      { key: "todayUnasked", count: 2 },
-      { key: "pastUnasked", count: 1 },
+    ).toEqual([{ key: "pastUnasked", count: 1 }]);
+  });
+
+  it("현재 배정된 활성 수업의 미작성 요청만 학생 할 일로 고른다", () => {
+    const result = selectActionableSessionReminders({
+      reminders: [
+        { id: "current", sessionId: "session-current", href: "/current" },
+        { id: "removed", sessionId: "session-removed", href: "/removed" },
+        { id: "completed", sessionId: "session-completed", href: "/completed" },
+        { id: "missing", sessionId: null, href: "/missing" },
+      ],
+      availableSessionIds: new Set(["session-current", "session-completed"]),
+      completedSessionIds: new Set(["session-completed"]),
+    });
+
+    expect(result).toEqual([
+      { id: "current", sessionId: "session-current", href: "/current" },
     ]);
   });
 });

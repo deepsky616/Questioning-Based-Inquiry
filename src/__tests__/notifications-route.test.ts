@@ -42,6 +42,32 @@ describe("알림 API", () => {
       expect(call[0].where.recipientId).toBe("u1");
     }
     expect(mockCount.mock.calls[0][0].where).toMatchObject({ recipientId: "u1", readAt: null });
+    expect(mockFindMany).toHaveBeenCalledTimes(2);
+  });
+
+  it("다시 보낸 안 읽은 요청은 최근 갱신 시각 순서로 조회한다", async () => {
+    await GET();
+
+    expect(mockFindMany.mock.calls[0][0]).toMatchObject({
+      where: { recipientId: "u1", readAt: null },
+      orderBy: { updatedAt: "desc" },
+      select: { createdAt: true, updatedAt: true },
+    });
+  });
+
+  it("대시보드 집계용 안 읽은 수업 요청 식별값은 화면 표시 상한과 별도로 조회한다", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "u1", role: "STUDENT" } });
+    await GET();
+
+    expect(mockFindMany.mock.calls[2][0]).toMatchObject({
+      where: {
+        recipientId: "u1",
+        readAt: null,
+        type: "SESSION_REMINDER",
+        sessionId: { not: null },
+      },
+      select: { id: true, sessionId: true, href: true },
+    });
   });
 
   it("PATCH(전체 읽음)는 본인의 안 읽은 알림만 갱신한다", async () => {

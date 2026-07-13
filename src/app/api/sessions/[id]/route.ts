@@ -51,7 +51,23 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         targetStudentIds: targetStudentIds as Prisma.InputJsonValue,
       }),
     };
-    const updated = await prisma.questionSession.update({ where: { id }, data: updateData });
+    const updated = data.isActive === false
+      ? await prisma.$transaction(async (tx) => {
+          const nextSession = await tx.questionSession.update({
+            where: { id },
+            data: updateData,
+          });
+          await tx.appNotification.updateMany({
+            where: { sessionId: id, type: "SESSION_REMINDER" },
+            data: { href: null },
+          });
+          await tx.appNotification.updateMany({
+            where: { sessionId: id, type: "SESSION_REMINDER", readAt: null },
+            data: { readAt: new Date() },
+          });
+          return nextSession;
+        })
+      : await prisma.questionSession.update({ where: { id }, data: updateData });
     return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -73,9 +89,13 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (!existing || existing.teacherId !== authResult.user.id) {
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
-    // 저장된 세션 AI 분석도 함께 정리(고아 행 방지)
-    await prisma.sessionAnalysis.deleteMany({ where: { sessionId: id } });
-    await prisma.questionSession.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.appNotification.deleteMany({
+        where: { sessionId: id, type: "SESSION_REMINDER" },
+      });
+      await tx.sessionAnalysis.deleteMany({ where: { sessionId: id } });
+      await tx.questionSession.delete({ where: { id } });
+    });
     return new NextResponse(null, { status: 204 });
   } catch {
     return NextResponse.json({ error: "서버 오류" }, { status: 500 });

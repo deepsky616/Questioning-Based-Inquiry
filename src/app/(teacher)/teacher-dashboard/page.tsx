@@ -13,9 +13,14 @@ import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { useTranslations } from "next-intl";
-import { useTeacherStudents } from "@/lib/app-queries";
+import { useTeacherDashboardSchedule, useTeacherStudents } from "@/lib/app-queries";
 import { buildTeacherPriorityCounts } from "@/lib/dashboard-priority-tasks";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
+import {
+  buildDashboardQuestionClassSchedule,
+  localDateKey,
+} from "@/lib/dashboard-question-class-schedule";
+import { teacherAlertQueryOptions } from "@/lib/teacher-alert-counts";
 
 interface TeacherClass {
   grade: string;
@@ -53,6 +58,15 @@ interface TeacherStudent {
   commentCount: number;
   lastActivityAt: string | null;
   sessionProgress?: { total: number; completed: number; remaining: number; percent: number };
+}
+
+interface TeacherDashboardSession {
+  id: string;
+  date: string;
+  createdAt?: string | null;
+  subject: string;
+  topic: string;
+  isActive: boolean;
 }
 
 // 학급 Select에서 사용할 복합 키 (grade|className)
@@ -98,31 +112,21 @@ function TeacherDashboard() {
     refetchOnWindowFocus: true,
   });
   const { data: stats, isLoading } = statsQuery;
-  const pendingPointQuery = useQuery<number>({
-    queryKey: ["teacher-pending-point-count"],
-    queryFn: async () => {
-      const r = await fetch("/api/teacher/points/pending-count");
-      if (!r.ok) throw new Error("추천 포인트 수를 불러오지 못했습니다");
-      const data = await r.json();
-      return Number(data.count ?? 0);
-    },
-    refetchInterval: visibleDataRefetchInterval,
-    refetchOnWindowFocus: true,
-  });
-  const flaggedQuery = useQuery<number>({
-    queryKey: ["teacher-flagged-count"],
-    queryFn: async () => {
-      const r = await fetch("/api/teacher/flagged-count");
-      if (!r.ok) throw new Error("부적절 의심 활동 수를 불러오지 못했습니다");
-      const data = await r.json();
-      return Number(data.total ?? 0);
-    },
-    refetchInterval: visibleDataRefetchInterval,
-    refetchOnWindowFocus: true,
-  });
+  const pendingPointQuery = useQuery(teacherAlertQueryOptions.pendingPoints());
+  const flaggedQuery = useQuery(teacherAlertQueryOptions.flagged());
   const teacherStudentsQuery = useTeacherStudents<TeacherStudent, TeacherClass>();
+  const teacherSessionsQuery = useTeacherDashboardSchedule<TeacherDashboardSession>();
   const { data: teacherStudentData } = teacherStudentsQuery;
   const teacherStudents = useMemo(() => teacherStudentData?.students ?? [], [teacherStudentData]);
+  const today = localDateKey();
+  const teacherSchedule = useMemo(
+    () =>
+      buildDashboardQuestionClassSchedule({
+        sessions: teacherSessionsQuery.data ?? [],
+        today,
+      }),
+    [teacherSessionsQuery.data, today],
+  );
 
   // 학급 변경 시 선택값이 새 목록에 없으면 "전체"로 초기화
   useEffect(() => {
@@ -172,6 +176,34 @@ function TeacherDashboard() {
     const [grade, className] = selectedClass.split("|");
     return `${stats.school ? `${stats.school} ` : ""}${t("gradeClass", { grade, className })}`;
   })();
+  const scheduleStatus: "loading" | "ready" | "error" = teacherSessionsQuery.isError
+    ? "error"
+    : teacherSessionsQuery.isSuccess
+      ? "ready"
+      : "loading";
+  const teacherScheduleItem = (() => {
+    const session = teacherSchedule.primarySession;
+    if (!session || !teacherSchedule.date || teacherSchedule.kind === "empty") return null;
+    const [year, month, day] = teacherSchedule.date.split("-");
+    const sessionTitle = [session.subject.trim(), session.topic.trim()].filter(Boolean).join(" · ");
+    const dateLabel = t("scheduleDate", {
+      year: Number(year),
+      month: Number(month),
+      day: Number(day),
+    });
+
+    return {
+      id: session.id,
+      label: teacherSchedule.kind === "today"
+        ? t("scheduleTodayTitle")
+        : t("scheduleUpcomingTitle"),
+      countLabel: t("scheduleClassCount", { count: teacherSchedule.totalCount }),
+      detail: teacherSchedule.kind === "today"
+        ? sessionTitle
+        : `${dateLabel} · ${sessionTitle}`,
+      href: `/teacher-sessions?session=${encodeURIComponent(session.id)}`,
+    };
+  })();
   const taskStatus =
     statsQuery.isError || pendingPointQuery.isError || flaggedQuery.isError || teacherStudentsQuery.isError
       ? "error"
@@ -180,8 +212,8 @@ function TeacherDashboard() {
         : "loading";
   const taskCounts = taskStatus === "ready"
     ? buildTeacherPriorityCounts({
-        flaggedCount: flaggedQuery.data ?? 0,
-        pendingPointCount: pendingPointQuery.data ?? 0,
+        flaggedCount: flaggedQuery.data?.total ?? 0,
+        pendingPointCount: pendingPointQuery.data?.count ?? 0,
         students: scopedStudents.map((student) => ({
           id: student.id,
           hasQuestion: activeStudentIds.has(student.id),
@@ -263,6 +295,18 @@ function TeacherDashboard() {
         status={taskStatus}
         onTaskClick={handleTaskClick}
         onRetry={handleTaskRetry}
+        schedule={{
+          status: scheduleStatus,
+          item: teacherScheduleItem,
+          onSelect: (item) => router.push(item.href),
+          onRetry: () => void teacherSessionsQuery.refetch(),
+          labels: {
+            empty: t("scheduleEmpty"),
+            loading: t("scheduleLoading"),
+            error: t("scheduleLoadError"),
+            retry: t("scheduleRetry"),
+          },
+        }}
         labels={{
           title: t("todayTasksTitle"),
           description: t("todayTasksDesc"),

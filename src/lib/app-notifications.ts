@@ -20,11 +20,17 @@ export interface AppNotification {
   metadata: unknown;
   readAt: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface NotificationResponse {
   notifications: AppNotification[];
   unreadCount: number;
+  unreadSessionReminders?: Array<{
+    id: string;
+    sessionId: string | null;
+    href: string | null;
+  }>;
 }
 
 export function notificationMetadataText(metadata: unknown, key: string): string {
@@ -42,13 +48,16 @@ export async function fetchAppNotifications(): Promise<NotificationResponse> {
 function markOneRead(prev: NotificationResponse | undefined, id: string): NotificationResponse | undefined {
   if (!prev) return prev;
   const now = new Date().toISOString();
-  const wasUnread = prev.notifications.some((item) => item.id === id && !item.readAt);
+  const wasUnread =
+    prev.notifications.some((item) => item.id === id && !item.readAt) ||
+    prev.unreadSessionReminders?.some((item) => item.id === id) === true;
 
   return {
     unreadCount: wasUnread ? Math.max(0, prev.unreadCount - 1) : prev.unreadCount,
     notifications: prev.notifications.map((item) =>
       item.id === id ? { ...item, readAt: item.readAt ?? now } : item,
     ),
+    unreadSessionReminders: prev.unreadSessionReminders?.filter((item) => item.id !== id),
   };
 }
 
@@ -62,6 +71,7 @@ function markEveryRead(prev: NotificationResponse | undefined): NotificationResp
       ...item,
       readAt: item.readAt ?? now,
     })),
+    unreadSessionReminders: [],
   };
 }
 
@@ -127,6 +137,7 @@ export function useAppNotifications({
     ...query,
     notifications: query.data?.notifications ?? [],
     unreadCount: query.data?.unreadCount ?? 0,
+    unreadSessionReminders: query.data?.unreadSessionReminders ?? [],
     markRead,
     markAllRead,
   };

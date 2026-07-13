@@ -3,7 +3,6 @@ export type PriorityCountKey =
   | "points"
   | "attention"
   | "teacherRequest"
-  | "todayUnasked"
   | "pastUnasked";
 
 export interface PriorityCount {
@@ -28,6 +27,25 @@ export interface StudentPriorityInput {
   }>;
   todayUnaskedSessionIds: string[];
   pastUnaskedSessionIds: string[];
+}
+
+export function selectActionableSessionReminders<
+  TReminder extends { id: string; sessionId?: string | null },
+>({
+  reminders,
+  availableSessionIds,
+  completedSessionIds,
+}: {
+  reminders: TReminder[];
+  availableSessionIds: ReadonlySet<string>;
+  completedSessionIds: ReadonlySet<string>;
+}): TReminder[] {
+  return reminders.filter(
+    (reminder) =>
+      Boolean(reminder.sessionId) &&
+      availableSessionIds.has(reminder.sessionId as string) &&
+      !completedSessionIds.has(reminder.sessionId as string),
+  );
 }
 
 export function buildTeacherPriorityCounts(input: TeacherPriorityInput): PriorityCount[] {
@@ -60,7 +78,6 @@ export function buildStudentPriorityCounts(input: StudentPriorityInput): Priorit
 
   return [
     { key: "teacherRequest", count: teacherRequestSessionIds.size },
-    { key: "todayUnasked", count: todayUnaskedSessionIds.size },
     { key: "pastUnasked", count: pastUnaskedSessionIds.size },
   ].filter((item): item is PriorityCount => item.count > 0);
 }

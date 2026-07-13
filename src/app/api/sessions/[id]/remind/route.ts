@@ -33,6 +33,12 @@ export async function POST(
   if (questionSession.teacherId !== teacherId) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
+  if (!questionSession.isActive) {
+    return NextResponse.json(
+      { error: "비활성 질문수업에는 요청을 보낼 수 없습니다" },
+      { status: 409 },
+    );
+  }
 
   try {
     const teacher = await prisma.user.findUnique({
