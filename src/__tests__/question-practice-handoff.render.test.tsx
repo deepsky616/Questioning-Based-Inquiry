@@ -367,6 +367,61 @@ describe("연습 질문 전달", () => {
     expect(await screen.findByText("유지된 바꾸기 문항")).toBeInTheDocument();
   });
 
+  it("바꾸기의 다른 문제를 고르면 늦은 생성 응답을 버린다", async () => {
+    const delayed = deferredGenerateResponse({
+      source: "버려져야 할 바꾸기 문항",
+      target: "controversial",
+      hint: "이전 생성 힌트",
+      example: "이전 생성 예시",
+    });
+    vi.stubGlobal("fetch", vi.fn(() => delayed.promise));
+    renderPractice("student", "student-1", {
+      tab: "transform",
+      quizMode: "cognitive",
+      focus: null,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /AI 새 문제/ }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 문제" }));
+    const input = screen.getByPlaceholderText("바꾼 질문을 써 보세요");
+    fireEvent.change(input, { target: { value: "다른 문제를 고른 뒤 작성한 질문입니다" } });
+
+    await act(async () => {
+      delayed.resolve();
+      await delayed.promise;
+    });
+
+    expect(input).toHaveValue("다른 문제를 고른 뒤 작성한 질문입니다");
+    expect(screen.queryByText("버려져야 할 바꾸기 문항")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /AI 새 문제/ })).toBeEnabled();
+  });
+
+  it("만들기의 다른 주제를 고르면 늦은 생성 응답을 버린다", async () => {
+    const delayed = deferredGenerateResponse({
+      title: "버려져야 할 만들기 주제",
+      passage: "이전 생성 요청의 제시문입니다.",
+    });
+    vi.stubGlobal("fetch", vi.fn(() => delayed.promise));
+    renderPractice("student", "student-1", {
+      tab: "create",
+      quizMode: "cognitive",
+      focus: null,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /AI 새 주제/ }));
+    fireEvent.click(screen.getByRole("button", { name: "다른 주제" }));
+    const input = screen.getByPlaceholderText("개념적 질문을 만들어 써 보세요");
+    fireEvent.change(input, { target: { value: "다른 주제를 고른 뒤 작성한 질문입니다" } });
+
+    await act(async () => {
+      delayed.resolve();
+      await delayed.promise;
+    });
+
+    expect(input).toHaveValue("다른 주제를 고른 뒤 작성한 질문입니다");
+    expect(screen.queryByText(/버려져야 할 만들기 주제/)).not.toBeInTheDocument();
+    expect(screen.queryByText("이전 생성 요청의 제시문입니다.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /AI 새 주제/ })).toBeEnabled();
+  });
+
   it("직접 탭을 왕복하면 분류 답을 지우고 늦은 이전 지급 응답을 버린다", async () => {
     const first = deferredQuizResponse(99);
     const second = deferredQuizResponse(1);

@@ -195,6 +195,15 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
     invalidateCheck();
   }, [invalidateCheck]);
 
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const generationRequestRef = useRef(0);
+  const invalidateGeneration = useCallback(() => {
+    generationRequestRef.current += 1;
+    setIsGenerating(false);
+    setGenError(null);
+  }, []);
+
   // ── 모드 2: 질문 바꾸기 ──
   const [transformDeck, setTransformDeck] = useState(() => drawFromDeck(PRACTICE_TRANSFORM_BANK, []));
   // AI가 실시간 출제한 문제(있으면 은행 문항 대신 사용, 실패 시 은행이 폴백)
@@ -202,6 +211,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   const transformItem = aiTransform ?? transformDeck.item;
   const [showHint, setShowHint] = useState(false);
   const nextTransform = () => {
+    invalidateGeneration();
     setAiTransform(null);
     setTransformDeck((d) => drawFromDeck(transformBank, d.remaining, d.item.id));
     setShowHint(false);
@@ -214,20 +224,13 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   const createTopic = aiTopic ?? createDeck.item;
   const [createTarget, setCreateTarget] = useState<TransformTarget>("conceptual");
   const nextCreateTopic = () => {
+    invalidateGeneration();
     setAiTopic(null);
     setCreateDeck((d) => drawFromDeck(createBank, d.remaining, d.item.id));
     resetCheck();
   };
 
   // ── AI 실시간 출제 ──
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
-  const generationRequestRef = useRef(0);
-  const invalidateGeneration = useCallback(() => {
-    generationRequestRef.current += 1;
-    setIsGenerating(false);
-  }, []);
-
   const initialSelectionKeyRef = useRef(
     `${initialSelection?.tab ?? "quiz"}:${initialSelection?.quizMode ?? "closure"}:${initialSelection?.focus ?? ""}`,
   );
