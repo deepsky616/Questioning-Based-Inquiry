@@ -121,13 +121,13 @@ function TeacherRankingsView({
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-4">
           {selectedClass !== "all" ? (
-            <StudentRankPanel gradeParam={selGrade} classNameParam={selClassName} />
+            <StudentRankPanel gradeParam={selGrade} classNameParam={selClassName} scrollable={false} />
           ) : teacherClasses.length > 0 ? (
             teacherClasses.map((tc) => (
-              <StudentRankPanel key={classKey(tc)} gradeParam={tc.grade} classNameParam={tc.className} />
+              <StudentRankPanel key={classKey(tc)} gradeParam={tc.grade} classNameParam={tc.className} scrollable={false} />
             ))
           ) : (
-            <StudentRankPanel />
+            <StudentRankPanel scrollable={false} />
           )}
         </div>
         <ClassRankingPanel
@@ -136,6 +136,7 @@ function TeacherRankingsView({
           highlightSelf={selectedClass !== "all"}
           highlightClasses={selectedClass === "all" ? teacherClasses : undefined}
           defaultScope="school"
+          scrollable={false}
         />
       </div>
     </div>

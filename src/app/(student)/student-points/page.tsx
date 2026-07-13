@@ -18,8 +18,8 @@ export default function StudentPointsPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <StudentRankPanel highlightSelf />
-        <ClassRankingPanel highlightSelf defaultScope="school" />
+        <StudentRankPanel highlightSelf scrollable={false} />
+        <ClassRankingPanel highlightSelf defaultScope="school" scrollable={false} />
       </div>
     </div>
   );

@@ -234,10 +234,12 @@ export function StudentRankPanel({
   gradeParam,
   classNameParam,
   highlightSelf = false,
+  scrollable = true,
 }: {
   gradeParam?: string;
   classNameParam?: string;
   highlightSelf?: boolean;
+  scrollable?: boolean;
 }) {
   const t = useTranslations("ranking");
   const selfRef = useRef<HTMLTableRowElement>(null);
@@ -259,13 +261,13 @@ export function StudentRankPanel({
   });
 
   useEffect(() => {
-    if (highlightSelf && selfRef.current && containerRef.current) {
+    if (scrollable && highlightSelf && selfRef.current && containerRef.current) {
       const c = containerRef.current;
       const cRect = c.getBoundingClientRect();
       const rRect = selfRef.current.getBoundingClientRect();
       c.scrollTop += rRect.top - cRect.top - cRect.height / 2 + rRect.height / 2;
     }
-  }, [data, highlightSelf]);
+  }, [data, highlightSelf, scrollable]);
 
   const klassLabel = data?.klass ? t("klassLabelFull", { grade: data.klass.grade, className: data.klass.className }) : "";
 
@@ -281,9 +283,9 @@ export function StudentRankPanel({
       ) : !data || data.students.length === 0 ? (
         <EmptyState icon="🏆" title={t("noRanking")} />
       ) : (
-        <div ref={containerRef} className="max-h-80 overflow-y-auto">
+        <div ref={containerRef} className={scrollable ? "max-h-80 overflow-y-auto" : "overflow-x-auto"}>
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-card">
+            <thead className={scrollable ? "sticky top-0 bg-card" : "bg-card"}>
               <tr className="text-xs text-muted-foreground border-b">
                 <th className="w-12 py-1.5 text-center font-medium">{t("colNumber")}</th>
                 <th className="py-1.5 text-left font-medium">{t("colName")}</th>
@@ -326,6 +328,7 @@ export function ClassRankingPanel({
   highlightSelf = false,
   highlightClasses,
   defaultScope = "school",
+  scrollable = true,
 }: {
   gradeParam?: string;
   classNameParam?: string;
@@ -333,6 +336,7 @@ export function ClassRankingPanel({
   /** 추가로 강조할 학급들(예: 교사의 담당 학급 전체). grade·className으로 매칭. */
   highlightClasses?: { grade: string; className: string }[];
   defaultScope?: ClassScope;
+  scrollable?: boolean;
 }) {
   const t = useTranslations("ranking");
   const [scope, setScope] = useState<ClassScope>(defaultScope);
@@ -357,13 +361,13 @@ export function ClassRankingPanel({
   useEffect(() => {
     // 페이지 전체가 아니라 순위 목록 컨테이너 안에서만 본인 행이 보이도록 스크롤한다
     // (scrollIntoView는 페이지가 통째로 이 패널로 점프하는 문제가 있어 사용하지 않는다)
-    if (highlightSelf && selfRef.current && containerRef.current) {
+    if (scrollable && highlightSelf && selfRef.current && containerRef.current) {
       const c = containerRef.current;
       const cRect = c.getBoundingClientRect();
       const rRect = selfRef.current.getBoundingClientRect();
       c.scrollTop += rRect.top - cRect.top - cRect.height / 2 + rRect.height / 2;
     }
-  }, [data, highlightSelf]);
+  }, [data, highlightSelf, scrollable]);
 
   const isSameClass = (c: RankedClass) =>
     (data?.myClass != null &&
@@ -400,9 +404,9 @@ export function ClassRankingPanel({
       ) : !data || data.classes.length === 0 ? (
         <EmptyState icon="🏆" title={t("noRanking")} />
       ) : (
-        <div ref={containerRef} className="max-h-80 overflow-y-auto">
+        <div ref={containerRef} className={scrollable ? "max-h-80 overflow-y-auto" : "overflow-x-auto"}>
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-card">
+            <thead className={scrollable ? "sticky top-0 bg-card" : "bg-card"}>
               <tr className="text-xs text-muted-foreground border-b">
                 <th className="w-12 py-1.5 text-center font-medium">{t("colRank")}</th>
                 <th className="py-1.5 text-left font-medium">{t("colClassName")}</th>
