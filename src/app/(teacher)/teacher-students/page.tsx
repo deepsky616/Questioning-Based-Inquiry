@@ -20,6 +20,10 @@ import { appQueryKeys, useTeacherStudents } from "@/lib/app-queries";
 import { StudentDetailDialog, StudentSessionProgress } from "./StudentDetailDialog";
 import type { Student, TeacherClass } from "./types";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
+import {
+  buildQuestionActivityScopeHref,
+  readQuestionActivityScope,
+} from "@/lib/teacher-student-question-activity-scope";
 
 /** ISO 날짜 → "오늘 / N일 전 / -" */
 function lastActiveLabel(iso?: string | null): { key: "today" | "yesterday" | "daysAgo" | "monthsAgo" | "yearsAgo"; v: Record<string, number> } | null {
@@ -56,17 +60,19 @@ export default function StudentsPage() {
   const queryClient = useQueryClient();
   const [mgmtTab, setMgmtTab] = useState<"list" | "bulk" | "reset">("list");
   const [search, setSearch] = useState("");
-  const [filterClass, setFilterClass] = useState<string>("all");
+  const [localFilterClass, setLocalFilterClass] = useState<string>("all");
   const [progressFilter, setProgressFilter] = useState<ProgressFilter>("all");
   const [studentSort, setStudentSort] = useState<StudentSort>("class");
   const [selected, setSelected] = useState<Student | null>(null);
-  const dashboardFilter = searchParams.get("filter");
+  const questionActivityScope = readQuestionActivityScope(searchParams);
+  const dashboardFilter = questionActivityScope.filter;
   const noQuestionsFilterOn = dashboardFilter === "noQuestions";
   const attentionFilterOn = dashboardFilter === "attention";
-  const questionActivityFilterOn = noQuestionsFilterOn || attentionFilterOn;
-  const questionActivityPeriod = searchParams.get("period") ?? "month";
-  const questionActivityGrade = searchParams.get("grade");
-  const questionActivityClassName = searchParams.get("className");
+  const questionActivityFilterOn = questionActivityScope.enabled;
+  const questionActivityPeriod = questionActivityScope.period;
+  const filterClass = questionActivityFilterOn
+    ? questionActivityScope.filterClass
+    : localFilterClass;
   const progressParam = searchParams.get("progress");
   const sortParam = searchParams.get("sort");
 
@@ -75,14 +81,9 @@ export default function StudentsPage() {
   const teacherClasses = data?.teacherClasses ?? EMPTY_TEACHER_CLASSES;
   const refetchList = () => queryClient.invalidateQueries({ queryKey: appQueryKeys.teacherStudents });
   const questionActivityStatsQuery = useQuery<TeacherStatsSummary>({
-    queryKey: ["teacher-students-question-activity-filter", questionActivityPeriod, questionActivityGrade, questionActivityClassName],
+    queryKey: questionActivityScope.queryKey,
     queryFn: async () => {
-      const params = new URLSearchParams({ period: questionActivityPeriod });
-      if (questionActivityGrade && questionActivityClassName) {
-        params.set("grade", questionActivityGrade);
-        params.set("className", questionActivityClassName);
-      }
-      const r = await fetch(`/api/stats?${params.toString()}`);
+      const r = await fetch(questionActivityScope.statsPath);
       if (!r.ok) throw new Error("학생 질문 활동을 불러오지 못했습니다");
       return r.json();
     },
@@ -99,22 +100,29 @@ export default function StudentsPage() {
     if (!questionActivityFilterOn) return;
     setMgmtTab("list");
     setSearch("");
-    if (questionActivityGrade && questionActivityClassName) {
-      setFilterClass(`${questionActivityGrade}-${questionActivityClassName}`);
-    } else {
-      setFilterClass("all");
-    }
-  }, [questionActivityFilterOn, questionActivityGrade, questionActivityClassName]);
+  }, [questionActivityFilterOn]);
 
   useEffect(() => {
     if (progressParam !== "remaining" && sortParam !== "progressAsc") return;
     setMgmtTab("list");
     if (progressParam === "remaining") setProgressFilter("remaining");
     if (sortParam === "progressAsc") setStudentSort("progressAsc");
-    if (questionActivityGrade && questionActivityClassName) {
-      setFilterClass(`${questionActivityGrade}-${questionActivityClassName}`);
+    if (
+      !questionActivityFilterOn &&
+      questionActivityScope.grade &&
+      questionActivityScope.className
+    ) {
+      setLocalFilterClass(
+        `${questionActivityScope.grade}-${questionActivityScope.className}`,
+      );
     }
-  }, [progressParam, sortParam, questionActivityGrade, questionActivityClassName]);
+  }, [
+    progressParam,
+    sortParam,
+    questionActivityFilterOn,
+    questionActivityScope.grade,
+    questionActivityScope.className,
+  ]);
 
   const normalizedSearch = search.trim().replace(/학년|반/g, "").trim();
 
@@ -187,6 +195,17 @@ export default function StudentsPage() {
     if (selectedStudentId) router.replace("/teacher-students");
   };
 
+  const handleClassFilterChange = (nextClass: TeacherClass | null) => {
+    if (questionActivityFilterOn) {
+      router.replace(buildQuestionActivityScopeHref(searchParams, nextClass));
+      return;
+    }
+
+    setLocalFilterClass(
+      nextClass ? `${nextClass.grade}-${nextClass.className}` : "all",
+    );
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader title={tPages("teacherStudents.title")} description={tPages("teacherStudents.description")} />
@@ -248,7 +267,7 @@ export default function StudentsPage() {
       {teacherClasses.length > 0 && (
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => setFilterClass("all")}
+            onClick={() => handleClassFilterChange(null)}
             className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
               filterClass === "all"
                 ? "bg-indigo-600 text-white border-indigo-600"
@@ -260,7 +279,7 @@ export default function StudentsPage() {
             const key = `${tc.grade}-${tc.className}`;
             return (
               <button key={key}
-                onClick={() => setFilterClass(filterClass === key ? "all" : key)}
+                onClick={() => handleClassFilterChange(filterClass === key ? null : tc)}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                   filterClass === key
                     ? "bg-indigo-600 text-white border-indigo-600"
