@@ -4,7 +4,7 @@
     "students": "Students",
     "questionPlay": "Question Games",
     "sessions": "Class Sessions",
-    "questions": "Browse Questions",
+    "questions": "Explore Questions",
     "curriculum": "Inquiry Questions",
     "reports": "Activity Report",
     "settings": "Edit profile",
@@ -22,6 +22,7 @@
     "personalInfo": "Edit profile",
     "withdraw": "Delete account",
     "studentManagement": "Student management",
+    "rankings": "Rankings",
     "gradeValue": "Grade {grade}",
     "classValue": "Class {className}",
     "numberValue": "No. {n}"
@@ -159,8 +160,12 @@
       "description": "Create and manage class sessions. Students choose a session when they ask questions."
     },
     "teacherQuestions": {
-      "title": "Browse Questions",
+      "title": "Explore Questions",
       "description": "Select a class session to review student questions systematically"
+    },
+    "teacherPoints": {
+      "title": "Rankings and Points",
+      "description": "Review student rankings, class rankings, and AI recommended points"
     },
     "teacherCurriculum": {
       "title": "Inquiry Question Helper",
@@ -1581,6 +1586,12 @@
     "memberCount": "{count}",
     "classNameAll": "{school} Grade {grade} Class {className}",
     "classNameShort": "Grade {grade} Class {className}"
+  },
+  "teacherPoints": {
+    "tabRanking": "Rankings",
+    "tabPoints": "Points",
+    "rankingTitle": "Student and class rankings",
+    "rankingDesc": "Review student point rankings and class average rankings for your assigned classes"
   },
   "targetSelector": {
     "selectClass": "Select class",

@@ -4,7 +4,7 @@
     "students": "학생관리",
     "questionPlay": "질문놀이",
     "sessions": "수업세션",
-    "questions": "질문조회",
+    "questions": "질문탐구",
     "curriculum": "탐구질문",
     "reports": "활동 리포트",
     "settings": "개인 정보 수정",
@@ -22,6 +22,7 @@
     "personalInfo": "개인 정보 수정",
     "withdraw": "탈퇴",
     "studentManagement": "학생관리",
+    "rankings": "순위",
     "gradeValue": "{grade}학년",
     "classValue": "{className}반",
     "numberValue": "{n}번"
@@ -159,8 +160,12 @@
       "description": "수업 세션을 만들고 관리하세요. 학생들이 질문할 때 세션을 선택할 수 있습니다."
     },
     "teacherQuestions": {
-      "title": "질문 조회",
+      "title": "질문탐구",
       "description": "수업 세션을 선택해 학생 질문을 체계적으로 확인하세요"
+    },
+    "teacherPoints": {
+      "title": "순위와 포인트",
+      "description": "학생 순위와 반 순위를 확인하고 AI 추천 포인트를 검토하세요"
     },
     "teacherCurriculum": {
       "title": "탐구 질문 도우미",
@@ -1581,6 +1586,12 @@
     "memberCount": "{count}명",
     "classNameAll": "{school} {grade}학년 {className}반",
     "classNameShort": "{grade}학년 {className}반"
+  },
+  "teacherPoints": {
+    "tabRanking": "순위",
+    "tabPoints": "포인트",
+    "rankingTitle": "학생 순위와 반 순위",
+    "rankingDesc": "담당 학급 기준으로 학생별 포인트 순위와 반별 평균 순위를 확인하세요"
   },
   "targetSelector": {
     "selectClass": "학급 선택",

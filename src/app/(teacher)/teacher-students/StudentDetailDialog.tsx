@@ -329,7 +329,7 @@ export function StudentDetailDialog({
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="font-semibold">{t("pendingAiTitle", { count: pendingAiPoints.length })}</p>
               <Link
-                href={`/teacher-questions?tab=review&studentId=${student.id}`}
+                href={`/teacher-points?tab=points&studentId=${student.id}`}
                 className="inline-flex h-8 items-center justify-center rounded-md bg-amber-600 px-3 text-xs font-semibold text-white hover:bg-amber-700"
               >
                 {t("pendingAiAction")}

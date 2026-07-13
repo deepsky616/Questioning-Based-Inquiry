@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useContentTranslation } from "@/components/shared/use-content-translation";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { QuestionSequencePanel } from "./QuestionSequencePanel";
@@ -16,7 +17,6 @@ import { TeacherQuestionSessionSelector } from "./TeacherQuestionSessionSelector
 import { TeacherQuestionStatsCard } from "./TeacherQuestionStatsCard";
 import { TeacherQuestionTopTabs, type TeacherQuestionTopTab } from "./TeacherQuestionTopTabs";
 import type { QuestionSession, Question, BulkPreview } from "./types";
-import { PointReviewView } from "@/components/teacher/PointReviewView";
 import type { SortField, SortDir } from "@/components/shared/QuestionClassificationStats";
 import { matchesCognitiveCategory } from "@/lib/question-labels";
 import { QUESTION_LIST_MAX } from "@/lib/questions";
@@ -36,6 +36,7 @@ export default function QuestionsPage() {
   const tSess = useTranslations("sessions");
   const tTarget = useTranslations("targetSelector");
   const ct = useContentTranslation();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [questions, setQuestions] = useState<Question[]>([]);
   const { toast } = useToast();
@@ -71,13 +72,16 @@ export default function QuestionsPage() {
 
   // 알림에서 들어온 쿼리 처리(마운트 시 1회 읽어 Suspense 회피)
   //  - ?flagged=1: 부적절 의심 필터 켜기
-  //  - ?tab=review: AI 추천 포인트 탭으로 이동
+  //  - ?tab=review: 이전 AI 추천 포인트 주소를 새 순위/포인트 화면으로 이동
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("flagged") === "1") setShowFlaggedOnly(true);
-    if (params.get("tab") === "review") setTopTab("review");
-  }, []);
+    if (params.get("tab") === "review") {
+      params.set("tab", "points");
+      router.replace(`/teacher-points?${params.toString()}`, { scroll: false });
+    }
+  }, [router]);
 
   const resetBulkState = () => {
     setSelectedIds(new Set());
@@ -445,13 +449,9 @@ export default function QuestionsPage() {
         labels={{
           questions: t("tabQuestions"),
           design: t("tabDesign"),
-          review: t("tabReview"),
         }}
       />
 
-      {topTab === "review" ? (
-        <PointReviewView />
-      ) : (
       <>
       <TeacherQuestionSessionSelector
         sessions={sessions}
@@ -653,7 +653,6 @@ export default function QuestionsPage() {
         }}
       />
       </>
-      )}
     </div>
   );
 }

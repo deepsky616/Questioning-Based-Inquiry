@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
-import { ChevronDown, LogOut, Pencil, Trash2, UserCircle, Users, Menu, X } from "lucide-react";
+import { ChevronDown, LogOut, Pencil, Trash2, Trophy, UserCircle, Users, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -21,6 +21,7 @@ export interface AccountNavLinks {
   settingsHref: string;
   withdrawalHref?: string;
   studentManagementHref?: string;
+  rankingsHref?: string;
 }
 
 export interface AccountProfile {
@@ -258,6 +259,16 @@ export function AppNav({
                       {t("studentManagement")}
                     </Link>
                   )}
+                  {accountLinks?.rankingsHref && (
+                    <Link
+                      href={accountLinks.rankingsHref}
+                      onClick={() => setAccountOpen(false)}
+                      className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+                    >
+                      <Trophy className="h-4 w-4 text-muted-foreground" />
+                      {t("rankings")}
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => signOut({ callbackUrl: "/login" })}
@@ -339,6 +350,16 @@ export function AppNav({
                   >
                     <Users className="h-4 w-4" />
                     {t("studentManagement")}
+                  </Link>
+                )}
+                {accountLinks.rankingsHref && (
+                  <Link
+                    href={accountLinks.rankingsHref}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
+                  >
+                    <Trophy className="h-4 w-4" />
+                    {t("rankings")}
                   </Link>
                 )}
               </div>

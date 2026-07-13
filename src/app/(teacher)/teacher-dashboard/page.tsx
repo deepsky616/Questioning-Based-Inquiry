@@ -13,7 +13,6 @@ import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
-import { StudentRankPanel, ClassRankingPanel } from "@/components/shared/RankingPanels";
 import { useTranslations } from "next-intl";
 import { useTeacherStudents } from "@/lib/app-queries";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
@@ -198,7 +197,7 @@ function TeacherDashboard() {
       description: t("taskPointsDesc"),
       count: pendingPointCount,
       action: t("taskReview"),
-      href: "/teacher-questions?tab=review",
+      href: "/teacher-points?tab=points",
       activeClass: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-200",
     },
     {
@@ -417,37 +416,6 @@ function TeacherDashboard() {
             onTrendSortToggle={() => setTrendSortOn((v) => !v)}
           />
 
-          {/* 순위 (개인: 우리반/교내/전체 · 반: 교내/전체)
-              · 특정 학급: 해당 학급 학생 순위
-              · 전체 담당 학급: 담당 학급별 학생 순위를 쌓아 모두 표시 + 반 순위에 담당 반 강조 */}
-          {(() => {
-            const [selGrade, selClassName] =
-              selectedClass !== "all" ? selectedClass.split("|") : [undefined, undefined];
-            return (
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="space-y-4">
-                  {selectedClass !== "all" ? (
-                    <StudentRankPanel gradeParam={selGrade} classNameParam={selClassName} />
-                  ) : (
-                    teacherClasses.map((tc) => (
-                      <StudentRankPanel
-                        key={classKey(tc)}
-                        gradeParam={tc.grade}
-                        classNameParam={tc.className}
-                      />
-                    ))
-                  )}
-                </div>
-                <ClassRankingPanel
-                  gradeParam={selGrade}
-                  classNameParam={selClassName}
-                  highlightSelf={selectedClass !== "all"}
-                  highlightClasses={selectedClass === "all" ? teacherClasses : undefined}
-                  defaultScope="school"
-                />
-              </div>
-            );
-          })()}
         </>
       )}
       </>

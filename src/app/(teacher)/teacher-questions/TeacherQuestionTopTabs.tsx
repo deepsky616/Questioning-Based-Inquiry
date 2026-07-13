@@ -1,6 +1,6 @@
 "use client";
 
-export type TeacherQuestionTopTab = "questions" | "design" | "review";
+export type TeacherQuestionTopTab = "questions" | "design";
 
 interface TeacherQuestionTopTabsProps {
   value: TeacherQuestionTopTab;
@@ -8,7 +8,6 @@ interface TeacherQuestionTopTabsProps {
   labels: {
     questions: string;
     design: string;
-    review: string;
   };
 }
 
@@ -25,9 +24,6 @@ export function TeacherQuestionTopTabs({ value, onChange, labels }: TeacherQuest
       </button>
       <button type="button" onClick={() => onChange("design")} className={tabClass("design", true)}>
         {labels.design}
-      </button>
-      <button type="button" onClick={() => onChange("review")} className={tabClass("review", true)}>
-        {labels.review}
       </button>
     </div>
   );

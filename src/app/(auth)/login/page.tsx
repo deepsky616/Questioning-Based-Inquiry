@@ -265,7 +265,7 @@ function TeacherLoginForm() {
       <div className="space-y-2">
         <Label htmlFor="t-email">{t("email")}</Label>
         <Input
-          id="t-email" name="email" type="email" placeholder="teacher@school.kr"
+          id="t-email" name="email" type="email" placeholder="teacher@gmail.com"
           value={form.email} onChange={handleChange}
           autoComplete={TEACHER_LOGIN_AUTOCOMPLETE.email}
         />

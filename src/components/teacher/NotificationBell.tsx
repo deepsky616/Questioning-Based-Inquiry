@@ -27,7 +27,7 @@ async function fetchPendingCount(): Promise<number> {
 /**
  * 교사 알림 센터 — 두 가지 검토 항목을 한 벨로 모은다.
  *  - 🚩 부적절 의심 질문·댓글 (안전) → 질문조회의 부적절 의심 필터
- *  - 📝 AI 추천 포인트 검토 대기 (보상) → 질문조회의 AI 추천 포인트 탭
+ *  - 📝 AI 추천 포인트 검토 대기 (보상) → 순위의 포인트 탭
  * 성격이 달라 합산 숫자가 아니라 항목별로 구분해 보여준다. (부적절 증가 시 토스트 알림)
  */
 export function NotificationBell() {
@@ -77,7 +77,7 @@ export function NotificationBell() {
     ...(pendingCount > 0
       ? [{
           id: "pending",
-          href: "/teacher-questions?tab=review",
+          href: "/teacher-points?tab=points",
           label: t.rich("pendingItem", { b: (c) => <b className="font-semibold text-amber-600">{c}</b> }),
           icon: <ClipboardCheck className="h-4 w-4 text-amber-500" />,
           count: pendingCount,
