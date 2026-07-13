@@ -6,6 +6,7 @@ import {
   drawFromDeck,
   isTargetAchieved,
 } from "@/lib/question-practice-data";
+import { focusedPracticeQuizBank } from "@/lib/practice-selection";
 
 describe("질문 연습 문항 은행 — 데이터 유효성", () => {
   it("모든 은행의 id는 중복이 없다", () => {
@@ -72,6 +73,21 @@ describe("drawFromDeck — 셔플백 출제 (한 바퀴 안에 중복 없음)", 
   it("은행 크기가 1이면 같은 항목이라도 반환한다", () => {
     const single = [{ id: "only" }];
     expect(drawFromDeck(single, [], "only").item.id).toBe("only");
+  });
+});
+
+describe("추천 유형 문항 제한", () => {
+  it("추천 유형이 있으면 그 유형의 문항만 출제 대상으로 삼는다", () => {
+    const focused = focusedPracticeQuizBank(PRACTICE_QUIZ_BANK, "cognitive", "conceptual");
+
+    expect(focused.length).toBeGreaterThan(0);
+    expect(focused.every((item) => item.cognitive === "conceptual")).toBe(true);
+  });
+
+  it("추천 유형에 맞는 문항이 하나도 없으면 원래 문항 묶음으로 돌아간다", () => {
+    const bank = PRACTICE_QUIZ_BANK.filter((item) => item.cognitive === "factual");
+
+    expect(focusedPracticeQuizBank(bank, "cognitive", "controversial")).toBe(bank);
   });
 });
 

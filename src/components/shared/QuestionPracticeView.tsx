@@ -7,7 +7,7 @@
 // 근거: 교육부 「질문기반 탐구수업」·「학생 질문 중심의 교과 수업 모델」
 //  - 분류는 정답 맞히기가 아니라 근거를 생각하는 활동 → 모든 문항에 해설 제공
 //  - 닫힌→열린, 사실적→개념적→논쟁적 전환·생성 연습 → AI 분류로 즉시 피드백
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -27,6 +27,10 @@ import {
   type PracticeTransformItem,
   type PracticeCreateTopic,
 } from "@/lib/question-practice-data";
+import {
+  focusedPracticeQuizBank,
+  type PracticeSelection,
+} from "@/lib/practice-selection";
 
 // /api/practice/bank 응답 — 담당 교사가 만든 커스텀 문항(내장 은행에 병합)
 interface CustomBank {
@@ -67,13 +71,14 @@ const TARGET_CHOICES: TransformTarget[] = ["open", "conceptual", "controversial"
 interface QuestionPracticeViewProps {
   audience: "student" | "teacher";
   studentId?: string;
+  initialSelection?: PracticeSelection;
 }
 
-export function QuestionPracticeView({ audience, studentId }: QuestionPracticeViewProps) {
+export function QuestionPracticeView({ audience, studentId, initialSelection }: QuestionPracticeViewProps) {
   const t = useTranslations("practice");
   const tCls = useTranslations("classification");
   const router = useRouter();
-  const [tab, setTab] = useState<PracticeTab>("quiz");
+  const [tab, setTab] = useState<PracticeTab>(initialSelection?.tab ?? "quiz");
 
   const typeLabel = (target: TransformTarget) =>
     target === "open" ? tCls("open.label") : target === "conceptual" ? tCls("conceptual.label") : tCls("controversial.label");
@@ -118,22 +123,42 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
     ) : null;
 
   // ── 모드 1: 분류 연습 ──
-  const [quizMode, setQuizMode] = useState<QuizMode>("closure");
+  const [quizMode, setQuizMode] = useState<QuizMode>(initialSelection?.quizMode ?? "closure");
+  const [focus, setFocus] = useState(initialSelection?.focus ?? null);
+  const focusedQuizBank = useMemo(
+    () => focusedPracticeQuizBank(quizBank, quizMode, focus),
+    [focus, quizBank, quizMode],
+  );
   // 셔플백 출제 — 은행을 한 바퀴 다 돌기 전에는 같은 문항이 다시 나오지 않는다
-  const [quizDeck, setQuizDeck] = useState(() => drawFromDeck(PRACTICE_QUIZ_BANK, []));
+  const [quizDeck, setQuizDeck] = useState(() =>
+    drawFromDeck(
+      focusedPracticeQuizBank(
+        PRACTICE_QUIZ_BANK,
+        initialSelection?.quizMode ?? "closure",
+        initialSelection?.focus ?? null,
+      ),
+      [],
+    ),
+  );
   const quizItem = quizDeck.item;
   const [quizAnswer, setQuizAnswer] = useState<string | null>(null);
   const [quizStats, setQuizStats] = useState({ correct: 0, total: 0 });
 
   const quizCorrectValue = quizMode === "closure" ? quizItem.closure : quizItem.cognitive;
   const [quizAward, setQuizAward] = useState<AwardInfo | null>(null);
-  const nextQuiz = () => {
-    setQuizDeck((d) => drawFromDeck(quizBank, d.remaining, d.item.id));
-    setQuizAnswer(null);
+  const quizRequestRef = useRef(0);
+  const invalidateQuiz = useCallback(() => {
+    quizRequestRef.current += 1;
     setQuizAward(null);
+  }, []);
+  const nextQuiz = () => {
+    invalidateQuiz();
+    setQuizDeck((d) => drawFromDeck(focusedQuizBank, d.remaining, d.item.id));
+    setQuizAnswer(null);
   };
   const answerQuiz = (value: string) => {
     if (quizAnswer) return;
+    const requestId = ++quizRequestRef.current;
     setQuizAnswer(value);
     const correct = value === quizCorrectValue;
     setQuizStats((s) => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
@@ -145,7 +170,9 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
       body: JSON.stringify({ mode: "quiz", itemId: quizItem.id, quizType: quizMode, answer: value }),
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data?.correct) setQuizAward(data); })
+      .then((data) => {
+        if (quizRequestRef.current === requestId && data?.correct) setQuizAward(data);
+      })
       .catch(() => {});
   };
 
@@ -156,17 +183,17 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
   const [checkError, setCheckError] = useState<string | null>(null);
   const checkRequestRef = useRef(0);
 
-  const invalidateCheck = () => {
+  const invalidateCheck = useCallback(() => {
     checkRequestRef.current += 1;
     setIsChecking(false);
     setCheckResult(null);
     setCheckError(null);
-  };
+  }, []);
 
-  const resetCheck = () => {
+  const resetCheck = useCallback(() => {
     setInput("");
     invalidateCheck();
-  };
+  }, [invalidateCheck]);
 
   // ── 모드 2: 질문 바꾸기 ──
   const [transformDeck, setTransformDeck] = useState(() => drawFromDeck(PRACTICE_TRANSFORM_BANK, []));
@@ -192,6 +219,39 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
     resetCheck();
   };
 
+  // ── AI 실시간 출제 ──
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+
+  const initialSelectionKeyRef = useRef(
+    `${initialSelection?.tab ?? "quiz"}:${initialSelection?.quizMode ?? "closure"}:${initialSelection?.focus ?? ""}`,
+  );
+  useEffect(() => {
+    const nextTab = initialSelection?.tab ?? "quiz";
+    const nextQuizMode = initialSelection?.quizMode ?? "closure";
+    const nextFocus = nextTab === "quiz" ? initialSelection?.focus ?? null : null;
+    const nextKey = `${nextTab}:${nextQuizMode}:${nextFocus ?? ""}`;
+    if (initialSelectionKeyRef.current === nextKey) return;
+    initialSelectionKeyRef.current = nextKey;
+
+    setTab(nextTab);
+    setQuizMode(nextQuizMode);
+    setFocus(nextFocus);
+    setQuizDeck(drawFromDeck(focusedPracticeQuizBank(quizBank, nextQuizMode, nextFocus), []));
+    setQuizAnswer(null);
+    invalidateQuiz();
+    invalidateCheck();
+    setShowHint(false);
+    setGenError(null);
+  }, [
+    initialSelection?.focus,
+    initialSelection?.quizMode,
+    initialSelection?.tab,
+    invalidateCheck,
+    invalidateQuiz,
+    quizBank,
+  ]);
+
   // 커스텀 문항이 도착하면 진행 중인 셔플백에 즉시 합류시킨다
   // (다음 사이클까지 기다리면 "저장했는데 안 나온다"는 혼란이 생긴다)
   const customApplied = useRef(false);
@@ -209,9 +269,6 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
     }
   }, [customBank]);
 
-  // ── AI 실시간 출제 ──
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
   const generateAiProblem = async (mode: "transform" | "create") => {
     if (isGenerating) return;
     setIsGenerating(true);
@@ -294,6 +351,15 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
     resetCheck();
     setShowHint(false);
     setGenError(null);
+  };
+
+  const switchQuizMode = (next: QuizMode) => {
+    setQuizMode(next);
+    setFocus(null);
+    setQuizDeck(drawFromDeck(focusedPracticeQuizBank(quizBank, next, null), []));
+    setQuizAnswer(null);
+    invalidateQuiz();
+    invalidateCheck();
   };
 
   // 지급 결과 배지 (퀴즈·바꾸기·만들기 공용)
@@ -395,12 +461,12 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
         <Card>
           <CardContent className="pt-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {(["closure", "cognitive"] as const).map((m) => (
                   <button
                     key={m}
                     type="button"
-                    onClick={() => { setQuizMode(m); setQuizAnswer(null); }}
+                    onClick={() => switchQuizMode(m)}
                     className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
                       quizMode === m ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300" : "text-muted-foreground"
                     }`}
@@ -408,6 +474,11 @@ export function QuestionPracticeView({ audience, studentId }: QuestionPracticeVi
                     {t(`quizMode_${m}`)}
                   </button>
                 ))}
+                {focus && (
+                  <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                    {t("focusActive", { type: tCls(`${focus}.label`) })}
+                  </span>
+                )}
               </div>
               <span className="text-sm text-muted-foreground">
                 {t("score", { correct: quizStats.correct, total: quizStats.total })}

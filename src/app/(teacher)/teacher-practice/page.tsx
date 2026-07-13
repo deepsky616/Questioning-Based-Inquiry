@@ -2,9 +2,10 @@
 
 // 교사용 질문 연습 — 학생과 같은 연습(탭1)에 더해, 교사 전용으로
 // 문항 은행 열람·복사(탭2)와 담당 학급 학생의 연습 현황(탭3)을 제공한다.
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,7 @@ import {
   type Closure,
 } from "@/lib/question-practice-data";
 import { PRACTICE_POINTS, PRACTICE_DAILY_CAP } from "@/lib/practice-points";
+import { parsePracticeSelection } from "@/lib/practice-selection";
 
 type TeacherPracticeTab = "try" | "bank" | "stats";
 
@@ -39,8 +41,18 @@ interface PracticeStatRow {
 }
 
 export default function TeacherPracticePage() {
+  return (
+    <Suspense fallback={null}>
+      <TeacherPracticeContent />
+    </Suspense>
+  );
+}
+
+function TeacherPracticeContent() {
   const t = useTranslations("practice");
   const tCls = useTranslations("classification");
+  const searchParams = useSearchParams();
+  const initialSelection = parsePracticeSelection(searchParams);
   const [tab, setTab] = useState<TeacherPracticeTab>("try");
 
   // ── 탭 2: 문항 은행 필터 ──
@@ -126,7 +138,7 @@ export default function TeacherPracticePage() {
             })}
           </p>
           <QuestionLearningSummary detailsHref="/teacher-question-learning" />
-          <QuestionPracticeView audience="teacher" />
+          <QuestionPracticeView audience="teacher" initialSelection={initialSelection} />
         </div>
       )}
 

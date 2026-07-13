@@ -5,24 +5,44 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import { QuestionPracticeView } from "@/components/shared/QuestionPracticeView";
+import type { PracticeSelection } from "@/lib/practice-selection";
 import ko from "../../messages/ko.json";
 
-const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+const { push, customBankState } = vi.hoisted(() => ({
+  push: vi.fn(),
+  customBankState: { current: undefined as undefined | { quiz: unknown[]; transform: unknown[]; create: unknown[] } },
+}));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: undefined }),
+  useQuery: () => ({ data: customBankState.current }),
 }));
 
-function renderPractice(audience: "student" | "teacher", studentId?: string) {
-  return render(
+function practiceElement(
+  audience: "student" | "teacher",
+  studentId?: string,
+  initialSelection?: PracticeSelection,
+) {
+  return (
     <NextIntlClientProvider locale="ko" messages={ko} timeZone="Asia/Seoul">
-      <QuestionPracticeView audience={audience} studentId={studentId} />
-    </NextIntlClientProvider>,
+      <QuestionPracticeView
+        audience={audience}
+        studentId={studentId}
+        initialSelection={initialSelection}
+      />
+    </NextIntlClientProvider>
   );
+}
+
+function renderPractice(
+  audience: "student" | "teacher",
+  studentId?: string,
+  initialSelection?: PracticeSelection,
+) {
+  return render(practiceElement(audience, studentId, initialSelection));
 }
 
 async function completeTransform() {
@@ -53,8 +73,21 @@ function deferredCheckResponse() {
   return { promise, resolve };
 }
 
+function deferredQuizResponse(awarded: number) {
+  const response = {
+    ok: true,
+    json: async () => ({ correct: true, awarded }),
+  };
+  let resolve!: (value: typeof response) => void;
+  const promise = new Promise<typeof response>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve: () => resolve(response) };
+}
+
 beforeEach(() => {
   push.mockReset();
+  customBankState.current = undefined;
   sessionStorage.clear();
   vi.spyOn(Math, "random").mockReturnValue(0);
   vi.stubGlobal(
@@ -77,6 +110,96 @@ afterEach(() => {
 });
 
 describe("연습 질문 전달", () => {
+  it("추천 선택으로 들어오면 해당 유형 문항만 출제한다", () => {
+    renderPractice("student", "student-1", {
+      tab: "quiz",
+      quizMode: "cognitive",
+      focus: "controversial",
+    });
+
+    expect(screen.getByText("문화유산 보호를 위해 일반인의 출입을 제한하는 것은 정당할까요?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "논쟁적 질문" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "닫힌 질문" })).not.toBeInTheDocument();
+    expect(screen.getByText("논쟁적 질문 집중")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "닫힌/열린 구분" }));
+    expect(screen.queryByText("논쟁적 질문 집중")).not.toBeInTheDocument();
+  });
+
+  it("커스텀 문항이 도착해도 추천과 다른 유형은 집중 묶음에 섞지 않는다", () => {
+    customBankState.current = {
+      quiz: [
+        {
+          id: "custom-controversial",
+          content: "학교 텃밭과 운동장 중 무엇을 더 넓혀야 할까요?",
+          closure: "open",
+          cognitive: "controversial",
+          explanation: "두 가치의 우선순위를 근거와 함께 판단하는 질문이에요.",
+        },
+        {
+          id: "custom-factual",
+          content: "우리 학교 운동장은 몇 개인가요?",
+          closure: "closed",
+          cognitive: "factual",
+          explanation: "확인하면 하나의 답을 얻는 사실적 질문이에요.",
+        },
+      ],
+      transform: [],
+      create: [],
+    };
+    renderPractice("student", "student-1", {
+      tab: "quiz",
+      quizMode: "cognitive",
+      focus: "controversial",
+    });
+    vi.mocked(Math.random).mockReturnValue(0.999);
+
+    fireEvent.click(screen.getByRole("button", { name: "논쟁적 질문" }));
+    fireEvent.click(screen.getByRole("button", { name: "다음 문제" }));
+
+    expect(screen.getByText("학교 텃밭과 운동장 중 무엇을 더 넓혀야 할까요?")).toBeInTheDocument();
+    expect(screen.queryByText("우리 학교 운동장은 몇 개인가요?")).not.toBeInTheDocument();
+  });
+
+  it("추천 선택이 바뀌면 답을 초기화하고 늦은 이전 지급 응답을 버린다", async () => {
+    const first = deferredQuizResponse(99);
+    const second = deferredQuizResponse(1);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise),
+    );
+    const view = renderPractice("student", "student-1", {
+      tab: "quiz",
+      quizMode: "cognitive",
+      focus: "conceptual",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "개념적 질문" }));
+    expect(screen.getByText(/정답이에요/)).toBeInTheDocument();
+
+    view.rerender(
+      practiceElement("student", "student-1", {
+        tab: "quiz",
+        quizMode: "closure",
+        focus: "open",
+      }),
+    );
+    expect(await screen.findByText("동물들이 환경에 따라 다른 특징을 가지는 이유는 무엇인가요?")).toBeInTheDocument();
+    expect(screen.queryByText(/정답이에요/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      first.resolve();
+      await first.promise;
+    });
+    fireEvent.click(screen.getByRole("button", { name: "열린 질문" }));
+    expect(screen.queryByText("+99P 획득!")).not.toBeInTheDocument();
+
+    await act(async () => {
+      second.resolve();
+      await second.promise;
+    });
+    expect(await screen.findByText("+1P 획득!")).toBeInTheDocument();
+  });
+
   it("학생의 바꾸기 성공 결과를 현재 학생 초안으로 저장하고 질문하기로 이동한다", async () => {
     renderPractice("student", "student-1");
     expect(screen.queryByRole("button", { name: "이 질문으로 질문하기" })).not.toBeInTheDocument();
