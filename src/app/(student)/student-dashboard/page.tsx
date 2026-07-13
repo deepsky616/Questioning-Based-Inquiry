@@ -69,7 +69,6 @@ function StudentDashboard() {
   const user = getSessionUser(session);
   const tCls = useTranslations("classification");
   const t = useTranslations("studentDash");
-  const tDash = useTranslations("dashboard");
   const router = useRouter();
   const pointsSectionRef = useRef<HTMLDivElement | null>(null);
   const [highlightPoints, setHighlightPoints] = useState(false);
@@ -243,18 +242,6 @@ function StudentDashboard() {
           {t("greeting", { name: user.name ?? "" })}
         </h2>
         <p className="text-sm leading-6 text-muted-foreground md:text-base">{t("greetingSub")}</p>
-      </div>
-
-      <div className="flex w-full overflow-hidden rounded-md border sm:w-fit">
-        <button
-          type="button"
-          onClick={() => router.replace("/student-dashboard", { scroll: false })}
-          className={`h-11 flex-1 px-4 text-sm font-medium transition-colors sm:flex-none ${
-            tab === "overview" ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
-          }`}
-        >
-          {tDash("tabOverview")}
-        </button>
       </div>
 
       {tab === "reports" ? (
