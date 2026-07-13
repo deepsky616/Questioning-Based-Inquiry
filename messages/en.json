@@ -180,6 +180,10 @@
       "title": "Edit profile",
       "description": "Manage your teacher account, password, and AI settings"
     },
+    "studentDashboard": {
+      "title": "Student Dashboard",
+      "description": "See today's tasks and your question activity at a glance"
+    },
     "studentQuestions": {
       "title": "Explore Questions",
       "description": "Manage your own questions, explore your friends' questions, and join the inquiry questions your teacher shared"
@@ -187,6 +191,10 @@
     "studentPoints": {
       "title": "My ranking and class ranking",
       "description": "Check your class, school, and overall rank plus your class average ranking"
+    },
+    "studentReports": {
+      "title": "Detailed Report",
+      "description": "Review your question, comment, and class session activity trends with AI analysis"
     },
     "studentSettings": {
       "title": "Edit profile",

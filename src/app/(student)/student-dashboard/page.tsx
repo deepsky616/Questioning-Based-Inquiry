@@ -12,6 +12,7 @@ import { useSession } from "next-auth/react";
 import { StatBar } from "@/components/shared/StatBar";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE, matchesCognitiveCategory } from "@/lib/question-labels";
 import PointsCard from "@/components/shared/PointsCard";
@@ -69,6 +70,7 @@ function StudentDashboard() {
   const user = getSessionUser(session);
   const tCls = useTranslations("classification");
   const t = useTranslations("studentDash");
+  const tPages = useTranslations("pages");
   const router = useRouter();
   const pointsSectionRef = useRef<HTMLDivElement | null>(null);
   const [highlightPoints, setHighlightPoints] = useState(false);
@@ -237,13 +239,10 @@ function StudentDashboard() {
 
   return (
     <div className="space-y-6">
-      {tab !== "reports" && (
-        <div className="space-y-1">
-          <h2 className="text-2xl font-bold leading-tight text-foreground md:text-3xl">
-            {t("greeting", { name: user.name ?? "" })}
-          </h2>
-          <p className="text-sm leading-6 text-muted-foreground md:text-base">{t("greetingSub")}</p>
-        </div>
+      {tab === "reports" ? (
+        <PageHeader title={tPages("studentReports.title")} description={tPages("studentReports.description")} />
+      ) : (
+        <PageHeader title={tPages("studentDashboard.title")} description={tPages("studentDashboard.description")} />
       )}
 
       {tab === "reports" ? (
