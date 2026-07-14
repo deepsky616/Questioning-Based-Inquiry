@@ -166,3 +166,50 @@ git diff --check
 - 복원 공개 기록은 상태 크기를 제한하기 위해 최근 예순네 개만 보존한다. 그보다 오래된 공개 식별값은 재생 기록에서 빠진다.
 - 완료 뒤 떠난 참가자의 점수는 검증 합계에만 남고 현재 담당 학생 지급 대상에는 포함되지 않는다.
 - 데이터베이스 파일은 변경하지 않았다.
+
+## 세 번째 재검토 수정
+
+### 수정 내역
+
+- 복원 공개 기록 수와 현재 실패 공개 수의 합이 전체 실패 시도 수를 넘지 못하도록 저장 상태 검증을 보강했다. 전체 실패 시도 수는 전체 시도에서 획득한 짝 수를 뺀 값으로 계산한다.
+- 최대 시도가 하나인데 복원 기록이 예순네 개인 불가능한 시험을 없앴다. 어려움 난이도의 실제 최대 시도인 마흔다섯 안에서 복원 기록 마흔네 개와 현재 실패 공개 하나가 자연스럽게 누적되는 사례로 바꿨다.
+- 메모리 점수 지급 경로를 작업 팔 전까지 다시 닫았다. 서버 검증 지급 놀이와 근거 버전 예외에서 메모리를 제거하고, 메모리 요청이 사백구로 거절되며 생성과 저장이 일어나지 않는지 확인한다.
+- 닫힌 경로에서 사용되지 않는 저장 점수 전체 합산 변경을 원래 구현으로 되돌렸다.
+- 작업 팔에서는 교사 방장, 완료 상태, `playId`, `pointAwardKeyVersion: 2`, 실행별 중복 키, 질문 없는 보너스 차단을 함께 검증한 뒤 저장된 전체 점수 합산과 메모리 점수 지급을 열어야 한다.
+
+### 실패 시험 확인
+
+```text
+npx vitest run src/__tests__/question-game-room-engine-memory.test.ts -t "실패 시도보다 많은 복원 공개 기록"
+PASS 0, FAIL 1: 실패 시도보다 많은 복원 기록 상태를 받아들임
+
+npx vitest run src/__tests__/points-award-route.test.ts -t "떠난 학생 점수가 있는 메모리 지급은 작업 팔 전까지 닫아 둔다"
+PASS 0, FAIL 1: 메모리 지급 요청이 사백구가 아니라 이백으로 처리됨
+```
+
+### 최종 확인
+
+```text
+npx vitest run src/__tests__/question-game-room-engine-memory.test.ts src/__tests__/question-game-room-engine.test.ts src/__tests__/question-game-room-command-route.test.ts src/__tests__/game-room-route.test.ts src/__tests__/points-award-route.test.ts
+PASS 307, FAIL 0
+
+npx tsc --noEmit
+통과
+
+npx eslint src/lib/question-game-room-engines/memory.ts src/lib/point-award-service.ts src/__tests__/question-game-room-engine-memory.test.ts src/__tests__/points-award-route.test.ts
+통과
+
+git diff --check
+통과
+```
+
+### 커밋
+
+- `2bf4b5e` `fix: 복원 기록 관계와 점수 경계 정리`
+- 별도 사용자 커밋 `defab6a`는 되돌리거나 수정하지 않았다.
+
+### 남은 우려
+
+- 복원 공개 기록의 저장 구조 상한은 예순네 개지만 현재 난이도별 실제 최대 시도는 마흔다섯이므로 정상 실행에서는 마흔다섯 개를 넘지 않는다.
+- 메모리 점수 지급은 작업 팔에서 실행별 중복 방지와 근거 검증을 완성할 때까지 의도적으로 닫혀 있다.
+- 데이터베이스 파일은 변경하지 않았다.
