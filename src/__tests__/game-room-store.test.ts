@@ -59,9 +59,46 @@ describe("loadGameRoom", () => {
     await expect(loadGameRoom("1234")).resolves.toMatchObject({ version: 1 });
   });
 
+  it("놀이 식별값과 점수 버전 2를 읽는다", async () => {
+    prismaMock.gameRoom.findUnique.mockResolvedValue({
+      data: {
+        ...makeRoom(),
+        playId: "play-1",
+        pointAwardKeyVersion: 2,
+        pointEvidenceVersion: 2,
+      },
+    });
+
+    await expect(loadGameRoom("1234")).resolves.toMatchObject({
+      playId: "play-1",
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+    });
+  });
+
+  it.each(["", 3, null])("잘못된 놀이 식별값 %s는 읽지 않는다", async (playId) => {
+    prismaMock.gameRoom.findUnique.mockResolvedValue({
+      data: { ...makeRoom(), playId },
+    });
+
+    await expect(loadGameRoom("1234")).resolves.toBeNull();
+  });
+
   it("알 수 없는 지급 키 버전은 이전 방으로 낮추지 않는다", async () => {
     prismaMock.gameRoom.findUnique.mockResolvedValue({
-      data: { ...makeRoom(), pointAwardKeyVersion: 2 },
+      data: { ...makeRoom(), pointAwardKeyVersion: 3 },
+    });
+
+    await expect(loadGameRoom("1234")).resolves.toBeNull();
+  });
+
+  it.each([
+    ["지급 키", { pointAwardKeyVersion: null }],
+    ["활동 증거", { pointEvidenceVersion: 3 }],
+    ["활동 증거", { pointEvidenceVersion: null }],
+  ])("잘못된 %s 버전은 읽지 않는다", async (_kind, versionFields) => {
+    prismaMock.gameRoom.findUnique.mockResolvedValue({
+      data: { ...makeRoom(), ...versionFields },
     });
 
     await expect(loadGameRoom("1234")).resolves.toBeNull();
@@ -246,7 +283,7 @@ describe("deleteGameRoom", () => {
 });
 
 describe("createGameRoom", () => {
-  it("새 방은 포인트 지급 키와 활동 증거 버전 1을 저장한다", async () => {
+  it("새 대기 방은 점수 버전을 넣지 않는다", async () => {
     prismaMock.gameRoom.create.mockResolvedValue({});
 
     const room = await createGameRoom({
@@ -255,13 +292,13 @@ describe("createGameRoom", () => {
       hostName: "방장",
     });
 
-    expect(room?.pointAwardKeyVersion).toBe(1);
-    expect(room?.pointEvidenceVersion).toBe(1);
+    expect(room).not.toHaveProperty("pointAwardKeyVersion");
+    expect(room).not.toHaveProperty("pointEvidenceVersion");
     expect(prismaMock.gameRoom.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        data: expect.objectContaining({
-          pointAwardKeyVersion: 1,
-          pointEvidenceVersion: 1,
+        data: expect.not.objectContaining({
+          pointAwardKeyVersion: expect.anything(),
+          pointEvidenceVersion: expect.anything(),
         }),
       }),
     });

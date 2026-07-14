@@ -143,8 +143,6 @@ export async function createGameRoom({
       version: 1,
       createdAt: now,
       updatedAt: now,
-      pointAwardKeyVersion: 1,
-      pointEvidenceVersion: 1,
     };
 
     try {

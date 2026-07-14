@@ -4,6 +4,7 @@ import {
   type GameRoom,
   type RoomActionHandler,
 } from "@/lib/question-games-data";
+import { readRoomCommandResult } from "@/lib/question-game-room-response";
 import { APP_ROOM_POLL_MS, visibleRefetchInterval } from "@/lib/query-refresh";
 
 const ROOM_REPLACED_MESSAGE =
@@ -23,6 +24,12 @@ function responseError(
   fallback: string,
 ) {
   return typeof data.error === "string" ? data.error : fallback;
+}
+
+function isSameRoomVersion(current: GameRoom | null, next: GameRoom) {
+  return current?.code === next.code &&
+    current.createdAt === next.createdAt &&
+    current.version === next.version;
 }
 
 interface UseRoomResult {
@@ -102,7 +109,11 @@ export function useRoom(): UseRoomResult {
       clearRoom();
       return { room: null, applied: false, lifetimeChanged: true };
     }
-    if (current?.code === nextRoom.code && nextRoom.version < current.version) {
+    if (
+      current?.code === nextRoom.code &&
+      current.createdAt === nextRoom.createdAt &&
+      nextRoom.version <= current.version
+    ) {
       return { room: current, applied: false, lifetimeChanged: false };
     }
     roomRef.current = nextRoom;
@@ -241,15 +252,22 @@ export function useRoom(): UseRoomResult {
       if (!code || !currentRoom) {
         return { ok: false, room: currentRoom, status: null, reason: "inactive" };
       }
+      const commandId = options?.commandId ?? crypto.randomUUID();
       const generation = roomGenerationRef.current;
       beginAction();
       setError(null);
       try {
         const body = action === "memory-roll"
-          ? { action, ...extra, expectedCreatedAt: currentRoom.createdAt }
+          ? {
+              action,
+              ...extra,
+              commandId,
+              expectedCreatedAt: currentRoom.createdAt,
+            }
           : {
               action,
               ...extra,
+              commandId,
               expectedVersion: currentRoom.version,
               expectedCreatedAt: currentRoom.createdAt,
             };
@@ -283,13 +301,22 @@ export function useRoom(): UseRoomResult {
             applied: false,
             lifetimeChanged: false,
           };
+          let responseMatchesCurrent = false;
           if (isGameRoom(responseRoom) && responseRoom.code === code) {
             hasApplicableRoom = true;
             outcome = applyRoom(responseRoom);
+            responseMatchesCurrent = isSameRoomVersion(
+              outcome.room,
+              responseRoom,
+            );
           }
           if (outcome.lifetimeChanged) {
             setError(ROOM_REPLACED_MESSAGE);
-          } else if (outcome.applied || !hasApplicableRoom) {
+          } else if (
+            outcome.applied ||
+            responseMatchesCurrent ||
+            !hasApplicableRoom
+          ) {
             setError(responseError(data, "작업 실패"));
           }
           return { ok: false, room: outcome.room, status: 409, reason: "conflict" };
@@ -318,7 +345,12 @@ export function useRoom(): UseRoomResult {
             reason: "superseded",
           };
         }
-        return { ok: true, room: outcome.room ?? data.room };
+        const result = readRoomCommandResult(data.result);
+        return {
+          ok: true,
+          room: outcome.room ?? data.room,
+          ...(result ? { result } : {}),
+        };
       } catch {
         if (!isCurrentRequest(code, generation)) {
           return {
@@ -367,15 +399,21 @@ export function useRoom(): UseRoomResult {
         return false;
       }
       if (!res.ok) {
+        const responseRoom = data.room;
         const outcome =
           res.status === 409 &&
-          isGameRoom(data.room) &&
-          data.room.code === code
-          ? applyRoom(data.room)
+          isGameRoom(responseRoom) &&
+          responseRoom.code === code
+          ? applyRoom(responseRoom)
           : null;
+        const responseMatchesCurrent = Boolean(
+          outcome &&
+          isGameRoom(responseRoom) &&
+          isSameRoomVersion(outcome.room, responseRoom),
+        );
         if (outcome?.lifetimeChanged) {
           setError(ROOM_REPLACED_MESSAGE);
-        } else if (!outcome || outcome.applied) {
+        } else if (!outcome || outcome.applied || responseMatchesCurrent) {
           setError(responseError(data, "나가기 실패"));
         }
         return false;

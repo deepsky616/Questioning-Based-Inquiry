@@ -168,8 +168,9 @@ export interface GameRoom {
   version: number;
   createdAt: number;
   updatedAt: number;
-  pointAwardKeyVersion?: 1;
-  pointEvidenceVersion?: 1;
+  playId?: string;
+  pointAwardKeyVersion?: 1 | 2;
+  pointEvidenceVersion?: 1 | 2;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -226,10 +227,13 @@ export function isGameRoom(value: unknown): value is GameRoom {
     isNonNegativeInteger(value.version) &&
     isNonNegativeNumber(value.createdAt) &&
     isNonNegativeNumber(value.updatedAt) &&
+    (value.playId === undefined || isNonEmptyString(value.playId)) &&
     (value.pointAwardKeyVersion === undefined ||
-      value.pointAwardKeyVersion === 1) &&
+      value.pointAwardKeyVersion === 1 ||
+      value.pointAwardKeyVersion === 2) &&
     (value.pointEvidenceVersion === undefined ||
-      value.pointEvidenceVersion === 1)
+      value.pointEvidenceVersion === 1 ||
+      value.pointEvidenceVersion === 2)
   );
 }
 
@@ -239,23 +243,36 @@ export function parseGameRoom(value: unknown): GameRoom | null {
   return isGameRoom(normalized) ? normalized : null;
 }
 
-export type RoomActionResult =
-  | { ok: true; room: GameRoom }
-  | {
-      ok: false;
-      room: GameRoom | null;
-      status: number | null;
-      reason:
-        | "conflict"
-        | "missing"
-        | "network"
-        | "inactive"
-        | "superseded"
-        | "rejected";
-    };
+export interface RoomCommandResult {
+  retryAfterMs?: number;
+  roll?: number;
+  replayed?: boolean;
+}
+
+export interface RoomActionSuccess {
+  ok: true;
+  room: GameRoom;
+  result?: RoomCommandResult;
+}
+
+export interface RoomActionFailure {
+  ok: false;
+  room: GameRoom | null;
+  status: number | null;
+  reason:
+    | "conflict"
+    | "missing"
+    | "network"
+    | "inactive"
+    | "superseded"
+    | "rejected";
+}
+
+export type RoomActionResult = RoomActionSuccess | RoomActionFailure;
 
 export interface RoomActionOptions {
   expectedRoom?: Pick<GameRoom, "code" | "createdAt">;
+  commandId?: string;
 }
 
 export type RoomActionHandler = (

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   loadGameRoom: vi.fn(),
   saveGameRoom: vi.fn(),
   deleteGameRoom: vi.fn(),
+  createGameRoom: vi.fn(),
   checkRateLimit: vi.fn((): Response | null => null),
   recordMemoryRoll: vi.fn(),
   settleMemoryRollingRoom: vi.fn((room: GameRoom) => room),
@@ -17,6 +18,7 @@ vi.mock("@/lib/game-room-store", () => ({
   loadGameRoom: mocks.loadGameRoom,
   saveGameRoom: mocks.saveGameRoom,
   deleteGameRoom: mocks.deleteGameRoom,
+  createGameRoom: mocks.createGameRoom,
   isStaleRoomAction: (room: GameRoom, expected: unknown) =>
     typeof expected === "number" && expected !== room.version,
 }));
@@ -25,6 +27,7 @@ vi.mock("@/lib/memory-room-roll", () => ({
   settleMemoryRollingRoom: mocks.settleMemoryRollingRoom,
 }));
 
+import { POST } from "@/app/api/question-games/rooms/route";
 import { GET, PATCH } from "@/app/api/question-games/rooms/[code]/route";
 
 function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
@@ -74,6 +77,16 @@ function get() {
   );
 }
 
+function create(body: Record<string, unknown>) {
+  return POST(
+    new Request("http://localhost/api/question-games/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }) as never,
+  );
+}
+
 beforeEach(() => {
   mocks.auth.mockReset().mockResolvedValue({
     user: { id: "user-1", name: "학생" },
@@ -81,11 +94,158 @@ beforeEach(() => {
   mocks.loadGameRoom.mockReset();
   mocks.saveGameRoom.mockReset();
   mocks.deleteGameRoom.mockReset();
+  mocks.createGameRoom.mockReset();
   mocks.checkRateLimit.mockReset().mockReturnValue(null);
   mocks.recordMemoryRoll.mockReset();
   mocks.settleMemoryRollingRoom
     .mockReset()
     .mockImplementation((room: GameRoom) => room);
+});
+
+describe("공개 방 응답", () => {
+  it("방 생성 성공 응답에서 비공개 상태를 제거한다", async () => {
+    const room = makeRoom({
+      gameState: { phase: "waiting", private: { answer: "사과" } },
+    });
+    mocks.createGameRoom.mockResolvedValue(room);
+
+    const response = await create({ gameId: "dice" });
+
+    const body = await response.json();
+    expect(body.room.gameState).toEqual({ phase: "waiting" });
+    expect(room.gameState.private).toEqual({ answer: "사과" });
+  });
+
+  it("조회 응답에서 비공개 상태를 제거한다", async () => {
+    const room = makeRoom({
+      gameState: { phase: "play", private: { answer: "사과" } },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+
+    const response = await get();
+
+    const body = await response.json();
+    expect(body.room.gameState).toEqual({ phase: "play" });
+    expect(room.gameState.private).toEqual({ answer: "사과" });
+  });
+
+  it("참가 응답에서 비공개 상태를 제거한다", async () => {
+    const room = makeRoom({
+      hostId: "host",
+      players: [{ id: "host", name: "방장", isHost: true, joinedAt: 1 }],
+      gameState: { phase: "play", private: { answer: "사과" } },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({ action: "join" });
+
+    const body = await response.json();
+    expect(body.room.gameState).toEqual({ phase: "play" });
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
+      gameState: { phase: "play", private: { answer: "사과" } },
+    }));
+  });
+
+  it("충돌 응답에서 비공개 상태를 제거한다", async () => {
+    const room = makeRoom({
+      version: 2,
+      gameState: { phase: "play", private: { answer: "사과" } },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+
+    const response = await patch({ action: "start", expectedVersion: 1 });
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.room.gameState).toEqual({ phase: "play" });
+    expect(room.gameState.private).toEqual({ answer: "사과" });
+  });
+
+  it("나가기 응답에서 비공개 상태를 제거하고 저장 자료는 유지한다", async () => {
+    const room = makeRoom({
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+        { id: "other", name: "다른 학생", isHost: false, joinedAt: 2 },
+      ],
+      gameState: { phase: "play", private: { answer: "사과" } },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({ action: "leave" });
+
+    const body = await response.json();
+    expect(body.room.gameState).toEqual({ phase: "play" });
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
+      gameState: { phase: "play", private: { answer: "사과" } },
+    }));
+  });
+
+  it("일반 성공 응답에서만 비공개 상태를 제거한다", async () => {
+    const room = makeRoom({ gameState: { phase: "play" } });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({
+      action: "update-state",
+      expectedVersion: 1,
+      patch: { private: { answer: "사과" } },
+    });
+
+    const body = await response.json();
+    expect(body.room.gameState).toEqual({ phase: "play" });
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
+      gameState: { phase: "play", private: { answer: "사과" } },
+    }));
+  });
+
+  it("다시 시작 성공 응답에서 비공개 상태를 제거한다", async () => {
+    const room = makeRoom({ status: "ended" });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: {
+        ...candidate,
+        version: candidate.version + 1,
+        gameState: { phase: "waiting", private: { answer: "사과" } },
+      },
+    }));
+
+    const response = await patch({
+      action: "restart",
+      expectedVersion: 1,
+    });
+
+    const body = await response.json();
+    expect(body.room.gameState).toEqual({ phase: "waiting" });
+  });
+
+  it("게임을 시작할 때 점수 버전 1을 저장한다", async () => {
+    const room = makeRoom({ players: makePlayers(2) });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({ action: "start", expectedVersion: 1 });
+
+    expect(response.status).toBe(200);
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
+      pointAwardKeyVersion: 1,
+      pointEvidenceVersion: 1,
+    }));
+  });
 });
 
 describe("방 생성 시각 경계", () => {
@@ -175,7 +335,11 @@ describe("memory-roll 요청", () => {
     const savedRoom = makeRoom({
       gameId: "memory",
       version: 2,
-      gameState: { phase: "rolling", diceRolls: { "user-1": 5 } },
+      gameState: {
+        phase: "rolling",
+        diceRolls: { "user-1": 5 },
+        private: { answer: "사과" },
+      },
     });
     mocks.loadGameRoom.mockResolvedValue(room);
     mocks.recordMemoryRoll.mockResolvedValue({
@@ -193,9 +357,13 @@ describe("memory-roll 요청", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      room: savedRoom,
+      room: {
+        ...savedRoom,
+        gameState: { phase: "rolling", diceRolls: { "user-1": 5 } },
+      },
       result: { roll: 5, replayed: false },
     });
+    expect(savedRoom.gameState.private).toEqual({ answer: "사과" });
     expect(mocks.recordMemoryRoll).toHaveBeenCalledWith({
       initialRoom: room,
       userId: "user-1",

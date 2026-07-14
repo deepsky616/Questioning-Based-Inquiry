@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createGameRoom } from "@/lib/game-room-store";
+import { toPublicGameRoom } from "@/lib/question-game-room-response";
 import { isBuiltInQuestionGameId } from "@/lib/question-game-rules";
 
 // 방 생성
@@ -26,5 +27,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "방 코드 생성에 실패했습니다. 다시 시도해주세요." }, { status: 500 });
   }
 
-  return NextResponse.json({ room });
+  return NextResponse.json({ room: toPublicGameRoom(room) });
 }
