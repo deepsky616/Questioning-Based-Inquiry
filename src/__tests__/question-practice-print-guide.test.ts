@@ -67,8 +67,8 @@ describe("질문연습 학습지 출력", () => {
     expect(cssSource).toContain("@page question-practice");
     expect(cssSource).toContain("margin: 6mm");
     expect(cssSource).toContain("page: question-practice");
-    expect(cssSource).toContain("break-before: page");
-    expect(cssSource).toContain("page-break-before: always");
+    expect(cssSource).toContain("break-after: page");
+    expect(cssSource).toContain("page-break-after: always");
     expect(cssSource).toContain("body.question-practice-print-mode *");
     expect(cssSource).toContain("visibility: hidden !important");
     expect(cssSource).toContain("visibility: visible !important");
@@ -83,10 +83,26 @@ describe("질문연습 학습지 출력", () => {
     expect(cssSource).toContain(".question-practice-print .qp-write-line");
     expect(cssSource).toContain(".question-practice-print .qp-card");
     expect(cssSource).toContain(".question-practice-print .qp-student-row-meta");
-    expect(cssSource).toContain("max-width: 275px !important");
     expect(cssSource).toContain("height: 11px !important");
-    expect(cssSource).toContain("font-size: 10.6px !important");
+    expect(cssSource).toContain("font-size: 11px !important");
     expect(cssSource).toContain(".question-practice-print .qp-pattern ul");
     expect(cssSource).toContain(".question-practice-print-page .qp-toolbar");
+  });
+
+  it("두 쪽 높이를 채우고 카드와 답안 영역을 균등하게 배치한다", () => {
+    expect(cssSource).toContain("height: 284mm !important");
+    expect(cssSource).toContain(".question-practice-print .qp-sheet {");
+    expect(cssSource).toContain("box-sizing: border-box !important");
+    expect(cssSource).toContain(".question-practice-print .qp-sheet-guide {");
+    expect(cssSource).toContain("break-after: page");
+    expect(cssSource).toContain(".question-practice-print .qp-card-grid {");
+    expect(cssSource).toContain("grid-template-rows: repeat(3, minmax(0, 1fr)) !important");
+    expect(cssSource).toContain(".question-practice-print .qp-prompt-list {");
+    expect(cssSource).toContain(".question-practice-print .qp-writing-lines {");
+    expect(cssSource).toContain(".question-practice-print .qp-eyebrow {");
+    expect(cssSource).toContain("display: none !important");
+    expect(cssSource).toContain(".question-practice-print-page .qp-sheet + .qp-sheet {");
+    expect(cssSource).toContain("margin-top: 24px");
+    expect(cssSource).not.toContain("max-width: 275px !important");
   });
 });
