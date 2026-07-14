@@ -16,6 +16,12 @@ import {
   type RoomActionHandler,
   type RoomActionResult,
 } from "@/lib/question-games-data";
+import {
+  createLadderState,
+  readLadderState,
+  type LadderRoomState,
+} from "@/lib/question-game-room-engines/ladder";
+import { assignLadderTopics } from "@/lib/question-ladder";
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -163,6 +169,7 @@ const flowCases = [
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
 });
 
 describe("이야기 주사위 입력", () => {
@@ -272,13 +279,30 @@ describe("게임 방 입력", () => {
   });
 
   it("질문 사다리 제출은 실패 뒤 유지하고 성공 뒤 비운다", async () => {
-    const room = makeGameRoom("ladder", {
-      topics: ["우주"],
-      grid: Array.from({ length: 10 }, () => [false]),
-      assignments: [{ playerId: "user-1", playerName: "서연", topic: "우주" }],
+    const topics = ["우주", "물의 순환"];
+    const grid = Array.from({ length: 10 }, () => [false]);
+    const assignments = assignLadderTopics(topics, grid).map((assignment, index) => ({
+      playerId: players[index].id,
+      playerName: players[index].name,
+      ...assignment,
+    }));
+    const state: LadderRoomState = {
+      ...createLadderState(),
+      phase: "compose",
+      round: 1,
+      roundId: "10000000-0000-4000-8000-000000000001",
+      topicPool: topics,
+      roundTopics: topics,
+      grid,
+      roundPlayerIds: players.map(({ id }) => id),
+      roundTargetPlayerIds: players.map(({ id }) => id),
+      assignments,
       questions: [],
-    });
+    };
+    expect(readLadderState(state)).not.toBeNull();
+    const room = makeGameRoom("ladder", state, { playId: "play-ladder-1" });
     const onAction = actionSequence(room);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
 
     render(
       <RoomLadder
@@ -291,11 +315,17 @@ describe("게임 방 입력", () => {
       />,
     );
 
-    await expectFailureThenSuccess(
-      screen.getByPlaceholderText(/대한 질문/) as HTMLTextAreaElement,
-      screen.getByRole("button", { name: /질문 제출/ }),
-      onAction,
-      "우주에는 별이 몇 개 있나요?",
-    );
+    const input = screen.getByRole("textbox", { name: /주제 질문$/ }) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "우주에는 별이 몇 개 있나요?" } });
+    fireEvent.click(screen.getByRole("button", { name: "질문 확인" }));
+    const confirm = await screen.findByRole("button", { name: "도움말 없이 확정" });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+    expect(input).toHaveValue("우주에는 별이 몇 개 있나요?");
+    expect(onAction.mock.calls[0]?.[0]).toBe("ladder-submit-question");
+
+    fireEvent.click(confirm);
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(input).toHaveValue(""));
   });
 });
