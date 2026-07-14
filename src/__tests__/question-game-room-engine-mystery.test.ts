@@ -118,6 +118,29 @@ function applyMystery(
   });
 }
 
+function askCurrentPlayer(
+  room: GameRoom,
+  commandIndex: number,
+  nextRoundIndex: number,
+  question = "먹을 수 있나요?",
+): GameRoom {
+  const state = room.gameState as unknown as MysteryRoomState;
+  const userId = state.turnOrder[state.currentTurnIdx];
+  const player = room.players.find(({ id }) => id === userId);
+  if (!player) throw new Error("현재 참가자가 필요합니다");
+  return changedRoom(applyMystery(
+    room,
+    "mystery-ask",
+    { locale: "ko", question },
+    {
+      userId,
+      userName: player.name,
+      commandIndex,
+      nextRoundId: commandId(nextRoundIndex),
+    },
+  ));
+}
+
 describe("미스터리 박스 방 판정기", () => {
   it("일반 시작은 비밀 없는 버전 2 준비 상태를 만든다", () => {
     const room = startRoom();
@@ -202,12 +225,13 @@ describe("미스터리 박스 방 판정기", () => {
     },
   );
 
-  it("질문은 기록과 질문자 점수만 바꾸고 차례와 활동은 유지한다", () => {
+  it("질문은 한 활동을 쓰고 다음 라운드와 차례로 이동한다", () => {
     const room = prepareRoom();
+    const nextRoundId = commandId(91);
     const result = applyMystery(room, "mystery-ask", {
       locale: "ko",
       question: "먹을 수 있나요?",
-    });
+    }, { nextRoundId });
     const nextRoom = changedRoom(result);
     const state = nextRoom.gameState as unknown as MysteryRoomState;
 
@@ -220,10 +244,72 @@ describe("미스터리 박스 방 판정기", () => {
       answer: "yes",
     }]);
     expect(state.scores).toEqual({ host: 1, guest: 0 });
-    expect(state.currentTurnIdx).toBe(0);
-    expect(state.round).toBe(1);
-    expect(state.roundId).toBe(ROUND_ID);
+    expect(state.currentTurnIdx).toBe(1);
+    expect(state.round).toBe(2);
+    expect(state.roundId).toBe(nextRoundId);
     expect(state.private).toEqual({ itemId: "apple" });
+  });
+
+  it("모름 질문도 한 활동을 쓰고 같은 참가자의 연속 제출을 막는다", () => {
+    const room = prepareRoom();
+    const nextRoundId = commandId(92);
+    const asked = changedRoom(applyMystery(
+      room,
+      "mystery-ask",
+      { locale: "ko", question: "무슨 소리가 나나요?" },
+      { nextRoundId },
+    ));
+    const state = asked.gameState as unknown as MysteryRoomState;
+
+    expect(state).toMatchObject({
+      round: 2,
+      roundId: nextRoundId,
+      currentTurnIdx: 1,
+    });
+    expect(state.history.at(-1)).toMatchObject({
+      kind: "question",
+      answer: "unknown",
+    });
+
+    const repeated = applyMystery(
+      asked,
+      "mystery-guess",
+      { locale: "ko", guess: "사과" },
+      { commandIndex: 12, nextRoundId: commandId(93) },
+    );
+    expect(repeated).toMatchObject({ kind: "forbidden", room: asked });
+  });
+
+  it("질문과 추측을 섞어도 활동마다 라운드와 차례를 한 번만 넘긴다", () => {
+    let room = askCurrentPlayer(prepareRoom(), 70, 170);
+    let state = room.gameState as unknown as MysteryRoomState;
+    const guest = state.turnOrder[state.currentTurnIdx];
+    room = changedRoom(applyMystery(
+      room,
+      "mystery-guess",
+      { locale: "en", guess: "book" },
+      {
+        userId: guest,
+        userName: "Guest",
+        commandIndex: 71,
+        nextRoundId: commandId(171),
+      },
+    ));
+    room = askCurrentPlayer(room, 72, 172, "무슨 소리가 나나요?");
+    state = room.gameState as unknown as MysteryRoomState;
+
+    expect(state).toMatchObject({
+      phase: "play",
+      round: 4,
+      roundId: commandId(172),
+      currentTurnIdx: 1,
+      scores: { host: 2, guest: 0 },
+    });
+    expect(state.history.map(({ kind }) => kind)).toEqual([
+      "question",
+      "guess",
+      "question",
+    ]);
   });
 
   it("틀린 추측은 한 활동을 기록하고 다음 라운드와 차례로 이동한다", () => {
@@ -355,6 +441,74 @@ describe("미스터리 박스 방 판정기", () => {
     });
   });
 
+  it("방장이 아닌 참가자의 스무 번째 질문은 정답을 공개하고 끝낸다", () => {
+    let room = prepareRoom();
+    for (let index = 0; index < 19; index += 1) {
+      room = askCurrentPlayer(room, 200 + index, 300 + index);
+    }
+    const beforeLast = room.gameState as unknown as MysteryRoomState;
+    expect(beforeLast).toMatchObject({
+      phase: "play",
+      round: 20,
+      currentTurnIdx: 1,
+    });
+    expect(beforeLast.history).toHaveLength(19);
+
+    const ended = askCurrentPlayer(room, 219, 319);
+    const state = ended.gameState as unknown as MysteryRoomState;
+
+    expect(ended.status).toBe("ended");
+    expect(state).toMatchObject({
+      phase: "done",
+      endReason: "completed",
+      round: 20,
+      currentTurnIdx: 0,
+      answer: { ko: "사과", en: "apple" },
+    });
+    expect(state).not.toHaveProperty("winnerId");
+    expect(state.history).toHaveLength(20);
+    expect(state.history.at(-1)).toMatchObject({
+      kind: "question",
+      playerId: "guest",
+    });
+  });
+
+  it("열아홉 질문 뒤 오답은 스무 번째 활동으로 정답을 공개하고 끝낸다", () => {
+    let room = prepareRoom();
+    for (let index = 0; index < 19; index += 1) {
+      room = askCurrentPlayer(room, 240 + index, 340 + index);
+    }
+    const stateBeforeGuess = room.gameState as unknown as MysteryRoomState;
+    const userId = stateBeforeGuess.turnOrder[stateBeforeGuess.currentTurnIdx];
+    const ended = changedRoom(applyMystery(
+      room,
+      "mystery-guess",
+      { locale: "en", guess: "book" },
+      {
+        userId,
+        userName: "Guest",
+        commandIndex: 259,
+        nextRoundId: commandId(359),
+      },
+    ));
+    const state = ended.gameState as unknown as MysteryRoomState;
+
+    expect(ended.status).toBe("ended");
+    expect(state).toMatchObject({
+      phase: "done",
+      endReason: "completed",
+      round: 20,
+      currentTurnIdx: 0,
+      answer: { ko: "사과", en: "apple" },
+    });
+    expect(state.history).toHaveLength(20);
+    expect(state.history.at(-1)).toMatchObject({
+      kind: "guess",
+      playerId: "guest",
+      correct: false,
+    });
+  });
+
   it("같은 오답 명령 재생은 기록과 라운드를 다시 늘리지 않는다", () => {
     const room = prepareRoom();
     const body = {
@@ -381,6 +535,40 @@ describe("미스터리 박스 방 판정기", () => {
     expect(replay).toMatchObject({ kind: "replayed", room: changed });
     const state = replay.room.gameState as unknown as MysteryRoomState;
     expect(state.round).toBe(2);
+    expect(state.history).toHaveLength(1);
+    expect(state.recentCommandIds.filter((id) => id === body.commandId)).toHaveLength(1);
+  });
+
+  it("같은 질문 명령 재생은 점수와 라운드를 다시 늘리지 않는다", () => {
+    const room = prepareRoom();
+    const body = {
+      commandId: commandId(61),
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      playId: room.playId,
+      roundId: room.gameState.roundId,
+      locale: "ko",
+      question: "먹을 수 있나요?",
+    };
+    const input = {
+      userId: "host",
+      userName: "Host",
+      action: "mystery-ask",
+      body,
+      now: 400,
+      random: () => 0,
+      randomUUID: () => commandId(121),
+    };
+    const changed = changedRoom(applyQuestionGameRoomCommand({ room, ...input }));
+    const replay = applyQuestionGameRoomCommand({ room: changed, ...input });
+
+    expect(replay).toMatchObject({ kind: "replayed", room: changed });
+    const state = replay.room.gameState as unknown as MysteryRoomState;
+    expect(state).toMatchObject({
+      round: 2,
+      currentTurnIdx: 1,
+      scores: { host: 1, guest: 0 },
+    });
     expect(state.history).toHaveLength(1);
     expect(state.recentCommandIds.filter((id) => id === body.commandId)).toHaveLength(1);
   });
@@ -573,8 +761,18 @@ describe("미스터리 박스 방 판정기", () => {
   it.each([
     ["빠진 참가자", ["guest", "third"], { guest: 0, third: 0 }],
     [
+      "차례에만 빠진 참가자",
+      ["guest", "third"],
+      { host: 0, guest: 0, third: 0 },
+    ],
+    [
       "중복 차례",
       ["host", "guest", "guest"],
+      { host: 0, guest: 0, third: 0 },
+    ],
+    [
+      "차례에 중복된 이탈자",
+      ["host", "host", "guest", "third"],
       { host: 0, guest: 0, third: 0 },
     ],
   ] as const)("%s 상태를 이탈 중에 복원하지 않는다", (_name, turnOrder, scores) => {

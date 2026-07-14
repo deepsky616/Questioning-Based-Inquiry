@@ -303,7 +303,10 @@ const ATTRIBUTE_PATTERNS: Record<
   Record<MysteryAttribute, readonly RegExp[]>
 > = {
   ko: {
-    living: [/(?<![가-힣])살아\s*있/u, koreanNoun("생물")],
+    living: [
+      koreanForm("살아\\s*있(?:나요|습니까|는|다|어요|어)?"),
+      koreanNoun("생물"),
+    ],
     animal: [koreanNoun("동물"), koreanNoun("짐승")],
     plant: [
       koreanNoun("식물"),
@@ -312,8 +315,8 @@ const ATTRIBUTE_PATTERNS: Record<
       koreanNoun("풀"),
     ],
     edible: [
-      /(?<![가-힣])먹을\s*수/u,
-      /(?<![가-힣])먹는/u,
+      koreanForm("먹을\\s*수"),
+      koreanForm("먹(?:는가요|나요|습니까|는다|는)"),
       koreanNoun("음식"),
       koreanNoun("식용"),
     ],
@@ -328,27 +331,45 @@ const ATTRIBUTE_PATTERNS: Record<
       koreanNoun("대형"),
     ],
     colorful: [
-      /(?<![가-힣])알록달록/u,
-      /(?<![가-힣])색(?:깔|이\s*다양)/u,
-      /(?<![가-힣])화려/u,
+      koreanForm("알록달록(?:한가요|한|하나요|합니까|하다)?"),
+      koreanNoun("색깔"),
+      koreanForm("색이\\s*다양(?:한가요|한|하나요|합니까|하다)?"),
+      koreanForm("화려(?:한가요|한|하나요|합니까|하다)?"),
     ],
-    indoor: [/실내/u, /집\s*안/u, /방\s*안/u],
+    indoor: [
+      koreanNoun("실내"),
+      koreanNoun("집\\s*안"),
+      koreanNoun("방\\s*안"),
+    ],
     legs: [koreanNoun("다리"), koreanNoun("발")],
-    fly: [/(?<![가-힣])날\s*수/u, koreanNoun("날개"), koreanNoun("비행")],
+    fly: [
+      koreanForm("날\\s*수"),
+      koreanNoun("날개"),
+      koreanNoun("비행"),
+      koreanForm("비행(?:하나요|합니까|하다|할\\s*수)"),
+    ],
     humanMade: [
-      /사람이\s*만든/u,
+      koreanForm("사람이\\s*만든"),
       koreanNoun("인공"),
       koreanNoun("제품"),
       koreanNoun("발명"),
     ],
-    hard: [/(?<![가-힣])딱딱/u, /(?<![가-힣])단단/u, /(?<![가-힣])굳은/u],
-    wet: [/(?<![가-힣])젖/u, koreanNoun("물기"), /(?<![가-힣])축축/u],
+    hard: [
+      koreanForm("딱딱(?:한가요|한|하나요|합니까|하다)?"),
+      koreanForm("단단(?:한가요|한|하나요|합니까|하다)?"),
+      koreanForm("굳(?:은가요|은|나요|습니까|다)"),
+    ],
+    wet: [
+      koreanForm("젖(?:어|은|나요|습니까|었나요|다)"),
+      koreanNoun("물기"),
+      koreanForm("축축(?:한가요|한|하나요|합니까|하다)?"),
+    ],
     round: [
-      /(?<![가-힣])동그/u,
-      /(?<![가-힣])둥글/u,
-      /(?<![가-힣])둥근/u,
+      koreanForm("동그(?:란가요|란|랗나요|랗습니까|랗다)"),
+      koreanForm("둥글(?:나요|습니까|다|고|게)"),
+      koreanForm("둥근(?:가요|지)?"),
       koreanNoun("원형"),
-      /(?<![가-힣])공처럼/u,
+      koreanForm("공처럼"),
     ],
   },
   en: {
@@ -430,7 +451,7 @@ function isAttachedNegation(
   }
   if (locale === "en" && negation.end <= attribute.start) {
     const between = text.slice(negation.end, attribute.start);
-    return /^\s*(?:(?:it|this|that|the (?:item|object|thing))\s+)?(?:(?:is|are|was|were|be|being|have|has|had)\s+)?$/u
+    return /^\s*(?:(?:it|this|that|the (?:item|object|thing))\s+)?(?:(?:is|are|was|were|be|being|have|has|had)\s+)?(?:(?:a|an|the)\s+)?$/u
       .test(between);
   }
   if (locale === "ko" && attribute.end <= negation.start) {

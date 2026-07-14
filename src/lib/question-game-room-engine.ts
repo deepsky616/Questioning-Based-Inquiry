@@ -65,6 +65,7 @@ export interface QuestionGameRoomLeaveContext {
   room: GameRoom;
   userId: string;
   wasCurrentTurn?: boolean;
+  wasInTurnOrderExactlyOnce?: boolean;
   now?: number;
   random?: () => number;
   randomUUID?: () => string;
@@ -522,6 +523,7 @@ function leaveQuestionGameRoomWithResolvedEngine(
     | { turnOrder: string[]; currentTurnIdx: number }
     | undefined;
   let wasCurrentTurn = false;
+  let wasInTurnOrderExactlyOnce = false;
   if (
     Array.isArray(oldState.turnOrder) &&
     oldState.turnOrder.every((id) => typeof id === "string") &&
@@ -530,6 +532,9 @@ function leaveQuestionGameRoomWithResolvedEngine(
     const oldTurnOrder = oldState.turnOrder;
     wasCurrentTurn = oldTurnOrder[oldState.currentTurnIdx] === userId;
     const removedTurnIndex = oldTurnOrder.indexOf(userId);
+    wasInTurnOrderExactlyOnce = oldTurnOrder.filter(
+      (playerId) => playerId === userId,
+    ).length === 1;
     const turnOrder = oldTurnOrder.filter((id) => id !== userId);
     adjustedTurn = {
       turnOrder,
@@ -567,6 +572,7 @@ function leaveQuestionGameRoomWithResolvedEngine(
         ...input,
         room: structuredClone(commonRoom),
         wasCurrentTurn,
+        wasInTurnOrderExactlyOnce,
       });
     } catch {
       return unchanged("corrupt", room, "이탈 처리를 마치지 못했습니다");

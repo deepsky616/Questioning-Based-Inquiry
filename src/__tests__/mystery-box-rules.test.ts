@@ -45,6 +45,8 @@ describe("미스터리 박스 질문 규칙", () => {
     ["큰일인가요?", "ko"],
     ["작은아버지인가요?", "ko"],
     ["비행기인가요?", "ko"],
+    ["실내화인가요?", "ko"],
+    ["젖소인가요?", "ko"],
     ["먹을 수 있고 작은가요?", "ko"],
     ["Does it make a sound?", "en"],
     ["Is it small and edible?", "en"],
@@ -79,8 +81,19 @@ describe("미스터리 박스 질문 규칙", () => {
     ["날 수 없나요?", "ko", "yes"],
     ["Is it not edible?", "en", "no"],
     ["Can it not fly?", "en", "yes"],
+    ["Is it not an animal?", "en", "yes"],
+    ["Isn't it a plant?", "en", "no"],
   ] as const)("한 번 부정한 질문 %s은 값을 뒤집는다", (question, locale, expected) => {
     expect(classifyMysteryQuestion(question, APPLE_ITEM, locale)).toBe(
+      expected,
+    );
+  });
+
+  it.each([
+    ["실내에 있나요?", "no"],
+    ["젖어 있나요?", "no"],
+  ] as const)("경계를 좁혀도 자연스러운 질문 %s을 유지한다", (question, expected) => {
+    expect(classifyMysteryQuestion(question, APPLE_ITEM, "ko")).toBe(
       expected,
     );
   });

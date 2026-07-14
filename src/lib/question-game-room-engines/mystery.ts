@@ -4,6 +4,7 @@ import {
   getMysteryItem,
   isMysteryGuessCorrect,
   type MysteryAnswer,
+  type MysteryItem,
   type MysteryLocale,
 } from "@/lib/mystery-box-rules";
 import {
@@ -249,7 +250,8 @@ function hasValidPhase(state: MysteryRoomState): boolean {
   );
   const correctGuesses = guesses.filter(({ correct }) => correct);
   const lastHistoryItem = state.history.at(-1);
-  if (guesses.length > state.maxRounds || correctGuesses.length > 1) {
+  const activityCount = state.history.length;
+  if (activityCount > state.maxRounds || correctGuesses.length > 1) {
     return false;
   }
 
@@ -288,18 +290,18 @@ function hasValidPhase(state: MysteryRoomState): boolean {
     return false;
   }
   if (state.phase === "play") {
-    return guesses.length < state.maxRounds &&
+    return activityCount < state.maxRounds &&
       correctGuesses.length === 0 &&
-      state.round === guesses.length + 1 &&
+      state.round === activityCount + 1 &&
       state.winnerId === undefined &&
       state.answer === undefined &&
       state.endReason === undefined;
   }
 
   if (state.endReason === "insufficient-players") {
-    return guesses.length < state.maxRounds &&
+    return activityCount < state.maxRounds &&
       correctGuesses.length === 0 &&
-      state.round === guesses.length + 1 &&
+      state.round === activityCount + 1 &&
       state.winnerId === undefined &&
       hasExpectedAnswer(state, state.private.itemId);
   }
@@ -309,17 +311,16 @@ function hasValidPhase(state: MysteryRoomState): boolean {
   }
   const lastGuess = guesses.at(-1);
   if (correctGuesses.length === 1) {
-    return guesses.length > 0 &&
-      state.round === guesses.length &&
+    return activityCount > 0 &&
+      state.round === activityCount &&
       lastGuess?.correct === true &&
       lastHistoryItem === lastGuess &&
       state.winnerId === lastGuess.playerId;
   }
-  return guesses.length === state.maxRounds &&
+  return activityCount === state.maxRounds &&
     state.round === state.maxRounds &&
     state.winnerId === undefined &&
-    lastGuess?.correct === false &&
-    lastHistoryItem === lastGuess;
+    lastHistoryItem !== undefined;
 }
 
 export function readMysteryState(value: unknown): MysteryRoomState | null {
@@ -649,6 +650,42 @@ function startMystery(
   });
 }
 
+function finishOrAdvanceMysteryActivity(
+  context: QuestionGameRoomEngineContext,
+  state: MysteryRoomState,
+  item: MysteryItem,
+  history: MysteryHistoryItem[],
+  scores: Record<string, number> = state.scores,
+): QuestionGameEngineResult {
+  const activityCount = history.length;
+  const currentTurnIdx =
+    (state.currentTurnIdx + 1) % state.turnOrder.length;
+  if (activityCount >= state.maxRounds) {
+    return changed(
+      context,
+      {
+        ...state,
+        phase: "done",
+        endReason: "completed",
+        round: state.maxRounds,
+        currentTurnIdx,
+        history,
+        scores,
+        answer: { ...item.names },
+      },
+      "ended",
+    );
+  }
+  return changed(context, {
+    ...state,
+    roundId: context.randomUUID(),
+    round: activityCount + 1,
+    currentTurnIdx,
+    history,
+    scores,
+  });
+}
+
 function askMysteryQuestion(
   context: QuestionGameRoomEngineContext,
   state: MysteryRoomState,
@@ -685,9 +722,11 @@ function askMysteryQuestion(
     };
   }
 
-  return changed(context, {
-    ...state,
-    history: [
+  return finishOrAdvanceMysteryActivity(
+    context,
+    state,
+    item,
+    [
       ...state.history,
       {
         kind: "question",
@@ -698,8 +737,8 @@ function askMysteryQuestion(
         answer: classifyMysteryQuestion(question, item, locale),
       },
     ],
-    scores: { ...state.scores, [context.userId]: score + 1 },
-  });
+    { ...state.scores, [context.userId]: score + 1 },
+  );
 }
 
 function guessMysteryItem(
@@ -723,9 +762,7 @@ function guessMysteryItem(
       message: "미스터리 박스 비공개 상태가 손상되었습니다",
     };
   }
-  const activityCount = state.history.filter(
-    ({ kind }) => kind === "guess",
-  ).length;
+  const activityCount = state.history.length;
   if (activityCount >= state.maxRounds) {
     return {
       kind: "conflict",
@@ -759,38 +796,11 @@ function guessMysteryItem(
       "ended",
     );
   }
-  if (nextActivityCount >= state.maxRounds) {
-    return changed(
-      context,
-      {
-        ...state,
-        phase: "done",
-        endReason: "completed",
-        round: state.maxRounds,
-        currentTurnIdx: (state.currentTurnIdx + 1) % state.turnOrder.length,
-        history: [
-          ...state.history,
-          {
-            kind: "guess",
-            playerId: context.userId,
-            playerName: context.userName,
-            locale,
-            guess,
-            correct: false,
-          },
-        ],
-        answer: { ...item.names },
-      },
-      "ended",
-    );
-  }
-
-  return changed(context, {
-    ...state,
-    roundId: context.randomUUID(),
-    round: nextActivityCount + 1,
-    currentTurnIdx: (state.currentTurnIdx + 1) % state.turnOrder.length,
-    history: [
+  return finishOrAdvanceMysteryActivity(
+    context,
+    state,
+    item,
+    [
       ...state.history,
       {
         kind: "guess",
@@ -801,7 +811,7 @@ function guessMysteryItem(
         correct: false,
       },
     ],
-  });
+  );
 }
 
 function readMysteryStateForLeave(
@@ -812,7 +822,8 @@ function readMysteryStateForLeave(
   if (
     !isRecord(context.room.gameState) ||
     !isScoreMap(context.room.gameState.scores) ||
-    !isStringArray(context.room.gameState.turnOrder)
+    !isStringArray(context.room.gameState.turnOrder) ||
+    context.wasInTurnOrderExactlyOnce !== true
   ) {
     return null;
   }
