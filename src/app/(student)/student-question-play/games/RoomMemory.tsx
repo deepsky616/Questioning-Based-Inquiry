@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Dices, HelpCircle, LoaderCircle, MessageCircle } from "lucide-react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,26 @@ interface Props {
   onLeave: () => void;
 }
 
+type MissResolvePhase =
+  | "idle"
+  | "in-flight"
+  | "timer"
+  | "wait-version"
+  | "settled";
+
+interface MissResolveProgress {
+  key: string;
+  commandId: string;
+  playId: string;
+  roundId: string;
+  revealId: string;
+  observedVersion: number;
+  attemptedVersion: number;
+  phase: MissResolvePhase;
+  timer: ReturnType<typeof setTimeout> | null;
+  cancelled: boolean;
+}
+
 const MAX_RESOLVE_RETRY_MS = 2_500;
 
 function isRetryDelay(value: unknown): value is number {
@@ -68,14 +88,22 @@ export default function RoomMemory({
   const { ask, loading: aiLoading } = useAIPlay();
   const mountedRef = useRef(false);
   const identityRef = useRef(roomIdentity(room.code, room.createdAt));
+  const roomVersionRef = useRef(room.version);
   const preparingRef = useRef(false);
+  const onActionRef = useRef(onAction);
+  const missResolveRef = useRef<MissResolveProgress | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [rolling, setRolling] = useState(false);
   const [pendingCardId, setPendingCardId] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     identityRef.current = roomIdentity(room.code, room.createdAt);
-  }, [room.code, room.createdAt]);
+    roomVersionRef.current = room.version;
+  }, [room.code, room.createdAt, room.version]);
+
+  useLayoutEffect(() => {
+    onActionRef.current = onAction;
+  }, [onAction]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -109,33 +137,110 @@ export default function RoomMemory({
   const roundId = state?.roundId;
   const revealId = missReveal?.revealId;
 
+  const runMissResolve = useCallback(async function run(
+    progress: MissResolveProgress,
+  ): Promise<void> {
+    if (
+      progress.cancelled ||
+      missResolveRef.current !== progress ||
+      (progress.phase !== "idle" && progress.phase !== "wait-version")
+    ) {
+      return;
+    }
+
+    const attemptedVersion = progress.observedVersion;
+    progress.attemptedVersion = attemptedVersion;
+    progress.phase = "in-flight";
+
+    const resumeAfterFailure = () => {
+      if (progress.cancelled || missResolveRef.current !== progress) return;
+      if (progress.observedVersion > attemptedVersion) {
+        progress.phase = "idle";
+        void run(progress);
+      } else {
+        progress.phase = "wait-version";
+      }
+    };
+
+    let result;
+    try {
+      result = await onActionRef.current(
+        "memory-resolve-miss",
+        {
+          playId: progress.playId,
+          roundId: progress.roundId,
+          revealId: progress.revealId,
+        },
+        { commandId: progress.commandId },
+      );
+    } catch {
+      resumeAfterFailure();
+      return;
+    }
+
+    if (progress.cancelled || missResolveRef.current !== progress) return;
+    if (!result.ok) {
+      resumeAfterFailure();
+      return;
+    }
+
+    const retryAfterMs = result.result?.retryAfterMs;
+    if (!isRetryDelay(retryAfterMs)) {
+      progress.phase = "settled";
+      return;
+    }
+
+    progress.phase = "timer";
+    progress.timer = setTimeout(() => {
+      if (progress.cancelled || missResolveRef.current !== progress) return;
+      progress.timer = null;
+      progress.phase = "idle";
+      void run(progress);
+    }, Math.min(retryAfterMs, MAX_RESOLVE_RETRY_MS));
+  }, []);
+
   useEffect(() => {
     if (!missKey || !playId || !roundId || !revealId) return;
 
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const commandId = crypto.randomUUID();
-    const resolveMiss = async () => {
-      const result = await onAction(
-        "memory-resolve-miss",
-        { playId, roundId, revealId },
-        { commandId },
-      );
-      if (cancelled || !result.ok) return;
-      const retryAfterMs = result.result?.retryAfterMs;
-      if (!isRetryDelay(retryAfterMs)) return;
-      timer = setTimeout(
-        () => void resolveMiss(),
-        Math.min(retryAfterMs, MAX_RESOLVE_RETRY_MS),
-      );
+    const progress: MissResolveProgress = {
+      key: missKey,
+      commandId: crypto.randomUUID(),
+      playId,
+      roundId,
+      revealId,
+      observedVersion: roomVersionRef.current,
+      attemptedVersion: roomVersionRef.current,
+      phase: "idle",
+      timer: null,
+      cancelled: false,
     };
+    missResolveRef.current = progress;
+    void runMissResolve(progress);
 
-    void resolveMiss();
     return () => {
-      cancelled = true;
-      if (timer !== null) clearTimeout(timer);
+      progress.cancelled = true;
+      if (progress.timer !== null) clearTimeout(progress.timer);
+      progress.timer = null;
+      progress.phase = "settled";
+      if (missResolveRef.current === progress) {
+        missResolveRef.current = null;
+      }
     };
-  }, [missKey, onAction, playId, revealId, roundId]);
+  }, [missKey, playId, revealId, roundId, runMissResolve]);
+
+  useEffect(() => {
+    const progress = missResolveRef.current;
+    if (!progress || progress.key !== missKey || progress.cancelled) return;
+
+    progress.observedVersion = Math.max(progress.observedVersion, room.version);
+    if (
+      progress.phase === "wait-version" &&
+      progress.observedVersion > progress.attemptedVersion
+    ) {
+      progress.phase = "idle";
+      void runMissResolve(progress);
+    }
+  }, [missKey, room.version, runMissResolve]);
 
   async function prepareGame(difficulty: MemoryDifficulty) {
     if (

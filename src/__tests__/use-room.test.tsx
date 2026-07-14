@@ -4,6 +4,15 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameRoom, RoomActionResult } from "@/lib/question-games-data";
 import { useRoom } from "@/app/(student)/student-question-play/games/useRoom";
+import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
+import {
+  createMemoryState,
+  readMemoryState,
+  type MemoryRoomState,
+} from "@/lib/question-game-room-engines/memory";
+
+const MEMORY_PLAY_ID = "22222222-2222-4222-8222-222222222222";
+const MEMORY_ROUND_ID = "33333333-3333-4333-8333-333333333333";
 
 function makeRoom(version = 1, code = "1234"): GameRoom {
   return {
@@ -21,6 +30,41 @@ function makeRoom(version = 1, code = "1234"): GameRoom {
     version,
     createdAt: 1,
     updatedAt: 1,
+  };
+}
+
+function makeRollingMemoryRoom(version = 7): GameRoom {
+  const pairs = Array.from({ length: 6 }, (_, index) => ({
+    id: `pair-${index}`,
+    question: `질문 ${index + 1}`,
+    answer: `대답 ${index + 1}`,
+  }));
+  const state: MemoryRoomState = {
+    ...createMemoryState(),
+    phase: "rolling",
+    roundId: MEMORY_ROUND_ID,
+    difficulty: "easy",
+    pairs,
+    qCards: pairs.map(({ id }, index) => ({
+      id: `question-${index}`,
+      pairId: id,
+      type: "q",
+    })),
+    aCards: pairs.map(({ id }, index) => ({
+      id: `answer-${index}`,
+      pairId: id,
+      type: "a",
+    })),
+    scores: { "user-1": 0 },
+    maxAttempts: QUESTION_GAME_RULES.memory.targets.room.easy,
+  };
+  expect(readMemoryState(state)).toEqual(state);
+  return {
+    ...makeRoom(version),
+    gameId: "memory",
+    status: "playing",
+    playId: MEMORY_PLAY_ID,
+    gameState: state as unknown as Record<string, unknown>,
   };
 }
 
@@ -187,11 +231,8 @@ describe("useRoom sendAction", () => {
   );
 
   it("버전 2 memory-roll은 최신 기대 버전과 실행 및 라운드 식별값을 보낸다", async () => {
-    const currentRoom = {
-      ...makeRoom(7),
-      playId: "play-1",
-      gameState: { stateVersion: 2, game: "memory", roundId: "round-1" },
-    };
+    const currentRoom = makeRollingMemoryRoom(7);
+    const commandId = "00000000-0000-4000-8000-000000000401";
     let actionBody: Record<string, unknown> | null = null;
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const body = requestBody(init);
@@ -206,18 +247,18 @@ describe("useRoom sendAction", () => {
     await act(async () => {
       await result.current.joinRoom("1234");
       await result.current.sendAction("memory-roll", {
-        playId: "play-1",
-        roundId: "round-1",
-      });
+        playId: MEMORY_PLAY_ID,
+        roundId: MEMORY_ROUND_ID,
+      }, { commandId });
     });
 
-    expect(actionBody).toMatchObject({
+    expect(actionBody).toEqual({
       action: "memory-roll",
-      playId: "play-1",
-      roundId: "round-1",
+      playId: MEMORY_PLAY_ID,
+      roundId: MEMORY_ROUND_ID,
       expectedVersion: 7,
       expectedCreatedAt: 1,
-      commandId: expect.any(String),
+      commandId,
     });
     unmount();
   });

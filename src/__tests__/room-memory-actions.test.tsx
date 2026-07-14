@@ -151,6 +151,30 @@ function makeMissState(
   });
 }
 
+function makeCompletedState(): MemoryRoomState {
+  const playState = makePlayState();
+  const state: MemoryRoomState = {
+    ...playState,
+    phase: "done",
+    endReason: "completed",
+    takenIds: [
+      ...playState.qCards.map(({ id }) => id),
+      ...playState.aCards.map(({ id }) => id),
+    ],
+    revealedIds: [],
+    scores: { host: playState.pairs.length, other: 0 },
+    attempts: playState.pairs.length,
+    lastReveal: {
+      revealId: "reveal-completed",
+      result: "match",
+      turnPlayerId: "host",
+      resolveAt: 9999,
+    },
+  };
+  expect(readMemoryState(state)).not.toBeNull();
+  return state;
+}
+
 function makeProps(
   room: GameRoom,
   onAction: RoomActionHandler,
@@ -172,6 +196,20 @@ function success(
   result?: RoomCommandResult,
 ): RoomActionResult {
   return { ok: true, room, ...(result ? { result } : {}) };
+}
+
+function failure(room: GameRoom): RoomActionResult {
+  return { ok: false, room, status: 409, reason: "conflict" };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
 }
 
 function generatedPairs(count: number) {
@@ -478,6 +516,115 @@ describe("실패 공개 복원", () => {
     expect(onAction.mock.calls[1]).toEqual(onAction.mock.calls[0]);
   });
 
+  it("실패 뒤 같은 공개의 높은 버전이 오면 같은 명령으로 복원을 재개한다", async () => {
+    const room = makeRoom(makeMissState());
+    const nextRoom = makeRoom(makeMissState(), { version: 8 });
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockResolvedValueOnce(failure(nextRoom))
+      .mockResolvedValue(success(nextRoom));
+    stubCommandIds("00000000-0000-4000-8000-000000000306");
+
+    const view = render(<RoomMemory {...makeProps(room, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <RoomMemory
+        {...makeProps({
+          ...room,
+          gameState: { ...room.gameState },
+        }, onAction, "other")}
+      />,
+    );
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    view.rerender(<RoomMemory {...makeProps(nextRoom, onAction, "other")} />);
+    await flushEffects();
+
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction.mock.calls[1]).toEqual(onAction.mock.calls[0]);
+  });
+
+  it("높은 버전이 요청 실패보다 먼저 와도 실패 뒤 같은 명령으로 재개한다", async () => {
+    const room = makeRoom(makeMissState());
+    const nextRoom = makeRoom(makeMissState(), { version: 8 });
+    const firstRequest = deferred<RoomActionResult>();
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockReturnValueOnce(firstRequest.promise)
+      .mockResolvedValue(success(nextRoom));
+    stubCommandIds("00000000-0000-4000-8000-000000000307");
+
+    const view = render(<RoomMemory {...makeProps(room, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    view.rerender(<RoomMemory {...makeProps(nextRoom, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    firstRequest.resolve(failure(nextRoom));
+    await flushEffects();
+
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction.mock.calls[1]).toEqual(onAction.mock.calls[0]);
+  });
+
+  it("네트워크 예외 뒤 같은 공개의 높은 버전이 오면 복원을 재개한다", async () => {
+    const room = makeRoom(makeMissState());
+    const nextRoom = makeRoom(makeMissState(), { version: 8 });
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValue(success(nextRoom));
+    stubCommandIds("00000000-0000-4000-8000-000000000308");
+
+    const view = render(<RoomMemory {...makeProps(room, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    view.rerender(<RoomMemory {...makeProps(nextRoom, onAction, "other")} />);
+    await flushEffects();
+
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction.mock.calls[1]).toEqual(onAction.mock.calls[0]);
+  });
+
+  it("정상 재시도 대기 중 버전이 올라가도 타이머를 다시 시작하지 않는다", async () => {
+    vi.useFakeTimers();
+    const room = makeRoom(makeMissState());
+    const nextRoom = makeRoom(makeMissState(), { version: 8 });
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockResolvedValueOnce(success(room, { retryAfterMs: 1200 }))
+      .mockResolvedValue(success(nextRoom));
+    stubCommandIds("00000000-0000-4000-8000-000000000309");
+
+    const view = render(<RoomMemory {...makeProps(room, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    view.rerender(<RoomMemory {...makeProps(nextRoom, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(599);
+    });
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction.mock.calls[1]).toEqual(onAction.mock.calls[0]);
+  });
+
   it.each([
     ["없음", undefined],
     ["음수", -1],
@@ -534,17 +681,57 @@ describe("실패 공개 복원", () => {
       { commandId: "00000000-0000-4000-8000-000000000304" },
     );
   });
+
+  it("실행 수명이 바뀌면 옛 지연 응답을 버리고 새 명령으로 시작한다", async () => {
+    vi.useFakeTimers();
+    const oldRoom = makeRoom(makeMissState());
+    const newRoom = makeRoom(
+      makeMissState("reveal-1", { roundId: "round-2" }),
+      { createdAt: 20, updatedAt: 20, version: 1, playId: "play-2" },
+    );
+    const oldRequest = deferred<RoomActionResult>();
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockReturnValueOnce(oldRequest.promise)
+      .mockResolvedValue(success(newRoom));
+    stubCommandIds(
+      "00000000-0000-4000-8000-000000000310",
+      "00000000-0000-4000-8000-000000000311",
+    );
+
+    const view = render(<RoomMemory {...makeProps(oldRoom, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    view.rerender(<RoomMemory {...makeProps(newRoom, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction).toHaveBeenLastCalledWith(
+      "memory-resolve-miss",
+      { playId: "play-2", roundId: "round-2", revealId: "reveal-1" },
+      { commandId: "00000000-0000-4000-8000-000000000311" },
+    );
+
+    oldRequest.resolve(success(oldRoom, { retryAfterMs: 1200 }));
+    await flushEffects();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1200);
+    });
+    expect(onAction).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("RoomMemory 결과 흐름", () => {
-  it("방장은 공용 결과 화면에서 대기실로 돌아갈 수 있다", async () => {
-    const room = makeRoom(makePlayState(), { status: "ended" });
+  it("방장은 엄격한 완료 결과에서 대기실 다시 시작을 보존한다", async () => {
+    const completedState = makeCompletedState();
+    expect(readMemoryState(completedState)).toEqual(completedState);
+    const room = makeRoom(completedState, { status: "ended" });
     const onAction = vi
       .fn<RoomActionHandler>()
       .mockResolvedValue(success(room));
     vi.stubGlobal("fetch", vi.fn(async () => new Response(
-      JSON.stringify({ awards: [] }),
-      { status: 200, headers: { "Content-Type": "application/json" } },
+      JSON.stringify({ error: "not-ready" }),
+      { status: 409, headers: { "Content-Type": "application/json" } },
     )));
 
     render(<RoomMemory {...makeProps(room, onAction)} />);
@@ -552,6 +739,7 @@ describe("RoomMemory 결과 흐름", () => {
     const returnButton = await screen.findByRole("button", { name: /대기실/ });
     fireEvent.click(returnButton);
     await waitFor(() => {
+      expect(onAction).toHaveBeenCalledTimes(1);
       expect(onAction).toHaveBeenCalledWith("restart");
     });
   });
@@ -569,7 +757,9 @@ describe("RoomMemory 명령 소스 경계", () => {
 
     expect(source).not.toMatch(/\bset-state\b|\bupdate-state\b/);
     expect(source).not.toMatch(/Math\.random|Date\.now/);
-    const actions = [...source.matchAll(/onAction\(\s*["']([^"']+)["']/g)]
+    const actions = [
+      ...source.matchAll(/(?:onAction|onActionRef\.current)\(\s*["']([^"']+)["']/g),
+    ]
       .map((match) => match[1]);
     expect(new Set(actions)).toEqual(new Set([
       "memory-prepare",
@@ -677,6 +867,13 @@ describe("지역 메모리 최대 시도", () => {
     });
 
     expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
+    expect(awardMocks.award).toHaveBeenCalledTimes(1);
+    expect(awardMocks.award).toHaveBeenCalledWith({
+      mode: "solo",
+      gameId: "memory",
+      validQuestions: 1,
+      completed: true,
+    });
   });
 
   it("모든 짝을 찾으면 최대 시도 전에 결과로 이동한다", async () => {
