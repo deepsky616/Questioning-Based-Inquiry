@@ -19,6 +19,7 @@ import RoomDice from "../games/RoomDice";
 import RoomStoryDice from "../games/RoomStoryDice";
 import RoomMemory from "../games/RoomMemory";
 import RoomLadder from "../games/RoomLadder";
+import RoomMysteryBox from "../games/RoomMysteryBox";
 import RoomCompatibilityNotice, {
   shouldShowRoomCompatibilityNotice,
 } from "../games/RoomCompatibilityNotice";
@@ -67,6 +68,7 @@ const ROOM_GAME_MAP: Record<string, RoomGameComponent> = {
   "story-dice": RoomStoryDice,
   memory: RoomMemory,
   ladder: RoomLadder,
+  "mystery-box": RoomMysteryBox,
 };
 
 export default function GamePage({ params }: { params: Promise<{ gameId: string }> }) {
@@ -173,15 +175,23 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
         </>
       );
     }
-    // 멀티 미지원 게임(미스터리 박스): 방 참가자 명단으로 로컬 진행
+    // 등록되지 않은 진행 방은 지역 상태로 대신 실행하지 않는다.
     return (
       <>
         {roomErrorAlert}
-        <GameComponent
-          game={game}
-          onBack={handleLeaveRoom}
-          config={{ mode: "friend", players: room.players.map((p) => p.name) }}
-        />
+        <div className="mx-auto max-w-lg space-y-5">
+          <div className="border-y border-border bg-card px-5 py-6 text-center text-card-foreground">
+            <p className="font-black">{t("notFound")}</p>
+            <Button
+              type="button"
+              variant="outline"
+              className="mt-4 rounded-lg"
+              onClick={handleLeaveRoom}
+            >
+              {t("backToList")}
+            </Button>
+          </div>
+        </div>
       </>
     );
   }

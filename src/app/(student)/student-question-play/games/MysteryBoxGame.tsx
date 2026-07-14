@@ -5,8 +5,11 @@ import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
 import { useSingleAward, AwardBadge } from "./useSingleAward";
-import { GameResultReview } from "./GameResultReview";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
+import {
+  QUESTION_GAME_LIMITS,
+  QUESTION_GAME_RULES,
+} from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -85,10 +88,14 @@ function detectAnswer(q: string, item: MysteryItem, locale: string): Answer {
   return locale === "en" ? "Not sure" : "잘 모르겠어요";
 }
 
-const MAX_Q = 20;
 const AI_NAME = "🤖 AI";
 const AI_THINK_MS = 1000;
-interface QAEntry { asker: string; question: string; answer: Answer | string }
+interface QAEntry {
+  kind: "question" | "guess";
+  asker: string;
+  question: string;
+  answer: Answer | string;
+}
 interface AIItem { name: string; category: string; emoji: string }
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
@@ -97,6 +104,16 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const text = getQuestionGameText(locale);
   const isAI = config.mode === "ai";
   const isSolo = config.mode === "solo";
+  const maxActivities = QUESTION_GAME_RULES["mystery-box"].targets[
+    isAI ? "ai" : "solo"
+  ].count;
+  const activityDescription = locale === "en"
+    ? isAI
+      ? `Take turns with AI. Each question or guess uses one of ${maxActivities} activities.`
+      : `Use questions or guesses to solve it within ${maxActivities} activities.`
+    : isAI
+      ? `인공지능과 번갈아 진행해요. 질문이나 추측을 합쳐 ${maxActivities}번 안에 맞혀 보세요.`
+      : `질문이나 추측을 합쳐 ${maxActivities}번 안에 맞혀 보세요.`;
   const { ask, loading: aiLoading } = useAIPlay();
   const { award, result: awardResult } = useSingleAward();
 
@@ -108,7 +125,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   })();
   const hasTurns = playersList.length > 1;
 
-  const [phase, setPhase] = useState<"start"|"playing"|"guessing"|"win"|"lose">("start");
+  const [phase, setPhase] = useState<"start"|"playing"|"win"|"lose">("start");
   const [localItem, setLocalItem] = useState<MysteryItem | null>(null);
   const [aiItem, setAiItem] = useState<AIItem | null>(null);
   const [qaList, setQaList] = useState<QAEntry[]>([]);
@@ -121,7 +138,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
   const item = isAI ? aiItem : localItem;
   const itemName = isAI ? (aiItem?.name ?? "") : (localItem?.name ?? "");
-  const remaining = MAX_Q - qaList.length;
+  const remaining = Math.max(0, maxActivities - qaList.length);
   const currentPlayer = playersList[turnIdx % playersList.length] ?? text.me;
   const isAITurn = isAI && currentPlayer === AI_NAME;
   const isHumanTurn = !isAITurn;
@@ -133,7 +150,9 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     award({
       mode: isAI ? "ai" : "solo",
       gameId: "mystery-box",
-      validQuestions: qaList.filter((qa) => qa.asker !== AI_NAME).length,
+      validQuestions: qaList.filter(
+        (qa) => qa.kind === "question" && qa.asker !== AI_NAME,
+      ).length,
       completed: phase === "win",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,8 +195,13 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     return text.notSure;
   }
 
-  function advanceTurnAfter(newList: QAEntry[]) {
-    if (newList.length >= MAX_Q) { setPhase("guessing"); return; }
+  function recordActivity(newList: QAEntry[]) {
+    setQaList(newList);
+    if (newList.length >= maxActivities) {
+      setIsGuessing(false);
+      setPhase("lose");
+      return;
+    }
     if (hasTurns) setTurnIdx((t) => t + 1);
   }
 
@@ -186,10 +210,12 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     if (!inputQ.trim() || aiLoading || !isHumanTurn) return;
     const q = inputQ.trim();
     const ans = await answerFor(q);
-    const newList = [...qaList, { asker: currentPlayer, question: q, answer: ans }];
-    setQaList(newList);
+    const newList: QAEntry[] = [
+      ...qaList,
+      { kind: "question", asker: currentPlayer, question: q, answer: ans },
+    ];
     setInputQ("");
-    advanceTurnAfter(newList);
+    recordActivity(newList);
   }
 
   // AI 차례: 스스로 질문을 만들고, 확신하면 추측까지 (turnIdx 변화로 1회 실행)
@@ -204,20 +230,36 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
       const guess = (turnRes?.parsed?.guess ?? "").trim();
       if (guess) {
         const correct = guess.includes(aiItem.name) || aiItem.name.includes(guess);
-        if (correct) { setWinner(AI_NAME); setPhase("lose"); return; }
+        const guessList: QAEntry[] = [
+          ...qaList,
+          {
+            kind: "guess",
+            asker: AI_NAME,
+            question: locale === "en"
+              ? `"${guess}" ${text.guessSuffix}`
+              : `“${guess}” ${text.guessSuffix}`,
+            answer: correct ? text.correct : text.wrongGuess,
+          },
+        ];
+        if (correct) {
+          setQaList(guessList);
+          setWinner(AI_NAME);
+          setPhase("lose");
+          return;
+        }
         // 틀린 추측 → 차례 한 번 소모
-        const missList = [...qaList, { asker: AI_NAME, question: locale === "en" ? `"${guess}" ${text.guessSuffix}` : `“${guess}” ${text.guessSuffix}`, answer: text.wrongGuess }];
-        setQaList(missList);
-        advanceTurnAfter(missList);
+        recordActivity(guessList);
         return;
       }
 
       const q = (turnRes?.parsed?.question ?? "").trim() || text.aiQuestionFallback;
       const ans = await answerFor(q);
       if (cancelled) return;
-      const newList = [...qaList, { asker: AI_NAME, question: q, answer: ans }];
-      setQaList(newList);
-      advanceTurnAfter(newList);
+      const newList: QAEntry[] = [
+        ...qaList,
+        { kind: "question", asker: AI_NAME, question: q, answer: ans },
+      ];
+      recordActivity(newList);
     }, AI_THINK_MS);
     return () => { cancelled = true; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -227,28 +269,39 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     if (!guessInput.trim() || !item) return;
     const g = guessInput.trim();
     const correct = g.includes(itemName) || itemName.includes(g);
-    if (correct) { setWinner(currentPlayer); setPhase("win"); return; }
-    // 틀림
-    if (phase === "guessing") { setPhase("lose"); return; }  // 마지막 강제 추측 실패
-    if (hasTurns) {
-      // 차례 모드: 추측 실패 = 차례 넘김
-      const missList = [...qaList, { asker: currentPlayer, question: locale === "en" ? `"${g}" ${text.guessSuffix}` : `“${g}” ${text.guessSuffix}`, answer: text.wrongGuess }];
-      setQaList(missList);
-      setGuessInput("");
-      setIsGuessing(false);
-      advanceTurnAfter(missList);
-    } else {
-      setPhase("lose");  // 솔로: 자발적 추측 실패 = 종료
+    const guessList: QAEntry[] = [
+      ...qaList,
+      {
+        kind: "guess",
+        asker: currentPlayer,
+        question: locale === "en"
+          ? `"${g}" ${text.guessSuffix}`
+          : `“${g}” ${text.guessSuffix}`,
+        answer: correct ? text.correct : text.wrongGuess,
+      },
+    ];
+    setGuessInput("");
+    setIsGuessing(false);
+    if (correct) {
+      setQaList(guessList);
+      setWinner(currentPlayer);
+      setPhase("win");
+      return;
     }
+    recordActivity(guessList);
   }
 
-  const answerColor = (a: string) =>
-    a === "네" || a === "Yes" ? "#10b981" : a === "아니오" || a === "No" ? "#ef4444" : "#9ca3af";
+  const answerClass = (answer: string) =>
+    answer === "네" || answer === "Yes" || answer === text.correct
+      ? "bg-emerald-700 text-white dark:bg-emerald-300 dark:text-emerald-950"
+      : answer === "아니오" || answer === "No" || answer === text.wrongGuess
+        ? "bg-rose-700 text-white dark:bg-rose-300 dark:text-rose-950"
+        : "bg-muted text-foreground";
 
   return (
-    <div className="max-w-xl mx-auto space-y-5">
+    <div className="mx-auto max-w-xl space-y-5 text-foreground">
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+        <button onClick={onBack} className="text-sm text-muted-foreground hover:text-foreground">{text.backToList}</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>
@@ -265,34 +318,34 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
       {/* 시작 */}
       {phase === "start" && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 flex flex-col items-center gap-6">
+        <div className="flex flex-col items-center gap-6 rounded-lg border border-border bg-card p-10 text-card-foreground shadow-sm">
           <div className="text-8xl">📦</div>
           {isAI ? (
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-black text-gray-800">{text.mysteryAiTitle}</h2>
-              <p className="text-gray-500 text-sm">{text.mysteryAiDesc(MAX_Q)}</p>
-              <div className="flex items-center justify-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2 mt-2">
+              <h2 className="text-2xl font-black text-foreground">{text.mysteryAiTitle}</h2>
+              <p className="text-sm text-muted-foreground">{activityDescription}</p>
+              <div className="mt-2 flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 dark:border-indigo-700 dark:bg-indigo-950">
                 <span className="text-xl">🤖</span>
-                <p className="text-indigo-600 text-sm font-medium">{text.mysteryAiAlso}</p>
+                <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">{text.mysteryAiAlso}</p>
               </div>
             </div>
           ) : (
             <div className="text-center">
-              <h2 className="text-2xl font-black text-gray-800">{text.mysteryTitle}</h2>
-              <p className="text-gray-500 text-sm mt-2">
-                {text.mysteryDesc(playersList.length, MAX_Q, hasTurns)}
+              <h2 className="text-2xl font-black text-foreground">{text.mysteryTitle}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {activityDescription}
               </p>
             </div>
           )}
           {hasTurns && !isAI && (
             <div className="flex flex-wrap justify-center gap-2">
               {playersList.map((p, i) => (
-                <span key={p} className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">{i + 1}. {p}</span>
+                <span key={p} className="rounded-lg bg-muted px-3 py-1 text-xs font-bold text-foreground">{i + 1}. {p}</span>
               ))}
             </div>
           )}
           {aiSetupError && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-sm text-center">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-200">
               {aiSetupError}
             </div>
           )}
@@ -305,55 +358,57 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
       )}
 
       {/* 게임 */}
-      {(phase === "playing" || phase === "guessing") && (
+      {phase === "playing" && (
         <div className="space-y-4">
           {/* 차례 표시 (AI/친구 모드) */}
-          {hasTurns && phase === "playing" && (
-            <div className="flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold"
-              style={{ background: `${game.accentColor}1a`, color: game.accentColor }}>
+          {hasTurns && (
+            <div className="flex items-center justify-center gap-2 rounded-lg border border-border bg-muted px-4 py-2 text-sm font-bold text-foreground">
               <span>{isAITurn ? "🤖" : "🙋"}</span>
               <span>{text.turnOf(currentPlayer)}</span>
             </div>
           )}
 
-          <div className="bg-white rounded-2xl shadow-sm border-2 p-6 flex items-center justify-between"
+          <div className="flex items-center justify-between rounded-lg border-2 bg-card p-6 text-card-foreground shadow-sm"
             style={{ borderColor: game.accentColor }}>
             <div className="text-center">
               <div className="text-6xl">📦</div>
-              {isAI && <p className="text-gray-400 text-xs mt-1">{text.secretItem}</p>}
+              {isAI && <p className="mt-1 text-xs text-muted-foreground">{text.secretItem}</p>}
             </div>
             <div className="text-center">
               <div className="text-4xl font-black" style={{ color: remaining <= 5 ? "#ef4444" : game.accentColor }}>
                 {remaining}
               </div>
-              <p className="text-gray-500 text-xs">{text.questionsLeft}</p>
+              <p className="text-xs text-muted-foreground">
+                {locale === "en" ? "Activities left" : "남은 활동"}
+              </p>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-gray-700">{qaList.length}</div>
-              <p className="text-gray-400 text-xs">{text.questionsAsked}</p>
+              <div className="text-2xl font-bold text-foreground">{qaList.length}</div>
+              <p className="text-xs text-muted-foreground">
+                {locale === "en" ? "Activities used" : "사용한 활동"}
+              </p>
             </div>
           </div>
 
-          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div className="h-2 rounded-full transition-all"
-              style={{ background: game.gradientCss, width: `${(qaList.length / MAX_Q) * 100}%` }} />
+              style={{ background: game.gradientCss, width: `${(qaList.length / maxActivities) * 100}%` }} />
           </div>
 
           {qaList.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 p-4 max-h-52 overflow-y-auto space-y-2">
+            <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border border-border bg-card p-4 text-card-foreground">
               {qaList.map((qa, i) => (
                 <div key={i} className="flex items-start gap-3">
-                  <span className="text-xs text-gray-400 w-5 flex-shrink-0 mt-0.5 font-medium">{i+1}</span>
+                  <span className="mt-0.5 w-5 flex-shrink-0 text-xs font-medium text-muted-foreground">{i+1}</span>
                   <div className="flex-1 min-w-0">
                     {hasTurns && (
-                      <span className={`mr-1 text-xs font-bold ${qa.asker === AI_NAME ? "text-indigo-500" : "text-gray-500"}`}>
+                      <span className={`mr-1 text-xs font-bold ${qa.asker === AI_NAME ? "text-indigo-700 dark:text-indigo-300" : "text-muted-foreground"}`}>
                         {qa.asker}
                       </span>
                     )}
-                    <span className="text-sm text-gray-700">{qa.question}</span>
+                    <span className="text-sm text-foreground">{qa.question}</span>
                   </div>
-                  <span className="font-black text-sm flex-shrink-0 px-2.5 py-0.5 rounded-full text-white"
-                    style={{ background: answerColor(qa.answer as string) }}>
+                  <span className={`flex-shrink-0 rounded-lg px-2.5 py-0.5 text-sm font-black ${answerClass(String(qa.answer))}`}>
                     {qa.answer}
                   </span>
                 </div>
@@ -363,8 +418,8 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
           {/* AI 생각 중 */}
           {isAITurn && phase === "playing" && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center">
-              <div className="flex items-center justify-center gap-2 text-indigo-600">
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-center dark:border-indigo-700 dark:bg-indigo-950">
+              <div className="flex items-center justify-center gap-2 text-indigo-800 dark:text-indigo-200">
                 <span className="w-4 h-4 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
                 <p className="text-sm font-bold">{text.aiMakingQuestion}</p>
               </div>
@@ -373,34 +428,36 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
           {/* 사람 차례 입력 */}
           {phase === "playing" && isHumanTurn && !isGuessing && (
-            <div className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
+            <div className="space-y-3 rounded-lg border border-border bg-card p-4 text-card-foreground">
               <textarea
-                className="w-full border-2 rounded-xl p-3 text-sm resize-none focus:outline-none h-20"
-                style={{ borderColor: "#e5e7eb" }}
-                onFocus={(e) => (e.target.style.borderColor = game.accentColor)}
-                onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+                aria-label={locale === "en" ? "Yes-or-no question" : "예 또는 아니오 질문"}
+                maxLength={QUESTION_GAME_LIMITS.question}
+                className="h-20 w-full resize-none rounded-lg border-2 border-input bg-background p-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-pink-500"
                 placeholder={text.yesNoPlaceholder(hasTurns ? currentPlayer : undefined)}
                 value={inputQ}
                 onChange={(e) => setInputQ(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askQuestion(); }}}
               />
               <div className="flex gap-2">
-                <Button className="flex-1 font-bold text-white rounded-xl"
+                <Button className="flex-1 rounded-lg font-bold text-white"
                   style={{ background: game.gradientCss, opacity: inputQ.trim() && !aiLoading ? 1 : 0.5 }}
                   disabled={!inputQ.trim() || aiLoading} onClick={askQuestion}>
                   {aiLoading ? text.answerLoading : text.askQuestion}
                 </Button>
-                <Button variant="outline" className="rounded-xl px-4 text-sm" onClick={() => setIsGuessing(true)}>
+                <Button variant="outline" className="rounded-lg px-4 text-sm" onClick={() => setIsGuessing(true)}>
                   {text.guessAnswer}
                 </Button>
               </div>
             </div>
           )}
 
-          {(isGuessing || phase === "guessing") && (
-            <div className="bg-white rounded-xl border-2 p-5 space-y-3" style={{ borderColor: game.accentColor }}>
-              <h3 className="font-black text-gray-800">🎯 {hasTurns && phase === "playing" ? `${currentPlayer}, ` : ""}{text.guessPrompt}</h3>
-              <input className="w-full border-2 rounded-xl px-4 py-3 text-sm focus:outline-none"
+          {isGuessing && (
+            <div className="space-y-3 rounded-lg border-2 bg-card p-5 text-card-foreground" style={{ borderColor: game.accentColor }}>
+              <h3 className="font-black text-foreground">🎯 {hasTurns ? `${currentPlayer}, ` : ""}{text.guessPrompt}</h3>
+              <input
+                aria-label={locale === "en" ? "Answer guess" : "정답 추측"}
+                maxLength={QUESTION_GAME_LIMITS.shortWord}
+                className="w-full rounded-lg border-2 bg-background px-4 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
                 style={{ borderColor: game.accentColor }}
                 placeholder={text.guessInputPlaceholder}
                 value={guessInput}
@@ -408,14 +465,12 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                 onKeyDown={(e) => { if (e.key === "Enter") makeGuess(); }}
                 autoFocus />
               <div className="flex gap-2">
-                <Button className="flex-1 font-bold text-white rounded-xl"
+                <Button className="flex-1 rounded-lg font-bold text-white"
                   style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }}
                   disabled={!guessInput.trim()} onClick={makeGuess}>
                   {text.submitAnswer}
                 </Button>
-                {isGuessing && phase !== "guessing" && (
-                  <Button variant="outline" className="rounded-xl" onClick={() => { setIsGuessing(false); setGuessInput(""); }}>{text.keepAsking}</Button>
-                )}
+                <Button variant="outline" className="rounded-lg" onClick={() => { setIsGuessing(false); setGuessInput(""); }}>{text.keepAsking}</Button>
               </div>
             </div>
           )}
@@ -424,20 +479,20 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
       {/* 성공 */}
       {phase === "win" && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 flex flex-col items-center gap-5">
+        <div className="flex flex-col items-center gap-5 rounded-lg border border-border bg-card p-10 text-card-foreground shadow-sm">
           <div className="text-8xl animate-bounce">{isAI ? aiItem?.emoji : localItem?.emoji}</div>
           <div className="text-white font-black text-2xl px-8 py-3 rounded-full"
             style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>{text.correct} 🎉</div>
-          <h2 className="text-4xl font-black text-gray-800">{itemName}</h2>
-          <p className="text-gray-500 text-sm text-center">
-            {hasTurns && winner ? text.win(winner) : text.solvedWithQuestions(qaList.length)}
-            {isAI && <><br/><span className="text-indigo-500 font-bold">{text.beatAi} 🏆</span></>}
+          <h2 className="text-4xl font-black text-foreground">{itemName}</h2>
+          <p className="text-center text-sm text-muted-foreground">
+            {hasTurns && winner
+              ? text.win(winner)
+              : locale === "en"
+                ? `Solved in ${qaList.length} activities!`
+                : `${qaList.length}회 활동으로 맞혔어요!`}
+            {isAI && <><br/><span className="font-bold text-indigo-700 dark:text-indigo-300">{text.beatAi} 🏆</span></>}
           </p>
-          <GameResultReview
-            title={text.exchangedQuestions}
-            accentColor={game.accentColor}
-            entries={qaList.map((qa) => ({ q: hasTurns ? `${qa.asker} · ${qa.question}` : qa.question, a: String(qa.answer) }))}
-          />
+          <ActivityReview entries={qaList} hasTurns={hasTurns} locale={locale} />
           <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>
@@ -448,21 +503,17 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
       {/* 실패 */}
       {phase === "lose" && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 flex flex-col items-center gap-5">
+        <div className="flex flex-col items-center gap-5 rounded-lg border border-border bg-card p-10 text-card-foreground shadow-sm">
           <div className="text-8xl">{isAI ? aiItem?.emoji : localItem?.emoji}</div>
           <div className="text-white font-black text-xl px-6 py-2 rounded-full" style={{ background: "#ef4444" }}>
             {winner === AI_NAME ? text.aiWon : text.close}
           </div>
           <div className="text-center">
-            <p className="text-gray-500 text-sm mb-2">{text.answerWas}</p>
-            <h2 className="text-4xl font-black text-gray-800">{itemName}</h2>
-            <p className="text-gray-400 text-sm mt-1">({isAI ? aiItem?.category : localItem?.hint})</p>
+            <p className="mb-2 text-sm text-muted-foreground">{text.answerWas}</p>
+            <h2 className="text-4xl font-black text-foreground">{itemName}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">({isAI ? aiItem?.category : localItem?.hint})</p>
           </div>
-          <GameResultReview
-            title={text.exchangedQuestions}
-            accentColor={game.accentColor}
-            entries={qaList.map((qa) => ({ q: hasTurns ? `${qa.asker} · ${qa.question}` : qa.question, a: String(qa.answer) }))}
-          />
+          <ActivityReview entries={qaList} hasTurns={hasTurns} locale={locale} />
           <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>
@@ -471,5 +522,42 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+function ActivityReview({
+  entries,
+  hasTurns,
+  locale,
+}: {
+  entries: QAEntry[];
+  hasTurns: boolean;
+  locale: string;
+}) {
+  if (entries.length === 0) return null;
+  return (
+    <section className="w-full border-y border-border py-4 text-left text-foreground">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-black">
+          {locale === "en" ? "Activity history" : "활동 기록"}
+        </h3>
+        <span className="text-xs font-semibold text-muted-foreground">
+          {entries.length}{locale === "en" ? " activities" : "개"}
+        </span>
+      </div>
+      <ol className="mt-3 max-h-72 divide-y divide-border overflow-y-auto border-y border-border">
+        {entries.map((entry, index) => (
+          <li key={index} className="py-3 text-sm">
+            <p className="break-words font-bold text-foreground">
+              <span className="mr-2 text-pink-700 dark:text-pink-300">{index + 1}.</span>
+              {hasTurns ? `${entry.asker} · ` : ""}{entry.question}
+            </p>
+            <p className="mt-1 break-words pl-6 text-muted-foreground">
+              {entry.answer}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

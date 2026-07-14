@@ -53,7 +53,23 @@ export interface MysteryRoomState extends EngineStateBase {
   private?: { itemId: string };
 }
 
-export type MysteryPublicRoomState = Omit<MysteryRoomState, "private"> & {
+export type MysteryPublicRoomState = Pick<
+  MysteryRoomState,
+  | "stateVersion"
+  | "game"
+  | "phase"
+  | "recentCommandIds"
+  | "roundId"
+  | "round"
+  | "maxRounds"
+  | "turnOrder"
+  | "currentTurnIdx"
+  | "history"
+  | "scores"
+  | "winnerId"
+  | "answer"
+  | "endReason"
+> & {
   private?: never;
 };
 

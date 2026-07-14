@@ -67,6 +67,7 @@ describe("room sync policy", () => {
     expect(page.match(/\{roomErrorAlert\}/g)).toHaveLength(3);
     expect(page).toMatch(/\{roomErrorAlert\}\s*<RoomLobby/);
     expect(page).toMatch(/\{roomErrorAlert\}\s*<RoomComponent/);
-    expect(page).toMatch(/\{roomErrorAlert\}\s*<GameComponent/);
+    expect(page).toMatch(/\{roomErrorAlert\}\s*<div className="mx-auto max-w-lg/);
+    expect(page).not.toContain('config={{ mode: "friend"');
   });
 });
