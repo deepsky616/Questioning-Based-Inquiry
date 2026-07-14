@@ -106,3 +106,63 @@ git diff --check
 
 - 기존 저장 형식에는 획득 짝의 참가자별 소유 기록이 없다. 득점 참가자 이탈 때 상태 일관성을 위해 획득 순서의 뒤쪽부터 해당 점수 수만큼 완전한 짝을 다시 판에 놓는다.
 - 데이터베이스 파일은 변경하지 않았다.
+
+## 재검토 수정
+
+### 수정 내역
+
+- 같은 `memory-prepare` 명령은 같은 실행 식별값과 최근 명령 기록을 확인한 뒤 현재 라운드가 달라도 재생 성공한다. 새 명령에만 현재 라운드 식별값을 요구한다.
+- 이미 `completed`인 방은 두 명 중 한 명이 나가도 완료 사유와 공개 결과를 보존한다. 이번 이탈 때문에 끝난 진행 방만 `insufficient-players`로 정리한다.
+- `done/completed`에서는 떠난 참가자를 포함한 서버 점수와 획득 짝을 보존한다. 진행 중 이탈에만 떠난 점수 수만큼 획득 짝을 다시 놓는다.
+- 완료 상태의 점수 표는 현재 참가자 점수를 모두 포함하면서 떠난 참가자 점수를 더 보존할 수 있다. 점수 지급은 저장 점수 전체 합을 획득 짝과 비교하고, 현재 담당 학생에게만 지급한다.
+- 공통 이탈 경계가 이탈 전 현재 차례 여부를 판정기에 전달한다. 질문 카드 한 장을 공개한 현재 차례 참가자가 나가면 선택을 지우고, 무관한 참가자가 나가면 유지한다.
+- 최근 복원 공개 식별값을 고유한 배열로 최대 예순네 개 보존한다. 기존 단일 `lastResolvedRevealId` 상태도 읽으며 새 배열과 마지막 값의 관계, 중복 및 크기를 검증한다.
+
+### 실패 시험 확인
+
+```text
+npx vitest run src/__tests__/question-game-room-engine-memory.test.ts -t "응답을 잃은 같은 준비 명령은 새 라운드에서도 재생 성공한다"
+PASS 0, FAIL 1: 같은 준비 명령이 conflict로 끝남
+
+npx vitest run src/__tests__/question-game-room-engine-memory.test.ts -t "완료 근거를 보존|완료 공개와 사유를 보존"
+PASS 0, FAIL 2: 조기 완료 이탈은 corrupt, 두 명 완료 이탈은 부족 인원 종료로 덮임
+
+npx vitest run src/__tests__/question-game-room-engine-memory.test.ts -t "질문 카드를 공개한 현재 차례 참가자가 나가면 선택을 지운다"
+PASS 0, FAIL 1: 떠난 참가자의 질문 선택이 남음
+
+npx vitest run src/__tests__/question-game-room-engine-memory.test.ts -t "두 공개를 복원한 뒤 예전 공개의 새 명령도 재생 성공한다"
+PASS 0, FAIL 1: 마지막 복원 식별값만 남아 예전 공개가 conflict로 끝남
+
+npx vitest run src/__tests__/question-game-room-engine-memory.test.ts -t "복원 공개 기록"
+PASS 0, FAIL 4: 기록 크기 및 관계를 검사하지 않고 최근 기록도 갱신하지 않음
+
+npx vitest run src/__tests__/points-award-route.test.ts -t "완료 뒤 떠난 학생 점수는 합계만 검증하고 남은 학생에게만 지급한다"
+PASS 0, FAIL 1: 메모리 지급 요청이 409로 거절됨
+```
+
+### 최종 확인
+
+```text
+npx vitest run src/__tests__/question-game-room-engine-memory.test.ts src/__tests__/question-game-room-engine.test.ts src/__tests__/question-game-room-command-route.test.ts src/__tests__/game-room-route.test.ts src/__tests__/points-award-route.test.ts
+PASS 305, FAIL 0
+
+npx tsc --noEmit
+통과
+
+npx eslint src/lib/question-game-room-engine.ts src/lib/question-game-room-engines/memory.ts src/lib/point-award-service.ts src/__tests__/question-game-room-engine-memory.test.ts src/__tests__/question-game-room-engine.test.ts src/__tests__/points-award-route.test.ts
+통과
+
+git diff --check
+통과
+```
+
+### 커밋
+
+- `59b5ab1` `fix: 질문 짝 찾기 완료와 재시도 보강`
+- 별도 사용자 커밋 `defab6a`는 되돌리거나 수정하지 않았다.
+
+### 남은 우려
+
+- 복원 공개 기록은 상태 크기를 제한하기 위해 최근 예순네 개만 보존한다. 그보다 오래된 공개 식별값은 재생 기록에서 빠진다.
+- 완료 뒤 떠난 참가자의 점수는 검증 합계에만 남고 현재 담당 학생 지급 대상에는 포함되지 않는다.
+- 데이터베이스 파일은 변경하지 않았다.
