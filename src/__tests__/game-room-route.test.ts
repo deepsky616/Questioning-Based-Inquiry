@@ -1360,7 +1360,7 @@ describe("새 판정기 시작과 옛 방 호환", () => {
 
 describe("옛 진행 방 안내 화면", () => {
   const pagePath =
-    "src/app/(student)/student-question-play/[gameId]/page.tsx";
+    "src/components/question-games/QuestionGameRoomFlow.tsx";
   const game = BUILT_IN_GAMES.find((candidate) => candidate.id === "dice")!;
   const room = makeRoom({ gameId: "dice", status: "playing" });
 
@@ -1370,7 +1370,7 @@ describe("옛 진행 방 안내 화면", () => {
     expect(page).toContain("RoomCompatibilityNotice");
     expect(page).toContain("shouldShowRoomCompatibilityNotice(room)");
     expect(page).toMatch(
-      /const RoomComponent = [\s\S]*?RoomCompatibilityNotice[\s\S]*?ROOM_GAME_MAP\[gameId\]/,
+      /const RoomComponent = [\s\S]*?RoomCompatibilityNotice[\s\S]*?ROOM_GAME_MAP\[game.id\]/,
     );
   });
 

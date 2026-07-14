@@ -279,11 +279,16 @@ export default function TeacherQuestionPlayPage() {
                     );
                   })()}
 
-                  {/* 체험하기 (기본 제공 놀이만, 솔로 미리보기 · 점수 미적립) */}
+                  {/* 기본 제공 놀이 실행 */}
                   {game.isBuiltIn && (
-                    <Button asChild variant="gradient" size="sm" className="w-full text-xs rounded-xl mb-2">
-                      <Link href={`/teacher-question-play/${game.id}/preview`}>{t("experience")}</Link>
-                    </Button>
+                    <div className="mb-2 grid grid-cols-2 gap-2">
+                      <Button asChild variant="gradient" size="sm" className="text-xs rounded-lg">
+                        <Link href={`/teacher-question-play/${game.id}/host`}>{t("openFriendRoom")}</Link>
+                      </Button>
+                      <Button asChild variant="outline" size="sm" className="text-xs rounded-lg">
+                        <Link href={`/teacher-question-play/${game.id}/preview`}>{t("experience")}</Link>
+                      </Button>
+                    </div>
                   )}
 
                   {/* 액션 버튼 */}

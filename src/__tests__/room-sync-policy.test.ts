@@ -8,8 +8,7 @@ const roomRouteSource = readFileSync("src/app/api/question-games/rooms/[code]/ro
 const roomCreateRouteSource = readFileSync("src/app/api/question-games/rooms/route.ts", "utf8");
 const roomStorePath = "src/lib/game-room-store.ts";
 const roomStoreSource = existsSync(roomStorePath) ? readFileSync(roomStorePath, "utf8") : "";
-const roomPagePath =
-  "src/app/(student)/student-question-play/[gameId]/page.tsx";
+const roomPagePath = "src/components/question-games/QuestionGameRoomFlow.tsx";
 
 describe("room sync policy", () => {
   it("keeps room polling interval in the shared refresh policy", () => {
@@ -55,19 +54,19 @@ describe("room sync policy", () => {
   });
 
   it("나가기 성공일 때만 방 선택 화면으로 이동한다", () => {
-    const page = readFileSync(roomPagePath, "utf8");
-    expect(page).toContain("if (!(await leaveRoom())) return;");
+    const flow = readFileSync(roomPagePath, "utf8");
+    expect(flow).toContain("if (!(await leaveRoom())) return;");
   });
 
   it("열린 방의 모든 화면에 방 오류 알림을 연결한다", () => {
-    const page = readFileSync(roomPagePath, "utf8");
-    expect(page).toMatch(
-      /const roomErrorAlert = roomError \? \([\s\S]*?role="alert"[\s\S]*?\{roomError\}[\s\S]*?\) : null;/,
+    const flow = readFileSync(roomPagePath, "utf8");
+    expect(flow).toMatch(
+      /const errorAlert = error \? \([\s\S]*?role="alert"[\s\S]*?\{error\}[\s\S]*?\) : null;/,
     );
-    expect(page.match(/\{roomErrorAlert\}/g)).toHaveLength(3);
-    expect(page).toMatch(/\{roomErrorAlert\}\s*<RoomLobby/);
-    expect(page).toMatch(/\{roomErrorAlert\}\s*<RoomComponent/);
-    expect(page).toMatch(/\{roomErrorAlert\}\s*<div className="mx-auto max-w-lg/);
-    expect(page).not.toContain('config={{ mode: "friend"');
+    expect(flow.match(/\{errorAlert\}/g)).toHaveLength(4);
+    expect(flow).toMatch(/\{errorAlert\}\s*<RoomLobby/);
+    expect(flow).toMatch(/\{errorAlert\}\s*<RoomComponent/);
+    expect(flow).toMatch(/\{errorAlert\}\s*<div className="mx-auto max-w-lg/);
+    expect(flow).not.toContain('config={{ mode: "friend"');
   });
 });

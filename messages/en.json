@@ -1581,6 +1581,7 @@
     "statLine": "Participants <b>{participants}</b> · Plays <b>{plays}</b> · Completion <b>{rate}%</b> · Good questions <b>{good}</b>",
     "noStats": "No participation yet",
     "experience": "🎮 Try it",
+    "openFriendRoom": "Open friend room",
     "participation": "📊 Participation",
     "visSettings": "⚙️ Visibility",
     "statsDialogTitle": "{title} participation",

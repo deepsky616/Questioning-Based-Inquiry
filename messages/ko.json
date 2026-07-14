@@ -1581,6 +1581,7 @@
     "statLine": "참여 <b>{participants}</b>명 · 플레이 <b>{plays}</b>회 · 완료율 <b>{rate}%</b> · 좋은질문 <b>{good}</b>개",
     "noStats": "아직 참여 기록이 없어요",
     "experience": "🎮 체험하기",
+    "openFriendRoom": "친구 방 열기",
     "participation": "📊 참여 현황",
     "visSettings": "⚙️ 공개 설정",
     "statsDialogTitle": "{title} 참여 현황",
