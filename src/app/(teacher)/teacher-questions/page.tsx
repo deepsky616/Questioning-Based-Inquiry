@@ -16,6 +16,7 @@ import { TeacherQuestionSessionSelector } from "./TeacherQuestionSessionSelector
 import { TeacherQuestionStatsCard } from "./TeacherQuestionStatsCard";
 import { TeacherQuestionTopTabs, type TeacherQuestionTopTab } from "./TeacherQuestionTopTabs";
 import { useTeacherQuestionBulkSelection } from "./useTeacherQuestionBulkSelection";
+import { useTeacherQuestionQuickActions } from "./useTeacherQuestionQuickActions";
 import { useTeacherQuestionViewState } from "./useTeacherQuestionViewState";
 import type { QuestionSession, Question, BulkPreview, TeacherQuestionPageResponse } from "./types";
 import type { SortField, SortDir } from "@/components/shared/QuestionClassificationStats";
@@ -163,6 +164,8 @@ function QuestionsContent() {
   const { pageInfo, summary } = questionPage;
   const isLoading = questionsQuery.isPending || questionsQuery.isPlaceholderData;
   const reloadQuestions = () => questionsQuery.refetch();
+  const { handleToggleLike, handleToggleQuestionPublic } =
+    useTeacherQuestionQuickActions(reloadQuestions);
   const reloadSessions = useCallback(
     () => queryClient.invalidateQueries({ queryKey: appQueryKeys.teacherSessions }),
     [queryClient],
@@ -369,35 +372,6 @@ function QuestionsContent() {
       });
     } finally {
       runForBulkOperation(requestScope, requestOperationRevision, () => setIsSendingPreviews(false));
-    }
-  };
-  const handleToggleQuestionPublic = async (question: Question) => {
-    const nextPublic = !question.isPublic;
-    try {
-      const res = await fetch(`/api/questions/${question.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPublic: nextPublic }),
-      });
-      if (!res.ok) throw new Error(t("publicUpdateFailed"));
-      await reloadQuestions();
-    } catch {
-      toast({ variant: "destructive", description: t("publicUpdateFailed") });
-    }
-  };
-  const handleToggleLike = async (question: Question) => {
-    try {
-      const res = await fetch(`/api/questions/${question.id}/likes`, {
-        method: question.myLike ? "DELETE" : "POST",
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error ?? t("likeUpdateFailed"));
-      await reloadQuestions();
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        description: error instanceof Error ? error.message : t("likeUpdateFailed"),
-      });
     }
   };
   const handleDeleteQuestion = async (question: Question) => {

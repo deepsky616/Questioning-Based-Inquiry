@@ -7,7 +7,7 @@ const ciSource = readFileSync(".github/workflows/ci.yml", "utf8");
 
 describe("Next.js 16 실행 기반", () => {
   it("지원 버전과 Node.js 하한을 정확히 고정한다", () => {
-    expect(packageJson.engines.node).toBe(">=20.9.0");
+    expect(packageJson.engines.node).toBe(">=20.19.0");
     expect(packageJson.dependencies).toMatchObject({
       next: "16.2.10",
       react: "19.2.7",

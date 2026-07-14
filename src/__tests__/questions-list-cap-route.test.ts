@@ -59,7 +59,7 @@ describe("질문 목록 조회 상한 (누적 무제한 조회 방지)", () => {
     expect(mFindMany).not.toHaveBeenCalled();
   });
 
-  it("교사 페이지 조회는 30건씩 나누고 댓글과 좋아요 명단 대신 숫자만 반환한다", async () => {
+  it("교사 페이지 조회는 30건씩 나누고 댓글 원문 대신 집계와 좋아요 표시 정보를 반환한다", async () => {
     mFindMany.mockResolvedValue([
       {
         id: "q1",
@@ -77,6 +77,10 @@ describe("질문 목록 조회 상한 (누적 무제한 조회 방지)", () => {
         createdAt: new Date("2026-07-13T00:00:00.000Z"),
         _count: { likes: 3, comments: 2 },
         comments: [{ id: "flagged-comment" }],
+        likes: [
+          { userId: "t1", user: { id: "t1", name: "담당 교사" } },
+          { userId: "t2", user: { id: "t2", name: "다른 교사" } },
+        ],
       },
     ]);
     mCount.mockResolvedValueOnce(61).mockResolvedValueOnce(4);
@@ -108,6 +112,11 @@ describe("질문 목록 조회 상한 (누적 무제한 조회 방지)", () => {
       likeCount: 3,
       commentCount: 2,
       hasFlaggedComment: true,
+      myLike: true,
+      likedBy: [
+        { id: "t1", name: "담당 교사" },
+        { id: "t2", name: "다른 교사" },
+      ],
     });
     expect(body.items[0]).not.toHaveProperty("comments");
     expect(body.items[0]).not.toHaveProperty("likes");
