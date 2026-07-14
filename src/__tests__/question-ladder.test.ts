@@ -12,7 +12,50 @@ const FIXED_GRID = [
   [true, false, true],
   [false, true, false],
   [true, false, false],
+  [false, false, false],
+  [false, false, false],
+  [false, false, false],
+  [false, false, false],
+  [false, false, false],
+  [false, false, false],
+  [false, false, false],
 ] as const satisfies LadderGrid;
+
+function createEmptyGrid(columnCount: number): boolean[][] {
+  return Array.from(
+    { length: LADDER_ROW_COUNT },
+    () => Array.from({ length: columnCount - 1 }, () => false),
+  );
+}
+
+function malformedGridCases(): Array<{ name: string; grid: unknown }> {
+  const unevenRows = createEmptyGrid(2);
+  unevenRows[4] = [false, false];
+
+  const adjacentRungs = createEmptyGrid(3);
+  adjacentRungs[4] = [true, true];
+
+  const invalidRung: unknown[][] = createEmptyGrid(3);
+  invalidRung[4][1] = 1;
+
+  return [
+    { name: "빈 배열", grid: [] },
+    { name: "서로 다른 행 너비", grid: unevenRows },
+    { name: "맞닿은 발판", grid: adjacentRungs },
+    { name: "범위를 넘은 열 수", grid: createEmptyGrid(9) },
+    { name: "참이나 거짓이 아닌 발판", grid: invalidRung },
+  ];
+}
+
+function expectGridConsumersToReject(grid: LadderGrid): void {
+  const firstRow = grid[0];
+  const topicCount = Array.isArray(firstRow) ? firstRow.length + 1 : 2;
+  const topics = Array.from({ length: topicCount }, (_, index) => `주제 ${index}`);
+
+  expect(() => traceLadderColumns(0, grid)).toThrow();
+  expect(() => buildLadderPathSegments(0, grid)).toThrow();
+  expect(() => assignLadderTopics(topics, grid)).toThrow();
+}
 
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -59,10 +102,10 @@ describe("질문 사다리 생성", () => {
 
 describe("질문 사다리 추적", () => {
   it.each([
-    [0, [0, 1, 2, 2]],
-    [1, [1, 0, 0, 1]],
-    [2, [2, 3, 3, 3]],
-    [3, [3, 2, 1, 0]],
+    [0, [0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2]],
+    [1, [1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]],
+    [2, [2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]],
+    [3, [3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0]],
   ] as const)("%i번 시작점의 행별 열을 추적한다", (startColumn, expected) => {
     expect(traceLadderColumns(startColumn, FIXED_GRID)).toEqual(expected);
   });
@@ -86,16 +129,31 @@ describe("질문 사다리 추적", () => {
     expect(() => traceLadderColumns(startColumn, FIXED_GRID)).toThrow();
   });
 
-  it.each([
-    { name: "빈 배열", grid: [] },
-    { name: "서로 다른 행 너비", grid: [[true], [false, true]] },
-    { name: "맞닿은 발판", grid: [[true, true]] },
-    {
-      name: "범위를 넘은 열 수",
-      grid: [[true, false, false, false, false, false, false, false]],
-    },
-    { name: "참이나 거짓이 아닌 발판", grid: [[true, 1]] },
-  ])("$name 자료를 거절한다", ({ grid }) => {
+  it.each([1, 9, 11])("%i개 행인 사다리를 모든 소비 함수가 거절한다", (rowCount) => {
+    const grid = Array.from({ length: rowCount }, () => [false]) as LadderGrid;
+
+    expectGridConsumersToReject(grid);
+  });
+
+  it("바깥 배열의 비어 있는 칸을 모든 소비 함수가 거절한다", () => {
+    const grid = new Array<boolean[]>(LADDER_ROW_COUNT);
+    for (let index = 0; index < grid.length; index += 1) {
+      if (index !== 4) grid[index] = [false];
+    }
+
+    expectGridConsumersToReject(grid);
+  });
+
+  it("안쪽 행의 비어 있는 칸을 모든 소비 함수가 거절한다", () => {
+    const grid = createEmptyGrid(3);
+    const sparseRow = new Array<boolean>(2);
+    sparseRow[0] = false;
+    grid[4] = sparseRow;
+
+    expectGridConsumersToReject(grid);
+  });
+
+  it.each(malformedGridCases())("$name 자료를 거절한다", ({ grid }) => {
     expect(() => traceLadderColumns(0, grid as unknown as LadderGrid)).toThrow();
   });
 });
@@ -131,7 +189,42 @@ describe("질문 사다리 경로 선분", () => {
       {
         axis: "vertical",
         from: { column: 2, level: 2.5 },
-        to: { column: 2, level: 3 },
+        to: { column: 2, level: 3.5 },
+      },
+      {
+        axis: "vertical",
+        from: { column: 2, level: 3.5 },
+        to: { column: 2, level: 4.5 },
+      },
+      {
+        axis: "vertical",
+        from: { column: 2, level: 4.5 },
+        to: { column: 2, level: 5.5 },
+      },
+      {
+        axis: "vertical",
+        from: { column: 2, level: 5.5 },
+        to: { column: 2, level: 6.5 },
+      },
+      {
+        axis: "vertical",
+        from: { column: 2, level: 6.5 },
+        to: { column: 2, level: 7.5 },
+      },
+      {
+        axis: "vertical",
+        from: { column: 2, level: 7.5 },
+        to: { column: 2, level: 8.5 },
+      },
+      {
+        axis: "vertical",
+        from: { column: 2, level: 8.5 },
+        to: { column: 2, level: 9.5 },
+      },
+      {
+        axis: "vertical",
+        from: { column: 2, level: 9.5 },
+        to: { column: 2, level: 10 },
       },
     ]);
   });
@@ -197,6 +290,13 @@ describe("질문 사다리 주제 배정", () => {
       [true, false, true],
       [false, true, false],
       [true, false, false],
+      [false, false, false],
+      [false, false, false],
+      [false, false, false],
+      [false, false, false],
+      [false, false, false],
+      [false, false, false],
+      [false, false, false],
     ]);
   });
 

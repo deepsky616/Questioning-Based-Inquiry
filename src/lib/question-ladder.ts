@@ -34,8 +34,8 @@ function assertColumnCount(columnCount: number): void {
 }
 
 function readColumnCount(grid: LadderGrid): number {
-  if (!Array.isArray(grid) || grid.length === 0) {
-    throw new Error("사다리 발판은 한 행 이상이어야 합니다");
+  if (!Array.isArray(grid) || grid.length !== LADDER_ROW_COUNT) {
+    throw new Error("사다리 발판은 정확히 열 행이어야 합니다");
   }
 
   const firstRow = grid[0];
