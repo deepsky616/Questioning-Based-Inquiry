@@ -3,7 +3,10 @@ import {
   isBuiltInQuestionGameId,
   type BuiltInQuestionGameId,
 } from "@/lib/question-game-rules";
-import type { GameRoom } from "@/lib/question-games-data";
+import type {
+  GameRoom,
+  RoomCommandResult,
+} from "@/lib/question-games-data";
 
 const RECENT_COMMAND_LIMIT = 64;
 const UUID_V4_PATTERN =
@@ -16,7 +19,7 @@ export interface EngineStateBase {
   roundId?: string;
   round?: number;
   maxRounds?: number;
-  endReason?: string;
+  endReason?: "completed" | "host" | "insufficient-players";
   [key: string]: unknown;
 }
 
@@ -39,11 +42,11 @@ export interface QuestionGameRoomEngineContext
 }
 
 export type QuestionGameRoomEngineApplyResult =
-  | { kind: "changed"; room: GameRoom; result?: Record<string, unknown> }
+  | { kind: "changed"; room: GameRoom; result?: RoomCommandResult }
   | {
       kind: "replayed" | "invalid" | "forbidden" | "conflict" | "corrupt";
       reason?: string;
-      result?: Record<string, unknown>;
+      result?: RoomCommandResult;
     };
 
 export interface QuestionGameRoomLeaveContext {
@@ -64,18 +67,20 @@ export interface QuestionGameRoomEngine {
   onPlayerLeave?: (context: QuestionGameRoomLeaveContext) => GameRoom;
 }
 
-export type QuestionGameRoomResult =
+export type QuestionGameEngineResult =
   | {
       kind: "changed";
       room: GameRoom;
-      result?: Record<string, unknown>;
+      result?: RoomCommandResult;
     }
   | {
       kind: "replayed" | "invalid" | "forbidden" | "conflict" | "corrupt";
       room: GameRoom;
       reason?: string;
-      result?: Record<string, unknown>;
+      result?: RoomCommandResult;
     };
+
+export type QuestionGameRoomResult = QuestionGameEngineResult;
 
 const QUESTION_GAME_ROOM_ENGINES: Partial<
   Record<BuiltInQuestionGameId, QuestionGameRoomEngine>
@@ -149,7 +154,12 @@ function parseEngineState(value: unknown): EngineStateBase | null {
   ) {
     return null;
   }
-  if (value.endReason !== undefined && typeof value.endReason !== "string") {
+  if (
+    value.endReason !== undefined &&
+    value.endReason !== "completed" &&
+    value.endReason !== "host" &&
+    value.endReason !== "insufficient-players"
+  ) {
     return null;
   }
   return value as EngineStateBase;
@@ -175,6 +185,70 @@ export function appendRecentCommandId(
 
 export function applyQuestionGameRoomCommand(
   input: QuestionGameRoomCommandInput,
+): QuestionGameRoomResult {
+  const engine = isBuiltInQuestionGameId(input.room.gameId)
+    ? QUESTION_GAME_ROOM_ENGINES[input.room.gameId]
+    : undefined;
+  return engine
+    ? applyQuestionGameRoomCommandWithEngine(input, engine)
+    : applyQuestionGameRoomCommandWithResolvedEngine(input, undefined);
+}
+
+export function applyQuestionGameRoomCommandWithEngine(
+  input: QuestionGameRoomCommandInput,
+  engine: QuestionGameRoomEngine,
+): QuestionGameRoomResult {
+  return applyQuestionGameRoomCommandWithResolvedEngine(input, engine);
+}
+
+function changedRoomWithCommand(
+  room: GameRoom,
+  candidate: GameRoom,
+  commandId: string,
+  result?: RoomCommandResult,
+): QuestionGameRoomResult {
+  const nextState = parseEngineState(candidate.gameState);
+  if (!nextState) {
+    return unchanged("corrupt", room, "engine-state");
+  }
+  const nextRoom: GameRoom = {
+    ...structuredClone(candidate),
+    code: room.code,
+    version: room.version,
+    createdAt: room.createdAt,
+    updatedAt: room.updatedAt,
+    gameState: {
+      ...nextState,
+      recentCommandIds: appendRecentCommandId(
+        nextState.recentCommandIds,
+        commandId,
+      ),
+    },
+  };
+  const nextStateBytes = serializedBytes(nextRoom.gameState);
+  const nextRoomBytes = serializedBytes(nextRoom);
+  if (
+    nextStateBytes === null ||
+    nextStateBytes > QUESTION_GAME_LIMITS.gameStateBytes
+  ) {
+    return unchanged("invalid", room, "game-state-size");
+  }
+  if (
+    nextRoomBytes === null ||
+    nextRoomBytes > QUESTION_GAME_LIMITS.roomBytes
+  ) {
+    return unchanged("invalid", room, "room-size");
+  }
+  return {
+    kind: "changed",
+    room: nextRoom,
+    ...(result === undefined ? {} : { result }),
+  };
+}
+
+function applyQuestionGameRoomCommandWithResolvedEngine(
+  input: QuestionGameRoomCommandInput,
+  engine: QuestionGameRoomEngine | undefined,
 ): QuestionGameRoomResult {
   const {
     room,
@@ -245,7 +319,10 @@ export function applyQuestionGameRoomCommand(
 
   const isStart = action === "start";
   const isEmptyRestart = action === "restart" && state === null;
-  if (!isStart && !isEmptyRestart && room.status === "playing" && room.playId) {
+  if (!isStart && !isEmptyRestart && room.status === "playing") {
+    if (room.playId === undefined) {
+      return unchanged("corrupt", room, "play-id");
+    }
     if (body.playId !== room.playId) {
       return unchanged("conflict", room, "play-id");
     }
@@ -257,9 +334,57 @@ export function applyQuestionGameRoomCommand(
   if (!isBuiltInQuestionGameId(room.gameId)) {
     return unchanged("corrupt", room, "game-id");
   }
-  const engine = QUESTION_GAME_ROOM_ENGINES[room.gameId];
   if (!engine) {
     return unchanged("corrupt", room, "missing-engine");
+  }
+
+  let invalidRandomUUID = false;
+  const checkedRandomUUID = () => {
+    const value = randomUUID();
+    if (!isQuestionGameCommandId(value)) {
+      invalidRandomUUID = true;
+      throw new Error("invalid random UUID");
+    }
+    return value;
+  };
+
+  if (isStart) {
+    let startRoom: GameRoom;
+    let initialState: EngineStateBase;
+    try {
+      startRoom = {
+        ...structuredClone(room),
+        status: "playing",
+        playId: checkedRandomUUID(),
+        pointAwardKeyVersion: 2,
+        pointEvidenceVersion: 2,
+      };
+      initialState = engine.createInitialState({
+        room: structuredClone(startRoom),
+        userId,
+        userName,
+        action,
+        body: structuredClone(body),
+        state: null,
+        now,
+        random,
+        randomUUID: checkedRandomUUID,
+      });
+    } catch {
+      return unchanged(
+        "corrupt",
+        room,
+        invalidRandomUUID ? "random-uuid" : "engine-error",
+      );
+    }
+    if (invalidRandomUUID) {
+      return unchanged("corrupt", room, "random-uuid");
+    }
+    return changedRoomWithCommand(
+      room,
+      { ...startRoom, gameState: structuredClone(initialState) },
+      body.commandId,
+    );
   }
 
   let engineResult: QuestionGameRoomEngineApplyResult;
@@ -273,10 +398,17 @@ export function applyQuestionGameRoomCommand(
       state: state ? structuredClone(state) : null,
       now,
       random,
-      randomUUID,
+      randomUUID: checkedRandomUUID,
     });
   } catch {
-    return unchanged("corrupt", room, "engine-error");
+    return unchanged(
+      "corrupt",
+      room,
+      invalidRandomUUID ? "random-uuid" : "engine-error",
+    );
+  }
+  if (invalidRandomUUID) {
+    return unchanged("corrupt", room, "random-uuid");
   }
 
   if (engineResult.kind !== "changed") {
@@ -292,45 +424,12 @@ export function applyQuestionGameRoomCommand(
     };
   }
 
-  const nextState = parseEngineState(engineResult.room.gameState);
-  if (!nextState) {
-    return unchanged("corrupt", room, "engine-state");
-  }
-  const nextRoom: GameRoom = {
-    ...structuredClone(engineResult.room),
-    code: room.code,
-    version: room.version,
-    createdAt: room.createdAt,
-    updatedAt: room.updatedAt,
-    gameState: {
-      ...nextState,
-      recentCommandIds: appendRecentCommandId(
-        nextState.recentCommandIds,
-        body.commandId,
-      ),
-    },
-  };
-  const nextStateBytes = serializedBytes(nextRoom.gameState);
-  const nextRoomBytes = serializedBytes(nextRoom);
-  if (
-    nextStateBytes === null ||
-    nextStateBytes > QUESTION_GAME_LIMITS.gameStateBytes
-  ) {
-    return unchanged("invalid", room, "game-state-size");
-  }
-  if (
-    nextRoomBytes === null ||
-    nextRoomBytes > QUESTION_GAME_LIMITS.roomBytes
-  ) {
-    return unchanged("invalid", room, "room-size");
-  }
-  return {
-    kind: "changed",
-    room: nextRoom,
-    ...(engineResult.result === undefined
-      ? {}
-      : { result: engineResult.result }),
-  };
+  return changedRoomWithCommand(
+    room,
+    engineResult.room,
+    body.commandId,
+    engineResult.result,
+  );
 }
 
 function adjustedTurnIndex(
@@ -349,6 +448,25 @@ function adjustedTurnIndex(
 export function leaveQuestionGameRoom(
   input: QuestionGameRoomLeaveContext,
 ): QuestionGameRoomResult {
+  const engine = isBuiltInQuestionGameId(input.room.gameId)
+    ? QUESTION_GAME_ROOM_ENGINES[input.room.gameId]
+    : undefined;
+  return engine
+    ? leaveQuestionGameRoomWithEngine(input, engine)
+    : leaveQuestionGameRoomWithResolvedEngine(input, undefined);
+}
+
+export function leaveQuestionGameRoomWithEngine(
+  input: QuestionGameRoomLeaveContext,
+  engine: QuestionGameRoomEngine,
+): QuestionGameRoomResult {
+  return leaveQuestionGameRoomWithResolvedEngine(input, engine);
+}
+
+function leaveQuestionGameRoomWithResolvedEngine(
+  input: QuestionGameRoomLeaveContext,
+  engine: QuestionGameRoomEngine | undefined,
+): QuestionGameRoomResult {
   const { room, userId } = input;
   if (!room.players.some(({ id }) => id === userId)) {
     return unchanged("replayed", room);
@@ -365,6 +483,9 @@ export function leaveQuestionGameRoom(
 
   const oldState = isRecord(room.gameState) ? room.gameState : {};
   const gameState: Record<string, unknown> = { ...oldState };
+  let adjustedTurn:
+    | { turnOrder: string[]; currentTurnIdx: number }
+    | undefined;
   if (
     Array.isArray(oldState.turnOrder) &&
     oldState.turnOrder.every((id) => typeof id === "string") &&
@@ -373,22 +494,26 @@ export function leaveQuestionGameRoom(
     const oldTurnOrder = oldState.turnOrder;
     const removedTurnIndex = oldTurnOrder.indexOf(userId);
     const turnOrder = oldTurnOrder.filter((id) => id !== userId);
-    gameState.turnOrder = turnOrder;
-    gameState.currentTurnIdx = adjustedTurnIndex(
-      oldTurnOrder.length,
-      oldState.currentTurnIdx,
-      removedTurnIndex,
-      turnOrder.length,
-    );
+    adjustedTurn = {
+      turnOrder,
+      currentTurnIdx: adjustedTurnIndex(
+        oldTurnOrder.length,
+        oldState.currentTurnIdx,
+        removedTurnIndex,
+        turnOrder.length,
+      ),
+    };
+    gameState.turnOrder = adjustedTurn.turnOrder;
+    gameState.currentTurnIdx = adjustedTurn.currentTurnIdx;
   }
 
   const shouldEnd = room.status === "playing" && players.length === 1;
   if (shouldEnd) {
-    gameState.phase = "ended";
+    gameState.phase = "done";
     gameState.endReason = "insufficient-players";
   }
 
-  let nextRoom: GameRoom = {
+  const commonRoom: GameRoom = {
     ...structuredClone(room),
     hostId: nextHostId,
     status: shouldEnd ? "ended" : room.status,
@@ -398,23 +523,42 @@ export function leaveQuestionGameRoom(
     updatedAt: room.updatedAt,
   };
 
-  if (isBuiltInQuestionGameId(room.gameId)) {
-    const onPlayerLeave = QUESTION_GAME_ROOM_ENGINES[room.gameId]?.onPlayerLeave;
-    if (onPlayerLeave) {
-      try {
-        nextRoom = onPlayerLeave({ ...input, room: structuredClone(nextRoom) });
-      } catch {
-        return unchanged("corrupt", room, "leave-hook-error");
-      }
-      nextRoom = {
-        ...structuredClone(nextRoom),
-        code: room.code,
-        createdAt: room.createdAt,
-        version: room.version,
-        updatedAt: room.updatedAt,
-      };
+  let hookRoom = commonRoom;
+  if (engine?.onPlayerLeave) {
+    try {
+      hookRoom = engine.onPlayerLeave({
+        ...input,
+        room: structuredClone(commonRoom),
+      });
+    } catch {
+      return unchanged("corrupt", room, "leave-hook-error");
     }
   }
+
+  const hookState = isRecord(hookRoom.gameState)
+    ? hookRoom.gameState
+    : commonRoom.gameState;
+  const finalState: Record<string, unknown> = { ...hookState };
+  if (adjustedTurn) {
+    finalState.turnOrder = adjustedTurn.turnOrder;
+    finalState.currentTurnIdx = adjustedTurn.currentTurnIdx;
+  }
+  if (shouldEnd) {
+    finalState.phase = "done";
+    finalState.endReason = "insufficient-players";
+  }
+  const nextRoom: GameRoom = {
+    ...structuredClone(hookRoom),
+    code: room.code,
+    gameId: room.gameId,
+    createdAt: room.createdAt,
+    version: room.version,
+    updatedAt: room.updatedAt,
+    hostId: nextHostId,
+    players: structuredClone(players),
+    status: shouldEnd ? "ended" : hookRoom.status,
+    gameState: finalState,
+  };
 
   return { kind: "changed", room: nextRoom };
 }

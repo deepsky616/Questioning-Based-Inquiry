@@ -7,11 +7,15 @@ import type { GameRoom, RoomPlayer } from "@/lib/question-games-data";
 import {
   appendRecentCommandId,
   applyQuestionGameRoomCommand,
+  applyQuestionGameRoomCommandWithEngine,
   hasQuestionGameRoomEngine,
   isQuestionGameCommandId,
   leaveQuestionGameRoom,
+  leaveQuestionGameRoomWithEngine,
   restartQuestionGameRoom,
   type EngineStateBase,
+  type QuestionGameEngineResult,
+  type QuestionGameRoomEngine,
 } from "@/lib/question-game-room-engine";
 
 const COMMAND_ID = "11111111-1111-4111-8111-111111111111";
@@ -97,6 +101,52 @@ function apply(
   });
 }
 
+function makeEngine(
+  overrides: Partial<QuestionGameRoomEngine> = {},
+): QuestionGameRoomEngine {
+  return {
+    createInitialState: vi.fn(() =>
+      makeState({ phase: "ready", roundId: undefined, round: 0 }),
+    ),
+    applyCommand: vi.fn(
+      (context: Parameters<QuestionGameRoomEngine["applyCommand"]>[0]) => ({
+        kind: "changed" as const,
+        room: context.room,
+      }),
+    ),
+    ...overrides,
+  };
+}
+
+function applyWithEngine(
+  room: GameRoom,
+  engine: QuestionGameRoomEngine,
+  body: unknown = makeBody(),
+  overrides: Partial<{
+    userId: string;
+    userName: string;
+    action: string;
+    now: number;
+    random: () => number;
+    randomUUID: () => string;
+  }> = {},
+) {
+  return applyQuestionGameRoomCommandWithEngine(
+    {
+      room,
+      userId: "a",
+      userName: "A",
+      action: "roll",
+      body,
+      now: 300,
+      random: () => 0.5,
+      randomUUID: () => "44444444-4444-4444-8444-444444444444",
+      ...overrides,
+    },
+    engine,
+  );
+}
+
 function serializedBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).byteLength;
 }
@@ -118,6 +168,25 @@ function indexedCommandId(index: number): string {
 }
 
 describe("질문놀이 방 판정기", () => {
+  it("놀이 결과와 끝 사유의 공개 자료형을 고정한다", () => {
+    const result: QuestionGameEngineResult = {
+      kind: "changed",
+      room: makeRoom(),
+      result: { roll: 4, replayed: false },
+    };
+    const acceptedEndReasons: NonNullable<EngineStateBase["endReason"]>[] = [
+      "completed",
+      "host",
+      "insufficient-players",
+    ];
+    // @ts-expect-error 정해진 세 값 밖의 끝 사유는 허용하지 않는다.
+    const rejectedEndReason: NonNullable<EngineStateBase["endReason"]> = "other";
+
+    expect(result.result).toEqual({ roll: 4, replayed: false });
+    expect(acceptedEndReasons).toHaveLength(3);
+    expect(rejectedEndReason).toBe("other");
+  });
+
   it("정적 등록부는 아직 모든 내장 놀이에 비어 있다", () => {
     expect(BUILT_IN_QUESTION_GAME_IDS.every(hasQuestionGameRoomEngine)).toBe(false);
     expect(BUILT_IN_QUESTION_GAME_IDS.some(hasQuestionGameRoomEngine)).toBe(false);
@@ -252,6 +321,106 @@ describe("질문놀이 방 판정기", () => {
       expect(
         apply(room, makeBody({ roundId: indexedCommandId(92) })),
       ).toMatchObject({ kind: "conflict", reason: "round-id" });
+    });
+
+    it("진행 방에 실행 식별값이 없으면 놀이를 부르지 않고 corrupt다", () => {
+      const room = makeRoom({ playId: undefined });
+      const engine = makeEngine();
+
+      const result = applyWithEngine(room, engine);
+
+      expect(result).toMatchObject({ kind: "corrupt", reason: "play-id" });
+      expect(result.room).toBe(room);
+      expect(engine.applyCommand).not.toHaveBeenCalled();
+    });
+
+    it("진행 방의 실행 및 라운드 식별값 불일치는 놀이를 부르지 않고 conflict다", () => {
+      const room = makeRoom();
+      const engine = makeEngine();
+
+      expect(
+        applyWithEngine(
+          room,
+          engine,
+          makeBody({ playId: indexedCommandId(91) }),
+        ),
+      ).toMatchObject({ kind: "conflict", reason: "play-id" });
+      expect(
+        applyWithEngine(
+          room,
+          engine,
+          makeBody({ roundId: indexedCommandId(92) }),
+        ),
+      ).toMatchObject({ kind: "conflict", reason: "round-id" });
+      expect(engine.applyCommand).not.toHaveBeenCalled();
+    });
+
+    it("등록 엔진의 시작은 초기 상태와 서버 실행 식별값을 만들고 명령을 기록한다", () => {
+      const room = makeRoom({
+        status: "waiting",
+        gameState: {},
+        playId: undefined,
+        pointAwardKeyVersion: undefined,
+        pointEvidenceVersion: undefined,
+      });
+      const before = structuredClone(room);
+      const createInitialState = vi.fn(() =>
+        makeState({
+          phase: "ready",
+          recentCommandIds: [indexedCommandId(60)],
+          roundId: undefined,
+          round: 0,
+        }),
+      );
+      const engine = makeEngine({ createInitialState });
+      const serverPlayId = indexedCommandId(61);
+      const randomUUID = vi.fn(() => serverPlayId);
+
+      const result = applyWithEngine(room, engine, makeBody(), {
+        action: "start",
+        randomUUID,
+      });
+
+      expect(result).toMatchObject({
+        kind: "changed",
+        room: {
+          status: "playing",
+          playId: serverPlayId,
+          pointAwardKeyVersion: 2,
+          pointEvidenceVersion: 2,
+          version: room.version,
+          updatedAt: room.updatedAt,
+          gameState: {
+            stateVersion: 2,
+            phase: "ready",
+            recentCommandIds: [indexedCommandId(60), COMMAND_ID],
+          },
+        },
+      });
+      expect(result.room).not.toBe(room);
+      expect(createInitialState).toHaveBeenCalledOnce();
+      expect(engine.applyCommand).not.toHaveBeenCalled();
+      expect(randomUUID).toHaveBeenCalledOnce();
+      expect(room).toEqual(before);
+    });
+
+    it("등록 엔진 시작 때 서버 식별값이 잘못되면 입력 방의 corrupt다", () => {
+      const room = makeRoom({
+        status: "waiting",
+        gameState: {},
+        playId: undefined,
+      });
+      const engine = makeEngine();
+
+      const result = applyWithEngine(room, engine, makeBody(), {
+        action: "start",
+        randomUUID: () => "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+      });
+
+      expect(result).toMatchObject({ kind: "corrupt", reason: "random-uuid" });
+      expect(result.room).toBe(room);
+      expect(engine.createInitialState).not.toHaveBeenCalled();
+      expect(engine.applyCommand).not.toHaveBeenCalled();
     });
 
     it("등록된 놀이가 없으면 입력 방을 유지한 corrupt다", () => {
@@ -438,7 +607,7 @@ describe("질문놀이 방 판정기", () => {
         status: "ended",
         hostId: "b",
         gameState: {
-          phase: "ended",
+          phase: "done",
           endReason: "insufficient-players",
           turnOrder: ["b"],
           currentTurnIdx: 0,
@@ -446,6 +615,96 @@ describe("질문놀이 방 판정기", () => {
       });
       expect(result.room.version).toBe(room.version);
       expect(result.room.updatedAt).toBe(room.updatedAt);
+    });
+
+    it("이탈 훅 뒤에도 한 명 방의 참가자와 방장 및 부족 종료를 다시 고정한다", () => {
+      const room = makeRoom({
+        players: [makePlayer("a", true), makePlayer("b")],
+        gameState: makeState({
+          turnOrder: ["a", "b"],
+          currentTurnIdx: 0,
+        }),
+      });
+      const onPlayerLeave = vi.fn(({ room: candidate }) => ({
+        ...candidate,
+        status: "playing" as const,
+        hostId: "a",
+        players: [makePlayer("a", true), makePlayer("b", true)],
+        gameState: {
+          ...candidate.gameState,
+          phase: "playing",
+          endReason: "host",
+          turnOrder: ["a", "b"],
+          currentTurnIdx: 9,
+          hookValue: "kept",
+        },
+      }));
+      const engine = makeEngine({ onPlayerLeave });
+
+      const result = leaveQuestionGameRoomWithEngine(
+        { room, userId: "a" },
+        engine,
+      );
+
+      expect(onPlayerLeave).toHaveBeenCalledOnce();
+      expect(result.room).toMatchObject({
+        status: "ended",
+        hostId: "b",
+        players: [{ id: "b", isHost: true }],
+        gameState: {
+          phase: "done",
+          endReason: "insufficient-players",
+          turnOrder: ["b"],
+          currentTurnIdx: 0,
+          hookValue: "kept",
+        },
+      });
+    });
+
+    it("두 명 이상 남으면 훅의 놀이 상태와 종료 결정을 보존하고 공통 값만 고정한다", () => {
+      const room = makeRoom({
+        players: [makePlayer("a", true), makePlayer("b"), makePlayer("c")],
+        gameState: makeState({
+          turnOrder: ["a", "b", "c"],
+          currentTurnIdx: 0,
+        }),
+      });
+      const onPlayerLeave = vi.fn(({ room: candidate }) => ({
+        ...candidate,
+        status: "ended" as const,
+        hostId: "a",
+        players: [makePlayer("a", true)],
+        gameState: {
+          ...candidate.gameState,
+          phase: "done",
+          endReason: "host",
+          turnOrder: ["a"],
+          currentTurnIdx: 8,
+          hookValue: "kept",
+        },
+      }));
+      const engine = makeEngine({ onPlayerLeave });
+
+      const result = leaveQuestionGameRoomWithEngine(
+        { room, userId: "a" },
+        engine,
+      );
+
+      expect(result.room).toMatchObject({
+        status: "ended",
+        hostId: "b",
+        players: [
+          { id: "b", isHost: true },
+          { id: "c", isHost: false },
+        ],
+        gameState: {
+          phase: "done",
+          endReason: "host",
+          turnOrder: ["b", "c"],
+          currentTurnIdx: 0,
+          hookValue: "kept",
+        },
+      });
     });
   });
 
@@ -456,7 +715,7 @@ describe("질문놀이 방 판정기", () => {
         topic: "old topic",
         chain: [{ question: "old", playerId: "a", playerName: "A" }],
         turnIndex: 1,
-        gameState: makeState({ phase: "ended", endReason: "complete" }),
+        gameState: makeState({ phase: "done", endReason: "completed" }),
       });
       const before = structuredClone(room);
 
