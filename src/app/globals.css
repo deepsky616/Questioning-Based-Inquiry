@@ -671,7 +671,7 @@ html.dark .question-practice-print-page .question-practice-print .qp-pill {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
   .question-practice-print .qp-student-row-name {
-    justify-content: flex-end !important;
+    justify-content: flex-start !important;
   }
   .question-practice-print .qp-field {
     gap: 3px !important;
@@ -681,10 +681,12 @@ html.dark .question-practice-print-page .question-practice-print .qp-pill {
     min-width: 26px !important;
   }
   .question-practice-print .qp-student-row-name .qp-field {
-    max-width: 190px !important;
+    width: 100% !important;
+    max-width: none !important;
   }
   .question-practice-print .qp-student-row-name .qp-write-line {
-    min-width: 72px !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
   }
   .question-practice-print section {
     margin-top: 5px !important;
@@ -777,7 +779,7 @@ html.dark .question-practice-print-page .question-practice-print .qp-pill {
     grid-template-rows: repeat(2, minmax(0, 1fr)) !important;
   }
   .question-practice-print .qp-question-block .qp-write-line {
-    height: 24px !important;
+    height: auto !important;
   }
   .question-practice-print .qp-pattern .space-y-2,
   .question-practice-print .qp-question-block + .qp-question-block {
