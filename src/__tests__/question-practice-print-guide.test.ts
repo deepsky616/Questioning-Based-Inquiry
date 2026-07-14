@@ -23,6 +23,8 @@ describe("질문연습 학습지 출력", () => {
     expect(pageSource).toContain("onClick={printWorksheet}");
     expect(pageSource).toContain("question-practice-print-page");
     expect(pageSource).toContain("qp-toolbar");
+    expect(pageSource).toContain("qp-teacher-note");
+    expect(pageSource).toContain("guide.teacherNote");
     expect(pageSource).toContain('style={{ colorScheme: "light" }}');
     expect(pageSource).toContain("qp-student-fields ml-auto flex");
     expect(pageSource).toContain("qp-student-row-meta grid grid-cols-3");
@@ -54,6 +56,7 @@ describe("질문연습 학습지 출력", () => {
     expect(cssSource).toContain("mix-blend-mode: normal !important");
     expect(cssSource).toContain("text-shadow: none !important");
     expect(cssSource).toContain("html.dark .question-practice-print-page .qp-toolbar button");
+    expect(cssSource).toContain("html.dark .question-practice-print-page .qp-teacher-note");
     expect(cssSource).toContain(".question-practice-print-page .question-practice-print h1");
     expect(cssSource).toContain("html.dark .question-practice-print-page .question-practice-print h1");
     expect(cssSource).toContain(".question-practice-print-page .question-practice-print.qp-paper");
@@ -61,6 +64,8 @@ describe("질문연습 학습지 출력", () => {
     expect(cssSource).toContain(".question-practice-print .qp-write-line");
     expect(cssSource).toContain(".question-practice-print .qp-card");
     expect(cssSource).toContain(".question-practice-print .qp-student-row-meta");
+    expect(cssSource).toContain("font-size: 10.6px !important");
+    expect(cssSource).toContain(".question-practice-print .qp-pattern ul");
     expect(cssSource).toContain(".question-practice-print-page .qp-toolbar");
   });
 });

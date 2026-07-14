@@ -415,6 +415,14 @@ html.dark .question-practice-print-page .qp-toolbar {
   color-scheme: light !important;
 }
 
+.question-practice-print-page .qp-teacher-note,
+html.dark .question-practice-print-page .qp-teacher-note {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #312e81 !important;
+  color-scheme: light !important;
+}
+
 .question-practice-print-page .qp-toolbar button,
 .question-practice-print-page .qp-toolbar a,
 html.dark .question-practice-print-page .qp-toolbar button,
@@ -608,8 +616,8 @@ html.dark .question-practice-print-page .question-practice-print .qp-pill {
     border-color: transparent !important;
     color: #111827 !important;
     color-scheme: light !important;
-    font-size: 12px !important;
-    line-height: 1.35 !important;
+    font-size: 10.6px !important;
+    line-height: 1.24 !important;
     page: question-practice;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -620,21 +628,21 @@ html.dark .question-practice-print-page .question-practice-print .qp-pill {
     page-break-inside: avoid;
   }
   .question-practice-print .qp-header {
-    padding-bottom: 8px !important;
+    padding-bottom: 5px !important;
   }
   .question-practice-print .qp-title {
-    font-size: 25px !important;
-    line-height: 1.15 !important;
+    font-size: 21px !important;
+    line-height: 1.08 !important;
   }
   .question-practice-print .qp-subtitle {
-    margin-top: 4px !important;
-    font-size: 12px !important;
-    line-height: 1.35 !important;
+    margin-top: 2px !important;
+    font-size: 10.5px !important;
+    line-height: 1.25 !important;
   }
   .question-practice-print .qp-student-fields {
-    max-width: 390px !important;
-    gap: 5px 12px !important;
-    font-size: 12px !important;
+    max-width: 330px !important;
+    gap: 3px 8px !important;
+    font-size: 10.5px !important;
   }
   .question-practice-print .qp-student-row-meta {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
@@ -643,54 +651,65 @@ html.dark .question-practice-print-page .question-practice-print .qp-pill {
     justify-content: flex-end !important;
   }
   .question-practice-print .qp-field {
-    gap: 6px !important;
+    gap: 4px !important;
   }
   .question-practice-print .qp-field .qp-write-line {
-    height: 20px !important;
-    min-width: 48px !important;
+    height: 15px !important;
+    min-width: 34px !important;
   }
   .question-practice-print section {
-    margin-top: 10px !important;
+    margin-top: 6px !important;
   }
   .question-practice-print .qp-section-heading {
-    font-size: 16px !important;
-    line-height: 1.2 !important;
+    font-size: 14px !important;
+    line-height: 1.1 !important;
   }
   .question-practice-print .qp-card {
-    padding: 9px !important;
+    padding: 6px !important;
     border-radius: 0 !important;
   }
   .question-practice-print .qp-card-title {
-    font-size: 13px !important;
-    line-height: 1.25 !important;
+    font-size: 11.5px !important;
+    line-height: 1.15 !important;
   }
   .question-practice-print .qp-muted {
-    margin-top: 3px !important;
-    font-size: 11px !important;
-    line-height: 1.35 !important;
+    margin-top: 2px !important;
+    font-size: 9.8px !important;
+    line-height: 1.22 !important;
   }
   .question-practice-print .qp-pill {
-    padding: 2px 8px !important;
-    font-size: 10px !important;
+    padding: 1px 6px !important;
+    font-size: 9px !important;
   }
   .question-practice-print .qp-pattern {
-    padding: 7px !important;
+    padding: 5px !important;
   }
   .question-practice-print .qp-pattern-title,
   .question-practice-print .qp-prompt {
-    font-size: 11px !important;
-    line-height: 1.3 !important;
+    font-size: 10px !important;
+    line-height: 1.18 !important;
   }
   .question-practice-print .qp-answer-box {
-    min-height: 28px !important;
-    padding: 5px 8px !important;
-    font-size: 11px !important;
+    min-height: 22px !important;
+    padding: 3px 6px !important;
+    font-size: 10px !important;
   }
   .question-practice-print .qp-question-block {
-    gap: 4px !important;
+    gap: 3px !important;
   }
   .question-practice-print .qp-question-block .qp-write-line {
-    height: 22px !important;
+    height: 17px !important;
+  }
+  .question-practice-print .qp-pattern .space-y-2,
+  .question-practice-print .qp-question-block + .qp-question-block {
+    margin-top: 3px !important;
+  }
+  .question-practice-print .qp-pattern ul {
+    margin-top: 3px !important;
+    padding-left: 12px !important;
+  }
+  .question-practice-print .qp-pattern li {
+    margin-top: 1px !important;
   }
 }
 

@@ -47,6 +47,10 @@ export default function TeacherPracticePrintGuidePage() {
         </Button>
       </div>
 
+      <p className="no-print qp-teacher-note rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-900 shadow-sm">
+        {guide.teacherNote}
+      </p>
+
       <article className="question-practice-print qp-paper rounded-xl border bg-white p-6 text-slate-950 shadow-sm [color-scheme:light] dark:bg-white dark:text-slate-950 print:border-0 print:p-0 print:shadow-none" style={{ colorScheme: "light" }}>
         <div className="qp-header border-b border-slate-300 pb-5">
           <p className="qp-eyebrow text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">{guide.eyebrow}</p>
@@ -72,9 +76,6 @@ export default function TeacherPracticePrintGuidePage() {
               </div>
             </div>
           </div>
-          <p className="no-print mt-4 rounded-md bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-900 print:bg-indigo-50">
-            {guide.teacherNote}
-          </p>
         </div>
 
         <section className="mt-6 space-y-4">
