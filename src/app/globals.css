@@ -590,6 +590,7 @@ html.dark .question-practice-print-page .question-practice-print .qp-pill {
     background: #ffffff !important;
     color: #111827 !important;
     color-scheme: light !important;
+    page: question-practice !important;
   }
   body.question-practice-print-mode * {
     visibility: hidden !important;

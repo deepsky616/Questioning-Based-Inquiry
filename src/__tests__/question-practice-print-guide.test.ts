@@ -124,6 +124,7 @@ describe("질문연습 학습지 출력", () => {
   });
 
   it("두 쪽 높이를 채우고 카드와 답안 영역을 균등하게 배치한다", () => {
+    const printModeBodyRule = getExactCssRule(printCss, "body.question-practice-print-mode");
     const sheetRule = getExactCssRule(printCss, ".question-practice-print .qp-sheet");
     const sheetGuideRule = getExactCssRule(printCss, ".question-practice-print .qp-sheet-guide");
     const eyebrowRule = getExactCssRule(printCss, ".question-practice-print .qp-eyebrow");
@@ -144,6 +145,7 @@ describe("질문연습 학습지 출력", () => {
       ".question-practice-print .qp-question-block .qp-write-line",
     );
 
+    expect(printModeBodyRule).toContain("page: question-practice !important");
     expect(sheetRule).toContain("height: 284mm !important");
     expect(sheetRule).toContain("box-sizing: border-box !important");
     expect(sheetGuideRule).toContain("break-after: page");
