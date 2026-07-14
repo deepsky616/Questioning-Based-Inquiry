@@ -7,9 +7,12 @@ import {
   act,
   cleanup,
   fireEvent,
+  render as renderWithoutIntl,
   screen,
   waitFor,
 } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import RoomMysteryBox from "@/app/(student)/student-question-play/games/RoomMysteryBox";
@@ -27,6 +30,7 @@ import {
   type MysteryHistoryItem,
   type MysteryRoomState,
 } from "@/lib/question-game-room-engines/mystery";
+import en from "../../messages/en.json";
 
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
 const awardMocks = vi.hoisted(() => ({ award: vi.fn() }));
@@ -47,6 +51,18 @@ const players: GameRoom["players"] = [
 ];
 const ROUND_ID = "10000000-0000-4000-8000-000000000001";
 const COMMAND_ID = "20000000-0000-4000-8000-000000000001";
+
+function renderEnglish(ui: ReactElement) {
+  return renderWithoutIntl(
+    <NextIntlClientProvider
+      locale="en"
+      messages={en as never}
+      timeZone="Asia/Seoul"
+    >
+      {ui}
+    </NextIntlClientProvider>,
+  );
+}
 
 beforeEach(() => {
   aiMocks.ask.mockReset();
@@ -404,6 +420,44 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
     await waitFor(() => expect(input).toHaveValue(""));
   });
 
+  it.each([
+    {
+      label: "예 또는 아니오 질문",
+      button: "질문 보내기",
+      value: "  먹을 수 있나요?  ",
+      field: "question",
+      sent: "먹을 수 있나요?",
+    },
+    {
+      label: "정답 추측",
+      button: "추측 보내기",
+      value: "  사과  ",
+      field: "guess",
+      sent: "사과",
+    },
+  ])("앞뒤 공백을 뺀 $field 요청이 성공하면 원래 입력을 지운다", async ({
+    label,
+    button,
+    value,
+    field,
+    sent,
+  }) => {
+    stubCommandId();
+    const room = makeRoom(publicState(storedPlayState()));
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(success(room));
+    render(<RoomMysteryBox {...makeProps(room, onAction)} />);
+
+    const input = screen.getByLabelText(label);
+    fireEvent.change(input, { target: { value } });
+    fireEvent.click(screen.getByRole("button", { name: button }));
+
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+    expect(onAction.mock.calls[0]?.[1]).toEqual(expect.objectContaining({
+      [field]: sent,
+    }));
+    await waitFor(() => expect(input).toHaveValue(""));
+  });
+
   it("질문과 추측의 연결 실패 재시도 식별값을 서로 덮어쓰지 않는다", async () => {
     const questionCommandId = "20000000-0000-4000-8000-000000000011";
     const guessCommandId = "20000000-0000-4000-8000-000000000012";
@@ -471,6 +525,83 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
       />,
     );
     await waitFor(() => expect(screen.getByLabelText("예 또는 아니오 질문")).toHaveValue(""));
+  });
+
+  it.each([
+    {
+      label: "예 또는 아니오 질문",
+      button: "질문 보내기",
+      value: "  먹을 수 있나요?  ",
+    },
+    {
+      label: "정답 추측",
+      button: "추측 보내기",
+      value: "  사과  ",
+    },
+  ])("응답을 잃은 앞뒤 공백 입력도 최근 명령 확인 뒤 지운다: $label", async ({
+    label,
+    button,
+    value,
+  }) => {
+    stubCommandId();
+    const stored = storedPlayState();
+    const room = makeRoom(publicState(stored));
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(failure(room, "network"));
+    const view = render(<RoomMysteryBox {...makeProps(room, onAction)} />);
+
+    const input = screen.getByLabelText(label);
+    fireEvent.change(input, { target: { value } });
+    fireEvent.click(screen.getByRole("button", { name: button }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+    expect(input).toHaveValue(value);
+
+    const confirmed = { ...stored, recentCommandIds: [COMMAND_ID] };
+    view.rerender(
+      <RoomMysteryBox
+        {...makeProps(makeRoom(publicState(confirmed), { version: 8 }), onAction)}
+      />,
+    );
+    await waitFor(() => expect(screen.getByLabelText(label)).toHaveValue(""));
+  });
+
+  it.each([
+    {
+      label: "예 또는 아니오 질문",
+      button: "질문 보내기",
+      original: "  먹을 수 있나요?  ",
+      changed: "다른 질문인가요?",
+    },
+    {
+      label: "정답 추측",
+      button: "추측 보내기",
+      original: "  사과  ",
+      changed: "자동차",
+    },
+  ])("최근 명령을 확인해도 학생이 실제 내용을 바꾼 입력은 지우지 않는다: $label", async ({
+    label,
+    button,
+    original,
+    changed,
+  }) => {
+    stubCommandId();
+    const stored = storedPlayState();
+    const room = makeRoom(publicState(stored));
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(failure(room, "network"));
+    const view = render(<RoomMysteryBox {...makeProps(room, onAction)} />);
+
+    const input = screen.getByLabelText(label);
+    fireEvent.change(input, { target: { value: original } });
+    fireEvent.click(screen.getByRole("button", { name: button }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+    fireEvent.change(input, { target: { value: changed } });
+
+    const confirmed = { ...stored, recentCommandIds: [COMMAND_ID] };
+    view.rerender(
+      <RoomMysteryBox
+        {...makeProps(makeRoom(publicState(confirmed), { version: 8 }), onAction)}
+      />,
+    );
+    expect(screen.getByLabelText(label)).toHaveValue(changed);
   });
 
   it("이전 방 수명의 늦은 성공은 새 방에 쓴 입력을 지우지 않는다", async () => {
@@ -637,6 +768,30 @@ async function submitLocalGuess(value: string) {
   fireEvent.click(screen.getByRole("button", { name: "정답 제출!" }));
 }
 
+async function startEnglishLocal(mode: "solo" | "ai" = "solo") {
+  if (mode === "ai") {
+    aiMocks.ask.mockResolvedValueOnce({
+      parsed: { name: "apple", category: "fruit", emoji: "🍎" },
+    });
+  }
+  renderEnglish(
+    <MysteryBoxGame
+      game={game}
+      onBack={vi.fn()}
+      config={{ mode, players: mode === "ai" ? ["Me", "AI"] : ["Me"] }}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /Start/ }));
+  await screen.findByLabelText("Yes-or-no question");
+}
+
+async function submitEnglishGuess(value: string) {
+  fireEvent.click(screen.getByRole("button", { name: "Guess!" }));
+  const input = screen.getByLabelText("Answer guess");
+  fireEvent.change(input, { target: { value } });
+  fireEvent.click(screen.getByRole("button", { name: "Submit answer!" }));
+}
+
 function expectLocalRemaining(value: number) {
   const label = screen.getByText("남은 활동");
   expect(label.previousElementSibling).toHaveTextContent(String(value));
@@ -666,12 +821,85 @@ describe("지역 미스터리 박스 활동 종료", () => {
     expect(screen.queryByText("아쉬워요...")).not.toBeInTheDocument();
   });
 
+  it("혼자 모드에서 정답 일부는 거절하고 앞뒤 공백이 있는 별칭 전체는 허용한다", async () => {
+    await startLocal();
+    await submitLocalGuess("사");
+
+    expect(await screen.findByLabelText("예 또는 아니오 질문")).toBeEnabled();
+    expect(screen.getByText("땡")).toBeVisible();
+    await submitLocalGuess("  풋사과  ");
+
+    expect(await screen.findAllByText(/정답!/)).toHaveLength(2);
+  });
+
+  it("혼자 모드 영문 정답은 앞뒤 공백과 대소문자를 정규화해 전체 일치시킨다", async () => {
+    await startEnglishLocal();
+    await submitEnglishGuess("  APPLE  ");
+
+    expect(await screen.findAllByText(/Correct!/)).toHaveLength(2);
+  });
+
   it("인공지능 모드의 틀린 사람 추측은 인공지능 차례로 넘긴다", async () => {
     await startLocal("ai");
-    await submitLocalGuess("책");
+    await submitLocalGuess("사");
 
     expect(screen.getByText(/AI.*차례/)).toBeVisible();
+    expect(screen.getByText("땡")).toBeVisible();
     expectLocalRemaining(19);
+  });
+
+  it("인공지능 모드 영문 정답도 앞뒤 공백과 대소문자를 정규화해 전체 일치시킨다", async () => {
+    await startEnglishLocal("ai");
+    await submitEnglishGuess("  APPLE  ");
+
+    expect(await screen.findAllByText(/Correct!/)).toHaveLength(2);
+  });
+
+  it("인공지능이 고른 내장 물건도 정답 별칭 전체를 허용한다", async () => {
+    await startLocal("ai");
+    await submitLocalGuess("풋사과");
+
+    expect(await screen.findAllByText(/정답!/)).toHaveLength(2);
+  });
+
+  it("인공지능 답변을 기다리는 동안 질문 반복과 추측을 막고 한 활동만 기록한다", async () => {
+    await startLocal("ai");
+    const pending = deferred<{ text: string }>();
+    aiMocks.ask.mockReturnValueOnce(pending.promise);
+
+    const input = screen.getByLabelText("예 또는 아니오 질문");
+    fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
+    const askButton = screen.getByRole("button", { name: /질문하기/ });
+    const guessButton = screen.getByRole("button", { name: "정답 맞추기!" });
+    fireEvent.click(askButton);
+    fireEvent.click(askButton);
+    fireEvent.click(guessButton);
+
+    expect(aiMocks.ask).toHaveBeenCalledTimes(2);
+    expect(askButton).toBeDisabled();
+    expect(guessButton).toBeDisabled();
+    expect(screen.queryByLabelText("정답 추측")).not.toBeInTheDocument();
+
+    await act(async () => { pending.resolve({ text: "네" }); });
+    await waitFor(() => expect(screen.getByText(/AI.*차례/)).toBeVisible());
+    expect(screen.getAllByText("먹을 수 있나요?")).toHaveLength(1);
+    expectLocalRemaining(19);
+  });
+
+  it("인공지능 답변 오류가 나면 입력을 보존하고 활동 잠금을 푼다", async () => {
+    await startLocal("ai");
+    aiMocks.ask.mockRejectedValueOnce(new Error("answer failed"));
+
+    const input = screen.getByLabelText("예 또는 아니오 질문");
+    fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
+    fireEvent.click(screen.getByRole("button", { name: /질문하기/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /질문하기/ })).toBeEnabled();
+    });
+    expect(input).toHaveValue("먹을 수 있나요?");
+    fireEvent.click(screen.getByRole("button", { name: "정답 맞추기!" }));
+    expect(screen.getByLabelText("정답 추측")).toBeEnabled();
   });
 
   it("스무 번째 질문에서 바로 끝내고 스물한 번째 강제 추측을 열지 않는다", async () => {

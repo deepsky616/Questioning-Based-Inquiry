@@ -99,6 +99,18 @@ describe("question play localization", () => {
     expect(BUILT_IN_GAMES.find((game) => game.id === "mystery-box")?.duration).toBe("약 8~15분");
   });
 
+  it("미스터리 상자 안내는 질문과 추측을 합친 스무 활동 기준을 두 언어로 알린다", () => {
+    const mystery = BUILT_IN_GAMES.find((game) => game.id === "mystery-box")!;
+    const englishMystery = localizeBuiltInGame(mystery, "en");
+
+    expect(mystery.description).toContain("질문과 추측");
+    expect(mystery.instructions.join(" ")).toContain("20번의 활동");
+    expect(mystery.instructions.join(" ")).not.toContain("20개의 질문");
+    expect(englishMystery.description).toContain("questions and guesses");
+    expect(englishMystery.instructions.join(" ")).toContain("20 activities");
+    expect(englishMystery.instructions.join(" ")).not.toContain("20 questions");
+  });
+
   it("requires one friend before the host can start a room", () => {
     const koreanLobby = renderLobby("ko", 1);
     const englishLobby = renderLobby("en", 1);

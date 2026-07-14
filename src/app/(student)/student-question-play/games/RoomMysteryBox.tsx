@@ -124,10 +124,10 @@ export default function RoomMysteryBox({
 
       delete retriesRef.current[retry.kind];
       if (retry.kind === "mystery-ask") {
-        setQuestionInput((current) => current === retry.value ? "" : current);
+        setQuestionInput((current) => current.trim() === retry.value ? "" : current);
       }
       if (retry.kind === "mystery-guess") {
-        setGuessInput((current) => current === retry.value ? "" : current);
+        setGuessInput((current) => current.trim() === retry.value ? "" : current);
       }
     }
   }, [identity, state]);
@@ -184,10 +184,10 @@ export default function RoomMysteryBox({
         delete retriesRef.current[kind];
       }
       if (kind === "mystery-ask") {
-        setQuestionInput((current) => current === value ? "" : current);
+        setQuestionInput((current) => current.trim() === value ? "" : current);
       }
       if (kind === "mystery-guess") {
-        setGuessInput((current) => current === value ? "" : current);
+        setGuessInput((current) => current.trim() === value ? "" : current);
       }
     }
 

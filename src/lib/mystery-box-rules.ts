@@ -506,9 +506,16 @@ export function isMysteryGuessCorrect(
   item: MysteryItem,
   locale: MysteryLocale,
 ): boolean {
-  const normalizedGuess = normalizeText(guess, locale);
-  if (!normalizedGuess) return false;
   return [item.names[locale], ...item.aliases[locale]].some(
-    (candidate) => normalizeText(candidate, locale) === normalizedGuess,
+    (candidate) => isMysteryNameMatch(guess, candidate, locale),
   );
+}
+
+export function isMysteryNameMatch(
+  guess: string,
+  answer: string,
+  locale: MysteryLocale,
+): boolean {
+  const normalizedGuess = normalizeText(guess, locale);
+  return Boolean(normalizedGuess) && normalizedGuess === normalizeText(answer, locale);
 }

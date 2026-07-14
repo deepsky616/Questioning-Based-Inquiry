@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
@@ -10,6 +10,12 @@ import {
   QUESTION_GAME_LIMITS,
   QUESTION_GAME_RULES,
 } from "@/lib/question-game-rules";
+import {
+  isMysteryGuessCorrect,
+  isMysteryNameMatch,
+  MYSTERY_ITEMS,
+  type MysteryLocale,
+} from "@/lib/mystery-box-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -99,8 +105,22 @@ interface QAEntry {
 interface AIItem { name: string; category: string; emoji: string }
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
+function matchesMysteryItem(
+  guess: string,
+  answer: string,
+  locale: MysteryLocale,
+): boolean {
+  const builtInItem = MYSTERY_ITEMS.find((candidate) =>
+    isMysteryGuessCorrect(answer, candidate, locale),
+  );
+  return builtInItem
+    ? isMysteryGuessCorrect(guess, builtInItem, locale)
+    : isMysteryNameMatch(guess, answer, locale);
+}
+
 export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const locale = useLocale();
+  const mysteryLocale: MysteryLocale = locale === "en" ? "en" : "ko";
   const text = getQuestionGameText(locale);
   const isAI = config.mode === "ai";
   const isSolo = config.mode === "solo";
@@ -135,6 +155,9 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const [aiSetupError, setAiSetupError] = useState("");
   const [turnIdx, setTurnIdx] = useState(0);
   const [winner, setWinner] = useState<string | null>(null);
+  const [activityPending, setActivityPending] = useState(false);
+  const activityLockRef = useRef(false);
+  const gameRunRef = useRef(0);
 
   const item = isAI ? aiItem : localItem;
   const itemName = isAI ? (aiItem?.name ?? "") : (localItem?.name ?? "");
@@ -159,6 +182,10 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   }, [phase]);
 
   async function startGame() {
+    const gameRun = gameRunRef.current + 1;
+    gameRunRef.current = gameRun;
+    activityLockRef.current = false;
+    setActivityPending(false);
     setQaList([]);
     setInputQ("");
     setGuessInput("");
@@ -170,6 +197,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     if (isAI) {
       // AI 모드: 게임이 비밀 물건을 고른다(AI는 이름을 모른 채 추측, 답변만 AI가 정직하게)
       const res = await ask({ action: "mystery-box:setup", context: {} });
+      if (gameRunRef.current !== gameRun) return;
       if (!res) { setAiSetupError(text.aiSetupError); return; }
       if (res.parsed) {
         setAiItem({ name: res.parsed.name ?? "?", category: res.parsed.category ?? "", emoji: res.parsed.emoji ?? "📦" });
@@ -207,15 +235,33 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
   // 사람 차례: 질문하기
   async function askQuestion() {
-    if (!inputQ.trim() || aiLoading || !isHumanTurn) return;
+    if (
+      !inputQ.trim() ||
+      aiLoading ||
+      !isHumanTurn ||
+      activityLockRef.current
+    ) return;
     const q = inputQ.trim();
-    const ans = await answerFor(q);
-    const newList: QAEntry[] = [
-      ...qaList,
-      { kind: "question", asker: currentPlayer, question: q, answer: ans },
-    ];
-    setInputQ("");
-    recordActivity(newList);
+    const gameRun = gameRunRef.current;
+    activityLockRef.current = true;
+    setActivityPending(true);
+    try {
+      const ans = await answerFor(q);
+      if (gameRunRef.current !== gameRun) return;
+      const newList: QAEntry[] = [
+        ...qaList,
+        { kind: "question", asker: currentPlayer, question: q, answer: ans },
+      ];
+      setInputQ("");
+      recordActivity(newList);
+    } catch {
+      // 입력을 보존해 학생이 그대로 다시 시도할 수 있게 한다.
+    } finally {
+      if (gameRunRef.current === gameRun) {
+        activityLockRef.current = false;
+        setActivityPending(false);
+      }
+    }
   }
 
   // AI 차례: 스스로 질문을 만들고, 확신하면 추측까지 (turnIdx 변화로 1회 실행)
@@ -229,7 +275,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
       const guess = (turnRes?.parsed?.guess ?? "").trim();
       if (guess) {
-        const correct = guess.includes(aiItem.name) || aiItem.name.includes(guess);
+        const correct = matchesMysteryItem(guess, aiItem.name, mysteryLocale);
         const guessList: QAEntry[] = [
           ...qaList,
           {
@@ -266,9 +312,9 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   }, [isAITurn, phase, turnIdx]);
 
   function makeGuess() {
-    if (!guessInput.trim() || !item) return;
+    if (!guessInput.trim() || !item || activityLockRef.current) return;
     const g = guessInput.trim();
-    const correct = g.includes(itemName) || itemName.includes(g);
+    const correct = matchesMysteryItem(g, itemName, mysteryLocale);
     const guessList: QAEntry[] = [
       ...qaList,
       {
@@ -435,16 +481,24 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                 className="h-20 w-full resize-none rounded-lg border-2 border-input bg-background p-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-pink-500"
                 placeholder={text.yesNoPlaceholder(hasTurns ? currentPlayer : undefined)}
                 value={inputQ}
+                disabled={activityPending}
                 onChange={(e) => setInputQ(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askQuestion(); }}}
               />
               <div className="flex gap-2">
                 <Button className="flex-1 rounded-lg font-bold text-white"
-                  style={{ background: game.gradientCss, opacity: inputQ.trim() && !aiLoading ? 1 : 0.5 }}
-                  disabled={!inputQ.trim() || aiLoading} onClick={askQuestion}>
-                  {aiLoading ? text.answerLoading : text.askQuestion}
+                  style={{ background: game.gradientCss, opacity: inputQ.trim() && !aiLoading && !activityPending ? 1 : 0.5 }}
+                  disabled={!inputQ.trim() || aiLoading || activityPending} onClick={askQuestion}>
+                  {aiLoading || activityPending ? text.answerLoading : text.askQuestion}
                 </Button>
-                <Button variant="outline" className="rounded-lg px-4 text-sm" onClick={() => setIsGuessing(true)}>
+                <Button
+                  variant="outline"
+                  className="rounded-lg px-4 text-sm"
+                  disabled={activityPending}
+                  onClick={() => {
+                    if (!activityLockRef.current) setIsGuessing(true);
+                  }}
+                >
                   {text.guessAnswer}
                 </Button>
               </div>
@@ -461,16 +515,17 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                 style={{ borderColor: game.accentColor }}
                 placeholder={text.guessInputPlaceholder}
                 value={guessInput}
+                disabled={activityPending}
                 onChange={(e) => setGuessInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") makeGuess(); }}
                 autoFocus />
               <div className="flex gap-2">
                 <Button className="flex-1 rounded-lg font-bold text-white"
                   style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }}
-                  disabled={!guessInput.trim()} onClick={makeGuess}>
+                  disabled={!guessInput.trim() || activityPending} onClick={makeGuess}>
                   {text.submitAnswer}
                 </Button>
-                <Button variant="outline" className="rounded-lg" onClick={() => { setIsGuessing(false); setGuessInput(""); }}>{text.keepAsking}</Button>
+                <Button variant="outline" className="rounded-lg" disabled={activityPending} onClick={() => { setIsGuessing(false); setGuessInput(""); }}>{text.keepAsking}</Button>
               </div>
             </div>
           )}

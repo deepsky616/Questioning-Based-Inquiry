@@ -104,11 +104,11 @@ const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
     },
     "mystery-box": {
       title: "Mystery Box",
-      description: "Guess the hidden object in the box by asking questions only.",
+      description: "Use yes-or-no questions and guesses to identify the hidden object within 20 activities.",
       instructions: [
         "Hide an object inside a box.",
         "Other players may ask only questions that can be answered yes or no.",
-        "Guess the object within 20 questions to succeed.",
+        "Each question or guess uses one activity. Identify the object within 20 activities to succeed.",
         "Better questions make the object easier to discover.",
       ],
     },
@@ -404,7 +404,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
   {
     id: "mystery-box",
     title: "미스터리 박스",
-    description: "상자 안의 물건을 보지 않고 질문만으로 맞혀보세요!",
+    description: "예 또는 아니오 질문과 추측으로 상자 속 물건을 20번의 활동 안에 맞혀보세요!",
     emoji: "📦",
     gradientCss: "linear-gradient(135deg, #F472B6 0%, #E11D48 100%)",
     accentColor: "#E11D48",
@@ -412,7 +412,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     instructions: [
       "상자 안에 물건을 넣어 숨겨요.",
       "나머지 친구들은 '네/아니오'로 대답할 수 있는 질문만 해요.",
-      "20개의 질문 안에 물건을 맞히면 성공!",
+      "질문이나 추측 한 번이 한 활동이며, 20번의 활동 안에 맞히면 성공해요.",
       "좋은 질문을 많이 할수록 더 쉽게 맞힐 수 있어요.",
     ],
     isBuiltIn: true,
