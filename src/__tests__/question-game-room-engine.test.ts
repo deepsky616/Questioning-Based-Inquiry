@@ -48,7 +48,7 @@ function makeState(
 function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
   return {
     code: "1234",
-    gameId: "memory",
+    gameId: "dice",
     hostId: "a",
     status: "playing",
     players: [makePlayer("a", true), makePlayer("b")],
@@ -226,9 +226,13 @@ describe("질문놀이 방 판정기", () => {
     expect(resultOnFailure.kind).toBe("invalid");
   });
 
-  it("정적 등록부는 아직 모든 내장 놀이에 비어 있다", () => {
-    expect(BUILT_IN_QUESTION_GAME_IDS.every(hasQuestionGameRoomEngine)).toBe(false);
-    expect(BUILT_IN_QUESTION_GAME_IDS.some(hasQuestionGameRoomEngine)).toBe(false);
+  it("정적 등록부는 짝 찾기 판정기만 등록한다", () => {
+    expect(hasQuestionGameRoomEngine("memory")).toBe(true);
+    expect(
+      BUILT_IN_QUESTION_GAME_IDS
+        .filter((gameId) => gameId !== "memory")
+        .every((gameId) => !hasQuestionGameRoomEngine(gameId)),
+    ).toBe(true);
     expect(hasQuestionGameRoomEngine("unknown")).toBe(false);
   });
 

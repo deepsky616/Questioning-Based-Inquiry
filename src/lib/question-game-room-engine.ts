@@ -7,6 +7,7 @@ import type {
   GameRoom,
   RoomCommandResult,
 } from "@/lib/question-games-data";
+import { memoryQuestionGameRoomEngine } from "@/lib/question-game-room-engines/memory";
 
 const RECENT_COMMAND_LIMIT = 64;
 const UUID_V4_PATTERN =
@@ -81,7 +82,9 @@ export type QuestionGameRoomResult = QuestionGameEngineResult;
 
 const QUESTION_GAME_ROOM_ENGINES: Partial<
   Record<BuiltInQuestionGameId, QuestionGameRoomEngine>
-> = {};
+> = {
+  memory: memoryQuestionGameRoomEngine,
+};
 
 export function hasQuestionGameRoomEngine(gameId: string): boolean {
   return (
@@ -555,8 +558,39 @@ function leaveQuestionGameRoomWithResolvedEngine(
     : commonRoom.gameState;
   const finalState: Record<string, unknown> = { ...hookState };
   if (adjustedTurn) {
-    finalState.turnOrder = adjustedTurn.turnOrder;
-    finalState.currentTurnIdx = adjustedTurn.currentTurnIdx;
+    const hookTurnOrder = Array.isArray(hookState.turnOrder) &&
+      hookState.turnOrder.every((id) => typeof id === "string")
+      ? hookState.turnOrder as string[]
+      : null;
+    const hookTurnIndex = isNonNegativeInteger(hookState.currentTurnIdx)
+      ? hookState.currentTurnIdx
+      : null;
+    const activeIds = new Set(players.map(({ id }) => id));
+    const hookTurnSet = new Set(hookTurnOrder ?? []);
+    const adjustedTurnSet = new Set(adjustedTurn.turnOrder);
+    const matchesAdjustedTurn =
+      hookTurnOrder !== null &&
+      hookTurnSet.size === adjustedTurnSet.size &&
+      [...hookTurnSet].every((id) => adjustedTurnSet.has(id));
+    const matchesAllPlayers =
+      hookTurnOrder !== null &&
+      hookTurnSet.size === activeIds.size &&
+      [...hookTurnSet].every((id) => activeIds.has(id));
+    const validHookTurn =
+      hookTurnOrder !== null &&
+      hookTurnSet.size === hookTurnOrder.length &&
+      hookTurnOrder.every((id) => activeIds.has(id)) &&
+      (matchesAdjustedTurn || matchesAllPlayers) &&
+      hookTurnIndex !== null &&
+      (hookTurnOrder.length === 0
+        ? hookTurnIndex === 0
+        : hookTurnIndex < hookTurnOrder.length);
+    finalState.turnOrder = validHookTurn
+      ? hookTurnOrder
+      : adjustedTurn.turnOrder;
+    finalState.currentTurnIdx = validHookTurn
+      ? hookTurnIndex
+      : adjustedTurn.currentTurnIdx;
   }
   if (shouldEnd) {
     finalState.phase = "done";

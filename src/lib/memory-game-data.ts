@@ -87,13 +87,21 @@ export function resolveMemoryRollRoundId(
   return isMemoryRollRoundId(stored) ? stored : null;
 }
 
-export function shuffle<T>(a: T[]): T[] {
+export function shuffleWithRandom<T>(a: readonly T[], random: () => number): T[] {
   const c = [...a];
   for (let i = c.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const value = random();
+    if (!Number.isFinite(value) || value < 0 || value >= 1) {
+      throw new Error("random must be between zero and one");
+    }
+    const j = Math.floor(value * (i + 1));
     [c[i], c[j]] = [c[j], c[i]];
   }
   return c;
+}
+
+export function shuffle<T>(a: T[]): T[] {
+  return shuffleWithRandom(a, Math.random);
 }
 
 export function pickFallbackPairs(n: number, locale = "ko"): QAPair[] {

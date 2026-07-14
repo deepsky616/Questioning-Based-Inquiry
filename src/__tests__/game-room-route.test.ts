@@ -8,6 +8,7 @@ import { createElement } from "react";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import RoomCompatibilityNotice from "@/app/(student)/student-question-play/games/RoomCompatibilityNotice";
 import { BUILT_IN_GAMES, type GameRoom } from "@/lib/question-games-data";
+import { createMemoryState } from "@/lib/question-game-room-engines/memory";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -255,6 +256,64 @@ describe("공개 방 응답", () => {
       pointAwardKeyVersion: 1,
       pointEvidenceVersion: 1,
     }));
+  });
+});
+
+describe("버전 2 짝 찾기 명령 응답", () => {
+  it("등록 판정기의 복원 대기 결과를 응답까지 그대로 전달한다", async () => {
+    const playId = "11111111-1111-4111-8111-111111111111";
+    const roundId = "22222222-2222-4222-8222-222222222222";
+    const revealId = "33333333-3333-4333-8333-333333333333";
+    const room = makeRoom({
+      gameId: "memory",
+      status: "playing",
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+        { id: "other", name: "다른 학생", isHost: false, joinedAt: 2 },
+      ],
+      playId,
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      gameState: {
+        ...createMemoryState(),
+        phase: "play",
+        roundId,
+        diceRolls: { "user-1": 6, other: 5 },
+        turnOrder: ["user-1", "other"],
+        scores: { "user-1": 0, other: 0 },
+        revealedIds: ["q-0", "a-1"],
+        attempts: 1,
+        lastReveal: {
+          revealId,
+          result: "miss",
+          turnPlayerId: "user-1",
+          resolveAt: 3_500,
+        },
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_100);
+
+    try {
+      const response = await patch({
+        action: "memory-resolve-miss",
+        commandId: "44444444-4444-4444-8444-444444444444",
+        expectedCreatedAt: room.createdAt,
+        expectedVersion: room.version,
+        playId,
+        roundId,
+        revealId,
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        room: { code: room.code, version: room.version },
+        result: { retryAfterMs: 2_400 },
+      });
+      expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    } finally {
+      now.mockRestore();
+    }
   });
 });
 
@@ -601,9 +660,9 @@ describe("친구 방 시작 인원", () => {
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("상태 갱신의 종료 전환은 유지한다", async () => {
+  it("미등록 놀이 상태 갱신의 종료 전환은 유지한다", async () => {
     mocks.loadGameRoom.mockResolvedValue(
-      makeRoom({ gameId: "memory", status: "playing" }),
+      makeRoom({ gameId: "dice", status: "playing" }),
     );
     mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
       kind: "saved",
@@ -632,11 +691,26 @@ describe("친구 방 시작 인원", () => {
       room: { ...room, version: room.version + 1 },
     }));
 
-    const response = await patch({ action: "start", expectedVersion: 1 });
+    const response = await patch({
+      action: "start",
+      commandId: "55555555-5555-4555-8555-555555555555",
+      expectedCreatedAt: 1,
+      expectedVersion: 1,
+    });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      room: { status: "playing", players: { length: playerCount } },
+      room: {
+        status: "playing",
+        players: { length: playerCount },
+        pointAwardKeyVersion: 2,
+        pointEvidenceVersion: 2,
+        gameState: {
+          stateVersion: 2,
+          game: "memory",
+          phase: "setup",
+        },
+      },
     });
   });
 });
