@@ -158,6 +158,32 @@ afterEach(() => {
 });
 
 describe("이야기 주사위 지역 목표", () => {
+  it("최초 단어 요청은 언마운트 뒤 도착한 응답을 읽지 않는다", async () => {
+    const delayed = deferred<unknown>();
+    const parsedRead = vi.fn();
+    aiMocks.ask.mockReturnValue(delayed.promise);
+    const view = renderLocalGame("story-dice", StoryDiceGame);
+    const lateResponse = {
+      get parsed() {
+        parsedRead();
+        return {
+          protagonist: ["고양이"],
+          place: ["학교"],
+          event: ["보물을 찾았어요"],
+        };
+      },
+    };
+
+    view.unmount();
+    await act(async () => {
+      delayed.resolve(lateResponse);
+      await delayed.promise;
+      await Promise.resolve();
+    });
+
+    expect(parsedRead).not.toHaveBeenCalled();
+  });
+
   it("혼자 모드는 질문만 낸 상태가 아니라 셋째 답안으로 묶음을 닫을 때 끝난다", async () => {
     await startStory("solo");
 
@@ -249,6 +275,40 @@ describe("질문 주사위 지역 목표", () => {
 
     expect(screen.getByText(/민준.*🎲/)).toBeVisible();
     expect(screen.getByRole("button", { name: /주사위.*굴리기/ })).toBeEnabled();
+  });
+
+  it("셋째 학생 질문은 끝나지 않는 피드백을 기다리지 않고 바로 끝난다", async () => {
+    const pendingFeedback = deferred<{ text: string } | null>();
+    let generated = 0;
+    let feedbackCalls = 0;
+    aiMocks.ask.mockImplementation(({ action }: { action: string }) => {
+      if (action === "dice:generate") {
+        generated += 1;
+        return Promise.resolve({ text: `인공지능 예시 질문 ${generated}은 무엇인가요?` });
+      }
+      feedbackCalls += 1;
+      return feedbackCalls === 1
+        ? Promise.resolve({ text: "질문을 잘 만들었어요." })
+        : pendingFeedback.promise;
+    });
+    renderLocalGame("dice", DiceGame, "ai");
+
+    await rollQuestionDice();
+    await submitDiceQuestion("첫째 학생 질문은 무엇인가요?");
+    await rollQuestionDice();
+    await rollQuestionDice();
+    await submitDiceQuestion("둘째 학생 질문은 무엇인가요?");
+    await rollQuestionDice();
+    await rollQuestionDice();
+
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "셋째 학생 질문은 무엇인가요?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /제출/ }));
+    await flushPromises();
+
+    expect(screen.getByRole("button", { name: /다른 놀이 하러 가기/ })).toBeVisible();
+    expect(feedbackCalls).toBe(1);
   });
 });
 

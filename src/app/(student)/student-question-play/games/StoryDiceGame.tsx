@@ -48,23 +48,34 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   const [animTick, setAnimTick] = useState(0);
 
   const initRef = useRef(false);
+  const mountedRef = useRef(true);
+  const initialWordsRequestRef = useRef(0);
   const aiQuestionRequestRef = useRef(0);
   const aiQuestionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { ask, loading: aiLoading } = useAIPlay();
 
-  useEffect(() => () => {
-    aiQuestionRequestRef.current += 1;
-    if (aiQuestionTimerRef.current) clearTimeout(aiQuestionTimerRef.current);
-    if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      aiQuestionRequestRef.current += 1;
+      if (aiQuestionTimerRef.current) clearTimeout(aiQuestionTimerRef.current);
+      if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+    };
   }, []);
 
   // 1) 시작 시 단어 생성
   useEffect(() => {
     if (initRef.current) return;
     initRef.current = true;
+    const requestId = ++initialWordsRequestRef.current;
     (async () => {
       const res = await ask({ action: "story-dice:words" });
+      if (
+        !mountedRef.current ||
+        requestId !== initialWordsRequestRef.current
+      ) return;
       const parsed = (res?.parsed as unknown as StoryDiceWords | undefined)
         ?? (res?.text ? parseAIWords(res.text) : null)
         ?? pickFallbackWords(8, locale);
@@ -117,6 +128,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   }
 
   function handleBack() {
+    initialWordsRequestRef.current += 1;
     cancelAIQuestion();
     if (rollTimerRef.current) clearInterval(rollTimerRef.current);
     rollTimerRef.current = null;

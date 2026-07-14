@@ -107,37 +107,41 @@ export default function DiceGame({ game, onBack, config }: Props) {
   }, [isAITurn, ask, diceTypes, players]);
 
   async function submit() {
-    if (!question.trim()) return;
+    const trimmed = question.trim();
+    if (!trimmed) return;
     const typeInfo = diceTypes[currentFace - 1];
+    const studentEntry: RoundEntry = {
+      player: currentPlayer,
+      face: currentFace,
+      type: typeInfo.type,
+      question: trimmed,
+    };
+
+    if (studentQuestionCount + 1 >= targetQuestions) {
+      aiRequestRef.current += 1;
+      setHistory([studentEntry, ...history]);
+      setFeedback("");
+      setQuestion("");
+      setPhase("done");
+      return;
+    }
+
     let fb = "";
 
     if (isAI && aiQuestion) {
       const requestId = ++aiRequestRef.current;
       const res = await ask({
         action: "dice:feedback",
-        context: { studentQuestion: question, aiQuestion },
+        context: { studentQuestion: trimmed, aiQuestion },
       });
       if (requestId !== aiRequestRef.current) return;
       fb = res?.text ?? "";
     }
 
-    const nextHistory: RoundEntry[] = [{
-      player: currentPlayer,
-      face: currentFace,
-      type: typeInfo.type,
-      question,
-      aiFeedback: fb,
-    }, ...history];
+    const nextHistory: RoundEntry[] = [{ ...studentEntry, aiFeedback: fb }, ...history];
     setHistory(nextHistory);
     setFeedback(fb);
     setQuestion("");
-
-    const nextStudentQuestionCount = nextHistory.filter((entry) => !entry.isAI).length;
-    if (nextStudentQuestionCount >= targetQuestions) {
-      aiRequestRef.current += 1;
-      setPhase("done");
-      return;
-    }
 
     if (isAI) {
       setCurrentPlayerIdx(1);
