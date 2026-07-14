@@ -326,6 +326,20 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
     return unchanged("corrupt", room, "놀이 상태가 손상되었습니다");
   }
 
+  const isStart = action === "start";
+  const isEmptyRestart = action === "restart" && state === null;
+  if (!isStart && !isEmptyRestart && state !== null) {
+    if (room.playId === undefined) {
+      return unchanged("corrupt", room, "실행 식별값이 없습니다");
+    }
+    if (body.playId !== room.playId) {
+      return unchanged("conflict", room, "실행 식별값이 다릅니다");
+    }
+    if (state.roundId && body.roundId !== state.roundId) {
+      return unchanged("conflict", room, "라운드 식별값이 다릅니다");
+    }
+  }
+
   if (state?.recentCommandIds.includes(body.commandId)) {
     return unchanged("replayed", room);
   }
@@ -333,29 +347,17 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
   if (!isNonNegativeInteger(body.expectedVersion)) {
     return unchanged("invalid", room, "기대 버전이 올바르지 않습니다");
   }
-  if (body.expectedVersion !== room.version) {
-    return unchanged("conflict", room, "기대 버전이 다릅니다");
-  }
-
-  const isStart = action === "start";
-  const isEmptyRestart = action === "restart" && state === null;
-  if (!isStart && !isEmptyRestart && room.status === "playing") {
-    if (room.playId === undefined) {
-      return unchanged("corrupt", room, "실행 식별값이 없습니다");
-    }
-    if (body.playId !== room.playId) {
-      return unchanged("conflict", room, "실행 식별값이 다릅니다");
-    }
-    if (state?.roundId && body.roundId !== state.roundId) {
-      return unchanged("conflict", room, "라운드 식별값이 다릅니다");
-    }
-  }
+  const staleVersion = body.expectedVersion !== room.version;
 
   if (!isBuiltInQuestionGameId(room.gameId)) {
     return unchanged("corrupt", room, "놀이 식별값이 올바르지 않습니다");
   }
   if (!engine) {
     return unchanged("corrupt", room, "등록된 놀이 판정기가 없습니다");
+  }
+
+  if (isStart && staleVersion) {
+    return unchanged("conflict", room, "기대 버전이 다릅니다");
   }
 
   let invalidRandomUUID = false;
@@ -433,6 +435,12 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
   }
   if (invalidRandomUUID) {
     return unchanged("corrupt", room, "서버 식별값이 올바르지 않습니다");
+  }
+
+  if (staleVersion) {
+    return engineResult.kind === "replayed"
+      ? unchanged("replayed", room, engineResult.result)
+      : unchanged("conflict", room, "기대 버전이 다릅니다");
   }
 
   if (engineResult.kind === "replayed") {

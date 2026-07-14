@@ -151,6 +151,202 @@ function isLastReveal(
   );
 }
 
+function hasUniqueStrings(values: readonly string[]): boolean {
+  return new Set(values).size === values.length;
+}
+
+function hasSameStrings(
+  values: readonly string[],
+  expected: readonly string[],
+): boolean {
+  if (!hasUniqueStrings(values) || values.length !== expected.length) {
+    return false;
+  }
+  const expectedSet = new Set(expected);
+  return values.every((value) => expectedSet.has(value));
+}
+
+function hasValidBoard(state: MemoryRoomState): boolean {
+  const expectedPairCount = MEMORY_DIFFICULTY[state.difficulty].pairs;
+  const emptyBoard = state.pairs.length === 0;
+  const mayHaveEmptyBoard =
+    state.phase === "setup" ||
+    (state.phase === "done" && state.endReason === "insufficient-players");
+  if (emptyBoard) {
+    return mayHaveEmptyBoard &&
+      state.qCards.length === 0 &&
+      state.aCards.length === 0;
+  }
+  if (
+    state.phase === "setup" ||
+    state.pairs.length !== expectedPairCount ||
+    state.qCards.length !== expectedPairCount ||
+    state.aCards.length !== expectedPairCount
+  ) {
+    return false;
+  }
+
+  const pairIds = state.pairs.map(({ id }) => id);
+  const qPairIds = state.qCards.map(({ pairId }) => pairId);
+  const aPairIds = state.aCards.map(({ pairId }) => pairId);
+  const cardIds = [...state.qCards, ...state.aCards].map(({ id }) => id);
+  return hasUniqueStrings(pairIds) &&
+    hasUniqueStrings(cardIds) &&
+    state.qCards.every(({ type }) => type === "q") &&
+    state.aCards.every(({ type }) => type === "a") &&
+    hasSameStrings(qPairIds, pairIds) &&
+    hasSameStrings(aPairIds, pairIds);
+}
+
+function hasValidCardCollections(state: MemoryRoomState): boolean {
+  const cards = [...state.qCards, ...state.aCards];
+  const cardById = new Map(cards.map((card) => [card.id, card]));
+  if (
+    !hasUniqueStrings(state.takenIds) ||
+    !hasUniqueStrings(state.revealedIds) ||
+    !state.takenIds.every((id) => cardById.has(id)) ||
+    !state.revealedIds.every((id) => cardById.has(id))
+  ) {
+    return false;
+  }
+
+  const taken = new Set(state.takenIds);
+  if (state.revealedIds.some((id) => taken.has(id))) return false;
+  return state.pairs.every(({ id: pairId }) => {
+    const question = state.qCards.find((card) => card.pairId === pairId);
+    const answer = state.aCards.find((card) => card.pairId === pairId);
+    return question !== undefined &&
+      answer !== undefined &&
+      taken.has(question.id) === taken.has(answer.id);
+  });
+}
+
+function scoreTotal(scores: Record<string, number>): number {
+  return Object.values(scores).reduce((total, score) => total + score, 0);
+}
+
+function hasValidReveal(state: MemoryRoomState): boolean {
+  const cardById = new Map(
+    [...state.qCards, ...state.aCards].map((card) => [card.id, card]),
+  );
+  if (
+    state.lastResolvedRevealId !== undefined &&
+    state.lastResolvedRevealId === state.lastReveal?.revealId
+  ) {
+    return false;
+  }
+
+  if (state.lastReveal?.result === "miss") {
+    if (state.phase !== "play" || state.revealedIds.length !== 2) {
+      return false;
+    }
+    const question = cardById.get(state.revealedIds[0]);
+    const answer = cardById.get(state.revealedIds[1]);
+    return question?.type === "q" &&
+      answer?.type === "a" &&
+      question.pairId !== answer.pairId;
+  }
+
+  if (state.phase === "setup" || state.phase === "rolling") {
+    return state.revealedIds.length === 0 && state.lastReveal === null;
+  }
+  if (state.phase === "play") {
+    if (state.lastReveal?.result === "match") {
+      return state.revealedIds.length === 0;
+    }
+    if (state.revealedIds.length === 0) return true;
+    return state.revealedIds.length === 1 &&
+      cardById.get(state.revealedIds[0])?.type === "q";
+  }
+  if (state.endReason === "insufficient-players") {
+    return state.revealedIds.length === 0 && state.lastReveal === null;
+  }
+  if (
+    state.lastReveal === null &&
+    state.lastResolvedRevealId === undefined
+  ) {
+    return false;
+  }
+
+  const taken = new Set(state.takenIds);
+  const expectedRevealedIds = [...state.qCards, ...state.aCards]
+    .filter(({ id }) => !taken.has(id))
+    .map(({ id }) => id);
+  if (
+    expectedRevealedIds.length === 0 &&
+    state.lastReveal?.result !== "match"
+  ) {
+    return false;
+  }
+  return hasSameStrings(state.revealedIds, expectedRevealedIds);
+}
+
+function hasValidPhase(state: MemoryRoomState): boolean {
+  const matchedPairs = state.takenIds.length / 2;
+  if (
+    state.maxAttempts !==
+      QUESTION_GAME_RULES.memory.targets.room[state.difficulty] ||
+    state.attempts > state.maxAttempts ||
+    state.attempts < matchedPairs ||
+    (state.lastReveal?.result === "miss" &&
+      state.attempts <= matchedPairs) ||
+    scoreTotal(state.scores) !== matchedPairs ||
+    !hasUniqueStrings(state.turnOrder) ||
+    (state.turnOrder.length === 0
+      ? state.currentTurnIdx !== 0
+      : state.currentTurnIdx >= state.turnOrder.length)
+  ) {
+    return false;
+  }
+
+  const emptyCollections =
+    Object.keys(state.diceRolls).length === 0 &&
+    state.turnOrder.length === 0 &&
+    state.takenIds.length === 0 &&
+    state.revealedIds.length === 0 &&
+    Object.keys(state.scores).length === 0 &&
+    state.attempts === 0 &&
+    state.lastReveal === null;
+  if (state.phase === "setup") {
+    return state.difficulty === "normal" &&
+      state.pairs.length === 0 &&
+      emptyCollections &&
+      state.roundId === undefined &&
+      state.endReason === undefined &&
+      state.lastResolvedRevealId === undefined;
+  }
+  if (state.pairs.length > 0 &&
+    (typeof state.roundId !== "string" || state.roundId.length === 0)) {
+    return false;
+  }
+  if (state.phase === "rolling") {
+    return state.turnOrder.length === 0 &&
+      state.takenIds.length === 0 &&
+      state.revealedIds.length === 0 &&
+      state.attempts === 0 &&
+      scoreTotal(state.scores) === 0 &&
+      state.lastReveal === null &&
+      state.endReason === undefined &&
+      state.lastResolvedRevealId === undefined;
+  }
+  if (state.phase === "play") {
+    return state.turnOrder.length > 0 &&
+      state.endReason === undefined &&
+      (state.attempts < state.maxAttempts ||
+        state.lastReveal?.result === "miss");
+  }
+  if (
+    state.endReason !== "completed" &&
+    state.endReason !== "insufficient-players"
+  ) {
+    return false;
+  }
+  if (state.endReason === "insufficient-players") return true;
+
+  const allPairsTaken = matchedPairs === state.pairs.length;
+  return allPairsTaken || state.attempts === state.maxAttempts;
+}
+
 export function readMemoryState(value: unknown): MemoryRoomState | null {
   if (
     !isRecord(value) ||
@@ -192,7 +388,13 @@ export function readMemoryState(value: unknown): MemoryRoomState | null {
   ) {
     return null;
   }
-  return value as MemoryRoomState;
+  const state = value as MemoryRoomState;
+  return hasValidBoard(state) &&
+      hasValidCardCollections(state) &&
+      hasValidPhase(state) &&
+      hasValidReveal(state)
+    ? state
+    : null;
 }
 
 function changed(
@@ -611,26 +813,81 @@ function keepActiveValues(
   );
 }
 
+function releaseScoredPairs(
+  state: MemoryRoomState,
+  score: number,
+): string[] {
+  if (score === 0) return state.takenIds;
+
+  const cardById = new Map(allCards(state).map((card) => [card.id, card]));
+  const takenPairIds: string[] = [];
+  const seenPairIds = new Set<string>();
+  for (const cardId of state.takenIds) {
+    const pairId = cardById.get(cardId)?.pairId;
+    if (pairId && !seenPairIds.has(pairId)) {
+      seenPairIds.add(pairId);
+      takenPairIds.push(pairId);
+    }
+  }
+  const releasedPairIds = new Set(takenPairIds.slice(-score));
+  return state.takenIds.filter((cardId) => {
+    const pairId = cardById.get(cardId)?.pairId;
+    return pairId === undefined || !releasedPairIds.has(pairId);
+  });
+}
+
+function readMemoryStateForLeave(
+  value: unknown,
+  leavingPlayerId: string,
+): MemoryRoomState | null {
+  const direct = readMemoryState(value);
+  if (direct) return direct;
+  if (!isRecord(value)) return null;
+
+  const candidate: Record<string, unknown> = { ...value };
+  if (
+    candidate.phase === "done" &&
+    candidate.endReason === "insufficient-players"
+  ) {
+    const hasBoard = Array.isArray(candidate.pairs) && candidate.pairs.length > 0;
+    const hasTurn = Array.isArray(candidate.turnOrder) &&
+      candidate.turnOrder.length > 0;
+    candidate.phase = !hasBoard ? "setup" : hasTurn ? "play" : "rolling";
+    delete candidate.endReason;
+  }
+  if (
+    candidate.phase === "play" &&
+    Array.isArray(candidate.turnOrder) &&
+    candidate.turnOrder.length === 0
+  ) {
+    candidate.turnOrder = [leavingPlayerId];
+    candidate.currentTurnIdx = 0;
+  }
+  return readMemoryState(candidate);
+}
+
 function memoryPlayerLeft(
   context: QuestionGameRoomLeaveContext,
 ): GameRoom {
-  const state = readMemoryState(context.room.gameState);
+  const state = readMemoryStateForLeave(
+    context.room.gameState,
+    context.userId,
+  );
   if (!state) throw new Error("corrupt memory state");
 
   const activeIds = new Set(context.room.players.map(({ id }) => id));
   const diceRolls = keepActiveValues(state.diceRolls, activeIds);
   const scores = keepActiveValues(state.scores, activeIds);
+  const departedScore = state.scores[context.userId] ?? 0;
+  const takenIds = releaseScoredPairs(state, departedScore);
   const revealOwnerLeft = state.lastReveal?.turnPlayerId === context.userId;
-  const clearFirstCard =
-    state.phase === "play" &&
-    state.lastReveal === null &&
-    state.revealedIds.length === 1;
+  const completed = state.phase === "done" && state.endReason === "completed";
   const clearMatchedReveal =
-    revealOwnerLeft && state.lastReveal?.result === "match";
+    !completed && revealOwnerLeft && state.lastReveal?.result === "match";
   const insufficientPlayers =
     context.room.status === "ended" &&
-    state.endReason === "insufficient-players";
-  const clearReveal = clearMatchedReveal || clearFirstCard || insufficientPlayers;
+    context.room.players.length === 1;
+  const clearReveal = clearMatchedReveal || insufficientPlayers;
   const resolvedRevealId =
     insufficientPlayers && state.lastReveal?.result === "miss"
       ? state.lastReveal.revealId
@@ -640,6 +897,10 @@ function memoryPlayerLeft(
     ...state,
     diceRolls,
     scores,
+    takenIds,
+    ...(completed
+      ? { revealedIds: remainingCardIds(state, takenIds) }
+      : {}),
     ...(clearReveal
       ? {
           revealedIds: [],
@@ -649,8 +910,11 @@ function memoryPlayerLeft(
             : {}),
         }
       : {}),
+    ...(insufficientPlayers
+      ? { phase: "done", endReason: "insufficient-players" }
+      : {}),
   };
-  let status = context.room.status;
+  const status = context.room.status;
 
   if (
     nextState.phase === "rolling" &&
@@ -672,6 +936,14 @@ function memoryPlayerLeft(
       turnOrder,
       currentTurnIdx: 0,
     };
+  }
+
+  const validatedState = readMemoryState(nextState);
+  if (
+    context.room.players.length > 0 &&
+    (!validatedState || !matchesRoomParticipants(context.room, validatedState))
+  ) {
+    throw new Error("corrupt memory state after player leave");
   }
 
   return { ...context.room, status, gameState: nextState };
@@ -699,11 +971,43 @@ export function createMemoryState(): MemoryRoomState {
   };
 }
 
+function matchesRoomParticipants(
+  room: GameRoom,
+  state: MemoryRoomState,
+): boolean {
+  const playerIds = room.players.map(({ id }) => id);
+  if (!hasUniqueStrings(playerIds)) return false;
+
+  const scoreIds = Object.keys(state.scores);
+  const diceIds = Object.keys(state.diceRolls);
+  const emptyBoard = state.pairs.length === 0;
+  const needsPlayerScores = state.phase !== "setup" && !emptyBoard;
+  if (
+    (needsPlayerScores
+      ? !hasSameStrings(scoreIds, playerIds)
+      : scoreIds.length !== 0) ||
+    !diceIds.every((id) => playerIds.includes(id))
+  ) {
+    return false;
+  }
+
+  if (state.phase === "play" ||
+    (state.phase === "done" && state.endReason === "completed")) {
+    return hasSameStrings(diceIds, playerIds) &&
+      hasSameStrings(state.turnOrder, playerIds);
+  }
+  if (state.phase === "done" && state.endReason === "insufficient-players") {
+    return state.turnOrder.length === 0 ||
+      hasSameStrings(state.turnOrder, playerIds);
+  }
+  return state.turnOrder.length === 0;
+}
+
 export function applyMemoryCommand(
   context: QuestionGameRoomEngineContext,
 ): QuestionGameEngineResult {
   const state = readMemoryState(context.state);
-  if (!state) {
+  if (!state || !matchesRoomParticipants(context.room, state)) {
     return {
       kind: "corrupt",
       room: context.room,

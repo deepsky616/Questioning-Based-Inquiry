@@ -260,10 +260,116 @@ describe("공개 방 응답", () => {
 });
 
 describe("버전 2 짝 찾기 명령 응답", () => {
+  it("서로 다른 복원 명령의 저장 경쟁 패자도 최신 방에서 재생 성공한다", async () => {
+    const playId = "11111111-1111-4111-8111-111111111111";
+    const roundId = "22222222-2222-4222-8222-222222222222";
+    const revealId = "33333333-3333-4333-8333-333333333333";
+    const pairs = Array.from({ length: 6 }, (_, index) => ({
+      id: `pair-${index}`,
+      question: `질문 ${index + 1}?`,
+      answer: `대답 ${index + 1}`,
+    }));
+    const room = makeRoom({
+      gameId: "memory",
+      status: "playing",
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+        { id: "user-2", name: "친구", isHost: false, joinedAt: 2 },
+      ],
+      playId,
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      gameState: {
+        ...createMemoryState(),
+        phase: "play",
+        roundId,
+        difficulty: "easy",
+        pairs,
+        qCards: pairs.map(({ id }, index) => ({
+          id: `q-${index}`,
+          pairId: id,
+          type: "q",
+        })),
+        aCards: pairs.map(({ id }, index) => ({
+          id: `a-${index}`,
+          pairId: id,
+          type: "a",
+        })),
+        diceRolls: { "user-1": 6, "user-2": 5 },
+        turnOrder: ["user-1", "user-2"],
+        scores: { "user-1": 0, "user-2": 0 },
+        revealedIds: ["q-0", "a-1"],
+        attempts: 1,
+        maxAttempts: 18,
+        lastReveal: {
+          revealId,
+          result: "miss",
+          turnPlayerId: "user-1",
+          resolveAt: 3_500,
+        },
+      },
+    });
+    let latest: GameRoom | null = null;
+    mocks.auth
+      .mockResolvedValueOnce({ user: { id: "user-1", name: "학생" } })
+      .mockResolvedValueOnce({ user: { id: "user-2", name: "친구" } });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => {
+      if (latest === null) {
+        latest = { ...candidate, version: 2, updatedAt: 4_000 };
+        return { kind: "saved" as const, room: latest };
+      }
+      return { kind: "conflict" as const, room: latest };
+    });
+    const now = vi.spyOn(Date, "now").mockReturnValue(4_000);
+
+    try {
+      const [first, second] = await Promise.all([
+        patch({
+          action: "memory-resolve-miss",
+          commandId: "44444444-4444-4444-8444-444444444444",
+          expectedCreatedAt: room.createdAt,
+          expectedVersion: room.version,
+          playId,
+          roundId,
+          revealId,
+        }),
+        patch({
+          action: "memory-resolve-miss",
+          commandId: "55555555-5555-4555-8555-555555555555",
+          expectedCreatedAt: room.createdAt,
+          expectedVersion: room.version,
+          playId,
+          roundId,
+          revealId,
+        }),
+      ]);
+
+      expect([first.status, second.status]).toEqual([200, 200]);
+      await expect(first.json()).resolves.toMatchObject({
+        room: { version: 2 },
+      });
+      await expect(second.json()).resolves.toMatchObject({
+        room: {
+          version: 2,
+          gameState: { lastResolvedRevealId: revealId },
+        },
+      });
+      expect(mocks.saveGameRoom).toHaveBeenCalledTimes(2);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it("등록 판정기의 복원 대기 결과를 응답까지 그대로 전달한다", async () => {
     const playId = "11111111-1111-4111-8111-111111111111";
     const roundId = "22222222-2222-4222-8222-222222222222";
     const revealId = "33333333-3333-4333-8333-333333333333";
+    const pairs = Array.from({ length: 6 }, (_, index) => ({
+      id: `pair-${index}`,
+      question: `질문 ${index + 1}?`,
+      answer: `대답 ${index + 1}`,
+    }));
     const room = makeRoom({
       gameId: "memory",
       status: "playing",
@@ -278,11 +384,24 @@ describe("버전 2 짝 찾기 명령 응답", () => {
         ...createMemoryState(),
         phase: "play",
         roundId,
+        difficulty: "easy",
+        pairs,
+        qCards: pairs.map(({ id }, index) => ({
+          id: `q-${index}`,
+          pairId: id,
+          type: "q",
+        })),
+        aCards: pairs.map(({ id }, index) => ({
+          id: `a-${index}`,
+          pairId: id,
+          type: "a",
+        })),
         diceRolls: { "user-1": 6, other: 5 },
         turnOrder: ["user-1", "other"],
         scores: { "user-1": 0, other: 0 },
         revealedIds: ["q-0", "a-1"],
         attempts: 1,
+        maxAttempts: 18,
         lastReveal: {
           revealId,
           result: "miss",

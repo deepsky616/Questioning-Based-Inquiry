@@ -327,7 +327,7 @@ describe("질문놀이 방 판정기", () => {
       expect(result.room).toBe(room);
     });
 
-    it("같은 명령은 버전과 실행 및 라운드가 달라도 방 참조를 유지한 replayed다", () => {
+    it("같은 명령은 실행과 라운드가 같으면 낡은 버전에도 방 참조를 유지한 replayed다", () => {
       const room = makeRoom({
         gameState: makeState({ recentCommandIds: [COMMAND_ID] }),
       });
@@ -339,8 +339,6 @@ describe("질문놀이 방 판정기", () => {
         room,
         makeBody({
           expectedVersion: 1,
-          playId: indexedCommandId(91),
-          roundId: indexedCommandId(92),
         }),
         { random, randomUUID },
       );
@@ -352,7 +350,19 @@ describe("질문놀이 방 판정기", () => {
       expect(room).toEqual(before);
     });
 
-    it("새 명령은 기대 버전, 실행, 라운드 차례로 불일치를 판정한다", () => {
+    it.each([
+      ["실행", { playId: indexedCommandId(91) }, "실행 식별값이 다릅니다"],
+      ["라운드", { roundId: indexedCommandId(92) }, "라운드 식별값이 다릅니다"],
+    ])("같은 명령도 다른 %s 식별값은 재생하지 않는다", (_name, override, message) => {
+      const room = makeRoom({
+        gameState: makeState({ recentCommandIds: [COMMAND_ID] }),
+      });
+
+      expect(apply(room, makeBody({ expectedVersion: 1, ...override })))
+        .toMatchObject({ kind: "conflict", message });
+    });
+
+    it("새 명령은 실행, 라운드, 낡은 버전 차례로 불일치를 판정한다", () => {
       const room = makeRoom();
 
       expect(
@@ -366,7 +376,7 @@ describe("질문놀이 방 판정기", () => {
         ),
       ).toMatchObject({
         kind: "conflict",
-        message: "기대 버전이 다릅니다",
+        message: "실행 식별값이 다릅니다",
       });
       expect(
         apply(
@@ -382,6 +392,53 @@ describe("질문놀이 방 판정기", () => {
       ).toMatchObject({
         kind: "conflict",
         message: "라운드 식별값이 다릅니다",
+      });
+    });
+
+    it("낡은 버전에서 판정기가 만든 변경 결과는 버린다", () => {
+      const room = makeRoom();
+      const engine = makeEngine();
+
+      const result = applyWithEngine(
+        room,
+        engine,
+        makeBody({
+          commandId: indexedCommandId(93),
+          expectedVersion: 1,
+        }),
+      );
+
+      expect(result).toMatchObject({
+        kind: "conflict",
+        room,
+        message: "기대 버전이 다릅니다",
+      });
+      expect(engine.applyCommand).toHaveBeenCalledOnce();
+    });
+
+    it("낡은 버전에서도 판정기의 의미상 재생은 성공한다", () => {
+      const room = makeRoom();
+      const engine = makeEngine({
+        applyCommand: vi.fn(() => ({
+          kind: "replayed" as const,
+          room,
+          result: { retryAfterMs: 200 },
+        })),
+      });
+
+      const result = applyWithEngine(
+        room,
+        engine,
+        makeBody({
+          commandId: indexedCommandId(94),
+          expectedVersion: 1,
+        }),
+      );
+
+      expect(result).toEqual({
+        kind: "replayed",
+        room,
+        result: { retryAfterMs: 200 },
       });
     });
 

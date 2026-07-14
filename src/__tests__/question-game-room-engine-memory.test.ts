@@ -7,6 +7,7 @@ import {
 import {
   applyMemoryCommand,
   createMemoryState,
+  readMemoryState,
   type MemoryRoomState,
 } from "@/lib/question-game-room-engines/memory";
 
@@ -165,6 +166,225 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
           recentCommandIds: [COMMAND_ID],
         },
       },
+    });
+  });
+
+  describe("저장 상태 검증", () => {
+    const invalidPlayStates: Array<[
+      string,
+      (state: MemoryRoomState) => unknown,
+    ]> = [
+      ["난이도와 다른 짝 수", (state) => ({
+        ...state,
+        pairs: state.pairs.slice(0, -1),
+      })],
+      ["중복 짝 식별값", (state) => ({
+        ...state,
+        pairs: state.pairs.map((pair, index) => index === 1
+          ? { ...pair, id: state.pairs[0].id }
+          : pair),
+      })],
+      ["존재하지 않는 짝을 가리키는 카드", (state) => ({
+        ...state,
+        qCards: state.qCards.map((card, index) => index === 0
+          ? { ...card, pairId: "missing-pair" }
+          : card),
+      })],
+      ["중복 카드 식별값", (state) => ({
+        ...state,
+        aCards: state.aCards.map((card, index) => index === 0
+          ? { ...card, id: state.qCards[0].id }
+          : card),
+      })],
+      ["질문 목록의 대답 카드", (state) => ({
+        ...state,
+        qCards: state.qCards.map((card, index) => index === 0
+          ? { ...card, type: "a" }
+          : card),
+      })],
+      ["존재하지 않는 획득 카드", (state) => ({
+        ...state,
+        takenIds: ["missing-card"],
+      })],
+      ["중복 획득 카드", (state) => ({
+        ...state,
+        takenIds: ["q-0", "a-0", "q-0"],
+        scores: { host: 1, guest: 0 },
+        attempts: 1,
+      })],
+      ["완전한 짝이 아닌 획득 카드", (state) => ({
+        ...state,
+        takenIds: ["q-0"],
+      })],
+      ["존재하지 않는 공개 카드", (state) => ({
+        ...state,
+        revealedIds: ["missing-card"],
+      })],
+      ["중복 공개 카드", (state) => ({
+        ...state,
+        revealedIds: ["q-0", "q-0"],
+        attempts: 1,
+        lastReveal: {
+          revealId: uuidAt(110),
+          result: "miss",
+          turnPlayerId: "host",
+          resolveAt: 3_500,
+        },
+      })],
+      ["획득과 공개가 겹치는 카드", (state) => ({
+        ...state,
+        takenIds: ["q-0", "a-0"],
+        revealedIds: ["q-0"],
+        scores: { host: 1, guest: 0 },
+        attempts: 1,
+      })],
+      ["차례 범위를 벗어난 현재 위치", (state) => ({
+        ...state,
+        currentTurnIdx: state.turnOrder.length,
+      })],
+      ["난이도와 다른 최대 시도", (state) => ({
+        ...state,
+        maxAttempts: 19,
+      })],
+      ["최대 시도를 넘은 시도 수", (state) => ({
+        ...state,
+        attempts: state.maxAttempts + 1,
+      })],
+      ["획득 짝 수와 다른 점수 합", (state) => ({
+        ...state,
+        takenIds: ["q-0", "a-0"],
+        attempts: 1,
+      })],
+      ["득점보다 작은 시도 수", (state) => ({
+        ...state,
+        takenIds: ["q-0", "a-0"],
+        scores: { host: 1, guest: 0 },
+      })],
+      ["첫 공개로 놓인 대답 카드", (state) => ({
+        ...state,
+        revealedIds: ["a-0"],
+      })],
+      ["마지막 공개 정보가 없는 두 카드", (state) => ({
+        ...state,
+        revealedIds: ["q-0", "a-1"],
+        attempts: 1,
+      })],
+      ["맞는 짝을 실패로 기록한 공개", (state) => ({
+        ...state,
+        revealedIds: ["q-0", "a-0"],
+        attempts: 1,
+        lastReveal: {
+          revealId: uuidAt(111),
+          result: "miss",
+          turnPlayerId: "host",
+          resolveAt: 3_500,
+        },
+      })],
+      ["공개 카드가 없는 실패 정보", (state) => ({
+        ...state,
+        attempts: 1,
+        lastReveal: {
+          revealId: uuidAt(112),
+          result: "miss",
+          turnPlayerId: "host",
+          resolveAt: 3_500,
+        },
+      })],
+      ["시도를 소비하지 않은 실패 공개", (state) => ({
+        ...state,
+        revealedIds: ["q-0", "a-1"],
+        lastReveal: {
+          revealId: uuidAt(114),
+          result: "miss",
+          turnPlayerId: "host",
+          resolveAt: 3_500,
+        },
+      })],
+      ["현재 실패와 같은 복원 완료 식별값", (state) => ({
+        ...state,
+        revealedIds: ["q-0", "a-1"],
+        attempts: 1,
+        lastReveal: {
+          revealId: uuidAt(113),
+          result: "miss",
+          turnPlayerId: "host",
+          resolveAt: 3_500,
+        },
+        lastResolvedRevealId: uuidAt(113),
+      })],
+      ["마지막 공개 근거가 없는 완료 상태", (state) => ({
+        ...state,
+        phase: "done",
+        endReason: "completed",
+        attempts: state.maxAttempts,
+        revealedIds: [
+          ...state.qCards.map(({ id }) => id),
+          ...state.aCards.map(({ id }) => id),
+        ],
+      })],
+    ];
+
+    it.each(invalidPlayStates)("%s 상태를 거절한다", (_name, makeInvalid) => {
+      expect(readMemoryState(makeInvalid(makePlayState()))).toBeNull();
+    });
+
+    it("준비와 진행 단계의 기본 상태는 읽는다", () => {
+      expect(readMemoryState(createMemoryState())).toEqual(createMemoryState());
+      expect(readMemoryState(makePlayState())).toEqual(makePlayState());
+    });
+
+    it.each([
+      ["준비 단계의 카드", {
+        ...createMemoryState(),
+        pairs: [{ id: "pair", question: "질문?", answer: "대답" }],
+      }],
+      ["준비 단계의 다른 난이도", {
+        ...createMemoryState(),
+        difficulty: "easy",
+        maxAttempts: 18,
+      }],
+      ["굴림 단계의 획득 카드", {
+        ...makePlayState(),
+        phase: "rolling",
+        turnOrder: [],
+        currentTurnIdx: 0,
+        takenIds: ["q-0", "a-0"],
+        scores: { host: 1, guest: 0 },
+        attempts: 1,
+      }],
+      ["완료 근거가 없는 종료 단계", {
+        ...makePlayState(),
+        phase: "done",
+        endReason: "completed",
+      }],
+      ["남은 카드를 공개하지 않은 최대 시도 종료", {
+        ...makePlayState(),
+        phase: "done",
+        endReason: "completed",
+        attempts: 18,
+        lastResolvedRevealId: uuidAt(115),
+      }],
+    ])("%s를 거절한다", (_name, state) => {
+      expect(readMemoryState(state)).toBeNull();
+    });
+
+    it.each([
+      ["점수 참가자", makePlayState({ scores: { host: 0 } })],
+      ["차례 참가자", makePlayState({ turnOrder: ["host"] })],
+      [
+        "주사위 참가자",
+        makePlayState({
+          diceRolls: { host: 6, guest: 5, outsider: 4 },
+        }),
+      ],
+    ])("방과 다른 %s 대응을 명령 경계에서 거절한다", (_name, state) => {
+      const result = applyMemory(
+        makePlayingRoom(state),
+        "memory-flip",
+        { cardId: "q-0" },
+      );
+
+      expect(result).toMatchObject({ kind: "corrupt" });
     });
   });
 
@@ -404,6 +624,7 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
         diceRolls: { guest: 6, host: 5 },
         takenIds,
         scores: { host: 5, guest: 0 },
+        attempts: 5,
       });
       let room = makePlayingRoom(state);
       room = changedRoom(applyMemory(
@@ -427,7 +648,7 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
             phase: "done",
             endReason: "completed",
             scores: { host: 5, guest: 1 },
-            attempts: 1,
+            attempts: 6,
           },
         },
       });
@@ -563,6 +784,7 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
 
     it("다음 실패 공개 뒤 도착한 이전 복원 요청도 재생 성공이다", () => {
       const state = makePlayState({
+        attempts: 2,
         revealedIds: ["q-0", "a-1"],
         lastResolvedRevealId: uuidAt(97),
         lastReveal: {
@@ -629,6 +851,7 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
       const state = makePlayState({
         diceRolls: { host: 6, guest: 5, third: 4 },
         turnOrder: ["host", "guest", "third"],
+        takenIds: ["q-2", "a-2"],
         scores: { host: 1, guest: 0, third: 0 },
         attempts: 2,
         revealedIds: ["q-0", "a-1"],
@@ -665,6 +888,69 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
       });
     });
 
+    it("득점 참가자가 나가면 점수와 획득 짝을 함께 정리한다", () => {
+      let room = makePlayingRoom(
+        makePlayState({
+          diceRolls: { host: 6, guest: 5, third: 4 },
+          turnOrder: ["host", "guest", "third"],
+          scores: { host: 0, guest: 0, third: 0 },
+        }),
+        ["host", "guest", "third"],
+      );
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "q-0" },
+      ));
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "a-0" },
+        { randomUUID: () => uuidAt(101) },
+      ));
+
+      const result = leaveQuestionGameRoom({ room, userId: "host" });
+
+      expect(result.kind).toBe("changed");
+      const state = result.room.gameState as MemoryRoomState;
+      expect(state.scores).toEqual({ guest: 0, third: 0 });
+      expect(state.takenIds).toEqual([]);
+      expect(Object.values(state.scores).reduce(
+        (sum, score) => sum + score,
+        0,
+      )).toBe(state.takenIds.length / 2);
+    });
+
+    it("질문 카드 공개와 무관한 참가자가 나가도 선택을 유지한다", () => {
+      let room = makePlayingRoom(
+        makePlayState({
+          diceRolls: { host: 6, guest: 5, third: 4 },
+          turnOrder: ["host", "guest", "third"],
+          scores: { host: 0, guest: 0, third: 0 },
+        }),
+        ["host", "guest", "third"],
+      );
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "q-0" },
+      ));
+
+      const result = leaveQuestionGameRoom({ room, userId: "third" });
+
+      expect(result).toMatchObject({
+        kind: "changed",
+        room: {
+          gameState: {
+            turnOrder: ["host", "guest"],
+            currentTurnIdx: 0,
+            revealedIds: ["q-0"],
+            lastReveal: null,
+          },
+        },
+      });
+    });
+
     it("주사위 미참가자가 나가 남은 결과가 모두 모이면 놀이 단계로 간다", () => {
       const state = makePlayState({
         phase: "rolling",
@@ -691,26 +977,54 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
       });
     });
 
-    it("완료 뒤 공개한 남은 카드는 참가자 이탈에도 유지한다", () => {
-      const revealedIds = ["q-0", "a-0"];
-      const state = makePlayState({
-        phase: "done",
-        endReason: "completed",
-        revealedIds,
-        lastReveal: null,
-        diceRolls: { host: 6, guest: 5, third: 4 },
-        turnOrder: ["host", "guest", "third"],
-        scores: { host: 0, guest: 0, third: 0 },
+    it("최대 시도의 마지막 맞음으로 공개한 카드는 득점자 이탈에도 유지한다", () => {
+      let room = makePlayingRoom(
+        makePlayState({
+          attempts: 17,
+          diceRolls: { host: 6, guest: 5, third: 4 },
+          turnOrder: ["host", "guest", "third"],
+          scores: { host: 0, guest: 0, third: 0 },
+        }),
+        ["host", "guest", "third"],
+      );
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "q-0" },
+      ));
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "a-0" },
+        { randomUUID: () => uuidAt(102) },
+      ));
+      const completedRevealedIds = [
+        "q-1", "q-2", "q-3", "q-4", "q-5",
+        "a-1", "a-2", "a-3", "a-4", "a-5",
+      ];
+      expect(room).toMatchObject({
+        status: "ended",
+        gameState: {
+          phase: "done",
+          attempts: 18,
+          revealedIds: completedRevealedIds,
+          lastReveal: { result: "match", turnPlayerId: "host" },
+        },
       });
-      const room = makePlayingRoom(state, ["host", "guest", "third"]);
-      room.status = "ended";
 
-      const result = leaveQuestionGameRoom({ room, userId: "third" });
+      const result = leaveQuestionGameRoom({ room, userId: "host" });
 
-      expect(result).toMatchObject({
-        kind: "changed",
-        room: { gameState: { revealedIds } },
-      });
+      expect(result.kind).toBe("changed");
+      const state = result.room.gameState as MemoryRoomState;
+      expect(state.revealedIds).toEqual([
+        "q-0", "q-1", "q-2", "q-3", "q-4", "q-5",
+        "a-0", "a-1", "a-2", "a-3", "a-4", "a-5",
+      ]);
+      expect(state.revealedIds).toEqual(
+        expect.arrayContaining(completedRevealedIds),
+      );
+      expect(state.takenIds).toEqual([]);
+      expect(state.scores).toEqual({ guest: 0, third: 0 });
     });
 
     it("마지막 실패의 주인이 나가도 마감 전에는 종료하지 않는다", () => {
@@ -748,6 +1062,7 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
 
     it("한 명 부족 종료에는 처리되지 않은 실패 공개를 남기지 않는다", () => {
       const state = makePlayState({
+        attempts: 1,
         revealedIds: ["q-0", "a-1"],
         lastReveal: {
           revealId: uuidAt(100),
