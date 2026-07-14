@@ -300,7 +300,9 @@ describe("게임 방 입력", () => {
       questions: [],
     };
     expect(readLadderState(state)).not.toBeNull();
-    const room = makeGameRoom("ladder", state, { playId: "play-ladder-1" });
+    const room = makeGameRoom("ladder", state, {
+      playId: "30000000-0000-4000-8000-000000000001",
+    });
     const onAction = actionSequence(room);
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
 

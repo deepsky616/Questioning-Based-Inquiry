@@ -36,7 +36,8 @@ const players: GameRoom["players"] = [
   { id: "host", name: LONG_NAME, isHost: true, joinedAt: 1 },
   { id: "guest", name: "참가자 민준", isHost: false, joinedAt: 2 },
 ];
-const PLAY_ID = "play-ladder-1";
+const PLAY_ID = "30000000-0000-4000-8000-000000000001";
+const NEXT_PLAY_ID = "30000000-0000-4000-8000-000000000002";
 const ROUND_IDS = [
   "10000000-0000-4000-8000-000000000001",
   "10000000-0000-4000-8000-000000000002",
@@ -281,6 +282,72 @@ describe("친구 방 질문 사다리 핵심 흐름", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(error);
   });
 
+  it.each([
+    ["새 실행", (room: GameRoom): GameRoom => ({
+      ...room,
+      playId: NEXT_PLAY_ID,
+      version: room.version + 1,
+    })],
+    ["참가자 식별값 교체", (room: GameRoom): GameRoom => ({
+      ...room,
+      players: [room.players[0], { ...room.players[1], id: "guest-next" }],
+      version: room.version + 1,
+    })],
+    ["참가자 이름 교체", (room: GameRoom): GameRoom => ({
+      ...room,
+      players: [room.players[0], { ...room.players[1], name: "새 참가자 이름" }],
+      version: room.version + 1,
+    })],
+  ] as const)("준비 요청 도중 %s 뒤에는 새 명령을 바로 보내고 옛 실패를 무시한다", async (
+    _label,
+    changeLifetime,
+  ) => {
+    let commandIndex = 0;
+    vi.stubGlobal("crypto", {
+      randomUUID: vi.fn(() => [COMMAND_ID, NEXT_COMMAND_ID][commandIndex++] ?? NEXT_COMMAND_ID),
+    });
+    const firstRoom = makeRoom(createLadderState());
+    const nextRoom = changeLifetime(makeRoom(createLadderState()));
+    const oldRequest = deferred<RoomActionResult>();
+    const onAction = vi.fn<RoomActionHandler>()
+      .mockImplementationOnce(() => oldRequest.promise)
+      .mockResolvedValueOnce(success(nextRoom));
+    const view = render(<RoomLadder {...makeProps(firstRoom, onAction)} />);
+
+    const oldInputs = screen.getAllByRole("textbox");
+    fireEvent.change(oldInputs[0], { target: { value: "옛 우주" } });
+    fireEvent.change(oldInputs[1], { target: { value: "옛 바다" } });
+    fireEvent.click(screen.getByRole("button", { name: "사다리 준비" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      <RoomLadder
+        {...makeProps(nextRoom, onAction)}
+        actionLoading={true}
+      />,
+    );
+    const nextInputs = screen.getAllByRole("textbox");
+    await waitFor(() => {
+      expect(nextInputs[0]).toBeEnabled();
+      expect(nextInputs[0]).toHaveValue("");
+      expect(nextInputs[1]).toHaveValue("");
+    });
+
+    fireEvent.change(nextInputs[0], { target: { value: "새 우주" } });
+    fireEvent.change(nextInputs[1], { target: { value: "새 바다" } });
+    fireEvent.click(screen.getByRole("button", { name: "사다리 준비" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+    expect(onAction.mock.calls[1]?.[2]?.commandId).toBe(NEXT_COMMAND_ID);
+
+    await act(async () => {
+      oldRequest.resolve(failure(firstRoom));
+      await oldRequest.promise;
+    });
+    expect(nextInputs[0]).toHaveValue("새 우주");
+    expect(nextInputs[1]).toHaveValue("새 바다");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("서버 고정 그리드에서 내 실제 가로 이동만 경로 선으로 그린다", () => {
     const room = makeRoom(makeComposeState());
     render(<RoomLadder {...makeProps(room)} />);
@@ -501,6 +568,55 @@ describe("친구 방 질문 사다리 핵심 흐름", () => {
     expect(screen.queryByRole("button", { name: "이 질문 확정" })).not.toBeInTheDocument();
   });
 
+  it("제출 요청 도중 새 라운드가 오면 새 명령을 바로 보내고 옛 성공을 무시한다", async () => {
+    let commandIndex = 0;
+    vi.stubGlobal("crypto", {
+      randomUUID: vi.fn(() => [COMMAND_ID, NEXT_COMMAND_ID][commandIndex++] ?? NEXT_COMMAND_ID),
+    });
+    const firstState = makeComposeState(1);
+    const firstRoom = makeRoom(firstState);
+    const secondRoom = makeRoom(makeComposeState(2), { version: 8 });
+    const oldRequest = deferred<RoomActionResult>();
+    const onAction = vi.fn<RoomActionHandler>()
+      .mockImplementationOnce(() => oldRequest.promise)
+      .mockResolvedValueOnce(failure(secondRoom));
+    const view = render(<RoomLadder {...makeProps(firstRoom, onAction)} />);
+
+    await openHelpFailureAndConfirm("첫 라운드 질문은 어디로 갈까요?");
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      <RoomLadder
+        {...makeProps(secondRoom, onAction)}
+        actionLoading={true}
+      />,
+    );
+    const nextInput = screen.getByRole("textbox", { name: /주제 질문$/ });
+    await waitFor(() => expect(nextInput).toHaveValue(""));
+    await openHelpFailureAndConfirm("새 라운드 질문은 유지될까요?");
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+    expect(onAction.mock.calls[1]?.[1]).toEqual(expect.objectContaining({
+      playId: PLAY_ID,
+      roundId: ROUND_IDS[1],
+      question: "새 라운드 질문은 유지될까요?",
+    }));
+    expect(onAction.mock.calls[1]?.[2]?.commandId).toBe(NEXT_COMMAND_ID);
+    expect(nextInput).toHaveValue("새 라운드 질문은 유지될까요?");
+    const currentError = await screen.findByRole("alert");
+    expect(currentError).toHaveTextContent(/확정하지 못/);
+
+    const oldConfirmedState: LadderRoomState = {
+      ...firstState,
+      recentCommandIds: [COMMAND_ID],
+    };
+    await act(async () => {
+      oldRequest.resolve(success(makeRoom(oldConfirmedState, { version: 8 })));
+      await oldRequest.promise;
+    });
+    expect(nextInput).toHaveValue("새 라운드 질문은 유지될까요?");
+    expect(screen.getByRole("alert")).toHaveTextContent(/확정하지 못/);
+  });
+
   it("완료 상태는 세 라운드 누적 질문을 보이고 수동 진행 명령을 만들지 않는다", () => {
     const room = makeRoom(makeDoneState());
     const onAction = vi.fn<RoomActionHandler>();
@@ -534,6 +650,49 @@ describe("친구 방 질문 사다리 핵심 흐름", () => {
     expect(screen.getAllByRole("button")).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: /나가기/ }));
     expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("완료 뒤 현재 참가자가 마지막 라운드 참가자의 일부이면 결과를 보인다", () => {
+    render(
+      <RoomLadder
+        {...makeProps(makeRoom(makeDoneState(), { players: [players[0]] }))}
+      />,
+    );
+
+    expect(screen.getByText("질문 사다리 완성")).toBeInTheDocument();
+    expect(screen.queryByText(/안전하게 불러오지 못/)).not.toBeInTheDocument();
+  });
+
+  it("끝 상태와 맞지 않는 놀이, 실행 및 참가자 껍데기는 안전 안내를 보인다", () => {
+    const insufficientState: LadderRoomState = {
+      ...createLadderState(),
+      phase: "done",
+      endReason: "insufficient-players",
+    };
+    const completedState = makeDoneState();
+    const cases: GameRoom[] = [
+      makeRoom(insufficientState),
+      makeRoom(completedState, {
+        players: [{
+          id: "outside",
+          name: "마지막 라운드 밖 참가자",
+          isHost: true,
+          joinedAt: 3,
+        }],
+      }),
+      makeRoom(completedState, {
+        players: [{ ...players[0], name: "바뀐 참가자 이름" }],
+      }),
+      makeRoom(completedState, { gameId: "dice" }),
+      makeRoom(completedState, { playId: "not-a-version-four-id" }),
+    ];
+
+    for (const room of cases) {
+      const view = render(<RoomLadder {...makeProps(room)} />);
+      expect(screen.getByText(/안전하게 불러오지 못/)).toBeInTheDocument();
+      expect(screen.queryByText("질문 사다리 완성")).not.toBeInTheDocument();
+      view.unmount();
+    }
   });
 
   it.each([

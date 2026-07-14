@@ -47,63 +47,138 @@ type RequestKind = "ladder-prepare" | "ladder-submit-question";
 interface RetryRequest {
   kind: RequestKind;
   commandId: string;
-  identity: string;
+  execution: string;
+  lifetime: string;
   signature: string;
 }
 
-function roomIdentity(room: Pick<GameRoom, "code" | "createdAt">) {
-  return `${room.code}:${room.createdAt}`;
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function isUuidV4(value: unknown): value is string {
+  return typeof value === "string" && UUID_V4_PATTERN.test(value);
+}
+
+function roomExecution(
+  room: Pick<GameRoom, "code" | "createdAt" | "playId">,
+) {
+  return JSON.stringify([room.code, room.createdAt, room.playId ?? ""]);
+}
+
+function roomLifetime(room: GameRoom, state: LadderRoomState | null) {
+  return JSON.stringify([
+    room.code,
+    room.createdAt,
+    room.playId ?? "",
+    state?.phase ?? "invalid",
+    state?.roundId ?? "",
+    room.players.map(({ id, name }) => [id, name]),
+  ]);
 }
 
 function requestSignature(
-  identity: string,
+  lifetime: string,
   kind: RequestKind,
   playId: string,
   value: unknown,
   roundId?: string,
 ) {
-  return JSON.stringify([identity, kind, playId, roundId ?? "", value]);
+  return JSON.stringify([lifetime, kind, playId, roundId ?? "", value]);
+}
+
+function responseMatchesExecution(
+  result: RoomActionResult | null,
+  request: RetryRequest,
+) {
+  if (!result?.room) return false;
+  return result.room.gameId === "ladder" &&
+    roomExecution(result.room) === request.execution;
 }
 
 function responseConfirmsCommand(
   result: RoomActionResult | null,
   request: RetryRequest,
 ) {
-  if (!result?.room) return false;
-  if (roomIdentity(result.room) !== request.identity) return false;
+  if (!responseMatchesExecution(result, request) || !result?.room) return false;
   return readLadderState(result.room.gameState)
     ?.recentCommandIds.includes(request.commandId) === true;
+}
+
+function hasUniqueRoomPlayers(room: GameRoom) {
+  return new Set(room.players.map(({ id }) => id)).size === room.players.length;
+}
+
+function playerMatchesAssignment(
+  state: LadderRoomState,
+  player: GameRoom["players"][number],
+) {
+  return state.assignments.some((assignment) =>
+    assignment.playerId === player.id && assignment.playerName === player.name
+  );
+}
+
+function currentPlayersMatchTargets(
+  room: GameRoom,
+  state: LadderRoomState,
+) {
+  const targetIds = new Set(state.roundTargetPlayerIds);
+  return targetIds.size === room.players.length &&
+    room.players.every((player) =>
+      targetIds.has(player.id) && playerMatchesAssignment(state, player)
+    );
+}
+
+function currentPlayersAreFinalRoundSubset(
+  room: GameRoom,
+  state: LadderRoomState,
+) {
+  const roundPlayerIds = new Set(state.roundPlayerIds);
+  const targetIds = new Set(state.roundTargetPlayerIds);
+  return room.players.every((player) =>
+    roundPlayerIds.has(player.id) &&
+    targetIds.has(player.id) &&
+    playerMatchesAssignment(state, player)
+  );
 }
 
 function roomShellMatchesState(
   room: GameRoom,
   state: LadderRoomState,
 ) {
-  if (!room.playId) return false;
+  if (
+    room.gameId !== "ladder" ||
+    !isUuidV4(room.playId) ||
+    !hasUniqueRoomPlayers(room)
+  ) {
+    return false;
+  }
   if (state.phase === "setup") {
     return room.status === "playing" &&
       room.players.length >= QUESTION_GAME_RULES.ladder.multiplayer.min &&
       room.players.length <= QUESTION_GAME_RULES.ladder.multiplayer.max;
   }
-  if (state.phase === "done") return room.status === "ended";
+  if (state.phase === "done") {
+    if (room.status !== "ended") return false;
+    if (state.endReason === "insufficient-players") {
+      if (room.players.length >= QUESTION_GAME_RULES.ladder.multiplayer.min) {
+        return false;
+      }
+      return state.round === 0
+        ? state.roundTargetPlayerIds.length === 0
+        : currentPlayersMatchTargets(room, state);
+    }
+    return state.endReason === "completed" &&
+      currentPlayersAreFinalRoundSubset(room, state);
+  }
   if (room.status !== "playing" || !state.roundId) return false;
 
-  const targetIds = new Set(state.roundTargetPlayerIds);
-  const assignmentById = new Map(
-    state.assignments.map((assignment) => [assignment.playerId, assignment]),
-  );
-  return targetIds.size === room.players.length &&
-    room.players.every((player) =>
-      targetIds.has(player.id) &&
-      assignmentById.get(player.id)?.playerName === player.name
-    );
+  return currentPlayersMatchTargets(room, state);
 }
 
 export default function RoomLadder({
   game,
   room,
   myId,
-  actionLoading,
   onAction,
   onLeave,
 }: Props) {
@@ -111,9 +186,9 @@ export default function RoomLadder({
   const locale = resolveQuestionGameLocale(rawLocale);
   const text = getQuestionGameText(locale);
   const state = readLadderState(room.gameState);
-  const identity = roomIdentity(room);
-  const setupInputKey = `${identity}:${room.players.map(({ id }) => id).join(":")}`;
-  const identityRef = useRef(identity);
+  const execution = roomExecution(room);
+  const lifetime = roomLifetime(room, state);
+  const lifetimeRef = useRef(lifetime);
   const pendingRef = useRef<RetryRequest | null>(null);
   const retriesRef = useRef<Partial<Record<RequestKind, RetryRequest>>>({});
   const [topicInputs, setTopicInputs] = useState<string[]>(() =>
@@ -126,8 +201,8 @@ export default function RoomLadder({
   const isHost = room.hostId === myId;
 
   useLayoutEffect(() => {
-    identityRef.current = identity;
-  }, [identity]);
+    lifetimeRef.current = lifetime;
+  }, [lifetime]);
 
   useEffect(() => {
     pendingRef.current = null;
@@ -135,20 +210,20 @@ export default function RoomLadder({
     setPendingKind(null);
     setPrepareError(null);
     setAcknowledgementVersion(0);
-  }, [identity]);
+  }, [lifetime]);
 
   useEffect(() => {
     setTopicInputs(Array.from({ length: room.players.length }, () => ""));
     setTopicErrors(Array.from({ length: room.players.length }, () => null));
     setPrepareError(null);
-  }, [room.players.length, setupInputKey]);
+  }, [lifetime, room.players.length]);
 
   useEffect(() => {
     if (!state) return;
     for (const request of Object.values(retriesRef.current)) {
       if (
         !request ||
-        request.identity !== identity ||
+        request.lifetime !== lifetime ||
         !state.recentCommandIds.includes(request.commandId)
       ) {
         continue;
@@ -167,7 +242,7 @@ export default function RoomLadder({
         setPrepareError(null);
       }
     }
-  }, [identity, state]);
+  }, [lifetime, state]);
 
   async function sendRequest(
     kind: RequestKind,
@@ -176,10 +251,10 @@ export default function RoomLadder({
     playId: string,
     roundId?: string,
   ) {
-    if (pendingRef.current || actionLoading) return false;
+    if (pendingRef.current) return false;
 
     const signature = requestSignature(
-      identity,
+      lifetime,
       kind,
       playId,
       signatureValue,
@@ -187,12 +262,13 @@ export default function RoomLadder({
     );
     const previous = retriesRef.current[kind];
     const request: RetryRequest =
-      previous?.identity === identity && previous.signature === signature
+      previous?.lifetime === lifetime && previous.signature === signature
         ? previous
         : {
             kind,
             commandId: crypto.randomUUID(),
-            identity,
+            execution,
+            lifetime,
             signature,
           };
 
@@ -210,8 +286,8 @@ export default function RoomLadder({
       result = null;
     }
 
-    const sameIdentity = identityRef.current === request.identity;
-    const confirmed = sameIdentity && (
+    const sameLifetime = lifetimeRef.current === request.lifetime;
+    const confirmed = sameLifetime && responseMatchesExecution(result, request) && (
       result?.ok === true || responseConfirmsCommand(result, request)
     );
     if (confirmed && retriesRef.current[kind] === request) {
@@ -219,7 +295,7 @@ export default function RoomLadder({
     }
     if (pendingRef.current === request) {
       pendingRef.current = null;
-      if (sameIdentity) setPendingKind(null);
+      if (sameLifetime) setPendingKind(null);
     }
     return confirmed;
   }
@@ -256,7 +332,7 @@ export default function RoomLadder({
       topics,
       room.playId,
     );
-    if (!confirmed && identityRef.current === identity) {
+    if (!confirmed && lifetimeRef.current === lifetime) {
       setPrepareError(locale === "en"
         ? "Could not prepare the ladder. Try again."
         : "사다리를 준비하지 못했어요. 다시 시도해 주세요.");
@@ -328,7 +404,7 @@ export default function RoomLadder({
                     <Input
                       aria-describedby={topicErrors[index] ? errorId : undefined}
                       className="bg-background text-foreground"
-                      disabled={actionLoading || pendingKind !== null}
+                      disabled={pendingKind !== null}
                       id={`room-ladder-topic-${index}`}
                       onChange={(event) => updateTopic(index, event.target.value)}
                       placeholder={text.defaultTopic(String.fromCharCode(65 + index))}
@@ -354,7 +430,7 @@ export default function RoomLadder({
             )}
             <Button
               className="w-full bg-emerald-700 py-5 font-black text-white hover:bg-emerald-800 dark:bg-emerald-300 dark:text-emerald-950 dark:hover:bg-emerald-200"
-              disabled={actionLoading || pendingKind !== null || !room.playId}
+              disabled={pendingKind !== null || !room.playId}
               onClick={() => void prepareLadder()}
               type="button"
             >
@@ -430,9 +506,7 @@ export default function RoomLadder({
   const submittedCount = targetAssignments.filter((assignment) =>
     assignment && currentQuestionByPlayer.has(assignment.playerId)).length;
   const roundKey = [
-    identity,
-    playId,
-    roundId,
+    lifetime,
     acknowledgementVersion,
   ].join(":");
 
