@@ -514,7 +514,11 @@ describe("질문놀이 방 판정기", () => {
       const serverPlayId = indexedCommandId(61);
       const randomUUID = vi.fn(() => serverPlayId);
 
-      const result = applyWithEngine(room, engine, makeBody(), {
+      const result = applyWithEngine(room, engine, {
+        commandId: COMMAND_ID,
+        expectedCreatedAt: room.createdAt,
+        expectedVersion: room.version,
+      }, {
         action: "start",
         randomUUID,
       });
@@ -550,7 +554,11 @@ describe("질문놀이 방 판정기", () => {
       });
       const engine = makeEngine();
 
-      const result = applyWithEngine(room, engine, makeBody(), {
+      const result = applyWithEngine(room, engine, {
+        commandId: COMMAND_ID,
+        expectedCreatedAt: room.createdAt,
+        expectedVersion: room.version,
+      }, {
         action: "start",
         randomUUID: () => "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
       });
@@ -560,6 +568,53 @@ describe("질문놀이 방 판정기", () => {
         message: "서버 식별값이 올바르지 않습니다",
       });
       expect(result.room).toBe(room);
+      expect(engine.createInitialState).not.toHaveBeenCalled();
+      expect(engine.applyCommand).not.toHaveBeenCalled();
+    });
+
+    it("등록 엔진 시작 본문의 초과 필드는 초기 상태를 만들기 전에 거절한다", () => {
+      const room = makeRoom({
+        status: "waiting",
+        gameState: {},
+        playId: undefined,
+      });
+      const engine = makeEngine();
+
+      const result = applyWithEngine(room, engine, {
+        action: "start",
+        commandId: COMMAND_ID,
+        expectedCreatedAt: room.createdAt,
+        expectedVersion: room.version,
+        unexpected: true,
+      }, { action: "start" });
+
+      expect(result).toMatchObject({
+        kind: "invalid",
+        message: "시작 입력이 올바르지 않습니다",
+      });
+      expect(result.room).toBe(room);
+      expect(engine.createInitialState).not.toHaveBeenCalled();
+      expect(engine.applyCommand).not.toHaveBeenCalled();
+    });
+
+    it("기록된 시작 명령 재전송도 초과 필드가 있으면 재생 전에 거절한다", () => {
+      const room = makeRoom({
+        gameState: makeState({ recentCommandIds: [COMMAND_ID] }),
+      });
+      const engine = makeEngine();
+
+      const result = applyWithEngine(room, engine, {
+        action: "start",
+        commandId: COMMAND_ID,
+        expectedCreatedAt: room.createdAt,
+        expectedVersion: room.version,
+        unexpected: true,
+      }, { action: "start" });
+
+      expect(result).toMatchObject({
+        kind: "invalid",
+        message: "시작 입력이 올바르지 않습니다",
+      });
       expect(engine.createInitialState).not.toHaveBeenCalled();
       expect(engine.applyCommand).not.toHaveBeenCalled();
     });

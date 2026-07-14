@@ -180,6 +180,23 @@ describe("이야기 주사위 방 판정기", () => {
     expect(state.pairs).toHaveLength(4);
   });
 
+  it("완료 뒤 일부와 마지막 참가자가 나가도 기록을 보존한 변경 결과를 낸다", () => {
+    let room = storyReady(2);
+    room = completePair(room, "guest-1", 60, ROUND_2_ID);
+    room = completePair(room, "guest-1", 62);
+    const completedState = structuredClone(room.gameState);
+
+    const firstLeave = leaveQuestionGameRoom({ room, userId: "host" });
+    room = changed(firstLeave);
+    expect(room.players.map(({ id }) => id)).toEqual(["guest-1"]);
+    expect(room.gameState).toEqual(completedState);
+
+    const lastLeave = leaveQuestionGameRoom({ room, userId: "guest-1" });
+    room = changed(lastLeave);
+    expect(room.players).toEqual([]);
+    expect(room.gameState).toEqual(completedState);
+  });
+
   it("차례 위반, 예전 라운드, 같은 명령 재전송을 구분한다", () => {
     const room = storyReady();
     const wrongTurn = run(room, "guest-2", "story-submit-question", 20, {

@@ -604,7 +604,35 @@ export async function PATCH(
     }
     return restartManagedRoom(room, body, userId);
   }
-  if (isVersion2 && LEGACY_STATE_ACTIONS.has(action)) {
+  if (
+    VERSIONED_ACTIONS.has(action) &&
+    !isValidExpectedVersion(expectedVersion)
+  ) {
+    return NextResponse.json(
+      { error: "올바른 expectedVersion이 필요합니다" },
+      { status: 400 },
+    );
+  }
+  if (
+    action === "update-state" &&
+    (body.status === "playing" || body.status === "ended") &&
+    room.hostId !== userId
+  ) {
+    return NextResponse.json(
+      { error: "방장만 방 상태를 변경할 수 있어요" },
+      { status: 403 },
+    );
+  }
+  if (action === "update-state" && body.status === "playing") {
+    return NextResponse.json(
+      { error: "게임 시작은 시작 동작으로만 할 수 있어요" },
+      { status: 400 },
+    );
+  }
+  if (
+    (isVersion2 || (hasEngine && room.status === "waiting")) &&
+    LEGACY_STATE_ACTIONS.has(action)
+  ) {
     return NextResponse.json(
       { error: "새 질문놀이에서는 사용할 수 없는 동작입니다" },
       { status: 403 },
@@ -645,15 +673,6 @@ export async function PATCH(
     });
   }
   if (action === "memory-roll") return handleMemoryRoll(room, userId, body);
-  if (
-    VERSIONED_ACTIONS.has(action) &&
-    !isValidExpectedVersion(expectedVersion)
-  ) {
-    return NextResponse.json(
-      { error: "올바른 expectedVersion이 필요합니다" },
-      { status: 400 },
-    );
-  }
 
   switch (action) {
     case "start": {
@@ -700,12 +719,6 @@ export async function PATCH(
         return NextResponse.json(
           { error: "방장만 방 상태를 변경할 수 있어요" },
           { status: 403 },
-        );
-      }
-      if (body.status === "playing") {
-        return NextResponse.json(
-          { error: "게임 시작은 시작 동작으로만 할 수 있어요" },
-          { status: 400 },
         );
       }
       if (isStaleRoomAction(room, expectedVersion)) {

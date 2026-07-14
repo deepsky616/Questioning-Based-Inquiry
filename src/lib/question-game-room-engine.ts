@@ -205,6 +205,14 @@ function isEmptyRecord(value: unknown): value is Record<string, never> {
   return isRecord(value) && Object.keys(value).length === 0;
 }
 
+function isExactStartBody(body: Record<string, unknown>): boolean {
+  const required = ["commandId", "expectedCreatedAt", "expectedVersion"];
+  const allowed = new Set([...required, "action"]);
+  return required.every((key) => Object.prototype.hasOwnProperty.call(body, key)) &&
+    Object.keys(body).every((key) => allowed.has(key)) &&
+    (body.action === undefined || body.action === "start");
+}
+
 export function isQuestionGameCommandId(value: unknown): value is string {
   return typeof value === "string" && UUID_V4_PATTERN.test(value);
 }
@@ -344,6 +352,9 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
 
   const isStart = action === "start";
   const isEmptyRestart = action === "restart" && state === null;
+  if (isStart && !isExactStartBody(body)) {
+    return unchanged("invalid", room, "시작 입력이 올바르지 않습니다");
+  }
   if (!isStart && !isEmptyRestart && state !== null) {
     if (room.playId === undefined) {
       return unchanged("corrupt", room, "실행 식별값이 없습니다");
@@ -528,6 +539,17 @@ function leaveQuestionGameRoomWithResolvedEngine(
     ...player,
     isHost: player.id === nextHostId,
   }));
+
+  if (room.status === "ended") {
+    return {
+      kind: "changed",
+      room: {
+        ...structuredClone(room),
+        hostId: nextHostId,
+        players: structuredClone(players),
+      },
+    };
+  }
 
   const oldState = isRecord(room.gameState) ? room.gameState : {};
   const gameState: Record<string, unknown> = { ...oldState };

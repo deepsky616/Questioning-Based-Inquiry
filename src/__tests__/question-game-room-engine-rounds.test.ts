@@ -130,6 +130,35 @@ function preparedKaba(count: number, random = () => 0): GameRoom {
   }));
 }
 
+function completedRoom(gameId: "dice" | "relay" | "kaba"): GameRoom {
+  if (gameId === "dice") {
+    let room = start("dice", 2);
+    for (let turn = 0; turn < 6; turn += 1) {
+      room = submitDiceTurn(room, 200 + turn * 2);
+    }
+    return room;
+  }
+
+  if (gameId === "relay") {
+    let room = setRelayTopic();
+    for (let turn = 0; turn < 6; turn += 1) {
+      room = submitRelayTurn(room, 300 + turn);
+    }
+    return room;
+  }
+
+  let room = preparedKaba(2);
+  for (let turn = 0; turn < 6; turn += 1) {
+    const state = readKabaPublicState(room.gameState)!;
+    const playerId = state.turnOrder[state.currentTurnIdx];
+    room = changed(run(room, playerId, "kaba-submit-question", 400 + turn, {
+      locale: "ko",
+      question: `${turn + 1}번째 완료 문장인가요?`,
+    }, { randomUUID: () => uuid(950 + turn) }));
+  }
+  return room;
+}
+
 describe("질문 주사위 판정기", () => {
   it("서버가 면을 정하고 모두 한 번씩 하면 다음 라운드로 넘긴다", () => {
     let room = start("dice", 2);
@@ -352,9 +381,41 @@ describe("카바 판정기", () => {
       endReason: "completed",
     });
   });
+
+  it("세 명으로 시작한 뒤 준비 전에 한 명이 나가면 두 명용 문장 계획을 만든다", () => {
+    let room = start("kaba", 3);
+    room = changed(leaveQuestionGameRoom({ room, userId: "guest-2" }));
+    room = changed(run(room, "host", "kaba-prepare", 150, {}, {
+      random: () => 0.37,
+      randomUUID: () => uuid(31),
+    }));
+
+    const state = readKabaPublicState(room.gameState)!;
+    expect(state.players.map(({ id }) => id)).toEqual(["host", "guest-1"]);
+    expect(Object.keys(state.scores).sort()).toEqual(["guest-1", "host"]);
+    expect(state.sentencePlan).toHaveLength(6);
+  });
 });
 
 describe("공유 라운드 공통 경계", () => {
+  it.each(["dice", "relay", "kaba"] as const)(
+    "%s 완료 뒤 일부와 마지막 참가자가 나가도 기록을 보존한 변경 결과를 낸다",
+    (gameId) => {
+      let room = completedRoom(gameId);
+      const completedState = structuredClone(room.gameState);
+
+      const firstLeave = leaveQuestionGameRoom({ room, userId: "host" });
+      room = changed(firstLeave);
+      expect(room.players.map(({ id }) => id)).toEqual(["guest-1"]);
+      expect(room.gameState).toEqual(completedState);
+
+      const lastLeave = leaveQuestionGameRoom({ room, userId: "guest-1" });
+      room = changed(lastLeave);
+      expect(room.players).toEqual([]);
+      expect(room.gameState).toEqual(completedState);
+    },
+  );
+
   it("완료 라운드가 하나 이상일 때만 방장이 조기 종료할 수 있다", () => {
     let room = setRelayTopic();
     expect(run(room, "host", "end-game-early", 100).kind).toBe("conflict");

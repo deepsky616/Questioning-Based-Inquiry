@@ -217,7 +217,10 @@ describe("공개 방 응답", () => {
   });
 
   it("일반 성공 응답에서만 비공개 상태를 제거한다", async () => {
-    const room = makeRoom({ gameState: { phase: "play" } });
+    const room = makeRoom({
+      gameId: "custom-game",
+      gameState: { phase: "play" },
+    });
     mocks.loadGameRoom.mockResolvedValue(room);
     mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
       kind: "saved",
@@ -931,7 +934,7 @@ describe("일반 게임 동작 충돌", () => {
   });
 
   it("저장 전에 방이 사라지면 404를 반환한다", async () => {
-    mocks.loadGameRoom.mockResolvedValue(makeRoom());
+    mocks.loadGameRoom.mockResolvedValue(makeRoom({ gameId: "custom-game" }));
     mocks.saveGameRoom.mockResolvedValue({ kind: "missing", room: null });
 
     const response = await patch({
@@ -1226,6 +1229,55 @@ describe("친구 방 시작 인원", () => {
       error: "새 규칙으로 다시 시작해 주세요",
       room: { status: "playing" },
     });
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["update-state", { patch: { score: 1 } }],
+    ["set-state", { state: { score: 1 } }],
+    ["next-turn", {}],
+    ["set-topic", { topic: "물" }],
+    ["add-question", { question: "왜 그럴까요?" }],
+  ] as const)(
+    "등록 엔진의 대기 방은 예전 %s 직접 쓰기를 저장 전에 거절한다",
+    async (action, extra) => {
+      const room = makeRoom({
+        gameId: "dice",
+        status: "waiting",
+        players: makePlayers(2),
+        gameState: {},
+      });
+      mocks.loadGameRoom.mockResolvedValue(room);
+
+      const response = await patch({
+        action,
+        expectedVersion: room.version,
+        ...extra,
+      });
+
+      expect(response.status).toBe(403);
+      expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    },
+  );
+
+  it("등록 엔진 시작 본문의 초과 필드는 저장 전에 거절한다", async () => {
+    const room = makeRoom({
+      gameId: "dice",
+      status: "waiting",
+      players: makePlayers(2),
+      gameState: {},
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+
+    const response = await patch({
+      action: "start",
+      commandId: "56555555-5555-4555-8555-555555555555",
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      unexpected: true,
+    });
+
+    expect(response.status).toBe(400);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 

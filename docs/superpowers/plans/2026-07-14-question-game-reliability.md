@@ -954,7 +954,7 @@ it("질문 주사위의 세 번째 라운드 마지막 비방장 질문이 자�
 it("이야기는 질문만 저장된 묶음으로 끝나지 않는다", () => {
   const result = applyTurnGameCommand(submitStoryQuestion(lastPairRoom));
   expect(result.room.status).toBe("playing");
-  expect(readStoryState(result.room).completedPairs).toBe(TARGET - 1);
+  expect(readStoryState(result.room).pairs).toHaveLength(TARGET - 1);
 });
 ```
 
@@ -970,7 +970,7 @@ npm test -- src/__tests__/question-game-room-engine-story-dice.test.ts src/__tes
 
 - [ ] **단계 3: 네 놀이 서버 상태와 명령을 구현한다**
 
-이야기는 질문과 답안을 한 쌍으로 닫을 때만 `completedPairs`를 늘린다. 질문 주사위 눈은 서버가 고른다. 릴레이는 `room.chain`을 유지하되 각 새 항목에 현재 `roundId`를 기록한다. 까바 문장 순서는 서버가 섞고 정답 여부는 `isQuestionFormForLocale`로 판정한다.
+이야기는 질문과 답안을 한 쌍으로 닫을 때만 `pairs`에 추가하고, 완결 묶음 수는 별도 저장 필드 없이 `pairs.length`에서 파생한다. 질문 주사위 눈은 서버가 고른다. 릴레이는 `room.chain`을 유지하되 각 새 항목에 현재 `roundId`를 기록한다. 까바 문장 순서는 서버가 섞고 정답 여부는 `isQuestionFormForLocale`로 판정한다.
 
 친구 방과 지역 모드의 목표는 각 놀이의 `QUESTION_GAME_RULES.targets`에서 읽고, 이야기 지역 세 묶음과 까바 지역 열 문제를 화면 안에 다시 숫자로 적지 않는다.
 
