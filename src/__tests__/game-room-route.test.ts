@@ -13,6 +13,11 @@ import {
   createMysteryState,
   type MysteryRoomState,
 } from "@/lib/question-game-room-engines/mystery";
+import {
+  createLadderState,
+  type LadderRoomState,
+} from "@/lib/question-game-room-engines/ladder";
+import { assignLadderTopics, generateLadderGrid } from "@/lib/question-ladder";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -527,6 +532,117 @@ describe("미스터리 박스 실제 공개 응답", () => {
     });
     expect(mocks.deleteGameRoom).toHaveBeenCalledTimes(1);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+});
+
+describe("질문 사다리 실제 명령 경로", () => {
+  const playId = "11111111-1111-4111-8111-111111111111";
+  const roundId = "22222222-2222-4222-8222-222222222222";
+  const hostCommandId = "33333333-3333-4333-8333-333333333333";
+  const guestCommandId = "44444444-4444-4444-8444-444444444444";
+
+  function makeLadderState(
+    overrides: Partial<LadderRoomState> = {},
+  ): LadderRoomState {
+    const players = makePlayers(2);
+    const roundTopics = ["물", "빛"];
+    const grid = generateLadderGrid(2, () => 0.9);
+    const assignments = assignLadderTopics(roundTopics, grid).map(
+      (assignment, index) => ({
+        playerId: players[index].id,
+        playerName: players[index].name,
+        ...assignment,
+      }),
+    );
+    return {
+      ...createLadderState(),
+      phase: "compose",
+      roundId,
+      round: 1,
+      topicPool: [...roundTopics],
+      roundTopics,
+      grid,
+      roundPlayerIds: players.map(({ id }) => id),
+      assignments,
+      ...overrides,
+    };
+  }
+
+  function makeLadderRoom(
+    state: LadderRoomState,
+    version: number,
+  ): GameRoom {
+    return makeRoom({
+      gameId: "ladder",
+      status: "playing",
+      players: makePlayers(2),
+      playId,
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      gameState: state,
+      version,
+    });
+  }
+
+  it("다른 참가자 저장 경합 뒤 최신 판본 재시도에 두 질문을 모두 보존한다", async () => {
+    const initial = makeLadderRoom(makeLadderState(), 1);
+    const guestQuestion = {
+      roundId,
+      round: 1,
+      playerId: "user-2",
+      playerName: "학생 2",
+      topic: "빛",
+      question: "빛은 왜 필요할까요?",
+      locale: "ko" as const,
+    };
+    const latestState = makeLadderState({
+      recentCommandIds: [guestCommandId],
+      questions: [guestQuestion],
+    });
+    const latest = makeLadderRoom(latestState, 2);
+    mocks.loadGameRoom.mockResolvedValueOnce(initial).mockResolvedValueOnce(latest);
+    mocks.saveGameRoom
+      .mockResolvedValueOnce({ kind: "conflict", room: latest })
+      .mockImplementationOnce(async (candidate: GameRoom) => ({
+        kind: "saved" as const,
+        room: { ...candidate, version: candidate.version + 1 },
+      }));
+
+    const firstResponse = await patch({
+      action: "ladder-submit-question",
+      commandId: hostCommandId,
+      expectedCreatedAt: initial.createdAt,
+      expectedVersion: initial.version,
+      playId,
+      roundId,
+      locale: "ko",
+      question: "물은 왜 중요할까요?",
+    });
+    expect(firstResponse.status).toBe(409);
+
+    const retryResponse = await patch({
+      action: "ladder-submit-question",
+      commandId: hostCommandId,
+      expectedCreatedAt: latest.createdAt,
+      expectedVersion: latest.version,
+      playId,
+      roundId,
+      locale: "ko",
+      question: "물은 왜 중요할까요?",
+    });
+    const body = await retryResponse.json();
+
+    expect(retryResponse.status).toBe(200);
+    expect(body.room.gameState.questions).toEqual([
+      guestQuestion,
+      expect.objectContaining({
+        playerId: "user-1",
+        playerName: "학생 1",
+        topic: "물",
+        question: "물은 왜 중요할까요?",
+      }),
+    ]);
+    expect(latestState.questions).toEqual([guestQuestion]);
   });
 });
 

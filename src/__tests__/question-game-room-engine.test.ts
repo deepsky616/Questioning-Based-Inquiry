@@ -226,12 +226,17 @@ describe("질문놀이 방 판정기", () => {
     expect(resultOnFailure.kind).toBe("invalid");
   });
 
-  it("정적 등록부는 짝 찾기와 미스터리 박스 판정기를 등록한다", () => {
+  it("정적 등록부는 짝 찾기, 미스터리 박스와 질문 사다리 판정기를 등록한다", () => {
     expect(hasQuestionGameRoomEngine("memory")).toBe(true);
     expect(hasQuestionGameRoomEngine("mystery-box")).toBe(true);
+    expect(hasQuestionGameRoomEngine("ladder")).toBe(true);
     expect(
       BUILT_IN_QUESTION_GAME_IDS
-        .filter((gameId) => gameId !== "memory" && gameId !== "mystery-box")
+        .filter((gameId) =>
+          gameId !== "memory" &&
+          gameId !== "mystery-box" &&
+          gameId !== "ladder"
+        )
         .every((gameId) => !hasQuestionGameRoomEngine(gameId)),
     ).toBe(true);
     expect(hasQuestionGameRoomEngine("unknown")).toBe(false);

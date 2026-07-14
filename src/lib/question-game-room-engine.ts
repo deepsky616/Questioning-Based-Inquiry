@@ -9,6 +9,7 @@ import type {
 } from "@/lib/question-games-data";
 import { memoryQuestionGameRoomEngine } from "@/lib/question-game-room-engines/memory";
 import { mysteryQuestionGameRoomEngine } from "@/lib/question-game-room-engines/mystery";
+import { ladderQuestionGameRoomEngine } from "@/lib/question-game-room-engines/ladder";
 
 const RECENT_COMMAND_LIMIT = 64;
 const UUID_V4_PATTERN =
@@ -86,6 +87,7 @@ export type QuestionGameRoomResult = QuestionGameEngineResult;
 const QUESTION_GAME_ROOM_ENGINES: Partial<
   Record<BuiltInQuestionGameId, QuestionGameRoomEngine>
 > = {
+  ladder: ladderQuestionGameRoomEngine,
   memory: memoryQuestionGameRoomEngine,
   "mystery-box": mysteryQuestionGameRoomEngine,
 };
