@@ -61,6 +61,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
   }, []);
 
   const roll = useCallback(() => {
+    if (phase !== "idle" || rollTimerRef.current) return;
     setPhase("rolling");
     setQuestion("");
     if (isAITurn) setAiQuestion("");
@@ -104,7 +105,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
         }
       }
     }, 100);
-  }, [isAITurn, ask, diceTypes, players]);
+  }, [phase, isAITurn, ask, diceTypes, players]);
 
   async function submit() {
     const trimmed = question.trim();
@@ -257,12 +258,12 @@ export default function DiceGame({ game, onBack, config }: Props) {
           </div>
         )}
 
-        {phase !== "rolling" && phase !== "ai-turn" && (
+        {phase === "idle" && (
           <Button onClick={roll}
             className="w-full py-4 text-lg font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
             disabled={aiLoading}>
-            {phase === "idle" ? text.diceRoll : text.diceRollAgain}
+            {text.diceRoll}
           </Button>
         )}
 

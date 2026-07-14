@@ -7,10 +7,10 @@ import { GameHeader } from "./GameHeader";
 import { useAIPlay } from "./useAIPlay";
 import {
   STORY_DICE_EMOJI, STORY_DICE_COLOR,
-  pickFallbackWords, parseAIWords, getWordEmoji, StoryDiceWords, DiceCategory,
+  pickFallbackBilingualWords, parseAIWords, getWordEmoji, StoryDiceWords, DiceCategory,
 } from "@/lib/story-dice-data";
 import { getQuestionGameText, getStoryDiceCategoryLabel } from "@/lib/question-game-i18n";
-import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
+import { QUESTION_GAME_LIMITS, QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -19,6 +19,34 @@ interface ChainItem { type: "story" | "question" | "answer"; text: string; autho
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
 function pickOne<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+
+const STORY_WORD_CATEGORIES: DiceCategory[] = ["protagonist", "place", "event"];
+
+function readSafeStoryWords(value: unknown): StoryDiceWords | null {
+  let parsed: StoryDiceWords | null = null;
+  if (typeof value === "string") {
+    parsed = parseAIWords(value);
+  } else if (value && typeof value === "object" && !Array.isArray(value)) {
+    try {
+      parsed = parseAIWords(JSON.stringify(value));
+    } catch {
+      return null;
+    }
+  }
+  if (!parsed) return null;
+
+  const safe = STORY_WORD_CATEGORIES.every((category) => {
+    const values = parsed[category];
+    return values.length >= 6 &&
+      new Set(values).size === values.length &&
+      values.every((word) =>
+        word === word.trim() &&
+        word.length > 0 &&
+        word.length <= QUESTION_GAME_LIMITS.generatedWord
+      );
+  });
+  return safe ? parsed : null;
+}
 
 function countCompletedPairs(chain: ChainItem[]): number {
   return chain.reduce((count, item, index) => (
@@ -76,9 +104,9 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
         !mountedRef.current ||
         requestId !== initialWordsRequestRef.current
       ) return;
-      const parsed = (res?.parsed as unknown as StoryDiceWords | undefined)
-        ?? (res?.text ? parseAIWords(res.text) : null)
-        ?? pickFallbackWords(8, locale);
+      const parsed = readSafeStoryWords(res?.parsed)
+        ?? readSafeStoryWords(res?.text)
+        ?? pickFallbackBilingualWords(8);
       setWords(parsed);
       setPhase("rolling");
     })();

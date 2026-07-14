@@ -184,6 +184,35 @@ describe("이야기 주사위 지역 목표", () => {
     expect(parsedRead).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["빈 객체", {}],
+    ["일부 범주만 있는 객체", {
+      protagonist: Array.from({ length: 6 }, (_, index) => `주인공 ${index + 1}`),
+      place: Array.from({ length: 6 }, (_, index) => `장소 ${index + 1}`),
+    }],
+    ["빈 범주 배열", { protagonist: [], place: [], event: [] }],
+    ["제한보다 긴 단어", {
+      protagonist: Array.from({ length: 6 }, () => "가".repeat(61)),
+      place: Array.from({ length: 6 }, () => "나".repeat(61)),
+      event: Array.from({ length: 6 }, () => "다".repeat(61)),
+    }],
+  ])("인공지능 단어의 %s는 안전한 대체 단어로 바꾼다", async (_name, parsed) => {
+    aiMocks.ask.mockResolvedValue({ parsed });
+    renderLocalGame("story-dice", StoryDiceGame);
+
+    await flushPromises();
+
+    const poolTitle = screen.getByText(/주사위 단어/);
+    const pool = poolTitle.parentElement;
+    expect(pool).not.toBeNull();
+    expect(pool?.querySelectorAll("span")).toHaveLength(24);
+    expect(pool).not.toHaveTextContent("가".repeat(61));
+
+    fireEvent.click(screen.getByRole("button", { name: /주사위 3개 굴리기/ }));
+    await advance(1500);
+    expect(screen.getByRole("textbox")).toBeVisible();
+  });
+
   it("혼자 모드는 질문만 낸 상태가 아니라 셋째 답안으로 묶음을 닫을 때 끝난다", async () => {
     await startStory("solo");
 
@@ -223,6 +252,19 @@ describe("이야기 주사위 지역 목표", () => {
 });
 
 describe("질문 주사위 지역 목표", () => {
+  it.each(["solo", "ai"] as const)(
+    "%s 모드는 굴림 뒤 질문을 내기 전 다시 굴릴 수 없다",
+    async (mode) => {
+      renderLocalGame("dice", DiceGame, mode);
+
+      await rollQuestionDice();
+
+      expect(screen.getByRole("textbox")).toBeVisible();
+      expect(screen.queryByRole("button", { name: /다시 굴리기/ }))
+        .not.toBeInTheDocument();
+    },
+  );
+
   it("혼자 모드는 학생 질문 셋째 제출 직후 결과로 간다", async () => {
     renderLocalGame("dice", DiceGame);
 
