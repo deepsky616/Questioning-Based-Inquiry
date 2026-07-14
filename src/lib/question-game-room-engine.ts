@@ -8,6 +8,7 @@ import type {
   RoomCommandResult,
 } from "@/lib/question-games-data";
 import { memoryQuestionGameRoomEngine } from "@/lib/question-game-room-engines/memory";
+import { mysteryQuestionGameRoomEngine } from "@/lib/question-game-room-engines/mystery";
 
 const RECENT_COMMAND_LIMIT = 64;
 const UUID_V4_PATTERN =
@@ -85,6 +86,7 @@ const QUESTION_GAME_ROOM_ENGINES: Partial<
   Record<BuiltInQuestionGameId, QuestionGameRoomEngine>
 > = {
   memory: memoryQuestionGameRoomEngine,
+  "mystery-box": mysteryQuestionGameRoomEngine,
 };
 
 export function hasQuestionGameRoomEngine(gameId: string): boolean {

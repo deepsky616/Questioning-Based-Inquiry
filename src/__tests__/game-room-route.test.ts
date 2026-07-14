@@ -9,6 +9,10 @@ import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-int
 import RoomCompatibilityNotice from "@/app/(student)/student-question-play/games/RoomCompatibilityNotice";
 import { BUILT_IN_GAMES, type GameRoom } from "@/lib/question-games-data";
 import { createMemoryState } from "@/lib/question-game-room-engines/memory";
+import {
+  createMysteryState,
+  type MysteryRoomState,
+} from "@/lib/question-game-room-engines/mystery";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -256,6 +260,187 @@ describe("공개 방 응답", () => {
       pointAwardKeyVersion: 1,
       pointEvidenceVersion: 1,
     }));
+  });
+});
+
+describe("미스터리 박스 실제 공개 응답", () => {
+  const playId = "11111111-1111-4111-8111-111111111111";
+  const roundId = "22222222-2222-4222-8222-222222222222";
+  const commandId = "33333333-3333-4333-8333-333333333333";
+
+  function makeMysteryRoom(
+    state: MysteryRoomState = createMysteryState(),
+    overrides: Partial<GameRoom> = {},
+  ): GameRoom {
+    return makeRoom({
+      gameId: "mystery-box",
+      status: "playing",
+      players: makePlayers(2),
+      playId,
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      gameState: state,
+      ...overrides,
+    });
+  }
+
+  function makeMysteryPlayState(
+    overrides: Partial<MysteryRoomState> = {},
+  ): MysteryRoomState {
+    return {
+      ...createMysteryState(),
+      phase: "play",
+      roundId,
+      round: 1,
+      turnOrder: ["user-1", "user-2"],
+      scores: { "user-1": 0, "user-2": 0 },
+      private: { itemId: "apple" },
+      ...overrides,
+    };
+  }
+
+  it("준비 성공은 저장 후보에만 서버 물건을 둔다", async () => {
+    const room = makeMysteryRoom();
+    let savedCandidate: GameRoom | null = null;
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => {
+      savedCandidate = structuredClone(candidate);
+      return {
+        kind: "saved" as const,
+        room: { ...candidate, version: candidate.version + 1 },
+      };
+    });
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+
+    try {
+      const response = await patch({
+        action: "mystery-start",
+        commandId,
+        expectedCreatedAt: room.createdAt,
+        expectedVersion: room.version,
+        playId,
+      });
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(savedCandidate).not.toBeNull();
+      expect(savedCandidate!.gameState).toHaveProperty("private.itemId", "apple");
+      expect(body.room.gameState).not.toHaveProperty("private");
+      expect(body.room.gameState).not.toHaveProperty("answer");
+      expect(room.gameState).not.toHaveProperty("private");
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it("조회와 같은 명령 재생 응답은 저장 상태를 바꾸지 않고 비밀을 뺀다", async () => {
+    const state = makeMysteryPlayState({ recentCommandIds: [commandId] });
+    const room = makeMysteryRoom(state);
+    mocks.loadGameRoom.mockResolvedValue(room);
+
+    const pollResponse = await get();
+    const replayResponse = await patch({
+      action: "mystery-start",
+      commandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version - 1,
+      playId,
+    });
+    const [pollBody, replayBody] = await Promise.all([
+      pollResponse.json(),
+      replayResponse.json(),
+    ]);
+
+    expect([pollResponse.status, replayResponse.status]).toEqual([200, 200]);
+    expect(pollBody.room.gameState).not.toHaveProperty("private");
+    expect(replayBody.room.gameState).not.toHaveProperty("private");
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    expect(state.private).toEqual({ itemId: "apple" });
+  });
+
+  it("저장 충돌 응답은 최신 방의 비밀을 제거하고 원본은 유지한다", async () => {
+    const initial = makeMysteryRoom();
+    const latestState = makeMysteryPlayState();
+    const latest = makeMysteryRoom(latestState, { version: 2 });
+    mocks.loadGameRoom.mockResolvedValue(initial);
+    mocks.saveGameRoom.mockResolvedValue({ kind: "conflict", room: latest });
+
+    const response = await patch({
+      action: "mystery-start",
+      commandId,
+      expectedCreatedAt: initial.createdAt,
+      expectedVersion: initial.version,
+      playId,
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.room.gameState).not.toHaveProperty("private");
+    expect(latestState.private).toEqual({ itemId: "apple" });
+  });
+
+  it("나가기 응답은 저장할 비밀과 공개 정답을 분리한다", async () => {
+    const state = makeMysteryPlayState();
+    const room = makeMysteryRoom(state);
+    let savedCandidate: GameRoom | null = null;
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => {
+      savedCandidate = structuredClone(candidate);
+      return {
+        kind: "saved" as const,
+        room: { ...candidate, version: candidate.version + 1 },
+      };
+    });
+
+    const response = await patch({
+      action: "leave",
+      expectedCreatedAt: room.createdAt,
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(savedCandidate!.gameState).toHaveProperty("private.itemId", "apple");
+    expect(savedCandidate!.gameState).toHaveProperty("answer.ko", "사과");
+    expect(body.room.gameState).not.toHaveProperty("private");
+    expect(body.room.gameState).toHaveProperty("answer.ko", "사과");
+    expect(state.private).toEqual({ itemId: "apple" });
+  });
+
+  it("다시 시작 응답은 끝난 저장 상태의 비밀을 내보내지 않는다", async () => {
+    const state = makeMysteryPlayState({
+      phase: "done",
+      round: 1,
+      history: [{
+        kind: "guess",
+        playerId: "user-1",
+        playerName: "학생 1",
+        guess: "사과",
+        correct: true,
+      }],
+      winnerId: "user-1",
+      answer: { ko: "사과", en: "apple" },
+      endReason: "completed",
+    });
+    const room = makeMysteryRoom(state, { status: "ended" });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved" as const,
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({
+      action: "restart",
+      commandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      playId,
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.room.gameState).not.toHaveProperty("private");
+    expect(body.room.gameState).toEqual({});
+    expect(state.private).toEqual({ itemId: "apple" });
   });
 });
 
