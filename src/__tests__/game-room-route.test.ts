@@ -563,6 +563,7 @@ describe("질문 사다리 실제 명령 경로", () => {
       roundTopics,
       grid,
       roundPlayerIds: players.map(({ id }) => id),
+      roundTargetPlayerIds: players.map(({ id }) => id),
       assignments,
       ...overrides,
     };

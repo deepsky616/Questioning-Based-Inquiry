@@ -45,6 +45,7 @@ export interface LadderRoomState extends EngineStateBase {
   roundTopics: string[];
   grid: boolean[][];
   roundPlayerIds: string[];
+  roundTargetPlayerIds: string[];
   assignments: LadderAssignment[];
   questions: LadderQuestion[];
 }
@@ -67,6 +68,7 @@ const STATE_REQUIRED_KEYS = [
   "roundTopics",
   "grid",
   "roundPlayerIds",
+  "roundTargetPlayerIds",
   "assignments",
   "questions",
 ] as const;
@@ -148,6 +150,14 @@ function isStoredPlayerName(value: unknown): value is string {
   return typeof value === "string";
 }
 
+function isDenseArray<T = unknown>(value: unknown): value is T[] {
+  if (!Array.isArray(value)) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    if (!Object.prototype.hasOwnProperty.call(value, index)) return false;
+  }
+  return true;
+}
+
 function isUnique(values: readonly string[]): boolean {
   return new Set(values).size === values.length;
 }
@@ -156,9 +166,7 @@ function isStringList(
   value: unknown,
   check: (item: unknown) => item is string,
 ): value is string[] {
-  return Array.isArray(value) &&
-    Array.from({ length: value.length }, (_, index) => value[index])
-      .every(check);
+  return isDenseArray(value) && value.every(check);
 }
 
 function isLadderAssignment(value: unknown): value is LadderAssignment {
@@ -199,6 +207,10 @@ function hasValidCurrentRound(state: LadderRoomState): boolean {
     playerCount < MIN_PLAYERS ||
     playerCount > MAX_PLAYERS ||
     !isUnique(state.roundPlayerIds) ||
+    !isUnique(state.roundTargetPlayerIds) ||
+    !state.roundTargetPlayerIds.every((playerId) =>
+      state.roundPlayerIds.includes(playerId)
+    ) ||
     state.topicPool.length < playerCount ||
     state.topicPool.length > MAX_PLAYERS ||
     state.roundTopics.length !== playerCount ||
@@ -270,15 +282,18 @@ function hasValidQuestions(state: LadderRoomState): boolean {
 }
 
 function hasRequiredRoundHistory(state: LadderRoomState): boolean {
+  const roundCounts = new Map<number, number>();
+  for (const question of state.questions) {
+    const count = (roundCounts.get(question.round) ?? 0) + 1;
+    if (count > MAX_PLAYERS) return false;
+    roundCounts.set(question.round, count);
+  }
   for (let round = 1; round < state.round; round += 1) {
-    if (state.questions.filter((question) => question.round === round).length <
-      MIN_PLAYERS) {
+    if ((roundCounts.get(round) ?? 0) < MIN_PLAYERS) {
       return false;
     }
   }
-  return state.phase !== "done" || state.endReason !== "completed" ||
-    state.questions.filter((question) => question.round === state.round).length >=
-      MIN_PLAYERS;
+  return true;
 }
 
 function hasEmptyRoundData(state: LadderRoomState): boolean {
@@ -286,6 +301,7 @@ function hasEmptyRoundData(state: LadderRoomState): boolean {
     state.roundTopics.length === 0 &&
     state.grid.length === 0 &&
     state.roundPlayerIds.length === 0 &&
+    state.roundTargetPlayerIds.length === 0 &&
     state.assignments.length === 0 &&
     state.questions.length === 0 &&
     state.roundId === undefined;
@@ -309,10 +325,22 @@ function hasValidPhase(state: LadderRoomState): boolean {
   ) {
     return false;
   }
-  if (state.phase === "compose") return state.endReason === undefined;
+  if (state.phase === "compose") {
+    return state.endReason === undefined &&
+      state.roundTargetPlayerIds.length >= MIN_PLAYERS &&
+      !allTargetPlayersSubmitted(state, state.questions);
+  }
   if (state.phase !== "done") return false;
-  return state.endReason === "insufficient-players" ||
-    (state.endReason === "completed" && state.round === MAX_ROUNDS);
+  if (state.endReason === "insufficient-players") {
+    return state.roundTargetPlayerIds.length <= 1;
+  }
+  if (
+    state.endReason !== "completed" ||
+    state.round !== MAX_ROUNDS
+  ) {
+    return false;
+  }
+  return allTargetPlayersSubmitted(state, state.questions);
 }
 
 export function createLadderState(): LadderRoomState {
@@ -327,12 +355,13 @@ export function createLadderState(): LadderRoomState {
     roundTopics: [],
     grid: [],
     roundPlayerIds: [],
+    roundTargetPlayerIds: [],
     assignments: [],
     questions: [],
   };
 }
 
-export function readLadderState(value: unknown): LadderRoomState | null {
+function readLadderStateUnchecked(value: unknown): LadderRoomState | null {
   if (
     !isRecord(value) ||
     !hasExactKeys(value, STATE_REQUIRED_KEYS, STATE_OPTIONAL_KEYS) ||
@@ -355,15 +384,19 @@ export function readLadderState(value: unknown): LadderRoomState | null {
       value.roundTopics,
       (item): item is string => isStoredText(item, QUESTION_GAME_LIMITS.topic),
     ) ||
-    !Array.isArray(value.grid) ||
-    !Array.isArray(value.roundPlayerIds) ||
+    !isDenseArray(value.grid) ||
+    !value.grid.every((row) => isDenseArray(row)) ||
     !isStringList(
       value.roundPlayerIds,
       isStoredPlayerId,
     ) ||
-    !Array.isArray(value.assignments) ||
+    !isStringList(
+      value.roundTargetPlayerIds,
+      isStoredPlayerId,
+    ) ||
+    !isDenseArray(value.assignments) ||
     !value.assignments.every(isLadderAssignment) ||
-    !Array.isArray(value.questions) ||
+    !isDenseArray(value.questions) ||
     !value.questions.every(isLadderQuestion) ||
     (value.roundId !== undefined && !isUuid(value.roundId)) ||
     (value.endReason !== undefined &&
@@ -375,6 +408,14 @@ export function readLadderState(value: unknown): LadderRoomState | null {
 
   const state = value as unknown as LadderRoomState;
   return hasValidPhase(state) ? state : null;
+}
+
+export function readLadderState(value: unknown): LadderRoomState | null {
+  try {
+    return readLadderStateUnchecked(value);
+  } catch {
+    return null;
+  }
 }
 
 function invalid(
@@ -429,6 +470,15 @@ function matchesRoomState(room: GameRoom, state: LadderRoomState): boolean {
   if (state.phase === "done") return room.status === "ended";
   if (room.status !== "playing") return false;
 
+  const roomPlayerIds = room.players.map(({ id }) => id);
+  if (
+    state.roundTargetPlayerIds.length !== roomPlayerIds.length ||
+    !state.roundTargetPlayerIds.every((playerId) =>
+      roomPlayerIds.includes(playerId)
+    )
+  ) {
+    return false;
+  }
   const assignmentById = new Map(
     state.assignments.map((assignment) => [assignment.playerId, assignment]),
   );
@@ -475,6 +525,7 @@ function nextRoundState(
     roundTopics,
     grid,
     roundPlayerIds: players.map(({ id }) => id),
+    roundTargetPlayerIds: players.map(({ id }) => id),
     assignments: buildAssignments(players, roundTopics, grid),
   };
 }
@@ -532,6 +583,7 @@ function prepareLadder(
       roundTopics,
       grid,
       roundPlayerIds: context.room.players.map(({ id }) => id),
+      roundTargetPlayerIds: context.room.players.map(({ id }) => id),
       assignments: buildAssignments(context.room.players, roundTopics, grid),
     };
     return changed(context, nextState);
@@ -550,24 +602,15 @@ function hasSubmitted(
   );
 }
 
-function activeRoundPlayerIds(
+function allTargetPlayersSubmitted(
   state: LadderRoomState,
-  players: readonly RoomPlayer[],
-): string[] {
-  const activeIds = new Set(players.map(({ id }) => id));
-  return state.roundPlayerIds.filter((playerId) => activeIds.has(playerId));
-}
-
-function allActivePlayersSubmitted(
-  state: LadderRoomState,
-  players: readonly RoomPlayer[],
   questions: readonly LadderQuestion[],
 ): boolean {
-  if (!state.roundId) return false;
-  const targets = activeRoundPlayerIds(state, players);
-  return targets.length >= MIN_PLAYERS &&
-    targets.every((playerId) =>
-      hasSubmitted(questions, state.roundId as string, playerId)
+  const roundId = state.roundId;
+  if (!roundId) return false;
+  return state.roundTargetPlayerIds.length >= MIN_PLAYERS &&
+    state.roundTargetPlayerIds.every((playerId) =>
+      hasSubmitted(questions, roundId, playerId)
     );
 }
 
@@ -581,14 +624,11 @@ function submitLadderQuestion(
   if (!hasExactActionBody(context, SUBMIT_BODY_KEYS)) {
     return invalid(context, "질문 제출 자료가 올바르지 않습니다");
   }
-  if (!matchesRoomState(context.room, state)) {
-    return corrupt(context, "질문 사다리 참가자 상태가 손상되었습니다");
-  }
   const assignment = state.assignments.find(
     ({ playerId }) => playerId === context.userId,
   );
   if (
-    !state.roundPlayerIds.includes(context.userId) ||
+    !state.roundTargetPlayerIds.includes(context.userId) ||
     !assignment ||
     !context.room.players.some(({ id }) => id === context.userId)
   ) {
@@ -632,7 +672,7 @@ function submitLadderQuestion(
       locale,
     },
   ];
-  if (!allActivePlayersSubmitted(state, context.room.players, questions)) {
+  if (!allTargetPlayersSubmitted(state, questions)) {
     return changed(context, { ...state, questions });
   }
   if (state.round === state.maxRounds) {
@@ -661,6 +701,9 @@ export function applyLadderCommand(
   if (!state) {
     return corrupt(context, "질문 사다리 상태가 손상되었습니다");
   }
+  if (state.phase === "compose" && !matchesRoomState(context.room, state)) {
+    return corrupt(context, "질문 사다리 참가자 상태가 손상되었습니다");
+  }
   if (context.action === "ladder-prepare") {
     return prepareLadder(context, state);
   }
@@ -670,27 +713,72 @@ export function applyLadderCommand(
   return invalid(context, "지원하지 않는 질문 사다리 명령입니다");
 }
 
-function ladderPlayerLeft(context: QuestionGameRoomLeaveContext): GameRoom {
-  const state = readLadderState(context.room.gameState);
-  if (!state) throw new Error("corrupt ladder state");
-  if (state.phase === "done" || state.phase === "setup") {
-    return context.room;
+function readLadderStateForLeave(
+  context: QuestionGameRoomLeaveContext,
+): LadderRoomState | null {
+  const direct = readLadderState(context.room.gameState);
+  if (direct) return direct;
+  if (
+    !isRecord(context.room.gameState) ||
+    context.room.gameState.phase !== "done" ||
+    context.room.gameState.endReason !== "insufficient-players"
+  ) {
+    return null;
   }
-  if (context.room.status !== "playing") {
-    throw new Error("invalid ladder room status");
+  const restored: Record<string, unknown> = {
+    ...context.room.gameState,
+    phase: context.room.gameState.round === 0 ? "setup" : "compose",
+  };
+  delete restored.endReason;
+  return readLadderState(restored);
+}
+
+function ladderPlayerLeft(context: QuestionGameRoomLeaveContext): GameRoom {
+  const commonInsufficient = isRecord(context.room.gameState) &&
+    context.room.gameState.phase === "done" &&
+    context.room.gameState.endReason === "insufficient-players";
+  const state = readLadderStateForLeave(context);
+  if (!state) throw new Error("corrupt ladder state");
+  if (state.phase === "done" && state.endReason === "completed") {
+    return context.room;
   }
 
   const activeIds = new Set(context.room.players.map(({ id }) => id));
-  if (!context.room.players.every(({ id }) => state.roundPlayerIds.includes(id)) ||
-    activeIds.size !== context.room.players.length) {
+  const roundTargetPlayerIds = state.roundTargetPlayerIds.filter(
+    (playerId) => activeIds.has(playerId),
+  );
+  const candidate: LadderRoomState = { ...state, roundTargetPlayerIds };
+
+  if (commonInsufficient || state.endReason === "insufficient-players") {
+    const insufficientState: LadderRoomState = {
+      ...candidate,
+      phase: "done",
+      endReason: "insufficient-players",
+    };
+    if (!readLadderState(insufficientState)) {
+      throw new Error("corrupt ladder insufficient state");
+    }
+    return { ...context.room, status: "ended", gameState: insufficientState };
+  }
+  if (state.phase === "setup") {
+    if (!readLadderState(candidate)) throw new Error("corrupt ladder setup");
+    return { ...context.room, gameState: candidate };
+  }
+  if (
+    context.room.status !== "playing" ||
+    !context.room.players.every(({ id }) => state.roundPlayerIds.includes(id)) ||
+    activeIds.size !== context.room.players.length ||
+    roundTargetPlayerIds.length !== context.room.players.length
+  ) {
     throw new Error("corrupt ladder participants");
   }
-  if (!allActivePlayersSubmitted(state, context.room.players, state.questions)) {
-    return context.room;
+  if (!allTargetPlayersSubmitted(candidate, candidate.questions)) {
+    if (!readLadderState(candidate)) throw new Error("corrupt ladder candidate");
+    return { ...context.room, gameState: candidate };
   }
-  if (state.round === state.maxRounds) {
+  if (candidate.round === candidate.maxRounds) {
     const nextState: LadderRoomState = {
-      ...state,
+      ...candidate,
       phase: "done",
       endReason: "completed",
     };
@@ -699,7 +787,7 @@ function ladderPlayerLeft(context: QuestionGameRoomLeaveContext): GameRoom {
   }
 
   const nextState = nextRoundState(
-    state,
+    candidate,
     context.room.players,
     context.random,
     context.randomUUID,

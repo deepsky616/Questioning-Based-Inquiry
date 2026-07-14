@@ -151,7 +151,7 @@ function submitRound(
 ): GameRoom {
   let current = room;
   const playerIds = (current.gameState as unknown as LadderRoomState)
-    .roundPlayerIds;
+    .roundTargetPlayerIds;
   playerIds.forEach((playerId, index) => {
     current = changedRoom(applySubmit(current, playerId, startIndex + index, {
       question: `주제 ${index + 1}은 왜 필요할까요?`,
@@ -188,6 +188,7 @@ function makeComposeState(
     roundTopics,
     grid,
     roundPlayerIds: playerList.map(({ id }) => id),
+    roundTargetPlayerIds: playerList.map(({ id }) => id),
     assignments,
     questions: [],
     ...overrides,
@@ -209,6 +210,7 @@ describe("질문 사다리 방 판정기", () => {
       roundTopics: [],
       grid: [],
       roundPlayerIds: [],
+      roundTargetPlayerIds: [],
       assignments: [],
       questions: [],
     });
@@ -249,6 +251,7 @@ describe("질문 사다리 방 판정기", () => {
       const insufficientDuringRound = makeComposeState(2, {
         phase: "done",
         endReason: "insufficient-players",
+        roundTargetPlayerIds: ["host"],
       });
 
       expect(readLadderState(setup)).not.toBeNull();
@@ -261,6 +264,50 @@ describe("질문 사다리 방 판정기", () => {
       expect(readLadderState({ ...compose, phase: "done" })).toBeNull();
       expect(readLadderState({ ...completed, round: 2 })).toBeNull();
       expect(readLadderState({ ...completed, questions: [] })).toBeNull();
+      expect(readLadderState({
+        ...completed,
+        questions: completed.questions.filter((question) =>
+          question.round !== 3 || question.playerId !== "guest-1"
+        ),
+      })).toBeNull();
+      expect(readLadderState({
+        ...insufficientDuringRound,
+        roundTargetPlayerIds: ["host", "guest-1"],
+      })).toBeNull();
+    });
+
+    it("대상은 중복 없는 라운드 참가자 부분집합이어야 한다", () => {
+      const state = makeComposeState(3);
+
+      expect(readLadderState({
+        ...state,
+        roundTargetPlayerIds: ["host", "host"],
+      })).toBeNull();
+      expect(readLadderState({
+        ...state,
+        roundTargetPlayerIds: ["host", "outside"],
+      })).toBeNull();
+      expect(readLadderState({
+        ...state,
+        roundTargetPlayerIds: ["host"],
+      })).toBeNull();
+    });
+
+    it("대상 전원이 제출된 진행 상태는 정지 상태로 받지 않는다", () => {
+      const state = makeComposeState();
+      const questions: LadderQuestion[] = state.assignments.map(
+        (assignment) => ({
+          roundId: ROUND_1_ID,
+          round: 1,
+          playerId: assignment.playerId,
+          playerName: assignment.playerName,
+          topic: assignment.topic,
+          question: `${assignment.topic}은 왜 중요할까요?`,
+          locale: "ko",
+        }),
+      );
+
+      expect(readLadderState({ ...state, questions })).toBeNull();
     });
 
     it("배정과 질문도 정확한 키만 받는다", () => {
@@ -322,7 +369,12 @@ describe("질문 사다리 방 판정기", () => {
     });
 
     it("질문 중복, 현재 배정 불일치와 질문 수 상한을 거절한다", () => {
-      const state = makeComposeState(8, { round: 3, roundId: ROUND_3_ID });
+      const state = makeComposeState(8, {
+        phase: "done",
+        round: 3,
+        roundId: ROUND_3_ID,
+        endReason: "completed",
+      });
       const roundIds = [ROUND_1_ID, ROUND_2_ID, ROUND_3_ID];
       const questions: LadderQuestion[] = roundIds.flatMap((roundId, round) =>
         state.assignments.map((assignment) => ({
@@ -349,6 +401,49 @@ describe("질문 사다리 방 판정기", () => {
         ...state,
         questions: [questions[0], { ...questions[0], roundId: commandId(91) }],
       })).toBeNull();
+    });
+
+    it("지난 한 라운드의 서로 다른 아홉 질문을 거절한다", () => {
+      const state = makeComposeState(2, {
+        round: 2,
+        roundId: ROUND_2_ID,
+      });
+      const questions: LadderQuestion[] = Array.from(
+        { length: 9 },
+        (_, index) => ({
+          roundId: ROUND_1_ID,
+          round: 1,
+          playerId: `past-${index}`,
+          playerName: `지난 참가자 ${index}`,
+          topic: "지난 주제",
+          question: `지난 질문 ${index}은 무엇인가요?`,
+          locale: "ko",
+        }),
+      );
+
+      expect(readLadderState({ ...state, questions })).toBeNull();
+    });
+
+    it.each([
+      ["배정", { assignments: Array(2) }],
+      ["질문", { questions: Array(2) }],
+      ["바깥 발판", { grid: Array(10) }],
+      [
+        "안쪽 발판",
+        {
+          grid: Array.from(
+            { length: 10 },
+            (_, index) => index === 4 ? Array(1) : [false],
+          ),
+        },
+      ],
+      ["라운드 참가자", { roundPlayerIds: Array(2) }],
+      ["라운드 대상", { roundTargetPlayerIds: Array(2) }],
+    ] as const)("희소 %s 배열은 예외 없이 거절한다", (_name, override) => {
+      const candidate = { ...makeComposeState(), ...override };
+
+      expect(() => readLadderState(candidate)).not.toThrow();
+      expect(readLadderState(candidate)).toBeNull();
     });
   });
 
@@ -382,6 +477,7 @@ describe("질문 사다리 방 판정기", () => {
         topicPool: topics(count),
         roundTopics: topics(count),
         roundPlayerIds: room.players.map(({ id }) => id),
+        roundTargetPlayerIds: room.players.map(({ id }) => id),
       });
       expect(state.grid).toHaveLength(10);
       expect(state.grid.every((row) => row.length === count - 1)).toBe(true);
@@ -598,6 +694,7 @@ describe("질문 사다리 방 판정기", () => {
       }]);
       expect(state.phase).toBe("compose");
       expect(state.round).toBe(1);
+      expect(state.roundTargetPlayerIds).toEqual(["host", "guest-1"]);
     });
 
     it.each([
@@ -656,6 +753,7 @@ describe("질문 사다리 방 판정기", () => {
         round: 2,
         roundId: ROUND_2_ID,
         roundPlayerIds: ["host", "guest-1"],
+        roundTargetPlayerIds: ["host", "guest-1"],
       });
       expect(state.questions).toHaveLength(2);
       expect(state.questions.every(({ round, roundId }) =>
@@ -684,6 +782,38 @@ describe("질문 사다리 방 판정기", () => {
       expect(state.questions).toHaveLength(6);
       expect(randomUUID).not.toHaveBeenCalled();
       expect(readLadderState(state)).not.toBeNull();
+    });
+
+    it("저장 대상과 현재 방 참가자 집합이 다르면 제출을 거절한다", () => {
+      const room = prepareRoom(3);
+      const mismatched: GameRoom = {
+        ...room,
+        players: room.players.slice(0, 2),
+      };
+      const result = applySubmit(mismatched, "host", 46);
+      const repeatedPrepare = applyQuestionGameRoomCommand({
+        room: mismatched,
+        userId: "host",
+        userName: "방장",
+        action: "ladder-prepare",
+        body: {
+          commandId: commandId(47),
+          expectedCreatedAt: mismatched.createdAt,
+          expectedVersion: mismatched.version,
+          playId: mismatched.playId,
+          roundId: mismatched.gameState.roundId,
+          topics: topics(2),
+        },
+        now: 500,
+        random: () => 0.9,
+        randomUUID: () => ROUND_2_ID,
+      });
+
+      expect(result).toMatchObject({ kind: "corrupt", room: mismatched });
+      expect(repeatedPrepare).toMatchObject({
+        kind: "corrupt",
+        room: mismatched,
+      });
     });
 
     it.each([
@@ -722,9 +852,30 @@ describe("질문 사다리 방 판정기", () => {
         topicPool: topics(3),
         roundTopics: topics(2),
         roundPlayerIds: ["host", "guest-1"],
+        roundTargetPlayerIds: ["host", "guest-1"],
       });
       expect(state.questions).toHaveLength(2);
       expect(random).toHaveBeenCalledTimes(10);
+    });
+
+    it("이탈 뒤 미제출 대상이 남으면 줄어든 대상만 같은 라운드에 저장한다", () => {
+      let room = prepareRoom(3);
+      room = changedRoom(applySubmit(room, "host", 53));
+      const result = leaveQuestionGameRoom({
+        room,
+        userId: "guest-2",
+        random: () => 0.9,
+        randomUUID: () => ROUND_2_ID,
+      });
+
+      expect(result.kind).toBe("changed");
+      if (result.kind !== "changed") throw new Error("이탈 결과가 필요합니다");
+      expect(result.room.gameState).toMatchObject({
+        phase: "compose",
+        round: 1,
+        roundPlayerIds: ["host", "guest-1", "guest-2"],
+        roundTargetPlayerIds: ["host", "guest-1"],
+      });
     });
 
     it("한 명만 남으면 완료로 덮지 않고 인원 부족 종료를 유지한다", () => {
@@ -747,6 +898,7 @@ describe("질문 사다리 방 판정기", () => {
         endReason: "insufficient-players",
         round: 1,
         roundId: ROUND_1_ID,
+        roundTargetPlayerIds: ["host"],
       });
       expect(random).not.toHaveBeenCalled();
       expect(randomUUID).not.toHaveBeenCalled();
@@ -775,6 +927,50 @@ describe("질문 사다리 방 판정기", () => {
         round: 3,
       });
       expect(state.questions).toHaveLength(8);
+    });
+
+    it("여덟 명 시작 뒤 실제 이탈로 두 대상이 남아도 세 라운드를 정상 완료한다", () => {
+      let room = prepareRoom(8);
+      for (const playerId of [
+        "guest-7",
+        "guest-6",
+        "guest-5",
+        "guest-4",
+        "guest-3",
+        "guest-2",
+      ]) {
+        const left = leaveQuestionGameRoom({
+          room,
+          userId: playerId,
+          random: () => 0.9,
+          randomUUID: () => commandId(290),
+        });
+        expect(left.kind).toBe("changed");
+        if (left.kind !== "changed") throw new Error("이탈 결과가 필요합니다");
+        room = left.room;
+      }
+
+      expect(room.players.map(({ id }) => id)).toEqual(["host", "guest-1"]);
+      expect(room.gameState).toMatchObject({
+        round: 1,
+        roundPlayerIds: makePlayers(8).map(({ id }) => id),
+        roundTargetPlayerIds: ["host", "guest-1"],
+      });
+
+      room = submitRound(room, 130, ROUND_2_ID);
+      room = submitRound(room, 140, ROUND_3_ID);
+      room = changedRoom(applySubmit(room, "host", 150));
+      room = changedRoom(applySubmit(room, "guest-1", 151));
+
+      expect(room.status).toBe("ended");
+      expect(room.gameState).toMatchObject({
+        phase: "done",
+        endReason: "completed",
+        round: 3,
+        roundTargetPlayerIds: ["host", "guest-1"],
+      });
+      expect((room.gameState as unknown as LadderRoomState).questions)
+        .toHaveLength(6);
     });
 
     it.each([
