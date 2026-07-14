@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
-import { useSingleAward, AwardBadge } from "./useSingleAward";
 import { getKabaSentences, getKabaText, getQuestionGameText, isQuestionFormForLocale } from "@/lib/question-game-i18n";
+import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -24,7 +24,8 @@ export default function KabaGame({ game, onBack, config }: Props) {
   const kabaText = getKabaText(locale);
   const { mode, players } = config;
   const isAI = mode === "ai";
-  const isMulti = mode !== "solo";
+  const isMulti = mode === "friend";
+  const targetAttempts = QUESTION_GAME_RULES.kaba.targets[isAI ? "ai" : "solo"].count;
 
   const [sentences, setSentences] = useState<string[]>(() => shuffle([...getKabaSentences(locale)]));
   const [idx, setIdx] = useState(0);
@@ -35,10 +36,11 @@ export default function KabaGame({ game, onBack, config }: Props) {
   const [feedback, setFeedback] = useState<AIFeedback | null>(null);
   const [localResult, setLocalResult] = useState<"correct" | "incorrect" | null>(null);
 
-  const { ask, loading: aiLoading } = useAIPlay();
-  const { award, result: awardResult } = useSingleAward();
+  const { ask } = useAIPlay();
+  const aiRequestRef = useRef(0);
 
   useEffect(() => {
+    aiRequestRef.current += 1;
     setSentences(shuffle([...getKabaSentences(locale)]));
     setIdx(0);
     setPlayerIdx(0);
@@ -49,34 +51,28 @@ export default function KabaGame({ game, onBack, config }: Props) {
     setPhase("input");
   }, [locale]);
 
-  // 적립 (혼자/AI 모드)
-  useEffect(() => {
-    if (phase !== "done") return;
-    if (mode !== "solo" && mode !== "ai") return;
-    const myCorrect = history.filter((h) => h.isCorrect && h.playerName === (players[0] || text.me)).length;
-    award({
-      mode: mode as "solo" | "ai",
-      gameId: "kaba",
-      validQuestions: myCorrect,
-      completed: true,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  useEffect(() => () => {
+    aiRequestRef.current += 1;
+  }, []);
 
-  const TOTAL_ROUNDS = Math.min(10, sentences.length);
+  const TOTAL_ROUNDS = Math.min(targetAttempts, sentences.length);
   const current = sentences[idx] ?? "";
   const currentPlayer = players[playerIdx] ?? text.me;
 
-  const parseAIFeedback = useCallback((text: string): AIFeedback => {
+  const parseAIFeedback = useCallback((text: string): AIFeedback | null => {
     const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-    let verdict: "잘했어요" | "다시해봐요" = "잘했어요";
+    let verdict: "잘했어요" | "다시해봐요" | null = null;
     let reason = "";
     let cheer = "";
     for (const line of lines) {
-      if (line.startsWith("판정:")) verdict = line.includes("잘했어요") ? "잘했어요" : "다시해봐요";
+      if (line.startsWith("판정:")) {
+        if (line.includes("잘했어요")) verdict = "잘했어요";
+        else if (line.includes("다시해봐요")) verdict = "다시해봐요";
+      }
       if (line.startsWith("이유:")) reason = line.replace("이유:", "").trim();
       if (line.startsWith("격려:")) cheer = line.replace("격려:", "").trim();
     }
+    if (!verdict) return null;
     return {
       verdict,
       reason: reason || (locale === "en" ? "Checked!" : "확인했어요!"),
@@ -91,17 +87,20 @@ export default function KabaGame({ game, onBack, config }: Props) {
     setPhase("checking");
 
     if (isAI) {
+      const requestId = ++aiRequestRef.current;
       const res = await ask({
         action: "kaba:check",
         context: { original: current, student: trimmed },
       });
-      const fb = res?.text
-        ? parseAIFeedback(res.text)
-        : {
-          verdict: "잘했어요" as const,
-          reason: locale === "en" ? "Checked!" : "확인했어요!",
-          cheer: locale === "en" ? "Nice work!" : "멋져요! 👍",
-        };
+      if (requestId !== aiRequestRef.current) return;
+      const locallyCorrect = isQuestionFormForLocale(trimmed, locale);
+      const fb = (res?.text ? parseAIFeedback(res.text) : null) ?? {
+        verdict: locallyCorrect ? "잘했어요" as const : "다시해봐요" as const,
+        reason: locale === "en"
+          ? (locallyCorrect ? "It has a question form." : "Rewrite it as a question.")
+          : (locallyCorrect ? "질문 형태로 바꿨어요." : "질문 형태로 다시 바꿔 보세요."),
+        cheer: locale === "en" ? "Keep going!" : "계속 도전해 보세요!",
+      };
       setFeedback(fb);
       setHistory((h) => [...h, {
         original: current,
@@ -140,6 +139,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
   }
 
   function restart() {
+    aiRequestRef.current += 1;
     setIdx(0);
     setPlayerIdx(0);
     setInput("");
@@ -149,8 +149,13 @@ export default function KabaGame({ game, onBack, config }: Props) {
     setPhase("input");
   }
 
+  function handleBack() {
+    aiRequestRef.current += 1;
+    onBack();
+  }
+
   const correctCount = history.filter((h) => h.isCorrect).length;
-  const progressPct = (idx / TOTAL_ROUNDS) * 100;
+  const progressPct = (history.length / TOTAL_ROUNDS) * 100;
 
   /* ── 완료 화면 ── */
   if (phase === "done") {
@@ -159,7 +164,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+          <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 flex flex-col items-center gap-5">
           <div className="text-6xl">{"⭐".repeat(stars)}</div>
@@ -169,7 +174,12 @@ export default function KabaGame({ game, onBack, config }: Props) {
           </p>
           <div className="w-full space-y-2">
             {history.map((h, i) => (
-              <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
+              <div
+                key={i}
+                data-testid="kaba-result-entry"
+                data-player-name={h.playerName}
+                className="flex items-center gap-3 bg-gray-50 rounded-xl p-3"
+              >
                 <span className="text-lg">{h.isCorrect ? "✅" : "❌"}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-gray-400">{h.original}</p>
@@ -179,7 +189,6 @@ export default function KabaGame({ game, onBack, config }: Props) {
               </div>
             ))}
           </div>
-          <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: game.gradientCss }} onClick={restart}>
             {text.retry}
@@ -193,7 +202,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
     <div className="max-w-lg mx-auto space-y-5">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+        <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>

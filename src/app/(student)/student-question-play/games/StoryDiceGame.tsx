@@ -5,12 +5,12 @@ import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { GameHeader } from "./GameHeader";
 import { useAIPlay } from "./useAIPlay";
-import { useSingleAward, AwardBadge } from "./useSingleAward";
 import {
   STORY_DICE_EMOJI, STORY_DICE_COLOR,
   pickFallbackWords, parseAIWords, getWordEmoji, StoryDiceWords, DiceCategory,
 } from "@/lib/story-dice-data";
 import { getQuestionGameText, getStoryDiceCategoryLabel } from "@/lib/question-game-i18n";
+import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -20,12 +20,21 @@ interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig
 
 function pickOne<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
+function countCompletedPairs(chain: ChainItem[]): number {
+  return chain.reduce((count, item, index) => (
+    item.type === "answer" && chain[index - 1]?.type === "question"
+      ? count + 1
+      : count
+  ), 0);
+}
+
 export default function StoryDiceGame({ game, onBack, config }: Props) {
   const locale = useLocale();
   const text = getQuestionGameText(locale);
   const { mode, players } = config;
   const isAI = mode === "ai";
   const isMulti = mode !== "solo";
+  const targetPairs = QUESTION_GAME_RULES["story-dice"].targets[isAI ? "ai" : "solo"].count;
 
   const myName = players[0]?.trim() || text.me;
   const aiName = "🤖 AI";
@@ -39,23 +48,16 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   const [animTick, setAnimTick] = useState(0);
 
   const initRef = useRef(false);
+  const aiQuestionRequestRef = useRef(0);
+  const aiQuestionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { ask, loading: aiLoading } = useAIPlay();
-  const { award, result: awardResult, reset: resetAward } = useSingleAward();
 
-  // 적립 (혼자/AI 모드)
-  useEffect(() => {
-    if (phase !== "done") return;
-    if (mode !== "solo" && mode !== "ai") return;
-    const myUtterances = chain.filter((c) => !c.isAI && c.type !== "story").length
-      + chain.filter((c) => c.type === "story" && !c.isAI).length;
-    award({
-      mode: mode as "solo" | "ai",
-      gameId: "story-dice",
-      validQuestions: myUtterances,
-      completed: chain.length >= 4,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  useEffect(() => () => {
+    aiQuestionRequestRef.current += 1;
+    if (aiQuestionTimerRef.current) clearTimeout(aiQuestionTimerRef.current);
+    if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+  }, []);
 
   // 1) 시작 시 단어 생성
   useEffect(() => {
@@ -81,7 +83,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
       place: pickOne(words.place),
       event: pickOne(words.event),
     };
-    const iv = setInterval(() => {
+    rollTimerRef.current = setInterval(() => {
       setAnimTick((t) => t + 1);
       setRolling({
         protagonist: pickOne(words!.protagonist),
@@ -90,7 +92,8 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
       });
       count++;
       if (count >= 14) {
-        clearInterval(iv);
+        if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+        rollTimerRef.current = null;
         setRolling(null);
         setRolled(final);
         setPhase("story");
@@ -98,7 +101,29 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     }, 100);
   }
 
-  async function submitStory() {
+  function scheduleAIQuestion(currentChain: ChainItem[]) {
+    const requestId = ++aiQuestionRequestRef.current;
+    if (aiQuestionTimerRef.current) clearTimeout(aiQuestionTimerRef.current);
+    aiQuestionTimerRef.current = setTimeout(() => {
+      aiQuestionTimerRef.current = null;
+      void askAIQuestion(currentChain, requestId);
+    }, 400);
+  }
+
+  function cancelAIQuestion() {
+    aiQuestionRequestRef.current += 1;
+    if (aiQuestionTimerRef.current) clearTimeout(aiQuestionTimerRef.current);
+    aiQuestionTimerRef.current = null;
+  }
+
+  function handleBack() {
+    cancelAIQuestion();
+    if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+    rollTimerRef.current = null;
+    onBack();
+  }
+
+  function submitStory() {
     const trimmed = input.trim();
     if (!trimmed) return;
     setChain([{ type: "story", text: trimmed, author: myName }]);
@@ -106,11 +131,11 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     setPhase("qa");
     // AI 모드: 첫 질문은 AI가
     if (isAI && rolled) {
-      setTimeout(() => askAIQuestion([{ type: "story", text: trimmed, author: myName }]), 400);
+      scheduleAIQuestion([{ type: "story", text: trimmed, author: myName }]);
     }
   }
 
-  async function askAIQuestion(currentChain: ChainItem[]) {
+  async function askAIQuestion(currentChain: ChainItem[], requestId: number) {
     if (!rolled) return;
     const history = currentChain
       .filter((c) => c.type !== "story")
@@ -124,13 +149,18 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
         history,
       },
     });
-    if (res?.text) {
-      const newItem: ChainItem = { type: "question", text: res.text.trim(), author: aiName, isAI: true };
-      setChain((c) => [...c, newItem]);
-    }
+    if (requestId !== aiQuestionRequestRef.current) return;
+    const generated = res?.text.trim();
+    const question = generated || (
+      locale.toLowerCase().startsWith("en")
+        ? "What happened next?"
+        : "그다음에는 어떤 일이 있었나요?"
+    );
+    const newItem: ChainItem = { type: "question", text: question, author: aiName, isAI: true };
+    setChain((c) => [...c, newItem]);
   }
 
-  async function submitQuestion() {
+  function submitQuestion() {
     const trimmed = input.trim();
     if (!trimmed) return;
     const item: ChainItem = { type: "question", text: trimmed, author: myName };
@@ -141,20 +171,23 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     // 실제로는 AI 모드에서 술래=학생, 질문자=AI이므로 학생이 답변 차례.
   }
 
-  async function submitAnswer() {
+  function submitAnswer() {
     const trimmed = input.trim();
     if (!trimmed) return;
     const item: ChainItem = { type: "answer", text: trimmed, author: myName };
     const newChain = [...chain, item];
     setChain(newChain);
     setInput("");
+    if (countCompletedPairs(newChain) >= targetPairs) {
+      cancelAIQuestion();
+      setPhase("done");
+      return;
+    }
     // AI 모드: 다음 AI 질문 자동
     if (isAI) {
-      setTimeout(() => askAIQuestion(newChain), 400);
+      scheduleAIQuestion(newChain);
     }
   }
-
-  function endGame() { setPhase("done"); }
 
   /* ── 결과 ── */
   if (phase === "done") {
@@ -162,7 +195,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     const myAs = chain.filter((c) => c.type === "answer" && !c.isAI).length;
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <GameHeader game={game} subtitle={text.storyCompleteSubtitle} onBack={onBack} />
+        <GameHeader game={game} subtitle={text.storyCompleteSubtitle} onBack={handleBack} />
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-3">
           <div className="text-6xl">📖</div>
           <h2 className="text-2xl font-black text-gray-800">{text.storyDoneTitle}</h2>
@@ -180,10 +213,9 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
             </div>
           ))}
         </div>
-        <AwardBadge result={awardResult} />
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
-          onClick={() => { resetAward(); onBack(); }}>
+          onClick={handleBack}>
           {text.goOtherGame}
         </Button>
       </div>
@@ -194,7 +226,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   if (phase === "loading" || !words) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <GameHeader game={game} subtitle={text.storyWordsLoading} onBack={onBack} />
+        <GameHeader game={game} subtitle={text.storyWordsLoading} onBack={handleBack} />
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center space-y-3">
           <div className="text-6xl animate-bounce">🎲</div>
           <p className="text-gray-500 text-sm">
@@ -220,7 +252,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
 
   return (
     <div className="max-w-lg mx-auto space-y-5">
-      <GameHeader game={game} subtitle={isAI ? text.storyWithAi : text.storyTogether} onBack={onBack} />
+      <GameHeader game={game} subtitle={isAI ? text.storyWithAi : text.storyTogether} onBack={handleBack} />
 
       {/* 단어 풀 */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
@@ -350,12 +382,6 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
             </div>
           )}
 
-          {chain.length >= 4 && (
-            <Button variant="outline" className="w-full rounded-xl text-gray-500"
-              onClick={endGame}>
-              {text.storyFinish}
-            </Button>
-          )}
         </>
       )}
 

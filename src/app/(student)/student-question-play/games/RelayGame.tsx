@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
-import { useSingleAward, AwardBadge } from "./useSingleAward";
 import { getQuestionGameText, getRelayTopics, isQuestionFormForLocale } from "@/lib/question-game-i18n";
+import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -23,6 +23,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
   const { mode, players } = config;
   const isAI = mode === "ai";
   const isMulti = mode !== "solo";
+  const targetQuestions = QUESTION_GAME_RULES.relay.targets[isAI ? "ai" : "solo"].count;
 
   const [phase, setPhase] = useState<"setup" | "playing" | "done">("setup");
   const [topic, setTopic] = useState("");
@@ -33,11 +34,13 @@ export default function RelayGame({ game, onBack, config }: Props) {
   const [localError, setLocalError] = useState<string | null>(null);
   const chainEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const aiRequestRef = useRef(0);
 
   const { ask, loading: aiLoading } = useAIPlay();
 
   const finalTopic = customTopic.trim() || topic;
   const myPlayerName = players[0] ?? text.me;
+  const studentQuestionCount = chain.filter((item) => !item.isAI).length;
   // 친구 모드에서의 현재 플레이어
   const currentFriendPlayer = players[playerIdx] ?? "나";
   const playerColor = useCallback((name: string) => {
@@ -53,28 +56,23 @@ export default function RelayGame({ game, onBack, config }: Props) {
   // AI 응답 후 입력창 포커스
   useEffect(() => {
     if (!aiLoading && phase === "playing") {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      const timer = setTimeout(() => inputRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
     }
   }, [aiLoading, phase]);
 
-  const { award, result: awardResult } = useSingleAward();
+  useEffect(() => () => {
+    aiRequestRef.current += 1;
+  }, []);
 
-  // 적립 (혼자/AI 모드)
-  useEffect(() => {
-    if (phase !== "done") return;
-    if (mode !== "solo" && mode !== "ai") return;
-    const myCount = chain.filter((c) => c.player === myPlayerName).length;
-    award({
-      mode: mode as "solo" | "ai",
-      gameId: "relay",
-      validQuestions: myCount,
-      completed: chain.length >= 4,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  function handleBack() {
+    aiRequestRef.current += 1;
+    onBack();
+  }
 
   function startGame() {
     if (!finalTopic) return;
+    aiRequestRef.current += 1;
     setChain([]);
     setInputQ("");
     setPlayerIdx(0);
@@ -84,14 +82,19 @@ export default function RelayGame({ game, onBack, config }: Props) {
 
   // AI가 다음 질문 생성 (체인 추가까지 완료)
   const runAITurn = useCallback(async (currentChain: ChainItem[], t: string) => {
+    const requestId = ++aiRequestRef.current;
     const prev = currentChain[currentChain.length - 1]?.question ?? "";
     const history = currentChain.map((c) => `"${c.question}"`).join(", ");
     const res = await ask({
       action: "relay:ai-turn",
       context: { topic: t, prev, history },
     });
+    if (requestId !== aiRequestRef.current) return;
     if (res?.text) {
-      setChain((c) => [...c, { question: res.text.trim(), player: "🤖 AI", isAI: true }]);
+      const generated = res.text.trim();
+      if (generated) {
+        setChain((c) => [...c, { question: generated, player: "🤖 AI", isAI: true }]);
+      }
     }
   }, [ask]);
 
@@ -119,6 +122,13 @@ export default function RelayGame({ game, onBack, config }: Props) {
     setChain(newChain);
     setInputQ("");
 
+    const nextStudentQuestionCount = newChain.filter((item) => !item.isAI).length;
+    if (nextStudentQuestionCount >= targetQuestions) {
+      aiRequestRef.current += 1;
+      setPhase("done");
+      return;
+    }
+
     if (isAI) {
       // AI가 즉시 다음 질문 생성
       await runAITurn(newChain, finalTopic);
@@ -126,10 +136,6 @@ export default function RelayGame({ game, onBack, config }: Props) {
       // 친구 모드: 다음 플레이어로 교대
       setPlayerIdx((i) => (i + 1) % players.length);
     }
-  }
-
-  function endGame() {
-    setPhase("done");
   }
 
   const lastItem = chain[chain.length - 1];
@@ -141,7 +147,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+          <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
           <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
             style={{ background: game.gradientCss }}>
             <span className="text-4xl">{game.emoji}</span>
@@ -220,14 +226,14 @@ export default function RelayGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+          <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-4">
           <div className="text-6xl">🏆</div>
           <h2 className="text-2xl font-black text-gray-800">{text.relayDone}</h2>
           <p className="text-gray-500 text-sm">{text.topic}: <span className="font-bold text-orange-500">{finalTopic}</span></p>
           <p className="text-gray-500 text-sm">
-            {text.relayTotal(chain.length)}
+            {text.relayTotal(studentQuestionCount)}
           </p>
         </div>
 
@@ -249,10 +255,14 @@ export default function RelayGame({ game, onBack, config }: Props) {
           ))}
         </div>
 
-        <AwardBadge result={awardResult} />
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
-          onClick={() => { setPhase("setup"); setTopic(""); setCustomTopic(""); }}>
+          onClick={() => {
+            aiRequestRef.current += 1;
+            setPhase("setup");
+            setTopic("");
+            setCustomTopic("");
+          }}>
           {text.retry}
         </Button>
       </div>
@@ -264,7 +274,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
     <div className="max-w-lg mx-auto space-y-4">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+        <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
         <div className="flex-1 rounded-2xl py-3 px-5 text-white flex items-center justify-between"
           style={{ background: game.gradientCss }}>
           <div className="flex items-center gap-3">
@@ -275,7 +285,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             </div>
           </div>
           <div className="text-white text-right">
-            <p className="text-2xl font-black">{chain.length}</p>
+            <p className="text-2xl font-black">{studentQuestionCount} / {targetQuestions}</p>
             <p className="text-xs opacity-80">{text.connectedCount}</p>
           </div>
         </div>
@@ -423,11 +433,6 @@ export default function RelayGame({ game, onBack, config }: Props) {
             onClick={submitQuestion}>
             {isAI ? text.relaySubmitAi : text.relaySubmit}
           </Button>
-          {chain.length >= 4 && !aiLoading && (
-            <Button variant="outline" className="rounded-xl px-4 text-sm text-gray-400" onClick={endGame}>
-              {text.finish}
-            </Button>
-          )}
         </div>
 
         <p className="text-xs text-gray-400 text-center">

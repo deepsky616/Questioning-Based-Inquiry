@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
-import { useSingleAward } from "./useSingleAward";
 import { getQuestionDiceTypes, getQuestionGameText } from "@/lib/question-game-i18n";
+import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -18,7 +18,7 @@ const DOT_POSITIONS: Record<number, [number, number][]> = {
   6: [[28, 28], [72, 28], [28, 50], [72, 50], [28, 72], [72, 72]],
 };
 
-interface RoundEntry { player: string; face: number; type: string; question: string; aiFeedback?: string }
+interface RoundEntry { player: string; face: number; type: string; question: string; isAI?: boolean; aiFeedback?: string }
 
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
@@ -29,8 +29,9 @@ export default function DiceGame({ game, onBack, config }: Props) {
   const { mode, players } = config;
   const isMulti = mode !== "solo";
   const isAI = mode === "ai";
+  const targetQuestions = QUESTION_GAME_RULES.dice.targets[isAI ? "ai" : "solo"].count;
 
-  const [phase, setPhase] = useState<"idle" | "rolling" | "result" | "ai-turn">("idle");
+  const [phase, setPhase] = useState<"idle" | "rolling" | "result" | "ai-turn" | "done">("idle");
   const [currentFace, setCurrentFace] = useState(1);
   const [displayFace, setDisplayFace] = useState(1);
   const [question, setQuestion] = useState("");
@@ -40,57 +41,70 @@ export default function DiceGame({ game, onBack, config }: Props) {
   const [feedback, setFeedback] = useState("");
 
   const { ask, loading: aiLoading } = useAIPlay();
-  const { award } = useSingleAward();
+  const aiRequestRef = useRef(0);
+  const rollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentPlayer = players[currentPlayerIdx] ?? text.me;
   const isAITurn = isAI && currentPlayerIdx === 1;
+  const studentQuestionCount = history.filter((entry) => !entry.isAI).length;
 
   function handleBack() {
-    if (mode === "solo" || mode === "ai") {
-      const myCount = history.filter((h) => h.player === (players[0] || text.me)).length;
-      if (myCount > 0) {
-        award({
-          mode: mode as "solo" | "ai",
-          gameId: "dice",
-          validQuestions: myCount,
-          completed: myCount >= 3,
-        });
-      }
-    }
+    aiRequestRef.current += 1;
+    if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+    rollTimerRef.current = null;
     onBack();
   }
+
+  useEffect(() => () => {
+    aiRequestRef.current += 1;
+    if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+  }, []);
 
   const roll = useCallback(() => {
     setPhase("rolling");
     setQuestion("");
-    setAiQuestion("");
+    if (isAITurn) setAiQuestion("");
     setFeedback("");
     let count = 0;
     const final = Math.ceil(Math.random() * 6);
-    const interval = setInterval(() => {
+    rollTimerRef.current = setInterval(() => {
       setDisplayFace(Math.ceil(Math.random() * 6));
       count++;
       if (count >= 14) {
-        clearInterval(interval);
+        if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+        rollTimerRef.current = null;
         setDisplayFace(final);
         setCurrentFace(final);
         if (isAITurn) {
           setPhase("ai-turn");
           // AI가 자동으로 질문 생성
           const typeInfo = diceTypes[final - 1];
+          const requestId = ++aiRequestRef.current;
           ask({
             action: "dice:generate",
             context: { questionType: typeInfo.type, typeDesc: typeInfo.desc },
           }).then((res) => {
-            if (res?.text) setAiQuestion(res.text);
-            setPhase("result");
+            if (requestId !== aiRequestRef.current) return;
+            const generated = res?.text.trim();
+            if (generated) {
+              setAiQuestion(generated);
+              setHistory((entries) => [{
+                player: players[1] ?? "AI",
+                face: final,
+                type: typeInfo.type,
+                question: generated,
+                isAI: true,
+              }, ...entries]);
+            }
+            setCurrentPlayerIdx(0);
+            setPhase("idle");
           });
         } else {
           setPhase("result");
         }
       }
     }, 100);
-  }, [isAITurn, ask, diceTypes]);
+  }, [isAITurn, ask, diceTypes, players]);
 
   async function submit() {
     if (!question.trim()) return;
@@ -98,28 +112,80 @@ export default function DiceGame({ game, onBack, config }: Props) {
     let fb = "";
 
     if (isAI && aiQuestion) {
+      const requestId = ++aiRequestRef.current;
       const res = await ask({
         action: "dice:feedback",
         context: { studentQuestion: question, aiQuestion },
       });
+      if (requestId !== aiRequestRef.current) return;
       fb = res?.text ?? "";
     }
 
-    setHistory((h) => [
-      { player: currentPlayer, face: currentFace, type: typeInfo.type, question, aiFeedback: fb },
-      ...h,
-    ]);
+    const nextHistory: RoundEntry[] = [{
+      player: currentPlayer,
+      face: currentFace,
+      type: typeInfo.type,
+      question,
+      aiFeedback: fb,
+    }, ...history];
+    setHistory(nextHistory);
     setFeedback(fb);
+    setQuestion("");
 
-    if (isMulti) {
+    const nextStudentQuestionCount = nextHistory.filter((entry) => !entry.isAI).length;
+    if (nextStudentQuestionCount >= targetQuestions) {
+      aiRequestRef.current += 1;
+      setPhase("done");
+      return;
+    }
+
+    if (isAI) {
+      setCurrentPlayerIdx(1);
+    } else if (isMulti) {
       setCurrentPlayerIdx((i) => (i + 1) % players.length);
     }
     setPhase("idle");
-    setQuestion("");
   }
 
   const typeInfo = diceTypes[currentFace - 1];
   const displayInfo = diceTypes[displayFace - 1];
+
+  if (phase === "done") {
+    return (
+      <div className="max-w-xl mx-auto space-y-6">
+        <div className="flex items-center gap-3">
+          <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+          <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
+            style={{ background: game.gradientCss }}>
+            <span className="text-4xl">{game.emoji}</span>
+            <h1 className="text-xl font-black">{game.title}</h1>
+          </div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center space-y-3">
+          <div className="text-6xl">🎲</div>
+          <h2 className="text-2xl font-black text-gray-800">{text.diceHistory(studentQuestionCount)}</h2>
+        </div>
+        <div className="space-y-3">
+          {history.map((entry, index) => (
+            <div key={index} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-2">
+              <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-black text-sm"
+                style={{ background: diceTypes[entry.face - 1].color }}>
+                {entry.face}
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">{entry.player} · {entry.type}</p>
+                <p className="text-gray-800 text-sm font-medium">{entry.question}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <Button className="w-full py-4 font-black text-white rounded-xl"
+          style={{ background: game.gradientCss }} onClick={handleBack}>
+          {text.goOtherGame}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
