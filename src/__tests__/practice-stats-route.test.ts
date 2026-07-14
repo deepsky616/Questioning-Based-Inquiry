@@ -5,6 +5,7 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     user: { findUnique: vi.fn(), findMany: vi.fn() },
     pointLog: { findMany: vi.fn() },
+    practiceCustomItem: { findMany: vi.fn() },
     $queryRaw: vi.fn(),
   },
 }));
@@ -19,6 +20,7 @@ const mTeacher = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mStudents = prisma.user.findMany as unknown as ReturnType<typeof vi.fn>;
 const mLogs = prisma.pointLog.findMany as unknown as ReturnType<typeof vi.fn>;
 const mAttempts = prisma.$queryRaw as unknown as ReturnType<typeof vi.fn>;
+const mCustomItems = prisma.practiceCustomItem.findMany as unknown as ReturnType<typeof vi.fn>;
 
 const attempt = (
   id: string,
@@ -50,6 +52,7 @@ beforeEach(() => {
   ]);
   mLogs.mockResolvedValue([]);
   mAttempts.mockResolvedValue([]);
+  mCustomItems.mockResolvedValue([]);
 });
 
 describe("학생 연습 현황 API", () => {
@@ -169,6 +172,38 @@ describe("학생 연습 현황 API", () => {
       diagnosticAttempts: 100,
       capped: true,
     });
+  });
+
+  it("교사 커스텀 문항 시도는 커스텀 유형을 조회해 유형 정답률에 반영한다", async () => {
+    mAttempts.mockResolvedValue([
+      attempt("builtin", "s1"), // q01 = 닫힌·사실적 (내장)
+      attempt("custom-quiz", "s1", new Date("2026-07-13T02:00:00Z"), {
+        itemId: "cust-quiz", quizType: "cognitive", correct: false,
+      }),
+      attempt("custom-transform", "s1", new Date("2026-07-13T03:00:00Z"), {
+        mode: "transform", itemId: "cust-transform", quizType: null, correct: true,
+      }),
+    ]);
+    mCustomItems.mockResolvedValue([
+      { id: "cust-quiz", closure: "open", cognitive: "controversial", target: null },
+      { id: "cust-transform", closure: null, cognitive: null, target: "conceptual" },
+    ]);
+
+    const data = await (await GET()).json();
+
+    // 내장에 없는 문항 id만 커스텀 조회 대상이 된다
+    expect(mCustomItems.mock.calls[0][0].where.id.in.sort()).toEqual(["cust-quiz", "cust-transform"]);
+    expect(data.summary.types.controversial).toMatchObject({ attempts: 1, correct: 0 });
+    expect(data.summary.types.conceptual).toMatchObject({ attempts: 1, correct: 1 });
+    expect(data.summary.unknownTypeAttempts).toBe(0);
+  });
+
+  it("커스텀 문항 시도가 없으면 커스텀 유형 조회를 생략한다", async () => {
+    mAttempts.mockResolvedValue([attempt("builtin-only", "s1")]);
+
+    await GET();
+
+    expect(mCustomItems).not.toHaveBeenCalled();
   });
 
   it("학교가 없어도 같은 빈 성공 응답 모양을 유지한다", async () => {

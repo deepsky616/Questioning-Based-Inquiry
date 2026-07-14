@@ -46,8 +46,35 @@ export interface PracticeRecommendationSelection {
 }
 
 const FOCUS_ORDER: PracticeFocus[] = ["closed", "open", "factual", "conceptual", "controversial"];
+const FOCUS_SET = new Set<string>(FOCUS_ORDER);
 const QUIZ_BY_ID = new Map(PRACTICE_QUIZ_BANK.map((item) => [item.id, item]));
 const TRANSFORM_BY_ID = new Map(PRACTICE_TRANSFORM_BANK.map((item) => [item.id, item]));
+
+/** 교사 커스텀 문항의 유형 정보 — DB(practice_custom_items) 컬럼 그대로 */
+export interface PracticeCustomItemType {
+  closure: string | null;
+  cognitive: string | null;
+  target: string | null;
+}
+
+export type PracticeCustomItemTypeLookup = ReadonlyMap<string, PracticeCustomItemType>;
+
+/** 내장 은행에 없는 시도 문항 id — 교사 커스텀 문항 유형 조회 대상 */
+export function collectCustomPracticeItemIds(
+  attempts: readonly PracticeAttemptInput[],
+): string[] {
+  const ids = new Set<string>();
+  for (const attempt of attempts) {
+    if (!attempt.itemId) continue;
+    if (attempt.mode === "quiz" && !QUIZ_BY_ID.has(attempt.itemId)) ids.add(attempt.itemId);
+    else if (attempt.mode === "transform" && !TRANSFORM_BY_ID.has(attempt.itemId)) ids.add(attempt.itemId);
+  }
+  return [...ids];
+}
+
+function focusFromValue(value: string | null | undefined): PracticeFocus | null {
+  return value && FOCUS_SET.has(value) ? (value as PracticeFocus) : null;
+}
 
 type MetricCounts = { attempts: number; correct: number };
 type NormalizedMode = keyof PracticeDiagnostic["modes"];
@@ -75,17 +102,22 @@ function normalizedMode(mode: string): NormalizedMode | null {
   return null;
 }
 
-function focusForAttempt(attempt: PracticeAttemptInput): PracticeFocus | null {
+function focusForAttempt(
+  attempt: PracticeAttemptInput,
+  customItemTypes?: PracticeCustomItemTypeLookup,
+): PracticeFocus | null {
   if (attempt.mode === "quiz" && attempt.itemId) {
-    const item = QUIZ_BY_ID.get(attempt.itemId);
+    const item = QUIZ_BY_ID.get(attempt.itemId) ?? customItemTypes?.get(attempt.itemId);
     if (!item) return null;
-    if (attempt.quizType === "closure") return item.closure;
-    if (attempt.quizType === "cognitive") return item.cognitive;
+    if (attempt.quizType === "closure") return focusFromValue(item.closure);
+    if (attempt.quizType === "cognitive") return focusFromValue(item.cognitive);
     return null;
   }
 
   if (attempt.mode === "transform" && attempt.itemId) {
-    return TRANSFORM_BY_ID.get(attempt.itemId)?.target ?? null;
+    const target =
+      TRANSFORM_BY_ID.get(attempt.itemId)?.target ?? customItemTypes?.get(attempt.itemId)?.target;
+    return focusFromValue(target);
   }
 
   return null;
@@ -141,7 +173,10 @@ function focusRecommendation(focus: PracticeFocus): PracticeRecommendation {
   };
 }
 
-export function buildPracticeDiagnostic(attempts: readonly PracticeAttemptInput[]): PracticeDiagnostic {
+export function buildPracticeDiagnostic(
+  attempts: readonly PracticeAttemptInput[],
+  customItemTypes?: PracticeCustomItemTypeLookup,
+): PracticeDiagnostic {
   const sortedAttempts = [...attempts].sort(
     (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
   );
@@ -178,7 +213,7 @@ export function buildPracticeDiagnostic(attempts: readonly PracticeAttemptInput[
     const mode = normalizedMode(attempt.mode);
     if (mode) addAttempt(modeCounts[mode], attempt.correct);
 
-    const focus = focusForAttempt(attempt);
+    const focus = focusForAttempt(attempt, customItemTypes);
     if (!focus) {
       unknownTypeAttempts += 1;
       continue;

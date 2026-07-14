@@ -7,7 +7,9 @@ import { compareByClassAndNumber } from "@/lib/student-sort";
 import { PRACTICE_GAME_ID, practiceDayStartUtc } from "@/lib/practice-points";
 import {
   buildPracticeDiagnostic,
+  collectCustomPracticeItemIds,
   type PracticeAttemptInput,
+  type PracticeCustomItemType,
 } from "@/lib/practice-diagnostics";
 
 // 담당 학급 학생들의 질문 연습 현황(오늘/최근 7일 포인트, 모드별 성공 횟수).
@@ -98,6 +100,20 @@ export async function GET() {
       studentAttempts.sort(compareAttemptsNewestFirst);
     }
 
+    // 교사 커스텀 문항 시도도 유형 정답률에 반영 — 내장 은행에 없는 문항 id는
+    // 커스텀 문항 테이블에서 유형(closure/cognitive/target)을 찾아 넘긴다
+    const customItemIds = collectCustomPracticeItemIds(rawAttempts);
+    const customItemTypes = new Map<string, PracticeCustomItemType>(
+      customItemIds.length > 0
+        ? (
+            await prisma.practiceCustomItem.findMany({
+              where: { id: { in: customItemIds } },
+              select: { id: true, closure: true, cognitive: true, target: true },
+            })
+          ).map((item) => [item.id, item])
+        : [],
+    );
+
     const todayStart = practiceDayStartUtc();
     const weekStart = new Date(todayStart.getTime() - 6 * 24 * 60 * 60 * 1000);
     const logs = await prisma.pointLog.findMany({
@@ -143,13 +159,13 @@ export async function GET() {
           quizCount: byStudent.get(student.id)?.quizCount ?? 0,
           transformCount: byStudent.get(student.id)?.transformCount ?? 0,
           createCount: byStudent.get(student.id)?.createCount ?? 0,
-          ...buildPracticeDiagnostic(attempts.slice(0, 100)),
+          ...buildPracticeDiagnostic(attempts.slice(0, 100), customItemTypes),
           capped: attempts.length > 100,
         };
       });
 
     return NextResponse.json({
-      summary: buildPracticeDiagnostic(diagnosticAttempts),
+      summary: buildPracticeDiagnostic(diagnosticAttempts, customItemTypes),
       students: result,
     });
   } catch (error) {

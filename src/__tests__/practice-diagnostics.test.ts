@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPracticeDiagnostic,
+  collectCustomPracticeItemIds,
   practiceSelectionForRecommendation,
   type PracticeAttemptInput,
+  type PracticeCustomItemType,
   type PracticeFocus,
   type PracticeRecommendation,
 } from "@/lib/practice-diagnostics";
@@ -133,6 +135,50 @@ describe("연습 진단 집계", () => {
     });
     expect(result.types.conceptual).toEqual({ attempts: 1, correct: 1, accuracy: 100 });
     expect(result.unknownTypeAttempts).toBe(4);
+  });
+
+  it("교사 커스텀 문항은 유형 정보를 넘기면 유형 정답률에 반영한다", () => {
+    const customTypes = new Map<string, PracticeCustomItemType>([
+      ["cust-quiz", { closure: "open", cognitive: "controversial", target: null }],
+      ["cust-transform", { closure: null, cognitive: null, target: "conceptual" }],
+      ["cust-broken", { closure: "??", cognitive: null, target: null }],
+    ]);
+    const result = buildPracticeDiagnostic(
+      [
+        attempt({ id: "c1", itemId: "cust-quiz", quizType: "closure", correct: true }),
+        attempt({ id: "c2", itemId: "cust-quiz", quizType: "cognitive", correct: false }),
+        attempt({
+          id: "c3",
+          mode: "transform",
+          itemId: "cust-transform",
+          quizType: null,
+          correct: true,
+          createdAt: new Date("2026-07-13T02:00:00Z"),
+        }),
+        // 알 수 없는 유형 값은 조용히 유형 미상으로 남긴다
+        attempt({ id: "c4", itemId: "cust-broken", quizType: "closure", correct: true, createdAt: new Date("2026-07-13T03:00:00Z") }),
+      ],
+      customTypes,
+    );
+
+    expect(result.types.open).toEqual({ attempts: 1, correct: 1, accuracy: 100 });
+    expect(result.types.controversial).toEqual({ attempts: 1, correct: 0, accuracy: 0 });
+    expect(result.types.conceptual).toEqual({ attempts: 1, correct: 1, accuracy: 100 });
+    expect(result.unknownTypeAttempts).toBe(1);
+  });
+
+  it("내장 은행에 없는 시도 문항 id만 커스텀 조회 대상으로 모은다", () => {
+    const ids = collectCustomPracticeItemIds([
+      attempt({ id: "b1", itemId: "q01" }), // 내장 퀴즈
+      attempt({ id: "b2", mode: "transform", itemId: "t01", quizType: null }), // 내장 바꾸기
+      attempt({ id: "c1", itemId: "cust-quiz" }),
+      attempt({ id: "c2", itemId: "cust-quiz" }), // 중복 제거
+      attempt({ id: "c3", mode: "transform", itemId: "cust-transform", quizType: null }),
+      attempt({ id: "ai", mode: "transform-ai", itemId: null, quizType: null }), // id 없음
+      attempt({ id: "cr", mode: "create", itemId: "cust-topic", quizType: null }), // 만들기는 유형 매핑 없음
+    ]);
+
+    expect(ids.sort()).toEqual(["cust-quiz", "cust-transform"]);
   });
 
   it("바꾸기는 내장 문항의 목표 유형 하나에만 반영한다", () => {
