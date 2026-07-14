@@ -58,10 +58,12 @@ describe("teacher navigation order", () => {
   });
 
   it("교사 설정과 학생 관리를 상단 계정 메뉴에서 접근할 수 있다", () => {
-    expect(readAppNavAccountLinks(layoutSource)).toMatchObject({
+    const accountLinks = readAppNavAccountLinks(layoutSource);
+    expect(accountLinks).toMatchObject({
       settingsHref: "/teacher-settings",
       studentManagementHref: "/teacher-students",
     });
+    expect(accountLinks).not.toHaveProperty("withdrawalHref");
   });
 
   it("AppNav 밖에 있는 계정 경로는 무시한다", () => {
