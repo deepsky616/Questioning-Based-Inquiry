@@ -374,6 +374,12 @@ export async function PATCH(
           { status: 403 },
         );
       }
+      if (body.status === "playing") {
+        return NextResponse.json(
+          { error: "게임 시작은 시작 동작으로만 할 수 있어요" },
+          { status: 400 },
+        );
+      }
       if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
       }

@@ -403,6 +403,48 @@ describe("친구 방 시작 인원", () => {
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
+  it("상태 갱신으로 한 명 시작 검사를 우회할 수 없다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(makeRoom({ gameId: "memory" }));
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room: { ...room, version: room.version + 1 },
+    }));
+
+    const response = await patch({
+      action: "update-state",
+      expectedVersion: 1,
+      status: "playing",
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "게임 시작은 시작 동작으로만 할 수 있어요",
+    });
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("상태 갱신의 종료 전환은 유지한다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({ gameId: "memory", status: "playing" }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room: { ...room, version: room.version + 1 },
+    }));
+
+    const response = await patch({
+      action: "update-state",
+      expectedVersion: 1,
+      status: "ended",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      room: { status: "ended" },
+    });
+    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
+  });
+
   it.each([2, 8])("참가자가 %i명이면 시작할 수 있다", async (playerCount) => {
     mocks.loadGameRoom.mockResolvedValue(
       makeRoom({ gameId: "memory", players: makePlayers(playerCount) }),
