@@ -41,13 +41,23 @@ export interface QuestionGameRoomEngineContext
   state: EngineStateBase | null;
 }
 
-export type QuestionGameRoomEngineApplyResult =
+type QuestionGameEngineFailure<
+  Kind extends "invalid" | "forbidden" | "conflict" | "corrupt",
+> = {
+  kind: Kind;
+  room: GameRoom;
+  message: string;
+};
+
+export type QuestionGameEngineResult =
   | { kind: "changed"; room: GameRoom; result?: RoomCommandResult }
-  | {
-      kind: "replayed" | "invalid" | "forbidden" | "conflict" | "corrupt";
-      reason?: string;
-      result?: RoomCommandResult;
-    };
+  | { kind: "replayed"; room: GameRoom; result?: RoomCommandResult }
+  | QuestionGameEngineFailure<"invalid">
+  | QuestionGameEngineFailure<"forbidden">
+  | QuestionGameEngineFailure<"conflict">
+  | QuestionGameEngineFailure<"corrupt">;
+
+export type QuestionGameRoomEngineApplyResult = QuestionGameEngineResult;
 
 export interface QuestionGameRoomLeaveContext {
   room: GameRoom;
@@ -66,19 +76,6 @@ export interface QuestionGameRoomEngine {
   ) => QuestionGameRoomEngineApplyResult;
   onPlayerLeave?: (context: QuestionGameRoomLeaveContext) => GameRoom;
 }
-
-export type QuestionGameEngineResult =
-  | {
-      kind: "changed";
-      room: GameRoom;
-      result?: RoomCommandResult;
-    }
-  | {
-      kind: "replayed" | "invalid" | "forbidden" | "conflict" | "corrupt";
-      room: GameRoom;
-      reason?: string;
-      result?: RoomCommandResult;
-    };
 
 export type QuestionGameRoomResult = QuestionGameEngineResult;
 
@@ -116,12 +113,32 @@ function serializedBytes(value: unknown): number | null {
   }
 }
 
+type QuestionGameFailureKind = Exclude<
+  QuestionGameRoomResult["kind"],
+  "changed" | "replayed"
+>;
+
 function unchanged(
-  kind: Exclude<QuestionGameRoomResult["kind"], "changed">,
+  kind: "replayed",
   room: GameRoom,
-  reason?: string,
+  result?: RoomCommandResult,
+): Extract<QuestionGameRoomResult, { kind: "replayed" }>;
+function unchanged(
+  kind: QuestionGameFailureKind,
+  room: GameRoom,
+  message: string,
+): QuestionGameRoomResult;
+function unchanged(
+  kind: "replayed" | QuestionGameFailureKind,
+  room: GameRoom,
+  detail?: RoomCommandResult | string,
 ): QuestionGameRoomResult {
-  return reason === undefined ? { kind, room } : { kind, room, reason };
+  if (kind === "replayed") {
+    return detail === undefined
+      ? { kind, room }
+      : { kind, room, result: detail as RoomCommandResult };
+  }
+  return { kind, room, message: detail as string };
 }
 
 function parseEngineState(value: unknown): EngineStateBase | null {
@@ -209,7 +226,7 @@ function changedRoomWithCommand(
 ): QuestionGameRoomResult {
   const nextState = parseEngineState(candidate.gameState);
   if (!nextState) {
-    return unchanged("corrupt", room, "engine-state");
+    return unchanged("corrupt", room, "놀이 판정 결과 상태가 손상되었습니다");
   }
   const nextRoom: GameRoom = {
     ...structuredClone(candidate),
@@ -231,13 +248,13 @@ function changedRoomWithCommand(
     nextStateBytes === null ||
     nextStateBytes > QUESTION_GAME_LIMITS.gameStateBytes
   ) {
-    return unchanged("invalid", room, "game-state-size");
+    return unchanged("invalid", room, "놀이 상태가 너무 큽니다");
   }
   if (
     nextRoomBytes === null ||
     nextRoomBytes > QUESTION_GAME_LIMITS.roomBytes
   ) {
-    return unchanged("invalid", room, "room-size");
+    return unchanged("invalid", room, "방 자료가 너무 큽니다");
   }
   return {
     kind: "changed",
@@ -262,18 +279,18 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
   } = input;
 
   if (!room.players.some(({ id }) => id === userId)) {
-    return unchanged("forbidden", room, "not-player");
+    return unchanged("forbidden", room, "참가자가 아닙니다");
   }
   if (!isRecord(body)) {
-    return unchanged("invalid", room, "command-body");
+    return unchanged("invalid", room, "명령 본문이 올바르지 않습니다");
   }
 
   const expectedCreatedAt = body.expectedCreatedAt;
   if (!isFiniteNumber(expectedCreatedAt)) {
-    return unchanged("invalid", room, "expected-created-at");
+    return unchanged("invalid", room, "방 생성 시각이 올바르지 않습니다");
   }
   if (expectedCreatedAt !== room.createdAt) {
-    return unchanged("conflict", room, "created-at");
+    return unchanged("conflict", room, "방 생성 시각이 다릅니다");
   }
 
   const bodyBytes = serializedBytes(body);
@@ -281,29 +298,29 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
     bodyBytes === null ||
     bodyBytes > QUESTION_GAME_LIMITS.commandBodyBytes
   ) {
-    return unchanged("invalid", room, "command-body-size");
+    return unchanged("invalid", room, "명령 본문이 너무 큽니다");
   }
   const gameStateBytes = serializedBytes(room.gameState);
   if (
     gameStateBytes === null ||
     gameStateBytes > QUESTION_GAME_LIMITS.gameStateBytes
   ) {
-    return unchanged("invalid", room, "game-state-size");
+    return unchanged("invalid", room, "놀이 상태가 너무 큽니다");
   }
   const roomBytes = serializedBytes(room);
   if (roomBytes === null || roomBytes > QUESTION_GAME_LIMITS.roomBytes) {
-    return unchanged("invalid", room, "room-size");
+    return unchanged("invalid", room, "방 자료가 너무 큽니다");
   }
 
   if (!isQuestionGameCommandId(body.commandId)) {
-    return unchanged("invalid", room, "command-id");
+    return unchanged("invalid", room, "명령 식별값이 올바르지 않습니다");
   }
 
   const state = isEmptyRecord(room.gameState)
     ? null
     : parseEngineState(room.gameState);
   if (state === null && !isEmptyRecord(room.gameState)) {
-    return unchanged("corrupt", room, "game-state");
+    return unchanged("corrupt", room, "놀이 상태가 손상되었습니다");
   }
 
   if (state?.recentCommandIds.includes(body.commandId)) {
@@ -311,31 +328,31 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
   }
 
   if (!isNonNegativeInteger(body.expectedVersion)) {
-    return unchanged("invalid", room, "expected-version");
+    return unchanged("invalid", room, "기대 버전이 올바르지 않습니다");
   }
   if (body.expectedVersion !== room.version) {
-    return unchanged("conflict", room, "expected-version");
+    return unchanged("conflict", room, "기대 버전이 다릅니다");
   }
 
   const isStart = action === "start";
   const isEmptyRestart = action === "restart" && state === null;
   if (!isStart && !isEmptyRestart && room.status === "playing") {
     if (room.playId === undefined) {
-      return unchanged("corrupt", room, "play-id");
+      return unchanged("corrupt", room, "실행 식별값이 없습니다");
     }
     if (body.playId !== room.playId) {
-      return unchanged("conflict", room, "play-id");
+      return unchanged("conflict", room, "실행 식별값이 다릅니다");
     }
     if (state?.roundId && body.roundId !== state.roundId) {
-      return unchanged("conflict", room, "round-id");
+      return unchanged("conflict", room, "라운드 식별값이 다릅니다");
     }
   }
 
   if (!isBuiltInQuestionGameId(room.gameId)) {
-    return unchanged("corrupt", room, "game-id");
+    return unchanged("corrupt", room, "놀이 식별값이 올바르지 않습니다");
   }
   if (!engine) {
-    return unchanged("corrupt", room, "missing-engine");
+    return unchanged("corrupt", room, "등록된 놀이 판정기가 없습니다");
   }
 
   let invalidRandomUUID = false;
@@ -374,11 +391,13 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
       return unchanged(
         "corrupt",
         room,
-        invalidRandomUUID ? "random-uuid" : "engine-error",
+        invalidRandomUUID
+          ? "서버 식별값이 올바르지 않습니다"
+          : "놀이 판정에 실패했습니다",
       );
     }
     if (invalidRandomUUID) {
-      return unchanged("corrupt", room, "random-uuid");
+      return unchanged("corrupt", room, "서버 식별값이 올바르지 않습니다");
     }
     return changedRoomWithCommand(
       room,
@@ -404,24 +423,20 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
     return unchanged(
       "corrupt",
       room,
-      invalidRandomUUID ? "random-uuid" : "engine-error",
+      invalidRandomUUID
+        ? "서버 식별값이 올바르지 않습니다"
+        : "놀이 판정에 실패했습니다",
     );
   }
   if (invalidRandomUUID) {
-    return unchanged("corrupt", room, "random-uuid");
+    return unchanged("corrupt", room, "서버 식별값이 올바르지 않습니다");
   }
 
+  if (engineResult.kind === "replayed") {
+    return unchanged("replayed", room, engineResult.result);
+  }
   if (engineResult.kind !== "changed") {
-    return {
-      kind: engineResult.kind,
-      room,
-      ...(engineResult.reason === undefined
-        ? {}
-        : { reason: engineResult.reason }),
-      ...(engineResult.result === undefined
-        ? {}
-        : { result: engineResult.result }),
-    };
+    return unchanged(engineResult.kind, room, engineResult.message);
   }
 
   return changedRoomWithCommand(
@@ -531,7 +546,7 @@ function leaveQuestionGameRoomWithResolvedEngine(
         room: structuredClone(commonRoom),
       });
     } catch {
-      return unchanged("corrupt", room, "leave-hook-error");
+      return unchanged("corrupt", room, "이탈 처리를 마치지 못했습니다");
     }
   }
 
@@ -554,6 +569,9 @@ function leaveQuestionGameRoomWithResolvedEngine(
     createdAt: room.createdAt,
     version: room.version,
     updatedAt: room.updatedAt,
+    playId: room.playId,
+    pointAwardKeyVersion: room.pointAwardKeyVersion,
+    pointEvidenceVersion: room.pointEvidenceVersion,
     hostId: nextHostId,
     players: structuredClone(players),
     status: shouldEnd ? "ended" : hookRoom.status,

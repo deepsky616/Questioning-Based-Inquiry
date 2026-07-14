@@ -16,6 +16,7 @@ import {
   type EngineStateBase,
   type QuestionGameEngineResult,
   type QuestionGameRoomEngine,
+  type QuestionGameRoomEngineApplyResult,
 } from "@/lib/question-game-room-engine";
 
 const COMMAND_ID = "11111111-1111-4111-8111-111111111111";
@@ -187,6 +188,44 @@ describe("질문놀이 방 판정기", () => {
     expect(rejectedEndReason).toBe("other");
   });
 
+  it("오류 결과는 방과 메시지가 필수이고 명령 결과를 가질 수 없다", () => {
+    const room = makeRoom();
+    const failure = {
+      kind: "invalid",
+      room,
+      message: "잘못된 명령입니다",
+    } satisfies QuestionGameEngineResult;
+    const engineFailure = {
+      kind: "corrupt",
+      room,
+      message: "놀이 상태가 손상되었습니다",
+    } satisfies QuestionGameRoomEngineApplyResult;
+    type Failure = Extract<QuestionGameEngineResult, { kind: "invalid" }>;
+    type EngineFailure = Extract<
+      QuestionGameRoomEngineApplyResult,
+      { kind: "corrupt" }
+    >;
+    const failureHasNoResult: "result" extends keyof Failure ? never : true = true;
+    const engineFailureHasNoResult:
+      "result" extends keyof EngineFailure ? never : true = true;
+    // @ts-expect-error 오류 결과에는 메시지가 반드시 있어야 한다.
+    const missingMessage: QuestionGameEngineResult = { kind: "invalid", room };
+    const resultOnFailure: QuestionGameEngineResult = {
+      kind: "invalid",
+      room,
+      message: "잘못된 명령입니다",
+      // @ts-expect-error 오류 결과에는 명령 결과를 넣을 수 없다.
+      result: { roll: 1 },
+    };
+
+    expect(failure.message).toBe("잘못된 명령입니다");
+    expect(engineFailure.message).toBe("놀이 상태가 손상되었습니다");
+    expect(failureHasNoResult).toBe(true);
+    expect(engineFailureHasNoResult).toBe(true);
+    expect(missingMessage.kind).toBe("invalid");
+    expect(resultOnFailure.kind).toBe("invalid");
+  });
+
   it("정적 등록부는 아직 모든 내장 놀이에 비어 있다", () => {
     expect(BUILT_IN_QUESTION_GAME_IDS.every(hasQuestionGameRoomEngine)).toBe(false);
     expect(BUILT_IN_QUESTION_GAME_IDS.some(hasQuestionGameRoomEngine)).toBe(false);
@@ -217,7 +256,11 @@ describe("질문놀이 방 판정기", () => {
 
       const result = apply(room, makeBody({ commandId: "" }));
 
-      expect(result).toMatchObject({ kind: "invalid", room });
+      expect(result).toMatchObject({
+        kind: "invalid",
+        room,
+        message: "명령 식별값이 올바르지 않습니다",
+      });
       expect(result.room).toBe(room);
     });
   });
@@ -259,7 +302,10 @@ describe("질문놀이 방 판정기", () => {
 
       const result = apply(room, makeBody(), { userId: "outsider" });
 
-      expect(result).toMatchObject({ kind: "forbidden", reason: "not-player" });
+      expect(result).toMatchObject({
+        kind: "forbidden",
+        message: "참가자가 아닙니다",
+      });
       expect(result.room).toBe(room);
     });
 
@@ -270,7 +316,10 @@ describe("질문놀이 방 판정기", () => {
 
       const result = apply(room, makeBody({ expectedCreatedAt: 99 }));
 
-      expect(result).toMatchObject({ kind: "conflict", reason: "created-at" });
+      expect(result).toMatchObject({
+        kind: "conflict",
+        message: "방 생성 시각이 다릅니다",
+      });
       expect(result.room).toBe(room);
     });
 
@@ -311,16 +360,25 @@ describe("질문놀이 방 판정기", () => {
             roundId: indexedCommandId(92),
           }),
         ),
-      ).toMatchObject({ kind: "conflict", reason: "expected-version" });
+      ).toMatchObject({
+        kind: "conflict",
+        message: "기대 버전이 다릅니다",
+      });
       expect(
         apply(
           room,
           makeBody({ playId: indexedCommandId(91), roundId: indexedCommandId(92) }),
         ),
-      ).toMatchObject({ kind: "conflict", reason: "play-id" });
+      ).toMatchObject({
+        kind: "conflict",
+        message: "실행 식별값이 다릅니다",
+      });
       expect(
         apply(room, makeBody({ roundId: indexedCommandId(92) })),
-      ).toMatchObject({ kind: "conflict", reason: "round-id" });
+      ).toMatchObject({
+        kind: "conflict",
+        message: "라운드 식별값이 다릅니다",
+      });
     });
 
     it("진행 방에 실행 식별값이 없으면 놀이를 부르지 않고 corrupt다", () => {
@@ -329,7 +387,10 @@ describe("질문놀이 방 판정기", () => {
 
       const result = applyWithEngine(room, engine);
 
-      expect(result).toMatchObject({ kind: "corrupt", reason: "play-id" });
+      expect(result).toMatchObject({
+        kind: "corrupt",
+        message: "실행 식별값이 없습니다",
+      });
       expect(result.room).toBe(room);
       expect(engine.applyCommand).not.toHaveBeenCalled();
     });
@@ -344,14 +405,20 @@ describe("질문놀이 방 판정기", () => {
           engine,
           makeBody({ playId: indexedCommandId(91) }),
         ),
-      ).toMatchObject({ kind: "conflict", reason: "play-id" });
+      ).toMatchObject({
+        kind: "conflict",
+        message: "실행 식별값이 다릅니다",
+      });
       expect(
         applyWithEngine(
           room,
           engine,
           makeBody({ roundId: indexedCommandId(92) }),
         ),
-      ).toMatchObject({ kind: "conflict", reason: "round-id" });
+      ).toMatchObject({
+        kind: "conflict",
+        message: "라운드 식별값이 다릅니다",
+      });
       expect(engine.applyCommand).not.toHaveBeenCalled();
     });
 
@@ -417,10 +484,100 @@ describe("질문놀이 방 판정기", () => {
         randomUUID: () => "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
       });
 
-      expect(result).toMatchObject({ kind: "corrupt", reason: "random-uuid" });
+      expect(result).toMatchObject({
+        kind: "corrupt",
+        message: "서버 식별값이 올바르지 않습니다",
+      });
       expect(result.room).toBe(room);
       expect(engine.createInitialState).not.toHaveBeenCalled();
       expect(engine.applyCommand).not.toHaveBeenCalled();
+    });
+
+    it("일반 변경 명령은 기록과 명령 결과를 새 방에 더하고 입력을 바꾸지 않는다", () => {
+      const room = makeRoom();
+      const before = structuredClone(room);
+      const candidate = {
+        ...structuredClone(room),
+        topic: "next topic",
+        gameState: makeState({
+          recentCommandIds: [indexedCommandId(62)],
+          roundId: ROUND_ID,
+        }),
+      };
+      const candidateBefore = structuredClone(candidate);
+      const applyCommand = vi.fn(
+        (_context: Parameters<QuestionGameRoomEngine["applyCommand"]>[0]) => ({
+          kind: "changed" as const,
+          room: candidate,
+          result: { roll: 6, replayed: false },
+        }),
+      );
+      const engine = makeEngine({ applyCommand });
+
+      const result = applyWithEngine(room, engine);
+
+      expect(result).toMatchObject({
+        kind: "changed",
+        result: { roll: 6, replayed: false },
+        room: {
+          topic: "next topic",
+          version: room.version,
+          updatedAt: room.updatedAt,
+          gameState: {
+            recentCommandIds: [indexedCommandId(62), COMMAND_ID],
+          },
+        },
+      });
+      expect(result.room).not.toBe(room);
+      expect(applyCommand).toHaveBeenCalledOnce();
+      expect(applyCommand.mock.calls[0][0].room).not.toBe(room);
+      expect(room).toEqual(before);
+      expect(candidate).toEqual(candidateBefore);
+    });
+
+    it("일반 변경 명령의 상태와 방 출력 상한 초과는 결과 없이 invalid다", () => {
+      const room = makeRoom();
+      const overLimitState = padRecordToBytes(
+        makeState(),
+        QUESTION_GAME_LIMITS.gameStateBytes + 1,
+      );
+      const stateEngine = makeEngine({
+        applyCommand: vi.fn(() => ({
+          kind: "changed" as const,
+          room: { ...structuredClone(room), gameState: overLimitState },
+          result: { roll: 2 },
+        })),
+      });
+
+      const stateResult = applyWithEngine(room, stateEngine);
+
+      expect(stateResult).toEqual({
+        kind: "invalid",
+        room,
+        message: "놀이 상태가 너무 큽니다",
+      });
+      expect(stateResult).not.toHaveProperty("result");
+
+      const overLimitRoom = padRecordToBytes(
+        makeRoom() as GameRoom & Record<string, unknown>,
+        QUESTION_GAME_LIMITS.roomBytes + 1,
+      );
+      const roomEngine = makeEngine({
+        applyCommand: vi.fn(() => ({
+          kind: "changed" as const,
+          room: overLimitRoom,
+          result: { roll: 3 },
+        })),
+      });
+
+      const roomResult = applyWithEngine(room, roomEngine);
+
+      expect(roomResult).toEqual({
+        kind: "invalid",
+        room,
+        message: "방 자료가 너무 큽니다",
+      });
+      expect(roomResult).not.toHaveProperty("result");
     });
 
     it("등록된 놀이가 없으면 입력 방을 유지한 corrupt다", () => {
@@ -428,7 +585,10 @@ describe("질문놀이 방 판정기", () => {
 
       const result = apply(room);
 
-      expect(result).toMatchObject({ kind: "corrupt", reason: "missing-engine" });
+      expect(result).toMatchObject({
+        kind: "corrupt",
+        message: "등록된 놀이 판정기가 없습니다",
+      });
       expect(result.room).toBe(room);
     });
 
@@ -439,7 +599,10 @@ describe("질문놀이 방 판정기", () => {
 
       const result = apply(room);
 
-      expect(result).toMatchObject({ kind: "corrupt", reason: "game-state" });
+      expect(result).toMatchObject({
+        kind: "corrupt",
+        message: "놀이 상태가 손상되었습니다",
+      });
       expect(result.room).toBe(room);
     });
   });
@@ -455,10 +618,13 @@ describe("질문놀이 방 판정기", () => {
 
       expect(apply(room, atLimit)).toMatchObject({
         kind: "corrupt",
-        reason: "missing-engine",
+        message: "등록된 놀이 판정기가 없습니다",
       });
       const result = apply(room, overLimit);
-      expect(result).toMatchObject({ kind: "invalid", reason: "command-body-size" });
+      expect(result).toMatchObject({
+        kind: "invalid",
+        message: "명령 본문이 너무 큽니다",
+      });
       expect(result.room).toBe(room);
     });
 
@@ -477,7 +643,10 @@ describe("질문놀이 방 판정기", () => {
 
       expect(apply(atLimitRoom)).toMatchObject({ kind: "replayed" });
       const result = apply(overLimitRoom);
-      expect(result).toMatchObject({ kind: "invalid", reason: "game-state-size" });
+      expect(result).toMatchObject({
+        kind: "invalid",
+        message: "놀이 상태가 너무 큽니다",
+      });
       expect(result.room).toBe(overLimitRoom);
     });
 
@@ -494,7 +663,10 @@ describe("질문놀이 방 판정기", () => {
 
       expect(apply(atLimitRoom)).toMatchObject({ kind: "replayed" });
       const result = apply(overLimitRoom);
-      expect(result).toMatchObject({ kind: "invalid", reason: "room-size" });
+      expect(result).toMatchObject({
+        kind: "invalid",
+        message: "방 자료가 너무 큽니다",
+      });
       expect(result.room).toBe(overLimitRoom);
     });
   });
@@ -628,6 +800,9 @@ describe("질문놀이 방 판정기", () => {
       const onPlayerLeave = vi.fn(({ room: candidate }) => ({
         ...candidate,
         status: "playing" as const,
+        playId: indexedCommandId(96),
+        pointAwardKeyVersion: 1 as const,
+        pointEvidenceVersion: 1 as const,
         hostId: "a",
         players: [makePlayer("a", true), makePlayer("b", true)],
         gameState: {
@@ -649,6 +824,9 @@ describe("질문놀이 방 판정기", () => {
       expect(onPlayerLeave).toHaveBeenCalledOnce();
       expect(result.room).toMatchObject({
         status: "ended",
+        playId: PLAY_ID,
+        pointAwardKeyVersion: 2,
+        pointEvidenceVersion: 2,
         hostId: "b",
         players: [{ id: "b", isHost: true }],
         gameState: {
