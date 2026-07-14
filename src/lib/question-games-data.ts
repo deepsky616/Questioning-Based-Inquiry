@@ -151,6 +151,8 @@ export interface RoomChainItem {
   question: string;
   playerId: string;
   playerName: string;
+  round?: number;
+  roundId?: string;
 }
 
 export type RoomStatus = "waiting" | "playing" | "ended";
@@ -204,7 +206,10 @@ function isRoomChainItem(value: unknown): value is RoomChainItem {
     isRecord(value) &&
     typeof value.question === "string" &&
     isNonEmptyString(value.playerId) &&
-    typeof value.playerName === "string"
+    typeof value.playerName === "string" &&
+    (value.round === undefined ||
+      (isNonNegativeInteger(value.round) && value.round > 0)) &&
+    (value.roundId === undefined || isNonEmptyString(value.roundId))
   );
 }
 

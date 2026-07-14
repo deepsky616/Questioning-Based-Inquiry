@@ -226,18 +226,9 @@ describe("질문놀이 방 판정기", () => {
     expect(resultOnFailure.kind).toBe("invalid");
   });
 
-  it("정적 등록부는 짝 찾기, 미스터리 박스와 질문 사다리 판정기를 등록한다", () => {
-    expect(hasQuestionGameRoomEngine("memory")).toBe(true);
-    expect(hasQuestionGameRoomEngine("mystery-box")).toBe(true);
-    expect(hasQuestionGameRoomEngine("ladder")).toBe(true);
+  it("정적 등록부는 기본 제공 놀이 일곱 개를 모두 등록한다", () => {
     expect(
-      BUILT_IN_QUESTION_GAME_IDS
-        .filter((gameId) =>
-          gameId !== "memory" &&
-          gameId !== "mystery-box" &&
-          gameId !== "ladder"
-        )
-        .every((gameId) => !hasQuestionGameRoomEngine(gameId)),
+      BUILT_IN_QUESTION_GAME_IDS.every(hasQuestionGameRoomEngine),
     ).toBe(true);
     expect(hasQuestionGameRoomEngine("unknown")).toBe(false);
   });
@@ -660,14 +651,14 @@ describe("질문놀이 방 판정기", () => {
       expect(roomResult).not.toHaveProperty("result");
     });
 
-    it("등록된 놀이가 없으면 입력 방을 유지한 corrupt다", () => {
-      const room = makeRoom();
+    it("지원하지 않는 놀이 식별값이면 입력 방을 유지한 corrupt다", () => {
+      const room = makeRoom({ gameId: "custom-game" });
 
       const result = apply(room);
 
       expect(result).toMatchObject({
         kind: "corrupt",
-        message: "등록된 놀이 판정기가 없습니다",
+        message: "놀이 식별값이 올바르지 않습니다",
       });
       expect(result.room).toBe(room);
     });
@@ -689,7 +680,7 @@ describe("질문놀이 방 판정기", () => {
 
   describe("유티에프 팔 바이트 상한", () => {
     it("본문은 경계까지 받고 한 바이트 초과를 invalid로 거절한다", () => {
-      const room = makeRoom();
+      const room = makeRoom({ gameId: "custom-game" });
       const atLimit = padRecordToBytes(
         makeBody(),
         QUESTION_GAME_LIMITS.commandBodyBytes,
@@ -698,7 +689,7 @@ describe("질문놀이 방 판정기", () => {
 
       expect(apply(room, atLimit)).toMatchObject({
         kind: "corrupt",
-        message: "등록된 놀이 판정기가 없습니다",
+        message: "놀이 식별값이 올바르지 않습니다",
       });
       const result = apply(room, overLimit);
       expect(result).toMatchObject({
@@ -761,6 +752,7 @@ describe("질문놀이 방 판정기", () => {
 
     function turnRoom(currentTurnIdx: number): GameRoom {
       return makeRoom({
+        gameId: "custom-game",
         players,
         gameState: makeState({
           turnOrder: players.map(({ id }) => id),
@@ -827,6 +819,7 @@ describe("질문놀이 방 판정기", () => {
 
     it("마지막 참가자가 나가면 빈 참가자와 빈 차례를 반환한다", () => {
       const room = makeRoom({
+        gameId: "custom-game",
         hostId: "a",
         players: [makePlayer("a", true)],
         gameState: makeState({ turnOrder: ["a"], currentTurnIdx: 0 }),
@@ -846,6 +839,7 @@ describe("질문놀이 방 판정기", () => {
 
     it("진행 중 두 명 방에서 한 명이 남으면 부족 인원으로 끝낸다", () => {
       const room = makeRoom({
+        gameId: "custom-game",
         players: [makePlayer("a", true), makePlayer("b")],
         gameState: makeState({
           turnOrder: ["a", "b"],

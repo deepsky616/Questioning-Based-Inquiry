@@ -10,6 +10,12 @@ import type {
 import { memoryQuestionGameRoomEngine } from "@/lib/question-game-room-engines/memory";
 import { mysteryQuestionGameRoomEngine } from "@/lib/question-game-room-engines/mystery";
 import { ladderQuestionGameRoomEngine } from "@/lib/question-game-room-engines/ladder";
+import {
+  diceQuestionGameRoomEngine,
+  kabaQuestionGameRoomEngine,
+  relayQuestionGameRoomEngine,
+  storyDiceQuestionGameRoomEngine,
+} from "@/lib/question-game-room-engines/turn-games";
 
 const RECENT_COMMAND_LIMIT = 64;
 const UUID_V4_PATTERN =
@@ -90,6 +96,10 @@ const QUESTION_GAME_ROOM_ENGINES: Partial<
   ladder: ladderQuestionGameRoomEngine,
   memory: memoryQuestionGameRoomEngine,
   "mystery-box": mysteryQuestionGameRoomEngine,
+  "story-dice": storyDiceQuestionGameRoomEngine,
+  dice: diceQuestionGameRoomEngine,
+  relay: relayQuestionGameRoomEngine,
+  kaba: kabaQuestionGameRoomEngine,
 };
 
 export function hasQuestionGameRoomEngine(gameId: string): boolean {
@@ -604,11 +614,21 @@ function leaveQuestionGameRoomWithResolvedEngine(
       hookTurnOrder !== null &&
       hookTurnSet.size === activeIds.size &&
       [...hookTurnSet].every((id) => activeIds.has(id));
+    const matchesStoryQuestioners =
+      room.gameId === "story-dice" &&
+      typeof hookState.taggerId === "string" &&
+      hookTurnOrder !== null &&
+      hookTurnSet.size === activeIds.size - 1 &&
+      !hookTurnSet.has(hookState.taggerId) &&
+      activeIds.has(hookState.taggerId) &&
+      [...activeIds].every((id) =>
+        id === hookState.taggerId || hookTurnSet.has(id)
+      );
     const validHookTurn =
       hookTurnOrder !== null &&
       hookTurnSet.size === hookTurnOrder.length &&
       hookTurnOrder.every((id) => activeIds.has(id)) &&
-      (matchesAdjustedTurn || matchesAllPlayers) &&
+      (matchesAdjustedTurn || matchesAllPlayers || matchesStoryQuestioners) &&
       hookTurnIndex !== null &&
       (hookTurnOrder.length === 0
         ? hookTurnIndex === 0

@@ -657,16 +657,13 @@ export async function PATCH(
 
   switch (action) {
     case "start": {
-      if (hasEngine && isStaleRoomAction(room, expectedVersion)) {
+      if (isStaleRoomAction(room, expectedVersion)) {
         return roomConflict(room);
       }
       if (room.hostId !== userId) {
         return NextResponse.json({ error: "방장만 시작할 수 있어요" }, { status: 403 });
       }
-      if (hasEngine && room.status !== "waiting") return roomConflict(room);
-      if (!hasEngine && isStaleRoomAction(room, expectedVersion)) {
-        return roomConflict(room);
-      }
+      if (room.status !== "waiting") return roomConflict(room);
       if (!isBuiltInQuestionGameId(room.gameId)) {
         return NextResponse.json(
           { error: "지원하지 않는 질문놀이입니다" },
@@ -680,25 +677,13 @@ export async function PATCH(
           { status: 400 },
         );
       }
-      if (hasEngine) {
-        return handleQuestionGameCommand({
-          room,
-          userId,
-          userName,
-          action,
-          body,
-        });
-      }
-      room.status = "playing";
-      room.turnIndex = 0;
-      room.chain = [];
-      room.gameState = {};
-      room.pointAwardKeyVersion = 1;
-      room.pointEvidenceVersion = 1;
-      const persisted = await persistRoom(room, userId);
-      if (!persisted.ok) return persisted.response;
-      room = persisted.room;
-      break;
+      return handleQuestionGameCommand({
+        room,
+        userId,
+        userName,
+        action,
+        body,
+      });
     }
 
     case "update-state": {

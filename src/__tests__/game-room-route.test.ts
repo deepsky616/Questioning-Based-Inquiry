@@ -17,6 +17,7 @@ import {
   createLadderState,
   type LadderRoomState,
 } from "@/lib/question-game-room-engines/ladder";
+import { hasQuestionGameRoomEngine } from "@/lib/question-game-room-engine";
 import { assignLadderTopics, generateLadderGrid } from "@/lib/question-ladder";
 
 const mocks = vi.hoisted(() => ({
@@ -118,6 +119,13 @@ beforeEach(() => {
   mocks.settleMemoryRollingRoom
     .mockReset()
     .mockImplementation((room: GameRoom) => room);
+});
+
+describe("방 판정기 등록 경계", () => {
+  it("기본 제공 놀이 일곱 개가 모두 서버 판정기에 등록되어 있다", () => {
+    expect(BUILT_IN_GAMES.map(({ id }) => [id, hasQuestionGameRoomEngine(id)]))
+      .toEqual(BUILT_IN_GAMES.map(({ id }) => [id, true]));
+  });
 });
 
 afterEach(cleanup);
@@ -243,6 +251,8 @@ describe("공개 방 응답", () => {
 
     const response = await patch({
       action: "restart",
+      commandId: "11111111-1111-4111-8111-111111111111",
+      expectedCreatedAt: 1,
       expectedVersion: 1,
     });
 
@@ -250,7 +260,7 @@ describe("공개 방 응답", () => {
     expect(body.room.gameState).toEqual({ phase: "waiting" });
   });
 
-  it("게임을 시작할 때 점수 버전 1을 저장한다", async () => {
+  it("새 내장 놀이를 시작할 때 서버 상태와 점수 버전 2를 저장한다", async () => {
     const room = makeRoom({ players: makePlayers(2) });
     mocks.loadGameRoom.mockResolvedValue(room);
     mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
@@ -258,12 +268,22 @@ describe("공개 방 응답", () => {
       room: { ...candidate, version: candidate.version + 1 },
     }));
 
-    const response = await patch({ action: "start", expectedVersion: 1 });
+    const response = await patch({
+      action: "start",
+      commandId: "11111111-1111-4111-8111-111111111111",
+      expectedCreatedAt: 1,
+      expectedVersion: 1,
+    });
 
     expect(response.status).toBe(200);
     expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
-      pointAwardKeyVersion: 1,
-      pointEvidenceVersion: 1,
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      gameState: expect.objectContaining({
+        stateVersion: 2,
+        game: "dice",
+        phase: "roll",
+      }),
     }));
   });
 });
@@ -853,12 +873,10 @@ describe("방 생성 시각 경계", () => {
 
 describe("일반 게임 동작 충돌", () => {
   const cases: Array<[string, Record<string, unknown>]> = [
-    ["start", {}],
     ["update-state", { patch: { score: 1 } }],
     ["set-state", { state: { score: 1 } }],
     ["next-turn", {}],
     ["set-topic", { topic: "물" }],
-    ["add-question", { question: "왜 그럴까?" }],
     ["end", {}],
     ["restart", {}],
   ];
@@ -867,12 +885,11 @@ describe("일반 게임 동작 충돌", () => {
     "%s 저장 충돌은 최신 방과 409를 반환한다",
     async (action, extra) => {
       const current = makeRoom({
-        gameId: "relay",
+        gameId: "custom-game",
         status: "playing",
-        ...(action === "start" ? { players: makePlayers(2) } : {}),
       });
       const latest = makeRoom({
-        gameId: "relay",
+        gameId: "custom-game",
         status: "playing",
         version: 2,
         topic: "최신",
@@ -890,6 +907,28 @@ describe("일반 게임 동작 충돌", () => {
       await expect(response.json()).resolves.toMatchObject({ room: latest });
     },
   );
+
+  it("새 내장 놀이 start 저장 충돌은 최신 방과 409를 반환한다", async () => {
+    const current = makeRoom({ gameId: "dice", players: makePlayers(2) });
+    const latest = makeRoom({
+      gameId: "dice",
+      players: makePlayers(2),
+      version: 2,
+      topic: "최신",
+    });
+    mocks.loadGameRoom.mockResolvedValue(current);
+    mocks.saveGameRoom.mockResolvedValue({ kind: "conflict", room: latest });
+
+    const response = await patch({
+      action: "start",
+      commandId: "12111111-1111-4111-8111-111111111111",
+      expectedCreatedAt: current.createdAt,
+      expectedVersion: current.version,
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ room: latest });
+  });
 
   it("저장 전에 방이 사라지면 404를 반환한다", async () => {
     mocks.loadGameRoom.mockResolvedValue(makeRoom());
@@ -1167,7 +1206,7 @@ describe("친구 방 시작 인원", () => {
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("미등록 놀이 상태 갱신의 종료 전환은 유지한다", async () => {
+  it("옛 진행 방의 직접 종료 전환 대신 다시 시작 안내를 반환한다", async () => {
     mocks.loadGameRoom.mockResolvedValue(
       makeRoom({ gameId: "dice", status: "playing" }),
     );
@@ -1182,11 +1221,12 @@ describe("친구 방 시작 인원", () => {
       status: "ended",
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({
-      room: { status: "ended" },
+      error: "새 규칙으로 다시 시작해 주세요",
+      room: { status: "playing" },
     });
-    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
   it.each([2, 8])("참가자가 %i명이면 시작할 수 있다", async (playerCount) => {
@@ -1222,8 +1262,8 @@ describe("친구 방 시작 인원", () => {
   });
 });
 
-describe("미등록 놀이 회귀", () => {
-  it("등록부가 비어 있어도 기존 시작과 점수 버전 1을 유지한다", async () => {
+describe("새 판정기 시작과 옛 방 호환", () => {
+  it("질문 주사위 새 시작은 버전 2 상태를 저장한다", async () => {
     const room = makeRoom({ gameId: "dice", players: makePlayers(2) });
     mocks.loadGameRoom.mockResolvedValue(room);
     mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
@@ -1231,18 +1271,23 @@ describe("미등록 놀이 회귀", () => {
       room: { ...candidate, version: candidate.version + 1 },
     }));
 
-    const response = await patch({ action: "start", expectedVersion: 1 });
+    const response = await patch({
+      action: "start",
+      commandId: "13111111-1111-4111-8111-111111111111",
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: 1,
+    });
 
     expect(response.status).toBe(200);
     expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
       status: "playing",
-      gameState: {},
-      pointAwardKeyVersion: 1,
-      pointEvidenceVersion: 1,
+      gameState: expect.objectContaining({ stateVersion: 2, game: "dice" }),
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
     }));
   });
 
-  it("등록부가 비어 있어도 기존 상태 쓰기를 유지한다", async () => {
+  it("질문 주사위 옛 진행 방은 직접 상태 쓰기를 막는다", async () => {
     const room = makeRoom({ gameId: "dice", status: "playing" });
     mocks.loadGameRoom.mockResolvedValue(room);
     mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
@@ -1256,10 +1301,8 @@ describe("미등록 놀이 회귀", () => {
       patch: { score: 3 },
     });
 
-    expect(response.status).toBe(200);
-    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
-      gameState: { score: 3 },
-    }));
+    expect(response.status).toBe(409);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 });
 
@@ -2093,7 +2136,7 @@ describe("방 상태 쓰기 권한", () => {
   it.each(versionedActions)(
     "%s 요청은 expectedVersion이 없으면 400을 반환한다",
     async (action, extra) => {
-      mocks.loadGameRoom.mockResolvedValue(makeRoom());
+      mocks.loadGameRoom.mockResolvedValue(makeRoom({ gameId: "custom-game" }));
 
       const response = await patch({ action, ...extra });
 
@@ -2152,6 +2195,7 @@ describe("방 상태 쓰기 권한", () => {
       });
       mocks.loadGameRoom.mockResolvedValue(
         makeRoom({
+          gameId: "custom-game",
           status: status === "playing" ? "ended" : "playing",
           players: [
             { id: "user-1", name: "방장", isHost: true, joinedAt: 1 },
@@ -2265,7 +2309,7 @@ describe("기존 권한과 게임 규칙", () => {
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("방장이 아닌 참가자는 이어 말하기 차례를 임의로 넘길 수 없다", async () => {
+  it("옛 이어 말하기 진행 방은 직접 차례 변경보다 호환 안내를 먼저 반환한다", async () => {
     mocks.auth.mockResolvedValue({
       user: { id: "member", name: "참가자" },
     });
@@ -2289,11 +2333,11 @@ describe("기존 권한과 게임 규칙", () => {
       expectedVersion: 1,
     });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(409);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("방장이 아닌 참가자는 이어 말하기 상태를 직접 갱신할 수 없다", async () => {
+  it("옛 이어 말하기 진행 방은 직접 상태 갱신보다 호환 안내를 먼저 반환한다", async () => {
     mocks.auth.mockResolvedValue({
       user: { id: "member", name: "참가자" },
     });
@@ -2318,11 +2362,11 @@ describe("기존 권한과 게임 규칙", () => {
       patch: {},
     });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(409);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("이미 나온 질문을 다시 추가할 수 없다", async () => {
+  it("옛 이어 말하기의 중복 질문 추가는 호환 안내로 막는다", async () => {
     mocks.loadGameRoom.mockResolvedValue(
       makeRoom({
         gameId: "relay",
@@ -2343,11 +2387,11 @@ describe("기존 권한과 게임 규칙", () => {
       question: "왜 그럴까?",
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("공백과 대소문자만 다른 같은 질문을 다시 저장할 수 없다", async () => {
+  it("옛 이어 말하기의 정규화 중복 추가는 호환 안내로 막는다", async () => {
     mocks.loadGameRoom.mockResolvedValue(
       makeRoom({
         gameId: "relay",
@@ -2372,11 +2416,11 @@ describe("기존 권한과 게임 규칙", () => {
       question: "why is the sky blue?",
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("한 학생은 이어 말하기 질문을 30개보다 많이 저장할 수 없다", async () => {
+  it("옛 이어 말하기의 학생 한도 초과 추가는 호환 안내로 막는다", async () => {
     mocks.loadGameRoom.mockResolvedValue(
       makeRoom({
         gameId: "relay",
@@ -2399,11 +2443,11 @@ describe("기존 권한과 게임 규칙", () => {
       question: "31번째 질문인가요?",
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("이어 말하기 방에는 질문을 120개보다 많이 저장할 수 없다", async () => {
+  it("옛 이어 말하기의 방 한도 초과 추가는 호환 안내로 막는다", async () => {
     const players = Array.from({ length: 8 }, (_, index) => ({
       id: index === 0 ? "user-1" : `user-${index + 1}`,
       name: `학생 ${index + 1}`,
@@ -2433,11 +2477,11 @@ describe("기존 권한과 게임 규칙", () => {
       question: "121번째 탐구 질문인가요?",
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("질문 형식이 아닌 짧은 답은 이어 말하기에 저장하지 않는다", async () => {
+  it("옛 이어 말하기의 짧은 답 추가는 호환 안내로 막는다", async () => {
     mocks.loadGameRoom.mockResolvedValue(
       makeRoom({ gameId: "relay", status: "playing" }),
     );
@@ -2452,7 +2496,7 @@ describe("기존 권한과 게임 규칙", () => {
       question: "1",
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 });
