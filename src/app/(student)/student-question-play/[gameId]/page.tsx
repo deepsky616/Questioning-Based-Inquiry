@@ -19,6 +19,9 @@ import RoomDice from "../games/RoomDice";
 import RoomStoryDice from "../games/RoomStoryDice";
 import RoomMemory from "../games/RoomMemory";
 import RoomLadder from "../games/RoomLadder";
+import RoomCompatibilityNotice, {
+  shouldShowRoomCompatibilityNotice,
+} from "../games/RoomCompatibilityNotice";
 import { useRoom } from "../games/useRoom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -152,7 +155,9 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
       );
     }
     // 게임 진행 / 종료 — 멀티 동기화 컴포넌트
-    const RoomComponent = ROOM_GAME_MAP[gameId];
+    const RoomComponent = shouldShowRoomCompatibilityNotice(room)
+      ? RoomCompatibilityNotice
+      : ROOM_GAME_MAP[gameId];
     if (RoomComponent) {
       return (
         <>

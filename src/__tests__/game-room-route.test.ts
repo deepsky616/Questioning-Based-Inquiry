@@ -1,5 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GameRoom } from "@/lib/question-games-data";
+// @vitest-environment jsdom
+
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
+import RoomCompatibilityNotice from "@/app/(student)/student-question-play/games/RoomCompatibilityNotice";
+import { BUILT_IN_GAMES, type GameRoom } from "@/lib/question-games-data";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -101,6 +109,8 @@ beforeEach(() => {
     .mockReset()
     .mockImplementation((room: GameRoom) => room);
 });
+
+afterEach(cleanup);
 
 describe("공개 방 응답", () => {
   it("방 생성 성공 응답에서 비공개 상태를 제거한다", async () => {
@@ -628,6 +638,109 @@ describe("친구 방 시작 인원", () => {
     await expect(response.json()).resolves.toMatchObject({
       room: { status: "playing", players: { length: playerCount } },
     });
+  });
+});
+
+describe("미등록 놀이 회귀", () => {
+  it("등록부가 비어 있어도 기존 시작과 점수 버전 1을 유지한다", async () => {
+    const room = makeRoom({ gameId: "dice", players: makePlayers(2) });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({ action: "start", expectedVersion: 1 });
+
+    expect(response.status).toBe(200);
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
+      status: "playing",
+      gameState: {},
+      pointAwardKeyVersion: 1,
+      pointEvidenceVersion: 1,
+    }));
+  });
+
+  it("등록부가 비어 있어도 기존 상태 쓰기를 유지한다", async () => {
+    const room = makeRoom({ gameId: "dice", status: "playing" });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({
+      action: "update-state",
+      expectedVersion: 1,
+      patch: { score: 3 },
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
+      gameState: { score: 3 },
+    }));
+  });
+});
+
+describe("옛 진행 방 안내 화면", () => {
+  const pagePath =
+    "src/app/(student)/student-question-play/[gameId]/page.tsx";
+  const game = BUILT_IN_GAMES.find((candidate) => candidate.id === "dice")!;
+  const room = makeRoom({ gameId: "dice", status: "playing" });
+
+  it("페이지가 안내 판별 결과를 기존 놀이 구성 요소보다 먼저 쓴다", () => {
+    const page = readFileSync(pagePath, "utf8");
+
+    expect(page).toContain("RoomCompatibilityNotice");
+    expect(page).toContain("shouldShowRoomCompatibilityNotice(room)");
+    expect(page).toMatch(
+      /const RoomComponent = [\s\S]*?RoomCompatibilityNotice[\s\S]*?ROOM_GAME_MAP\[gameId\]/,
+    );
+  });
+
+  it("방장에게 다시 시작과 나가기를 제공하고 실제 동작을 연결한다", () => {
+    const onAction = vi.fn();
+    const onLeave = vi.fn();
+    const view = render(createElement(RoomCompatibilityNotice, {
+      game,
+      room,
+      myId: "user-1",
+      actionLoading: false,
+      onAction,
+      onLeave,
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: "새 규칙으로 다시 시작" }));
+    fireEvent.click(screen.getByRole("button", { name: /나가기/ }));
+
+    expect(onAction).toHaveBeenCalledOnce();
+    expect(onAction).toHaveBeenCalledWith("restart");
+    expect(onLeave).toHaveBeenCalledOnce();
+    expect(screen.getByText("방 1234")).toBeInTheDocument();
+    expect(view.container.querySelector("main")).toBeNull();
+  });
+
+  it("다른 참가자에게는 방장 대기 안내와 나가기만 제공한다", () => {
+    const onAction = vi.fn();
+    const onLeave = vi.fn();
+    render(createElement(RoomCompatibilityNotice, {
+      game,
+      room,
+      myId: "user-2",
+      actionLoading: false,
+      onAction,
+      onLeave,
+    }));
+
+    expect(screen.queryByRole("button", {
+      name: "새 규칙으로 다시 시작",
+    })).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "방장이 새 규칙으로 다시 시작하기를 기다리는 중입니다.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /나가기/ }));
+    expect(onLeave).toHaveBeenCalledOnce();
+    expect(onAction).not.toHaveBeenCalled();
   });
 });
 
