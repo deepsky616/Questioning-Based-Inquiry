@@ -30,7 +30,7 @@ import { GET, PATCH } from "@/app/api/question-games/rooms/[code]/route";
 function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
   return {
     code: "1234",
-    gameId: "question-chain",
+    gameId: "dice",
     hostId: "user-1",
     status: "waiting",
     players: [
@@ -45,6 +45,15 @@ function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
     updatedAt: 1,
     ...overrides,
   };
+}
+
+function makePlayers(count: number): GameRoom["players"] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: index === 0 ? "user-1" : `user-${index + 1}`,
+    name: `학생 ${index + 1}`,
+    isHost: index === 0,
+    joinedAt: index + 1,
+  }));
 }
 
 function patch(body: Record<string, unknown>) {
@@ -121,7 +130,11 @@ describe("일반 게임 동작 충돌", () => {
   it.each(cases)(
     "%s 저장 충돌은 최신 방과 409를 반환한다",
     async (action, extra) => {
-      const current = makeRoom({ gameId: "relay", status: "playing" });
+      const current = makeRoom({
+        gameId: "relay",
+        status: "playing",
+        ...(action === "start" ? { players: makePlayers(2) } : {}),
+      });
       const latest = makeRoom({
         gameId: "relay",
         status: "playing",
@@ -370,6 +383,41 @@ describe("memory-roll 요청", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.recordMemoryRoll).toHaveBeenCalledOnce();
+  });
+});
+
+describe("친구 방 시작 인원", () => {
+  it("방장 혼자서는 시작할 수 없다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(makeRoom({ gameId: "memory" }));
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room: { ...room, version: room.version + 1 },
+    }));
+
+    const response = await patch({ action: "start", expectedVersion: 1 });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "친구 방은 2명부터 8명까지 시작할 수 있어요",
+    });
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it.each([2, 8])("참가자가 %i명이면 시작할 수 있다", async (playerCount) => {
+    mocks.loadGameRoom.mockResolvedValue(
+      makeRoom({ gameId: "memory", players: makePlayers(playerCount) }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (room: GameRoom) => ({
+      kind: "saved",
+      room: { ...room, version: room.version + 1 },
+    }));
+
+    const response = await patch({ action: "start", expectedVersion: 1 });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      room: { status: "playing", players: { length: playerCount } },
+    });
   });
 });
 

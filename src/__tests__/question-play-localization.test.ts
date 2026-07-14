@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import type { ComponentType, PropsWithChildren } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { NextIntlClientProvider } from "next-intl";
+import RoomLobby from "@/app/(student)/student-question-play/games/RoomLobby";
 import { BUILT_IN_GAMES, localizeBuiltInGame, localizeQuestionGames } from "@/lib/question-games-data";
+import type { GameRoom } from "@/lib/question-games-data";
 import {
   getKabaSentences,
   getLocalizedText,
@@ -15,6 +21,47 @@ const studentLanding = readFileSync("src/app/(student)/student-question-play/pag
 const studentGamePage = readFileSync("src/app/(student)/student-question-play/[gameId]/page.tsx", "utf8");
 const teacherGamePage = readFileSync("src/app/(teacher)/teacher-question-play/page.tsx", "utf8");
 const teacherPreviewPage = readFileSync("src/app/(teacher)/teacher-question-play/[gameId]/preview/page.tsx", "utf8");
+const TestIntlProvider = NextIntlClientProvider as ComponentType<
+  PropsWithChildren<{ locale: string; messages: Record<string, never> }>
+>;
+
+function renderLobby(locale: "ko" | "en", playerCount: number) {
+  const game = BUILT_IN_GAMES[0];
+  const room: GameRoom = {
+    code: "1234",
+    gameId: game.id,
+    hostId: "user-1",
+    status: "waiting",
+    players: Array.from({ length: playerCount }, (_, index) => ({
+      id: index === 0 ? "user-1" : `user-${index + 1}`,
+      name: `학생 ${index + 1}`,
+      isHost: index === 0,
+      joinedAt: index + 1,
+    })),
+    topic: "",
+    chain: [],
+    turnIndex: 0,
+    gameState: {},
+    version: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+
+  return renderToStaticMarkup(
+    createElement(
+      TestIntlProvider,
+      { locale, messages: {} },
+      createElement(RoomLobby, {
+        game,
+        room,
+        myId: "user-1",
+        actionLoading: false,
+        onStart: () => {},
+        onLeave: () => {},
+      }),
+    ),
+  );
+}
 
 describe("question play localization", () => {
   it("localizes built-in question games while preserving custom game text", () => {
@@ -39,6 +86,28 @@ describe("question play localization", () => {
       order: 99,
     };
     expect(localizeQuestionGames([custom], "en")[0].title).toBe("교사 입력 제목");
+  });
+
+  it("shows the shared player count and duration on built-in game lists", () => {
+    for (const game of BUILT_IN_GAMES) {
+      expect(game.playerCount).toBe("2~8명");
+      expect(localizeBuiltInGame(game, "en").playerCount).toBe("2-8 players");
+    }
+
+    expect(BUILT_IN_GAMES.find((game) => game.id === "memory")?.duration).toBe("약 5~20분");
+    expect(BUILT_IN_GAMES.find((game) => game.id === "ladder")?.duration).toBe("약 10~15분");
+    expect(BUILT_IN_GAMES.find((game) => game.id === "mystery-box")?.duration).toBe("약 8~15분");
+  });
+
+  it("requires one friend before the host can start a room", () => {
+    const koreanLobby = renderLobby("ko", 1);
+    const englishLobby = renderLobby("en", 1);
+
+    expect(koreanLobby).toContain('disabled=""');
+    expect(koreanLobby).toContain("친구가 한 명 이상 더 참가해야 시작할 수 있어요");
+    expect(englishLobby).toContain('disabled=""');
+    expect(englishLobby).toContain("At least one friend must join before starting.");
+    expect(renderLobby("ko", 2)).not.toContain('disabled=""');
   });
 
   it("uses localized game text on list, management, and preview surfaces", () => {

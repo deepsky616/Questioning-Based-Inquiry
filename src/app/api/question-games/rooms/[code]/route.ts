@@ -21,6 +21,10 @@ import {
   recordMemoryRoll,
   settleMemoryRollingRoom,
 } from "@/lib/memory-room-roll";
+import {
+  getQuestionGameRule,
+  isBuiltInQuestionGameId,
+} from "@/lib/question-game-rules";
 
 type Params = { params: Promise<{ code: string }> };
 
@@ -140,6 +144,13 @@ async function joinRoom(
   userName: string,
 ) {
   let room = initialRoom;
+  if (!isBuiltInQuestionGameId(room.gameId)) {
+    return NextResponse.json(
+      { error: "지원하지 않는 질문놀이입니다" },
+      { status: 400 },
+    );
+  }
+  const { max } = getQuestionGameRule(room.gameId).multiplayer;
   const player: RoomPlayer = {
     id: userId,
     name: userName,
@@ -157,9 +168,9 @@ async function joinRoom(
         { status: 400 },
       );
     }
-    if (room.players.length >= 8) {
+    if (room.players.length >= max) {
       return NextResponse.json(
-        { error: "방이 가득 찼어요 (최대 8명)" },
+        { error: `방이 가득 찼어요 (최대 ${max}명)` },
         { status: 400 },
       );
     }
@@ -323,6 +334,19 @@ export async function PATCH(
       }
       if (isStaleRoomAction(room, expectedVersion)) {
         return NextResponse.json({ error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.", room }, { status: 409 });
+      }
+      if (!isBuiltInQuestionGameId(room.gameId)) {
+        return NextResponse.json(
+          { error: "지원하지 않는 질문놀이입니다" },
+          { status: 400 },
+        );
+      }
+      const { min, max } = getQuestionGameRule(room.gameId).multiplayer;
+      if (room.players.length < min || room.players.length > max) {
+        return NextResponse.json(
+          { error: `친구 방은 ${min}명부터 ${max}명까지 시작할 수 있어요` },
+          { status: 400 },
+        );
       }
       room.status = "playing";
       room.turnIndex = 0;

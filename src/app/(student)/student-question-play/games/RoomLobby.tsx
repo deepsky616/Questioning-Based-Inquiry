@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
+import { getQuestionGameRule } from "@/lib/question-game-rules";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
 const PLAYER_COLORS = ["#F97316", "#3B82F6", "#10B981", "#8B5CF6", "#EF4444", "#EC4899", "#14B8A6", "#F59E0B"];
@@ -22,6 +23,8 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
   const text = getQuestionGameText(locale);
   const [copied, setCopied] = useState(false);
   const isHost = room.hostId === myId;
+  const { min, max } = getQuestionGameRule(game.id).multiplayer;
+  const needsMorePlayers = room.players.length < min;
 
   function copyCode() {
     navigator.clipboard?.writeText(room.code).then(() => {
@@ -72,7 +75,9 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
           <h2 className="font-black text-gray-800">
             👥 {locale === "en" ? "Players" : "참가자"} <span style={{ color: game.accentColor }}>{room.players.length}</span>
           </h2>
-          <span className="text-xs text-gray-400">{locale === "en" ? "Max 8" : "최대 8명"}</span>
+          <span className="text-xs text-gray-400">
+            {locale === "en" ? `Max ${max}` : `최대 ${max}명`}
+          </span>
         </div>
         <div className="space-y-2">
           {room.players.map((p, i) => (
@@ -96,7 +101,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
             </div>
           ))}
           {/* 빈 자리 안내 */}
-          {room.players.length < 2 && (
+          {room.players.length < min && (
             <div className="flex items-center gap-3 rounded-xl p-3 border-2 border-dashed border-gray-200">
               <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-300 text-lg">+</div>
               <span className="text-gray-400 text-sm animate-pulse">{locale === "en" ? "Waiting for friends..." : "친구를 기다리는 중..."}</span>
@@ -107,13 +112,22 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
 
       {/* 시작 / 대기 */}
       {isHost ? (
-        <Button
-          className="w-full py-5 text-xl font-black text-white rounded-2xl"
-          style={{ background: game.gradientCss, opacity: room.players.length >= 1 && !actionLoading ? 1 : 0.5 }}
-          disabled={room.players.length < 1 || actionLoading}
-          onClick={onStart}>
-          {actionLoading ? (locale === "en" ? "Starting..." : "시작하는 중...") : (locale === "en" ? "🚀 Start game!" : "🚀 게임 시작!")}
-        </Button>
+        <div className="space-y-2">
+          <Button
+            className="w-full py-5 text-xl font-black text-white rounded-2xl"
+            style={{ background: game.gradientCss, opacity: !needsMorePlayers && !actionLoading ? 1 : 0.5 }}
+            disabled={needsMorePlayers || actionLoading}
+            onClick={onStart}>
+            {actionLoading ? (locale === "en" ? "Starting..." : "시작하는 중...") : (locale === "en" ? "🚀 Start game!" : "🚀 게임 시작!")}
+          </Button>
+          {needsMorePlayers && (
+            <p className="text-center text-sm text-gray-500" role="status">
+              {locale === "en"
+                ? "At least one friend must join before starting."
+                : "친구가 한 명 이상 더 참가해야 시작할 수 있어요"}
+            </p>
+          )}
+        </div>
       ) : (
         <div className="bg-gray-50 rounded-2xl p-5 text-center">
           <div className="flex items-center justify-center gap-2 text-gray-500">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createGameRoom } from "@/lib/game-room-store";
+import { isBuiltInQuestionGameId } from "@/lib/question-game-rules";
 
 // 방 생성
 export async function POST(req: NextRequest) {
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
   const gameId = typeof body.gameId === "string" ? body.gameId : "";
   if (!gameId) {
     return NextResponse.json({ error: "gameId가 필요합니다" }, { status: 400 });
+  }
+  if (!isBuiltInQuestionGameId(gameId)) {
+    return NextResponse.json({ error: "지원하지 않는 질문놀이입니다" }, { status: 400 });
   }
 
   const room = await createGameRoom({ gameId, hostId: userId, hostName: userName });

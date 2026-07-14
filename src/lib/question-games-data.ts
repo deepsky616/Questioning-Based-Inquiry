@@ -1,3 +1,5 @@
+import { applyQuestionGameRuleText } from "@/lib/question-game-rules";
+
 // 교사가 지정한 순서(gameId 배열)대로 정렬. 순서에 없는 게임은 기본 order로 뒤에 둔다.
 export function sortGamesByOrder<T extends { id: string; order: number }>(
   games: T[],
@@ -43,15 +45,13 @@ export interface CustomGame {
 
 export type AnyGame = BuiltInGame | CustomGame;
 
-type BuiltInGameText = Pick<BuiltInGame, "title" | "description" | "playerCount" | "duration" | "instructions">;
+type BuiltInGameText = Pick<BuiltInGame, "title" | "description" | "instructions">;
 
 const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
   en: {
     memory: {
       title: "Q&A Matching",
       description: "Find matching pairs of question cards and answer cards in this memory game.",
-      playerCount: "1-6 players",
-      duration: "15-25 min",
       instructions: [
         "AI creates blue question cards and yellow answer cards.",
         "All players roll a die to decide the turn order, highest number first.",
@@ -64,8 +64,6 @@ const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
     "story-dice": {
       title: "Story Dice",
       description: "Roll three dice, build a story from the words, and complete it through friends' questions.",
-      playerCount: "2-30 players",
-      duration: "15-25 min",
       instructions: [
         "The storyteller rolls three dice for a character, place, and event or object.",
         "The storyteller makes one story sentence using the three words.",
@@ -77,8 +75,6 @@ const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
     dice: {
       title: "Question Dice",
       description: "Roll the die and create a question that matches the question type you get.",
-      playerCount: "2-30 players",
-      duration: "10-20 min",
       instructions: [
         "Roll the die.",
         "Each number is a question type: 1=factual, 2=conceptual, 3=debate, 4=imaginative, 5=comparison, 6=free choice.",
@@ -89,8 +85,6 @@ const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
     ladder: {
       title: "Question Ladder",
       description: "Use a ladder draw to match players with topics for question making.",
-      playerCount: "4-20 players",
-      duration: "15-20 min",
       instructions: [
         "Draw a ladder. Write player names at the top and question topics at the bottom.",
         "Each player follows the ladder from their name.",
@@ -101,8 +95,6 @@ const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
     relay: {
       title: "Question Relay",
       description: "Choose a topic and continue only with connected questions. No answers allowed.",
-      playerCount: "2-30 players",
-      duration: "15-25 min",
       instructions: [
         "Choose one topic or word, such as ocean, weather, or space.",
         "Create the first question related to the topic.",
@@ -113,8 +105,6 @@ const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
     "mystery-box": {
       title: "Mystery Box",
       description: "Guess the hidden object in the box by asking questions only.",
-      playerCount: "2-30 players",
-      duration: "20-30 min",
       instructions: [
         "Hide an object inside a box.",
         "Other players may ask only questions that can be answered yes or no.",
@@ -125,8 +115,6 @@ const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
     kaba: {
       title: "Kaba Game",
       description: "Turn statements into questions, such as 'The cat sleeps' into 'Does the cat sleep?'",
-      playerCount: "1-30 players",
-      duration: "10-20 min",
       instructions: [
         "Read the statement shown by the teacher or screen.",
         "Change the statement into a question by speaking or writing it.",
@@ -139,7 +127,8 @@ const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
 
 export function localizeBuiltInGame<T extends BuiltInGame>(game: T, locale: string): T {
   const text = locale === "en" ? BUILT_IN_GAME_TEXT.en[game.id] : null;
-  return text ? { ...game, ...text } : game;
+  const ruleText = applyQuestionGameRuleText(game.id, locale === "en" ? "en" : "ko");
+  return text ? { ...game, ...text, ...ruleText } : { ...game, ...ruleText };
 }
 
 export function localizeQuestionGame<T extends AnyGame>(game: T, locale: string): T {
@@ -314,8 +303,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     emoji: "🃏",
     gradientCss: "linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)",
     accentColor: "#7C3AED",
-    playerCount: "1~6명",
-    duration: "15~25분",
+    ...applyQuestionGameRuleText("memory", "ko"),
     instructions: [
       "AI가 질문 카드(파란색)와 대답 카드(노란색) 짝을 만들어요.",
       "모든 참가자가 주사위를 굴려 순서를 정해요 (큰 숫자부터).",
@@ -334,8 +322,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     emoji: "📖",
     gradientCss: "linear-gradient(135deg, #FB923C 0%, #EF4444 100%)",
     accentColor: "#EF4444",
-    playerCount: "2~30명",
-    duration: "15~25분",
+    ...applyQuestionGameRuleText("story-dice", "ko"),
     instructions: [
       "술래가 주사위 3개(주인공·장소·사건/물건)를 굴려요.",
       "술래는 나온 3개 단어로 이야기 한 문장을 만들어요.",
@@ -353,8 +340,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     emoji: "🎲",
     gradientCss: "linear-gradient(135deg, #38BDF8 0%, #2563EB 100%)",
     accentColor: "#2563EB",
-    playerCount: "2~30명",
-    duration: "10~20분",
+    ...applyQuestionGameRuleText("dice", "ko"),
     instructions: [
       "주사위를 굴려요.",
       "각 숫자는 질문 유형이에요: 1=사실 2=개념 3=논쟁 4=상상 5=비교 6=자유",
@@ -371,8 +357,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     emoji: "🪜",
     gradientCss: "linear-gradient(135deg, #34D399 0%, #059669 100%)",
     accentColor: "#059669",
-    playerCount: "4~20명",
-    duration: "15~20분",
+    ...applyQuestionGameRuleText("ladder", "ko"),
     instructions: [
       "칠판에 사다리를 그려요. 위쪽에 친구 이름, 아래쪽에 질문 주제를 써요.",
       "각자 자신의 이름에서 출발해 사다리를 타요.",
@@ -389,8 +374,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     emoji: "🏃",
     gradientCss: "linear-gradient(135deg, #FBBF24 0%, #F97316 100%)",
     accentColor: "#F97316",
-    playerCount: "2~30명",
-    duration: "15~25분",
+    ...applyQuestionGameRuleText("relay", "ko"),
     instructions: [
       "주제나 단어를 하나 정해요. (예: 바다, 날씨, 우주...)",
       "주제와 관련된 첫 번째 질문을 만들어요.",
@@ -407,8 +391,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     emoji: "📦",
     gradientCss: "linear-gradient(135deg, #F472B6 0%, #E11D48 100%)",
     accentColor: "#E11D48",
-    playerCount: "2~30명",
-    duration: "20~30분",
+    ...applyQuestionGameRuleText("mystery-box", "ko"),
     instructions: [
       "상자 안에 물건을 넣어 숨겨요.",
       "나머지 친구들은 '네/아니오'로 대답할 수 있는 질문만 해요.",
@@ -425,8 +408,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     emoji: "🙋",
     gradientCss: "linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)",
     accentColor: "#2563EB",
-    playerCount: "1~30명",
-    duration: "10~20분",
+    ...applyQuestionGameRuleText("kaba", "ko"),
     instructions: [
       "선생님이나 화면에 나온 평서문을 읽어요. 예) 고양이가 잔다",
       "평서문을 질문으로 바꿔 말하거나 써요. 예) 고양이가 자나요?",
