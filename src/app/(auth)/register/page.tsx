@@ -19,7 +19,6 @@ function RegisterContent() {
   const [form, setForm] = useState({
     email: "",
     school: "",
-    registrationCode: "",
     name: "",
     password: "",
     confirmPassword: "",
@@ -35,14 +34,13 @@ function RegisterContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { email, school, registrationCode, name, password, confirmPassword } = form;
+    const { email, school, name, password, confirmPassword } = form;
 
     // 항목별로 무엇이 비었는지 구체적으로 안내
     const missing = (label: string) => { setError(t("fieldRequired", { field: label })); };
     if (!name) { missing(t("name")); return; }
     if (!school) { missing(t("school")); return; }
     if (!email) { missing(t("email")); return; }
-    if (!registrationCode) { missing(t("teacherRegistrationCode")); return; }
     if (!password) { missing(t("password")); return; }
     if (!email.includes("@")) {
       setError(t("invalidEmail"));
@@ -71,7 +69,6 @@ function RegisterContent() {
           role: "TEACHER",
           email,
           school,
-          registrationCode,
           name,
           password,
           teacherClasses,
@@ -114,18 +111,6 @@ function RegisterContent() {
             <div className="space-y-2">
               <Label htmlFor="teacher-school">{t("school")}</Label>
               <Input id="teacher-school" name="school" placeholder={t("schoolPlaceholder")} value={form.school} onChange={handleChange} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="registration-code">{t("teacherRegistrationCode")}</Label>
-              <Input
-                id="registration-code"
-                name="registrationCode"
-                type="password"
-                autoComplete="one-time-code"
-                placeholder={t("teacherRegistrationCodePlaceholder")}
-                value={form.registrationCode}
-                onChange={handleChange}
-              />
             </div>
 
             <div className="space-y-2">

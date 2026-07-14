@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/api-rate-limit", () => ({
   checkRateLimit: vi.fn(() => null),
@@ -26,7 +26,6 @@ import { prisma } from "@/lib/db";
 const findFirst = prisma.user.findFirst as unknown as ReturnType<typeof vi.fn>;
 const findUnique = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 const createUser = prisma.user.create as unknown as ReturnType<typeof vi.fn>;
-const originalRegistrationCode = process.env.TEACHER_REGISTRATION_CODE;
 
 const request = (body: unknown) => new Request("http://localhost/api/auth/register", {
   method: "POST",
@@ -45,7 +44,6 @@ const teacherBody = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.TEACHER_REGISTRATION_CODE = "school-admin-code";
   findFirst.mockResolvedValue(null);
   findUnique.mockResolvedValue(null);
   createUser.mockResolvedValue({
@@ -54,11 +52,6 @@ beforeEach(() => {
     name: "새 교사",
     email: "teacher@example.com",
   });
-});
-
-afterAll(() => {
-  if (originalRegistrationCode === undefined) delete process.env.TEACHER_REGISTRATION_CODE;
-  else process.env.TEACHER_REGISTRATION_CODE = originalRegistrationCode;
 });
 
 describe("공개 가입 권한 경계", () => {
@@ -78,31 +71,11 @@ describe("공개 가입 권한 경계", () => {
     expect(createUser).not.toHaveBeenCalled();
   });
 
-  it("교사 가입 코드가 없거나 다르면 교사 계정을 만들 수 없다", async () => {
-    expect((await POST(request(teacherBody))).status).toBe(403);
-    expect((await POST(request({ ...teacherBody, registrationCode: "wrong-code" }))).status).toBe(403);
-    expect(findUnique).not.toHaveBeenCalled();
-    expect(createUser).not.toHaveBeenCalled();
-  });
-
-  it("서버에 설정한 가입 코드가 맞을 때만 교사 계정을 만든다", async () => {
-    const response = await POST(request({
-      ...teacherBody,
-      registrationCode: "school-admin-code",
-    }));
+  it("교사 가입 코드 없이 교사 계정을 만들 수 있다", async () => {
+    const response = await POST(request(teacherBody));
 
     expect(response.status).toBe(200);
     expect(createUser).toHaveBeenCalledOnce();
     expect(createUser.mock.calls[0][0].data).not.toHaveProperty("registrationCode");
-  });
-
-  it("서버 가입 코드가 비어 있으면 교사 가입을 기본 거부한다", async () => {
-    delete process.env.TEACHER_REGISTRATION_CODE;
-
-    expect((await POST(request({
-      ...teacherBody,
-      registrationCode: "school-admin-code",
-    }))).status).toBe(403);
-    expect(createUser).not.toHaveBeenCalled();
   });
 });
