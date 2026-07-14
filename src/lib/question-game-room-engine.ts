@@ -63,6 +63,7 @@ export type QuestionGameRoomEngineApplyResult = QuestionGameEngineResult;
 export interface QuestionGameRoomLeaveContext {
   room: GameRoom;
   userId: string;
+  wasCurrentTurn?: boolean;
   now?: number;
   random?: () => number;
   randomUUID?: () => string;
@@ -335,13 +336,19 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
     if (body.playId !== room.playId) {
       return unchanged("conflict", room, "실행 식별값이 다릅니다");
     }
-    if (state.roundId && body.roundId !== state.roundId) {
-      return unchanged("conflict", room, "라운드 식별값이 다릅니다");
-    }
   }
 
   if (state?.recentCommandIds.includes(body.commandId)) {
     return unchanged("replayed", room);
+  }
+
+  if (
+    !isStart &&
+    !isEmptyRestart &&
+    state?.roundId &&
+    body.roundId !== state.roundId
+  ) {
+    return unchanged("conflict", room, "라운드 식별값이 다릅니다");
   }
 
   if (!isNonNegativeInteger(body.expectedVersion)) {
@@ -512,12 +519,14 @@ function leaveQuestionGameRoomWithResolvedEngine(
   let adjustedTurn:
     | { turnOrder: string[]; currentTurnIdx: number }
     | undefined;
+  let wasCurrentTurn = false;
   if (
     Array.isArray(oldState.turnOrder) &&
     oldState.turnOrder.every((id) => typeof id === "string") &&
     isNonNegativeInteger(oldState.currentTurnIdx)
   ) {
     const oldTurnOrder = oldState.turnOrder;
+    wasCurrentTurn = oldTurnOrder[oldState.currentTurnIdx] === userId;
     const removedTurnIndex = oldTurnOrder.indexOf(userId);
     const turnOrder = oldTurnOrder.filter((id) => id !== userId);
     adjustedTurn = {
@@ -555,6 +564,7 @@ function leaveQuestionGameRoomWithResolvedEngine(
       hookRoom = engine.onPlayerLeave({
         ...input,
         room: structuredClone(commonRoom),
+        wasCurrentTurn,
       });
     } catch {
       return unchanged("corrupt", room, "이탈 처리를 마치지 못했습니다");

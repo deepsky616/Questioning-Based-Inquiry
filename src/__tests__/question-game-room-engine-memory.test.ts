@@ -322,6 +322,24 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
           ...state.aCards.map(({ id }) => id),
         ],
       })],
+      ["상한을 넘은 복원 공개 기록", (state) => ({
+        ...state,
+        resolvedRevealIds: Array.from(
+          { length: 65 },
+          (_, index) => uuidAt(300 + index),
+        ),
+        lastResolvedRevealId: uuidAt(364),
+      })],
+      ["중복된 복원 공개 기록", (state) => ({
+        ...state,
+        resolvedRevealIds: [uuidAt(365), uuidAt(365)],
+        lastResolvedRevealId: uuidAt(365),
+      })],
+      ["마지막 값과 어긋난 복원 공개 기록", (state) => ({
+        ...state,
+        resolvedRevealIds: [uuidAt(366)],
+        lastResolvedRevealId: uuidAt(367),
+      })],
     ];
 
     it.each(invalidPlayStates)("%s 상태를 거절한다", (_name, makeInvalid) => {
@@ -389,6 +407,43 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
   });
 
   describe("카드 준비", () => {
+    it("응답을 잃은 같은 준비 명령은 새 라운드에서도 재생 성공한다", () => {
+      const room = makePlayingRoom();
+      const body = {
+        commandId: COMMAND_ID,
+        expectedCreatedAt: room.createdAt,
+        expectedVersion: room.version,
+        playId: PLAY_ID,
+        difficulty: "easy",
+        pairs: makePairs(6),
+      };
+      const first = applyQuestionGameRoomCommand({
+        room,
+        userId: "host",
+        userName: "host",
+        action: "memory-prepare",
+        body,
+        now: 1_000,
+        random: () => 0,
+        randomUUID: uuidSequence(),
+      });
+      expect(first.kind).toBe("changed");
+      const savedRoom = { ...first.room, version: room.version + 1 };
+
+      const replayed = applyQuestionGameRoomCommand({
+        room: savedRoom,
+        userId: "host",
+        userName: "host",
+        action: "memory-prepare",
+        body,
+        now: 1_100,
+        random: () => 0,
+        randomUUID: uuidSequence(100),
+      });
+
+      expect(replayed).toEqual({ kind: "replayed", room: savedRoom });
+    });
+
     it.each([
       ["easy", 6, 18],
       ["normal", 10, 30],
@@ -787,6 +842,7 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
         attempts: 2,
         revealedIds: ["q-0", "a-1"],
         lastResolvedRevealId: uuidAt(97),
+        resolvedRevealIds: [uuidAt(97)],
         lastReveal: {
           revealId: uuidAt(98),
           result: "miss",
@@ -802,6 +858,128 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
         { revealId: uuidAt(97) },
         { userId: "guest", now: 2_000 },
       )).toMatchObject({ kind: "replayed", room });
+    });
+
+    it("두 공개를 복원한 뒤 예전 공개의 새 명령도 재생 성공한다", () => {
+      const firstRevealId = uuidAt(118);
+      const secondRevealId = uuidAt(119);
+      let commandIndex = 120;
+      let room = makePlayingRoom(makePlayState());
+      const applyChanged = (
+        action: string,
+        userId: string,
+        body: Record<string, unknown>,
+        now: number,
+        randomUUID = () => uuidAt(200),
+      ) => {
+        const result = applyQuestionGameRoomCommand({
+          room,
+          userId,
+          userName: userId,
+          action,
+          body: {
+            commandId: uuidAt(commandIndex++),
+            expectedCreatedAt: room.createdAt,
+            expectedVersion: room.version,
+            playId: PLAY_ID,
+            roundId: ROUND_ID,
+            ...body,
+          },
+          now,
+          random: () => 0,
+          randomUUID,
+        });
+        expect(result.kind).toBe("changed");
+        if (result.kind !== "changed") {
+          throw new Error("changed 결과가 필요합니다");
+        }
+        room = { ...result.room, version: room.version + 1 };
+      };
+
+      applyChanged("memory-flip", "host", { cardId: "q-0" }, 1_000);
+      applyChanged(
+        "memory-flip",
+        "host",
+        { cardId: "a-1" },
+        1_000,
+        () => firstRevealId,
+      );
+      applyChanged(
+        "memory-resolve-miss",
+        "guest",
+        { revealId: firstRevealId },
+        3_500,
+      );
+      applyChanged("memory-flip", "guest", { cardId: "q-2" }, 4_000);
+      applyChanged(
+        "memory-flip",
+        "guest",
+        { cardId: "a-3" },
+        4_000,
+        () => secondRevealId,
+      );
+      applyChanged(
+        "memory-resolve-miss",
+        "host",
+        { revealId: secondRevealId },
+        6_500,
+      );
+
+      const before = structuredClone(room);
+      const late = applyQuestionGameRoomCommand({
+        room,
+        userId: "guest",
+        userName: "guest",
+        action: "memory-resolve-miss",
+        body: {
+          commandId: uuidAt(commandIndex),
+          expectedCreatedAt: room.createdAt,
+          expectedVersion: room.version,
+          playId: PLAY_ID,
+          roundId: ROUND_ID,
+          revealId: firstRevealId,
+        },
+        now: 7_000,
+        random: () => 0,
+        randomUUID: () => uuidAt(201),
+      });
+
+      expect(late).toEqual({ kind: "replayed", room });
+      expect(room).toEqual(before);
+    });
+
+    it("복원 공개 기록은 최근 예순네 개만 보존한다", () => {
+      const resolvedRevealIds = Array.from(
+        { length: 64 },
+        (_, index) => uuidAt(400 + index),
+      );
+      const revealId = uuidAt(464);
+      const state = makePlayState({
+        attempts: 1,
+        revealedIds: ["q-0", "a-1"],
+        lastResolvedRevealId: resolvedRevealIds.at(-1),
+        resolvedRevealIds,
+        lastReveal: {
+          revealId,
+          result: "miss",
+          turnPlayerId: "host",
+          resolveAt: 3_500,
+        },
+      });
+
+      const result = applyMemory(
+        makePlayingRoom(state),
+        "memory-resolve-miss",
+        { revealId },
+        { userId: "guest", now: 3_500 },
+      );
+
+      const nextState = changedRoom(result).gameState as MemoryRoomState;
+      expect(nextState.resolvedRevealIds).toEqual([
+        ...resolvedRevealIds.slice(1),
+        revealId,
+      ]);
+      expect(nextState.lastResolvedRevealId).toBe(revealId);
     });
   });
 
@@ -951,6 +1129,36 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
       });
     });
 
+    it("질문 카드를 공개한 현재 차례 참가자가 나가면 선택을 지운다", () => {
+      let room = makePlayingRoom(
+        makePlayState({
+          diceRolls: { host: 6, guest: 5, third: 4 },
+          turnOrder: ["host", "guest", "third"],
+          scores: { host: 0, guest: 0, third: 0 },
+        }),
+        ["host", "guest", "third"],
+      );
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "q-0" },
+      ));
+
+      const result = leaveQuestionGameRoom({ room, userId: "host" });
+
+      expect(result).toMatchObject({
+        kind: "changed",
+        room: {
+          gameState: {
+            turnOrder: ["guest", "third"],
+            currentTurnIdx: 0,
+            revealedIds: [],
+            lastReveal: null,
+          },
+        },
+      });
+    });
+
     it("주사위 미참가자가 나가 남은 결과가 모두 모이면 놀이 단계로 간다", () => {
       const state = makePlayState({
         phase: "rolling",
@@ -1016,15 +1224,92 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
 
       expect(result.kind).toBe("changed");
       const state = result.room.gameState as MemoryRoomState;
-      expect(state.revealedIds).toEqual([
-        "q-0", "q-1", "q-2", "q-3", "q-4", "q-5",
-        "a-0", "a-1", "a-2", "a-3", "a-4", "a-5",
-      ]);
+      expect(state.revealedIds).toEqual(completedRevealedIds);
       expect(state.revealedIds).toEqual(
         expect.arrayContaining(completedRevealedIds),
       );
-      expect(state.takenIds).toEqual([]);
-      expect(state.scores).toEqual({ guest: 0, third: 0 });
+      expect(state.takenIds).toEqual(["q-0", "a-0"]);
+      expect(state.scores).toEqual({ host: 1, guest: 0, third: 0 });
+    });
+
+    it("최대 시도 전 모든 짝을 찾은 뒤 득점자가 나가도 완료 근거를 보존한다", () => {
+      const takenIds = Array.from({ length: 5 }, (_, index) => [
+        `q-${index}`,
+        `a-${index}`,
+      ]).flat();
+      let room = makePlayingRoom(
+        makePlayState({
+          diceRolls: { host: 6, guest: 5, third: 4 },
+          turnOrder: ["host", "guest", "third"],
+          takenIds,
+          scores: { host: 5, guest: 0, third: 0 },
+          attempts: 5,
+        }),
+        ["host", "guest", "third"],
+      );
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "q-5" },
+      ));
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "a-5" },
+        { randomUUID: () => uuidAt(116) },
+      ));
+
+      const result = leaveQuestionGameRoom({ room, userId: "host" });
+
+      expect(result).toMatchObject({
+        kind: "changed",
+        room: {
+          status: "ended",
+          gameState: {
+            phase: "done",
+            endReason: "completed",
+            attempts: 6,
+            takenIds: [
+              "q-0", "a-0", "q-1", "a-1", "q-2", "a-2",
+              "q-3", "a-3", "q-4", "a-4", "q-5", "a-5",
+            ],
+            revealedIds: [],
+            scores: { host: 6, guest: 0, third: 0 },
+          },
+        },
+      });
+    });
+
+    it("완료된 두 명 방에서 한 명이 나가도 완료 공개와 사유를 보존한다", () => {
+      let room = makePlayingRoom(makePlayState({ attempts: 17 }));
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "q-0" },
+      ));
+      room = changedRoom(applyMemory(
+        room,
+        "memory-flip",
+        { cardId: "a-0" },
+        { randomUUID: () => uuidAt(117) },
+      ));
+      const completedRevealedIds = (
+        room.gameState as MemoryRoomState
+      ).revealedIds;
+
+      const result = leaveQuestionGameRoom({ room, userId: "guest" });
+
+      expect(result).toMatchObject({
+        kind: "changed",
+        room: {
+          status: "ended",
+          gameState: {
+            phase: "done",
+            endReason: "completed",
+            revealedIds: completedRevealedIds,
+          },
+        },
+      });
     });
 
     it("마지막 실패의 주인이 나가도 마감 전에는 종료하지 않는다", () => {

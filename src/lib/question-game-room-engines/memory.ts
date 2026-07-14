@@ -18,6 +18,7 @@ import type {
 } from "@/lib/question-game-room-engine";
 
 const MISS_REVEAL_MS = 2_500;
+const RESOLVED_REVEAL_LIMIT = 64;
 
 export interface MemoryCard {
   id: string;
@@ -47,6 +48,7 @@ export interface MemoryRoomState extends EngineStateBase {
     resolveAt: number;
   };
   lastResolvedRevealId?: string;
+  resolvedRevealIds?: string[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -229,10 +231,8 @@ function hasValidReveal(state: MemoryRoomState): boolean {
   const cardById = new Map(
     [...state.qCards, ...state.aCards].map((card) => [card.id, card]),
   );
-  if (
-    state.lastResolvedRevealId !== undefined &&
-    state.lastResolvedRevealId === state.lastReveal?.revealId
-  ) {
+  const resolvedRevealIds = readResolvedRevealIds(state);
+  if (resolvedRevealIds.includes(state.lastReveal?.revealId ?? "")) {
     return false;
   }
 
@@ -313,7 +313,8 @@ function hasValidPhase(state: MemoryRoomState): boolean {
       emptyCollections &&
       state.roundId === undefined &&
       state.endReason === undefined &&
-      state.lastResolvedRevealId === undefined;
+      state.lastResolvedRevealId === undefined &&
+      readResolvedRevealIds(state).length === 0;
   }
   if (state.pairs.length > 0 &&
     (typeof state.roundId !== "string" || state.roundId.length === 0)) {
@@ -384,17 +385,43 @@ export function readMemoryState(value: unknown): MemoryRoomState | null {
     (value.lastReveal !== null && !isLastReveal(value.lastReveal)) ||
     (value.lastResolvedRevealId !== undefined &&
       (typeof value.lastResolvedRevealId !== "string" ||
-        value.lastResolvedRevealId.length === 0))
+        value.lastResolvedRevealId.length === 0)) ||
+    (value.resolvedRevealIds !== undefined &&
+      (!Array.isArray(value.resolvedRevealIds) ||
+        value.resolvedRevealIds.length > RESOLVED_REVEAL_LIMIT ||
+        !value.resolvedRevealIds.every(
+          (id) => typeof id === "string" && id.length > 0,
+        ) ||
+        !hasUniqueStrings(value.resolvedRevealIds)))
   ) {
     return null;
   }
   const state = value as MemoryRoomState;
+  if (state.resolvedRevealIds !== undefined) {
+    const latestResolvedRevealId = state.resolvedRevealIds.at(-1);
+    if (latestResolvedRevealId !== state.lastResolvedRevealId) return null;
+  }
   return hasValidBoard(state) &&
       hasValidCardCollections(state) &&
       hasValidPhase(state) &&
       hasValidReveal(state)
     ? state
     : null;
+}
+
+function readResolvedRevealIds(state: MemoryRoomState): string[] {
+  if (state.resolvedRevealIds !== undefined) return state.resolvedRevealIds;
+  return state.lastResolvedRevealId ? [state.lastResolvedRevealId] : [];
+}
+
+function appendResolvedRevealId(
+  state: MemoryRoomState,
+  revealId: string,
+): string[] {
+  return [
+    ...readResolvedRevealIds(state).filter((id) => id !== revealId),
+    revealId,
+  ].slice(-RESOLVED_REVEAL_LIMIT);
 }
 
 function changed(
@@ -490,6 +517,7 @@ function prepareMemory(
     attempts: 0,
     maxAttempts: QUESTION_GAME_RULES.memory.targets.room[difficulty],
     lastReveal: null,
+    resolvedRevealIds: [],
   };
   delete nextState.lastResolvedRevealId;
   return changed(context, nextState);
@@ -733,7 +761,7 @@ function resolveMemoryMiss(
     return invalid(context, "공개 식별값이 올바르지 않습니다");
   }
   if (
-    state.lastResolvedRevealId === revealId &&
+    readResolvedRevealIds(state).includes(revealId) &&
     state.lastReveal?.revealId !== revealId
   ) {
     return { kind: "replayed", room: context.room };
@@ -782,6 +810,7 @@ function resolveMemoryMiss(
         revealedIds: remainingCardIds(state, state.takenIds),
         lastReveal: null,
         lastResolvedRevealId: revealId,
+        resolvedRevealIds: appendResolvedRevealId(state, revealId),
       },
       undefined,
       "ended",
@@ -801,6 +830,7 @@ function resolveMemoryMiss(
     revealedIds: [],
     lastReveal: null,
     lastResolvedRevealId: revealId,
+    resolvedRevealIds: appendResolvedRevealId(state, revealId),
   });
 }
 
@@ -869,6 +899,9 @@ function readMemoryStateForLeave(
 function memoryPlayerLeft(
   context: QuestionGameRoomLeaveContext,
 ): GameRoom {
+  const interruptedByDeparture =
+    isRecord(context.room.gameState) &&
+    context.room.gameState.endReason === "insufficient-players";
   const state = readMemoryStateForLeave(
     context.room.gameState,
     context.userId,
@@ -877,21 +910,33 @@ function memoryPlayerLeft(
 
   const activeIds = new Set(context.room.players.map(({ id }) => id));
   const diceRolls = keepActiveValues(state.diceRolls, activeIds);
-  const scores = keepActiveValues(state.scores, activeIds);
-  const departedScore = state.scores[context.userId] ?? 0;
-  const takenIds = releaseScoredPairs(state, departedScore);
-  const revealOwnerLeft = state.lastReveal?.turnPlayerId === context.userId;
   const completed = state.phase === "done" && state.endReason === "completed";
+  const scores = completed
+    ? state.scores
+    : keepActiveValues(state.scores, activeIds);
+  const departedScore = state.scores[context.userId] ?? 0;
+  const takenIds = completed
+    ? state.takenIds
+    : releaseScoredPairs(state, departedScore);
+  const revealOwnerLeft = state.lastReveal?.turnPlayerId === context.userId;
   const clearMatchedReveal =
     !completed && revealOwnerLeft && state.lastReveal?.result === "match";
-  const insufficientPlayers =
-    context.room.status === "ended" &&
-    context.room.players.length === 1;
-  const clearReveal = clearMatchedReveal || insufficientPlayers;
+  const clearFirstCard =
+    context.wasCurrentTurn === true &&
+    state.phase === "play" &&
+    state.lastReveal === null &&
+    state.revealedIds.length === 1;
+  const insufficientPlayers = interruptedByDeparture;
+  const clearReveal =
+    clearMatchedReveal || clearFirstCard || insufficientPlayers;
   const resolvedRevealId =
     insufficientPlayers && state.lastReveal?.result === "miss"
       ? state.lastReveal.revealId
       : state.lastResolvedRevealId;
+  const resolvedRevealIds =
+    insufficientPlayers && state.lastReveal?.result === "miss"
+      ? appendResolvedRevealId(state, state.lastReveal.revealId)
+      : state.resolvedRevealIds;
 
   let nextState: MemoryRoomState = {
     ...state,
@@ -906,7 +951,12 @@ function memoryPlayerLeft(
           revealedIds: [],
           lastReveal: null,
           ...(resolvedRevealId
-            ? { lastResolvedRevealId: resolvedRevealId }
+            ? {
+                lastResolvedRevealId: resolvedRevealId,
+                ...(resolvedRevealIds
+                  ? { resolvedRevealIds }
+                  : {}),
+              }
             : {}),
         }
       : {}),
@@ -968,6 +1018,7 @@ export function createMemoryState(): MemoryRoomState {
     attempts: 0,
     maxAttempts: QUESTION_GAME_RULES.memory.targets.room.normal,
     lastReveal: null,
+    resolvedRevealIds: [],
   };
 }
 
@@ -982,9 +1033,13 @@ function matchesRoomParticipants(
   const diceIds = Object.keys(state.diceRolls);
   const emptyBoard = state.pairs.length === 0;
   const needsPlayerScores = state.phase !== "setup" && !emptyBoard;
+  const completed = state.phase === "done" && state.endReason === "completed";
+  const validScorePlayers = completed
+    ? playerIds.every((id) => scoreIds.includes(id))
+    : hasSameStrings(scoreIds, playerIds);
   if (
     (needsPlayerScores
-      ? !hasSameStrings(scoreIds, playerIds)
+      ? !validScorePlayers
       : scoreIds.length !== 0) ||
     !diceIds.every((id) => playerIds.includes(id))
   ) {

@@ -350,16 +350,29 @@ describe("질문놀이 방 판정기", () => {
       expect(room).toEqual(before);
     });
 
-    it.each([
-      ["실행", { playId: indexedCommandId(91) }, "실행 식별값이 다릅니다"],
-      ["라운드", { roundId: indexedCommandId(92) }, "라운드 식별값이 다릅니다"],
-    ])("같은 명령도 다른 %s 식별값은 재생하지 않는다", (_name, override, message) => {
+    it("같은 명령도 다른 실행 식별값은 재생하지 않는다", () => {
       const room = makeRoom({
         gameState: makeState({ recentCommandIds: [COMMAND_ID] }),
       });
 
-      expect(apply(room, makeBody({ expectedVersion: 1, ...override })))
-        .toMatchObject({ kind: "conflict", message });
+      expect(apply(room, makeBody({
+        expectedVersion: 1,
+        playId: indexedCommandId(91),
+      }))).toMatchObject({
+        kind: "conflict",
+        message: "실행 식별값이 다릅니다",
+      });
+    });
+
+    it("같은 실행의 기록된 명령은 현재 라운드가 달라도 재생한다", () => {
+      const room = makeRoom({
+        gameState: makeState({ recentCommandIds: [COMMAND_ID] }),
+      });
+
+      expect(apply(room, makeBody({
+        expectedVersion: 1,
+        roundId: indexedCommandId(92),
+      }))).toEqual({ kind: "replayed", room });
     });
 
     it("새 명령은 실행, 라운드, 낡은 버전 차례로 불일치를 판정한다", () => {

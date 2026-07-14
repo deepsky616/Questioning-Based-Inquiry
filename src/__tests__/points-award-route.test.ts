@@ -242,7 +242,7 @@ describe("포인트 지급 요청 검증", () => {
     expect(mTx).not.toHaveBeenCalled();
   });
 
-  it.each(["dice", "kaba", "ladder", "story-dice", "memory"])(
+  it.each(["dice", "kaba", "ladder", "story-dice"])(
     "서버가 활동을 직접 기록하지 않는 %s 놀이는 점수를 지급하지 않는다",
     async (gameId) => {
       mLoadGameRoom.mockResolvedValue(makeRoom({ gameId }));
@@ -498,6 +498,56 @@ describe("포인트 지급 수명별 중복 조회", () => {
 });
 
 describe("저장된 놀이 상태 계산", () => {
+  it("완료 뒤 떠난 학생 점수는 합계만 검증하고 남은 학생에게만 지급한다", async () => {
+    const gameRoom = makeRoom({
+      gameId: "memory",
+      players: [
+        { id: "t1", name: "교사", isHost: true, joinedAt: 1 },
+        { id: "s1", name: "학생", isHost: false, joinedAt: 2 },
+      ],
+      chain: [],
+      gameState: {
+        stateVersion: 2,
+        game: "memory",
+        phase: "done",
+        endReason: "completed",
+        qCards: [
+          { id: "q-1", pairId: "pair-1", type: "q" },
+          { id: "q-2", pairId: "pair-2", type: "q" },
+        ],
+        aCards: [
+          { id: "a-1", pairId: "pair-1", type: "a" },
+          { id: "a-2", pairId: "pair-2", type: "a" },
+        ],
+        takenIds: ["q-1", "a-1", "q-2", "a-2"],
+        scores: { t1: 0, s1: 1, s2: 1 },
+      },
+      version: 10,
+      playId: "11111111-1111-4111-8111-111111111111",
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+    });
+    mLoadGameRoom.mockResolvedValue(gameRoom);
+    txQueryRaw
+      .mockResolvedValueOnce([{ locked: true }])
+      .mockResolvedValueOnce([{ data: gameRoom }]);
+
+    const res = await POST(awardReq({ ...BODY, gameId: "memory" }));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s1" }),
+    ]));
+    expect(data.awards).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s2" }),
+    ]));
+    expect(txUserUpdate).toHaveBeenCalledTimes(1);
+    expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "s1" },
+    }));
+  });
+
   it.each([
     [
       "relay",
