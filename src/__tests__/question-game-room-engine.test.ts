@@ -1,0 +1,502 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  BUILT_IN_QUESTION_GAME_IDS,
+  QUESTION_GAME_LIMITS,
+} from "@/lib/question-game-rules";
+import type { GameRoom, RoomPlayer } from "@/lib/question-games-data";
+import {
+  appendRecentCommandId,
+  applyQuestionGameRoomCommand,
+  hasQuestionGameRoomEngine,
+  isQuestionGameCommandId,
+  leaveQuestionGameRoom,
+  restartQuestionGameRoom,
+  type EngineStateBase,
+} from "@/lib/question-game-room-engine";
+
+const COMMAND_ID = "11111111-1111-4111-8111-111111111111";
+const PLAY_ID = "22222222-2222-4222-8222-222222222222";
+const ROUND_ID = "33333333-3333-4333-8333-333333333333";
+
+function makePlayer(
+  id: string,
+  isHost = false,
+  joinedAt = 1,
+): RoomPlayer {
+  return { id, name: id.toUpperCase(), isHost, joinedAt };
+}
+
+function makeState(
+  overrides: Partial<EngineStateBase> & Record<string, unknown> = {},
+): EngineStateBase {
+  return {
+    stateVersion: 2,
+    phase: "playing",
+    recentCommandIds: [],
+    roundId: ROUND_ID,
+    round: 1,
+    maxRounds: 3,
+    ...overrides,
+  };
+}
+
+function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
+  return {
+    code: "1234",
+    gameId: "memory",
+    hostId: "a",
+    status: "playing",
+    players: [makePlayer("a", true), makePlayer("b")],
+    topic: "topic",
+    chain: [],
+    turnIndex: 0,
+    gameState: makeState(),
+    version: 7,
+    createdAt: 100,
+    updatedAt: 200,
+    playId: PLAY_ID,
+    pointAwardKeyVersion: 2,
+    pointEvidenceVersion: 2,
+    ...overrides,
+  };
+}
+
+function makeBody(overrides: Record<string, unknown> = {}) {
+  return {
+    commandId: COMMAND_ID,
+    expectedCreatedAt: 100,
+    expectedVersion: 7,
+    playId: PLAY_ID,
+    roundId: ROUND_ID,
+    ...overrides,
+  };
+}
+
+function apply(
+  room: GameRoom,
+  body: unknown = makeBody(),
+  overrides: Partial<{
+    userId: string;
+    userName: string;
+    action: string;
+    now: number;
+    random: () => number;
+    randomUUID: () => string;
+  }> = {},
+) {
+  return applyQuestionGameRoomCommand({
+    room,
+    userId: "a",
+    userName: "A",
+    action: "roll",
+    body,
+    now: 300,
+    random: () => 0.5,
+    randomUUID: () => "44444444-4444-4444-8444-444444444444",
+    ...overrides,
+  });
+}
+
+function serializedBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).byteLength;
+}
+
+function padRecordToBytes<T extends Record<string, unknown>>(
+  value: T,
+  targetBytes: number,
+): T & { padding: string } {
+  const withKoreanText = { ...value, padding: "가" };
+  const remaining = targetBytes - serializedBytes(withKoreanText);
+  if (remaining < 0) throw new Error("target is smaller than the value");
+  const result = { ...withKoreanText, padding: `가${"x".repeat(remaining)}` };
+  expect(serializedBytes(result)).toBe(targetBytes);
+  return result;
+}
+
+function indexedCommandId(index: number): string {
+  return `00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`;
+}
+
+describe("질문놀이 방 판정기", () => {
+  it("정적 등록부는 아직 모든 내장 놀이에 비어 있다", () => {
+    expect(BUILT_IN_QUESTION_GAME_IDS.every(hasQuestionGameRoomEngine)).toBe(false);
+    expect(BUILT_IN_QUESTION_GAME_IDS.some(hasQuestionGameRoomEngine)).toBe(false);
+    expect(hasQuestionGameRoomEngine("unknown")).toBe(false);
+  });
+
+  describe("명령 식별값", () => {
+    it.each([
+      COMMAND_ID,
+      "00000000-0000-4000-8000-000000000000",
+      "ffffffff-ffff-4fff-bfff-ffffffffffff",
+    ])("소문자 버전 4 식별값 %s를 받는다", (value) => {
+      expect(isQuestionGameCommandId(value)).toBe(true);
+    });
+
+    it.each([
+      "",
+      "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+      "11111111-1111-3111-8111-111111111111",
+      "11111111-1111-4111-7111-111111111111",
+      "11111111111141118111111111111111",
+    ])("잘못된 식별값 %s를 거절한다", (value) => {
+      expect(isQuestionGameCommandId(value)).toBe(false);
+    });
+
+    it("잘못된 명령 식별값은 입력 방을 유지한 invalid다", () => {
+      const room = makeRoom();
+
+      const result = apply(room, makeBody({ commandId: "" }));
+
+      expect(result).toMatchObject({ kind: "invalid", room });
+      expect(result.room).toBe(room);
+    });
+  });
+
+  describe("최근 명령 순환", () => {
+    it("예순세 개 뒤에 새 식별값을 붙이고 입력 배열을 바꾸지 않는다", () => {
+      const commandIds = Object.freeze(
+        Array.from({ length: 63 }, (_, index) => indexedCommandId(index)),
+      );
+      const before = [...commandIds];
+
+      const result = appendRecentCommandId(commandIds, indexedCommandId(63));
+
+      expect(result).toEqual([...before, indexedCommandId(63)]);
+      expect(result).toHaveLength(64);
+      expect(commandIds).toEqual(before);
+      expect(result).not.toBe(commandIds);
+    });
+
+    it("예순네 개가 있으면 가장 오래된 값을 버리고 입력 배열을 바꾸지 않는다", () => {
+      const commandIds = Object.freeze(
+        Array.from({ length: 64 }, (_, index) => indexedCommandId(index)),
+      );
+      const before = [...commandIds];
+
+      const result = appendRecentCommandId(commandIds, indexedCommandId(64));
+
+      expect(result).toEqual([...before.slice(1), indexedCommandId(64)]);
+      expect(result).toHaveLength(64);
+      expect(commandIds).toEqual(before);
+    });
+  });
+
+  describe("공통 판정 순서", () => {
+    it("참가자가 아니면 재생 명령이어도 먼저 forbidden을 반환한다", () => {
+      const room = makeRoom({
+        gameState: makeState({ recentCommandIds: [COMMAND_ID] }),
+      });
+
+      const result = apply(room, makeBody(), { userId: "outsider" });
+
+      expect(result).toMatchObject({ kind: "forbidden", reason: "not-player" });
+      expect(result.room).toBe(room);
+    });
+
+    it("생성 시각 불일치는 재생 명령보다 먼저 conflict다", () => {
+      const room = makeRoom({
+        gameState: makeState({ recentCommandIds: [COMMAND_ID] }),
+      });
+
+      const result = apply(room, makeBody({ expectedCreatedAt: 99 }));
+
+      expect(result).toMatchObject({ kind: "conflict", reason: "created-at" });
+      expect(result.room).toBe(room);
+    });
+
+    it("같은 명령은 버전과 실행 및 라운드가 달라도 방 참조를 유지한 replayed다", () => {
+      const room = makeRoom({
+        gameState: makeState({ recentCommandIds: [COMMAND_ID] }),
+      });
+      const before = structuredClone(room);
+      const random = vi.fn(() => 0.5);
+      const randomUUID = vi.fn(() => indexedCommandId(90));
+
+      const result = apply(
+        room,
+        makeBody({
+          expectedVersion: 1,
+          playId: indexedCommandId(91),
+          roundId: indexedCommandId(92),
+        }),
+        { random, randomUUID },
+      );
+
+      expect(result).toEqual({ kind: "replayed", room });
+      expect(result.room).toBe(room);
+      expect(random).not.toHaveBeenCalled();
+      expect(randomUUID).not.toHaveBeenCalled();
+      expect(room).toEqual(before);
+    });
+
+    it("새 명령은 기대 버전, 실행, 라운드 차례로 불일치를 판정한다", () => {
+      const room = makeRoom();
+
+      expect(
+        apply(
+          room,
+          makeBody({
+            expectedVersion: 1,
+            playId: indexedCommandId(91),
+            roundId: indexedCommandId(92),
+          }),
+        ),
+      ).toMatchObject({ kind: "conflict", reason: "expected-version" });
+      expect(
+        apply(
+          room,
+          makeBody({ playId: indexedCommandId(91), roundId: indexedCommandId(92) }),
+        ),
+      ).toMatchObject({ kind: "conflict", reason: "play-id" });
+      expect(
+        apply(room, makeBody({ roundId: indexedCommandId(92) })),
+      ).toMatchObject({ kind: "conflict", reason: "round-id" });
+    });
+
+    it("등록된 놀이가 없으면 입력 방을 유지한 corrupt다", () => {
+      const room = makeRoom();
+
+      const result = apply(room);
+
+      expect(result).toMatchObject({ kind: "corrupt", reason: "missing-engine" });
+      expect(result.room).toBe(room);
+    });
+
+    it("상태 버전이 2가 아니면 입력 방을 유지한 corrupt다", () => {
+      const room = makeRoom({
+        gameState: { ...makeState(), stateVersion: 1 },
+      });
+
+      const result = apply(room);
+
+      expect(result).toMatchObject({ kind: "corrupt", reason: "game-state" });
+      expect(result.room).toBe(room);
+    });
+  });
+
+  describe("유티에프 팔 바이트 상한", () => {
+    it("본문은 경계까지 받고 한 바이트 초과를 invalid로 거절한다", () => {
+      const room = makeRoom();
+      const atLimit = padRecordToBytes(
+        makeBody(),
+        QUESTION_GAME_LIMITS.commandBodyBytes,
+      );
+      const overLimit = { ...atLimit, padding: `${atLimit.padding}x` };
+
+      expect(apply(room, atLimit)).toMatchObject({
+        kind: "corrupt",
+        reason: "missing-engine",
+      });
+      const result = apply(room, overLimit);
+      expect(result).toMatchObject({ kind: "invalid", reason: "command-body-size" });
+      expect(result.room).toBe(room);
+    });
+
+    it("놀이 상태는 경계까지 받고 한 바이트 초과를 invalid로 거절한다", () => {
+      const atLimitState = padRecordToBytes(
+        makeState({ recentCommandIds: [COMMAND_ID] }),
+        QUESTION_GAME_LIMITS.gameStateBytes,
+      );
+      const atLimitRoom = makeRoom({ gameState: atLimitState });
+      const overLimitRoom = makeRoom({
+        gameState: {
+          ...atLimitState,
+          padding: `${atLimitState.padding}x`,
+        },
+      });
+
+      expect(apply(atLimitRoom)).toMatchObject({ kind: "replayed" });
+      const result = apply(overLimitRoom);
+      expect(result).toMatchObject({ kind: "invalid", reason: "game-state-size" });
+      expect(result.room).toBe(overLimitRoom);
+    });
+
+    it("방은 경계까지 받고 한 바이트 초과를 invalid로 거절한다", () => {
+      const atLimitRoom = padRecordToBytes(
+        makeRoom({ gameState: makeState({ recentCommandIds: [COMMAND_ID] }) }) as
+          GameRoom & Record<string, unknown>,
+        QUESTION_GAME_LIMITS.roomBytes,
+      );
+      const overLimitRoom = {
+        ...atLimitRoom,
+        padding: `${atLimitRoom.padding}x`,
+      };
+
+      expect(apply(atLimitRoom)).toMatchObject({ kind: "replayed" });
+      const result = apply(overLimitRoom);
+      expect(result).toMatchObject({ kind: "invalid", reason: "room-size" });
+      expect(result.room).toBe(overLimitRoom);
+    });
+  });
+
+  describe("참가자 이탈", () => {
+    const players = [
+      makePlayer("a", true),
+      makePlayer("b"),
+      makePlayer("c"),
+      makePlayer("d"),
+    ];
+
+    function turnRoom(currentTurnIdx: number): GameRoom {
+      return makeRoom({
+        players,
+        gameState: makeState({
+          turnOrder: players.map(({ id }) => id),
+          currentTurnIdx,
+        }),
+      });
+    }
+
+    it("현재 차례 앞 참가자가 나가면 같은 참가자를 가리키도록 차례를 당긴다", () => {
+      const room = turnRoom(1);
+      const before = structuredClone(room);
+
+      const result = leaveQuestionGameRoom({ room, userId: "a" });
+
+      expect(result.kind).toBe("changed");
+      expect(result.room).not.toBe(room);
+      expect(result.room.gameState).toMatchObject({
+        turnOrder: ["b", "c", "d"],
+        currentTurnIdx: 0,
+      });
+      expect(result.room.hostId).toBe("b");
+      expect(result.room.players.map(({ id, isHost }) => [id, isHost])).toEqual([
+        ["b", true],
+        ["c", false],
+        ["d", false],
+      ]);
+      expect(room).toEqual(before);
+    });
+
+    it("현재 참가자가 나가면 그 뒤 참가자가 같은 차례 칸을 이어받는다", () => {
+      const room = turnRoom(1);
+
+      const result = leaveQuestionGameRoom({ room, userId: "b" });
+
+      expect(result.room.gameState).toMatchObject({
+        turnOrder: ["a", "c", "d"],
+        currentTurnIdx: 1,
+      });
+      expect(result.room.hostId).toBe("a");
+      expect(result.room.players.filter(({ isHost }) => isHost)).toHaveLength(1);
+    });
+
+    it("현재 차례 뒤 참가자가 나가면 차례 칸을 유지한다", () => {
+      const room = turnRoom(1);
+
+      const result = leaveQuestionGameRoom({ room, userId: "c" });
+
+      expect(result.room.gameState).toMatchObject({
+        turnOrder: ["a", "b", "d"],
+        currentTurnIdx: 1,
+      });
+    });
+
+    it("마지막 차례 참가자가 나가면 첫 차례로 감싼다", () => {
+      const room = turnRoom(3);
+
+      const result = leaveQuestionGameRoom({ room, userId: "d" });
+
+      expect(result.room.gameState).toMatchObject({
+        turnOrder: ["a", "b", "c"],
+        currentTurnIdx: 0,
+      });
+    });
+
+    it("마지막 참가자가 나가면 빈 참가자와 빈 차례를 반환한다", () => {
+      const room = makeRoom({
+        hostId: "a",
+        players: [makePlayer("a", true)],
+        gameState: makeState({ turnOrder: ["a"], currentTurnIdx: 0 }),
+      });
+
+      const result = leaveQuestionGameRoom({ room, userId: "a" });
+
+      expect(result).toMatchObject({
+        kind: "changed",
+        room: {
+          hostId: "",
+          players: [],
+          gameState: { turnOrder: [], currentTurnIdx: 0 },
+        },
+      });
+    });
+
+    it("진행 중 두 명 방에서 한 명이 남으면 부족 인원으로 끝낸다", () => {
+      const room = makeRoom({
+        players: [makePlayer("a", true), makePlayer("b")],
+        gameState: makeState({
+          turnOrder: ["a", "b"],
+          currentTurnIdx: 0,
+        }),
+      });
+
+      const result = leaveQuestionGameRoom({ room, userId: "a" });
+
+      expect(result.room).toMatchObject({
+        status: "ended",
+        hostId: "b",
+        gameState: {
+          phase: "ended",
+          endReason: "insufficient-players",
+          turnOrder: ["b"],
+          currentTurnIdx: 0,
+        },
+      });
+      expect(result.room.version).toBe(room.version);
+      expect(result.room.updatedAt).toBe(room.updatedAt);
+    });
+  });
+
+  describe("다시 시작", () => {
+    it("코드와 참가자를 유지하며 빈 대기 방으로 되돌리고 저장 값은 올리지 않는다", () => {
+      const room = makeRoom({
+        status: "ended",
+        topic: "old topic",
+        chain: [{ question: "old", playerId: "a", playerName: "A" }],
+        turnIndex: 1,
+        gameState: makeState({ phase: "ended", endReason: "complete" }),
+      });
+      const before = structuredClone(room);
+
+      const result = restartQuestionGameRoom(room);
+
+      expect(result.kind).toBe("changed");
+      expect(result.room).not.toBe(room);
+      expect(result.room).toEqual({
+        code: room.code,
+        gameId: room.gameId,
+        hostId: room.hostId,
+        status: "waiting",
+        players: room.players,
+        topic: "",
+        chain: [],
+        turnIndex: 0,
+        gameState: {},
+        version: room.version,
+        createdAt: room.createdAt,
+        updatedAt: room.updatedAt,
+      });
+      expect(room).toEqual(before);
+    });
+
+    it("이미 빈 대기 방이면 같은 방 참조의 replayed다", () => {
+      const room = makeRoom({
+        status: "waiting",
+        topic: "",
+        chain: [],
+        turnIndex: 0,
+        gameState: {},
+        playId: undefined,
+        pointAwardKeyVersion: undefined,
+        pointEvidenceVersion: undefined,
+      });
+
+      const result = restartQuestionGameRoom(room);
+
+      expect(result).toEqual({ kind: "replayed", room });
+      expect(result.room).toBe(room);
+    });
+  });
+});
