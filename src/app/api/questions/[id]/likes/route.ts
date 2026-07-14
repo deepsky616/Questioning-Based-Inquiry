@@ -36,12 +36,9 @@ export async function POST(_req: Request, { params }: Params) {
     if (!access.allowed || !access.viewer) {
       return NextResponse.json({ error: "접근 권한이 없습니다" }, { status: 403 });
     }
-    if (access.viewer.role !== "STUDENT") {
-      return NextResponse.json({ error: "학생만 좋아요를 표시할 수 있습니다" }, { status: 403 });
-    }
-
-    // 세션이 비활성화돼 있으면 학생은 좋아요를 누를 수 없다(댓글과 동일)
-    if (question.session && !question.session.isActive) {
+    // 세션이 비활성화돼 있으면 학생은 좋아요를 누를 수 없다(댓글과 동일).
+    // 교사는 담당 범위의 질문을 관리·검토하는 입장이므로 열람 권한이 있으면 허용한다.
+    if (access.viewer.role === "STUDENT" && question.session && !question.session.isActive) {
       return NextResponse.json({ error: "선생님이 아직 활동을 열지 않았어요." }, { status: 403 });
     }
 
@@ -49,6 +46,7 @@ export async function POST(_req: Request, { params }: Params) {
       likerId: userId,
       questionAuthorId: question.authorId,
       likerRole: access.viewer.role,
+      questionAuthorRole: question.author?.role,
       isPublic: question.isPublic,
     });
 
@@ -122,6 +120,7 @@ export async function GET(_req: Request, { params }: Params) {
   if (access.viewer.role === "TEACHER") {
     return NextResponse.json({
       likeCount: likes.length,
+      myLike: likes.some((l) => l.userId === userId),
       likedBy: likes.map((l) => ({ id: l.user.id, name: l.user.name })),
     });
   }

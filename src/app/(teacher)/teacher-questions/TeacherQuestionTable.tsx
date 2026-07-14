@@ -41,6 +41,7 @@ interface TeacherQuestionTableProps {
   onToggleComment: (id: string) => void;
   onCommentCountChange: (id: string, count: number) => void;
   onClearFlag: (question: Question) => void;
+  onToggleLike: (question: Question) => Promise<void> | void;
   onToggleQuestionPublic: (question: Question) => void;
   onEditQuestion: (question: Question) => void;
   onDeleteQuestion: (question: Question) => void;
@@ -59,6 +60,7 @@ export function TeacherQuestionTable({
   onToggleComment,
   onCommentCountChange,
   onClearFlag,
+  onToggleLike,
   onToggleQuestionPublic,
   onEditQuestion,
   onDeleteQuestion,
@@ -175,7 +177,16 @@ export function TeacherQuestionTable({
               <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3">
                 <div className="rounded-md bg-muted/40 px-2 py-2 text-center">
                   <p className="text-[11px] text-muted-foreground">{t("colLikes")}</p>
-                  <p className="text-sm font-semibold text-rose-500">❤️ {question.likeCount}</p>
+                  <TeacherQuestionLikeCount
+                    questionId={question.id}
+                    likeCount={question.likeCount}
+                    myLike={Boolean(question.myLike)}
+                    initialLikedBy={question.likedBy}
+                    likeCountLabel={t("likeCountLabel", { count: question.likeCount })}
+                    likedByLabel={t("likedByStudents")}
+                    likeToggleLabel={question.myLike ? t("unlike") : t("like")}
+                    onToggleLike={() => onToggleLike(question)}
+                  />
                 </div>
                 <button
                   type="button"
@@ -318,9 +329,12 @@ export function TeacherQuestionTable({
                     <TeacherQuestionLikeCount
                       questionId={question.id}
                       likeCount={question.likeCount}
+                      myLike={Boolean(question.myLike)}
                       initialLikedBy={question.likedBy}
                       likeCountLabel={t("likeCountLabel", { count: question.likeCount })}
                       likedByLabel={t("likedByStudents")}
+                      likeToggleLabel={question.myLike ? t("unlike") : t("like")}
+                      onToggleLike={() => onToggleLike(question)}
                     />
                   </TableCell>
                   <TableCell className="text-center">

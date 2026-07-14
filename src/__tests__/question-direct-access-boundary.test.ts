@@ -255,6 +255,18 @@ describe("질문 직접 경로 접근 경계", () => {
     expect(response.status).toBe(200);
   });
 
+  it("담당 교사는 담당 학급 학생 질문에 좋아요를 쓸 수 있다", async () => {
+    const response = await createLike(
+      request(`/api/questions/${assignedQuestion.id}/likes`, "POST"),
+      params(assignedQuestion.id),
+    );
+
+    expect(response.status).toBe(201);
+    expect(mockLikeCreate).toHaveBeenCalledWith({
+      data: { questionId: assignedQuestion.id, userId: teacher.id },
+    });
+  });
+
   it("같은 학급 학생은 담당 범위 공개 질문에 좋아요를 계속 쓸 수 있다", async () => {
     selectedViewer = student;
     mockAuth.mockResolvedValue({ user: student });

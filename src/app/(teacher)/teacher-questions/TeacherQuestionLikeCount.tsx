@@ -11,16 +11,23 @@ interface LikedByUser {
 export function TeacherQuestionLikeCount({
   questionId,
   likeCount,
+  myLike = false,
   initialLikedBy,
   likeCountLabel,
   likedByLabel,
+  likeToggleLabel,
+  onToggleLike,
 }: {
   questionId: string;
   likeCount: number;
+  myLike?: boolean;
   initialLikedBy?: LikedByUser[];
   likeCountLabel: string;
   likedByLabel: string;
+  likeToggleLabel?: string;
+  onToggleLike?: () => Promise<void> | void;
 }) {
+  const [isPending, setIsPending] = useState(false);
   const [likeList, setLikeList] = useState<{
     forCount: number | null;
     users: LikedByUser[];
@@ -60,17 +67,33 @@ export function TeacherQuestionLikeCount({
       }
     }
   };
+  const handleToggleLike = async () => {
+    if (!onToggleLike || isPending) return;
+    setIsPending(true);
+    try {
+      await onToggleLike();
+    } finally {
+      setIsPending(false);
+    }
+  };
 
   return (
     <div className="group relative inline-block">
       <button
         type="button"
+        onClick={handleToggleLike}
+        disabled={!onToggleLike || isPending}
         onFocus={() => void loadLikedBy()}
         onMouseEnter={() => void loadLikedBy()}
-        aria-label={likeCountLabel}
-        className="inline-flex items-center gap-1 text-sm font-medium text-rose-500"
+        aria-label={likeToggleLabel ?? likeCountLabel}
+        title={likeToggleLabel ?? likeCountLabel}
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium transition-colors ${
+          myLike
+            ? "bg-rose-100 text-rose-600 hover:bg-rose-200"
+            : "bg-muted text-muted-foreground hover:bg-rose-50 hover:text-rose-500"
+        } ${isPending ? "opacity-50" : ""}`}
       >
-        <Heart className="h-4 w-4 fill-current" aria-hidden="true" />
+        <Heart className={`h-4 w-4 ${myLike ? "fill-current" : ""}`} aria-hidden="true" />
         {likeCount}
       </button>
       {listIsCurrent && likeList.users.length > 0 && (

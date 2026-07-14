@@ -1,11 +1,10 @@
-import type { UserRole } from "@/types/user";
-
 export type LikeSortOrder = "asc" | "desc" | "none";
 
 interface CanLikeInput {
   likerId: string;
   questionAuthorId: string;
-  likerRole: UserRole;
+  likerRole: string | null | undefined;
+  questionAuthorRole?: string | null;
   isPublic?: boolean;
 }
 
@@ -14,13 +13,16 @@ type CanLikeResult =
   | { ok: false; reason: string };
 
 export function canLikeQuestion(input: CanLikeInput): CanLikeResult {
-  if (input.likerRole !== "STUDENT") {
-    return { ok: false, reason: "학생만 좋아요를 표시할 수 있습니다" };
+  if (input.likerRole !== "STUDENT" && input.likerRole !== "TEACHER") {
+    return { ok: false, reason: "좋아요를 표시할 수 없습니다" };
   }
   if (input.likerId === input.questionAuthorId) {
     return { ok: false, reason: "자신의 질문에는 좋아요를 표시할 수 없습니다" };
   }
-  if (input.isPublic === false) {
+  if (input.likerRole === "TEACHER" && input.questionAuthorRole !== "STUDENT") {
+    return { ok: false, reason: "학생 질문에만 좋아요를 표시할 수 있습니다" };
+  }
+  if (input.likerRole === "STUDENT" && input.isPublic === false) {
     return { ok: false, reason: "공개 질문에만 좋아요를 표시할 수 있습니다" };
   }
   return { ok: true };
@@ -31,7 +33,7 @@ interface LikeEntry {
   user: { id: string; name: string };
 }
 
-export function buildLikesInclude(role: UserRole): object {
+export function buildLikesInclude(role: string | null | undefined): object {
   if (role === "TEACHER") {
     return { select: { userId: true, user: { select: { id: true, name: true } } } };
   }

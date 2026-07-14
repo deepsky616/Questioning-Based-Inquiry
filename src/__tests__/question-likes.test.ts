@@ -25,17 +25,28 @@ describe("canLikeQuestion", () => {
     if (!result.ok) expect(result.reason).toMatch(/자신/);
   });
 
-  it("교사는 좋아요를 할 수 없다", () => {
+  it("교사는 학생 질문에 좋아요를 할 수 있다", () => {
     const result = canLikeQuestion({
       likerId: "teacher-1",
       questionAuthorId: "student-1",
       likerRole: "TEACHER",
+      questionAuthorRole: "STUDENT",
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toMatch(/학생/);
+    expect(result.ok).toBe(true);
   });
 
-  it("비공개 질문에는 좋아요를 할 수 없다", () => {
+  it("교사는 교사 질문에는 좋아요를 할 수 없다", () => {
+    const result = canLikeQuestion({
+      likerId: "teacher-1",
+      questionAuthorId: "teacher-2",
+      likerRole: "TEACHER",
+      questionAuthorRole: "TEACHER",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/학생 질문/);
+  });
+
+  it("학생은 비공개 질문에는 좋아요를 할 수 없다", () => {
     const result = canLikeQuestion({
       likerId: "student-1",
       questionAuthorId: "student-2",
@@ -44,6 +55,17 @@ describe("canLikeQuestion", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toMatch(/공개/);
+  });
+
+  it("교사는 담당 범위에서 열람 가능한 비공개 학생 질문에도 좋아요를 할 수 있다", () => {
+    const result = canLikeQuestion({
+      likerId: "teacher-1",
+      questionAuthorId: "student-1",
+      likerRole: "TEACHER",
+      questionAuthorRole: "STUDENT",
+      isPublic: false,
+    });
+    expect(result.ok).toBe(true);
   });
 
   it("공개 질문에는 좋아요를 할 수 있다", () => {

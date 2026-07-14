@@ -51,6 +51,7 @@ interface TeacherQuestionListPanelProps {
   onToggleComment: (id: string) => void;
   onCommentCountChange: (id: string, count: number) => void;
   onClearFlag: (question: Question) => void;
+  onToggleLike: (question: Question) => Promise<void> | void;
   onToggleQuestionPublic: (question: Question) => void;
   onEditQuestion: (question: Question) => void;
   onDeleteQuestion: (question: Question) => void;
@@ -90,6 +91,7 @@ export function TeacherQuestionListPanel({
   onToggleComment,
   onCommentCountChange,
   onClearFlag,
+  onToggleLike,
   onToggleQuestionPublic,
   onEditQuestion,
   onDeleteQuestion,
@@ -210,6 +212,7 @@ export function TeacherQuestionListPanel({
             onToggleComment={onToggleComment}
             onCommentCountChange={onCommentCountChange}
             onClearFlag={onClearFlag}
+            onToggleLike={onToggleLike}
             onToggleQuestionPublic={onToggleQuestionPublic}
             onEditQuestion={onEditQuestion}
             onDeleteQuestion={onDeleteQuestion}

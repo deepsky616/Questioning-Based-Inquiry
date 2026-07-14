@@ -385,6 +385,21 @@ function QuestionsContent() {
       toast({ variant: "destructive", description: t("publicUpdateFailed") });
     }
   };
+  const handleToggleLike = async (question: Question) => {
+    try {
+      const res = await fetch(`/api/questions/${question.id}/likes`, {
+        method: question.myLike ? "DELETE" : "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error ?? t("likeUpdateFailed"));
+      await reloadQuestions();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        description: error instanceof Error ? error.message : t("likeUpdateFailed"),
+      });
+    }
+  };
   const handleDeleteQuestion = async (question: Question) => {
     if (!(await confirm({ description: t("deleteQuestionConfirm", { name: question.author.name }), confirmText: tc("delete"), destructive: true }))) return;
     try {
@@ -565,6 +580,7 @@ function QuestionsContent() {
         onToggleComment={(id) => setExpandedCommentId((prev) => (prev === id ? null : id))}
         onCommentCountChange={(id, count) => setCommentCountOverride((prev) => ({ ...prev, [id]: count }))}
         onClearFlag={handleClearFlag}
+        onToggleLike={handleToggleLike}
         onToggleQuestionPublic={handleToggleQuestionPublic}
         onEditQuestion={setSelectedQuestion}
         onDeleteQuestion={handleDeleteQuestion}
