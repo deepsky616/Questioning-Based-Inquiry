@@ -197,7 +197,7 @@ export default function LadderQuestionComposer({
       data-state={phase}
     >
       <div className="space-y-2">
-        <label className="block font-black text-foreground" htmlFor={`ladder-question-${roundKey}`}>
+        <label className="block break-words font-black text-foreground" htmlFor={`ladder-question-${roundKey}`}>
           {text.ladderQuestionLabel(topic)}
         </label>
         <textarea

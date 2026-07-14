@@ -257,6 +257,29 @@ describe("공통 질문 사다리 그림", () => {
 });
 
 describe("공통 질문 확인 작성기", () => {
+  it("좁은 카드에서 공백 없는 긴 주제 제목을 끊어 표시한다", () => {
+    const topic = "T".repeat(80);
+    const question = `${"Q".repeat(199)}?`;
+
+    render(
+      <div style={{ width: "320px" }}>
+        <LadderQuestionComposer
+          locale="en"
+          roundKey="round-narrow"
+          topic={topic}
+          onConfirm={vi.fn()}
+        />
+      </div>,
+    );
+
+    const input = screen.getByRole("textbox", { name: `Question about ${topic}` });
+    const label = screen.getByText(`Question about ${topic}`);
+    fireEvent.change(input, { target: { value: question } });
+
+    expect(input).toHaveValue(question);
+    expect(label).toHaveClass("break-words");
+  });
+
   it.each([
     ["", "질문을 입력해 주세요"],
     ["별빛을 관찰한다", "질문 모양으로 써 주세요"],
