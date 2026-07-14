@@ -16,6 +16,12 @@ describe("질문연습 학습지 출력", () => {
   });
 
   it("페이지는 학생 작성란과 활동별 답안 영역을 렌더링한다", () => {
+    const titleIndex = pageSource.indexOf("{guide.title}");
+    const subtitleIndex = pageSource.indexOf("{guide.subtitle}");
+    const studentFieldsIndex = pageSource.indexOf("qp-student-fields");
+    const metaRowIndex = pageSource.indexOf("qp-student-row-meta");
+    const nameRowIndex = pageSource.indexOf("qp-student-row-name");
+
     expect(pageSource).toContain("question-practice-print-mode");
     expect(pageSource).not.toContain("originalThemeRef");
     expect(pageSource).not.toContain("classList.remove(\"dark\")");
@@ -27,9 +33,19 @@ describe("질문연습 학습지 출력", () => {
     expect(pageSource).toContain("guide.teacherNote");
     expect(pageSource).toContain('style={{ colorScheme: "light" }}');
     expect(pageSource).toContain("qp-guide mt-6 space-y-4");
-    expect(pageSource).toContain("qp-student-fields ml-auto flex");
+    expect(pageSource).toContain("qp-sheet qp-sheet-guide");
+    expect(pageSource).toContain("qp-sheet qp-sheet-activity qp-activity");
+    expect(pageSource).toContain("qp-card-grid");
+    expect(pageSource).toContain("qp-pattern-grid");
+    expect(pageSource).toContain("qp-prompt-list");
+    expect(pageSource).toContain("qp-writing-lines");
+    expect(titleIndex).toBeGreaterThan(-1);
+    expect(titleIndex).toBeLessThan(subtitleIndex);
+    expect(subtitleIndex).toBeLessThan(studentFieldsIndex);
+    expect(metaRowIndex).toBeLessThan(nameRowIndex);
+    expect(pageSource).not.toContain("qp-student-fields ml-auto");
     expect(pageSource).toContain("qp-student-row-meta grid grid-cols-3");
-    expect(pageSource).toContain("qp-student-row-name flex justify-end");
+    expect(pageSource).toContain("qp-student-row-name flex");
     expect(pageSource).toContain("guide.gradeLabel");
     expect(pageSource).toContain("guide.classNameLabel");
     expect(pageSource).toContain("guide.numberLabel");
