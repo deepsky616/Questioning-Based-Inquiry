@@ -1023,6 +1023,14 @@ describe("질문놀이 방 판정기", () => {
         chain: [{ question: "old", playerId: "a", playerName: "A" }],
         turnIndex: 1,
         gameState: makeState({ phase: "done", endReason: "completed" }),
+        awardResult: {
+          awards: [{
+            studentId: "b",
+            bonusType: "COMPLETION",
+            points: 5,
+            reason: "게임 완료",
+          }],
+        },
       });
       const before = structuredClone(room);
 
@@ -1057,6 +1065,7 @@ describe("질문놀이 방 판정기", () => {
         playId: undefined,
         pointAwardKeyVersion: undefined,
         pointEvidenceVersion: undefined,
+        awardResult: undefined,
       });
 
       const result = restartQuestionGameRoom(room);

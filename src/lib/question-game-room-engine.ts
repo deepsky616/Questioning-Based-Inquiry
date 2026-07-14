@@ -694,7 +694,8 @@ export function restartQuestionGameRoom(room: GameRoom): QuestionGameRoomResult 
     isEmptyRecord(room.gameState) &&
     room.playId === undefined &&
     room.pointAwardKeyVersion === undefined &&
-    room.pointEvidenceVersion === undefined;
+    room.pointEvidenceVersion === undefined &&
+    room.awardResult === undefined;
   if (alreadyRestarted) {
     return unchanged("replayed", room);
   }
@@ -703,6 +704,7 @@ export function restartQuestionGameRoom(room: GameRoom): QuestionGameRoomResult 
     playId: _playId,
     pointAwardKeyVersion: _pointAwardKeyVersion,
     pointEvidenceVersion: _pointEvidenceVersion,
+    awardResult: _awardResult,
     ...roomWithoutExecution
   } = structuredClone(room);
   return {

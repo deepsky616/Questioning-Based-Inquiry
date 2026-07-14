@@ -240,7 +240,9 @@ export function useRoom(): UseRoomResult {
         expectedRoom &&
         (!currentRoom ||
           currentRoom.code !== expectedRoom.code ||
-          currentRoom.createdAt !== expectedRoom.createdAt)
+          currentRoom.createdAt !== expectedRoom.createdAt ||
+          (expectedRoom.playId !== undefined &&
+            currentRoom.playId !== expectedRoom.playId))
       ) {
         return {
           ok: false,

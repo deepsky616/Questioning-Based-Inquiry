@@ -389,6 +389,47 @@ describe("useRoom sendAction", () => {
     },
   );
 
+  it("같은 방의 다른 실행 조건이면 요청 전에 superseded를 반환한다", async () => {
+    const currentRoom = {
+      ...makeRoom(1, "5678"),
+      createdAt: 2,
+      updatedAt: 2,
+      playId: "10000000-0000-4000-8000-000000000002",
+    };
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: currentRoom });
+      if (!init?.method) return jsonResponse({ room: currentRoom });
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("5678");
+    });
+    await waitFor(() => expect(result.current.room).toEqual(currentRoom));
+    fetchMock.mockClear();
+
+    let actionResult: RoomActionResult | undefined;
+    await act(async () => {
+      actionResult = await result.current.sendAction("publish-award-result", {}, {
+        expectedRoom: {
+          code: "5678",
+          createdAt: 2,
+          playId: "10000000-0000-4000-8000-000000000001",
+        },
+      });
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(actionResult).toMatchObject({
+      ok: false,
+      reason: "superseded",
+    });
+    unmount();
+  });
+
   it("높은 409를 먼저 반영하면 늦은 성공 응답이 방 버전을 낮추지 않는다", async () => {
     const delayedSuccess = deferred<Response>();
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {

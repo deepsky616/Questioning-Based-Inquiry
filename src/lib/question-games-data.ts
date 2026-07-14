@@ -1,4 +1,8 @@
 import { applyQuestionGameRuleText } from "@/lib/question-game-rules";
+import {
+  isGameAwardResult,
+  type GameAwardResult,
+} from "@/lib/game-award-result";
 
 // 교사가 지정한 순서(gameId 배열)대로 정렬. 순서에 없는 게임은 기본 order로 뒤에 둔다.
 export function sortGamesByOrder<T extends { id: string; order: number }>(
@@ -173,6 +177,7 @@ export interface GameRoom {
   playId?: string;
   pointAwardKeyVersion?: 1 | 2;
   pointEvidenceVersion?: 1 | 2;
+  awardResult?: GameAwardResult;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -238,7 +243,8 @@ export function isGameRoom(value: unknown): value is GameRoom {
       value.pointAwardKeyVersion === 2) &&
     (value.pointEvidenceVersion === undefined ||
       value.pointEvidenceVersion === 1 ||
-      value.pointEvidenceVersion === 2)
+      value.pointEvidenceVersion === 2) &&
+    (value.awardResult === undefined || isGameAwardResult(value.awardResult))
   );
 }
 
@@ -276,7 +282,7 @@ export interface RoomActionFailure {
 export type RoomActionResult = RoomActionSuccess | RoomActionFailure;
 
 export interface RoomActionOptions {
-  expectedRoom?: Pick<GameRoom, "code" | "createdAt">;
+  expectedRoom?: Pick<GameRoom, "code" | "createdAt" | "playId">;
   commandId?: string;
 }
 

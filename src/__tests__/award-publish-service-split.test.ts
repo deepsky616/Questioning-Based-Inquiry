@@ -5,6 +5,7 @@ import {
   restorePublishableAwardResult,
   serializeGameAwardResultSnapshot,
 } from "@/lib/game-award-result";
+import { isGameRoom } from "@/lib/question-games-data";
 
 const pointAwardRoute = readFileSync("src/app/api/points/award/route.ts", "utf8");
 const publishRoute = readFileSync("src/app/api/sessions/[id]/publish-questions/route.ts", "utf8");
@@ -125,6 +126,42 @@ describe("award and publish route service split", () => {
     expect(isGameAwardResult({
       ...result,
       awards: [{ ...result.awards[0], aiAnalysis: "hidden" }],
+    })).toBe(false);
+  });
+
+  it("validates the public result at the room top level", () => {
+    const room = {
+      code: "1234",
+      gameId: "dice",
+      hostId: "teacher-1",
+      status: "ended",
+      players: [{
+        id: "teacher-1",
+        name: "교사",
+        isHost: true,
+        joinedAt: 1,
+      }],
+      topic: "",
+      chain: [],
+      turnIndex: 0,
+      gameState: {},
+      version: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      awardResult: {
+        awards: [{
+          studentId: "student-1",
+          bonusType: "COMPLETION",
+          points: 5,
+          reason: "게임 완료",
+        }],
+      },
+    };
+
+    expect(isGameRoom(room)).toBe(true);
+    expect(isGameRoom({
+      ...room,
+      awardResult: { ...room.awardResult, internalId: "hidden" },
     })).toBe(false);
   });
 
