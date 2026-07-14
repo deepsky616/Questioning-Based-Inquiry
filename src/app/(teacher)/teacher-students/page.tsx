@@ -29,6 +29,10 @@ import {
   buildQuestionActivityScopeHref,
   readQuestionActivityScope,
 } from "@/lib/teacher-student-question-activity-scope";
+import {
+  matchesStudentManagementSearch,
+  summarizeStudentActivity,
+} from "@/lib/teacher-student-management";
 
 /** ISO 날짜 → "오늘 / N일 전 / -" */
 function lastActiveLabel(iso?: string | null): { key: "today" | "yesterday" | "daysAgo" | "monthsAgo" | "yearsAgo"; v: Record<string, number> } | null {
@@ -139,14 +143,8 @@ export default function StudentsPage() {
     questionActivityScope.className,
   ]);
 
-  const normalizedSearch = search.trim().replace(/학년|반/g, "").trim();
-
   const filtered = students.filter((s) => {
-    const matchSearch =
-      normalizedSearch === "" ||
-      s.name.includes(normalizedSearch) ||
-      s.grade.includes(normalizedSearch) ||
-      s.className.includes(normalizedSearch);
+    const matchSearch = matchesStudentManagementSearch(s, search);
     const matchClass =
       filterClass === "all" ||
       `${s.grade}-${s.className}` === filterClass;
@@ -182,11 +180,6 @@ export default function StudentsPage() {
     return acc;
   }, {});
 
-  // 전체 통계
-  const totalQ = students.reduce((a, b) => a + b.questionCount, 0);
-  const totalC = students.reduce((a, b) => a + b.commentCount, 0);
-  const totalP = students.reduce((a, b) => a + b.totalPoints, 0);
-  const avgP = students.length === 0 ? 0 : Math.round(totalP / students.length);
   const selectedStudentId = searchParams.get("studentId");
   const questionActivityPeriodLabel =
     questionActivityPeriod === "week" ? t("filterNoQuestionsWeek")
@@ -195,6 +188,8 @@ export default function StudentsPage() {
   const studentListLoading = isLoading || (
     questionActivityFilterOn && questionActivityStatsQuery.isPending
   );
+  const visibleSummary = summarizeStudentActivity(filtered);
+  const narrowedStudentScope = filtered.length !== students.length;
 
   useEffect(() => {
     if (!selectedStudentId || students.length === 0) return;
@@ -208,6 +203,30 @@ export default function StudentsPage() {
   const closeSelected = () => {
     setSelected(null);
     if (selectedStudentId) router.replace("/teacher-students");
+  };
+
+  const hasActiveViewControls =
+    search.trim() !== "" ||
+    filterClass !== "all" ||
+    progressFilter !== "all" ||
+    studentSort !== "class" ||
+    questionActivityFilterOn ||
+    progressParam === "remaining" ||
+    sortParam === "progressAsc";
+  const hasActiveStudentFilters =
+    filterClass !== "all" ||
+    progressFilter !== "all" ||
+    questionActivityFilterOn ||
+    progressParam === "remaining";
+
+  const resetStudentViewControls = () => {
+    setSearch("");
+    setLocalFilterClass("all");
+    setProgressFilter("all");
+    setStudentSort("class");
+    if (questionActivityFilterOn || progressParam || sortParam) {
+      router.replace("/teacher-students");
+    }
   };
 
   const handleClassFilterChange = (nextClass: TeacherClass | null) => {
@@ -235,6 +254,7 @@ export default function StudentsPage() {
           <button
             key={v}
             type="button"
+            aria-pressed={mgmtTab === v}
             onClick={() => setMgmtTab(v)}
             className={`px-4 py-2 text-sm font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
               mgmtTab === v ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
@@ -256,7 +276,7 @@ export default function StudentsPage() {
 
       {mgmtTab === "list" && studentDataError && (
         <div role="alert" className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-medium">{t("filterActivityLoadError")}</p>
+          <p className="font-medium">{t("studentDataLoadError")}</p>
           <Button
             type="button"
             variant="outline"
@@ -273,32 +293,59 @@ export default function StudentsPage() {
 
       {mgmtTab === "list" && !studentDataError && (
       <>
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-2xl bg-muted/40 border border-border p-4 text-center">
-          <p className="text-xs text-muted-foreground font-medium">{t("allStudents")}</p>
-          <p className="text-2xl font-black text-foreground mt-1">{t("studentCount", { n: students.length })}</p>
+      {!studentListLoading && !(questionActivityFilterOn && questionActivityStatsQuery.isError) && (
+        <div className="space-y-2">
+          <div className="flex flex-col gap-1 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <p
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              className="font-medium text-foreground"
+            >
+              {search.trim()
+                ? t("summaryScopeSearch", {
+                    query: search.trim(),
+                    shown: visibleSummary.studentCount,
+                    total: students.length,
+                  })
+                : narrowedStudentScope
+                ? t("summaryScopeFiltered", {
+                    shown: visibleSummary.studentCount,
+                    total: students.length,
+                  })
+                : t("summaryScopeAll", { count: visibleSummary.studentCount })}
+            </p>
+            <p>{t("summaryValuesNote")}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="rounded-2xl bg-muted/40 border border-border p-4 text-center">
+              <p className="text-xs text-muted-foreground font-medium">{t("allStudents")}</p>
+              <p className="text-2xl font-black text-foreground mt-1">{t("studentCount", { n: visibleSummary.studentCount })}</p>
+            </div>
+            <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 p-4 text-center">
+              <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">{t("totalQuestions")}</p>
+              <p className="text-2xl font-black text-indigo-700 mt-1">{visibleSummary.totalQuestions}</p>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-500/30 p-4 text-center">
+              <p className="text-xs text-emerald-800 dark:text-emerald-200 font-medium">{t("totalAnswers")}</p>
+              <p className="text-2xl font-black text-emerald-700 mt-1">{visibleSummary.totalAnswers}</p>
+            </div>
+            <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-500/30 p-4 text-center">
+              <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">{t("totalPointsAvg")}</p>
+              <p className="text-2xl font-black text-amber-800 dark:text-amber-200 mt-1">
+                {visibleSummary.totalPoints}<span className="text-sm font-normal text-amber-800 dark:text-amber-200 ml-1">/ {visibleSummary.averagePoints}</span>
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 p-4 text-center">
-          <p className="text-xs text-indigo-500 font-medium">{t("totalQuestions")}</p>
-          <p className="text-2xl font-black text-indigo-700 mt-1">{totalQ}</p>
-        </div>
-        <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-500/30 p-4 text-center">
-          <p className="text-xs text-emerald-500 font-medium">{t("totalAnswers")}</p>
-          <p className="text-2xl font-black text-emerald-700 mt-1">{totalC}</p>
-        </div>
-        <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-500/30 p-4 text-center">
-          <p className="text-xs text-amber-500 font-medium">{t("totalPointsAvg")}</p>
-          <p className="text-2xl font-black text-amber-700 mt-1">
-            {totalP}<span className="text-sm font-normal text-amber-500 ml-1">/ {avgP}</span>
-          </p>
-        </div>
-      </div>
+      )}
 
       {/* 학급 필터 */}
       {teacherClasses.length > 0 && (
         <div className="flex flex-wrap gap-2">
           <button
+            type="button"
+            aria-pressed={filterClass === "all"}
             onClick={() => handleClassFilterChange(null)}
             className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
               filterClass === "all"
@@ -311,6 +358,8 @@ export default function StudentsPage() {
             const key = `${tc.grade}-${tc.className}`;
             return (
               <button key={key}
+                type="button"
+                aria-pressed={filterClass === key}
                 onClick={() => handleClassFilterChange(filterClass === key ? null : tc)}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                   filterClass === key
@@ -327,6 +376,7 @@ export default function StudentsPage() {
       {/* 검색 + 지도 우선순위 필터 */}
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <Input
+          aria-label={t("searchLabel")}
           placeholder={t("searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -335,6 +385,7 @@ export default function StudentsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
+            aria-pressed={progressFilter === "remaining"}
             onClick={() => setProgressFilter(progressFilter === "remaining" ? "all" : "remaining")}
             className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
               progressFilter === "remaining"
@@ -346,6 +397,7 @@ export default function StudentsPage() {
           </button>
           <button
             type="button"
+            aria-pressed={studentSort === "progressAsc"}
             onClick={() => setStudentSort(studentSort === "progressAsc" ? "class" : "progressAsc")}
             className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
               studentSort === "progressAsc"
@@ -355,6 +407,17 @@ export default function StudentsPage() {
           >
             {studentSort === "progressAsc" ? t("sortClassDefault") : t("sortLowProgress")}
           </button>
+          {hasActiveViewControls && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={resetStudentViewControls}
+              className="h-7 rounded-full px-3 text-xs"
+            >
+              {t("resetSearchFilters")}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -410,7 +473,16 @@ export default function StudentsPage() {
         </CardContent></Card>
       ) : filtered.length === 0 ? (
         <Card><CardContent className="p-0">
-          <EmptyState icon="🔍" title={t("noResultTitle")} description={t("noResultDesc")} />
+          <EmptyState
+            icon="🔍"
+            title={t(hasActiveStudentFilters ? "noFilteredStudentsTitle" : "noResultTitle")}
+            description={t(hasActiveStudentFilters ? "noFilteredStudentsDesc" : "noResultDesc")}
+            action={hasActiveViewControls ? (
+              <Button type="button" variant="outline" size="sm" onClick={resetStudentViewControls}>
+                {t("resetSearchFilters")}
+              </Button>
+            ) : undefined}
+          />
         </CardContent></Card>
       ) : (
         Object.entries(grouped).map(([classLabel, classStudents]) => {

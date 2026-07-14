@@ -64,7 +64,7 @@ describe("학생 관리 자료 실패 표시", () => {
     renderPage();
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      ko.students.filterActivityLoadError,
+      ko.students.studentDataLoadError,
     );
     expect(screen.queryByText(ko.students.emptyTitle)).not.toBeInTheDocument();
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -21,13 +21,15 @@ interface StudentRow {
 
 export function StudentPasswordResetCard({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useTranslations("account");
-  const { data } = useTeacherStudents<StudentRow, { grade: string; className: string }>();
+  const studentQuery = useTeacherStudents<StudentRow, { grade: string; className: string }>();
+  const { data } = studentQuery;
   const students = useMemo(() => data?.students ?? [], [data]);
   const [classKey, setClassKey] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [newPassword, setNewPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   // 학급 옵션(학생 데이터에서 추출, 학년·반 순)
   const classOptions = useMemo(() => {
@@ -59,6 +61,10 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
   useEffect(() => { setChecked(new Set()); }, [classKey]);
 
   const allChecked = classStudents.length > 0 && classStudents.every((s) => checked.has(s.id));
+  const someChecked = checked.size > 0 && !allChecked;
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someChecked;
+  }, [someChecked]);
   const toggleAll = () =>
     setChecked((prev) => {
       const next = new Set(prev);
@@ -93,12 +99,12 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
         body: JSON.stringify({ studentIds: ids, newPassword }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("resetFailed"));
+      if (!res.ok) throw new Error(t("resetFailed"));
       setMsg({ type: "success", text: t("resetDone", { count: data.count }) });
       setChecked(new Set());
       setNewPassword("");
-    } catch (e) {
-      setMsg({ type: "error", text: e instanceof Error ? e.message : t("resetFailed") });
+    } catch {
+      setMsg({ type: "error", text: t("resetFailed") });
     } finally {
       setSaving(false);
     }
@@ -106,15 +112,29 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
 
   const body = (
     <div className="space-y-4">
-        {students.length === 0 ? (
+        {studentQuery.isLoading ? (
+          <p role="status" className="py-8 text-center text-sm text-muted-foreground">
+            {t("studentListLoading")}
+          </p>
+        ) : studentQuery.isError ? (
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="font-medium">{t("studentListLoadError")}</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => void studentQuery.refetch()}>
+              {t("retry")}
+            </Button>
+          </div>
+        ) : students.length === 0 ? (
           <EmptyState icon="🧑‍🏫" title={t("noStudents")} />
         ) : (
           <>
             {classOptions.length > 1 && (
               <div className="space-y-2">
-                <Label>{t("selectClass")}</Label>
+                <Label htmlFor="resetStudentClass">{t("selectClass")}</Label>
                 <Select value={classKey} onValueChange={setClassKey}>
-                  <SelectTrigger className="bg-background"><SelectValue placeholder={t("selectClass")} /></SelectTrigger>
+                  <SelectTrigger id="resetStudentClass" className="bg-background"><SelectValue placeholder={t("selectClass")} /></SelectTrigger>
                   <SelectContent>
                     {classOptions.map((c) => (
                       <SelectItem key={c.key} value={c.key}>{t("gradeClass", { grade: c.grade, className: c.className })}</SelectItem>
@@ -127,7 +147,13 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
             <div className="rounded-lg border">
               <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <input type="checkbox" checked={allChecked} onChange={toggleAll} />
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allChecked}
+                    aria-checked={someChecked ? "mixed" : allChecked}
+                    onChange={toggleAll}
+                  />
                   {t("selectAll")}
                 </label>
                 <span className="text-xs text-muted-foreground">{t("selectedCount", { count: checked.size })}</span>
@@ -154,7 +180,13 @@ export function StudentPasswordResetCard({ embedded = false }: { embedded?: bool
             </div>
 
             {msg && (
-              <p className={`text-sm ${msg.type === "success" ? "text-green-600" : "text-red-600"}`}>{msg.text}</p>
+              <p
+                role={msg.type === "success" ? "status" : "alert"}
+                aria-live={msg.type === "success" ? "polite" : undefined}
+                className={`text-sm ${msg.type === "success" ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}
+              >
+                {msg.text}
+              </p>
             )}
             <div className="flex justify-end border-t pt-4">
               <Button

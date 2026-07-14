@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
@@ -243,7 +243,7 @@ export function StudentDetailDialog({
   const [saving, setSaving] = useState(false);
 
   // 학생 상세 통계(질문·댓글·포인트)는 react-query로 주기 폴링(12초)+포커스 재조회.
-  const { data: stats = null } = useQuery<StudentStats>({
+  const statsQuery = useQuery<StudentStats>({
     queryKey: ["student-stats", student.id],
     queryFn: async () => {
       const r = await fetch(`/api/teacher/students/${student.id}/stats`);
@@ -253,11 +253,11 @@ export function StudentDetailDialog({
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
-  const { data: pendingAiPoints = [] } = useQuery<PendingPointItem[]>({
+  const pendingAiPointsQuery = useQuery<PendingPointItem[]>({
     queryKey: ["student-pending-ai-points", student.id],
     queryFn: async () => {
       const r = await fetch("/api/teacher/points/pending");
-      if (!r.ok) return [];
+      if (!r.ok) throw new Error("pending points request failed");
       const d = await r.json();
       const rows = Array.isArray(d.pending) ? d.pending : [];
       return rows.filter((p: PendingPointItem) => p.studentId === student.id);
@@ -265,6 +265,8 @@ export function StudentDetailDialog({
     refetchInterval: visibleDataRefetchInterval,
     refetchOnWindowFocus: true,
   });
+  const stats = statsQuery.data ?? null;
+  const pendingAiPoints = pendingAiPointsQuery.data ?? [];
 
   const series = useMemo(
     () => (stats ? buildSeries(stats.events, period, locale) : []),
@@ -280,13 +282,22 @@ export function StudentDetailDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studentId: student.id, points: delta, reason }),
       });
-      if (res.ok) {
-        setDelta(0); setReason("");
-        // 포인트 부여 후 상세 통계·목록 캐시 무효화(폴링과 무관하게 즉시 최신화)
-        await queryClient.invalidateQueries({ queryKey: ["student-stats", student.id] });
-        onChanged();
+      if (!res.ok) {
+        throw new Error(t("pointChangeFailed"));
       }
-    } catch {} finally { setSaving(false); }
+      setDelta(0);
+      setReason("");
+      toast({ variant: "success", description: t("pointChangeDone", { name: student.name }) });
+      onChanged();
+      void queryClient.invalidateQueries({ queryKey: ["student-stats", student.id] });
+    } catch {
+      toast({
+        variant: "destructive",
+        description: t("pointChangeFailed"),
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function deleteStudentAccount() {
@@ -330,7 +341,34 @@ export function StudentDetailDialog({
               {buildTeacherClassLabel(student.grade, student.className)} · {t("numberSuffix", { n: student.studentNumber })}
             </span>
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {t("detailDialogDesc", { name: student.name })}
+          </DialogDescription>
         </DialogHeader>
+
+        {statsQuery.isError && (
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="font-medium">{t("detailLoadError")}</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => void statsQuery.refetch()}>
+              {t("detailActivityRetry")}
+            </Button>
+          </div>
+        )}
+
+        {pendingAiPointsQuery.isError && (
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p className="font-medium">{t("pendingPointsLoadError")}</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => void pendingAiPointsQuery.refetch()}>
+              {t("pendingPointsRetry")}
+            </Button>
+          </div>
+        )}
 
         {pendingAiPoints.length > 0 && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300">
@@ -348,21 +386,21 @@ export function StudentDetailDialog({
         )}
 
         {/* 누적 통계 */}
-        <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-500/30 p-3 text-center">
-            <p className="text-xs text-indigo-500 font-medium">{t("totalQuestions")}</p>
+            <p className="text-xs text-indigo-700 dark:text-indigo-300 font-medium">{t("totalQuestions")}</p>
             <p className="text-2xl font-black text-indigo-700">
               {stats?.student.questionCount ?? student.questionCount}
             </p>
           </div>
           <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-500/30 p-3 text-center">
-            <p className="text-xs text-emerald-500 font-medium">{t("totalAnswers")}</p>
+            <p className="text-xs text-emerald-800 dark:text-emerald-200 font-medium">{t("totalAnswers")}</p>
             <p className="text-2xl font-black text-emerald-700">
               {stats?.student.commentCount ?? student.commentCount}
             </p>
           </div>
           <div className="rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-500/30 p-3 text-center">
-            <p className="text-xs text-amber-500 font-medium">{t("totalPoints")}</p>
+            <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">{t("totalPoints")}</p>
             <p className="text-2xl font-black text-amber-700">
               {stats?.student.totalPoints ?? student.totalPoints}
             </p>
@@ -441,6 +479,8 @@ export function StudentDetailDialog({
             <div className="flex gap-1">
               {(["month", "week", "dow"] as Period[]).map((p) => (
                 <button key={p}
+                  type="button"
+                  aria-pressed={period === p}
                   onClick={() => setPeriod(p)}
                   className="px-3 py-1 text-xs font-bold rounded-lg transition-colors"
                   style={{
@@ -454,6 +494,8 @@ export function StudentDetailDialog({
             <div className="flex gap-1">
               {(["question", "comment", "point"] as Metric[]).map((m) => (
                 <button key={m}
+                  type="button"
+                  aria-pressed={metric === m}
                   onClick={() => setMetric(m)}
                   className="px-3 py-1 text-xs font-bold rounded-lg transition-colors"
                   style={{
@@ -466,7 +508,11 @@ export function StudentDetailDialog({
             </div>
           </div>
 
-          {!stats ? (
+          {statsQuery.isError ? (
+            <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">
+              {t("detailUnavailable")}
+            </div>
+          ) : !stats ? (
             <div className="h-40 flex items-center justify-center text-muted-foreground text-sm">{t("loading")}</div>
           ) : (
             <BarChart data={series} metric={metric} />
@@ -485,6 +531,7 @@ export function StudentDetailDialog({
                 <button
                   key={key}
                   type="button"
+                  aria-pressed={activityTab === key}
                   onClick={() => setActivityTab(key)}
                   className={`px-3 py-1.5 text-xs font-bold transition-colors ${i > 0 ? "border-l" : ""} ${
                     activityTab === key ? "bg-indigo-600 text-white" : "bg-background text-muted-foreground hover:bg-muted"
@@ -580,6 +627,7 @@ export function StudentDetailDialog({
               <button
                 key={v}
                 type="button"
+                aria-pressed={delta === v}
                 onClick={() => setDelta(v)}
                 className={`rounded-full border px-2.5 py-0.5 text-xs font-bold transition-colors ${
                   delta === v
@@ -600,6 +648,7 @@ export function StudentDetailDialog({
               <button
                 key={label}
                 type="button"
+                aria-pressed={reason === label}
                 onClick={() => setReason(label)}
                 className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
                   reason === label
@@ -613,14 +662,14 @@ export function StudentDetailDialog({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs text-amber-700 font-bold">{t("scoreLabel")}</Label>
-              <Input ref={deltaInputRef} type="number" value={delta || ""}
+              <Label htmlFor={`student-point-score-${student.id}`} className="text-xs text-amber-700 font-bold">{t("scoreLabel")}</Label>
+              <Input id={`student-point-score-${student.id}`} ref={deltaInputRef} type="number" value={delta || ""}
                 onChange={(e) => setDelta(parseInt(e.target.value) || 0)}
                 placeholder={t("scorePlaceholder")} className="mt-1" />
             </div>
             <div>
-              <Label className="text-xs text-amber-700 font-bold">{t("reasonLabel")}</Label>
-              <Input value={reason} onChange={(e) => setReason(e.target.value)}
+              <Label htmlFor={`student-point-reason-${student.id}`} className="text-xs text-amber-700 font-bold">{t("reasonLabel")}</Label>
+              <Input id={`student-point-reason-${student.id}`} value={reason} onChange={(e) => setReason(e.target.value)}
                 placeholder={t("reasonPlaceholder")} className="mt-1" />
             </div>
           </div>

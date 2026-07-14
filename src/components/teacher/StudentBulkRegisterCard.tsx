@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -37,22 +37,32 @@ export function StudentBulkRegisterCard() {
   const [bulkPassword, setBulkPassword] = useState("");
   const [bulkText, setBulkText] = useState("");
   const [isBulkSaving, setIsBulkSaving] = useState(false);
+  const [profileLoadStatus, setProfileLoadStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  const loadTeacherProfile = useCallback(async () => {
+    setProfileLoadStatus("loading");
+    try {
+      const response = await fetch("/api/teacher/profile");
+      if (!response.ok) throw new Error("teacher profile request failed");
+      const data = await response.json();
+      const classes: TeacherClass[] = Array.isArray(data.teacherClasses)
+        ? data.teacherClasses
+        : [];
+      setTeacherClasses(classes);
+      setBulkSchool(typeof data.school === "string" ? data.school : "");
+      if (classes.length === 1) {
+        setBulkGrade(classes[0].grade);
+        setBulkClass(classes[0].className);
+      }
+      setProfileLoadStatus("ready");
+    } catch {
+      setProfileLoadStatus("error");
+    }
+  }, []);
 
   useEffect(() => {
-    fetch("/api/teacher/profile")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.teacherClasses) {
-          setTeacherClasses(data.teacherClasses);
-          if (data.school) setBulkSchool(data.school);
-          if (data.teacherClasses.length === 1) {
-            setBulkGrade(data.teacherClasses[0].grade);
-            setBulkClass(data.teacherClasses[0].className);
-          }
-        }
-      })
-      .catch(() => {});
-  }, []);
+    void loadTeacherProfile();
+  }, [loadTeacherProfile]);
 
   const parseBulkText = (): BulkStudent[] => {
     return bulkText
@@ -112,6 +122,30 @@ export function StudentBulkRegisterCard() {
       setIsBulkSaving(false);
     }
   };
+
+  if (profileLoadStatus !== "ready") {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          {profileLoadStatus === "loading" ? (
+            <p role="status" className="py-8 text-center text-sm text-muted-foreground">
+              {t("studentProfileLoading")}
+            </p>
+          ) : (
+            <div
+              role="alert"
+              className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+            >
+              <p className="font-medium">{t("studentProfileLoadError")}</p>
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadTeacherProfile()}>
+                {t("retry")}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
