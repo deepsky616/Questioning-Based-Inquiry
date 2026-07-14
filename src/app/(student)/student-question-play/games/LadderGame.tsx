@@ -24,6 +24,7 @@ import { useAIPlay } from "./useAIPlay";
 const MAX_ROUNDS = QUESTION_GAME_RULES.ladder.targets.solo.count;
 const SOLO_COLUMN_COUNT = 4;
 const AI_COLUMN_COUNT = 2;
+const PRIMARY_ACTION_CLASS = "w-full whitespace-normal rounded-lg bg-violet-700 font-black text-white hover:bg-violet-800 dark:bg-violet-300 dark:text-violet-950 dark:hover:bg-violet-200";
 
 type LocalPhase = "setup" | "reveal" | "compose" | "round-summary" | "done";
 type RoundNumber = 1 | 2 | 3;
@@ -98,9 +99,8 @@ export default function LadderGame({ game, onBack, config }: Props) {
   const boardAssignments: LadderBoardAssignment[] = topicAssignments.map(
     (assignment) => {
       let playerName = text.ladderStartName(assignment.startColumn + 1);
-      if (isAI) {
-        const studentStart = selectedStartColumn ?? 0;
-        playerName = assignment.startColumn === studentStart ? myName : aiName;
+      if (isAI && selectedStartColumn !== null) {
+        playerName = assignment.startColumn === selectedStartColumn ? myName : aiName;
       }
       return { ...assignment, playerName };
     },
@@ -313,9 +313,8 @@ export default function LadderGame({ game, onBack, config }: Props) {
             })}
           </div>
           <Button
-            className="w-full whitespace-normal rounded-lg font-black text-white"
+            className={PRIMARY_ACTION_CLASS}
             onClick={() => prepareRound(1)}
-            style={{ background: game.gradientCss }}
             type="button"
           >
             {text.drawLadder}
@@ -397,9 +396,8 @@ export default function LadderGame({ game, onBack, config }: Props) {
               </div>
               {renderAIQuestion()}
               <Button
-                className="w-full whitespace-normal rounded-lg font-black text-white"
+                className={PRIMARY_ACTION_CLASS}
                 onClick={() => prepareRound((round + 1) as RoundNumber)}
-                style={{ background: game.gradientCss }}
                 type="button"
               >
                 {text.ladderNextRound}
