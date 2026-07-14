@@ -25,6 +25,7 @@ export type MysteryHistoryItem =
       kind: "question";
       playerId: string;
       playerName: string;
+      locale: MysteryLocale;
       question: string;
       answer: MysteryAnswer;
     }
@@ -32,6 +33,7 @@ export type MysteryHistoryItem =
       kind: "guess";
       playerId: string;
       playerName: string;
+      locale: MysteryLocale;
       guess: string;
       correct: boolean;
     };
@@ -57,9 +59,40 @@ export type MysteryPublicRoomState = Omit<MysteryRoomState, "private"> & {
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const RECENT_COMMAND_LIMIT = 64;
+const MYSTERY_STATE_REQUIRED_KEYS = [
+  "stateVersion",
+  "game",
+  "phase",
+  "recentCommandIds",
+  "round",
+  "maxRounds",
+  "turnOrder",
+  "currentTurnIdx",
+  "history",
+  "scores",
+] as const;
+const MYSTERY_STATE_OPTIONAL_KEYS = [
+  "roundId",
+  "endReason",
+  "winnerId",
+  "answer",
+  "private",
+] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasExactKeys(
+  value: Record<string, unknown>,
+  required: readonly string[],
+  optional: readonly string[] = [],
+): boolean {
+  const allowed = new Set([...required, ...optional]);
+  const keys = Object.keys(value);
+  return required.every((key) =>
+    Object.prototype.hasOwnProperty.call(value, key)
+  ) && keys.every((key) => allowed.has(key));
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -90,13 +123,31 @@ function isMysteryHistoryItem(value: unknown): value is MysteryHistoryItem {
     return false;
   }
   if (value.kind === "question") {
-    return isBoundedStoredText(value.question, QUESTION_GAME_LIMITS.question) &&
+    return hasExactKeys(value, [
+      "kind",
+      "playerId",
+      "playerName",
+      "locale",
+      "question",
+      "answer",
+    ]) &&
+      (value.locale === "ko" || value.locale === "en") &&
+      isBoundedStoredText(value.question, QUESTION_GAME_LIMITS.question) &&
       /[?？]/u.test(value.question) &&
       (value.answer === "yes" ||
         value.answer === "no" ||
         value.answer === "unknown");
   }
   return value.kind === "guess" &&
+    hasExactKeys(value, [
+      "kind",
+      "playerId",
+      "playerName",
+      "locale",
+      "guess",
+      "correct",
+    ]) &&
+    (value.locale === "ko" || value.locale === "en") &&
     isBoundedStoredText(value.guess, QUESTION_GAME_LIMITS.shortWord) &&
     typeof value.correct === "boolean";
 }
@@ -105,6 +156,7 @@ function isLocalizedAnswer(
   value: unknown,
 ): value is { ko: string; en: string } {
   return isRecord(value) &&
+    hasExactKeys(value, ["ko", "en"]) &&
     isBoundedStoredText(value.ko, QUESTION_GAME_LIMITS.shortWord) &&
     isBoundedStoredText(value.en, QUESTION_GAME_LIMITS.shortWord);
 }
@@ -139,6 +191,15 @@ function hasValidScores(state: MysteryRoomState): boolean {
   ) {
     return false;
   }
+  const scorePlayerIds = Object.keys(state.scores);
+  if (
+    scorePlayerIds.length !== state.turnOrder.length ||
+    !state.turnOrder.every((playerId) =>
+      Object.prototype.hasOwnProperty.call(state.scores, playerId)
+    )
+  ) {
+    return false;
+  }
   return Object.entries(state.scores).every(
     ([playerId, score]) => score === (questionCounts.get(playerId) ?? 0),
   );
@@ -161,12 +222,33 @@ function hasExpectedAnswer(
     state.answer.en === item.names.en;
 }
 
+function hasValidHistorySemantics(state: MysteryRoomState): boolean {
+  if (!state.private) return state.history.length === 0;
+  const item = getMysteryItem(state.private.itemId);
+  if (!item) return false;
+
+  return state.history.every((historyItem) =>
+    historyItem.kind === "question"
+      ? classifyMysteryQuestion(
+          historyItem.question,
+          item,
+          historyItem.locale,
+        ) === historyItem.answer
+      : isMysteryGuessCorrect(
+          historyItem.guess,
+          item,
+          historyItem.locale,
+        ) === historyItem.correct
+  );
+}
+
 function hasValidPhase(state: MysteryRoomState): boolean {
   const guesses = state.history.filter(
     (item): item is Extract<MysteryHistoryItem, { kind: "guess" }> =>
       item.kind === "guess",
   );
   const correctGuesses = guesses.filter(({ correct }) => correct);
+  const lastHistoryItem = state.history.at(-1);
   if (guesses.length > state.maxRounds || correctGuesses.length > 1) {
     return false;
   }
@@ -230,17 +312,24 @@ function hasValidPhase(state: MysteryRoomState): boolean {
     return guesses.length > 0 &&
       state.round === guesses.length &&
       lastGuess?.correct === true &&
+      lastHistoryItem === lastGuess &&
       state.winnerId === lastGuess.playerId;
   }
   return guesses.length === state.maxRounds &&
     state.round === state.maxRounds &&
     state.winnerId === undefined &&
-    lastGuess?.correct === false;
+    lastGuess?.correct === false &&
+    lastHistoryItem === lastGuess;
 }
 
 export function readMysteryState(value: unknown): MysteryRoomState | null {
   if (
     !isRecord(value) ||
+    !hasExactKeys(
+      value,
+      MYSTERY_STATE_REQUIRED_KEYS,
+      MYSTERY_STATE_OPTIONAL_KEYS,
+    ) ||
     value.stateVersion !== 2 ||
     value.game !== "mystery-box" ||
     (value.phase !== "setup" && value.phase !== "play" && value.phase !== "done") ||
@@ -271,7 +360,10 @@ export function readMysteryState(value: unknown): MysteryRoomState | null {
     return null;
   }
   const state = value as unknown as MysteryRoomState;
-  return hasValidTurn(state) && hasValidScores(state) && hasValidPhase(state)
+  return hasValidTurn(state) &&
+      hasValidScores(state) &&
+      hasValidHistorySemantics(state) &&
+      hasValidPhase(state)
     ? state
     : null;
 }
@@ -301,20 +393,105 @@ export function readMysteryPublicState(
   }
 
   const publicAnswer = isLocalizedAnswer(value.answer) ? value.answer : null;
-  const item = value.phase === "done" && publicAnswer
-    ? MYSTERY_ITEMS.find(
+  const candidateItems = value.phase === "done" && publicAnswer
+    ? MYSTERY_ITEMS.filter(
         ({ names }) =>
           names.ko === publicAnswer.ko && names.en === publicAnswer.en,
       )
-    : MYSTERY_ITEMS[0];
-  if (!item) return null;
-  const storedCandidate = {
+    : MYSTERY_ITEMS;
+  return candidateItems.some((item) => readMysteryState({
     ...value,
     private: { itemId: item.id },
-  };
-  return readMysteryState(storedCandidate)
+  }))
     ? value as MysteryPublicRoomState
     : null;
+}
+
+function projectMysteryHistoryItem(
+  value: unknown,
+): MysteryHistoryItem | null {
+  if (!isRecord(value)) return null;
+  const common = {
+    playerId: value.playerId,
+    playerName: value.playerName,
+    locale: value.locale,
+  };
+  const candidate = value.kind === "question"
+    ? {
+        kind: value.kind,
+        ...common,
+        question: value.question,
+        answer: value.answer,
+      }
+    : value.kind === "guess"
+      ? {
+          kind: value.kind,
+          ...common,
+          guess: value.guess,
+          correct: value.correct,
+        }
+      : null;
+  return candidate && isMysteryHistoryItem(candidate) ? candidate : null;
+}
+
+function projectLocalizedAnswer(
+  value: unknown,
+): { ko: string; en: string } | null {
+  if (!isRecord(value)) return null;
+  const answer = { ko: value.ko, en: value.en };
+  return isLocalizedAnswer(answer) ? answer : null;
+}
+
+export function toPublicMysteryState(
+  value: unknown,
+): Record<string, unknown> {
+  if (!isRecord(value)) return {};
+
+  const state: Record<string, unknown> = {};
+  if (value.stateVersion === 2) state.stateVersion = value.stateVersion;
+  if (value.game === "mystery-box") state.game = value.game;
+  if (value.phase === "setup" || value.phase === "play" || value.phase === "done") {
+    state.phase = value.phase;
+  }
+  if (
+    isStringArray(value.recentCommandIds) &&
+    value.recentCommandIds.length <= RECENT_COMMAND_LIMIT
+  ) {
+    state.recentCommandIds = [...value.recentCommandIds];
+  }
+  if (typeof value.roundId === "string" && UUID_V4_PATTERN.test(value.roundId)) {
+    state.roundId = value.roundId;
+  }
+  if (Number.isInteger(value.round) && (value.round as number) >= 0) {
+    state.round = value.round;
+  }
+  if (value.maxRounds === QUESTION_GAME_RULES["mystery-box"].targets.room.count) {
+    state.maxRounds = value.maxRounds;
+  }
+  if (isStringArray(value.turnOrder)) state.turnOrder = [...value.turnOrder];
+  if (Number.isInteger(value.currentTurnIdx) && (value.currentTurnIdx as number) >= 0) {
+    state.currentTurnIdx = value.currentTurnIdx;
+  }
+  if (Array.isArray(value.history)) {
+    state.history = value.history
+      .map(projectMysteryHistoryItem)
+      .filter((item): item is MysteryHistoryItem => item !== null);
+  }
+  if (isScoreMap(value.scores)) state.scores = { ...value.scores };
+  if (typeof value.winnerId === "string" && value.winnerId.length > 0) {
+    state.winnerId = value.winnerId;
+  }
+  if (
+    value.endReason === "completed" ||
+    value.endReason === "insufficient-players"
+  ) {
+    state.endReason = value.endReason;
+  }
+  if (value.phase === "done") {
+    const answer = projectLocalizedAnswer(value.answer);
+    if (answer) state.answer = answer;
+  }
+  return state;
 }
 
 function changed(
@@ -347,6 +524,15 @@ function currentTurnPlayerId(state: MysteryRoomState): string | null {
   return state.turnOrder[state.currentTurnIdx] ?? null;
 }
 
+function hasSamePlayerIds(
+  playerIds: readonly string[],
+  players: GameRoom["players"],
+): boolean {
+  const activeIds = new Set(players.map(({ id }) => id));
+  return activeIds.size === playerIds.length &&
+    playerIds.every((playerId) => activeIds.has(playerId));
+}
+
 export function createMysteryState(): MysteryRoomState {
   return {
     stateVersion: 2,
@@ -371,6 +557,13 @@ export function applyMysteryCommand(
       kind: "corrupt",
       room: context.room,
       message: "미스터리 박스 상태가 손상되었습니다",
+    };
+  }
+  if (state.round > 0 && !hasSamePlayerIds(state.turnOrder, context.room.players)) {
+    return {
+      kind: "corrupt",
+      room: context.room,
+      message: "미스터리 박스 참가자 상태가 손상되었습니다",
     };
   }
   if (context.action === "mystery-start") {
@@ -500,6 +693,7 @@ function askMysteryQuestion(
         kind: "question",
         playerId: context.userId,
         playerName: context.userName,
+        locale,
         question,
         answer: classifyMysteryQuestion(question, item, locale),
       },
@@ -554,6 +748,7 @@ function guessMysteryItem(
             kind: "guess",
             playerId: context.userId,
             playerName: context.userName,
+            locale,
             guess,
             correct: true,
           },
@@ -579,6 +774,7 @@ function guessMysteryItem(
             kind: "guess",
             playerId: context.userId,
             playerName: context.userName,
+            locale,
             guess,
             correct: false,
           },
@@ -600,6 +796,7 @@ function guessMysteryItem(
         kind: "guess",
         playerId: context.userId,
         playerName: context.userName,
+        locale,
         guess,
         correct: false,
       },
@@ -607,41 +804,99 @@ function guessMysteryItem(
   });
 }
 
+function readMysteryStateForLeave(
+  context: QuestionGameRoomLeaveContext,
+): MysteryRoomState | null {
+  const direct = readMysteryState(context.room.gameState);
+  if (direct?.round === 0) return direct;
+  if (
+    !isRecord(context.room.gameState) ||
+    !isScoreMap(context.room.gameState.scores) ||
+    !isStringArray(context.room.gameState.turnOrder)
+  ) {
+    return null;
+  }
+
+  const scorePlayerIds = Object.keys(context.room.gameState.scores);
+  const expectedPlayerIds = [
+    ...context.room.players.map(({ id }) => id),
+    context.userId,
+  ];
+  const expectedPlayerSet = new Set(expectedPlayerIds);
+  const remainingScorePlayerIds = scorePlayerIds.filter(
+    (playerId) => playerId !== context.userId,
+  );
+  const remainingScorePlayerSet = new Set(remainingScorePlayerIds);
+  if (
+    scorePlayerIds.length === 0 ||
+    expectedPlayerSet.size !== scorePlayerIds.length ||
+    !scorePlayerIds.every((playerId) => expectedPlayerSet.has(playerId)) ||
+    context.room.gameState.turnOrder.length !== scorePlayerIds.length - 1 ||
+    !hasUniqueStrings(context.room.gameState.turnOrder) ||
+    !context.room.gameState.turnOrder.every((playerId) =>
+      playerId !== context.userId &&
+      remainingScorePlayerSet.has(playerId)
+    )
+  ) {
+    return null;
+  }
+
+  const restoredTurnState: Record<string, unknown> = {
+    ...context.room.gameState,
+    turnOrder: scorePlayerIds,
+    currentTurnIdx: 0,
+  };
+  const restored = readMysteryState(restoredTurnState);
+  if (restored) return restored;
+  if (
+    restoredTurnState.phase !== "done" ||
+    restoredTurnState.endReason !== "insufficient-players"
+  ) {
+    return null;
+  }
+
+  const playingCandidate: Record<string, unknown> = {
+    ...restoredTurnState,
+    phase: "play",
+  };
+  delete playingCandidate.endReason;
+  delete playingCandidate.answer;
+  return readMysteryState(playingCandidate);
+}
+
 function mysteryPlayerLeft(
   context: QuestionGameRoomLeaveContext,
 ): GameRoom {
-  const interruptedByDeparture =
+  const commonInterruptedByDeparture =
     isRecord(context.room.gameState) &&
     context.room.gameState.phase === "done" &&
     context.room.gameState.endReason === "insufficient-players";
-  let state = readMysteryState(context.room.gameState);
-  if (!state && interruptedByDeparture) {
-    const candidate: Record<string, unknown> = {
-      ...context.room.gameState,
-      phase: isValidPrivateState(context.room.gameState.private)
-        ? "play"
-        : "setup",
-    };
-    delete candidate.endReason;
-    delete candidate.answer;
-    state = readMysteryState(candidate);
-  }
+  const state = readMysteryStateForLeave(context);
   if (!state) throw new Error("corrupt mystery state");
 
-  const completed = state.phase === "done" && state.endReason === "completed";
   const activeIds = new Set(context.room.players.map(({ id }) => id));
-  const scores = completed
-    ? state.scores
-    : Object.fromEntries(
-        Object.entries(state.scores).filter(([id]) => activeIds.has(id)),
-      );
+  const scores = Object.fromEntries(
+    Object.entries(state.scores).filter(([id]) => activeIds.has(id)),
+  );
+  const adjustedTurnOrder = isStringArray(context.room.gameState.turnOrder)
+    ? context.room.gameState.turnOrder
+    : state.turnOrder.filter((playerId) => activeIds.has(playerId));
+  const adjustedTurnIdx = Number.isInteger(
+      context.room.gameState.currentTurnIdx,
+    ) && (context.room.gameState.currentTurnIdx as number) >= 0
+    ? context.room.gameState.currentTurnIdx as number
+    : 0;
   const item = state.private ? getMysteryItem(state.private.itemId) : null;
+  const interruptedByDeparture = commonInterruptedByDeparture ||
+    (state.phase === "play" && activeIds.size < 2);
   const revealAnswer = interruptedByDeparture && item;
 
   return {
     ...context.room,
     gameState: {
       ...state,
+      turnOrder: adjustedTurnOrder,
+      currentTurnIdx: adjustedTurnIdx,
       scores,
       ...(interruptedByDeparture
         ? { phase: "done", endReason: "insufficient-players" }

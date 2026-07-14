@@ -34,6 +34,52 @@ describe("toPublicGameRoom", () => {
     expect(publicRoom.gameState).toEqual({ phase: "play" });
     expect(room.gameState.private).toEqual({ answer: "사과" });
   });
+
+  it("미스터리 박스의 중첩 비공개 복사본과 알 수 없는 키를 제거한다", () => {
+    const marker = "copied-secret";
+    const gameState = {
+      stateVersion: 2,
+      game: "mystery-box",
+      phase: "play",
+      recentCommandIds: [],
+      roundId: "11111111-1111-4111-8111-111111111111",
+      round: 1,
+      maxRounds: 20,
+      turnOrder: ["host"],
+      currentTurnIdx: 0,
+      history: [{
+        kind: "question",
+        playerId: "host",
+        playerName: "방장",
+        locale: "ko",
+        question: "먹을 수 있나요?",
+        answer: "yes",
+        private: { itemId: marker },
+      }],
+      scores: { host: 1 },
+      private: { itemId: "apple", copied: { itemId: marker } },
+      answer: { ko: marker, en: marker, itemId: marker },
+      itemId: marker,
+      copied: { itemId: marker },
+    };
+    const room = makeRoom({ gameId: "memory", gameState });
+
+    const publicRoom = toPublicGameRoom(room);
+
+    expect(JSON.stringify(publicRoom.gameState)).not.toContain(marker);
+    expect(publicRoom.gameState).not.toHaveProperty("private");
+    expect(publicRoom.gameState).not.toHaveProperty("answer");
+    expect(publicRoom.gameState).not.toHaveProperty("itemId");
+    expect(publicRoom.gameState.history).toEqual([{
+      kind: "question",
+      playerId: "host",
+      playerName: "방장",
+      locale: "ko",
+      question: "먹을 수 있나요?",
+      answer: "yes",
+    }]);
+    expect(JSON.stringify(gameState)).toContain(marker);
+  });
 });
 
 describe("readRoomCommandResult", () => {

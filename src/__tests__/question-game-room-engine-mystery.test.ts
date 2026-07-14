@@ -215,6 +215,7 @@ describe("미스터리 박스 방 판정기", () => {
       kind: "question",
       playerId: "host",
       playerName: "Host",
+      locale: "ko",
       question: "먹을 수 있나요?",
       answer: "yes",
     }]);
@@ -250,6 +251,7 @@ describe("미스터리 박스 방 판정기", () => {
       kind: "guess",
       playerId: "host",
       playerName: "Host",
+      locale: "en",
       guess: "book",
       correct: false,
     }]);
@@ -292,6 +294,7 @@ describe("미스터리 박스 방 판정기", () => {
       kind: "guess",
       playerId: "guest",
       playerName: "Guest",
+      locale: "ko",
       guess: "사과",
       correct: true,
     });
@@ -346,6 +349,7 @@ describe("미스터리 박스 방 판정기", () => {
     expect(state.history.at(-1)).toMatchObject({
       kind: "guess",
       playerId: "guest",
+      locale: "en",
       guess: "book",
       correct: false,
     });
@@ -424,6 +428,125 @@ describe("미스터리 박스 방 판정기", () => {
     expect(readMysteryState(makeInvalid(state))).toBeNull();
   });
 
+  it("상태와 비공개 값 및 기록의 알 수 없는 키를 거절한다", () => {
+    const playState = prepareRoom().gameState as unknown as MysteryRoomState;
+    const askedRoom = changedRoom(applyMystery(
+      prepareRoom(),
+      "mystery-ask",
+      { locale: "ko", question: "먹을 수 있나요?" },
+      { commandIndex: 61 },
+    ));
+    const askedState = askedRoom.gameState as unknown as MysteryRoomState;
+    const doneRoom = changedRoom(applyMystery(
+      prepareRoom(),
+      "mystery-guess",
+      { locale: "ko", guess: "사과" },
+      { commandIndex: 62 },
+    ));
+    const doneState = doneRoom.gameState as unknown as MysteryRoomState;
+
+    expect(readMysteryState({ ...playState, itemId: "apple" })).toBeNull();
+    expect(readMysteryState({
+      ...playState,
+      private: { itemId: "apple", copied: "apple" },
+    })).toBeNull();
+    expect(readMysteryState({
+      ...askedState,
+      history: [{ ...askedState.history[0], itemId: "apple" }],
+    })).toBeNull();
+    expect(readMysteryState({
+      ...doneState,
+      history: [{ ...doneState.history[0], itemId: "apple" }],
+    })).toBeNull();
+    expect(readMysteryState({
+      ...doneState,
+      answer: { ...doneState.answer, itemId: "apple" },
+    })).toBeNull();
+  });
+
+  it("저장 질문의 언어와 판정 결과가 비밀 물건과 맞아야 한다", () => {
+    const room = changedRoom(applyMystery(
+      prepareRoom(),
+      "mystery-ask",
+      { locale: "ko", question: "먹을 수 있나요?" },
+      { commandIndex: 63 },
+    ));
+    const state = room.gameState as unknown as MysteryRoomState;
+    const question = state.history[0];
+
+    expect(readMysteryState({
+      ...state,
+      history: [{ ...question, answer: "no" }],
+    })).toBeNull();
+    expect(readMysteryState({
+      ...state,
+      history: [{ ...question, locale: "en" }],
+    })).toBeNull();
+  });
+
+  it("저장 추측의 언어와 정오가 비밀 물건과 맞아야 한다", () => {
+    const wrongRoom = changedRoom(applyMystery(
+      prepareRoom(),
+      "mystery-guess",
+      { locale: "en", guess: "book" },
+      { commandIndex: 64, nextRoundId: commandId(130) },
+    ));
+    const wrongState = wrongRoom.gameState as unknown as MysteryRoomState;
+    const wrongGuess = wrongState.history[0];
+    const correctRoom = changedRoom(applyMystery(
+      prepareRoom(),
+      "mystery-guess",
+      { locale: "ko", guess: "사과" },
+      { commandIndex: 65 },
+    ));
+    const correctState = correctRoom.gameState as unknown as MysteryRoomState;
+    const correctGuess = correctState.history[0];
+
+    expect(readMysteryState({
+      ...wrongState,
+      history: [{ ...wrongGuess, guess: "apple" }],
+    })).toBeNull();
+    expect(readMysteryState({
+      ...correctState,
+      history: [{ ...correctGuess, guess: "책" }],
+    })).toBeNull();
+  });
+
+  it("정답 추측 뒤에 질문 기록을 붙인 상태를 거절한다", () => {
+    const room = changedRoom(applyMystery(
+      prepareRoom(),
+      "mystery-guess",
+      { locale: "ko", guess: "사과" },
+      { commandIndex: 66 },
+    ));
+    const state = room.gameState as unknown as MysteryRoomState;
+
+    expect(readMysteryState({
+      ...state,
+      history: [
+        ...state.history,
+        {
+          kind: "question",
+          playerId: "host",
+          playerName: "Host",
+          locale: "ko",
+          question: "날 수 있나요?",
+          answer: "no",
+        },
+      ],
+      scores: { host: 1, guest: 0 },
+    })).toBeNull();
+  });
+
+  it.each([
+    ["점수 키 누락", { host: 0 }],
+    ["점수 키 추가", { host: 0, guest: 0, copied: 0 }],
+  ])("%s 상태를 거절한다", (_name, scores) => {
+    const state = prepareRoom().gameState as unknown as MysteryRoomState;
+
+    expect(readMysteryState({ ...state, scores })).toBeNull();
+  });
+
   it("현재 참가자 이탈은 다음 활성 참가자와 점수만 남긴다", () => {
     const room = prepareRoom(makeWaitingRoom(["host", "guest", "third"]));
     const result = leaveQuestionGameRoom({ room, userId: "host" });
@@ -445,6 +568,30 @@ describe("미스터리 박스 방 판정기", () => {
       private: { itemId: "apple" },
     });
     expect(state.scores).toEqual({ guest: 0, third: 0 });
+  });
+
+  it.each([
+    ["빠진 참가자", ["guest", "third"], { guest: 0, third: 0 }],
+    [
+      "중복 차례",
+      ["host", "guest", "guest"],
+      { host: 0, guest: 0, third: 0 },
+    ],
+  ] as const)("%s 상태를 이탈 중에 복원하지 않는다", (_name, turnOrder, scores) => {
+    const room = prepareRoom(makeWaitingRoom(["host", "guest", "third"]));
+    const corruptRoom: GameRoom = {
+      ...room,
+      gameState: {
+        ...room.gameState,
+        turnOrder: [...turnOrder],
+        currentTurnIdx: 0,
+        scores: { ...scores },
+      },
+    };
+
+    const result = leaveQuestionGameRoom({ room: corruptRoom, userId: "host" });
+
+    expect(result).toMatchObject({ kind: "corrupt", room: corruptRoom });
   });
 
   it("한 명만 남으면 승자 없이 끝내고 정답을 공개한다", () => {

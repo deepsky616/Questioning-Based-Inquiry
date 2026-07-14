@@ -358,6 +358,45 @@ describe("미스터리 박스 실제 공개 응답", () => {
     expect(state.private).toEqual({ itemId: "apple" });
   });
 
+  it("조회 응답은 중첩된 미스터리 비공개 복사본도 제거한다", async () => {
+    const marker = "copied-secret";
+    const state = {
+      ...makeMysteryPlayState({ scores: { "user-1": 1, "user-2": 0 } }),
+      history: [{
+        kind: "question",
+        playerId: "user-1",
+        playerName: "학생 1",
+        locale: "ko",
+        question: "먹을 수 있나요?",
+        answer: "yes",
+        private: { itemId: marker },
+      }],
+      private: { itemId: "apple", copied: { itemId: marker } },
+      answer: { ko: marker, en: marker, itemId: marker },
+      itemId: marker,
+      copied: { itemId: marker },
+    } as unknown as MysteryRoomState;
+    const room = makeMysteryRoom(state);
+    mocks.loadGameRoom.mockResolvedValue(room);
+
+    const response = await get();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(JSON.stringify(body.room.gameState)).not.toContain(marker);
+    expect(body.room.gameState).not.toHaveProperty("private");
+    expect(body.room.gameState).not.toHaveProperty("answer");
+    expect(body.room.gameState.history[0]).toEqual({
+      kind: "question",
+      playerId: "user-1",
+      playerName: "학생 1",
+      locale: "ko",
+      question: "먹을 수 있나요?",
+      answer: "yes",
+    });
+    expect(JSON.stringify(state)).toContain(marker);
+  });
+
   it("저장 충돌 응답은 최신 방의 비밀을 제거하고 원본은 유지한다", async () => {
     const initial = makeMysteryRoom();
     const latestState = makeMysteryPlayState();
@@ -414,6 +453,7 @@ describe("미스터리 박스 실제 공개 응답", () => {
         kind: "guess",
         playerId: "user-1",
         playerName: "학생 1",
+        locale: "ko",
         guess: "사과",
         correct: true,
       }],
@@ -441,6 +481,52 @@ describe("미스터리 박스 실제 공개 응답", () => {
     expect(body.room.gameState).not.toHaveProperty("private");
     expect(body.room.gameState).toEqual({});
     expect(state.private).toEqual({ itemId: "apple" });
+  });
+
+  it.each([
+    ["정답 완료", "completed"],
+    ["인원 부족 종료", "insufficient-players"],
+  ] as const)("마지막 참가자는 %s 방을 안전하게 삭제한다", async (_name, endReason) => {
+    const completed = endReason === "completed";
+    const state = makeMysteryPlayState({
+      phase: "done",
+      round: 1,
+      turnOrder: ["user-1"],
+      currentTurnIdx: 0,
+      history: completed
+        ? [{
+            kind: "guess",
+            playerId: "user-1",
+            playerName: "학생 1",
+            locale: "ko",
+            guess: "사과",
+            correct: true,
+          }]
+        : [],
+      scores: { "user-1": 0 },
+      ...(completed ? { winnerId: "user-1" } : {}),
+      answer: { ko: "사과", en: "apple" },
+      endReason,
+    });
+    const room = makeMysteryRoom(state, {
+      status: "ended",
+      players: makePlayers(1),
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.deleteGameRoom.mockResolvedValue({ kind: "deleted", room: null });
+
+    const response = await patch({
+      action: "leave",
+      expectedCreatedAt: room.createdAt,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      room: null,
+      deleted: true,
+    });
+    expect(mocks.deleteGameRoom).toHaveBeenCalledTimes(1);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 });
 

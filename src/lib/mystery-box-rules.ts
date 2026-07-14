@@ -281,25 +281,75 @@ export const MYSTERY_ITEMS: readonly MysteryItem[] = [
   },
 ] as const;
 
+const KOREAN_NOUN_ENDING =
+  "(?:인가요|입니까|이에요|예요|인가|이야|이다|이|가|은|는|을|를|도|만|의|에|에서|처럼)?";
+
+function koreanNoun(term: string): RegExp {
+  return new RegExp(
+    `(?<![가-힣])${term}${KOREAN_NOUN_ENDING}(?=$|[^가-힣])`,
+    "u",
+  );
+}
+
+function koreanForm(source: string): RegExp {
+  return new RegExp(
+    `(?<![가-힣])(?:${source})(?=$|[^가-힣])`,
+    "u",
+  );
+}
+
 const ATTRIBUTE_PATTERNS: Record<
   MysteryLocale,
   Record<MysteryAttribute, readonly RegExp[]>
 > = {
   ko: {
-    living: [/살아\s*있/u, /생물/u],
-    animal: [/동물/u, /짐승/u],
-    plant: [/식물/u, /나무/u, /꽃/u, /풀(?:인가|이야|입니까|인가요)/u],
-    edible: [/먹을\s*수/u, /먹는/u, /음식/u, /식용/u],
-    small: [/작(?:은|나요|습니까|다)/u, /소형/u, /주머니/u],
-    large: [/크(?:나요|습니까|다|고)/u, /큰/u, /대형/u],
-    colorful: [/알록달록/u, /색(?:깔|이\s*다양)/u, /화려/u],
+    living: [/(?<![가-힣])살아\s*있/u, koreanNoun("생물")],
+    animal: [koreanNoun("동물"), koreanNoun("짐승")],
+    plant: [
+      koreanNoun("식물"),
+      koreanNoun("나무"),
+      koreanNoun("꽃"),
+      koreanNoun("풀"),
+    ],
+    edible: [
+      /(?<![가-힣])먹을\s*수/u,
+      /(?<![가-힣])먹는/u,
+      koreanNoun("음식"),
+      koreanNoun("식용"),
+    ],
+    small: [
+      koreanForm("작(?:은가요|은|나요|습니까|다)"),
+      koreanNoun("소형"),
+      koreanNoun("주머니"),
+    ],
+    large: [
+      koreanForm("크(?:나요|습니까|다고|다|고)"),
+      koreanForm("큰(?:가요)?"),
+      koreanNoun("대형"),
+    ],
+    colorful: [
+      /(?<![가-힣])알록달록/u,
+      /(?<![가-힣])색(?:깔|이\s*다양)/u,
+      /(?<![가-힣])화려/u,
+    ],
     indoor: [/실내/u, /집\s*안/u, /방\s*안/u],
-    legs: [/다리/u, /발(?:이|을|이\s*있)/u],
-    fly: [/날\s*수/u, /날개/u, /비행/u],
-    humanMade: [/사람이\s*만든/u, /인공/u, /제품/u, /발명/u],
-    hard: [/딱딱/u, /단단/u, /굳은/u],
-    wet: [/젖/u, /물기/u, /축축/u],
-    round: [/동그/u, /둥글/u, /둥근/u, /원형/u, /공처럼/u],
+    legs: [koreanNoun("다리"), koreanNoun("발")],
+    fly: [/(?<![가-힣])날\s*수/u, koreanNoun("날개"), koreanNoun("비행")],
+    humanMade: [
+      /사람이\s*만든/u,
+      koreanNoun("인공"),
+      koreanNoun("제품"),
+      koreanNoun("발명"),
+    ],
+    hard: [/(?<![가-힣])딱딱/u, /(?<![가-힣])단단/u, /(?<![가-힣])굳은/u],
+    wet: [/(?<![가-힣])젖/u, koreanNoun("물기"), /(?<![가-힣])축축/u],
+    round: [
+      /(?<![가-힣])동그/u,
+      /(?<![가-힣])둥글/u,
+      /(?<![가-힣])둥근/u,
+      koreanNoun("원형"),
+      /(?<![가-힣])공처럼/u,
+    ],
   },
   en: {
     living: [/\balive\b/u, /\bliving\b/u],
@@ -326,7 +376,68 @@ const NEGATION_PATTERNS: Record<MysteryLocale, RegExp> = {
 
 function normalizeText(value: string, locale: MysteryLocale): string {
   const normalized = value.normalize("NFKC").trim().replace(/\s+/gu, " ");
-  return locale === "en" ? normalized.toLocaleLowerCase("en") : normalized;
+  return locale === "en"
+    ? normalized.replace(/’/gu, "'").toLocaleLowerCase("en")
+    : normalized;
+}
+
+interface TextMatch {
+  start: number;
+  end: number;
+}
+
+function findPatternMatches(
+  text: string,
+  patterns: readonly RegExp[],
+): TextMatch[] {
+  const matches: TextMatch[] = [];
+  for (const pattern of patterns) {
+    const flags = pattern.flags.includes("g")
+      ? pattern.flags
+      : `${pattern.flags}g`;
+    for (const match of text.matchAll(new RegExp(pattern.source, flags))) {
+      const start = match.index;
+      matches.push({ start, end: start + match[0].length });
+    }
+  }
+  return matches.filter(
+    (match, index) =>
+      matches.findIndex(
+        (candidate) =>
+          candidate.start === match.start && candidate.end === match.end,
+      ) === index,
+  );
+}
+
+function findNegations(text: string, locale: MysteryLocale): TextMatch[] {
+  return [...text.matchAll(NEGATION_PATTERNS[locale])].map((match) => ({
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
+}
+
+function isAttachedNegation(
+  text: string,
+  locale: MysteryLocale,
+  attribute: TextMatch,
+  negation: TextMatch,
+): boolean {
+  if (
+    negation.start < attribute.end &&
+    attribute.start < negation.end
+  ) {
+    return true;
+  }
+  if (locale === "en" && negation.end <= attribute.start) {
+    const between = text.slice(negation.end, attribute.start);
+    return /^\s*(?:(?:it|this|that|the (?:item|object|thing))\s+)?(?:(?:is|are|was|were|be|being|have|has|had)\s+)?$/u
+      .test(between);
+  }
+  if (locale === "ko" && attribute.end <= negation.start) {
+    const between = text.slice(attribute.end, negation.start);
+    return /^\s*(?:(?:이|가|은|는|을|를)\s*)?$/u.test(between);
+  }
+  return false;
 }
 
 export function getMysteryItem(itemId: string): MysteryItem | null {
@@ -339,17 +450,32 @@ export function classifyMysteryQuestion(
   locale: MysteryLocale,
 ): MysteryAnswer {
   const normalized = normalizeText(question, locale);
-  const attributes = MYSTERY_ATTRIBUTES.filter((attribute) =>
-    ATTRIBUTE_PATTERNS[locale][attribute].some((pattern) =>
-      pattern.test(normalized)
-    )
-  );
-  if (attributes.length !== 1) return "unknown";
+  const detectedAttributes = MYSTERY_ATTRIBUTES.map((attribute) => ({
+    attribute,
+    matches: findPatternMatches(
+      normalized,
+      ATTRIBUTE_PATTERNS[locale][attribute],
+    ),
+  })).filter(({ matches }) => matches.length > 0);
+  if (detectedAttributes.length !== 1) return "unknown";
 
-  const negations = normalized.match(NEGATION_PATTERNS[locale]) ?? [];
+  const negations = findNegations(normalized, locale);
   if (negations.length > 1) return "unknown";
+  if (
+    negations.length === 1 &&
+    !detectedAttributes[0].matches.every((attributeMatch) =>
+      isAttachedNegation(
+        normalized,
+        locale,
+        attributeMatch,
+        negations[0],
+      )
+    )
+  ) {
+    return "unknown";
+  }
 
-  const value = item.attributes[attributes[0]];
+  const value = item.attributes[detectedAttributes[0].attribute];
   const answer = negations.length === 1 ? !value : value;
   return answer ? "yes" : "no";
 }

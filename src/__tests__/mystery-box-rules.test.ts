@@ -40,10 +40,35 @@ describe("미스터리 박스 질문 규칙", () => {
 
   it.each([
     ["무슨 소리가 나나요?", "ko"],
+    ["사다리인가요?", "ko"],
+    ["꽃게인가요?", "ko"],
+    ["큰일인가요?", "ko"],
+    ["작은아버지인가요?", "ko"],
+    ["비행기인가요?", "ko"],
     ["먹을 수 있고 작은가요?", "ko"],
     ["Does it make a sound?", "en"],
     ["Is it small and edible?", "en"],
   ] as const)("속성이 없거나 둘 이상인 질문 %s은 모름이다", (question, locale) => {
+    expect(classifyMysteryQuestion(question, APPLE_ITEM, locale)).toBe(
+      "unknown",
+    );
+  });
+
+  it.each([
+    ["Is it edible and not red?", "en"],
+    ["Is it edible with no seeds?", "en"],
+    ["먹을 수 있지만 씨가 없나요?", "ko"],
+    ["먹을 수 있지만 빨갛지 않나요?", "ko"],
+  ] as const)("다른 절의 부정이 섞인 질문 %s은 모름이다", (question, locale) => {
+    expect(classifyMysteryQuestion(question, APPLE_ITEM, locale)).toBe(
+      "unknown",
+    );
+  });
+
+  it.each([
+    ["Does it fly without wings?", "en"],
+    ["다리는 있지만 발은 없나요?", "ko"],
+  ] as const)("같은 속성의 긍정과 부정이 섞인 질문 %s은 모름이다", (question, locale) => {
     expect(classifyMysteryQuestion(question, APPLE_ITEM, locale)).toBe(
       "unknown",
     );
