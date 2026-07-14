@@ -1,58 +1,62 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   act,
   cleanup,
   fireEvent,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import RoomMemory from "@/app/(student)/student-question-play/games/RoomMemory";
+import MemoryGame from "@/app/(student)/student-question-play/games/MemoryGame";
 import {
   BUILT_IN_GAMES,
   type GameRoom,
   type RoomActionHandler,
   type RoomActionResult,
+  type RoomCommandResult,
 } from "@/lib/question-games-data";
+import {
+  createMemoryState,
+  readMemoryState,
+  type MemoryRoomState,
+} from "@/lib/question-game-room-engines/memory";
 
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
-const stateUpdateMocks = vi.hoisted(() => ({
-  afterUnmount: false,
-  updateAfterUnmount: vi.fn(),
+const awardMocks = vi.hoisted(() => ({
+  award: vi.fn(),
+  reset: vi.fn(),
 }));
-
-vi.mock("react", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("react")>();
-
-  return {
-    ...actual,
-    useState<T>(initialState: T | (() => T)) {
-      const [value, setValue] = actual.useState(initialState);
-      const setObservedValue = (nextValue: React.SetStateAction<T>) => {
-        if (stateUpdateMocks.afterUnmount) {
-          stateUpdateMocks.updateAfterUnmount();
-        }
-        setValue(nextValue);
-      };
-
-      return [value, setObservedValue] as const;
-    },
-  };
-});
 
 vi.mock("@/app/(student)/student-question-play/games/useAIPlay", () => ({
   useAIPlay: () => ({ ask: aiMocks.ask, loading: false }),
 }));
 
-const fixedRoundId = "00000000-0000-4000-8000-000000000006";
+vi.mock("@/app/(student)/student-question-play/games/useSingleAward", () => ({
+  useSingleAward: () => ({
+    award: awardMocks.award,
+    result: null,
+    reset: awardMocks.reset,
+  }),
+  AwardBadge: () => null,
+}));
+
+const game = BUILT_IN_GAMES.find((item) => item.id === "memory")!;
+const players: GameRoom["players"] = [
+  { id: "host", name: "방장", isHost: true, joinedAt: 1 },
+  { id: "other", name: "학생", isHost: false, joinedAt: 2 },
+];
 
 beforeEach(() => {
   aiMocks.ask.mockReset();
-  stateUpdateMocks.afterUnmount = false;
-  stateUpdateMocks.updateAfterUnmount.mockReset();
+  awardMocks.award.mockReset();
+  awardMocks.reset.mockReset();
 });
 
 afterEach(() => {
@@ -62,12 +66,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function makeMemoryRoom(
-  state: Record<string, unknown>,
-  players: GameRoom["players"] = [
-    { id: "host", name: "방장", isHost: true, joinedAt: 1 },
-    { id: "other", name: "학생", isHost: false, joinedAt: 2 },
-  ],
+function makeRoom(
+  state: MemoryRoomState = createMemoryState(),
+  overrides: Partial<GameRoom> = {},
 ): GameRoom {
   return {
     code: "1234",
@@ -78,75 +79,99 @@ function makeMemoryRoom(
     topic: "",
     chain: [],
     turnIndex: 0,
-    gameState: state,
-    version: 1,
+    gameState: state as unknown as Record<string, unknown>,
+    version: 7,
     createdAt: 10,
     updatedAt: 10,
+    playId: "play-1",
+    ...overrides,
   };
+}
+
+function makeRollingState(
+  overrides: Partial<MemoryRoomState> = {},
+): MemoryRoomState {
+  const pairs = Array.from({ length: 6 }, (_, index) => ({
+    id: `pair-${index}`,
+    question: `질문 ${index + 1}`,
+    answer: `대답 ${index + 1}`,
+  }));
+  const state: MemoryRoomState = {
+    ...createMemoryState(),
+    phase: "rolling",
+    roundId: "round-1",
+    difficulty: "easy",
+    pairs,
+    qCards: pairs.map((pair, index) => ({
+      id: `question-${index}`,
+      pairId: pair.id,
+      type: "q",
+    })),
+    aCards: pairs.map((pair, index) => ({
+      id: `answer-${index}`,
+      pairId: pair.id,
+      type: "a",
+    })),
+    scores: { host: 0, other: 0 },
+    maxAttempts: 18,
+    ...overrides,
+  };
+  expect(readMemoryState(state)).not.toBeNull();
+  return state;
+}
+
+function makePlayState(
+  overrides: Partial<MemoryRoomState> = {},
+): MemoryRoomState {
+  const state: MemoryRoomState = {
+    ...makeRollingState(),
+    phase: "play",
+    diceRolls: { host: 6, other: 4 },
+    turnOrder: ["host", "other"],
+    ...overrides,
+  };
+  expect(readMemoryState(state)).not.toBeNull();
+  return state;
+}
+
+function makeMissState(
+  revealId = "reveal-1",
+  overrides: Partial<MemoryRoomState> = {},
+): MemoryRoomState {
+  return makePlayState({
+    attempts: 1,
+    revealedIds: ["question-0", "answer-1"],
+    lastReveal: {
+      revealId,
+      result: "miss",
+      turnPlayerId: "host",
+      resolveAt: 9999,
+    },
+    ...overrides,
+  });
 }
 
 function makeProps(
   room: GameRoom,
   onAction: RoomActionHandler,
   myId = "host",
+  actionLoading = false,
 ) {
   return {
-    game: BUILT_IN_GAMES.find((item) => item.id === "memory")!,
+    game,
     room,
     myId,
-    actionLoading: false,
+    actionLoading,
     onAction,
     onLeave: vi.fn(),
   };
 }
 
-function makeSetupState(): Record<string, unknown> {
-  return {
-    phase: "setup",
-    difficulty: "normal",
-    pairs: [],
-    qCards: [],
-    aCards: [],
-    diceRolls: {},
-    turnOrder: [],
-    currentTurnIdx: 0,
-    takenIds: [],
-    revealedIds: [],
-    scores: {},
-  };
-}
-
-function makeRollingState(
-  overrides: Record<string, unknown> = {},
-): Record<string, unknown> {
-  return {
-    phase: "rolling",
-    difficulty: "normal",
-    pairs: [],
-    qCards: [],
-    aCards: [],
-    diceRolls: {},
-    rollRoundId: "round-1",
-    turnOrder: [],
-    currentTurnIdx: 0,
-    takenIds: [],
-    revealedIds: [],
-    scores: {},
-    ...overrides,
-  };
-}
-
-function conflict(room: GameRoom): RoomActionResult {
-  return {
-    ok: false,
-    room,
-    status: 409,
-    reason: "conflict",
-  };
-}
-
-function success(room: GameRoom): RoomActionResult {
-  return { ok: true, room };
+function success(
+  room: GameRoom,
+  result?: RoomCommandResult,
+): RoomActionResult {
+  return { ok: true, room, ...(result ? { result } : {}) };
 }
 
 function generatedPairs(count: number) {
@@ -166,357 +191,505 @@ function generatedPairs(count: number) {
   };
 }
 
-async function finishDiceAnimation() {
-  await act(async () => {
-    await vi.advanceTimersByTimeAsync(12 * 80);
+function generatedLocalPairs(count: number) {
+  return {
+    text: JSON.stringify(
+      Array.from({ length: count }, (_, index) => ({
+        question: `질문 ${index + 1}`,
+        answer: `대답 ${index + 1}`,
+      })),
+    ),
+  };
+}
+
+function stubCommandIds(...ids: string[]) {
+  let index = 0;
+  vi.stubGlobal("crypto", {
+    randomUUID: vi.fn(() => ids[index++] ?? ids.at(-1) ?? "command-id"),
   });
 }
 
-describe("메모리 카드 생성", () => {
-  it("첫 생성 상태 저장이 실패하면 인공지능 생성을 시작하지 않는다", async () => {
-    const room = makeMemoryRoom(makeSetupState());
-    const onAction = vi
-      .fn<RoomActionHandler>()
-      .mockResolvedValue(conflict(room));
-
-    render(<RoomMemory {...makeProps(room, onAction)} />);
-    fireEvent.click(screen.getByRole("button", { name: /쉬움/ }));
-
-    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
-    expect(aiMocks.ask).not.toHaveBeenCalled();
+async function flushEffects() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
   });
+}
 
-  it("첫 생성 상태 저장 실패 뒤 생성 잠금을 풀어 다시 시도한다", async () => {
-    const room = makeMemoryRoom(makeSetupState());
+describe("메모리 준비와 주사위 서버 명령", () => {
+  it("준비 자료만 생성해 memory-prepare 한 번을 보낸다", async () => {
+    const room = makeRoom();
+    const preparedRoom = makeRoom(makeRollingState(), { version: 8 });
     const onAction = vi
       .fn<RoomActionHandler>()
-      .mockResolvedValue(conflict(room));
-
-    render(<RoomMemory {...makeProps(room, onAction)} />);
-    const difficultyButton = screen.getByRole("button", { name: /쉬움/ });
-
-    fireEvent.click(difficultyButton);
-    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
-
-    fireEvent.click(difficultyButton);
-    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
-  });
-
-  it("첫 저장과 인공지능 생성이 성공하면 새 라운드로 굴리기 상태를 저장한다", async () => {
-    const room = makeMemoryRoom(makeSetupState());
-    const onAction = vi
-      .fn<RoomActionHandler>()
-      .mockResolvedValue(success(room));
+      .mockResolvedValue(success(preparedRoom));
     aiMocks.ask.mockResolvedValue(generatedPairs(6));
-    vi.stubGlobal("crypto", {
-      randomUUID: vi.fn(() => fixedRoundId),
-    });
+    stubCommandIds("00000000-0000-4000-8000-000000000101");
 
     render(<RoomMemory {...makeProps(room, onAction)} />);
     fireEvent.click(screen.getByRole("button", { name: /쉬움/ }));
 
-    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
-    expect(onAction).toHaveBeenNthCalledWith(1, "update-state", {
-      patch: { phase: "generating", difficulty: "easy" },
-    });
-    expect(aiMocks.ask).toHaveBeenCalledWith({
-      action: "memory:pairs-bilingual",
-      context: { count: "6" },
-      locale: "ko",
-    });
-    expect(onAction).toHaveBeenNthCalledWith(
-      2,
-      "update-state",
-      expect.objectContaining({
-        patch: expect.objectContaining({
-          phase: "rolling",
-          rollRoundId: fixedRoundId,
-          pairs: expect.arrayContaining([
-            expect.objectContaining({
-              id: "p0",
-              question: "질문 1",
-              answer: "대답 1",
-              questionText: { ko: "질문 1", en: "Question 1" },
-              answerText: { ko: "대답 1", en: "Answer 1" },
-            }),
-          ]),
-        }),
-      }),
-      { expectedRoom: { code: "1234", createdAt: 10 } },
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+    expect(onAction).toHaveBeenCalledWith(
+      "memory-prepare",
+      {
+        playId: "play-1",
+        difficulty: "easy",
+        pairs: expect.arrayContaining([
+          expect.objectContaining({
+            question: "질문 1",
+            answer: "대답 1",
+          }),
+        ]),
+      },
+      { commandId: "00000000-0000-4000-8000-000000000101" },
     );
+    const body = onAction.mock.calls[0]?.[1];
+    expect(body).not.toHaveProperty("roundId");
+    expect(body).not.toHaveProperty("qCards");
+    expect(body).not.toHaveProperty("aCards");
+    expect(body).not.toHaveProperty("turnOrder");
+    expect(body).not.toHaveProperty("diceRolls");
+    expect((body?.pairs as Array<Record<string, unknown>>)[0]).not.toHaveProperty("id");
   });
 
-  it("인공지능 생성 대기 중 화면을 떠나면 이전 방의 카드를 저장하지 않는다", async () => {
-    const room = makeMemoryRoom(makeSetupState());
+  it("준비 자료를 만드는 동안 대기 상태를 보이고 중복 요청을 막는다", async () => {
     let resolveAsk!: (value: ReturnType<typeof generatedPairs>) => void;
     const pendingAsk = new Promise<ReturnType<typeof generatedPairs>>((resolve) => {
       resolveAsk = resolve;
     });
+    aiMocks.ask.mockReturnValue(pendingAsk);
+    const room = makeRoom();
     const onAction = vi
       .fn<RoomActionHandler>()
-      .mockResolvedValue(success(room));
-    aiMocks.ask.mockReturnValue(pendingAsk);
+      .mockResolvedValue(success(makeRoom(makeRollingState())));
+    stubCommandIds("00000000-0000-4000-8000-000000000102");
 
-    const { unmount } = render(<RoomMemory {...makeProps(room, onAction)} />);
+    render(<RoomMemory {...makeProps(room, onAction)} />);
     fireEvent.click(screen.getByRole("button", { name: /쉬움/ }));
 
-    await waitFor(() => expect(aiMocks.ask).toHaveBeenCalledTimes(1));
-    expect(onAction).toHaveBeenCalledTimes(1);
-    unmount();
+    expect(screen.getByText("카드 만드는 중")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /쉬움/ })).toBeDisabled();
+    expect(onAction).not.toHaveBeenCalled();
 
     await act(async () => {
       resolveAsk(generatedPairs(6));
       await pendingAsk;
     });
-
     expect(onAction).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    ["방 코드가", { code: "5678" }],
-    ["방 생성 시각이", { createdAt: 20 }],
-  ])(
-    "인공지능 생성 대기 중 %s 바뀌면 이전 방의 카드를 저장하지 않는다",
-    async (_identityPart, roomOverride) => {
-      const room = makeMemoryRoom(makeSetupState());
-      const nextRoom = { ...makeMemoryRoom(makeSetupState()), ...roomOverride };
-      let resolveAsk!: (value: ReturnType<typeof generatedPairs>) => void;
-      const pendingAsk = new Promise<ReturnType<typeof generatedPairs>>((resolve) => {
-        resolveAsk = resolve;
-      });
-      const onAction = vi
-        .fn<RoomActionHandler>()
-        .mockResolvedValue(success(room));
-      aiMocks.ask.mockReturnValue(pendingAsk);
-
-      const view = render(<RoomMemory {...makeProps(room, onAction)} />);
-      fireEvent.click(screen.getByRole("button", { name: /쉬움/ }));
-
-      await waitFor(() => expect(aiMocks.ask).toHaveBeenCalledTimes(1));
-      expect(onAction).toHaveBeenCalledTimes(1);
-      view.rerender(<RoomMemory {...makeProps(nextRoom, onAction)} />);
-
-      await act(async () => {
-        resolveAsk(generatedPairs(6));
-        await pendingAsk;
-      });
-
-      expect(onAction).toHaveBeenCalledTimes(1);
-    },
-  );
-
-  it("인공지능 생성 대기 중 같은 방의 버전만 바뀌면 카드를 저장한다", async () => {
-    const room = makeMemoryRoom(makeSetupState());
-    const nextRoom = { ...makeMemoryRoom(makeSetupState()), version: 2 };
-    let resolveAsk!: (value: ReturnType<typeof generatedPairs>) => void;
-    const pendingAsk = new Promise<ReturnType<typeof generatedPairs>>((resolve) => {
-      resolveAsk = resolve;
-    });
+  it("주사윗값을 만들지 않고 현재 라운드의 memory-roll만 보낸다", async () => {
+    const room = makeRoom(makeRollingState());
+    const rolledRoom = makeRoom(
+      makeRollingState({ diceRolls: { host: 4 } }),
+      { version: 8 },
+    );
     const onAction = vi
       .fn<RoomActionHandler>()
-      .mockResolvedValue(success(room));
-    aiMocks.ask.mockReturnValue(pendingAsk);
+      .mockResolvedValue(success(rolledRoom, { roll: 4 }));
+    stubCommandIds("00000000-0000-4000-8000-000000000103");
 
     const view = render(<RoomMemory {...makeProps(room, onAction)} />);
-    fireEvent.click(screen.getByRole("button", { name: /쉬움/ }));
+    fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
 
-    await waitFor(() => expect(aiMocks.ask).toHaveBeenCalledTimes(1));
-    view.rerender(<RoomMemory {...makeProps(nextRoom, onAction)} />);
-
-    await act(async () => {
-      resolveAsk(generatedPairs(6));
-      await pendingAsk;
-    });
-
-    expect(onAction).toHaveBeenCalledTimes(2);
-    expect(onAction).toHaveBeenNthCalledWith(
-      2,
-      "update-state",
-      expect.any(Object),
-      { expectedRoom: { code: "1234", createdAt: 10 } },
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+    expect(onAction).toHaveBeenCalledWith(
+      "memory-roll",
+      { playId: "play-1", roundId: "round-1" },
+      { commandId: "00000000-0000-4000-8000-000000000103" },
     );
+    expect(screen.queryByText("4")).not.toBeInTheDocument();
+
+    view.rerender(<RoomMemory {...makeProps(rolledRoom, onAction)} />);
+    expect(screen.getByText("내 주사위").parentElement).toHaveTextContent("4");
   });
 });
 
-describe("메모리 주사위", () => {
-  it("애니메이션 뒤 현재 라운드의 참가자별 주사위 명령만 보낸다", async () => {
-    vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0);
-    const room = makeMemoryRoom(makeRollingState());
-    const onAction = vi
-      .fn<RoomActionHandler>()
-      .mockResolvedValue(success(room));
-
-    render(<RoomMemory {...makeProps(room, onAction)} />);
-    fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
-    await finishDiceAnimation();
-
-    expect(onAction).toHaveBeenCalledTimes(1);
-    expect(onAction).toHaveBeenCalledWith("memory-roll", {
-      roll: 1,
-      rollRoundId: "round-1",
-    });
-  });
-
-  it("주사위 저장 결과가 끝날 때까지 굴리고 서버 결과를 표시한다", async () => {
-    vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const room = makeMemoryRoom(makeRollingState());
-    const savedRoom = makeMemoryRoom(
-      makeRollingState({ diceRolls: { host: 4 } }),
+describe("메모리 카드 서버 명령과 화면 상태", () => {
+  it("서버가 공개한 카드 상태에 맞춰 memory-flip만 보낸다", async () => {
+    const room = makeRoom(makePlayState());
+    const questionRoom = makeRoom(
+      makePlayState({ revealedIds: ["question-0"] }),
+      { version: 8 },
     );
-    let resolveAction!: (result: RoomActionResult) => void;
-    const pendingAction = new Promise<RoomActionResult>((resolve) => {
-      resolveAction = resolve;
-    });
     const onAction = vi
       .fn<RoomActionHandler>()
-      .mockReturnValue(pendingAction);
+      .mockResolvedValue(success(questionRoom));
+    stubCommandIds(
+      "00000000-0000-4000-8000-000000000201",
+      "00000000-0000-4000-8000-000000000202",
+    );
 
     const view = render(<RoomMemory {...makeProps(room, onAction)} />);
-    fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
-    await finishDiceAnimation();
+    fireEvent.click(screen.getByRole("button", { name: "질문 카드 1" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
 
-    expect(
-      screen.getByRole("button", { name: /^🎲 [1-6]$/ }),
-    ).toBeDisabled();
-
-    await act(async () => {
-      resolveAction(success(savedRoom));
-      await pendingAction;
-    });
-    view.rerender(<RoomMemory {...makeProps(savedRoom, onAction)} />);
-
-    expect(screen.getByText("내 주사위").parentElement).toHaveTextContent("4");
-    expect(
-      screen.queryByRole("button", { name: /주사위 굴리기/ }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("주사위 애니메이션 중 화면을 떠나면 저장 명령을 보내지 않는다", async () => {
-    vi.useFakeTimers();
-    const room = makeMemoryRoom(makeRollingState());
-    const onAction = vi
-      .fn<RoomActionHandler>()
-      .mockResolvedValue(success(room));
-
-    const { unmount } = render(<RoomMemory {...makeProps(room, onAction)} />);
-    fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(4 * 80);
-    });
-
-    unmount();
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(12 * 80);
-    });
-
-    expect(onAction).not.toHaveBeenCalled();
-  });
-
-  it("주사위 저장 대기 중 화면을 떠나면 응답 뒤 상태를 갱신하지 않는다", async () => {
-    vi.useFakeTimers();
-    const room = makeMemoryRoom(makeRollingState());
-    let resolveAction!: (result: RoomActionResult) => void;
-    const pendingAction = new Promise<RoomActionResult>((resolve) => {
-      resolveAction = resolve;
-    });
-    const onAction = vi
-      .fn<RoomActionHandler>()
-      .mockReturnValue(pendingAction);
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
-
-    const { unmount } = render(<RoomMemory {...makeProps(room, onAction)} />);
-    fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
-    await finishDiceAnimation();
-    expect(onAction).toHaveBeenCalledTimes(1);
-
-    unmount();
-    stateUpdateMocks.afterUnmount = true;
-    await act(async () => {
-      resolveAction(conflict(room));
-      await pendingAction;
-    });
-
-    expect(stateUpdateMocks.updateAfterUnmount).not.toHaveBeenCalled();
-    expect(consoleError).not.toHaveBeenCalled();
-    expect(onAction).toHaveBeenCalledTimes(1);
-  });
-
-  it("주사위 저장이 실패하면 지역 결과를 비우고 다시 굴릴 수 있다", async () => {
-    vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const room = makeMemoryRoom(makeRollingState());
-    const onAction = vi
-      .fn<RoomActionHandler>()
-      .mockResolvedValue(conflict(room));
-
-    render(<RoomMemory {...makeProps(room, onAction)} />);
-    fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
-    await finishDiceAnimation();
-
-    expect(onAction).toHaveBeenNthCalledWith(1, "memory-roll", {
-      roll: expect.any(Number),
-      rollRoundId: "round-1",
-    });
-    const retryButton = screen.getByRole("button", {
-      name: /주사위 굴리기/,
-    });
-    expect(retryButton).toBeEnabled();
-
-    fireEvent.click(retryButton);
-    await finishDiceAnimation();
-    expect(onAction).toHaveBeenCalledTimes(2);
-  });
-
-  it("서버 방에 내 결과가 있으면 다시 굴리기 단추를 숨긴다", () => {
-    const room = makeMemoryRoom(
-      makeRollingState({ diceRolls: { host: 6 } }),
+    expect(onAction).toHaveBeenNthCalledWith(
+      1,
+      "memory-flip",
+      { playId: "play-1", roundId: "round-1", cardId: "question-0" },
+      { commandId: "00000000-0000-4000-8000-000000000201" },
     );
+    expect(screen.getByRole("button", { name: "대답 카드 1" })).toBeDisabled();
+
+    view.rerender(<RoomMemory {...makeProps(questionRoom, onAction)} />);
+    fireEvent.click(screen.getByRole("button", { name: "대답 카드 2" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
+
+    expect(onAction).toHaveBeenNthCalledWith(
+      2,
+      "memory-flip",
+      { playId: "play-1", roundId: "round-1", cardId: "answer-1" },
+      { commandId: "00000000-0000-4000-8000-000000000202" },
+    );
+  });
+
+  it("현재 차례와 시도 수를 보이고 다른 참가자 입력을 막는다", () => {
+    const room = makeRoom(makePlayState());
+    const onAction = vi.fn<RoomActionHandler>();
+
+    render(<RoomMemory {...makeProps(room, onAction, "other")} />);
+
+    expect(screen.getByText(/방장의 차례/)).toBeInTheDocument();
+    expect(screen.getByText("시도 0/18")).toBeInTheDocument();
+    expect(screen.getByText("내 차례를 기다리는 중")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "질문 카드 1" })).toBeDisabled();
+  });
+
+  it("요청 처리와 실패 공개 및 획득 카드 상태를 분명히 보인다", () => {
+    const onAction = vi.fn<RoomActionHandler>();
+    const loadingRoom = makeRoom(makePlayState());
+    const first = render(
+      <RoomMemory {...makeProps(loadingRoom, onAction, "host", true)} />,
+    );
+    expect(screen.getByText("요청 처리 중")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "질문 카드 1" })).toBeDisabled();
+    first.unmount();
+
+    const missRoom = makeRoom(makeMissState());
+    const second = render(<RoomMemory {...makeProps(missRoom, onAction)} />);
+    expect(screen.getByText("카드를 다시 덮는 중")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "질문 카드 2" })).toBeDisabled();
+    second.unmount();
+
+    const takenRoom = makeRoom(makePlayState({
+      attempts: 1,
+      takenIds: ["question-0", "answer-0"],
+      scores: { host: 1, other: 0 },
+      lastReveal: {
+        revealId: "match-1",
+        result: "match",
+        turnPlayerId: "host",
+        resolveAt: 0,
+      },
+    }));
+    render(<RoomMemory {...makeProps(takenRoom, onAction)} />);
+    const taken = screen.getByRole("button", {
+      name: "획득한 질문 카드: 질문 1",
+    });
+    expect(taken).toBeDisabled();
+    expect(taken).toHaveTextContent("질문 1");
+  });
+
+  it("손상된 버전 2 상태는 그리거나 명령을 보내지 않는다", () => {
+    const room = {
+      ...makeRoom(),
+      gameState: {
+        stateVersion: 2,
+        game: "memory",
+        phase: "play",
+      },
+    };
     const onAction = vi.fn<RoomActionHandler>();
 
     render(<RoomMemory {...makeProps(room, onAction)} />);
 
-    expect(
-      screen.queryByRole("button", { name: /주사위 굴리기/ }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("모든 결과가 있어도 방장이 별도 놀이 상태 저장을 보내지 않는다", async () => {
-    const room = makeMemoryRoom(
-      makeRollingState({ diceRolls: { host: 6, other: 4 } }),
-    );
-    const onAction = vi
-      .fn<RoomActionHandler>()
-      .mockResolvedValue(success(room));
-
-    render(<RoomMemory {...makeProps(room, onAction)} />);
-    await act(async () => {
-      await Promise.resolve();
-    });
-
+    expect(screen.getAllByText(/준비 중/).length).toBeGreaterThan(0);
     expect(onAction).not.toHaveBeenCalled();
   });
+});
 
-  it("라운드 값이 없는 예전 방은 공용 예전 방 값을 보낸다", async () => {
+describe("실패 공개 복원", () => {
+  it("모든 참가자가 같은 공개를 한 효과로 복원하고 서버 대기값 뒤 다시 보낸다", async () => {
     vi.useFakeTimers();
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const rollingState = makeRollingState();
-    delete rollingState.rollRoundId;
-    const room = makeMemoryRoom(rollingState);
+    const room = makeRoom(makeMissState());
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockResolvedValueOnce(success(room, { retryAfterMs: 1200 }))
+      .mockResolvedValue(success(room));
+    stubCommandIds("00000000-0000-4000-8000-000000000301");
+
+    const view = render(<RoomMemory {...makeProps(room, onAction, "other")} />);
+    await flushEffects();
+
+    expect(onAction).toHaveBeenCalledTimes(1);
+    expect(onAction).toHaveBeenCalledWith(
+      "memory-resolve-miss",
+      { playId: "play-1", roundId: "round-1", revealId: "reveal-1" },
+      { commandId: "00000000-0000-4000-8000-000000000301" },
+    );
+
+    view.rerender(
+      <RoomMemory
+        {...makeProps({
+          ...room,
+          gameState: { ...room.gameState },
+        }, onAction, "other")}
+      />,
+    );
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1199);
+    });
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction.mock.calls[1]).toEqual(onAction.mock.calls[0]);
+  });
+
+  it("큰 서버 대기값은 복원 대기 상한까지만 기다린다", async () => {
+    vi.useFakeTimers();
+    const room = makeRoom(makeMissState());
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockResolvedValueOnce(success(room, { retryAfterMs: 3200 }))
+      .mockResolvedValue(success(room));
+    stubCommandIds("00000000-0000-4000-8000-000000000305");
+
+    render(<RoomMemory {...makeProps(room, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2499);
+    });
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction.mock.calls[1]).toEqual(onAction.mock.calls[0]);
+  });
+
+  it.each([
+    ["없음", undefined],
+    ["음수", -1],
+    ["소수", 1.5],
+  ])("%s 서버 대기값은 반복 복원 요청을 만들지 않는다", async (_kind, retryAfterMs) => {
+    vi.useFakeTimers();
+    const room = makeRoom(makeMissState());
+    const result = retryAfterMs === undefined ? undefined : { retryAfterMs };
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockResolvedValue(success(room, result));
+    stubCommandIds("00000000-0000-4000-8000-000000000302");
+
+    render(<RoomMemory {...makeProps(room, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(onAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("공개가 해소되면 예약 요청을 취소하고 새 공개에는 새 효과를 만든다", async () => {
+    vi.useFakeTimers();
+    const room = makeRoom(makeMissState());
+    const onAction = vi
+      .fn<RoomActionHandler>()
+      .mockResolvedValueOnce(success(room, { retryAfterMs: 1200 }))
+      .mockResolvedValue(success(room));
+    stubCommandIds(
+      "00000000-0000-4000-8000-000000000303",
+      "00000000-0000-4000-8000-000000000304",
+    );
+
+    const view = render(<RoomMemory {...makeProps(room, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    const clearRoom = makeRoom(makePlayState(), { version: 8 });
+    view.rerender(<RoomMemory {...makeProps(clearRoom, onAction, "other")} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1200);
+    });
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    const nextRoom = makeRoom(makeMissState("reveal-2"), { version: 9 });
+    view.rerender(<RoomMemory {...makeProps(nextRoom, onAction, "other")} />);
+    await flushEffects();
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction).toHaveBeenLastCalledWith(
+      "memory-resolve-miss",
+      { playId: "play-1", roundId: "round-1", revealId: "reveal-2" },
+      { commandId: "00000000-0000-4000-8000-000000000304" },
+    );
+  });
+});
+
+describe("RoomMemory 결과 흐름", () => {
+  it("방장은 공용 결과 화면에서 대기실로 돌아갈 수 있다", async () => {
+    const room = makeRoom(makePlayState(), { status: "ended" });
     const onAction = vi
       .fn<RoomActionHandler>()
       .mockResolvedValue(success(room));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      JSON.stringify({ awards: [] }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )));
 
     render(<RoomMemory {...makeProps(room, onAction)} />);
-    fireEvent.click(screen.getByRole("button", { name: /주사위 굴리기/ }));
-    await finishDiceAnimation();
 
-    expect(onAction).toHaveBeenCalledWith("memory-roll", {
-      roll: expect.any(Number),
-      rollRoundId: "legacy:1234:10",
+    const returnButton = await screen.findByRole("button", { name: /대기실/ });
+    fireEvent.click(returnButton);
+    await waitFor(() => {
+      expect(onAction).toHaveBeenCalledWith("restart");
     });
+  });
+});
+
+describe("RoomMemory 명령 소스 경계", () => {
+  it("허용한 네 서버 명령 밖의 지역 판정 경로가 없다", () => {
+    const source = readFileSync(
+      join(
+        process.cwd(),
+        "src/app/(student)/student-question-play/games/RoomMemory.tsx",
+      ),
+      "utf8",
+    );
+
+    expect(source).not.toMatch(/\bset-state\b|\bupdate-state\b/);
+    expect(source).not.toMatch(/Math\.random|Date\.now/);
+    const actions = [...source.matchAll(/onAction\(\s*["']([^"']+)["']/g)]
+      .map((match) => match[1]);
+    expect(new Set(actions)).toEqual(new Set([
+      "memory-prepare",
+      "memory-roll",
+      "memory-flip",
+      "memory-resolve-miss",
+    ]));
+  });
+});
+
+async function startLocalMemory(difficulty: "쉬움" | "보통" | "어려움") {
+  const pairCount = difficulty === "쉬움" ? 6 : difficulty === "보통" ? 10 : 15;
+  aiMocks.ask.mockResolvedValue(generatedLocalPairs(pairCount));
+  vi.spyOn(Math, "random").mockReturnValue(0);
+  render(
+    <MemoryGame
+      game={game}
+      onBack={vi.fn()}
+      config={{ mode: "solo", players: ["학생"] }}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: new RegExp(difficulty) }));
+  await screen.findByText("💧 질문 카드 (파란색)");
+}
+
+function localQuestionCards() {
+  const section = screen.getByText("💧 질문 카드 (파란색)").parentElement;
+  if (!section) throw new Error("질문 카드 영역이 없습니다");
+  return within(section).getAllByRole("button");
+}
+
+function localAnswerCards() {
+  const section = screen.getByText("⭐ 대답 카드 (노란색)").parentElement;
+  if (!section) throw new Error("대답 카드 영역이 없습니다");
+  return within(section).getAllByRole("button");
+}
+
+function chooseLocalPair(questionIndex: number, answerIndex: number) {
+  fireEvent.click(localQuestionCards()[questionIndex]);
+  fireEvent.click(localAnswerCards()[answerIndex]);
+}
+
+describe("지역 메모리 최대 시도", () => {
+  it.each([
+    ["쉬움", 18],
+    ["보통", 30],
+    ["어려움", 45],
+  ] as const)("%s은 공통 규칙의 최대 시도 %s를 보인다", async (difficulty, max) => {
+    await startLocalMemory(difficulty);
+    expect(screen.getByText(new RegExp(`시도 0/${max}`))).toBeInTheDocument();
+  });
+
+  it("획득 카드 글자를 흐리지 않고 카드 영역에 화면 주제 색을 쓴다", async () => {
+    await startLocalMemory("쉬움");
+    vi.useFakeTimers();
+
+    const questionSection = screen.getByText("💧 질문 카드 (파란색)").parentElement;
+    const answerSection = screen.getByText("⭐ 대답 카드 (노란색)").parentElement;
+    expect(questionSection).toHaveClass("bg-card", "text-card-foreground");
+    expect(answerSection).toHaveClass("bg-card", "text-card-foreground");
+
+    chooseLocalPair(0, 0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(localQuestionCards()[0]).not.toHaveStyle({ opacity: "0.3" });
+    expect(localAnswerCards()[0]).not.toHaveStyle({ opacity: "0.3" });
+    expect(localQuestionCards()[0].className).toContain("dark:");
+    expect(localAnswerCards()[0].className).toContain("dark:");
+  });
+
+  it("마지막 허용 실패를 보여 준 뒤 결과로 이동하고 완료로 적립한다", async () => {
+    await startLocalMemory("쉬움");
+    vi.useFakeTimers();
+
+    for (let attempt = 1; attempt <= 18; attempt += 1) {
+      chooseLocalPair(0, 1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1800);
+      });
+    }
+
+    expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
+    expect(awardMocks.award).toHaveBeenCalledWith(expect.objectContaining({
+      gameId: "memory",
+      mode: "solo",
+      completed: true,
+    }));
+  });
+
+  it("마지막 허용 성공 뒤 짝이 남아도 결과로 이동한다", async () => {
+    await startLocalMemory("쉬움");
+    vi.useFakeTimers();
+
+    for (let attempt = 1; attempt < 18; attempt += 1) {
+      chooseLocalPair(0, 1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1800);
+      });
+    }
+    chooseLocalPair(0, 0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
+  });
+
+  it("모든 짝을 찾으면 최대 시도 전에 결과로 이동한다", async () => {
+    await startLocalMemory("쉬움");
+    vi.useFakeTimers();
+
+    for (let index = 0; index < 6; index += 1) {
+      chooseLocalPair(index, index);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+    }
+
+    expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
   });
 });

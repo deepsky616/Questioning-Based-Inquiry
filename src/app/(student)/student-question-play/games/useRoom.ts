@@ -257,7 +257,9 @@ export function useRoom(): UseRoomResult {
       beginAction();
       setError(null);
       try {
-        const body = action === "memory-roll"
+        const isLegacyMemoryRoll =
+          action === "memory-roll" && currentRoom.gameState.stateVersion !== 2;
+        const body = isLegacyMemoryRoll
           ? {
               action,
               ...extra,

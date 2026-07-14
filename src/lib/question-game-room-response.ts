@@ -22,7 +22,11 @@ export function readRoomCommandResult(
   if (!isRecord(value)) return undefined;
 
   const result: RoomCommandResult = {};
-  if (isFiniteNumber(value.retryAfterMs)) {
+  if (
+    isFiniteNumber(value.retryAfterMs) &&
+    Number.isInteger(value.retryAfterMs) &&
+    value.retryAfterMs >= 0
+  ) {
     result.retryAfterMs = value.retryAfterMs;
   }
   if (isFiniteNumber(value.roll)) result.roll = value.roll;

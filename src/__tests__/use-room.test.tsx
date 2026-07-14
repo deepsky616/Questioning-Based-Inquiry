@@ -153,6 +153,76 @@ describe("useRoom sendAction", () => {
   });
 
   it.each([
+    ["음수", -1],
+    ["소수", 1.5],
+    ["무한값", Number.POSITIVE_INFINITY],
+    ["문자열", "1200"],
+  ])(
+    "%s retryAfterMs는 화면 결과에서 버린다",
+    async (_kind, retryAfterMs) => {
+      const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        const body = requestBody(init);
+        if (body?.action === "join") return jsonResponse({ room: makeRoom(1) });
+        if (!init?.method) return jsonResponse({ room: makeRoom(1) });
+        return jsonResponse({
+          room: makeRoom(2),
+          result: { retryAfterMs },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const { result, unmount } = renderHook(() => useRoom());
+
+      await act(async () => {
+        await result.current.joinRoom("1234");
+      });
+      let actionResult: RoomActionResult | undefined;
+      await act(async () => {
+        actionResult = await result.current.sendAction("memory-resolve-miss");
+      });
+
+      expect(actionResult).toMatchObject({ ok: true, room: { version: 2 } });
+      expect(actionResult).not.toHaveProperty("result.retryAfterMs");
+      unmount();
+    },
+  );
+
+  it("버전 2 memory-roll은 최신 기대 버전과 실행 및 라운드 식별값을 보낸다", async () => {
+    const currentRoom = {
+      ...makeRoom(7),
+      playId: "play-1",
+      gameState: { stateVersion: 2, game: "memory", roundId: "round-1" },
+    };
+    let actionBody: Record<string, unknown> | null = null;
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: currentRoom });
+      if (!init?.method) return jsonResponse({ room: currentRoom });
+      actionBody = body;
+      return jsonResponse({ room: { ...currentRoom, version: 8 } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+      await result.current.sendAction("memory-roll", {
+        playId: "play-1",
+        roundId: "round-1",
+      });
+    });
+
+    expect(actionBody).toMatchObject({
+      action: "memory-roll",
+      playId: "play-1",
+      roundId: "round-1",
+      expectedVersion: 7,
+      expectedCreatedAt: 1,
+      commandId: expect.any(String),
+    });
+    unmount();
+  });
+
+  it.each([
     ["배열", [{ retryAfterMs: 1200 }]],
     ["과대 문자열", "x".repeat(10_000)],
   ])("%s 명령 결과는 화면에 반환하지 않는다", async (_kind, commandResult) => {

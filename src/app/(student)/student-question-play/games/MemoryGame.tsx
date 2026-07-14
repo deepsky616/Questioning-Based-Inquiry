@@ -12,6 +12,7 @@ import {
   pickFallbackPairs, parseAIPairs, shuffle,
 } from "@/lib/memory-game-data";
 import { getMemoryDifficultyLabel, getQuestionGameText } from "@/lib/question-game-i18n";
+import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -44,6 +45,9 @@ export default function MemoryGame({ game, onBack, config }: Props) {
 
   const [phase, setPhase] = useState<"setup" | "generating" | "play" | "done">("setup");
   const [difficulty, setDifficulty] = useState<MemoryDifficulty>("normal");
+  const maximumAttempts = QUESTION_GAME_RULES.memory.targets[
+    isAI ? "ai" : "solo"
+  ][difficulty];
   const [pairs, setPairs] = useState<QAPair[]>([]);
   const [qCards, setQCards] = useState<Card[]>([]);
   const [aCards, setACards] = useState<Card[]>([]);
@@ -77,7 +81,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       mode: mode as "solo" | "ai",
       gameId: "memory",
       validQuestions: myMatches,
-      completed: taken.length >= qCards.length + aCards.length,
+      completed: true,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
@@ -128,7 +132,9 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     setRevealed(newRevealed);
 
     if (newRevealed.length === 2) {
-      setTries((t) => t + 1);
+      const nextTries = tries + 1;
+      const reachedMaximum = nextTries >= maximumAttempts;
+      setTries(nextTries);
       const [qId, aId] = newRevealed;
       const qCard = qCards.find((c) => c.id === qId);
       const aCard = aCards.find((c) => c.id === aId);
@@ -140,7 +146,12 @@ export default function MemoryGame({ game, onBack, config }: Props) {
           setTaken(newTaken);
           setRevealed([]);
           setScores((s) => ({ ...s, [currentPlayer]: (s[currentPlayer] ?? 0) + 1 }));
-          if (newTaken.length >= qCards.length + aCards.length) setPhase("done");
+          if (
+            newTaken.length >= qCards.length + aCards.length ||
+            reachedMaximum
+          ) {
+            setPhase("done");
+          }
         }, 500);
         return "match";
       } else {
@@ -148,7 +159,11 @@ export default function MemoryGame({ game, onBack, config }: Props) {
         missTimerRef.current = setTimeout(() => {
           setRevealed([]);
           missTimerRef.current = null;
-          if (hasOpponents) setTurnIdx((t) => (t + 1) % playersList.length);
+          if (reachedMaximum) {
+            setPhase("done");
+          } else if (hasOpponents) {
+            setTurnIdx((t) => (t + 1) % playersList.length);
+          }
         }, MISS_DELAY);
         return "miss";
       }
@@ -220,19 +235,18 @@ export default function MemoryGame({ game, onBack, config }: Props) {
 
   /* 결과 */
   if (phase === "done") {
-    const cfg = MEMORY_DIFFICULTY[difficulty];
     const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
     const topScore = sorted[0]?.[1] ?? 0;
     const winners = sorted.filter(([, s]) => s === topScore && topScore > 0);
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <GameHeader game={game} subtitle={locale === "en" ? "Complete!" : "완성!"} onBack={onBack} />
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-card p-8 text-card-foreground shadow-sm">
           <div className="text-6xl">🏆</div>
-          <h2 className="text-2xl font-black text-gray-800">{text.memoryDone}</h2>
+          <h2 className="text-2xl font-black text-foreground">{text.memoryDone}</h2>
           {hasOpponents && winners.length > 0 ? (
             <>
-              <p className="text-gray-500 text-sm">{winners.length === 1 ? text.winner : text.jointWinner}</p>
+              <p className="text-sm text-muted-foreground">{winners.length === 1 ? text.winner : text.jointWinner}</p>
               <div className="flex flex-wrap gap-2">
                 {winners.map(([name]) => (
                   <span key={name} className="px-3 py-1 rounded-full text-white text-sm font-black"
@@ -243,19 +257,19 @@ export default function MemoryGame({ game, onBack, config }: Props) {
               </div>
             </>
           ) : (
-            <p className="text-gray-500 text-sm">{getMemoryDifficultyLabel(locale, difficulty)} · {text.attempts(tries)}</p>
+            <p className="text-sm text-muted-foreground">{getMemoryDifficultyLabel(locale, difficulty)} · {text.attempts(tries)}</p>
           )}
         </div>
 
         {/* 점수판 */}
         {hasOpponents && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
-            <h3 className="font-black text-gray-700 text-sm mb-1">{text.scoreboard}</h3>
+          <div className="space-y-2 rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
+            <h3 className="mb-1 text-sm font-black text-foreground">{text.scoreboard}</h3>
             {sorted.map(([name, score], i) => (
-              <div key={name} className="flex items-center gap-3 rounded-xl p-3 bg-gray-50">
+              <div key={name} className="flex items-center gap-3 rounded-lg bg-muted p-3">
                 <span className="text-lg w-6 text-center">{["🥇", "🥈", "🥉"][i] ?? `${i + 1}`}</span>
-                <span className="font-bold text-gray-800 flex-1">{name}</span>
-                <span className="font-black" style={{ color: game.accentColor }}>
+                <span className="flex-1 font-bold text-foreground">{name}</span>
+                <span className="font-black text-violet-700 dark:text-violet-300">
                   {score}{locale === "en" ? ` ${text.pair}` : text.pair}
                 </span>
               </div>
@@ -293,12 +307,12 @@ export default function MemoryGame({ game, onBack, config }: Props) {
           : isAI ? text.aiModeSubtitle
           : text.friendModeSubtitle(playersList.length)
         } onBack={onBack} />
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-          <h2 className="font-black text-gray-800">{text.memoryChooseDifficulty}</h2>
+        <div className="space-y-4 rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
+          <h2 className="font-black text-foreground">{text.memoryChooseDifficulty}</h2>
           {hasOpponents && (
             <div className="flex flex-wrap gap-2">
               {playersList.map((p, i) => (
-                <span key={p} className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700">
+                <span key={p} className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-foreground">
                   {i + 1}. {p}
                 </span>
               ))}
@@ -309,12 +323,12 @@ export default function MemoryGame({ game, onBack, config }: Props) {
               const cfg = MEMORY_DIFFICULTY[d];
               return (
                 <button key={d} onClick={() => startGame(d)}
-                  className="rounded-2xl border-2 border-gray-200 p-4 hover:scale-105 transition-all">
-                  <p className="font-black text-gray-800 text-sm">{getMemoryDifficultyLabel(locale, d)}</p>
-                  <p className="text-2xl font-black mt-1" style={{ color: game.accentColor }}>
+                  className="rounded-lg border-2 border-border bg-background p-4 text-foreground transition-colors hover:border-violet-500">
+                  <p className="text-sm font-black">{getMemoryDifficultyLabel(locale, d)}</p>
+                  <p className="mt-1 text-2xl font-black text-violet-700 dark:text-violet-300">
                     {cfg.cards}{locale === "en" ? ` ${text.card}` : text.card}
                   </p>
-                  <p className="text-xs text-gray-400">{cfg.pairs}{locale === "en" ? ` ${text.pair}` : text.pair}</p>
+                  <p className="text-xs font-semibold text-muted-foreground">{cfg.pairs}{locale === "en" ? ` ${text.pair}` : text.pair}</p>
                 </button>
               );
             })}
@@ -329,9 +343,9 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <GameHeader game={game} subtitle={text.memoryGeneratingCards} onBack={onBack} />
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+        <div className="rounded-lg border border-border bg-card p-10 text-center text-card-foreground shadow-sm">
           <div className="text-6xl animate-bounce mb-3">🃏</div>
-          <p className="text-gray-600 font-bold text-sm">
+          <p className="text-sm font-bold text-muted-foreground">
             {aiLoading ? text.memoryAiGenerating : text.preparing}
           </p>
         </div>
@@ -348,8 +362,8 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     <div className="max-w-2xl mx-auto space-y-4">
       <GameHeader game={game}
         subtitle={hasOpponents
-          ? `${text.turnOf(currentPlayer)} · ${text.remainingCards(remaining)}`
-          : `${text.remainingCards(remaining)} · ${text.attempts(tries)}`}
+          ? `${text.turnOf(currentPlayer)} · ${text.remainingCards(remaining)} · ${locale === "en" ? `Attempts ${tries}/${maximumAttempts}` : `시도 ${tries}/${maximumAttempts}`}`
+          : `${text.remainingCards(remaining)} · ${locale === "en" ? `Attempts ${tries}/${maximumAttempts}` : `시도 ${tries}/${maximumAttempts}`}`}
         onBack={onBack} />
 
       {/* 점수판 (멀티/AI 모드) */}
@@ -359,11 +373,11 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             const isCurrent = i === turnIdx % playersList.length;
             return (
               <div key={p}
-                className="flex items-center gap-1 rounded-full px-3 py-1 text-xs flex-shrink-0"
-                style={{
-                  background: isCurrent ? game.accentColor : `${game.accentColor}20`,
-                  color: isCurrent ? "white" : game.accentColor,
-                }}>
+                className={`flex flex-shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs ${
+                  isCurrent
+                    ? "bg-violet-700 text-white dark:bg-violet-300 dark:text-violet-950"
+                    : "bg-muted text-foreground"
+                }`}>
                 <span className="font-bold">{p}</span>
                 <span className="font-black">{scores[p] ?? 0}</span>
               </div>
@@ -374,8 +388,8 @@ export default function MemoryGame({ game, onBack, config }: Props) {
 
       {/* AI 생각 중 */}
       {isAITurn && revealed.length === 0 && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center">
-          <div className="flex items-center justify-center gap-2 text-indigo-600">
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-center dark:border-indigo-800 dark:bg-indigo-950">
+          <div className="flex items-center justify-center gap-2 text-indigo-700 dark:text-indigo-200">
             <span className="w-4 h-4 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-bold">{text.aiChoosingCard}</p>
           </div>
@@ -383,8 +397,8 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       )}
 
       {/* 질문 카드 */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
-        <p className="text-xs font-black text-blue-600 mb-2">{text.questionCard}</p>
+      <div className="rounded-lg border border-border bg-card p-3 text-card-foreground shadow-sm">
+        <p className="mb-2 text-xs font-black text-blue-700 dark:text-blue-300">{text.questionCard}</p>
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {qCards.map((c) => {
             const flipped = isFlipped(c);
@@ -393,14 +407,13 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             return (
               <button key={c.id} onClick={() => !flipped && userFlip(c)}
                 disabled={flipped || revealed.length >= 2 || !isHumanTurn}
-                className="aspect-[3/4] overflow-hidden rounded-xl border-2 flex items-center justify-center text-center p-2 transition-all"
-                style={{
-                  background: tk ? "#dbeafe33" : flipped ? "#dbeafe" : "linear-gradient(135deg, #3b82f6, #2563eb)",
-                  borderColor: tk ? "transparent" : flipped ? "#3b82f6" : "#1e40af",
-                  color: flipped ? "#1e3a8a" : "white",
-                  opacity: tk ? 0.3 : 1,
-                  cursor: !isHumanTurn || flipped ? "default" : "pointer",
-                }}>
+                className={`flex aspect-[3/4] items-center justify-center overflow-y-auto rounded-lg border-2 p-2 text-center transition-colors ${
+                  tk
+                    ? "border-blue-300 bg-blue-100 text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100"
+                    : flipped
+                      ? "border-blue-500 bg-blue-50 text-blue-950 dark:border-blue-400 dark:bg-blue-950 dark:text-blue-50"
+                      : "border-blue-900 bg-blue-700 text-white dark:border-blue-300 dark:bg-blue-600"
+                } ${!isHumanTurn || flipped ? "cursor-default" : "cursor-pointer"}`}>
                 {flipped ? (
                   <AutoFitText text={pair?.question ?? "?"} />
                 ) : (
@@ -413,8 +426,8 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       </div>
 
       {/* 대답 카드 */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
-        <p className="text-xs font-black text-amber-600 mb-2">{text.answerCard}</p>
+      <div className="rounded-lg border border-border bg-card p-3 text-card-foreground shadow-sm">
+        <p className="mb-2 text-xs font-black text-amber-700 dark:text-amber-300">{text.answerCard}</p>
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
           {aCards.map((c) => {
             const flipped = isFlipped(c);
@@ -423,14 +436,13 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             return (
               <button key={c.id} onClick={() => !flipped && userFlip(c)}
                 disabled={flipped || revealed.length !== 1 || !isHumanTurn}
-                className="aspect-[3/4] overflow-hidden rounded-xl border-2 flex items-center justify-center text-center p-2 transition-all"
-                style={{
-                  background: tk ? "#fef3c733" : flipped ? "#fef3c7" : "linear-gradient(135deg, #f59e0b, #d97706)",
-                  borderColor: tk ? "transparent" : flipped ? "#f59e0b" : "#92400e",
-                  color: flipped ? "#78350f" : "white",
-                  opacity: tk ? 0.3 : 1,
-                  cursor: !isHumanTurn || flipped ? "default" : "pointer",
-                }}>
+                className={`flex aspect-[3/4] items-center justify-center overflow-y-auto rounded-lg border-2 p-2 text-center transition-colors ${
+                  tk
+                    ? "border-amber-300 bg-amber-100 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+                    : flipped
+                      ? "border-amber-500 bg-amber-50 text-amber-950 dark:border-amber-400 dark:bg-amber-950 dark:text-amber-50"
+                      : "border-amber-700 bg-amber-400 text-slate-950 dark:border-amber-300 dark:bg-amber-300 dark:text-slate-950"
+                } ${!isHumanTurn || flipped ? "cursor-default" : "cursor-pointer"}`}>
                 {flipped ? (
                   <AutoFitText text={pair?.answer ?? "!"} />
                 ) : (
@@ -442,7 +454,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
         </div>
       </div>
 
-      <p className="text-xs text-center text-gray-500">
+      <p className="text-center text-xs font-semibold text-muted-foreground">
         {isHumanTurn && revealed.length === 0 && text.pickQuestionCard}
         {isHumanTurn && revealed.length === 1 && text.pickAnswerCard}
         {isHumanTurn && revealed.length === 2 && text.checkingPair}
