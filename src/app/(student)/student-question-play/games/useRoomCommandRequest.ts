@@ -24,6 +24,14 @@ export type RoomCommandRequestOutcome =
   | "retryable"
   | "stale";
 
+export type RoomCommandRequestJsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | readonly RoomCommandRequestJsonValue[]
+  | { readonly [key: string]: RoomCommandRequestJsonValue };
+
 interface TrackedRequest {
   action: string;
   commandId: string;
@@ -41,7 +49,7 @@ export interface UseRoomCommandRequestOptions<
   state: State | null;
   readState: (value: unknown) => State | null;
   onAction: RoomActionHandler;
-  lifetimeParts?: readonly unknown[];
+  lifetimeParts?: readonly RoomCommandRequestJsonValue[];
   createCommandId?: () => string;
 }
 
@@ -49,18 +57,71 @@ export interface RoomCommandRequestController {
   send: (
     action: string,
     body: Record<string, unknown>,
-    dedupeValue: unknown,
+    dedupeValue: RoomCommandRequestJsonValue,
   ) => Promise<RoomCommandRequestOutcome>;
   pendingKind: string | null;
   acknowledgementVersion: number;
 }
 
-function serializeKey(parts: unknown): string {
-  try {
-    return JSON.stringify(parts) ?? "undefined";
-  } catch {
-    return "unserializable";
+const JSON_KEY_ERROR =
+  "Room command keys must contain only lossless JSON values";
+
+function serializeJsonValue(value: unknown, ancestors: Set<object>): string {
+  if (value === null) return "null";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new TypeError(JSON_KEY_ERROR);
+    return Object.is(value, -0) ? "-0" : String(value);
   }
+  if (typeof value !== "object") throw new TypeError(JSON_KEY_ERROR);
+  if (ancestors.has(value)) throw new TypeError(JSON_KEY_ERROR);
+
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (
+        Object.getOwnPropertySymbols(value).length > 0 ||
+        Object.getOwnPropertyNames(value).length !== value.length + 1
+      ) {
+        throw new TypeError(JSON_KEY_ERROR);
+      }
+      const items = Array.from({ length: value.length }, (_, index) => {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor || !("value" in descriptor)) {
+          throw new TypeError(JSON_KEY_ERROR);
+        }
+        return serializeJsonValue(descriptor.value, ancestors);
+      });
+      return `[${items.join(",")}]`;
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError(JSON_KEY_ERROR);
+    }
+    if (Object.getOwnPropertySymbols(value).length > 0) {
+      throw new TypeError(JSON_KEY_ERROR);
+    }
+
+    const keys = Object.keys(value).sort();
+    if (Object.getOwnPropertyNames(value).length !== keys.length) {
+      throw new TypeError(JSON_KEY_ERROR);
+    }
+    return `{${keys.map((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !("value" in descriptor)) {
+        throw new TypeError(JSON_KEY_ERROR);
+      }
+      return `${JSON.stringify(key)}:${serializeJsonValue(descriptor.value, ancestors)}`;
+    }).join(",")}}`;
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
+function serializeKey(value: RoomCommandRequestJsonValue): string {
+  return serializeJsonValue(value, new Set());
 }
 
 function executionKey(
@@ -143,8 +204,8 @@ export function useRoomCommandRequest<
       }
 
       request.confirmedByPolling = true;
-      if (retriesRef.current.get(request.action) === request) {
-        retriesRef.current.delete(request.action);
+      if (retriesRef.current.get(request.signature) === request) {
+        retriesRef.current.delete(request.signature);
       }
       if (pendingRef.current === request) {
         pendingRef.current = null;
@@ -157,8 +218,15 @@ export function useRoomCommandRequest<
   const send = useCallback(async (
     action: string,
     body: Record<string, unknown>,
-    dedupeValue: unknown,
+    dedupeValue: RoomCommandRequestJsonValue,
   ): Promise<RoomCommandRequestOutcome> => {
+    if (
+      !mountedRef.current ||
+      executionRef.current !== currentExecutionKey ||
+      lifetimeRef.current !== currentLifetimeKey
+    ) {
+      return "stale";
+    }
     if (pendingRef.current?.lifetimeKey === currentLifetimeKey) {
       return "retryable";
     }
@@ -168,7 +236,7 @@ export function useRoomCommandRequest<
       action,
       dedupeValue,
     ]);
-    const previous = retriesRef.current.get(action);
+    const previous = retriesRef.current.get(signature);
     const request =
       previous?.lifetimeKey === currentLifetimeKey &&
         previous.signature === signature
@@ -182,7 +250,7 @@ export function useRoomCommandRequest<
             confirmedByPolling: false,
           };
 
-    retriesRef.current.set(action, request);
+    retriesRef.current.set(signature, request);
     pendingRef.current = request;
     if (mountedRef.current) setPendingKind(action);
 
@@ -222,8 +290,8 @@ export function useRoomCommandRequest<
       !matchesExecution;
 
     if (confirmed || mismatchedResponse) {
-      if (retriesRef.current.get(action) === request) {
-        retriesRef.current.delete(action);
+      if (retriesRef.current.get(request.signature) === request) {
+        retriesRef.current.delete(request.signature);
       }
     }
     if (pendingRef.current === request) {

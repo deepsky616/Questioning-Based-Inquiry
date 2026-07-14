@@ -2,7 +2,10 @@
 
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useRoomCommandRequest } from "@/app/(student)/student-question-play/games/useRoomCommandRequest";
+import {
+  type RoomCommandRequestJsonValue,
+  useRoomCommandRequest,
+} from "@/app/(student)/student-question-play/games/useRoomCommandRequest";
 import type {
   GameRoom,
   RoomActionHandler,
@@ -19,7 +22,7 @@ interface HookProps {
   room: GameRoom;
   state: TestState;
   onAction: RoomActionHandler;
-  lifetimeParts?: readonly unknown[];
+  lifetimeParts?: readonly RoomCommandRequestJsonValue[];
   createCommandId: () => string;
 }
 
@@ -184,6 +187,156 @@ describe("useRoomCommandRequest", () => {
       .not.toBe(onAction.mock.calls[1]?.[2]?.commandId);
   });
 
+  it("같은 동작의 A-B-A 재시도는 최초 A commandId를 다시 쓴다", async () => {
+    const room = makeRoom();
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(conflict(room));
+    const createCommandId = commandIds();
+    const { result } = renderRequestHook({
+      room,
+      state: baseState,
+      onAction,
+      createCommandId,
+    });
+
+    await act(() => result.current.send("relay-submit-question", {}, "A"));
+    await act(() => result.current.send("relay-submit-question", {}, "B"));
+    await act(() => result.current.send("relay-submit-question", {}, "A"));
+
+    expect(createCommandId).toHaveBeenCalledTimes(2);
+    expect(onAction.mock.calls[2]?.[2]?.commandId)
+      .toBe(onAction.mock.calls[0]?.[2]?.commandId);
+    expect(onAction.mock.calls[2]?.[2]?.commandId)
+      .not.toBe(onAction.mock.calls[1]?.[2]?.commandId);
+  });
+
+  it("폴링 확인은 해당 서명만 지우고 다른 값의 재시도를 보존한다", async () => {
+    const room = makeRoom();
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(conflict(room));
+    const createCommandId = commandIds();
+    const hook = renderRequestHook({
+      room,
+      state: baseState,
+      onAction,
+      createCommandId,
+    });
+
+    await act(() => hook.result.current.send("relay-submit-question", {}, "A"));
+    const firstId = onAction.mock.calls[0]?.[2]?.commandId;
+    await act(() => hook.result.current.send("relay-submit-question", {}, "B"));
+    const secondId = onAction.mock.calls[1]?.[2]?.commandId;
+
+    const confirmedState = {
+      ...baseState,
+      recentCommandIds: [firstId!],
+    };
+    hook.rerender({
+      room: makeRoom({ gameState: confirmedState }),
+      state: confirmedState,
+      onAction,
+      createCommandId,
+    });
+
+    await waitFor(() => {
+      expect(hook.result.current.acknowledgementVersion).toBe(1);
+    });
+    await act(() => hook.result.current.send("relay-submit-question", {}, "B"));
+
+    expect(createCommandId).toHaveBeenCalledTimes(2);
+    expect(onAction.mock.calls[2]?.[2]?.commandId).toBe(secondId);
+  });
+
+  it("객체 키 순서가 달라도 같은 JSON 값은 같은 commandId를 다시 쓴다", async () => {
+    const room = makeRoom();
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(conflict(room));
+    const createCommandId = commandIds();
+    const { result } = renderRequestHook({
+      room,
+      state: baseState,
+      onAction,
+      createCommandId,
+    });
+
+    await act(() => result.current.send(
+      "relay-submit-question",
+      {},
+      { question: "왜?", playerId: "user-1" },
+    ));
+    await act(() => result.current.send(
+      "relay-submit-question",
+      {},
+      { playerId: "user-1", question: "왜?" },
+    ));
+
+    expect(createCommandId).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["정의되지 않은 값", undefined],
+    ["유한하지 않은 수", Number.POSITIVE_INFINITY],
+  ])("%s은 요청 전에 명시적으로 거절한다", async (_label, value) => {
+    const room = makeRoom();
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(conflict(room));
+    const createCommandId = commandIds();
+    const { result } = renderRequestHook({
+      room,
+      state: baseState,
+      onAction,
+      createCommandId,
+    });
+
+    await expect(act(() => result.current.send(
+      "relay-submit-question",
+      {},
+      value as unknown as RoomCommandRequestJsonValue,
+    ))).rejects.toThrow("JSON");
+    expect(createCommandId).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("순환 값은 요청 전에 명시적으로 거절한다", async () => {
+    const room = makeRoom();
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(conflict(room));
+    const createCommandId = commandIds();
+    const { result } = renderRequestHook({
+      room,
+      state: baseState,
+      onAction,
+      createCommandId,
+    });
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+
+    await expect(act(() => result.current.send(
+      "relay-submit-question",
+      {},
+      cyclic as unknown as RoomCommandRequestJsonValue,
+    ))).rejects.toThrow("JSON");
+    expect(createCommandId).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("직렬화에서 사라지는 배열 속성은 요청 전에 거절한다", async () => {
+    const room = makeRoom();
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(conflict(room));
+    const createCommandId = commandIds();
+    const { result } = renderRequestHook({
+      room,
+      state: baseState,
+      onAction,
+      createCommandId,
+    });
+    const value: RoomCommandRequestJsonValue[] = [];
+    Object.defineProperty(value, "hidden", { value: "사라질 값" });
+
+    await expect(act(() => result.current.send(
+      "relay-submit-question",
+      {},
+      value,
+    ))).rejects.toThrow("JSON");
+    expect(createCommandId).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
   it("409 최신 상태에 commandId가 있으면 confirmed로 처리한다", async () => {
     const room = makeRoom();
     const createCommandId = commandIds();
@@ -308,6 +461,37 @@ describe("useRoomCommandRequest", () => {
     await act(() => hook.result.current.send("relay-submit-question", {}, "질문"));
 
     expect(createCommandId).toHaveBeenCalledTimes(2);
+  });
+
+  it("새 수명 뒤 예전 send는 요청이나 현재 상태를 건드리지 않는다", async () => {
+    const room = makeRoom();
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(conflict(room));
+    const createCommandId = commandIds();
+    const hook = renderRequestHook({
+      room,
+      state: baseState,
+      onAction,
+      createCommandId,
+    });
+    const oldSend = hook.result.current.send;
+    const nextState = {
+      ...baseState,
+      roundId: "20000000-0000-4000-8000-000000000002",
+    };
+
+    hook.rerender({
+      room: makeRoom({ gameState: nextState }),
+      state: nextState,
+      onAction,
+      createCommandId,
+    });
+
+    await expect(oldSend("relay-submit-question", {}, "옛 질문"))
+      .resolves.toBe("stale");
+    expect(createCommandId).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+    expect(hook.result.current.pendingKind).toBeNull();
+    expect(hook.result.current.acknowledgementVersion).toBe(0);
   });
 
   it.each(["success", "failure"])(
@@ -491,5 +675,24 @@ describe("useRoomCommandRequest", () => {
     });
 
     expect(outcome).toBe("stale");
+  });
+
+  it("언마운트 뒤 보관한 send는 요청을 시작하지 않는다", async () => {
+    const room = makeRoom();
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(success(room));
+    const createCommandId = commandIds();
+    const hook = renderRequestHook({
+      room,
+      state: baseState,
+      onAction,
+      createCommandId,
+    });
+    const send = hook.result.current.send;
+    hook.unmount();
+
+    await expect(send("relay-submit-question", {}, "질문"))
+      .resolves.toBe("stale");
+    expect(createCommandId).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
   });
 });
