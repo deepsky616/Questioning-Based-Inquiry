@@ -155,7 +155,7 @@
     },
     "teacherStudents": {
       "title": "학생 관리",
-      "description": "담당 학생의 질문·답변·포인트 활동을 한눈에 확인하세요"
+      "description": "담당 학생의 질문·답변·포인트와 질문수업 참여 현황을 확인하고, 학생 일괄 등록과 비밀번호 재설정을 관리하세요"
     },
     "teacherSessions": {
       "title": "질문수업",
@@ -985,7 +985,7 @@
     "sessionProgressInline": "{completed}/{total} 완료 · {remaining}개 남음",
     "sessionProgressEmpty": "대상 수업 없음",
     "loading": "로딩 중...",
-    "tabList": "학생 현황",
+    "tabList": "학생 활동 현황",
     "awardFromItem": "+P 지급",
     "pendingAiTitle": "AI 추천 대기 {count}건",
     "pendingAiAction": "AI 추천 검토",

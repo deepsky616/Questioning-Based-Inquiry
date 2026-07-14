@@ -155,7 +155,7 @@
     },
     "teacherStudents": {
       "title": "Student Management",
-      "description": "See your students' questions, answers, and point activity at a glance"
+      "description": "Review students' questions, answers, points, and question-class participation, and manage bulk registration and password resets"
     },
     "teacherSessions": {
       "title": "Question Classes",
@@ -985,7 +985,7 @@
     "sessionProgressInline": "{completed}/{total} done · {remaining} left",
     "sessionProgressEmpty": "No target classes",
     "loading": "Loading...",
-    "tabList": "Students",
+    "tabList": "Student activity",
     "awardFromItem": "+P award",
     "pendingAiTitle": "{count} pending AI recommendations",
     "pendingAiAction": "Review AI suggestions",
