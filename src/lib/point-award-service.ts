@@ -53,7 +53,7 @@ interface AwardResultSnapshot {
 
 const AWARD_RESULT_TYPE = "game-room-award-result";
 const AWARD_RESULT_VERSION = 1;
-const SERVER_VERIFIED_AWARD_GAMES = new Set(["relay", "memory"]);
+const SERVER_VERIFIED_AWARD_GAMES = new Set(["relay"]);
 const GAME_ACTIVITY_LIMITS: Record<string, { perStudent: number; perRoom: number }> = {
   relay: RELAY_ACTIVITY_LIMITS,
   dice: { perStudent: 20, perRoom: 80 },
@@ -128,8 +128,7 @@ function requireAwardableRoom(
       409,
     );
   }
-  const expectedEvidenceVersion = current.gameId === "memory" ? 2 : 1;
-  if (current.pointEvidenceVersion !== expectedEvidenceVersion) {
+  if (current.pointEvidenceVersion !== 1) {
     throw new PointAwardError(
       "서버에서 활동을 확인한 새 놀이만 점수를 지급할 수 있습니다",
       409,
@@ -359,20 +358,16 @@ function buildStoredContributions(
       }
       assertStoredActivityCount(room, verifiedPairs, activityLimit);
       let storedScoreSum = 0;
-      for (const [playerId, score] of Object.entries(scores)) {
+      for (const player of allPlayers) {
+        const score = scores[player.id];
         if (typeof score !== "number" || !Number.isInteger(score) || score < 0) {
           throw new PointAwardError("저장된 놀이 점수를 확인할 수 없습니다", 409);
         }
-        if (studentIds.has(playerId) && score > activityLimit.perStudent) {
+        if (studentIds.has(player.id) && score > activityLimit.perStudent) {
           throw new PointAwardError("학생별 놀이 활동 상한을 넘었습니다", 409);
         }
-        if (studentIds.has(playerId)) scoreByStudent.set(playerId, score);
+        if (studentIds.has(player.id)) scoreByStudent.set(player.id, score);
         storedScoreSum += score;
-      }
-      for (const player of allPlayers) {
-        if (!Object.prototype.hasOwnProperty.call(scores, player.id)) {
-          throw new PointAwardError("저장된 놀이 점수를 확인할 수 없습니다", 409);
-        }
       }
       if (storedScoreSum !== verifiedPairs) {
         throw new PointAwardError("저장된 놀이 점수가 활동 기록과 맞지 않습니다", 409);

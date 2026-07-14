@@ -283,11 +283,14 @@ function hasValidReveal(state: MemoryRoomState): boolean {
 
 function hasValidPhase(state: MemoryRoomState): boolean {
   const matchedPairs = state.takenIds.length / 2;
+  const recordedMisses = readResolvedRevealIds(state).length +
+    (state.lastReveal?.result === "miss" ? 1 : 0);
   if (
     state.maxAttempts !==
       QUESTION_GAME_RULES.memory.targets.room[state.difficulty] ||
     state.attempts > state.maxAttempts ||
     state.attempts < matchedPairs ||
+    recordedMisses > state.attempts - matchedPairs ||
     (state.lastReveal?.result === "miss" &&
       state.attempts <= matchedPairs) ||
     scoreTotal(state.scores) !== matchedPairs ||

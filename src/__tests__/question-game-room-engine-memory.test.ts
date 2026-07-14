@@ -340,6 +340,12 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
         resolvedRevealIds: [uuidAt(366)],
         lastResolvedRevealId: uuidAt(367),
       })],
+      ["실패 시도보다 많은 복원 공개 기록", (state) => ({
+        ...state,
+        attempts: 1,
+        resolvedRevealIds: [uuidAt(368), uuidAt(369)],
+        lastResolvedRevealId: uuidAt(369),
+      })],
     ];
 
     it.each(invalidPlayStates)("%s 상태를 거절한다", (_name, makeInvalid) => {
@@ -948,15 +954,40 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
       expect(room).toEqual(before);
     });
 
-    it("복원 공개 기록은 최근 예순네 개만 보존한다", () => {
+    it("복원 공개 기록은 최대 시도 수 안에서 누적한다", () => {
       const resolvedRevealIds = Array.from(
-        { length: 64 },
+        { length: 44 },
         (_, index) => uuidAt(400 + index),
       );
-      const revealId = uuidAt(464);
-      const state = makePlayState({
-        attempts: 1,
-        revealedIds: ["q-0", "a-1"],
+      const revealId = uuidAt(444);
+      const pairs = Array.from({ length: 15 }, (_, index) => ({
+        id: `hard-pair-${index}`,
+        question: `질문 ${index + 1}?`,
+        answer: `대답 ${index + 1}`,
+      }));
+      const state: MemoryRoomState = {
+        ...createMemoryState(),
+        phase: "play",
+        roundId: ROUND_ID,
+        difficulty: "hard",
+        pairs,
+        qCards: pairs.map(({ id }, index) => ({
+          id: `hard-q-${index}`,
+          pairId: id,
+          type: "q",
+        })),
+        aCards: pairs.map(({ id }, index) => ({
+          id: `hard-a-${index}`,
+          pairId: id,
+          type: "a",
+        })),
+        diceRolls: { host: 6, guest: 5 },
+        turnOrder: ["host", "guest"],
+        currentTurnIdx: 0,
+        scores: { host: 0, guest: 0 },
+        attempts: 45,
+        maxAttempts: 45,
+        revealedIds: ["hard-q-0", "hard-a-1"],
         lastResolvedRevealId: resolvedRevealIds.at(-1),
         resolvedRevealIds,
         lastReveal: {
@@ -965,7 +996,7 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
           turnPlayerId: "host",
           resolveAt: 3_500,
         },
-      });
+      };
 
       const result = applyMemory(
         makePlayingRoom(state),
@@ -976,9 +1007,10 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
 
       const nextState = changedRoom(result).gameState as MemoryRoomState;
       expect(nextState.resolvedRevealIds).toEqual([
-        ...resolvedRevealIds.slice(1),
+        ...resolvedRevealIds,
         revealId,
       ]);
+      expect(nextState.resolvedRevealIds).toHaveLength(45);
       expect(nextState.lastResolvedRevealId).toBe(revealId);
     });
   });
