@@ -1,6 +1,6 @@
 /**
  * e2e 전용 DB 헬퍼 — 합성 테스트 교사 계정 준비와 흔적 정리.
- * .env.local의 DATABASE_URL을 직접 읽어 Prisma를 초기화한다(플레이라이트 프로세스에는 env가 없음).
+ * 환경의 DATABASE_URL을 우선 사용하고 로컬에서는 .env.local로 보완해 Prisma를 초기화한다.
  */
 import { existsSync, readFileSync } from "fs";
 import path from "path";
