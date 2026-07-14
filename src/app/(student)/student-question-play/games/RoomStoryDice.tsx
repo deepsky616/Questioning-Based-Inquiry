@@ -1,369 +1,434 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { BookOpen, Dices, Flag, LogOut, Play, Send } from "lucide-react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { RoomHeader, WaitingBanner, playerColorById } from "./roomShared";
-import RoomResult from "./RoomResult";
-import { useAIPlay } from "./useAIPlay";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  STORY_DICE_EMOJI, STORY_DICE_COLOR, getWordEmoji,
-  getStoryDiceWordText, parseAIBilingualWords, pickFallbackBilingualWords, StoryDiceWords, DiceCategory,
-} from "@/lib/story-dice-data";
-import { getQuestionGameText, getStoryDiceCategoryLabel } from "@/lib/question-game-i18n";
-import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
-
-interface ChainItem { type: "story" | "question" | "answer"; text: string; playerId: string; playerName: string }
-interface StoryDiceState {
-  phase: "rolling" | "story" | "qa" | "done";
-  words: StoryDiceWords | null;
-  rolled: { protagonist: string; place: string; event: string } | null;
-  chain: ChainItem[];           // story → q → a → q → a ...
-  taggerId: string;             // 술래
-  nextQuestionerIdx: number;    // 술래 제외 학생들 중 다음 질문자 인덱스
-}
+  getLocalizedText,
+  getRoomTurnGameText,
+  getStoryDiceCategoryLabel,
+  resolveQuestionGameLocale,
+} from "@/lib/question-game-i18n";
+import { isQuestionGameCommandId } from "@/lib/question-game-room-engine";
+import {
+  readStoryDicePublicState,
+  type StoryDiceRoomState,
+} from "@/lib/question-game-room-engines/turn-games";
+import type { DiceCategory } from "@/lib/story-dice-data";
+import type {
+  BuiltInGame,
+  GameRoom,
+  RoomActionHandler,
+} from "@/lib/question-games-data";
+import RoomResult from "./RoomResult";
+import { useRoomCommandRequest } from "./useRoomCommandRequest";
 
 interface Props {
-  game: BuiltInGame; room: GameRoom; myId: string; actionLoading: boolean;
+  game: BuiltInGame;
+  room: GameRoom;
+  myId: string;
+  actionLoading: boolean;
   onAction: RoomActionHandler;
   onLeave: () => void;
 }
 
-function shuffleArr<T>(arr: T[]): T[] { return [...arr].sort(() => Math.random() - 0.5); }
-function pickOne<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+const WORD_CATEGORIES: DiceCategory[] = ["protagonist", "place", "event"];
 
-export default function RoomStoryDice({ game, room, myId, actionLoading, onAction, onLeave }: Props) {
-  const locale = useLocale();
-  const text = getQuestionGameText(locale);
-  const isHost = room.hostId === myId;
-  const state = room.gameState as unknown as StoryDiceState;
-  const hasState = state && typeof state.phase === "string";
-  const { ask, loading: aiLoading } = useAIPlay();
+function sameValues(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length &&
+    new Set(left).size === left.length &&
+    left.every((value) => right.includes(value));
+}
 
-  const initRef = useRef(false);
+function roomMatchesState(
+  game: BuiltInGame,
+  room: GameRoom,
+  state: StoryDiceRoomState,
+  myId: string,
+): boolean {
+  const ids = room.players.map(({ id }) => id);
+  const me = room.players.find(({ id }) => id === myId);
+  if (
+    game.id !== "story-dice" ||
+    room.gameId !== "story-dice" ||
+    !isQuestionGameCommandId(room.playId) ||
+    !me ||
+    state.playerNames[myId] !== me.name ||
+    new Set(ids).size !== ids.length ||
+    !room.players.every(({ id, name }) => state.playerNames[id] === name)
+  ) {
+    return false;
+  }
+  if (state.phase === "done") return room.status === "ended";
+  if (ids.length < 2 || ids.length > 8) return false;
+  if (state.phase === "setup") {
+    return room.status === "playing" &&
+      state.roundTargetPlayerIds.length === 0;
+  }
+  const expectedTargets = ids.filter((id) => id !== state.taggerId);
+  return room.status === "playing" &&
+    ids.includes(state.taggerId) &&
+    Boolean(state.roundId) &&
+    sameValues(state.roundTargetPlayerIds, expectedTargets);
+}
 
+function endMessage(
+  reason: StoryDiceRoomState["endReason"],
+  text: ReturnType<typeof getRoomTurnGameText>,
+): string {
+  if (reason === "host") return text.endHost;
+  if (reason === "insufficient-players") return text.endInsufficient;
+  return text.endCompleted;
+}
+
+export default function RoomStoryDice({
+  game,
+  room,
+  myId,
+  onAction,
+  onLeave,
+}: Props) {
+  const locale = resolveQuestionGameLocale(useLocale());
+  const text = getRoomTurnGameText(locale);
+  const state = readStoryDicePublicState(room.gameState);
+  const valid = state !== null && roomMatchesState(game, room, state, myId);
+  const currentQuestionerId = state?.turnOrder[state.currentTurnIdx] ?? "";
+  const actorId = state?.phase === "setup"
+    ? room.hostId
+    : state?.phase === "roll" || state?.phase === "story" || state?.phase === "answer"
+      ? state?.taggerId ?? ""
+      : currentQuestionerId;
+  const pendingQuestion = state?.pendingQuestion?.question ?? "";
+  const inputContext = [
+    room.playId ?? "",
+    state?.phase ?? "invalid",
+    state?.roundId ?? "",
+    actorId,
+    pendingQuestion,
+    state?.rolledWords?.protagonist ?? "",
+    state?.rolledWords?.place ?? "",
+    state?.rolledWords?.event ?? "",
+  ].join(":");
   const [input, setInput] = useState("");
-  const [rolling, setRolling] = useState<{ protagonist: string; place: string; event: string } | null>(null);
-  const [animTick, setAnimTick] = useState(0);
+  const retryRef = useRef<{ context: string; value: string } | null>(null);
+  const acknowledgementRef = useRef(0);
+  const {
+    send,
+    pendingKind,
+    acknowledgementVersion,
+  } = useRoomCommandRequest({
+    room,
+    gameId: "story-dice",
+    state: valid ? state : null,
+    readState: readStoryDicePublicState,
+    onAction,
+    lifetimeParts: [actorId, inputContext],
+  });
 
-  // 술래·차례 계산
-  const tagger = state?.taggerId ? room.players.find((p) => p.id === state.taggerId) : null;
-  const nonTaggers = room.players.filter((p) => p.id !== state?.taggerId);
-  const currentQuestioner = nonTaggers.length > 0
-    ? nonTaggers[(state?.nextQuestionerIdx ?? 0) % Math.max(nonTaggers.length, 1)]
-    : null;
-  const lastChain = state?.chain?.[state.chain.length - 1];
-  // 다음 행동: story 끝나면 question, question 끝나면 answer, answer 끝나면 다음 question
-  const nextAction: "question" | "answer" =
-    !lastChain || lastChain.type === "story" || lastChain.type === "answer" ? "question" : "answer";
-
-  const amTagger = state?.taggerId === myId;
-  const isMyTurn =
-    nextAction === "answer" ? amTagger
-    : currentQuestioner?.id === myId;
-
-  /* ── 방장 초기화 ── */
   useEffect(() => {
-    if (!isHost || hasState || initRef.current || room.status !== "playing") return;
-    initRef.current = true;
+    setInput("");
+    retryRef.current = null;
+  }, [inputContext]);
 
-    (async () => {
-      // AI로 단어 생성, 실패 시 폴백
-      const res = await ask({ action: "story-dice:words-bilingual", locale: "ko" });
-      const parsed = (res?.text ? parseAIBilingualWords(res.text) : null)
-        ?? pickFallbackBilingualWords(8);
+  useEffect(() => {
+    if (acknowledgementRef.current === acknowledgementVersion) return;
+    acknowledgementRef.current = acknowledgementVersion;
+    const retry = retryRef.current;
+    if (!retry || retry.context !== inputContext) return;
+    setInput((current) => current.trim() === retry.value ? "" : current);
+    retryRef.current = null;
+  }, [acknowledgementVersion, inputContext]);
 
-      const init: StoryDiceState = {
-        phase: "rolling",
-        words: parsed,
-        rolled: null,
-        chain: [],
-        taggerId: room.players[0]?.id ?? myId,
-        nextQuestionerIdx: 0,
-      };
-      void onAction("set-state", { state: init, turnIndex: 0 });
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHost, hasState, room.status]);
-
-  /* ── 주사위 굴리기 애니메이션 (술래만) ── */
-  function rollDice() {
-    if (!state.words || rolling) return;
-    setRolling({ protagonist: "?", place: "?", event: "?" });
-    let count = 0;
-    const final = {
-      protagonist: pickOne(state.words.protagonist),
-      place: pickOne(state.words.place),
-      event: pickOne(state.words.event),
-    };
-    const iv = setInterval(() => {
-      setAnimTick((t) => t + 1);
-      setRolling({
-        protagonist: pickOne(state.words!.protagonist),
-        place: pickOne(state.words!.place),
-        event: pickOne(state.words!.event),
-      });
-      count++;
-      if (count >= 14) {
-        clearInterval(iv);
-        setRolling(final);
-        setTimeout(() => {
-          void onAction("update-state", {
-            patch: { rolled: final, phase: "story" },
-          });
-          setRolling(null);
-        }, 600);
-      }
-    }, 100);
-  }
-
-  async function submitStory() {
-    const trimmed = input.trim();
-    if (!trimmed || actionLoading) return;
-    const entry: ChainItem = {
-      type: "story", text: trimmed, playerId: myId, playerName: tagger?.name ?? (locale === "en" ? "Storyteller" : "술래"),
-    };
-    const result = await onAction("update-state", {
-      patch: { phase: "qa", chain: [entry] },
-    });
-    if (result.ok) setInput("");
-  }
-
-  async function submitQuestion() {
-    const trimmed = input.trim();
-    if (!trimmed || actionLoading || !currentQuestioner) return;
-    const entry: ChainItem = {
-      type: "question", text: trimmed, playerId: myId, playerName: currentQuestioner.name,
-    };
-    const result = await onAction("update-state", {
-      patch: { chain: [...(state.chain ?? []), entry] },
-    });
-    if (result.ok) setInput("");
-  }
-
-  async function submitAnswer() {
-    const trimmed = input.trim();
-    if (!trimmed || actionLoading) return;
-    const entry: ChainItem = {
-      type: "answer", text: trimmed, playerId: myId, playerName: tagger?.name ?? (locale === "en" ? "Storyteller" : "술래"),
-    };
-    const result = await onAction("update-state", {
-      patch: {
-        chain: [...(state.chain ?? []), entry],
-        // 다음 질문자로 인덱스 전진
-        nextQuestionerIdx: ((state.nextQuestionerIdx ?? 0) + 1) % Math.max(nonTaggers.length, 1),
-      },
-    });
-    if (result.ok) setInput("");
-  }
-
-  /* ── 결과 화면 ── */
-  if (room.status === "ended" || state?.phase === "done") {
-    const scores = room.players.map((p) => ({
-      playerId: p.id, name: p.name,
-      score: (state?.chain ?? []).filter((c) => c.playerId === p.id && c.type !== "story").length,
-    }));
-    const questions = (state?.chain ?? [])
-      .filter((c) => c.type !== "story")
-      .map((c) => ({ playerId: c.playerId, playerName: c.playerName, question: c.text }));
+  if (!valid || !state || !room.playId) {
     return (
-      <RoomResult game={game} room={room} myId={myId}
-        scoreLabel={locale === "en" ? "Turns" : "발화 수"} scoreUnit={text.count}
-        scores={scores} questions={questions}
-        onAction={onAction} onLeave={onLeave} />
-    );
-  }
-
-  /* ── 준비 중 ── */
-  if (!hasState || !state.words) {
-    return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle={text.storyWordsLoading} onLeave={onLeave} />
-        <WaitingBanner text={isHost && aiLoading ? text.storyAiWords : text.loading} />
+      <div className="mx-auto max-w-2xl space-y-5 text-foreground">
+        <GameHeader game={game} subtitle={text.safeState} onLeave={onLeave} leave={text.leave} />
+        <p role="status" className="border border-border bg-card p-4 text-sm text-muted-foreground rounded-lg">
+          {text.safeState}
+        </p>
       </div>
     );
   }
+
+  const scores = room.players.map((player) => ({
+    playerId: player.id,
+    name: player.name,
+    score: state.pairs.filter((pair) =>
+      pair.playerId === player.id || pair.taggerId === player.id
+    ).length,
+  }));
+  if (state.phase === "done") {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 text-foreground">
+        <p role="status" className="border border-border bg-secondary p-3 text-center text-sm font-semibold rounded-lg">
+          {endMessage(state.endReason, text)}
+        </p>
+        <RoomResult
+          game={game}
+          room={room}
+          myId={myId}
+          scoreLabel={locale === "en" ? "Turns" : "참여 수"}
+          scoreUnit=""
+          scores={scores}
+          questions={state.pairs}
+          onAction={onAction}
+          onLeave={onLeave}
+        />
+      </div>
+    );
+  }
+
+  const isHost = room.hostId === myId;
+  const isActor = actorId === myId;
+  const activeState = state;
+  const playId = room.playId;
+  const actorName = state.playerNames[actorId] ?? "";
+  const taggerName = state.playerNames[state.taggerId] ?? "";
+  const targetTotal = state.maxRounds * state.roundTargetPlayerIds.length;
+
+  async function prepare() {
+    if (!isHost || activeState.phase !== "setup" || pendingKind) return;
+    await send(
+      "story-prepare",
+      { playId },
+      [playId, "story-prepare"],
+    );
+  }
+
+  async function roll() {
+    if (!isActor || activeState.phase !== "roll" || pendingKind) return;
+    await send(
+      "story-roll",
+      { playId, roundId: activeState.roundId },
+      [playId, activeState.roundId ?? "", activeState.taggerId],
+    );
+  }
+
+  async function submitInput() {
+    const value = input.trim();
+    if (!value || !isActor || pendingKind) return;
+    let action: string;
+    let body: Record<string, unknown>;
+    if (activeState.phase === "story") {
+      action = "story-submit-story";
+      body = { playId, roundId: activeState.roundId, story: value };
+    } else if (activeState.phase === "question") {
+      action = "story-submit-question";
+      body = { playId, roundId: activeState.roundId, locale, question: value };
+    } else if (activeState.phase === "answer") {
+      action = "story-submit-answer";
+      body = { playId, roundId: activeState.roundId, answer: value };
+    } else {
+      return;
+    }
+    retryRef.current = { context: inputContext, value };
+    const outcome = await send(
+      action,
+      body,
+      [playId, activeState.roundId ?? "", activeState.phase, pendingQuestion, value],
+    );
+    if (outcome === "confirmed") {
+      setInput((current) => current.trim() === value ? "" : current);
+      retryRef.current = null;
+    } else if (outcome === "stale") {
+      retryRef.current = null;
+    }
+  }
+
+  async function endEarly() {
+    if (pendingKind || !window.confirm(text.earlyEndConfirm)) return;
+    await send(
+      "end-game-early",
+      { playId, roundId: activeState.roundId },
+      [playId, activeState.roundId ?? "", "end-game-early"],
+    );
+  }
+
+  const prompt = state.phase === "story"
+    ? text.storyPrompt
+    : state.phase === "question"
+      ? text.storyQuestionPrompt
+      : text.storyAnswerPrompt;
+  const placeholder = state.phase === "story"
+    ? text.storyPlaceholder
+    : state.phase === "question"
+      ? text.storyQuestionPlaceholder
+      : text.storyAnswerPlaceholder;
+  const submitLabel = state.phase === "story"
+    ? text.storySubmit
+    : state.phase === "question"
+      ? text.storyQuestionSubmit
+      : text.storyAnswerSubmit;
 
   return (
-    <div className="max-w-lg mx-auto space-y-5">
-      <RoomHeader game={game} room={room}
-        subtitle={tagger ? `${locale === "en" ? "Storyteller" : "술래"}: ${tagger.name}` : ""}
-        onLeave={onLeave} />
+    <div className="mx-auto max-w-2xl space-y-5 text-foreground">
+      <GameHeader game={game} subtitle={text.storySubtitle} onLeave={onLeave} leave={text.leave} />
 
-      {/* 주사위 단어 풀 (한 번 정해지면 끝까지) */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <h3 className="text-xs font-black text-gray-600">{text.storyWordPool}</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          {(["protagonist", "place", "event"] as DiceCategory[]).map((cat) => (
-            <div key={cat} className="rounded-xl p-2 border"
-              style={{ borderColor: STORY_DICE_COLOR[cat] + "40", background: STORY_DICE_COLOR[cat] + "08" }}>
-              <p className="text-xs font-bold text-center mb-1" style={{ color: STORY_DICE_COLOR[cat] }}>
-                {STORY_DICE_EMOJI[cat]} {getStoryDiceCategoryLabel(locale, cat)}
-              </p>
-              <div className="flex flex-wrap gap-1 justify-center">
-                {state.words![cat].map((w) => (
-                  <span key={w} className="text-[11px] bg-white border border-gray-200 rounded-full px-2 py-0.5 text-gray-600">
-                    {getWordEmoji(w, cat, state.words?.emojis)} {getStoryDiceWordText(state.words, w, locale)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 주사위 굴림 결과 */}
-      {(state.rolled || rolling) && (
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border-2 border-amber-200 p-4 grid grid-cols-3 gap-3">
-          {(["protagonist", "place", "event"] as DiceCategory[]).map((cat) => {
-            const value = rolling ? rolling[cat] : state.rolled![cat];
-            return (
-              <div key={cat} className="text-center">
-                <p className="text-xs font-bold mb-1" style={{ color: STORY_DICE_COLOR[cat] }}>
-                  {STORY_DICE_EMOJI[cat]} {getStoryDiceCategoryLabel(locale, cat)}
-                </p>
-                <div
-                  className="rounded-2xl py-3 text-white shadow-md flex flex-col items-center gap-0.5"
-                  style={{
-                    background: STORY_DICE_COLOR[cat],
-                    transform: rolling ? `rotate(${animTick * 5}deg) scale(${1 + (animTick % 2) * 0.05})` : "none",
-                    transition: "transform 0.1s",
-                  }}>
-                  <span className="text-3xl leading-none">
-                    {value === "?" ? "🎲" : getWordEmoji(value, cat, state.words?.emojis)}
-                  </span>
-                  <span className="text-lg font-black">{getStoryDiceWordText(state.words, value, locale)}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 단계별 UI */}
-      {state.phase === "rolling" && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3 text-center">
-          <p className="text-sm font-bold text-gray-700">
-            {locale === "en" ? `🎲 Storyteller (${tagger?.name}) rolls 3 dice!` : `🎲 술래(${tagger?.name})가 주사위 3개를 굴려요!`}
-          </p>
-          {amTagger ? (
-            <Button className="w-full py-4 text-lg font-black text-white rounded-2xl"
-              style={{ background: "linear-gradient(135deg, #FB923C, #EF4444)" }}
-              onClick={rollDice} disabled={!!rolling || actionLoading}>
-              {rolling ? text.diceRolling : text.diceRoll}
+      {state.phase === "setup" ? (
+        <section className="space-y-3 border-b border-border pb-5">
+          {isHost ? (
+            <Button type="button" onClick={prepare} disabled={pendingKind !== null} className="w-full sm:w-auto">
+              <Play className="mr-2 h-4 w-4" aria-hidden="true" />
+              {pendingKind === "story-prepare" ? text.sending : text.storyPrepare}
             </Button>
           ) : (
-            <WaitingBanner text={locale === "en" ? `${tagger?.name} is rolling the dice...` : `${tagger?.name}님이 주사위를 굴리는 중...`} />
+            <p className="text-sm text-muted-foreground">{text.waitingHost}</p>
           )}
-        </div>
-      )}
-
-      {state.phase === "story" && state.rolled && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-          <p className="text-sm font-bold text-gray-700">
-            {locale === "en" ? `✏️ Storyteller (${tagger?.name}) makes one story sentence with the three words!` : `✏️ 술래(${tagger?.name})가 세 단어로 이야기 한 문장을 만들어요!`}
-          </p>
-          <p className="text-xs text-gray-500">
-            {locale === "en" ? "Hint" : "힌트"}: <span className="font-bold text-red-500">{getStoryDiceWordText(state.words, state.rolled.protagonist, locale)}</span>
-            {locale === "en" ? " at " : "가/이 "}<span className="font-bold text-emerald-600">{getStoryDiceWordText(state.words, state.rolled.place, locale)}</span>
-            {locale === "en" ? " with " : "에서"}<span className="font-bold text-violet-600"> {getStoryDiceWordText(state.words, state.rolled.event, locale)}</span>{locale === "en" ? " ..." : "을(를) ..."}
-          </p>
-          {amTagger ? (
-            <>
-              <textarea
-                className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none h-24"
-                placeholder={text.storyMakeSentence}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                autoFocus />
-              <Button className="w-full font-bold text-white rounded-xl"
-                style={{ background: "linear-gradient(135deg, #FB923C, #EF4444)" }}
-                disabled={!input.trim() || actionLoading}
-                onClick={submitStory}>
-                {text.storyStart}
-              </Button>
-            </>
-          ) : (
-            <WaitingBanner text={locale === "en" ? `${tagger?.name} is making a story...` : `${tagger?.name}님이 이야기를 만드는 중...`} />
-          )}
-        </div>
-      )}
-
-      {state.phase === "qa" && (
+        </section>
+      ) : (
         <>
-          {/* 이야기 + Q&A 체인 */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2 max-h-72 overflow-y-auto">
-            {state.chain.map((c, i) => (
-              <div key={i} className="flex gap-2.5 items-start">
-                <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black text-white"
-                  style={{ background: c.type === "story" ? "#f59e0b" : playerColorById(room, c.playerId) }}>
-                  {c.type === "story" ? "📖" : c.type === "question" ? "?" : "💬"}
-                </div>
-                <div className="flex-1 rounded-xl px-3 py-2 text-sm"
-                  style={{
-                    background: c.type === "story" ? "#fef3c7"
-                      : c.type === "question" ? `${playerColorById(room, c.playerId)}12`
-                      : "#f3f4f6",
-                    border: i === state.chain.length - 1 ? `2px solid ${c.type === "story" ? "#f59e0b" : playerColorById(room, c.playerId)}` : "none",
-                  }}>
-                  <p className="text-[11px] font-bold mb-0.5" style={{ color: playerColorById(room, c.playerId) }}>
-                    {c.playerName} ({c.type === "story" ? text.story : c.type === "question" ? text.question : text.answer})
-                  </p>
-                  {c.text}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* 현재 차례 안내 */}
-          <div className="rounded-xl px-4 py-3 text-center font-bold"
-            style={{
-              background: isMyTurn ? `${game.accentColor}15` : "#f9fafb",
-              color: isMyTurn ? game.accentColor : "#9ca3af",
-            }}>
-            {isMyTurn
-              ? (nextAction === "question"
-                ? (locale === "en" ? "🙋 Your turn! Make a question for the story" : "🙋 내 차례! 이야기에 어울리는 질문을 만들어요")
-                : (locale === "en" ? "💬 Your turn! Answer the student's question" : "💬 내 차례! 학생의 질문에 대답해요"))
-              : nextAction === "question"
-                ? (locale === "en" ? `⏳ ${currentQuestioner?.name} is making a question...` : `⏳ ${currentQuestioner?.name}님이 질문을 만드는 중...`)
-                : (locale === "en" ? `⏳ ${tagger?.name} is answering...` : `⏳ ${tagger?.name}님이 대답하는 중...`)}
-          </div>
-
-          {/* 입력 */}
-          {isMyTurn ? (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-              <textarea
-                className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none h-20"
-                placeholder={
-                  nextAction === "question"
-                    ? text.storyQuestionPlaceholder
-                    : text.storyAnswerPlaceholder
-                }
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                autoFocus />
-              <Button className="w-full font-bold text-white rounded-xl"
-                style={{
-                  background: "linear-gradient(135deg, #FB923C, #EF4444)",
-                  opacity: input.trim() && !actionLoading ? 1 : 0.5,
-                }}
-                disabled={!input.trim() || actionLoading}
-                onClick={nextAction === "question" ? submitQuestion : submitAnswer}>
-                {nextAction === "question" ? text.storySubmitQuestion : text.storySubmitAnswer}
-              </Button>
+          <section className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+            <div>
+              <p className="text-sm font-semibold">{text.storyTagger(taggerName)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {text.roundProgress(state.round, state.maxRounds, state.completedRounds)}
+              </p>
             </div>
-          ) : null}
+            <div className="text-left sm:text-right">
+              <p className="text-sm font-semibold">{text.storyGoal(state.pairs.length, targetTotal)}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {text.submissionProgress(state.roundSubmittedPlayerIds.length, state.roundTargetPlayerIds.length)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {isActor ? text.currentTurn(actorName) : text.waitingTurn(actorName)}
+              </p>
+            </div>
+          </section>
 
-          {/* 방장 종료 */}
-          {isHost && state.chain.length >= 4 && (
-            <Button variant="outline" className="w-full rounded-xl text-gray-500"
-              onClick={() => void onAction("update-state", { patch: { phase: "done" }, status: "ended" })}>
-              {text.storyFinish}
+          <section className="space-y-3 border-b border-border pb-5" aria-labelledby="story-word-pool">
+            <h2 id="story-word-pool" className="text-base font-semibold">{text.storyWordPool}</h2>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {WORD_CATEGORIES.map((category) => (
+                <div key={category} className="border border-border bg-card p-3 rounded-lg">
+                  <p className="text-xs font-semibold text-muted-foreground">{getStoryDiceCategoryLabel(locale, category)}</p>
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {state.words[category].map((word) => (
+                      <li key={word} className="bg-secondary px-2 py-1 text-xs rounded-md">
+                        {getLocalizedText(state.words.wordText[word], locale, word)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {state.rolledWords && (
+            <section className="space-y-2 border-b border-border pb-5">
+              <h2 className="text-base font-semibold">{text.storyRolled}</h2>
+              <div className="flex flex-wrap gap-2">
+                {WORD_CATEGORIES.map((category) => {
+                  const word = state.rolledWords?.[category] ?? "";
+                  return (
+                    <span key={category} className="border border-border bg-secondary px-3 py-2 text-sm font-semibold rounded-lg">
+                      {getLocalizedText(state.words.wordText[word], locale, word)}
+                    </span>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {state.phase === "roll" && isActor && (
+            <Button type="button" onClick={roll} disabled={pendingKind !== null} className="w-full sm:w-auto">
+              <Dices className="mr-2 h-4 w-4" aria-hidden="true" />
+              {pendingKind === "story-roll" ? text.sending : text.storyRoll}
             </Button>
+          )}
+
+          {(state.phase === "story" || state.phase === "question" || state.phase === "answer") && isActor && (
+            <form className="space-y-3 border-b border-border pb-5" onSubmit={(event) => {
+              event.preventDefault();
+              void submitInput();
+            }}>
+              <label htmlFor="story-turn-input" className="text-sm font-semibold">{prompt}</label>
+              <Textarea
+                id="story-turn-input"
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder={placeholder}
+                maxLength={state.phase === "question" ? 200 : 500}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+              />
+              <Button type="submit" disabled={!input.trim() || pendingKind !== null} className="w-full sm:w-auto">
+                <Send className="mr-2 h-4 w-4" aria-hidden="true" />
+                {pendingKind?.startsWith("story-submit") ? text.sending : submitLabel}
+              </Button>
+            </form>
           )}
         </>
       )}
+
+      <section className="space-y-3" aria-labelledby="story-records-title">
+        <h2 id="story-records-title" className="text-base font-semibold">{text.sharedRecords}</h2>
+        {!state.story && state.pairs.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{text.noRecords}</p>
+        ) : (
+          <div className="space-y-2">
+            {state.story && (
+              <div className="border border-border bg-card p-3 rounded-lg">
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <BookOpen className="h-4 w-4" aria-hidden="true" />
+                  {text.storyRecord} · {state.story.playerName}
+                </p>
+                <p className="mt-1 text-sm">{state.story.story}</p>
+              </div>
+            )}
+            {state.pairs.map((pair) => (
+              <div key={`${pair.roundId}:${pair.playerId}`} className="border border-border bg-card p-3 rounded-lg">
+                <p className="text-xs text-muted-foreground">{pair.round} · {pair.playerName}</p>
+                <p className="mt-1 text-sm font-semibold">{pair.question}</p>
+                <p className="mt-2 border-t border-border pt-2 text-sm">{pair.answer}</p>
+              </div>
+            ))}
+            {state.pendingQuestion && (
+              <div className="border border-input bg-background p-3 rounded-lg">
+                <p className="text-xs text-muted-foreground">{state.pendingQuestion.playerName}</p>
+                <p className="mt-1 text-sm font-semibold">{state.pendingQuestion.question}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {isHost && state.completedRounds >= 1 && (
+        <Button type="button" variant="outline" onClick={endEarly} disabled={pendingKind !== null} className="border-border">
+          <Flag className="mr-2 h-4 w-4" aria-hidden="true" />
+          {text.earlyEnd}
+        </Button>
+      )}
     </div>
+  );
+}
+
+function GameHeader({
+  game,
+  subtitle,
+  leave,
+  onLeave,
+}: {
+  game: BuiltInGame;
+  subtitle: string;
+  leave: string;
+  onLeave: () => void;
+}) {
+  return (
+    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+      <div className="min-w-0">
+        <h1 className="text-xl font-bold">{game.emoji} {game.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      </div>
+      <Button type="button" variant="ghost" size="sm" onClick={onLeave}>
+        <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
+        {leave}
+      </Button>
+    </header>
   );
 }

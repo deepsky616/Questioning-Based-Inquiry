@@ -1,195 +1,307 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Dices, Flag, LogOut, Send } from "lucide-react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { RoomHeader, TurnBar, WaitingBanner, playerColorById } from "./roomShared";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  getQuestionDiceTypes,
+  getRoomTurnGameText,
+  resolveQuestionGameLocale,
+} from "@/lib/question-game-i18n";
+import { isQuestionGameCommandId } from "@/lib/question-game-room-engine";
+import {
+  readDicePublicState,
+  type DiceRoomState,
+} from "@/lib/question-game-room-engines/turn-games";
+import type {
+  BuiltInGame,
+  GameRoom,
+  RoomActionHandler,
+} from "@/lib/question-games-data";
 import RoomResult from "./RoomResult";
-import { getQuestionDiceTypes, getQuestionGameText } from "@/lib/question-game-i18n";
-import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
-
-const DOTS: Record<number, [number, number][]> = {
-  1: [[50, 50]], 2: [[28, 28], [72, 72]], 3: [[28, 28], [50, 50], [72, 72]],
-  4: [[28, 28], [72, 28], [28, 72], [72, 72]],
-  5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]],
-  6: [[28, 28], [72, 28], [28, 50], [72, 50], [28, 72], [72, 72]],
-};
-
-interface DiceEntry { face: number; type: string; question: string; playerId: string; playerName: string }
-interface DiceState { phase: "rolling" | "writing"; face: number; history: DiceEntry[] }
+import { useRoomCommandRequest } from "./useRoomCommandRequest";
 
 interface Props {
-  game: BuiltInGame; room: GameRoom; myId: string; actionLoading: boolean;
+  game: BuiltInGame;
+  room: GameRoom;
+  myId: string;
+  actionLoading: boolean;
   onAction: RoomActionHandler;
   onLeave: () => void;
 }
 
-export default function RoomDice({ game, room, myId, actionLoading, onAction, onLeave }: Props) {
-  const locale = useLocale();
-  const text = getQuestionGameText(locale);
-  const diceTypes = getQuestionDiceTypes(locale);
-  const [input, setInput] = useState("");
-  const [displayFace, setDisplayFace] = useState(1);
-  const [localRolling, setLocalRolling] = useState(false);
-  const initRef = useRef(false);
+function sameValues(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length &&
+    new Set(left).size === left.length &&
+    left.every((value) => right.includes(value));
+}
 
-  const isHost = room.hostId === myId;
-  const state = room.gameState as unknown as DiceState;
-  const hasState = state && typeof state.phase === "string";
-  const currentPlayer = room.players[room.turnIndex % room.players.length];
-  const isMyTurn = currentPlayer?.id === myId;
+function roomMatchesState(
+  game: BuiltInGame,
+  room: GameRoom,
+  state: DiceRoomState,
+  myId: string,
+): boolean {
+  const ids = room.players.map(({ id }) => id);
+  const me = room.players.find(({ id }) => id === myId);
+  if (
+    game.id !== "dice" ||
+    room.gameId !== "dice" ||
+    !isQuestionGameCommandId(room.playId) ||
+    !me ||
+    state.playerNames[myId] !== me.name ||
+    new Set(ids).size !== ids.length ||
+    !room.players.every(({ id, name }) => state.playerNames[id] === name)
+  ) {
+    return false;
+  }
+  if (state.phase === "done") return room.status === "ended";
+  if (ids.length < 2 || ids.length > 8) return false;
+  return room.status === "playing" &&
+    Boolean(state.roundId) &&
+    sameValues(state.roundTargetPlayerIds, ids);
+}
+
+function endMessage(
+  reason: DiceRoomState["endReason"],
+  text: ReturnType<typeof getRoomTurnGameText>,
+): string {
+  if (reason === "host") return text.endHost;
+  if (reason === "insufficient-players") return text.endInsufficient;
+  return text.endCompleted;
+}
+
+export default function RoomDice({
+  game,
+  room,
+  myId,
+  onAction,
+  onLeave,
+}: Props) {
+  const locale = resolveQuestionGameLocale(useLocale());
+  const text = getRoomTurnGameText(locale);
+  const state = readDicePublicState(room.gameState);
+  const valid = state !== null && roomMatchesState(game, room, state, myId);
+  const currentPlayerId = state?.turnOrder[state.currentTurnIdx] ?? "";
+  const currentPlayerName = state?.playerNames[currentPlayerId] ?? "";
+  const inputContext = state?.phase === "question"
+    ? `${room.playId ?? ""}:${state.roundId ?? ""}:${currentPlayerId}:${state.currentFace ?? 0}`
+    : `${room.playId ?? ""}:${state?.roundId ?? ""}:${currentPlayerId}:${state?.phase ?? "invalid"}`;
+  const [question, setQuestion] = useState("");
+  const retryRef = useRef<{ context: string; value: string } | null>(null);
+  const acknowledgementRef = useRef(0);
+  const {
+    send,
+    pendingKind,
+    acknowledgementVersion,
+  } = useRoomCommandRequest({
+    room,
+    gameId: "dice",
+    state: valid ? state : null,
+    readState: readDicePublicState,
+    onAction,
+    lifetimeParts: [currentPlayerId, inputContext],
+  });
 
   useEffect(() => {
-    if (isHost && !hasState && !initRef.current && room.status === "playing") {
-      initRef.current = true;
-      void onAction("set-state", { state: { phase: "rolling", face: 0, history: [] }, turnIndex: 0 });
-    }
-  }, [isHost, hasState, room.status, onAction]);
+    setQuestion("");
+    retryRef.current = null;
+  }, [inputContext]);
 
-  if (room.status === "ended") {
-    const hist = state?.history ?? [];
-    const scores = room.players.map((p) => ({
-      playerId: p.id, name: p.name,
-      score: hist.filter((h) => h.playerId === p.id).length,
-    }));
-    const questions = hist.map((h) => ({ playerId: h.playerId, playerName: h.playerName, question: h.question }));
-    return (
-      <RoomResult game={game} room={room} myId={myId}
-        scoreLabel={text.question} scoreUnit={text.count}
-        scores={scores} questions={questions}
-        onAction={onAction} onLeave={onLeave} />
-    );
-  }
+  useEffect(() => {
+    if (acknowledgementRef.current === acknowledgementVersion) return;
+    acknowledgementRef.current = acknowledgementVersion;
+    const retry = retryRef.current;
+    if (!retry || retry.context !== inputContext) return;
+    setQuestion((current) => current.trim() === retry.value ? "" : current);
+    retryRef.current = null;
+  }, [acknowledgementVersion, inputContext]);
 
-  if (!hasState) {
+  if (!valid || !state || !room.playId) {
     return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <RoomHeader game={game} room={room} subtitle={text.preparing} onLeave={onLeave} />
-        <WaitingBanner text={text.preparingGame} />
+      <div className="mx-auto max-w-2xl space-y-5 text-foreground">
+        <GameHeader game={game} subtitle={text.safeState} onLeave={onLeave} leave={text.leave} />
+        <p role="status" className="border border-border bg-card p-4 text-sm text-muted-foreground rounded-lg">
+          {text.safeState}
+        </p>
       </div>
     );
   }
 
-  function roll() {
-    if (localRolling || actionLoading) return;
-    setLocalRolling(true);
-    let count = 0;
-    const final = Math.ceil(Math.random() * 6);
-    const iv = setInterval(() => {
-      setDisplayFace(Math.ceil(Math.random() * 6));
-      count++;
-      if (count >= 12) {
-        clearInterval(iv);
-        setDisplayFace(final);
-        setLocalRolling(false);
-        void onAction("update-state", { patch: { phase: "writing", face: final } });
-      }
-    }, 100);
+  const scores = room.players.map((player) => ({
+    playerId: player.id,
+    name: player.name,
+    score: state.questions.filter(({ playerId }) => playerId === player.id).length,
+  }));
+  if (state.phase === "done") {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 text-foreground">
+        <p role="status" className="border border-border bg-secondary p-3 text-center text-sm font-semibold rounded-lg">
+          {endMessage(state.endReason, text)}
+        </p>
+        <RoomResult
+          game={game}
+          room={room}
+          myId={myId}
+          scoreLabel={locale === "en" ? "Questions" : "질문 수"}
+          scoreUnit=""
+          scores={scores}
+          questions={state.questions}
+          onAction={onAction}
+          onLeave={onLeave}
+        />
+      </div>
+    );
   }
 
-  async function submit() {
-    const trimmed = input.trim();
-    if (!trimmed || actionLoading) return;
-    const typeInfo = diceTypes[state.face - 1];
-    const entry: DiceEntry = {
-      face: state.face, type: typeInfo?.type ?? "", question: trimmed,
-      playerId: myId, playerName: currentPlayer?.name ?? text.me,
-    };
-    const res = await onAction("update-state", {
-      patch: { phase: "rolling", face: 0, history: [...state.history, entry] },
-      turnIndex: (room.turnIndex + 1) % room.players.length,
-    });
-    if (res.ok) setInput("");
+  const isMyTurn = currentPlayerId === myId;
+  const activeState = state;
+  const playId = room.playId;
+  const dieType = state.currentFace === null
+    ? null
+    : getQuestionDiceTypes(locale).find(({ face }) => face === state.currentFace);
+
+  async function roll() {
+    if (!isMyTurn || activeState.phase !== "roll" || pendingKind) return;
+    await send(
+      "dice-roll",
+      { playId, roundId: activeState.roundId },
+      [playId, activeState.roundId ?? "", currentPlayerId],
+    );
   }
 
-  const shownFace = state.phase === "writing" ? state.face : (localRolling ? displayFace : (state.face || 1));
-  const typeInfo = diceTypes[(state.face || 1) - 1];
+  async function submitQuestion() {
+    const value = question.trim();
+    if (!value || !isMyTurn || activeState.phase !== "question" || pendingKind) return;
+    retryRef.current = { context: inputContext, value };
+    const outcome = await send(
+      "dice-submit-question",
+      {
+        playId,
+        roundId: activeState.roundId,
+        locale,
+        question: value,
+      },
+      [playId, activeState.roundId ?? "", activeState.currentFace ?? 0, value],
+    );
+    if (outcome === "confirmed") {
+      setQuestion((current) => current.trim() === value ? "" : current);
+      retryRef.current = null;
+    } else if (outcome === "stale") {
+      retryRef.current = null;
+    }
+  }
+
+  async function endEarly() {
+    if (pendingKind || !window.confirm(text.earlyEndConfirm)) return;
+    await send(
+      "end-game-early",
+      { playId, roundId: activeState.roundId },
+      [playId, activeState.roundId ?? "", "end-game-early"],
+    );
+  }
 
   return (
-    <div className="max-w-lg mx-auto space-y-4">
-      <RoomHeader game={game} room={room} subtitle={`${text.question} ${state.history.length}${text.count}`} onLeave={onLeave} />
-      <TurnBar room={room} myId={myId} currentId={currentPlayer?.id} />
+    <div className="mx-auto max-w-2xl space-y-5 text-foreground">
+      <GameHeader game={game} subtitle={text.diceSubtitle} onLeave={onLeave} leave={text.leave} />
 
-      {/* 주사위 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col items-center gap-5">
-        <div className="w-32 h-32 rounded-2xl flex items-center justify-center shadow-xl"
-          style={{
-            background: state.phase === "writing" ? typeInfo?.color : "#6366f1",
-            transform: localRolling ? "rotate(15deg) scale(1.05)" : "none",
-            transition: "transform 0.1s",
-          }}>
-          <svg viewBox="0 0 100 100" className="w-20 h-20">
-            {(DOTS[shownFace] ?? []).map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r="9" fill="white" />)}
-          </svg>
+      <section className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-4">
+        <div>
+          <p className="text-sm font-semibold">{text.roundProgress(state.round, state.maxRounds, state.completedRounds)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {text.submissionProgress(state.roundSubmittedPlayerIds.length, state.roundTargetPlayerIds.length)}
+          </p>
         </div>
+        <p className="text-sm text-muted-foreground">{isMyTurn ? text.currentTurn(currentPlayerName) : text.waitingTurn(currentPlayerName)}</p>
+      </section>
 
-        {state.phase === "writing" && typeInfo && (
-          <div className="text-center">
-            <div className="inline-block rounded-full px-4 py-1.5 text-white font-black mb-1"
-          style={{ background: typeInfo.color }}>{state.face} — {typeInfo.type}</div>
-            <p className="text-gray-500 text-sm">{typeInfo.desc}</p>
+      <section className="space-y-4 border-b border-border pb-5" aria-label={locale === "en" ? "Current turn" : "현재 차례"}>
+        {state.phase === "roll" && isMyTurn && (
+          <Button type="button" onClick={roll} disabled={pendingKind !== null} className="w-full sm:w-auto">
+            <Dices className="mr-2 h-4 w-4" aria-hidden="true" />
+            {pendingKind === "dice-roll" ? text.sending : text.diceRoll}
+          </Button>
+        )}
+        {state.phase === "question" && state.currentFace !== null && (
+          <div className="space-y-2 bg-secondary p-4 rounded-lg">
+            <p className="font-semibold">{text.diceFace(state.currentFace)}</p>
+            {dieType && <p className="text-sm text-muted-foreground">{dieType.type} · {dieType.shortDesc}</p>}
           </div>
         )}
-
-        <div className="rounded-xl px-4 py-2.5 text-center font-bold w-full"
-          style={{ background: isMyTurn ? `${game.accentColor}15` : "#f9fafb", color: isMyTurn ? game.accentColor : "#9ca3af" }}>
-          {isMyTurn
-            ? (state.phase === "rolling" ? text.diceRoll : (locale === "en" ? "✏️ Make a question!" : "✏️ 질문을 만들어요!"))
-            : `⏳ ${text.turnOf(currentPlayer?.name ?? "")}`}
-        </div>
-
-        {/* 내 차례 + 굴리기 단계 */}
-        {isMyTurn && state.phase === "rolling" && (
-          <Button onClick={roll} disabled={localRolling || actionLoading}
-            className="w-full py-4 text-lg font-black text-white rounded-xl"
-            style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
-            {localRolling ? text.diceRolling : text.diceRoll}
-          </Button>
+        {state.phase === "question" && isMyTurn && (
+          <form className="space-y-3" onSubmit={(event) => {
+            event.preventDefault();
+            void submitQuestion();
+          }}>
+            <Textarea
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder={text.diceQuestionPlaceholder}
+              maxLength={200}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+            />
+            <Button type="submit" disabled={!question.trim() || pendingKind !== null} className="w-full sm:w-auto">
+              <Send className="mr-2 h-4 w-4" aria-hidden="true" />
+              {pendingKind === "dice-submit-question" ? text.sending : text.questionSubmit}
+            </Button>
+          </form>
         )}
-      </div>
+      </section>
 
-      {/* 내 차례 + 작성 단계 */}
-      {isMyTurn && state.phase === "writing" && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-          <textarea
-            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none h-24"
-            placeholder={typeInfo ? text.dicePlaceholder(typeInfo.type) : ""}
-            value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
-          <Button className="w-full font-bold text-white rounded-xl"
-            style={{ background: typeInfo?.color, opacity: input.trim() && !actionLoading ? 1 : 0.5 }}
-            disabled={!input.trim() || actionLoading} onClick={submit}>
-            {actionLoading ? text.sending : text.submit}
-          </Button>
-        </div>
-      )}
+      <section className="space-y-3" aria-labelledby="dice-records-title">
+        <h2 id="dice-records-title" className="text-base font-semibold">{text.sharedRecords}</h2>
+        {state.questions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{text.noRecords}</p>
+        ) : (
+          <ol className="space-y-2">
+            {state.questions.map((record) => (
+              <li key={`${record.roundId}:${record.playerId}`} className="border border-border bg-card p-3 rounded-lg">
+                <p className="text-xs text-muted-foreground">{record.round} · {record.playerName} · {text.diceFace(record.face)}</p>
+                <p className="mt-1 text-sm">{record.question}</p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
-      {!isMyTurn && (
-        <WaitingBanner text={locale === "en"
-          ? `${currentPlayer?.name} is ${state.phase === "rolling" ? "rolling the die" : "making a question"}...`
-          : `${currentPlayer?.name}님이 ${state.phase === "rolling" ? "주사위를 굴리는" : "질문을 만드는"} 중...`} />
-      )}
-
-      {/* 기록 */}
-      {state.history.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-2 max-h-40 overflow-y-auto">
-          {state.history.slice().reverse().map((h, i) => (
-            <div key={i} className="flex gap-2 items-center text-sm">
-              <span className="w-6 h-6 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-black text-xs"
-                style={{ background: diceTypes[h.face - 1]?.color }}>{h.face}</span>
-              <span className="text-xs font-bold" style={{ color: playerColorById(room, h.playerId) }}>{h.playerName}</span>
-              <span className="text-gray-700 flex-1 truncate">{h.question}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* 방장 종료 */}
-      {isHost && state.history.length >= 2 && (
-        <Button variant="outline" className="w-full rounded-xl text-gray-500"
-          onClick={() => void onAction("update-state", { patch: {}, status: "ended" })}>
-          {text.finishGame}
+      {room.hostId === myId && state.completedRounds >= 1 && (
+        <Button type="button" variant="outline" onClick={endEarly} disabled={pendingKind !== null} className="border-border">
+          <Flag className="mr-2 h-4 w-4" aria-hidden="true" />
+          {text.earlyEnd}
         </Button>
       )}
     </div>
+  );
+}
+
+function GameHeader({
+  game,
+  subtitle,
+  leave,
+  onLeave,
+}: {
+  game: BuiltInGame;
+  subtitle: string;
+  leave: string;
+  onLeave: () => void;
+}) {
+  return (
+    <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+      <div className="min-w-0">
+        <h1 className="text-xl font-bold">{game.emoji} {game.title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+      </div>
+      <Button type="button" variant="ghost" size="sm" onClick={onLeave}>
+        <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
+        {leave}
+      </Button>
+    </header>
   );
 }
