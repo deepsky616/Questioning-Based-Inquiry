@@ -78,7 +78,7 @@ export default function TeacherPracticePrintGuidePage() {
           </div>
         </div>
 
-        <section className="mt-6 space-y-4">
+        <section className="qp-guide mt-6 space-y-4">
           <h2 className="qp-section-heading text-xl font-extrabold text-slate-950">{guide.guideTitle}</h2>
           <div className="grid gap-4 print:gap-3">
             {guide.sections.map((section) => (
