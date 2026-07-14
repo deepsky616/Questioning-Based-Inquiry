@@ -29,6 +29,10 @@ import { generateJson } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { loadGameRoom } from "@/lib/game-room-store";
 import type { GameRoom } from "@/lib/question-games-data";
+import {
+  buildAwardList,
+  buildRoomAwardKey,
+} from "@/lib/point-award-service";
 import { POST } from "@/app/api/points/award/route";
 
 const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
@@ -102,6 +106,153 @@ const BODY = {
     isWinner: true,
   }],
 };
+
+const V2_PLAY_ID = "10000000-0000-4000-8000-000000000001";
+const V2_OTHER_PLAY_ID = "10000000-0000-4000-8000-000000000002";
+const V2_ROUND_IDS = [
+  "20000000-0000-4000-8000-000000000001",
+  "20000000-0000-4000-8000-000000000002",
+  "20000000-0000-4000-8000-000000000003",
+] as const;
+
+function makeV2RelayRoom(
+  overrides: Partial<GameRoom> = {},
+): GameRoom {
+  const players = [
+    { id: "t1", name: "교사", isHost: true, joinedAt: 1 },
+    { id: "s1", name: "학생", isHost: false, joinedAt: 2 },
+  ];
+  const questions = V2_ROUND_IDS.flatMap((roundId, roundIndex) =>
+    players.map((player, playerIndex) => ({
+      roundId,
+      round: roundIndex + 1,
+      playerId: player.id,
+      playerName: player.name,
+      locale: "ko" as const,
+      question: `${roundIndex + 1}-${playerIndex + 1}번째 질문은 무엇인가요?`,
+    })),
+  );
+  return makeRoom({
+    gameId: "relay",
+    players,
+    topic: "우주",
+    chain: [],
+    version: 20,
+    playId: V2_PLAY_ID,
+    pointAwardKeyVersion: 2,
+    pointEvidenceVersion: 2,
+    gameState: {
+      stateVersion: 2,
+      game: "relay",
+      phase: "done",
+      recentCommandIds: [],
+      roundId: V2_ROUND_IDS[2],
+      round: 3,
+      maxRounds: 3,
+      completedRounds: 3,
+      endReason: "completed",
+      players: players.map(({ id, name }) => ({ id, name })),
+      playerNames: { t1: "교사", s1: "학생" },
+      roundPlayerIds: ["t1", "s1"],
+      roundTargetPlayerIds: ["t1", "s1"],
+      roundSubmittedPlayerIds: ["t1", "s1"],
+      turnOrder: ["t1", "s1"],
+      currentTurnIdx: 0,
+      questions,
+      topic: "우주",
+    },
+    ...overrides,
+  });
+}
+
+function makeV2MemoryRoom(
+  scores: Record<"t1" | "s1", number> = { t1: 0, s1: 1 },
+  overrides: Partial<GameRoom> = {},
+): GameRoom {
+  const pairs = Array.from({ length: 6 }, (_, index) => ({
+    id: `pair-${index}`,
+    question: `질문 ${index + 1}?`,
+    answer: `대답 ${index + 1}`,
+  }));
+  const qCards = pairs.map(({ id }, index) => ({
+    id: `q-${index}`,
+    pairId: id,
+    type: "q" as const,
+  }));
+  const aCards = pairs.map(({ id }, index) => ({
+    id: `a-${index}`,
+    pairId: id,
+    type: "a" as const,
+  }));
+  const pairCount = Object.values(scores).reduce((sum, score) => sum + score, 0);
+  const takenIds = pairs.slice(0, pairCount).flatMap((_, index) => [
+    qCards[index].id,
+    aCards[index].id,
+  ]);
+  const takenSet = new Set(takenIds);
+  const players = [
+    { id: "t1", name: "교사", isHost: true, joinedAt: 1 },
+    { id: "s1", name: "학생", isHost: false, joinedAt: 2 },
+  ];
+  return makeRoom({
+    gameId: "memory",
+    players,
+    topic: "",
+    chain: [],
+    version: 20,
+    playId: V2_PLAY_ID,
+    pointAwardKeyVersion: 2,
+    pointEvidenceVersion: 2,
+    gameState: {
+      stateVersion: 2,
+      game: "memory",
+      phase: "done",
+      recentCommandIds: [],
+      roundId: V2_ROUND_IDS[0],
+      endReason: "completed",
+      difficulty: "easy",
+      pairs,
+      qCards,
+      aCards,
+      diceRolls: { t1: 6, s1: 5 },
+      turnOrder: ["t1", "s1"],
+      currentTurnIdx: 0,
+      takenIds,
+      revealedIds: [...qCards, ...aCards]
+        .filter(({ id }) => !takenSet.has(id))
+        .map(({ id }) => id),
+      scores,
+      attempts: 18,
+      maxAttempts: 18,
+      lastReveal: null,
+      lastResolvedRevealId: "resolved-last-attempt",
+    },
+    ...overrides,
+  });
+}
+
+function useLockedRoom(room: GameRoom) {
+  mLoadGameRoom.mockResolvedValue(room);
+  txQueryRaw
+    .mockResolvedValueOnce([{ locked: true }])
+    .mockResolvedValueOnce([{ data: room }]);
+}
+
+function v2Body(gameId: string, playId = V2_PLAY_ID) {
+  return {
+    ...BODY,
+    gameId,
+    playId,
+    topic: "클라이언트가 바꾼 주제",
+    contributions: [{
+      studentId: "attacker-target",
+      studentName: "가짜 학생",
+      validQuestions: 999,
+      questions: ["가짜 질문은 무엇인가요?"],
+      isWinner: true,
+    }],
+  };
+}
 
 const snapshot = JSON.stringify({
   type: "game-room-award-result",
@@ -310,6 +461,9 @@ describe("포인트 지급 요청 검증", () => {
     expect(data.awards).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ studentId: "attacker-target" }),
     ]));
+    expect(mGenerateJson.mock.calls[0][0].prompt).toContain("우주");
+    expect(mGenerateJson.mock.calls[0][0].prompt)
+      .not.toContain("클라이언트가 바꾼 주제");
     expect(txUserUpdate).toHaveBeenCalledTimes(1);
     expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "s1" } }));
     expect(mGenerateJson.mock.calls[0][0].prompt).toContain("우주");
@@ -394,10 +548,18 @@ describe("포인트 지급 수명별 중복 조회", () => {
 
     expect(res.status).toBe(200);
     expect(mFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { gameId: "relay", roomCode: "room:1234:100" },
+      where: {
+        gameId: "relay",
+        roomCode: "room:1234:100",
+        status: "APPROVED",
+      },
     }));
     expect(txPointLogFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { gameId: "relay", roomCode: "room:1234:100" },
+      where: {
+        gameId: "relay",
+        roomCode: "room:1234:100",
+        status: "APPROVED",
+      },
     }));
     expect(txPointLogCreateMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
@@ -438,8 +600,8 @@ describe("포인트 지급 수명별 중복 조회", () => {
   it("같은 수명의 기존 기록에서 표지된 결과를 생성 순서와 무관하게 복원한다", async () => {
     const createdAt = new Date(100);
     const logs = [
-      { id: "log1", studentId: "s1", bonusType: "PARTICIPATION", points: 5, reason: "참여", aiAnalysis: "예전 글", createdAt },
-      { id: "log2", studentId: "s1", bonusType: "COMPLETION", points: 5, reason: "완료", aiAnalysis: snapshot, createdAt },
+      { id: "log1", studentId: "s1", bonusType: "PARTICIPATION", points: 5, reason: "참여", status: "APPROVED", aiAnalysis: "예전 글", createdAt },
+      { id: "log2", studentId: "s1", bonusType: "COMPLETION", points: 5, reason: "완료", status: "APPROVED", aiAnalysis: snapshot, createdAt },
     ];
     mFindMany.mockResolvedValue(logs);
 
@@ -486,7 +648,10 @@ describe("포인트 지급 수명별 중복 조회", () => {
     mFindMany.mockResolvedValue([{
       id: "old-log",
       studentId: "outside-student",
+      bonusType: "PARTICIPATION",
       points: 5,
+      reason: "참여",
+      status: "APPROVED",
     }]);
 
     const res = await POST(awardReq(BODY));
@@ -732,7 +897,11 @@ describe("포인트 지급 저장", () => {
   it("첫 기록에 종류와 버전이 있는 결과 JSON을 저장한다", async () => {
     mGenerateJson.mockResolvedValue({
       bonuses: [],
-      bestQuestion: { studentId: "s1", question: "왜?", reason: "좋은 질문" },
+      bestQuestion: {
+        studentId: "s1",
+        question: "왜 별이 보일까요?",
+        reason: "좋은 질문",
+      },
       summary: "함께 잘 탐구했습니다.",
     });
 
@@ -745,7 +914,11 @@ describe("포인트 지급 저장", () => {
     expect(JSON.parse(firstData.aiAnalysis ?? "null")).toEqual({
       type: "game-room-award-result",
       version: 1,
-      bestQuestion: { studentId: "s1", question: "왜?", reason: "좋은 질문" },
+      bestQuestion: {
+        studentId: "s1",
+        question: "왜 별이 보일까요?",
+        reason: "좋은 질문",
+      },
       summary: "함께 잘 탐구했습니다.",
     });
     for (const row of rows.slice(1)) {
@@ -836,7 +1009,10 @@ describe("포인트 지급 저장", () => {
     txPointLogFindMany.mockResolvedValue([{
       id: "existing",
       studentId: "다른학생",
+      bonusType: "PARTICIPATION",
       points: 5,
+      reason: "참여",
+      status: "APPROVED",
     }]);
 
     const res = await POST(awardReq(BODY));
@@ -873,7 +1049,14 @@ describe("포인트 지급 저장", () => {
     );
     mFindMany
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: "log1", studentId: "s1", points: 5 }]);
+      .mockResolvedValueOnce([{
+        id: "log1",
+        studentId: "s1",
+        bonusType: "PARTICIPATION",
+        points: 5,
+        reason: "참여",
+        status: "APPROVED",
+      }]);
 
     const data = await (await POST(awardReq(BODY))).json();
 
@@ -889,7 +1072,10 @@ describe("포인트 지급 저장", () => {
       .mockResolvedValueOnce([{
         id: "log1",
         studentId: "outside-student",
+        bonusType: "PARTICIPATION",
         points: 5,
+        reason: "참여",
+        status: "APPROVED",
       }]);
 
     expect((await POST(awardReq(BODY))).status).toBe(403);
@@ -921,5 +1107,273 @@ describe("포인트 지급 저장", () => {
     );
 
     expect((await POST(awardReq(BODY))).status).toBe(409);
+  });
+});
+
+describe("버전 2 실행별 점수 지급", () => {
+  it("같은 방의 서로 다른 실행은 별도 점수 키를 사용한다", () => {
+    expect(buildRoomAwardKey("1234", 100, V2_PLAY_ID)).toBe(
+      `room:1234:100:${V2_PLAY_ID}`,
+    );
+    expect(buildRoomAwardKey("1234", 100, V2_OTHER_PLAY_ID)).toBe(
+      `room:1234:100:${V2_OTHER_PLAY_ID}`,
+    );
+    expect(buildRoomAwardKey("1234", 100)).toBe("room:1234:100");
+  });
+
+  it("클라이언트 기여를 무시하고 저장된 완료 질문을 실행 키로 지급한다", async () => {
+    const room = makeV2RelayRoom();
+    useLockedRoom(room);
+
+    const res = await POST(awardReq(v2Body("relay")));
+    const data = await res.json();
+    const executionKey = `room:1234:100:${V2_PLAY_ID}`;
+
+    expect(res.status).toBe(200);
+    expect(data.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "VALID_QUESTIONS",
+        points: 9,
+      }),
+    ]));
+    expect(data.awards).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "attacker-target" }),
+    ]));
+    expect(mFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        gameId: "relay",
+        roomCode: executionKey,
+        status: "APPROVED",
+      },
+    }));
+    expect(txPointLogFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        gameId: "relay",
+        roomCode: executionKey,
+        status: "APPROVED",
+      },
+    }));
+    expect(txPointLogCreateMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ roomCode: executionKey }),
+      ]),
+    });
+  });
+
+  it("버전 2 실행 식별값이 없거나 현재 방과 다르면 거절한다", async () => {
+    const room = makeV2RelayRoom();
+    mLoadGameRoom.mockResolvedValue(room);
+
+    const missing = await POST(awardReq({
+      ...v2Body("relay"),
+      playId: undefined,
+    }));
+    const mismatched = await POST(awardReq(v2Body("relay", V2_OTHER_PLAY_ID)));
+
+    expect(missing.status).toBe(409);
+    expect(mismatched.status).toBe(409);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it.each(["host", "insufficient-players"])(
+    "%s 종료는 참가와 완료 점수도 지급하지 않는다",
+    async (endReason) => {
+      const room = makeV2RelayRoom({
+        gameState: {
+          ...makeV2RelayRoom().gameState,
+          endReason,
+        },
+      });
+      mLoadGameRoom.mockResolvedValue(room);
+
+      const res = await POST(awardReq(v2Body("relay")));
+
+      expect(res.status).toBe(409);
+      expect(mGenerateJson).not.toHaveBeenCalled();
+      expect(mTx).not.toHaveBeenCalled();
+    },
+  );
+
+  it("짝 찾기는 질문 점수 없이 활동 우승과 참가 및 완료 점수만 지급한다", async () => {
+    const room = makeV2MemoryRoom();
+    useLockedRoom(room);
+
+    const res = await POST(awardReq(v2Body("memory")));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s1", bonusType: "PARTICIPATION" }),
+      expect.objectContaining({ studentId: "s1", bonusType: "COMPLETION" }),
+      expect.objectContaining({ studentId: "s1", bonusType: "WINNER" }),
+    ]));
+    expect(data.awards).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ bonusType: "VALID_QUESTIONS" }),
+    ]));
+    expect(mGenerateJson).not.toHaveBeenCalled();
+  });
+
+  it("질문도 활동 점수도 없는 완료 방은 인공지능 없이 참가와 완료만 지급한다", async () => {
+    const room = makeV2MemoryRoom({ t1: 0, s1: 0 });
+    useLockedRoom(room);
+
+    const res = await POST(awardReq(v2Body("memory")));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.awards.map((award: { bonusType: string }) => award.bonusType))
+      .toEqual(["PARTICIPATION", "COMPLETION"]);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+  });
+
+  it("기존 지급은 승인 기록만 공개 필드로 복원한다", async () => {
+    const room = makeV2MemoryRoom();
+    mLoadGameRoom.mockResolvedValue(room);
+    mFindMany.mockResolvedValue([
+      {
+        id: "private-id",
+        studentId: "s1",
+        gameId: "memory",
+        roomCode: `room:1234:100:${V2_PLAY_ID}`,
+        bonusType: "PARTICIPATION",
+        points: 1,
+        reason: "게임 참여",
+        status: "APPROVED",
+        awardedById: "private-teacher",
+        aiAnalysis: null,
+      },
+      {
+        id: "private-id-2",
+        studentId: "s1",
+        gameId: "memory",
+        roomCode: `room:1234:100:${V2_PLAY_ID}`,
+        bonusType: "COMPLETION",
+        points: 5,
+        reason: "게임 완료",
+        status: "APPROVED",
+        awardedById: "private-teacher",
+        aiAnalysis: null,
+      },
+    ]);
+
+    const data = await (await POST(awardReq(v2Body("memory")))).json();
+
+    expect(data).toEqual({
+      alreadyAwarded: true,
+      awards: [
+        {
+          studentId: "s1",
+          bonusType: "PARTICIPATION",
+          points: 1,
+          reason: "게임 참여",
+        },
+        {
+          studentId: "s1",
+          bonusType: "COMPLETION",
+          points: 5,
+          reason: "게임 완료",
+        },
+      ],
+    });
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("승인되지 않은 기록은 기존 지급 결과로 복원하지 않는다", async () => {
+    const room = makeV2MemoryRoom();
+    useLockedRoom(room);
+    mFindMany.mockResolvedValue([{
+      studentId: "s1",
+      bonusType: "PARTICIPATION",
+      points: 1,
+      reason: "검토 중",
+      status: "PENDING",
+      aiAnalysis: null,
+    }]);
+
+    const res = await POST(awardReq(v2Body("memory")));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.alreadyAwarded).toBeUndefined();
+    expect(mTx).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("저장 질문 기반 인공지능 보너스", () => {
+  const storedRequest = {
+    gameId: "relay",
+    roomCode: "1234",
+    roomCreatedAt: 100,
+    playId: V2_PLAY_ID,
+    topic: "우주",
+    contributions: [
+      {
+        studentId: "s1",
+        studentName: "학생 하나",
+        validQuestions: 1,
+        questions: ["Why Stars?"],
+        isWinner: false,
+      },
+      {
+        studentId: "s2",
+        studentName: "학생 둘",
+        validQuestions: 0,
+        questions: [],
+        isWinner: false,
+      },
+    ],
+  };
+
+  it("최고 질문은 공백과 대소문자를 정규화해 저장 원문으로 돌려준다", () => {
+    const result = buildAwardList(storedRequest, {
+      bestQuestion: {
+        studentId: "s1",
+        question: "  why   stars? ",
+        reason: "탐구할 점이 분명해요.",
+      },
+      bonuses: [],
+    });
+
+    expect(result.bestQuestion?.question).toBe("Why Stars?");
+    expect(result.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s1", bonusType: "BEST_QUESTION" }),
+    ]));
+  });
+
+  it("저장 질문과 다른 최고 질문 및 질문이 빈 학생의 모든 보너스를 거절한다", () => {
+    const forgedQuestionResult = buildAwardList(storedRequest, {
+      bestQuestion: {
+        studentId: "s1",
+        question: "서버에 없는 질문은 무엇인가요?",
+        reason: "가짜 근거",
+      },
+      bonuses: [],
+    });
+    const emptyStudentResult = buildAwardList(storedRequest, {
+      bestQuestion: {
+        studentId: "s2",
+        question: "가짜 질문은 무엇인가요?",
+        reason: "가짜 근거",
+      },
+      bonuses: [
+        { studentId: "s2", bonusType: "CREATIVITY", reason: "가짜 근거" },
+        { studentId: "s2", bonusType: "COOPERATION", reason: "가짜 근거" },
+        { studentId: "s1", bonusType: "EFFORT", reason: "실제 질문 근거" },
+      ],
+    });
+
+    expect(forgedQuestionResult.bestQuestion).toBeUndefined();
+    expect(emptyStudentResult.bestQuestion).toBeUndefined();
+    expect(emptyStudentResult.awards).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ bonusType: "BEST_QUESTION" }),
+      expect.objectContaining({ studentId: "s2", bonusType: "CREATIVITY" }),
+      expect.objectContaining({ studentId: "s2", bonusType: "COOPERATION" }),
+    ]));
+    expect(emptyStudentResult.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s1", bonusType: "EFFORT" }),
+    ]));
   });
 });

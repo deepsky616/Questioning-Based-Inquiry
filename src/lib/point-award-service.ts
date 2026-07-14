@@ -2,6 +2,16 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { generateJson } from "@/lib/ai";
 import { loadGameRoom } from "@/lib/game-room-store";
+import {
+  restorePublishableAwardResult,
+  serializeGameAwardResultSnapshot,
+  type GameAward,
+  type GameAwardBestQuestion,
+} from "@/lib/game-award-result";
+import {
+  buildQuestionGameScoreEvidence,
+  QuestionGameScoreEvidenceError,
+} from "@/lib/question-game-score-evidence";
 import { parseGameRoom, type GameRoom } from "@/lib/question-games-data";
 import {
   isStudentInTeacherScope,
@@ -26,6 +36,7 @@ interface StudentContribution {
   studentId: string;
   studentName: string;
   validQuestions: number;
+  activityScore?: number;
   questions: string[];
   isWinner: boolean;
 }
@@ -34,6 +45,7 @@ interface AwardIdentity {
   gameId: string;
   roomCode: string;
   roomCreatedAt: number;
+  playId?: string;
 }
 
 interface AwardRequest extends AwardIdentity {
@@ -43,17 +55,10 @@ interface AwardRequest extends AwardIdentity {
 
 interface AIBonus { studentId: string; bonusType: string; points?: number; reason: string }
 interface AIVerdictResponse { bonuses: AIBonus[]; bestQuestion?: { studentId: string; question: string; reason: string }; summary?: string }
-interface Award { studentId: string; bonusType: string; points: number; reason: string }
-interface AwardResultSnapshot {
-  type: "game-room-award-result";
-  version: 1;
-  bestQuestion?: { studentId: string; question: string; reason: string };
-  summary?: string;
-}
 
-const AWARD_RESULT_TYPE = "game-room-award-result";
-const AWARD_RESULT_VERSION = 1;
-const SERVER_VERIFIED_AWARD_GAMES = new Set(["relay"]);
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const LEGACY_SERVER_VERIFIED_AWARD_GAMES = new Set(["relay"]);
 const GAME_ACTIVITY_LIMITS: Record<string, { perStudent: number; perRoom: number }> = {
   relay: RELAY_ACTIVITY_LIMITS,
   dice: { perStudent: 20, perRoom: 80 },
@@ -93,15 +98,32 @@ function normalizeAwardRequest(body: Partial<AwardRequest>): AwardIdentity {
   ) {
     throw new PointAwardError("잘못된 방 생성 시각", 400);
   }
+  if (
+    body.playId !== undefined &&
+    (typeof body.playId !== "string" || !UUID_V4_PATTERN.test(body.playId))
+  ) {
+    throw new PointAwardError("잘못된 놀이 실행 식별값", 400);
+  }
   return {
     gameId,
     roomCode,
     roomCreatedAt: body.roomCreatedAt,
+    ...(body.playId ? { playId: body.playId } : {}),
   };
 }
 
-function buildRoomAwardKey(roomCode: string, roomCreatedAt: number) {
-  return `room:${roomCode}:${roomCreatedAt}`;
+export function buildRoomAwardKey(
+  roomCode: string,
+  roomCreatedAt: number,
+  playId?: string,
+) {
+  return playId
+    ? `room:${roomCode}:${roomCreatedAt}:${playId}`
+    : `room:${roomCode}:${roomCreatedAt}`;
+}
+
+function isVersion2Room(room: GameRoom): boolean {
+  return room.pointAwardKeyVersion === 2 || room.pointEvidenceVersion === 2;
 }
 
 function requireCurrentRoom(req: AwardIdentity, room: GameRoom | null): GameRoom {
@@ -113,6 +135,22 @@ function requireCurrentRoom(req: AwardIdentity, room: GameRoom | null): GameRoom
   ) {
     throw new PointAwardError("방이 바뀌었습니다. 다시 열어 주세요", 409);
   }
+  if (isVersion2Room(room)) {
+    if (
+      room.pointAwardKeyVersion !== 2 ||
+      room.pointEvidenceVersion !== 2 ||
+      typeof room.playId !== "string" ||
+      !UUID_V4_PATTERN.test(room.playId)
+    ) {
+      throw new PointAwardError("질문놀이 점수 근거 버전을 확인할 수 없습니다", 409);
+    }
+    if (!req.playId) {
+      throw new PointAwardError("놀이 실행 정보를 다시 불러와 주세요", 409);
+    }
+    if (room.playId !== req.playId) {
+      throw new PointAwardError("방의 놀이 실행이 바뀌었습니다. 다시 열어 주세요", 409);
+    }
+  }
   return room;
 }
 
@@ -122,7 +160,32 @@ function requireAwardableRoom(
   userId: string,
 ): GameRoom {
   const current = requireCurrentRoom(req, room);
-  if (!SERVER_VERIFIED_AWARD_GAMES.has(current.gameId)) {
+  if (current.hostId !== userId) {
+    throw new PointAwardError("방장만 점수를 지급할 수 있어요", 403);
+  }
+  if (current.status !== "ended") {
+    throw new PointAwardError("놀이가 끝난 뒤 점수를 지급할 수 있어요", 409);
+  }
+  if (current.players.length === 0) {
+    throw new PointAwardError("점수를 지급할 참가자가 없습니다", 409);
+  }
+  if (isVersion2Room(current)) {
+    if (
+      current.pointEvidenceVersion !== 2 ||
+      current.pointAwardKeyVersion !== 2 ||
+      current.gameState.stateVersion !== 2
+    ) {
+      throw new PointAwardError("질문놀이 점수 근거 버전을 확인할 수 없습니다", 409);
+    }
+    if (
+      current.gameState.phase !== "done" ||
+      current.gameState.endReason !== "completed"
+    ) {
+      throw new PointAwardError("목표를 완료한 질문놀이만 점수를 지급할 수 있습니다", 409);
+    }
+    return current;
+  }
+  if (!LEGACY_SERVER_VERIFIED_AWARD_GAMES.has(current.gameId)) {
     throw new PointAwardError(
       "서버에서 활동을 확인할 수 있는 놀이만 점수를 지급할 수 있습니다",
       409,
@@ -134,28 +197,31 @@ function requireAwardableRoom(
       409,
     );
   }
-  if (current.hostId !== userId) {
-    throw new PointAwardError("방장만 점수를 지급할 수 있어요", 403);
-  }
-  if (current.status !== "ended") {
-    throw new PointAwardError("놀이가 끝난 뒤 점수를 지급할 수 있어요", 409);
-  }
-  if (current.players.length === 0) {
-    throw new PointAwardError("점수를 지급할 참가자가 없습니다", 409);
-  }
   return current;
+}
+
+function awardKeyForRoom(req: AwardIdentity, room: GameRoom): string {
+  return buildRoomAwardKey(
+    req.roomCode,
+    req.roomCreatedAt,
+    room.pointAwardKeyVersion === 2 ? req.playId : undefined,
+  );
 }
 
 function buildAwardLogWhere(
   req: AwardIdentity,
   room: GameRoom,
+  awardKey: string,
 ): Prisma.PointLogWhereInput {
-  const awardKey = buildRoomAwardKey(req.roomCode, req.roomCreatedAt);
+  if (room.pointAwardKeyVersion === 2) {
+    return { gameId: req.gameId, roomCode: awardKey, status: "APPROVED" };
+  }
   if (room.pointAwardKeyVersion === 1) {
-    return { gameId: req.gameId, roomCode: awardKey };
+    return { gameId: req.gameId, roomCode: awardKey, status: "APPROVED" };
   }
   return {
     gameId: req.gameId,
+    status: "APPROVED",
     OR: [
       { roomCode: awardKey },
       {
@@ -170,11 +236,13 @@ async function findAwardLogs(
   client: Pick<Prisma.TransactionClient, "pointLog">,
   req: AwardIdentity,
   room: GameRoom,
+  awardKey: string,
 ) {
-  return client.pointLog.findMany({
-    where: buildAwardLogWhere(req, room),
+  const logs = await client.pointLog.findMany({
+    where: buildAwardLogWhere(req, room, awardKey),
     orderBy: { createdAt: "asc" },
   });
+  return logs.filter((log) => log.status === "APPROVED");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -428,10 +496,23 @@ function buildStoredAwardRequest(
   room: GameRoom,
   studentIds: Set<string>,
 ): AwardRequest {
+  let contributions: StudentContribution[];
+  if (room.pointEvidenceVersion === 2) {
+    try {
+      contributions = buildQuestionGameScoreEvidence(room, studentIds);
+    } catch (error) {
+      if (error instanceof QuestionGameScoreEvidenceError) {
+        throw new PointAwardError(error.message, error.status);
+      }
+      throw error;
+    }
+  } else {
+    contributions = buildStoredContributions(room, studentIds);
+  }
   return {
     ...req,
     topic: room.topic,
-    contributions: buildStoredContributions(room, studentIds),
+    contributions,
   };
 }
 
@@ -479,48 +560,6 @@ async function loadCurrentTeacherScope(
   return { school: teacher.school, classes: teacher.teacherClasses };
 }
 
-function parseAwardResultSnapshot(value: unknown): AwardResultSnapshot | null {
-  if (typeof value !== "string") return null;
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (
-      !isRecord(parsed) ||
-      parsed.type !== AWARD_RESULT_TYPE ||
-      parsed.version !== AWARD_RESULT_VERSION ||
-      (parsed.summary !== undefined && typeof parsed.summary !== "string")
-    ) {
-      return null;
-    }
-    if (parsed.bestQuestion !== undefined) {
-      if (
-        !isRecord(parsed.bestQuestion) ||
-        typeof parsed.bestQuestion.studentId !== "string" ||
-        typeof parsed.bestQuestion.question !== "string" ||
-        typeof parsed.bestQuestion.reason !== "string"
-      ) {
-        return null;
-      }
-    }
-    return parsed as unknown as AwardResultSnapshot;
-  } catch {
-    return null;
-  }
-}
-
-function restoreAwardResult<T extends { aiAnalysis?: string | null }>(logs: T[]) {
-  let snapshot: AwardResultSnapshot | null = null;
-  for (const log of logs) {
-    snapshot = parseAwardResultSnapshot(log.aiAnalysis);
-    if (snapshot) break;
-  }
-  return {
-    alreadyAwarded: true,
-    awards: logs,
-    ...(snapshot?.bestQuestion ? { bestQuestion: snapshot.bestQuestion } : {}),
-    ...(snapshot?.summary !== undefined ? { summary: snapshot.summary } : {}),
-  };
-}
-
 function restoreScopedAwardResult<
   T extends { studentId?: unknown; aiAnalysis?: string | null },
 >(logs: T[], studentIds: Set<string>) {
@@ -529,19 +568,11 @@ function restoreScopedAwardResult<
   )) {
     throw new PointAwardError("현재 방 참가 학생의 점수만 확인할 수 있습니다", 403);
   }
-  return restoreAwardResult(logs);
-}
-
-function serializeAwardResult(
-  bestQuestion: AwardResultSnapshot["bestQuestion"],
-  summary: string | undefined,
-) {
-  return JSON.stringify({
-    type: AWARD_RESULT_TYPE,
-    version: AWARD_RESULT_VERSION,
-    ...(bestQuestion ? { bestQuestion } : {}),
-    ...(summary !== undefined ? { summary } : {}),
-  });
+  const restored = restorePublishableAwardResult(logs);
+  if (!restored) {
+    throw new PointAwardError("기존 점수 지급 결과를 확인할 수 없습니다", 409);
+  }
+  return { alreadyAwarded: true, ...restored };
 }
 
 function buildPrompt(req: AwardRequest): string {
@@ -593,12 +624,23 @@ async function callAI(req: AwardRequest, userId: string): Promise<AIVerdictRespo
 }
 
 export function buildAwardList(req: AwardRequest, ai: AIVerdictResponse | null): {
-  awards: Award[];
-  bestQuestion?: { studentId: string; question: string; reason: string };
+  awards: GameAward[];
+  bestQuestion?: GameAwardBestQuestion;
   summary?: string;
 } {
-  const awards: Award[] = [];
+  const awards: GameAward[] = [];
   const validIds = new Set(req.contributions.map((c) => c.studentId));
+  const storedQuestions = new Map<string, Map<string, string>>();
+  for (const contribution of req.contributions) {
+    const byNormalizedQuestion = new Map<string, string>();
+    for (const question of contribution.questions) {
+      const normalized = normalizeQuestionActivity(question);
+      if (normalized) byNormalizedQuestion.set(normalized, question);
+    }
+    storedQuestions.set(contribution.studentId, byNormalizedQuestion);
+  }
+  const hasStoredQuestion = (studentId: string) =>
+    (storedQuestions.get(studentId)?.size ?? 0) > 0;
 
   for (const c of req.contributions) {
     awards.push({
@@ -631,12 +673,36 @@ export function buildAwardList(req: AwardRequest, ai: AIVerdictResponse | null):
     }
   }
 
-  let bestQuestion: AIVerdictResponse["bestQuestion"];
+  let bestQuestion: GameAwardBestQuestion | undefined;
   let summary: string | undefined;
   if (ai) {
-    summary = ai.summary;
-    bestQuestion = ai.bestQuestion && validIds.has(ai.bestQuestion.studentId)
-      ? ai.bestQuestion : undefined;
+    summary = typeof ai.summary === "string" && ai.summary.length <= 4_000
+      ? ai.summary
+      : undefined;
+    const candidate = ai.bestQuestion;
+    if (
+      candidate &&
+      typeof candidate.studentId === "string" &&
+      typeof candidate.question === "string" &&
+      validIds.has(candidate.studentId) &&
+      hasStoredQuestion(candidate.studentId)
+    ) {
+      const storedQuestion = storedQuestions
+        .get(candidate.studentId)
+        ?.get(normalizeQuestionActivity(candidate.question));
+      if (storedQuestion) {
+        const reason = typeof candidate.reason === "string"
+          ? candidate.reason.trim()
+          : "";
+        bestQuestion = {
+          studentId: candidate.studentId,
+          question: storedQuestion,
+          reason: reason && reason.length <= 4_000
+            ? reason
+            : "좋은 질문을 만들었어요",
+        };
+      }
+    }
 
     const perStudent: Record<string, { count: number; sum: number; types: Set<string> }> = {};
     validIds.forEach((id) => { perStudent[id] = { count: 0, sum: 0, types: new Set() }; });
@@ -651,8 +717,9 @@ export function buildAwardList(req: AwardRequest, ai: AIVerdictResponse | null):
       s.count++; s.sum += bk.points; s.types.add(bk.key);
     }
 
-    for (const b of ai.bonuses ?? []) {
+    for (const b of Array.isArray(ai.bonuses) ? ai.bonuses : []) {
       if (!validIds.has(b.studentId)) continue;
+      if (!hasStoredQuestion(b.studentId)) continue;
       if (!VALID_BONUS_KEYS.includes(b.bonusType as BonusKey)) continue;
       if (b.bonusType === "BEST_QUESTION") continue;
       const def = AI_BONUS_TYPES[b.bonusType as BonusKey];
@@ -662,7 +729,10 @@ export function buildAwardList(req: AwardRequest, ai: AIVerdictResponse | null):
       if (s.sum + def.points > MAX_BONUS_PER_STUDENT) continue;
       awards.push({
         studentId: b.studentId, bonusType: def.key,
-        points: def.points, reason: b.reason || def.label,
+        points: def.points,
+        reason: typeof b.reason === "string" && b.reason.trim() && b.reason.length <= 4_000
+          ? b.reason.trim()
+          : def.label,
       });
       s.count++; s.sum += def.points; s.types.add(def.key);
     }
@@ -680,7 +750,7 @@ export async function awardGamePoints(
     throw new PointAwardError("교사만 질문놀이 점수를 지급할 수 있습니다", 403);
   }
   const normalized = normalizeAwardRequest(body);
-  const { gameId, roomCode, roomCreatedAt } = normalized;
+  const { gameId, roomCode } = normalized;
   const room = requireAwardableRoom(
     normalized,
     await loadGameRoom(roomCode),
@@ -690,10 +760,15 @@ export async function awardGamePoints(
   if (!teacherScope) {
     throw new PointAwardError("교사 소속 학교를 확인할 수 없습니다", 403);
   }
-  const awardRoomCode = buildRoomAwardKey(roomCode, roomCreatedAt);
+  const awardRoomCode = awardKeyForRoom(normalized, room);
   const studentIds = await loadScopedStudentIds(room, prisma, teacherScope);
 
-  const existingLogs = await findAwardLogs(prisma, normalized, room);
+  const existingLogs = await findAwardLogs(
+    prisma,
+    normalized,
+    room,
+    awardRoomCode,
+  );
   if (existingLogs.length > 0) {
     return restoreScopedAwardResult(existingLogs, studentIds);
   }
@@ -703,7 +778,12 @@ export async function awardGamePoints(
     room,
     studentIds,
   );
-  const ai = await callAI(storedRequest, userId);
+  const hasStoredQuestions = storedRequest.contributions.some((contribution) =>
+    contribution.questions.some((question) => question.trim().length > 0)
+  );
+  const ai = hasStoredQuestions
+    ? await callAI(storedRequest, userId)
+    : null;
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -739,6 +819,7 @@ export async function awardGamePoints(
         tx,
         normalized,
         lockedRoom,
+        awardRoomCode,
       );
       if (lockedExistingLogs.length > 0) {
         return restoreScopedAwardResult(lockedExistingLogs, lockedStudentIds);
@@ -753,7 +834,10 @@ export async function awardGamePoints(
         lockedStudentIds,
       );
       const { awards, bestQuestion, summary } = buildAwardList(lockedRequest, ai);
-      const resultSnapshot = serializeAwardResult(bestQuestion, summary);
+      const resultSnapshot = serializeGameAwardResultSnapshot({
+        bestQuestion,
+        summary,
+      });
       const sumByStudent: Record<string, number> = {};
       for (const award of awards) {
         sumByStudent[award.studentId] =
@@ -768,6 +852,7 @@ export async function awardGamePoints(
           bonusType: award.bonusType,
           points: award.points,
           reason: award.reason,
+          status: "APPROVED",
           ...(index === 0 ? { aiAnalysis: resultSnapshot } : {}),
         })),
       });
@@ -795,7 +880,12 @@ export async function awardGamePoints(
         prisma,
         currentScope,
       );
-      const logs = await findAwardLogs(prisma, normalized, room);
+      const logs = await findAwardLogs(
+        prisma,
+        normalized,
+        room,
+        awardRoomCode,
+      );
       if (logs.length === 0) {
         throw new PointAwardError("포인트 지급 실패", 500);
       }
