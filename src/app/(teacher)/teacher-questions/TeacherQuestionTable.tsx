@@ -65,6 +65,7 @@ export function TeacherQuestionTable({
 }: TeacherQuestionTableProps) {
   const t = useTranslations("teacherQ");
   const tc = useTranslations("common");
+  const tCls = useTranslations("classification");
   const tTarget = useTranslations("targetSelector");
   const allChecked = list.length > 0 && list.every((question) => selectedIds.has(question.id));
   const sessionsForTranslation = useMemo(
@@ -72,6 +73,15 @@ export function TeacherQuestionTable({
     [list],
   );
   const sessionText = useSessionMetaTranslation(sessionsForTranslation);
+  const closureLabel = (value: string) =>
+    value === "closed" ? tCls("closed.label")
+      : value === "open" ? tCls("open.label")
+      : CLOSURE_LABEL[value] ?? value;
+  const cognitiveLabel = (value: string) =>
+    value === "factual" ? tCls("factual.label")
+      : value === "conceptual" ? tCls("conceptual.label")
+      : value === "controversial" ? tCls("controversial.label")
+      : COGNITIVE_LABEL[value] ?? value;
 
   if (list.length === 0) {
     return <EmptyState icon="🔍" title={t("noQuestions")} />;
@@ -141,10 +151,10 @@ export function TeacherQuestionTable({
 
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     <span className={`rounded px-2 py-0.5 text-xs break-keep ${CLOSURE_STYLE[question.closure]}`}>
-                      {CLOSURE_LABEL[question.closure]}
+                      {closureLabel(question.closure)}
                     </span>
                     <span className={`rounded px-2 py-0.5 text-xs break-keep ${COGNITIVE_STYLE[question.cognitive]}`}>
-                      {COGNITIVE_LABEL[question.cognitive]}
+                      {cognitiveLabel(question.cognitive)}
                     </span>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
@@ -285,10 +295,10 @@ export function TeacherQuestionTable({
                     )}
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       <span className={`text-xs px-2 py-0.5 rounded break-keep ${CLOSURE_STYLE[question.closure]}`}>
-                        {CLOSURE_LABEL[question.closure]}
+                        {closureLabel(question.closure)}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded break-keep ${COGNITIVE_STYLE[question.cognitive]}`}>
-                        {COGNITIVE_LABEL[question.cognitive]}
+                        {cognitiveLabel(question.cognitive)}
                       </span>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">

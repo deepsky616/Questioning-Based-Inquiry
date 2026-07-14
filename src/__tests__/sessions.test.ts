@@ -50,16 +50,16 @@ describe("isInquiryDesignSession", () => {
 describe("buildSessionLabel", () => {
   it("날짜·교과·주제를 합쳐 레이블을 반환한다", () => {
     expect(buildSessionLabel("2026-04-25", "과학", "지구의 역사")).toBe(
-      "2026년 4월 25일 · 과학 · 지구의 역사"
+      "2026-04-25 · 과학 · 지구의 역사"
     );
   });
 
   it("주제가 없으면 날짜·교과만 표시한다", () => {
-    expect(buildSessionLabel("2026-04-25", "수학", "")).toBe("2026년 4월 25일 · 수학");
+    expect(buildSessionLabel("2026-04-25", "수학", "")).toBe("2026-04-25 · 수학");
   });
 
   it("주제 앞뒤 공백은 무시한다", () => {
-    expect(buildSessionLabel("2026-04-25", "국어", "  ")).toBe("2026년 4월 25일 · 국어");
+    expect(buildSessionLabel("2026-04-25", "국어", "  ")).toBe("2026-04-25 · 국어");
   });
 });
 
@@ -152,7 +152,7 @@ describe("groupSessionsByMonth", () => {
     const groups = groupSessionsByMonth(sessions);
 
     expect(groups.map((group) => group.key)).toEqual(["2026-07", "2026-06", "2026-05"]);
-    expect(groups.map((group) => group.label)).toEqual(["2026년 7월", "2026년 6월", "2026년 5월"]);
+    expect(groups.map((group) => group.label)).toEqual(["2026-07", "2026-06", "2026-05"]);
     expect(groups[0].sessions.map((session) => session.id)).toEqual(["c", "a"]);
     expect(groups[1].sessions.map((session) => session.id)).toEqual(["b"]);
   });
@@ -185,7 +185,7 @@ describe("groupSessionDatesByMonth", () => {
     const groups = groupSessionDatesByMonth(["2026-06-01", "2026-07-02", "2026-07-01", "bad"]);
 
     expect(groups.map((group) => group.key)).toEqual(["2026-07", "2026-06"]);
-    expect(groups[0].label).toBe("2026년 7월");
+    expect(groups[0].label).toBe("2026-07");
     expect(groups[0].dates).toEqual(["2026-07-02", "2026-07-01"]);
   });
 });

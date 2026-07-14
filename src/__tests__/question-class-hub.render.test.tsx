@@ -241,14 +241,14 @@ describe("질문수업 행 강조와 종류", () => {
     const session = makeSession();
     renderWithProviders(
       <TeacherSessionMonthList
-        groups={[{ key: "2020-01", label: "2020년 1월", sessions: [session] }]}
+        groups={[{ key: "2020-01", label: "2020-01", sessions: [session] }]}
         collapsible
         highlightSessionId={session.id}
         {...rowHandlers}
       />,
     );
 
-    expect(screen.getByRole("button", { name: /2020년 1월/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /2020-01/ })).toHaveAttribute(
       "aria-expanded",
       "true",
     );

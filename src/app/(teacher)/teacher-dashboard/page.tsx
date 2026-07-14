@@ -232,13 +232,8 @@ function TeacherDashboard() {
   const teacherScheduleItem = (() => {
     const session = teacherSchedule.primarySession;
     if (!session || !teacherSchedule.date || teacherSchedule.kind === "empty") return null;
-    const [year, month, day] = teacherSchedule.date.split("-");
     const sessionTitle = [session.subject.trim(), session.topic.trim()].filter(Boolean).join(" · ");
-    const dateLabel = t("scheduleDate", {
-      year: Number(year),
-      month: Number(month),
-      day: Number(day),
-    });
+    const dateLabel = t("scheduleDate", { date: teacherSchedule.date });
 
     return {
       id: session.id,

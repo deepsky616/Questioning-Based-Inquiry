@@ -79,8 +79,7 @@ function bucketLabel(key: string, period: Period, locale: string): string {
     return new Date(2024, 0, 7 + idx).toLocaleDateString(locale, { weekday: "short" });
   }
   if (period === "month") {
-    const [y, m] = key.split("-");
-    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString(locale, { month: "short" });
+    return key;
   }
   if (period === "week") return "W" + key.slice(-2);
   return key;
@@ -224,6 +223,15 @@ export function StudentDetailDialog({
   // 최근 활동 탭(질문/답변/포인트) — 폭 전체를 써서 내용을 읽을 수 있게
   const [activityTab, setActivityTab] = useState<"questions" | "answers" | "points">("questions");
   const [deletingStudent, setDeletingStudent] = useState(false);
+  const closureLabel = (value: string) =>
+    value === "closed" ? tCls("closed.label")
+      : value === "open" ? tCls("open.label")
+      : CLOSURE_LABEL[value] ?? value;
+  const cognitiveLabel = (value: string) =>
+    value === "factual" ? tCls("factual.label")
+      : value === "conceptual" ? tCls("conceptual.label")
+      : value === "controversial" ? tCls("controversial.label")
+      : COGNITIVE_LABEL[value] ?? value;
   // 항목에서 '지급' 클릭 → 사유 자동 채움 + 점수 입력 포커스
   const deltaInputRef = useRef<HTMLInputElement>(null);
   const fillReasonFrom = (prefix: string, content: string) => {
@@ -495,8 +503,8 @@ export function StudentDetailDialog({
                   <div key={q.id} className="rounded-lg border bg-background p-2.5">
                     <p className="text-sm text-foreground leading-snug line-clamp-2">{q.content}</p>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      <span className={`px-1.5 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure] ?? "bg-muted"}`}>{CLOSURE_LABEL[q.closure] ?? q.closure}</span>
-                      <span className={`px-1.5 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive] ?? "bg-muted"}`}>{COGNITIVE_LABEL[q.cognitive] ?? q.cognitive}</span>
+                      <span className={`px-1.5 py-0.5 rounded break-keep ${CLOSURE_STYLE[q.closure] ?? "bg-muted"}`}>{closureLabel(q.closure)}</span>
+                      <span className={`px-1.5 py-0.5 rounded break-keep ${COGNITIVE_STYLE[q.cognitive] ?? "bg-muted"}`}>{cognitiveLabel(q.cognitive)}</span>
                       <span>❤️ {q._count?.likes ?? 0}</span>
                       <span>💬 {q._count?.comments ?? 0}</span>
                       <span className="inline-flex items-center gap-0.5">🕒 {formatShortDateTime(q.createdAt)}</span>

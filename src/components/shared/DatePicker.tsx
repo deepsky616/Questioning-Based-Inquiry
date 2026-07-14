@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
-import { useTranslations, useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { formatDateOnly } from "@/lib/datetime";
 
 export default function DatePicker({ value, onChange, placeholder }: {
   value: string;
@@ -11,13 +12,12 @@ export default function DatePicker({ value, onChange, placeholder }: {
   placeholder?: string;
 }) {
   const t = useTranslations("chrome");
-  const locale = useLocale();
   const [open, setOpen] = useState(false);
 
   const selected = value ? new Date(value + "T00:00:00") : undefined;
 
   const displayLabel = selected
-    ? selected.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" })
+    ? formatDateOnly(selected)
     : (placeholder ?? t("pickDate"));
 
   const handleSelect = (date: Date | undefined) => {

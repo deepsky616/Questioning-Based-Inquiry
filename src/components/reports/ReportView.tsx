@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { AiLoadingProcess } from "@/components/shared/AiLoadingProcess";
 import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
-import { formatDateTime } from "@/lib/datetime";
+import { formatDateOnly, formatDateTime, formatMonthOnly } from "@/lib/datetime";
 import { groupSessionsByMonth } from "@/lib/sessions";
 import { getAnalysisFreshness } from "@/lib/report-analysis-freshness";
 import { ReportClassificationGuide } from "@/components/reports/ReportClassificationGuide";
@@ -126,11 +126,12 @@ function mondayOf(d: Date): Date {
   return x;
 }
 /** 세션 날짜를 주/월 기간 키·라벨로 변환 */
-function sessionPeriod(dateStr: string, mode: ReportRange, locale: string, otherLabel: string, weekSuffix: string): { key: string; label: string } {
+function sessionPeriod(dateStr: string, mode: ReportRange, otherLabel: string, weekSuffix: string): { key: string; label: string } {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return { key: "기타", label: otherLabel };
   if (mode === "month") {
-    return { key: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`, label: d.toLocaleDateString(locale, { year: "numeric", month: "long" }) };
+    const month = formatMonthOnly(d);
+    return { key: month, label: month };
   }
   const m = mondayOf(d);
   const end = new Date(m); end.setDate(end.getDate() + 6);
@@ -263,19 +264,19 @@ export function ReportView({
   const periods = useMemo(() => {
     const map = new Map<string, string>();
     for (const s of allSessions) {
-      const p = sessionPeriod(s.date, range, locale, t("other"), t("weekSuffix"));
+      const p = sessionPeriod(s.date, range, t("other"), t("weekSuffix"));
       if (!map.has(p.key)) map.set(p.key, p.label);
     }
     const sorted = Array.from(map.entries()).sort((a, b) => (a[0] < b[0] ? 1 : -1));
     return [["ALL", t("allPeriods")] as [string, string], ...sorted];
-  }, [allSessions, range, locale, t]);
+  }, [allSessions, range, t]);
 
   // 주별↔월별 전환 등으로 현재 선택 키가 사라지면 '전체'로 되돌린다(전체는 항상 유효).
   useEffect(() => {
     if (period !== "ALL" && !periods.some(([k]) => k === period)) setPeriod("ALL");
   }, [periods, period]);
 
-  const inPeriod = (date: string) => period === "ALL" || sessionPeriod(date, range, locale, t("other"), t("weekSuffix")).key === period;
+  const inPeriod = (date: string) => period === "ALL" || sessionPeriod(date, range, t("other"), t("weekSuffix")).key === period;
   const filteredSessions = allSessions.filter((s) => inPeriod(s.date));
   const filteredSessionMonthGroups = groupSessionsByMonth(filteredSessions);
   // 일괄 분석 대상(학급 전체 세션 풀이 있으면 그것을 현재 기간으로 추림) 수
@@ -431,7 +432,7 @@ export function ReportView({
       <ReportHeaderControls
         title={title}
         subtitle={subtitle}
-        basisNote={t("basisNote", { date: new Date().toLocaleDateString(locale) })}
+        basisNote={t("basisNote", { date: formatDateOnly(new Date()) })}
         range={range}
         period={period}
         periods={periods}

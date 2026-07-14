@@ -4,7 +4,7 @@ import {
   type InquiryGraphQuestion,
   type InquiryGraphSharedQuestion,
 } from "@/lib/inquiry-graph";
-import { COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
+import { COGNITIVE_STYLE } from "@/lib/question-labels";
 
 interface InquiryFlowGraphProps {
   title: string;
@@ -37,9 +37,15 @@ export function InquiryFlowGraph({
   audience,
 }: InquiryFlowGraphProps) {
   const t = useTranslations("flow");
+  const tCls = useTranslations("classification");
   const summary = buildInquiryGraphSummary(sharedQuestions, studentQuestions);
   const hasSharedQuestions = summary.sharedQuestionCount > 0;
   const hasStudentQuestions = summary.studentQuestionCount > 0;
+  const cognitiveLabel = (value: string) =>
+    value === "factual" ? tCls("factual.label")
+      : value === "conceptual" ? tCls("conceptual.label")
+      : value === "controversial" ? tCls("controversial.label")
+      : value;
 
   return (
     <div className="rounded-xl border border-indigo-100 bg-card shadow-sm">
@@ -75,7 +81,7 @@ export function InquiryFlowGraph({
                 .map((question, index) => (
                   <div key={`${question.type}-${index}`} className="rounded-md bg-card px-3 py-2 text-xs text-foreground shadow-sm">
                     <span className="mr-1 font-medium text-indigo-600">
-                      {COGNITIVE_LABEL[question.type] ?? question.type}
+                      {cognitiveLabel(question.type)}
                     </span>
                     {question.content}
                   </div>
@@ -109,7 +115,7 @@ export function InquiryFlowGraph({
           <div className="mt-3 grid grid-cols-3 gap-2">
             {COGNITIVE_KEYS.map((key) => (
               <div key={key} className="rounded-md bg-card p-2 shadow-sm">
-                <p className="truncate text-[11px] font-medium text-muted-foreground">{COGNITIVE_LABEL[key]}</p>
+                <p className="truncate text-[11px] font-medium text-muted-foreground">{cognitiveLabel(key)}</p>
                 <p className="mt-1 text-lg font-bold text-foreground">{summary.byCognitive[key]}</p>
                 <MiniBar
                   value={summary.byCognitive[key]}
@@ -146,7 +152,7 @@ export function InquiryFlowGraph({
               {summary.highlights.map((question, index) => (
                 <div key={question.id ?? index} className="rounded-md bg-card px-3 py-2 text-xs text-foreground shadow-sm">
                   <span className={`mr-1 rounded px-1.5 py-0.5 break-keep text-center ${COGNITIVE_STYLE[question.cognitive ?? "factual"]}`}>
-                    {COGNITIVE_LABEL[question.cognitive ?? "factual"] ?? "사실적 질문"}
+                    {cognitiveLabel(question.cognitive ?? "factual")}
                   </span>
                   {question.content}
                 </div>

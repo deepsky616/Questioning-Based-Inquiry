@@ -22,6 +22,7 @@ import {
   localizeQuestionGames,
 } from "@/lib/question-games-data";
 import { useTeacherStudents } from "@/lib/app-queries";
+import { formatDateOnly } from "@/lib/datetime";
 
 type VisType = "all" | "classes" | "students" | "hidden";
 
@@ -347,7 +348,7 @@ export default function TeacherQuestionPlayPage() {
                       <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipRate", { n: rate })}</span>
                       <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipGood", { n: st.goodQuestions })}</span>
                       {st.lastPlayedAt && (
-                        <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipRecent", { date: new Date(st.lastPlayedAt).toLocaleDateString() })}</span>
+                        <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipRecent", { date: formatDateOnly(st.lastPlayedAt) })}</span>
                       )}
                     </div>
                     <div className="max-h-64 overflow-y-auto rounded-lg border border-border">

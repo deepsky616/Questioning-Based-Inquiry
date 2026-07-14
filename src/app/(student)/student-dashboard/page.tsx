@@ -13,7 +13,7 @@ import { ClassificationDonut } from "@/components/shared/ClassificationDonut";
 import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { getSessionUser } from "@/lib/auth-helpers";
-import { CLOSURE_LABEL, CLOSURE_STYLE, COGNITIVE_LABEL, COGNITIVE_STYLE } from "@/lib/question-labels";
+import { CLOSURE_STYLE, COGNITIVE_STYLE } from "@/lib/question-labels";
 import PointsCard from "@/components/shared/PointsCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
@@ -81,6 +81,15 @@ function StudentDashboard() {
 
   const questions = questionData?.recent ?? [];
   const stats = questionData?.stats ?? EMPTY_STATS;
+  const closureLabel = (value: string) =>
+    value === "closed" ? tCls("closed.label")
+      : value === "open" ? tCls("open.label")
+      : value;
+  const cognitiveLabel = (value: string) =>
+    value === "factual" ? tCls("factual.label")
+      : value === "conceptual" ? tCls("conceptual.label")
+      : value === "controversial" ? tCls("controversial.label")
+      : value;
   const todayStr = useLocalDateKey();
   const questionSessionIds = useMemo(
     () => new Set(
@@ -149,15 +158,10 @@ function StudentDashboard() {
   const studentScheduleItem = (() => {
     const scheduleSession = studentSchedule.primarySession;
     if (!scheduleSession || !studentSchedule.date || studentSchedule.kind === "empty") return null;
-    const [year, month, day] = studentSchedule.date.split("-");
     const sessionTitle = [scheduleSession.subject.trim(), scheduleSession.topic.trim()]
       .filter(Boolean)
       .join(" · ");
-    const dateLabel = t("scheduleDate", {
-      year: Number(year),
-      month: Number(month),
-      day: Number(day),
-    });
+    const dateLabel = t("scheduleDate", { date: studentSchedule.date });
     const countLabel = studentSchedule.kind === "today"
       ? (studentSchedule.needsQuestionCount ?? 0) > 0
         ? t("scheduleNeedsQuestion", { count: studentSchedule.needsQuestionCount ?? 0 })
@@ -420,10 +424,10 @@ function StudentDashboard() {
                   <p className="line-clamp-2 text-sm leading-6 text-foreground md:text-base">{q.content}</p>
                   <div className="flex gap-2 mt-2">
                     <span className={`text-xs px-2 py-1 rounded break-keep text-center ${CLOSURE_STYLE[q.closure]}`}>
-                      {CLOSURE_LABEL[q.closure]}
+                      {closureLabel(q.closure)}
                     </span>
                     <span className={`text-xs px-2 py-1 rounded break-keep text-center ${COGNITIVE_STYLE[q.cognitive]}`}>
-                      {COGNITIVE_LABEL[q.cognitive]}
+                      {cognitiveLabel(q.cognitive)}
                     </span>
                   </div>
                 </div>

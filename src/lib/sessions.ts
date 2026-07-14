@@ -23,10 +23,9 @@ function sessionDateSortKey(value: string): string {
   return isValidSessionDateString(value) ? value : "";
 }
 
-function formatDateKr(dateStr: string): string {
+export function formatSessionDateLabel(dateStr: string): string {
   if (!isValidSessionDateString(dateStr)) return dateStr;
-  const [year, month, day] = dateStr.split("-");
-  return `${year}년 ${parseInt(month)}월 ${parseInt(day)}일`;
+  return dateStr;
 }
 
 /**
@@ -42,7 +41,7 @@ export function isInquiryDesignSession(s: {
 }
 
 export function buildSessionLabel(date: string, subject: string, topic: string): string {
-  const parts = [formatDateKr(date), subject];
+  const parts = [formatSessionDateLabel(date), subject];
   if (topic.trim()) parts.push(topic.trim());
   return parts.join(" · ");
 }
@@ -106,8 +105,7 @@ function getSessionMonthKey(dateStr: string): string | null {
 
 function buildSessionMonthLabel(monthKey: string): string {
   if (monthKey === UNKNOWN_SESSION_MONTH_KEY) return UNKNOWN_SESSION_MONTH_LABEL;
-  const [year, month] = monthKey.split("-");
-  return `${year}년 ${parseInt(month, 10)}월`;
+  return monthKey;
 }
 
 export function groupSessionsByMonth<T extends SortableSession>(

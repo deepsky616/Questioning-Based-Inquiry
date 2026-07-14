@@ -1,11 +1,12 @@
 "use client";
 
-import { useTranslations, useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from "recharts";
 import type { ReportTotals, SeriesPoint } from "@/lib/report-stats";
 import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import type { SessionAnalysisResult } from "@/components/reports/ReportView";
 import { printTextOf } from "@/lib/report-print-safe";
+import { formatDateOnly } from "@/lib/datetime";
 
 // 인쇄 추세 꺾은선 시리즈(화면 리포트와 동일 색)
 const TREND_SERIES: { key: keyof SeriesPoint; color: string }[] = [
@@ -55,8 +56,7 @@ export interface PrintReportItem {
 export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
   const t = useTranslations("report");
   const tCls = useTranslations("classification");
-  const locale = useLocale();
-  const today = new Date().toLocaleDateString(locale);
+  const today = formatDateOnly(new Date());
 
   const kpis = (totals: ReportTotals) => [
     { label: t("metric_questions"), v: totals.questions, color: "#6366f1" },

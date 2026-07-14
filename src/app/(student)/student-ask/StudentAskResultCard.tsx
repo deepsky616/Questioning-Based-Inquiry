@@ -4,7 +4,6 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { COGNITIVE_LABEL } from "@/lib/question-labels";
 import type { ClassificationResult } from "./types";
 
 interface StudentAskResultCardProps {
@@ -29,6 +28,12 @@ export function StudentAskResultCard({
   onSave,
 }: StudentAskResultCardProps) {
   const t = useTranslations("ask");
+  const tCls = useTranslations("classification");
+  const cognitiveLabel = (value: string) =>
+    value === "factual" ? tCls("factual.label")
+      : value === "conceptual" ? tCls("conceptual.label")
+      : value === "controversial" ? tCls("controversial.label")
+      : value;
 
   return (
     <Card>
@@ -70,7 +75,7 @@ export function StudentAskResultCard({
           <div className="p-4 bg-purple-50 dark:bg-purple-950/40 rounded-lg">
             <div className="text-sm text-muted-foreground">{t("cognitiveLevel")}</div>
             <div className="text-xl font-bold text-purple-700">
-              {COGNITIVE_LABEL[result.cognitive] ?? result.cognitive}
+              {cognitiveLabel(result.cognitive)}
             </div>
             <div className="text-sm text-purple-600 mt-0.5">
               {result.cognitive === "factual" && t("factualHint")}

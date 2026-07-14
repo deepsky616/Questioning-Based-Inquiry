@@ -7,7 +7,7 @@ describe("buildBuckets", () => {
   it("월별 버킷은 최근 count개월을 과거→현재 순으로 만든다", () => {
     const b = buildBuckets("month", 3, NOW);
     expect(b.map((x) => x.key)).toEqual(["2026-04", "2026-05", "2026-06"]);
-    expect(b.map((x) => x.label)).toEqual(["4월", "5월", "6월"]);
+    expect(b.map((x) => x.label)).toEqual(["2026-04", "2026-05", "2026-06"]);
   });
 
   it("주별 버킷은 count개를 만들고 마지막 버킷이 현재를 포함한다", () => {

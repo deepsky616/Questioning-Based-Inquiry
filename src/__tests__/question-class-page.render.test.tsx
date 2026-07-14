@@ -125,7 +125,7 @@ describe("질문수업 목록 상태", () => {
 
     const highlightedRow = document.querySelector('[data-session-id="late-session"]');
     expect(highlightedRow).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("button", { name: /2020년 1월/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /2020-01/ })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
@@ -137,7 +137,7 @@ describe("질문수업 목록 상태", () => {
     expect(document.querySelector('[data-session-id="late-session"]')).not.toHaveAttribute(
       "aria-current",
     );
-    expect(screen.getByRole("button", { name: /2020년 1월/ })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: /2020-01/ })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
@@ -190,7 +190,7 @@ describe("질문수업 목록 상태", () => {
       ko.sequencePanel.commentsLabel,
     ]) {
       expect(screen.getByRole("switch", {
-        name: `2999년 1월 10일 · 과학 · 물질의 변화 · ${settingLabel}`,
+        name: `2999-01-10 · 과학 · 물질의 변화 · ${settingLabel}`,
       })).toBeInTheDocument();
     }
   });

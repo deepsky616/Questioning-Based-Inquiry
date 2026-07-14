@@ -63,9 +63,10 @@ export function buildBuckets(range: ReportRange, count: number, now: Date = new 
     for (let i = count - 1; i >= 0; i--) {
       const start = new Date(y, m - i, 1);
       const end = new Date(y, m - i + 1, 1);
+      const monthKey = `${start.getFullYear()}-${pad(start.getMonth() + 1)}`;
       buckets.push({
-        key: `${start.getFullYear()}-${pad(start.getMonth() + 1)}`,
-        label: `${start.getMonth() + 1}월`,
+        key: monthKey,
+        label: monthKey,
         start: start.getTime(),
         end: end.getTime(),
       });
