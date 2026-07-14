@@ -902,6 +902,85 @@ describe("지역 미스터리 박스 활동 종료", () => {
     expect(screen.getByLabelText("정답 추측")).toBeEnabled();
   });
 
+  it("인공지능 답변 요청이 실제 실패 값이면 질문과 차례를 보존하고 잠금을 푼다", async () => {
+    await startLocal("ai");
+    aiMocks.ask.mockResolvedValueOnce(null);
+
+    const input = screen.getByLabelText("예 또는 아니오 질문");
+    fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
+    fireEvent.click(screen.getByRole("button", { name: /질문하기/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /질문하기/ })).toBeEnabled();
+    });
+    expect(input).toHaveValue("먹을 수 있나요?");
+    expect(screen.getByText(/나.*차례/)).toBeVisible();
+    expect(screen.queryByText("잘 모르겠어요")).not.toBeInTheDocument();
+    expectLocalRemaining(20);
+    expect(screen.getByRole("button", { name: "정답 맞추기!" })).toBeEnabled();
+  });
+
+  it("인공지능이 실제로 모르는 답을 보내면 정상 활동으로 기록한다", async () => {
+    await startLocal("ai");
+    aiMocks.ask.mockResolvedValueOnce({ text: "잘 모르겠어요" });
+
+    const input = screen.getByLabelText("예 또는 아니오 질문");
+    fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
+    fireEvent.click(screen.getByRole("button", { name: /질문하기/ }));
+
+    await waitFor(() => expect(screen.getByText(/AI.*차례/)).toBeVisible());
+    expect(screen.getByText("잘 모르겠어요")).toBeVisible();
+    expectLocalRemaining(19);
+  });
+
+  it("인공지능 차례의 답 요청이 실패하면 활동을 쓰지 않고 사람 차례로 돌아온다", async () => {
+    await startLocal("ai");
+    aiMocks.ask
+      .mockResolvedValueOnce({ parsed: { question: "둥근가요?" } })
+      .mockResolvedValueOnce(null);
+    vi.useFakeTimers();
+
+    await submitLocalGuess("책");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
+    expect(aiMocks.ask).toHaveBeenCalledTimes(3);
+    expect(screen.getByText(/나.*차례/)).toBeVisible();
+    expect(screen.queryByText("둥근가요?")).not.toBeInTheDocument();
+    expect(screen.queryByText("잘 모르겠어요")).not.toBeInTheDocument();
+    expectLocalRemaining(19);
+  });
+
+  it("인공지능 차례 만들기가 실패해도 활동을 쓰지 않고 사람 차례로 돌아온다", async () => {
+    await startLocal("ai");
+    aiMocks.ask.mockResolvedValueOnce(null);
+    vi.useFakeTimers();
+
+    await submitLocalGuess("책");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+
+    expect(aiMocks.ask).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/나.*차례/)).toBeVisible();
+    expectLocalRemaining(19);
+  });
+
+  it("같은 화면 순간의 추측 엔터와 단추 제출은 한 번만 차례를 넘긴다", async () => {
+    await startLocal("ai");
+    fireEvent.click(screen.getByRole("button", { name: "정답 맞추기!" }));
+    const input = screen.getByLabelText("정답 추측");
+    const submit = screen.getByRole("button", { name: "정답 제출!" });
+    fireEvent.change(input, { target: { value: "책" } });
+
+    act(() => {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      submit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(screen.getByText(/AI.*차례/)).toBeVisible();
+    expect(screen.getAllByText(/책/)).toHaveLength(1);
+    expect(screen.getAllByText("땡")).toHaveLength(1);
+    expectLocalRemaining(19);
+  });
+
   it("스무 번째 질문에서 바로 끝내고 스물한 번째 강제 추측을 열지 않는다", async () => {
     await startLocal();
     for (let index = 0; index < 20; index += 1) {

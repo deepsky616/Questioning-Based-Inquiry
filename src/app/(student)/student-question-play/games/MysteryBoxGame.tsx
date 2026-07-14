@@ -102,6 +102,9 @@ interface QAEntry {
   question: string;
   answer: Answer | string;
 }
+type AnswerResult =
+  | { ok: true; answer: string }
+  | { ok: false };
 interface AIItem { name: string; category: string; emoji: string }
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
@@ -157,6 +160,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const [winner, setWinner] = useState<string | null>(null);
   const [activityPending, setActivityPending] = useState(false);
   const activityLockRef = useRef(false);
+  const unlockAfterActivityRef = useRef(false);
   const gameRunRef = useRef(0);
 
   const item = isAI ? aiItem : localItem;
@@ -165,6 +169,13 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const currentPlayer = playersList[turnIdx % playersList.length] ?? text.me;
   const isAITurn = isAI && currentPlayer === AI_NAME;
   const isHumanTurn = !isAITurn;
+
+  useEffect(() => {
+    if (!unlockAfterActivityRef.current) return;
+    unlockAfterActivityRef.current = false;
+    activityLockRef.current = false;
+    setActivityPending(false);
+  }, [qaList, phase, turnIdx]);
 
   // 적립 (혼자/AI 모드). AI 모드는 사람이 이겼을 때만 completed
   useEffect(() => {
@@ -185,6 +196,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     const gameRun = gameRunRef.current + 1;
     gameRunRef.current = gameRun;
     activityLockRef.current = false;
+    unlockAfterActivityRef.current = false;
     setActivityPending(false);
     setQaList([]);
     setInputQ("");
@@ -214,13 +226,16 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   }
 
   // 질문 1건 답을 얻는다 (AI 모드는 AI 지킴이, 그 외는 규칙 기반)
-  async function answerFor(question: string): Promise<string> {
+  async function answerFor(question: string): Promise<AnswerResult> {
     if (isAI && aiItem) {
       const res = await ask({ action: "mystery-box:answer", context: { itemName: aiItem.name, question } });
-      return res?.text ?? text.notSure;
+      if (!res) return { ok: false };
+      return { ok: true, answer: res.text?.trim() || text.notSure };
     }
-    if (localItem) return detectAnswer(question, localItem, locale);
-    return text.notSure;
+    if (localItem) {
+      return { ok: true, answer: detectAnswer(question, localItem, locale) };
+    }
+    return { ok: true, answer: text.notSure };
   }
 
   function recordActivity(newList: QAEntry[]) {
@@ -246,11 +261,17 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     activityLockRef.current = true;
     setActivityPending(true);
     try {
-      const ans = await answerFor(q);
+      const result = await answerFor(q);
       if (gameRunRef.current !== gameRun) return;
+      if (!result.ok) return;
       const newList: QAEntry[] = [
         ...qaList,
-        { kind: "question", asker: currentPlayer, question: q, answer: ans },
+        {
+          kind: "question",
+          asker: currentPlayer,
+          question: q,
+          answer: result.answer,
+        },
       ];
       setInputQ("");
       recordActivity(newList);
@@ -269,43 +290,60 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     if (!isAITurn || phase !== "playing" || !aiItem) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const history = qaList.map((qa, i) => `${i + 1}. (${qa.asker}) ${qa.question} → ${qa.answer}`).join("\n");
-      const turnRes = await ask({ action: "mystery-box:ai-turn", context: { history } });
-      if (cancelled) return;
-
-      const guess = (turnRes?.parsed?.guess ?? "").trim();
-      if (guess) {
-        const correct = matchesMysteryItem(guess, aiItem.name, mysteryLocale);
-        const guessList: QAEntry[] = [
-          ...qaList,
-          {
-            kind: "guess",
-            asker: AI_NAME,
-            question: locale === "en"
-              ? `"${guess}" ${text.guessSuffix}`
-              : `“${guess}” ${text.guessSuffix}`,
-            answer: correct ? text.correct : text.wrongGuess,
-          },
-        ];
-        if (correct) {
-          setQaList(guessList);
-          setWinner(AI_NAME);
-          setPhase("lose");
+      try {
+        const history = qaList.map((qa, i) => `${i + 1}. (${qa.asker}) ${qa.question} → ${qa.answer}`).join("\n");
+        const turnRes = await ask({ action: "mystery-box:ai-turn", context: { history } });
+        if (cancelled) return;
+        if (!turnRes) {
+          setTurnIdx((turn) => turn + 1);
           return;
         }
-        // 틀린 추측 → 차례 한 번 소모
-        recordActivity(guessList);
-        return;
-      }
 
-      const q = (turnRes?.parsed?.question ?? "").trim() || text.aiQuestionFallback;
-      const ans = await answerFor(q);
-      if (cancelled) return;
-      const newList: QAEntry[] = [
-        ...qaList,
-        { kind: "question", asker: AI_NAME, question: q, answer: ans },
-      ];
-      recordActivity(newList);
+        const guess = (turnRes.parsed?.guess ?? "").trim();
+        if (guess) {
+          const correct = matchesMysteryItem(guess, aiItem.name, mysteryLocale);
+          const guessList: QAEntry[] = [
+            ...qaList,
+            {
+              kind: "guess",
+              asker: AI_NAME,
+              question: locale === "en"
+                ? `"${guess}" ${text.guessSuffix}`
+                : `“${guess}” ${text.guessSuffix}`,
+              answer: correct ? text.correct : text.wrongGuess,
+            },
+          ];
+          if (correct) {
+            setQaList(guessList);
+            setWinner(AI_NAME);
+            setPhase("lose");
+            return;
+          }
+          // 틀린 추측 → 차례 한 번 소모
+          recordActivity(guessList);
+          return;
+        }
+
+        const q = (turnRes.parsed?.question ?? "").trim() || text.aiQuestionFallback;
+        const result = await answerFor(q);
+        if (cancelled) return;
+        if (!result.ok) {
+          setTurnIdx((turn) => turn + 1);
+          return;
+        }
+        const newList: QAEntry[] = [
+          ...qaList,
+          {
+            kind: "question",
+            asker: AI_NAME,
+            question: q,
+            answer: result.answer,
+          },
+        ];
+        recordActivity(newList);
+      } catch {
+        if (!cancelled) setTurnIdx((turn) => turn + 1);
+      }
     }, AI_THINK_MS);
     return () => { cancelled = true; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -313,28 +351,37 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
   function makeGuess() {
     if (!guessInput.trim() || !item || activityLockRef.current) return;
+    activityLockRef.current = true;
+    unlockAfterActivityRef.current = true;
+    setActivityPending(true);
     const g = guessInput.trim();
-    const correct = matchesMysteryItem(g, itemName, mysteryLocale);
-    const guessList: QAEntry[] = [
-      ...qaList,
-      {
-        kind: "guess",
-        asker: currentPlayer,
-        question: locale === "en"
-          ? `"${g}" ${text.guessSuffix}`
-          : `“${g}” ${text.guessSuffix}`,
-        answer: correct ? text.correct : text.wrongGuess,
-      },
-    ];
-    setGuessInput("");
-    setIsGuessing(false);
-    if (correct) {
-      setQaList(guessList);
-      setWinner(currentPlayer);
-      setPhase("win");
-      return;
+    try {
+      const correct = matchesMysteryItem(g, itemName, mysteryLocale);
+      const guessList: QAEntry[] = [
+        ...qaList,
+        {
+          kind: "guess",
+          asker: currentPlayer,
+          question: locale === "en"
+            ? `"${g}" ${text.guessSuffix}`
+            : `“${g}” ${text.guessSuffix}`,
+          answer: correct ? text.correct : text.wrongGuess,
+        },
+      ];
+      setGuessInput("");
+      setIsGuessing(false);
+      if (correct) {
+        setQaList(guessList);
+        setWinner(currentPlayer);
+        setPhase("win");
+        return;
+      }
+      recordActivity(guessList);
+    } catch {
+      unlockAfterActivityRef.current = false;
+      activityLockRef.current = false;
+      setActivityPending(false);
     }
-    recordActivity(guessList);
   }
 
   const answerClass = (answer: string) =>
