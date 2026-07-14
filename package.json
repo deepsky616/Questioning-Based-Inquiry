@@ -26,7 +26,7 @@
     "db:studio": "prisma studio"
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=20.19.0"
   },
   "overrides": {
     "next": {
@@ -86,6 +86,7 @@
     "eslint": "9.39.4",
     "eslint-config-next": "16.2.10",
     "jsdom": "^29.1.1",
+    "pdf-to-img": "^6.2.0",
     "postcss": "^8.5.16",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.6",

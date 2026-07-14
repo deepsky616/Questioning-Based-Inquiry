@@ -75,5 +75,18 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Question practice print E2E
+        run: npx playwright test e2e/question-practice-print.spec.ts --project=chromium
+
+      - name: Upload question practice print artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: question-practice-print-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+
       - name: Tablet E2E
         run: npm run test:e2e:tablet
