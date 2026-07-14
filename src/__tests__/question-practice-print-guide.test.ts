@@ -4,6 +4,11 @@ import { getQuestionPracticePrintGuide } from "@/lib/question-practice-print-gui
 
 const pageSource = readFileSync("src/app/(teacher)/teacher-practice/print-guide/page.tsx", "utf8");
 const cssSource = readFileSync("src/app/globals.css", "utf8");
+const e2eDbHelperSource = readFileSync("e2e/helpers/test-db.ts", "utf8");
+const ciSource = readFileSync(".github/workflows/ci.yml", "utf8");
+const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
+  scripts?: Record<string, string>;
+};
 
 function getCssBlock(source: string, header: string) {
   const headerIndex = source.indexOf(`${header} {`);
@@ -167,5 +172,23 @@ describe("질문연습 학습지 출력", () => {
     expect(cssSource).toContain(".question-practice-print-page .qp-sheet + .qp-sheet {");
     expect(cssSource).toContain("margin-top: 24px");
     expect(cssSource).not.toContain("max-width: 275px !important");
+  });
+
+  it("실제 인쇄 검증은 환경값을 사용하고 태블릿 검사와 독립 실행된다", () => {
+    const loaderStart = e2eDbHelperSource.indexOf("function loadDatabaseUrl");
+    const loaderSource = e2eDbHelperSource.slice(
+      loaderStart,
+      e2eDbHelperSource.indexOf("function client", loaderStart),
+    );
+    expect(loaderSource).toContain("process.env.DATABASE_URL");
+    expect(loaderSource.indexOf("process.env.DATABASE_URL")).toBeLessThan(
+      loaderSource.indexOf(".env.local"),
+    );
+    expect(packageJson.scripts?.["test:e2e:print"]).toBe(
+      "playwright test e2e/question-practice-print.spec.ts --project=chromium",
+    );
+    expect(ciSource).toContain("e2e-print:");
+    expect(ciSource).toContain("RUN_E2E_PRINT == 'true'");
+    expect(ciSource).toContain("run: npm run test:e2e:print");
   });
 });

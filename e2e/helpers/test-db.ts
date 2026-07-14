@@ -2,7 +2,7 @@
  * e2e 전용 DB 헬퍼 — 합성 테스트 교사 계정 준비와 흔적 정리.
  * .env.local의 DATABASE_URL을 직접 읽어 Prisma를 초기화한다(플레이라이트 프로세스에는 env가 없음).
  */
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
@@ -87,10 +87,16 @@ function questionLearningClassFor(): string {
 }
 
 function loadDatabaseUrl(): string {
+  const environmentUrl = process.env.DATABASE_URL?.trim();
+  if (environmentUrl) return environmentUrl.replace(/^"|"$/g, "");
+
   const envPath = path.resolve(__dirname, "../../.env.local");
+  if (!existsSync(envPath)) {
+    throw new Error("DATABASE_URL not found in process.env or .env.local");
+  }
   const content = readFileSync(envPath, "utf8");
   const line = content.split("\n").find((l) => l.startsWith("DATABASE_URL="));
-  if (!line) throw new Error("DATABASE_URL not found in .env.local");
+  if (!line) throw new Error("DATABASE_URL not found in process.env or .env.local");
   return line.slice("DATABASE_URL=".length).trim().replace(/^"|"$/g, "");
 }
 
