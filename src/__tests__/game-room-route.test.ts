@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   checkRateLimit: vi.fn((): Response | null => null),
   recordMemoryRoll: vi.fn(),
   settleMemoryRollingRoom: vi.fn((room: GameRoom) => room),
+  loadVerifiedGameAwardResult: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
@@ -44,6 +45,9 @@ vi.mock("@/lib/game-room-store", () => ({
 vi.mock("@/lib/memory-room-roll", () => ({
   recordMemoryRoll: mocks.recordMemoryRoll,
   settleMemoryRollingRoom: mocks.settleMemoryRollingRoom,
+}));
+vi.mock("@/lib/question-game-award-publish-service", () => ({
+  loadVerifiedGameAwardResult: mocks.loadVerifiedGameAwardResult,
 }));
 
 import { POST } from "@/app/api/question-games/rooms/route";
@@ -116,6 +120,7 @@ beforeEach(() => {
   mocks.createGameRoom.mockReset();
   mocks.checkRateLimit.mockReset().mockReturnValue(null);
   mocks.recordMemoryRoll.mockReset();
+  mocks.loadVerifiedGameAwardResult.mockReset();
   mocks.settleMemoryRollingRoom
     .mockReset()
     .mockImplementation((room: GameRoom) => room);

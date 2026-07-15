@@ -8,6 +8,10 @@ import {
 import { isGameRoom } from "@/lib/question-games-data";
 
 const pointAwardRoute = readFileSync("src/app/api/points/award/route.ts", "utf8");
+const gameRoomRoute = readFileSync(
+  "src/app/api/question-games/rooms/[code]/route.ts",
+  "utf8",
+);
 const publishRoute = readFileSync("src/app/api/sessions/[id]/publish-questions/route.ts", "utf8");
 
 describe("award and publish route service split", () => {
@@ -18,6 +22,17 @@ describe("award and publish route service split", () => {
     expect(serviceSource).toContain("buildAwardList");
     expect(pointAwardRoute).toContain("awardGamePoints");
     expect(pointAwardRoute.split("\n").length).toBeLessThan(90);
+  });
+
+  it("loads verified room award results through a dedicated service", () => {
+    expect(existsSync("src/lib/question-game-award-publish-service.ts")).toBe(true);
+    const serviceSource = readFileSync(
+      "src/lib/question-game-award-publish-service.ts",
+      "utf8",
+    );
+    expect(serviceSource).toContain("loadVerifiedGameAwardResult");
+    expect(serviceSource).toContain("restorePublishableAwardResult");
+    expect(gameRoomRoute).toContain("loadVerifiedGameAwardResult");
   });
 
   it("restores only public award fields and a validated analysis snapshot", () => {

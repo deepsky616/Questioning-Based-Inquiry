@@ -25,6 +25,7 @@ import {
   recordMemoryRoll,
   settleMemoryRollingRoom,
 } from "@/lib/memory-room-roll";
+import { loadVerifiedGameAwardResult } from "@/lib/question-game-award-publish-service";
 import {
   QUESTION_GAME_LIMITS,
   getQuestionGameRule,
@@ -60,6 +61,13 @@ const VERSIONED_ACTIONS = new Set([
   "add-question",
   "end",
   "restart",
+]);
+const PUBLISH_AWARD_RESULT_KEYS = new Set([
+  "action",
+  "commandId",
+  "expectedCreatedAt",
+  "expectedVersion",
+  "playId",
 ]);
 
 function isRequestBody(value: unknown): value is Record<string, unknown> {
@@ -109,6 +117,23 @@ function roomConflictForMember(room: GameRoom, userId: string) {
 
 function invalidRequest(error: string) {
   return NextResponse.json({ error }, { status: 400 });
+}
+
+function hasExactKeys(
+  value: Record<string, unknown>,
+  allowed: ReadonlySet<string>,
+) {
+  const keys = Object.keys(value);
+  return keys.length === allowed.size && keys.every((key) => allowed.has(key));
+}
+
+function awardResultsMatch(
+  first: GameRoom["awardResult"],
+  second: GameRoom["awardResult"],
+) {
+  return first !== undefined &&
+    second !== undefined &&
+    JSON.stringify(first) === JSON.stringify(second);
 }
 
 function commandSuccess(
@@ -218,6 +243,101 @@ async function handleQuestionGameCommand({
     );
   }
   return roomConflict(saved.room);
+}
+
+async function publishAwardResult({
+  room,
+  body,
+  userId,
+  userRole,
+}: {
+  room: GameRoom;
+  body: Record<string, unknown>;
+  userId: string;
+  userRole: string | undefined;
+}) {
+  if (!hasExactKeys(body, PUBLISH_AWARD_RESULT_KEYS)) {
+    return invalidRequest("점수 결과 공개 요청이 올바르지 않습니다");
+  }
+  if (!isQuestionGameCommandId(body.commandId)) {
+    return invalidRequest("명령 식별값이 올바르지 않습니다");
+  }
+  if (
+    typeof body.expectedCreatedAt !== "number" ||
+    !Number.isFinite(body.expectedCreatedAt)
+  ) {
+    return invalidRequest("방 생성 시각이 올바르지 않습니다");
+  }
+  if (!isValidExpectedVersion(body.expectedVersion)) {
+    return invalidRequest("올바른 expectedVersion이 필요합니다");
+  }
+  if (!isQuestionGameCommandId(body.playId)) {
+    return invalidRequest("놀이 실행 식별값이 올바르지 않습니다");
+  }
+  if (userRole !== "TEACHER") {
+    return NextResponse.json(
+      { error: "교사만 점수 결과를 공개할 수 있어요" },
+      { status: 403 },
+    );
+  }
+  if (room.hostId !== userId) {
+    return NextResponse.json(
+      { error: "방장 교사만 점수 결과를 공개할 수 있어요" },
+      { status: 403 },
+    );
+  }
+  if (
+    body.expectedCreatedAt !== room.createdAt ||
+    room.playId !== body.playId ||
+    room.pointAwardKeyVersion !== 2 ||
+    room.pointEvidenceVersion !== 2 ||
+    room.gameState.stateVersion !== 2 ||
+    room.status !== "ended" ||
+    room.gameState.phase !== "done" ||
+    room.gameState.endReason !== "completed"
+  ) {
+    return roomConflict(room);
+  }
+  const staleVersion = isStaleRoomAction(room, body.expectedVersion);
+  if (staleVersion && room.awardResult === undefined) return roomConflict(room);
+
+  let verifiedResult: GameRoom["awardResult"];
+  try {
+    verifiedResult = await loadVerifiedGameAwardResult({
+      gameId: room.gameId,
+      roomCode: room.code,
+      roomCreatedAt: room.createdAt,
+      playId: room.playId,
+    }) ?? undefined;
+  } catch {
+    return NextResponse.json(
+      { error: "점수 결과를 불러오지 못했습니다" },
+      { status: 500 },
+    );
+  }
+  if (!verifiedResult) {
+    return NextResponse.json(
+      { error: "공개할 점수 기록이 아직 없습니다" },
+      { status: 409 },
+    );
+  }
+  if (awardResultsMatch(room.awardResult, verifiedResult)) {
+    return commandSuccess(room, undefined);
+  }
+  if (staleVersion) return roomConflict(room);
+  if (room.awardResult !== undefined) return roomConflict(room);
+
+  const saved = await saveGameRoom({ ...room, awardResult: verifiedResult });
+  if (saved.kind === "saved") return commandSuccess(saved.room, undefined);
+  if (saved.kind === "missing") return roomMissing();
+  if (
+    saved.room.createdAt === room.createdAt &&
+    saved.room.playId === room.playId &&
+    awardResultsMatch(saved.room.awardResult, verifiedResult)
+  ) {
+    return commandSuccess(saved.room, undefined);
+  }
+  return roomConflictForMember(saved.room, userId);
 }
 
 async function restartManagedRoom(
@@ -518,6 +638,7 @@ export async function PATCH(
   }
   const userId = (session.user as { id: string }).id;
   const userName = (session.user as { name?: string }).name ?? "학생";
+  const userRole = (session.user as { role?: string }).role;
 
   const rawBody = await req.text().catch(() => null);
   if (
@@ -569,6 +690,10 @@ export async function PATCH(
       return invalidRequest("방 생성 시각이 올바르지 않습니다");
     }
     if (body.expectedCreatedAt !== room.createdAt) return roomConflict(room);
+  }
+
+  if (action === "publish-award-result") {
+    return publishAwardResult({ room, body, userId, userRole });
   }
 
   const isVersion2 = room.gameState.stateVersion === 2;
