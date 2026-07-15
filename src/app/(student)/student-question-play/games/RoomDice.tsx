@@ -157,6 +157,7 @@ export default function RoomDice({
           scoreUnit=""
           scores={scores}
           questions={state.questions}
+          actionLoading={actionLoading}
           onAction={onAction}
           onLeave={onLeave}
         />

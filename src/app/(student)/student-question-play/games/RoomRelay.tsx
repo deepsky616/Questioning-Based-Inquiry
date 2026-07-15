@@ -187,6 +187,7 @@ export default function RoomRelay({
           scoreUnit=""
           scores={scores}
           questions={state.questions}
+          actionLoading={actionLoading}
           onAction={onAction}
           onLeave={onLeave}
         />

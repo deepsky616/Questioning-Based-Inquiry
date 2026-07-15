@@ -112,7 +112,12 @@ function deferred<T>() {
 let fetchMock: ReturnType<typeof vi.fn>;
 let onAction: ReturnType<typeof vi.fn<RoomActionHandler>>;
 
-function renderResult(room = makeRoom(), myId = "teacher") {
+function renderResult(
+  room = makeRoom(),
+  myId = "teacher",
+  actionLoading = false,
+  onLeave = vi.fn(),
+) {
   return render(
     <RoomResult
       game={game}
@@ -129,8 +134,9 @@ function renderResult(room = makeRoom(), myId = "teacher") {
         playerName: "학생",
         question: "우주는 왜 넓을까요?",
       }]}
+      actionLoading={actionLoading}
       onAction={onAction}
-      onLeave={vi.fn()}
+      onLeave={onLeave}
     />,
   );
 }
@@ -227,6 +233,72 @@ describe("verified room result awards", () => {
     await waitFor(() => expect(onAction).toHaveBeenCalledOnce());
   });
 
+  it("locks leaving and restarting while the point request is pending", async () => {
+    const pending = deferred<Response>();
+    const onLeave = vi.fn();
+    fetchMock.mockReturnValue(pending.promise);
+
+    renderResult(makeRoom(), "teacher", false, onLeave);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    const leave = screen.getByRole("button", { name: /나가기/ });
+    const restart = screen.getByRole("button", { name: /대기실로 돌아가기/ });
+    expect(leave).toBeDisabled();
+    expect(restart).toBeDisabled();
+    fireEvent.click(leave);
+    fireEvent.click(restart);
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pending.resolve(new Response("실패", { status: 500 }));
+      await pending.promise;
+    });
+  });
+
+  it("locks leaving and restarting while the verified result is publishing", async () => {
+    const pending = deferred<RoomActionResult>();
+    const onLeave = vi.fn();
+    onAction.mockReturnValue(pending.promise);
+
+    renderResult(makeRoom(), "teacher", false, onLeave);
+    await waitFor(() => expect(onAction).toHaveBeenCalledOnce());
+
+    const leave = screen.getByRole("button", { name: /나가기/ });
+    const restart = screen.getByRole("button", { name: /대기실로 돌아가기/ });
+    expect(leave).toBeDisabled();
+    expect(restart).toBeDisabled();
+    fireEvent.click(leave);
+    fireEvent.click(restart);
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(onAction).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      pending.resolve(success(makeRoom({ awardResult: AWARD })));
+      await pending.promise;
+    });
+  });
+
+  it("honors the shared room action lock on a published result", async () => {
+    const onLeave = vi.fn();
+    renderResult(
+      makeRoom({ awardResult: AWARD }),
+      "teacher",
+      true,
+      onLeave,
+    );
+
+    const leave = screen.getByRole("button", { name: /나가기/ });
+    const restart = screen.getByRole("button", { name: /대기실로 돌아가기/ });
+    expect(leave).toBeDisabled();
+    expect(restart).toBeDisabled();
+    fireEvent.click(leave);
+    fireEvent.click(restart);
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a malformed successful award response", async () => {
     fetchMock.mockResolvedValue(jsonResponse({
       ...AWARD,
@@ -284,6 +356,7 @@ describe("verified room result awards", () => {
         scoreUnit="개"
         scores={[{ playerId: "student", name: "학생", score: 2 }]}
         questions={[]}
+        actionLoading={false}
         onAction={onAction}
         onLeave={vi.fn()}
       />,

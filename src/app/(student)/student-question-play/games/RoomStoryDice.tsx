@@ -193,6 +193,7 @@ export default function RoomStoryDice({
           scoreUnit=""
           scores={scores}
           questions={state.pairs}
+          actionLoading={actionLoading}
           onAction={onAction}
           onLeave={onLeave}
         />

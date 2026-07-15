@@ -19,17 +19,26 @@ export function RoomHeader({
   room,
   subtitle,
   onLeave,
+  disabled = false,
 }: {
   game: BuiltInGame;
   room: GameRoom;
   subtitle?: string;
   onLeave: () => void;
+  disabled?: boolean;
 }) {
   const locale = useLocale();
   const text = getQuestionGameText(locale);
   return (
     <div className="flex items-center gap-3">
-      <button onClick={onLeave} className="text-gray-400 hover:text-gray-600 text-sm">{text.leave}</button>
+      <button
+        type="button"
+        onClick={onLeave}
+        disabled={disabled}
+        className="text-gray-400 hover:text-gray-600 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {text.leave}
+      </button>
       <div className="flex-1 rounded-2xl py-3 px-5 text-white flex items-center justify-between"
         style={{ background: game.gradientCss }}>
         <div className="flex items-center gap-3">

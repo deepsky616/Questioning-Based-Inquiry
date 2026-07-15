@@ -73,12 +73,14 @@ interface Props {
   scoreUnit: string;
   scores: ScoreEntry[];
   questions: QInfo[];
+  actionLoading: boolean;
   onAction: RoomActionHandler;
   onLeave: () => void;
 }
 
 export default function RoomResult({
-  game, room, myId, scoreLabel, scoreUnit, scores, questions, onAction, onLeave,
+  game, room, myId, scoreLabel, scoreUnit, scores, questions,
+  actionLoading, onAction, onLeave,
 }: Props) {
   const locale = useLocale();
   const { data: session, status: sessionStatus } = useSession();
@@ -141,6 +143,7 @@ export default function RoomResult({
     : null;
   const awarding = awardingLifetime === lifetimeKey;
   const publishing = publishingLifetime === lifetimeKey;
+  const resultBusy = actionLoading || awarding || publishing;
   const award = sharedAward ?? localAward?.result ?? null;
 
   const publishAward = useCallback(async (
@@ -283,7 +286,13 @@ export default function RoomResult({
 
   return (
     <div className="max-w-lg mx-auto space-y-5">
-      <RoomHeader game={game} room={room} subtitle={text.gameEnded} onLeave={onLeave} />
+      <RoomHeader
+        game={game}
+        room={room}
+        subtitle={text.gameEnded}
+        onLeave={onLeave}
+        disabled={resultBusy}
+      />
 
       {/* 우승자 */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-3">
@@ -471,7 +480,10 @@ export default function RoomResult({
       {isHost ? (
         <Button className="w-full py-4 font-black text-white rounded-xl"
           style={{ background: game.gradientCss }}
-          onClick={() => void onAction("restart")}>
+          disabled={resultBusy}
+          onClick={() => {
+            if (!resultBusy) void onAction("restart");
+          }}>
           {text.returnLobby}
         </Button>
       ) : (

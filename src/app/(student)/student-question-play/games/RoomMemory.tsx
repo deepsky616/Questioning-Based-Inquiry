@@ -395,6 +395,7 @@ export default function RoomMemory({
         scoreUnit={locale === "en" ? " pairs" : "쌍"}
         scores={scores}
         questions={[]}
+        actionLoading={actionLoading}
         onAction={onAction}
         onLeave={onLeave}
       />

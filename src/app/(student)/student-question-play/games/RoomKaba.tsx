@@ -168,6 +168,7 @@ export default function RoomKaba({
           scoreUnit=""
           scores={scores}
           questions={questions}
+          actionLoading={actionLoading}
           onAction={onAction}
           onLeave={onLeave}
         />
