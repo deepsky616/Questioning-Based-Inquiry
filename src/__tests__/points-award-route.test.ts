@@ -437,8 +437,10 @@ describe("포인트 지급 요청 검증", () => {
   });
 
   it("요청의 가짜 참가자와 부풀린 기여를 무시하고 저장된 방 상태로 계산한다", async () => {
+    const room = makeV2RelayRoom();
+    useLockedRoom(room);
     const forgedBody = {
-      ...BODY,
+      ...v2Body("relay"),
       topic: "바꾼 주제",
       contributions: [
         {
@@ -456,7 +458,7 @@ describe("포인트 지급 요청 검증", () => {
 
     expect(res.status).toBe(200);
     expect(data.awards).toEqual(expect.arrayContaining([
-      expect.objectContaining({ studentId: "s1", bonusType: "VALID_QUESTIONS", points: 6 }),
+      expect.objectContaining({ studentId: "s1", bonusType: "VALID_QUESTIONS", points: 9 }),
     ]));
     expect(data.awards).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ studentId: "attacker-target" }),
@@ -502,9 +504,11 @@ describe("포인트 지급 요청 검증", () => {
   });
 
   it("담당 학급이 없는 교사는 같은 학교 학생에게 지급할 수 있다", async () => {
+    const room = makeV2RelayRoom();
+    useLockedRoom(room);
     mUserFindUnique.mockResolvedValue({ school: "별빛초", teacherClasses: [] });
 
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
 
     expect(res.status).toBe(200);
     expect(mUserFindMany).toHaveBeenCalledWith(expect.objectContaining({
@@ -516,18 +520,10 @@ describe("포인트 지급 요청 검증", () => {
   });
 
   it("교사 방장은 점수 대상에서 빼고 담당 학생에게만 지급한다", async () => {
-    const teacherRoom = makeRoom({
-      players: [
-        { id: "t1", name: "교사", isHost: true, joinedAt: 1 },
-        { id: "s1", name: "학생", isHost: false, joinedAt: 2 },
-      ],
-    });
-    mLoadGameRoom.mockResolvedValue(teacherRoom);
-    txQueryRaw
-      .mockResolvedValueOnce([{ locked: true }])
-      .mockResolvedValueOnce([{ data: teacherRoom }]);
+    const teacherRoom = makeV2RelayRoom();
+    useLockedRoom(teacherRoom);
 
-    const data = await (await POST(awardReq(BODY))).json();
+    const data = await (await POST(awardReq(v2Body("relay")))).json();
 
     expect(data.awards).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ studentId: "t1" }),
@@ -543,7 +539,15 @@ describe("포인트 지급 요청 검증", () => {
 });
 
 describe("포인트 지급 수명별 중복 조회", () => {
-  it("표지 방은 예전 표시 코드 기록을 무시하고 내부 키를 쓴다", async () => {
+  it("버전 1 표지 방은 내부 키의 승인 기록만 복원한다", async () => {
+    mFindMany.mockResolvedValue([{
+      studentId: "s1",
+      bonusType: "PARTICIPATION",
+      points: 1,
+      reason: "게임 참여",
+      status: "APPROVED",
+    }]);
+
     const res = await POST(awardReq(BODY));
 
     expect(res.status).toBe(200);
@@ -554,29 +558,24 @@ describe("포인트 지급 수명별 중복 조회", () => {
         status: "APPROVED",
       },
     }));
-    expect(txPointLogFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: {
-        gameId: "relay",
-        roomCode: "room:1234:100",
-        status: "APPROVED",
-      },
-    }));
-    expect(txPointLogCreateMany).toHaveBeenCalledWith({
-      data: expect.arrayContaining([
-        expect.objectContaining({ roomCode: "room:1234:100" }),
-      ]),
-    });
+    expect(txPointLogFindMany).not.toHaveBeenCalled();
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
   });
 
-  it("표지 없는 방은 생성 뒤 예전 표시 코드 기록도 확인한다", async () => {
+  it("표지 없는 버전 1 방은 생성 뒤 예전 표시 코드 승인 기록도 복원한다", async () => {
     const legacyRoom = makeRoom({ pointAwardKeyVersion: undefined });
     mLoadGameRoom.mockResolvedValue(legacyRoom);
-    txQueryRaw
-      .mockResolvedValueOnce([{ locked: true }])
-      .mockResolvedValueOnce([{ data: legacyRoom }]);
+    mFindMany.mockResolvedValue([{
+      studentId: "s1",
+      bonusType: "PARTICIPATION",
+      points: 1,
+      reason: "게임 참여",
+      status: "APPROVED",
+    }]);
 
-    await POST(awardReq(BODY));
+    const res = await POST(awardReq(BODY));
 
+    expect(res.status).toBe(200);
     expect(mFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: expect.objectContaining({
         gameId: "relay",
@@ -586,15 +585,8 @@ describe("포인트 지급 수명별 중복 조회", () => {
         ]),
       }),
     }));
-    expect(txPointLogFindMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({
-        gameId: "relay",
-        OR: expect.arrayContaining([
-          { roomCode: "room:1234:100" },
-          { roomCode: "1234", createdAt: { gte: new Date(100) } },
-        ]),
-      }),
-    }));
+    expect(txPointLogFindMany).not.toHaveBeenCalled();
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
   });
 
   it("같은 수명의 기존 기록에서 표지된 결과를 생성 순서와 무관하게 복원한다", async () => {
@@ -697,48 +689,13 @@ describe("저장된 놀이 상태 계산", () => {
       .mockResolvedValueOnce([{ locked: true }])
       .mockResolvedValueOnce([{ data: gameRoom }]);
 
-    const res = await POST(awardReq({ ...BODY, gameId: "memory" }));
+    const res = await POST(awardReq(v2Body("memory")));
 
     expect(res.status).toBe(409);
     expect(mGenerateJson).not.toHaveBeenCalled();
     expect(mTx).not.toHaveBeenCalled();
     expect(txPointLogCreateMany).not.toHaveBeenCalled();
     expect(txUserUpdate).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    [
-      "relay",
-      {},
-      [
-        { question: "첫 질문인가요?", playerId: "s1", playerName: "학생" },
-        { question: "둘째 질문인가요?", playerId: "s1", playerName: "학생" },
-      ],
-      6,
-    ],
-  ])("%s는 요청값이 아닌 저장 상태를 점수로 바꾼다", async (
-    gameId,
-    gameState,
-    chain,
-    expectedPoints,
-  ) => {
-    const gameRoom = makeRoom({ gameId, gameState, chain });
-    mLoadGameRoom.mockResolvedValue(gameRoom);
-    txQueryRaw
-      .mockResolvedValueOnce([{ locked: true }])
-      .mockResolvedValueOnce([{ data: gameRoom }]);
-
-    const res = await POST(awardReq({ ...BODY, gameId }));
-    const data = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(data.awards).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        studentId: "s1",
-        bonusType: "VALID_QUESTIONS",
-        points: expectedPoints,
-      }),
-    ]));
   });
 
   const repeatedStateCases: Array<[
@@ -879,19 +836,23 @@ describe("저장된 놀이 상태 계산", () => {
 });
 
 describe("포인트 지급 저장", () => {
+  beforeEach(() => {
+    useLockedRoom(makeV2RelayRoom());
+  });
+
   it("기본 점수는 내부 수명 키로 트랜잭션 지급하고 합계를 누적한다", async () => {
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
     const data = await res.json();
 
     expect(res.status).toBe(200);
     expect(mTx).toHaveBeenCalledTimes(1);
     expect(txPointLogCreate).not.toHaveBeenCalled();
     expect(txPointLogCreateMany).toHaveBeenCalledTimes(1);
-    expect(txPointLogCreateMany.mock.calls[0][0].data).toHaveLength(4);
+    expect(txPointLogCreateMany.mock.calls[0][0].data).toHaveLength(3);
     expect(txUserUpdate).toHaveBeenCalledTimes(1);
     const types = data.awards.map((award: { bonusType: string }) => award.bonusType);
-    expect(types).toHaveLength(4);
-    expect(new Set(types).size).toBe(4);
+    expect(types).toHaveLength(3);
+    expect(new Set(types).size).toBe(3);
   });
 
   it("첫 기록에 종류와 버전이 있는 결과 JSON을 저장한다", async () => {
@@ -899,13 +860,13 @@ describe("포인트 지급 저장", () => {
       bonuses: [],
       bestQuestion: {
         studentId: "s1",
-        question: "왜 별이 보일까요?",
+        question: "1-2번째 질문은 무엇인가요?",
         reason: "좋은 질문",
       },
       summary: "함께 잘 탐구했습니다.",
     });
 
-    await POST(awardReq(BODY));
+    await POST(awardReq(v2Body("relay")));
 
     const rows = txPointLogCreateMany.mock.calls[0][0].data as Array<{
       aiAnalysis?: string;
@@ -916,7 +877,7 @@ describe("포인트 지급 저장", () => {
       version: 1,
       bestQuestion: {
         studentId: "s1",
-        question: "왜 별이 보일까요?",
+        question: "1-2번째 질문은 무엇인가요?",
         reason: "좋은 질문",
       },
       summary: "함께 잘 탐구했습니다.",
@@ -927,7 +888,7 @@ describe("포인트 지급 저장", () => {
   });
 
   it("잠금과 방 공유 잠금 뒤 같은 수명 기록을 다시 확인하고 쓴다", async () => {
-    await POST(awardReq(BODY));
+    await POST(awardReq(v2Body("relay")));
 
     expect(txQueryRaw).toHaveBeenCalledTimes(4);
     const [lockStrings, ...lockValues] = txQueryRaw.mock.calls[0] as [
@@ -939,7 +900,7 @@ describe("포인트 지급 저장", () => {
       ...unknown[],
     ];
     expect(lockStrings.join("?")).toContain("pg_advisory_xact_lock");
-    expect(lockValues).toContain("relay:room:1234:100");
+    expect(lockValues).toContain(`relay:room:1234:100:${V2_PLAY_ID}`);
     expect(roomStrings.join("?")).toContain('FROM "game_rooms"');
     expect(roomStrings.join("?")).toContain("FOR SHARE");
     expect(roomValues).toContain("1234");
@@ -958,7 +919,7 @@ describe("포인트 지급 저장", () => {
       teacherClasses: [{ grade: "3", className: "2" }],
     });
 
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
 
     expect(res.status).toBe(403);
     expect(txPointLogCreateMany).not.toHaveBeenCalled();
@@ -966,7 +927,7 @@ describe("포인트 지급 저장", () => {
   });
 
   it("교사와 담당 학급 및 참가 학생 행을 잠그고 직렬 실행으로 지급한다", async () => {
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
 
     expect(res.status).toBe(200);
     const sqlCalls = txQueryRaw.mock.calls.map((call) =>
@@ -982,11 +943,11 @@ describe("포인트 지급 저장", () => {
   });
 
   it("첫 확인 뒤 방 수명이 바뀌면 409이고 쓰지 않는다", async () => {
-    txQueryRaw
+    txQueryRaw.mockReset()
       .mockResolvedValueOnce([{ locked: true }])
-      .mockResolvedValueOnce([{ data: makeRoom({ createdAt: 200 }) }]);
+      .mockResolvedValueOnce([{ data: makeV2RelayRoom({ createdAt: 200 }) }]);
 
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
 
     expect(res.status).toBe(409);
     expect(txPointLogCreateMany).not.toHaveBeenCalled();
@@ -994,11 +955,11 @@ describe("포인트 지급 저장", () => {
   });
 
   it("잠금 전에 놀이 상태 버전이 바뀌면 409이고 쓰지 않는다", async () => {
-    txQueryRaw
+    txQueryRaw.mockReset()
       .mockResolvedValueOnce([{ locked: true }])
-      .mockResolvedValueOnce([{ data: makeRoom({ version: 2 }) }]);
+      .mockResolvedValueOnce([{ data: makeV2RelayRoom({ version: 21 }) }]);
 
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
 
     expect(res.status).toBe(409);
     expect(txPointLogCreateMany).not.toHaveBeenCalled();
@@ -1015,7 +976,7 @@ describe("포인트 지급 저장", () => {
       status: "APPROVED",
     }]);
 
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
 
     expect(res.status).toBe(403);
     expect(txPointLogCreateMany).not.toHaveBeenCalled();
@@ -1036,7 +997,7 @@ describe("포인트 지급 저장", () => {
       className: "1",
     }]);
 
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
 
     expect(res.status).toBe(403);
     expect(txPointLogCreateMany).not.toHaveBeenCalled();
@@ -1058,7 +1019,7 @@ describe("포인트 지급 저장", () => {
         status: "APPROVED",
       }]);
 
-    const data = await (await POST(awardReq(BODY))).json();
+    const data = await (await POST(awardReq(v2Body("relay")))).json();
 
     expect(data.alreadyAwarded).toBe(true);
   });
@@ -1078,7 +1039,7 @@ describe("포인트 지급 저장", () => {
         status: "APPROVED",
       }]);
 
-    expect((await POST(awardReq(BODY))).status).toBe(403);
+    expect((await POST(awardReq(v2Body("relay")))).status).toBe(403);
   });
 
   it("unique 충돌 뒤 현재 수명 기록이 비어 있으면 500이다", async () => {
@@ -1087,7 +1048,7 @@ describe("포인트 지급 저장", () => {
     );
     mFindMany.mockResolvedValue([]);
 
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
 
     expect(res.status).toBe(500);
   });
@@ -1095,7 +1056,7 @@ describe("포인트 지급 저장", () => {
   it("그 외 저장 실패는 500", async () => {
     mTx.mockRejectedValue(new Error("db down"));
 
-    expect((await POST(awardReq(BODY))).status).toBe(500);
+    expect((await POST(awardReq(v2Body("relay")))).status).toBe(500);
   });
 
   it("직렬 실행 충돌은 다시 시도할 수 있도록 409로 응답한다", async () => {
@@ -1106,7 +1067,48 @@ describe("포인트 지급 저장", () => {
       }),
     );
 
-    expect((await POST(awardReq(BODY))).status).toBe(409);
+    expect((await POST(awardReq(v2Body("relay")))).status).toBe(409);
+  });
+});
+
+describe("버전 1 점수 결과 복원", () => {
+  it("승인된 기존 기록이 있으면 공개 결과만 복원한다", async () => {
+    mFindMany.mockResolvedValue([{
+      studentId: "s1",
+      bonusType: "PARTICIPATION",
+      points: 1,
+      reason: "게임 참여",
+      status: "APPROVED",
+      aiAnalysis: null,
+    }]);
+
+    const res = await POST(awardReq(BODY));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data).toEqual({
+      alreadyAwarded: true,
+      awards: [{
+        studentId: "s1",
+        bonusType: "PARTICIPATION",
+        points: 1,
+        reason: "게임 참여",
+      }],
+    });
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+  });
+
+  it("승인된 기존 기록이 없으면 새 점수를 만들지 않는다", async () => {
+    const res = await POST(awardReq(BODY));
+    const data = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(data.error).toMatch(/기존 지급 결과/);
+    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mTx).not.toHaveBeenCalled();
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
+    expect(txUserUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -1176,6 +1178,37 @@ describe("버전 2 실행별 점수 지급", () => {
     expect(mGenerateJson).not.toHaveBeenCalled();
     expect(mTx).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["두 점수 표지가 모두 1인", 1, 1],
+    ["두 점수 표지가 모두 빠진", undefined, undefined],
+  ] as const)(
+    "상태 버전 2인데 %s 방은 옛 지급 경로로 처리하지 않는다",
+    async (_name, pointAwardKeyVersion, pointEvidenceVersion) => {
+      const room = makeV2RelayRoom({
+        pointAwardKeyVersion,
+        pointEvidenceVersion,
+        chain: [{
+          question: "왜 별이 빛날까요?",
+          playerId: "s1",
+          playerName: "학생",
+        }],
+      });
+      mLoadGameRoom.mockResolvedValue(room);
+
+      const res = await POST(awardReq(v2Body("relay")));
+      const data = await res.json();
+
+      expect(res.status).toBe(409);
+      expect(data).toEqual({
+        error: "질문놀이 점수 근거 버전을 확인할 수 없습니다",
+      });
+      expect(mGenerateJson).not.toHaveBeenCalled();
+      expect(mTx).not.toHaveBeenCalled();
+      expect(txPointLogCreateMany).not.toHaveBeenCalled();
+      expect(txUserUpdate).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(["host", "insufficient-players"])(
     "%s 종료는 참가와 완료 점수도 지급하지 않는다",

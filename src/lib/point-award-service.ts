@@ -123,7 +123,9 @@ export function buildRoomAwardKey(
 }
 
 function isVersion2Room(room: GameRoom): boolean {
-  return room.pointAwardKeyVersion === 2 || room.pointEvidenceVersion === 2;
+  return room.gameState.stateVersion === 2 ||
+    room.pointAwardKeyVersion === 2 ||
+    room.pointEvidenceVersion === 2;
 }
 
 function requireCurrentRoom(req: AwardIdentity, room: GameRoom | null): GameRoom {
@@ -771,6 +773,12 @@ export async function awardGamePoints(
   );
   if (existingLogs.length > 0) {
     return restoreScopedAwardResult(existingLogs, studentIds);
+  }
+  if (!isVersion2Room(room)) {
+    throw new PointAwardError(
+      "이전 질문놀이의 기존 지급 결과를 찾을 수 없습니다",
+      409,
+    );
   }
 
   const storedRequest = buildStoredAwardRequest(
