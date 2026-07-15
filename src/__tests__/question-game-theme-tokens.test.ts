@@ -99,7 +99,7 @@ describe("question game theme tokens", () => {
     expect(copyButton).not.toContain("game.accentColor");
   });
 
-  it("uses muted semantic text for story flow authors", () => {
+  it("uses readable semantic text for story flow authors", () => {
     const source = readGameSource("StoryDiceGame.tsx");
     const author = openingTagNear(
       source,
@@ -107,7 +107,7 @@ describe("question game theme tokens", () => {
       '{c.author} ({c.type === "story"',
     );
 
-    expect(author).toMatch(/\btext-muted-foreground\b/);
+    expect(author).toMatch(/\btext-foreground\b/);
     expect(author).not.toContain("style=");
     expect(author).not.toMatch(/#[0-9a-f]{3,8}/i);
   });

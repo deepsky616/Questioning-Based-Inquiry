@@ -393,7 +393,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
                     ? "border-2 border-orange-400"
                     : "border border-transparent"
                 }`}>
-                  <p className="mb-0.5 text-[11px] font-bold text-muted-foreground">
+                  <p className="mb-0.5 text-[11px] font-bold text-foreground">
                     {c.author} ({c.type === "story" ? text.story : c.type === "question" ? text.question : text.answer})
                   </p>
                   {c.text}
