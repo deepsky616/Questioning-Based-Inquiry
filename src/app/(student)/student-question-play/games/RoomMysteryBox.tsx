@@ -28,6 +28,7 @@ import type {
   RoomActionResult,
 } from "@/lib/question-games-data";
 import { RoomHeader } from "./roomShared";
+import RoomResult from "./RoomResult";
 
 interface Props {
   game: BuiltInGame;
@@ -288,6 +289,44 @@ export default function RoomMysteryBox({
   }
 
   if (state.phase === "done") {
+    if (state.endReason === "completed") {
+      const names = new Map(
+        (room.pointParticipants ?? room.players).map(({ id, name }) => [id, name]),
+      );
+      for (const item of state.history) {
+        if (!names.has(item.playerId)) names.set(item.playerId, item.playerName);
+      }
+      return (
+        <RoomResult
+          game={game}
+          room={room}
+          myId={myId}
+          scoreLabel={locale === "en" ? "questions" : "질문"}
+          scoreUnit={locale === "en" ? " questions" : "개 질문"}
+          scores={Object.entries(state.scores).map(([playerId, score]) => ({
+            playerId,
+            name: names.get(playerId) ?? playerId,
+            score,
+          }))}
+          questions={state.history
+            .filter((item) => item.kind === "question")
+            .map((item) => ({
+              playerId: item.playerId,
+              playerName: item.playerName,
+              question: item.question,
+            }))}
+          details={<MysteryCompletedDetails state={state} locale={locale} />}
+          actionLoading={requestPending}
+          onAction={onAction}
+          onLeave={onLeave}
+          onRestart={() => void sendRequest("restart", {}, "")}
+          restartLabel={locale === "en" ? "Restart" : "다시 시작"}
+          waitingLabel={locale === "en"
+            ? "Wait until the host restarts the game."
+            : "방장이 다시 시작할 때까지 기다려 주세요."}
+        />
+      );
+    }
     return (
       <MysteryResult
         game={game}
@@ -535,6 +574,64 @@ function MysteryHistory({
         </ol>
       )}
     </section>
+  );
+}
+
+function MysteryCompletedDetails({
+  state,
+  locale,
+}: {
+  state: MysteryPublicRoomState;
+  locale: "ko" | "en";
+}) {
+  const names = new Map<string, string>();
+  for (const item of state.history) {
+    if (!names.has(item.playerId)) names.set(item.playerId, item.playerName);
+  }
+  const winnerName = state.winnerId ? names.get(state.winnerId) ?? "" : "";
+  const answer = state.answer
+    ? getLocalizedText(state.answer, locale, "")
+    : "";
+  const questionCount = state.history.filter(({ kind }) => kind === "question").length;
+  const heading = state.winnerId
+    ? (locale === "en" ? "The answer was found" : "정답을 맞혔어요")
+    : (locale === "en"
+        ? "All twenty activities were used"
+        : "스무 활동을 모두 사용했어요");
+
+  return (
+    <div className="space-y-4">
+      <section className="space-y-5 border-y border-border bg-card px-4 py-7 text-center text-card-foreground sm:px-6">
+        <PackageOpen
+          className="mx-auto h-14 w-14 text-pink-600 dark:text-pink-300"
+          aria-hidden="true"
+        />
+        <div>
+          <h1 className="text-2xl font-black text-foreground">{heading}</h1>
+          {state.winnerId && (
+            <p className="mt-2 font-bold text-pink-700 dark:text-pink-300">
+              {locale === "en"
+                ? `${winnerName} found the answer`
+                : `${winnerName} 정답 성공`}
+            </p>
+          )}
+          <p className="mt-2 text-sm text-muted-foreground">
+            {locale === "en"
+              ? `${state.history.length} activities, ${questionCount} questions`
+              : `활동 ${state.history.length}회, 질문 ${questionCount}개`}
+          </p>
+        </div>
+        {answer && (
+          <div className="border-y border-pink-300 bg-pink-50 py-5 text-pink-950 dark:border-pink-700 dark:bg-pink-950 dark:text-pink-50">
+            <p className="text-sm font-semibold">
+              {locale === "en" ? "Revealed answer" : "공개 정답"}
+            </p>
+            <p className="mt-1 text-3xl font-black">{answer}</p>
+          </div>
+        )}
+      </section>
+      <MysteryHistory history={state.history} locale={locale} />
+    </div>
   );
 }
 

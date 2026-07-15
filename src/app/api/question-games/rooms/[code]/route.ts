@@ -6,10 +6,11 @@ import {
   normalizeQuestionActivity,
   RELAY_ACTIVITY_LIMITS,
 } from "@/lib/points-policy";
-import type {
-  GameRoom,
-  RoomChainItem,
-  RoomPlayer,
+import {
+  pointStudentParticipantsForRoom,
+  type GameRoom,
+  type RoomChainItem,
+  type RoomPlayer,
 } from "@/lib/question-games-data";
 import {
   readRoomCommandResult,
@@ -299,9 +300,7 @@ async function publishAwardResult({
   let verifiedResult: GameRoom["awardResult"];
   try {
     const allowedStudentIds = new Set(
-      room.players
-        .filter((player) => player.id !== room.hostId)
-        .map((player) => player.id),
+      pointStudentParticipantsForRoom(room).map((player) => player.id),
     );
     verifiedResult = await loadVerifiedGameAwardResult(
       {

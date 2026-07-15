@@ -1163,6 +1163,29 @@ describe("버전 2 실행별 점수 지급", () => {
     });
   });
 
+  it("완료 뒤 떠난 학생에게 완료 순간 참가자 기록을 기준으로 지급한다", async () => {
+    const completed = makeV2RelayRoom();
+    const room = makeV2RelayRoom({
+      pointParticipants: structuredClone(completed.players),
+      players: [completed.players[0]],
+    });
+    useLockedRoom(room);
+
+    const res = await POST(awardReq(v2Body("relay")));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "VALID_QUESTIONS",
+      }),
+    ]));
+    expect(txUserFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: { in: ["s1"] } },
+    }));
+  });
+
   it("버전 2 실행 식별값이 없거나 현재 방과 다르면 거절한다", async () => {
     const room = makeV2RelayRoom();
     mLoadGameRoom.mockResolvedValue(room);

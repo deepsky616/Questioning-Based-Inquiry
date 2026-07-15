@@ -13,7 +13,11 @@ import {
   readStoryDiceState,
   type TurnGamePlayer,
 } from "@/lib/question-game-room-engines/turn-games";
-import type { GameRoom, RoomPlayer } from "@/lib/question-games-data";
+import {
+  pointParticipantsForRoom,
+  type GameRoom,
+  type RoomPlayer,
+} from "@/lib/question-games-data";
 
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -53,18 +57,22 @@ function requireRoomPlayers(
   room: GameRoom,
   gameId: BuiltInQuestionGameId,
 ): Map<string, RoomPlayer> {
+  const participants = pointParticipantsForRoom(room);
   const { min, max } = QUESTION_GAME_RULES[gameId].multiplayer;
-  if (room.players.length < min || room.players.length > max) {
+  if (participants.length < min || participants.length > max) {
     rejectEvidence("질문놀이 참가 인원 범위를 확인할 수 없습니다");
   }
   const byId = new Map<string, RoomPlayer>();
-  for (const player of room.players) {
+  for (const player of participants) {
     if (!player.id || byId.has(player.id)) {
       rejectEvidence("질문놀이 참가자 정보가 손상되었습니다");
     }
     byId.set(player.id, player);
   }
-  if (!byId.has(room.hostId)) {
+  if (
+    participants.filter(({ isHost }) => isHost).length !== 1 ||
+    !byId.has(room.hostId)
+  ) {
     rejectEvidence("질문놀이 방장 참가자 정보를 확인할 수 없습니다");
   }
   return byId;
@@ -327,7 +335,7 @@ export function buildQuestionGameScoreEvidence(
   const scoreRule = QUESTION_GAME_RULES[gameId].score;
   const topScore = Math.max(0, ...activityScores.values());
 
-  return room.players
+  return pointParticipantsForRoom(room)
     .filter(({ id }) => studentIds.has(id))
     .map((player) => {
       const playerQuestions = questions.get(player.id) ?? [];

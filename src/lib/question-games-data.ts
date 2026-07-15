@@ -177,6 +177,7 @@ export interface GameRoom {
   playId?: string;
   pointAwardKeyVersion?: 1 | 2;
   pointEvidenceVersion?: 1 | 2;
+  pointParticipants?: RoomPlayer[];
   awardResult?: GameAwardResult;
 }
 
@@ -204,6 +205,13 @@ function isRoomPlayer(value: unknown): value is RoomPlayer {
     typeof value.isHost === "boolean" &&
     isNonNegativeNumber(value.joinedAt)
   );
+}
+
+function isPointParticipantSnapshot(value: unknown): value is RoomPlayer[] {
+  if (!Array.isArray(value) || !value.every(isRoomPlayer)) return false;
+  const ids = new Set(value.map(({ id }) => id));
+  return ids.size === value.length &&
+    value.filter(({ isHost }) => isHost).length === 1;
 }
 
 function isRoomChainItem(value: unknown): value is RoomChainItem {
@@ -244,8 +252,22 @@ export function isGameRoom(value: unknown): value is GameRoom {
     (value.pointEvidenceVersion === undefined ||
       value.pointEvidenceVersion === 1 ||
       value.pointEvidenceVersion === 2) &&
+    (value.pointParticipants === undefined ||
+      isPointParticipantSnapshot(value.pointParticipants)) &&
     (value.awardResult === undefined || isGameAwardResult(value.awardResult))
   );
+}
+
+export function pointParticipantsForRoom(
+  room: Pick<GameRoom, "players" | "pointParticipants">,
+): readonly RoomPlayer[] {
+  return room.pointParticipants ?? room.players;
+}
+
+export function pointStudentParticipantsForRoom(
+  room: Pick<GameRoom, "players" | "pointParticipants">,
+): RoomPlayer[] {
+  return pointParticipantsForRoom(room).filter(({ isHost }) => !isHost);
 }
 
 export function parseGameRoom(value: unknown): GameRoom | null {

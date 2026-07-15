@@ -180,6 +180,48 @@ describe("award and publish route service split", () => {
     })).toBe(false);
   });
 
+  it("validates an optional completion participant snapshot", () => {
+    const room = {
+      code: "1234",
+      gameId: "dice",
+      hostId: "teacher-1",
+      status: "ended",
+      players: [{
+        id: "teacher-1",
+        name: "교사",
+        isHost: true,
+        joinedAt: 1,
+      }],
+      topic: "",
+      chain: [],
+      turnIndex: 0,
+      gameState: {},
+      version: 2,
+      createdAt: 1,
+      updatedAt: 2,
+      pointParticipants: [
+        { id: "teacher-1", name: "교사", isHost: true, joinedAt: 1 },
+        { id: "student-1", name: "학생", isHost: false, joinedAt: 2 },
+      ],
+    };
+
+    expect(isGameRoom(room)).toBe(true);
+    expect(isGameRoom({
+      ...room,
+      pointParticipants: room.pointParticipants.map((player) => ({
+        ...player,
+        isHost: true,
+      })),
+    })).toBe(false);
+    expect(isGameRoom({
+      ...room,
+      pointParticipants: [
+        room.pointParticipants[0],
+        { ...room.pointParticipants[1], id: "teacher-1" },
+      ],
+    })).toBe(false);
+  });
+
   it("keeps published inquiry question logic in a service module", () => {
     expect(existsSync("src/lib/publish-questions-service.ts")).toBe(true);
     const serviceSource = readFileSync("src/lib/publish-questions-service.ts", "utf8");

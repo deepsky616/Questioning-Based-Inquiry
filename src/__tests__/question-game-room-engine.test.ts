@@ -661,6 +661,50 @@ describe("질문놀이 방 판정기", () => {
       expect(candidate).toEqual(candidateBefore);
     });
 
+    it("완료 순간 남아 있던 참가자를 포인트 지급 대상으로 고정하고 이후 이탈에도 보존한다", () => {
+      const afterLeaveRoom = makeRoom({
+        players: [
+          makePlayer("a", true),
+          makePlayer("b"),
+        ],
+        gameState: makeState({
+          turnOrder: ["a", "b"],
+          currentTurnIdx: 0,
+        }),
+      });
+      const completionPlayers = structuredClone(afterLeaveRoom.players);
+      const candidate: GameRoom = {
+        ...structuredClone(afterLeaveRoom),
+        status: "ended",
+        gameState: makeState({
+          phase: "done",
+          endReason: "completed",
+          turnOrder: ["a", "b"],
+          currentTurnIdx: 0,
+        }),
+      };
+      const engine = makeEngine({
+        applyCommand: vi.fn(() => ({
+          kind: "changed" as const,
+          room: candidate,
+        })),
+      });
+
+      const completed = applyWithEngine(afterLeaveRoom, engine);
+
+      expect(completed.kind).toBe("changed");
+      expect(completed.room.pointParticipants).toEqual(completionPlayers);
+      expect(completed.room.pointParticipants).not.toBe(candidate.players);
+
+      const afterCompletedLeave = leaveQuestionGameRoom({
+        room: completed.room,
+        userId: "b",
+      });
+      expect(afterCompletedLeave.room.players.map(({ id }) => id)).toEqual(["a"]);
+      expect(afterCompletedLeave.room.pointParticipants?.map(({ id }) => id))
+        .toEqual(["a", "b"]);
+    });
+
     it("일반 변경 명령의 상태와 방 출력 상한 초과는 결과 없이 invalid다", () => {
       const room = makeRoom();
       const overLimitState = padRecordToBytes(
@@ -1031,6 +1075,7 @@ describe("질문놀이 방 판정기", () => {
             reason: "게임 완료",
           }],
         },
+        pointParticipants: structuredClone(makeRoom().players),
       });
       const before = structuredClone(room);
 

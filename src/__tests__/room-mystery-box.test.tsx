@@ -33,9 +33,19 @@ import {
 import en from "../../messages/en.json";
 
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
+const auth = vi.hoisted(() => ({
+  session: {
+    data: { user: { id: "host", name: "학생", role: "STUDENT" } },
+    status: "authenticated",
+  },
+}));
 
 vi.mock("@/app/(student)/student-question-play/games/useAIPlay", () => ({
   useAIPlay: () => ({ ask: aiMocks.ask, loading: false }),
+}));
+
+vi.mock("next-auth/react", () => ({
+  useSession: () => auth.session,
 }));
 
 const game = BUILT_IN_GAMES.find(({ id }) => id === "mystery-box")!;
@@ -60,6 +70,10 @@ function renderEnglish(ui: ReactElement) {
 
 beforeEach(() => {
   aiMocks.ask.mockReset();
+  auth.session = {
+    data: { user: { id: "host", name: "학생", role: "STUDENT" } },
+    status: "authenticated",
+  };
   vi.spyOn(Math, "random").mockReturnValue(0);
 });
 
@@ -677,6 +691,79 @@ describe("미스터리 박스 친구 방 결과", () => {
     expect(screen.getByText("사과")).toBeVisible();
   });
 
+  it("교사 방장의 완료 결과는 질문만 점수 근거로 받고 추측을 상세 기록에 보존한다", async () => {
+    auth.session = {
+      data: { user: { id: "host", name: "방장", role: "TEACHER" } },
+      status: "authenticated",
+    };
+    const history = [
+      question("other", "학생", "둥근 모양인가요?"),
+      {
+        kind: "guess" as const,
+        playerId: "host",
+        playerName: "방장",
+        locale: "ko" as const,
+        guess: "사과",
+        correct: true,
+      },
+    ];
+    const completed: MysteryRoomState = {
+      ...storedPlayState([history[0]]),
+      phase: "done",
+      endReason: "completed",
+      round: 2,
+      currentTurnIdx: 0,
+      history,
+      scores: { host: 0, other: 1 },
+      winnerId: "host",
+      answer: { ko: "사과", en: "apple" },
+    };
+    expect(readMysteryState(completed)).not.toBeNull();
+    const playId = "30000000-0000-4000-8000-000000000001";
+    const room = makeRoom(publicState(completed), {
+      status: "ended",
+      playId,
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+    });
+    const award = {
+      awards: [{
+        studentId: "other",
+        bonusType: "VALID_QUESTIONS",
+        points: 3,
+        reason: "좋은 질문",
+      }],
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      JSON.stringify(award),
+      { status: 200, headers: { "content-type": "application/json" } },
+    )));
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(
+      success({ ...room, awardResult: award }),
+    );
+
+    render(<RoomMysteryBox {...makeProps(room, onAction)} />);
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    expect(JSON.parse(String(
+      (fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[1]?.body,
+    ))).toEqual({
+      gameId: "mystery-box",
+      roomCode: "1234",
+      roomCreatedAt: 10,
+      playId,
+    });
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith(
+      "publish-award-result",
+      { playId },
+      { expectedRoom: { code: "1234", createdAt: 10, playId } },
+    ));
+    expect(screen.getByText("둥근 모양인가요?")).toBeVisible();
+    expect(screen.getAllByText("사과")).toHaveLength(2);
+    expect(screen.getByText("공개 정답")).toBeVisible();
+    expect(screen.getByText("1개 질문")).toBeVisible();
+  });
+
   it("방장만 결과에서 일반 다시 시작 명령을 한 번 보낸다", async () => {
     stubCommandId();
     const room = makeRoom(publicState(completedWithWinner()), { status: "ended" });
@@ -749,7 +836,7 @@ describe("미스터리 박스 친구 방 결과", () => {
       Array.from(roomSource.matchAll(/\"(mystery-[a-z-]+|restart)\"/g), (match) => match[1]),
     )).toEqual(new Set(["mystery-start", "mystery-ask", "mystery-guess", "restart"]));
     expect(roomSource).not.toContain("update-state");
-    expect(roomSource).not.toContain("RoomResult");
+    expect(roomSource).toContain("RoomResult");
     expect(pageSource).toContain("QuestionGameRoomFlow");
     expect(flowSource).toContain("RoomMysteryBox");
     expect(flowSource).toMatch(/\"mystery-box\"\s*:\s*RoomMysteryBox/);

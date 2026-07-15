@@ -255,8 +255,21 @@ function changedRoomWithCommand(
   if (!nextState) {
     return unchanged("corrupt", room, "놀이 판정 결과 상태가 손상되었습니다");
   }
+  const previousState = parseEngineState(room.gameState);
+  const completedNow =
+    candidate.status === "ended" &&
+    nextState.phase === "done" &&
+    nextState.endReason === "completed" &&
+    !(
+      room.status === "ended" &&
+      previousState?.phase === "done" &&
+      previousState.endReason === "completed"
+    );
   const nextRoom: GameRoom = {
     ...structuredClone(candidate),
+    ...(completedNow
+      ? { pointParticipants: structuredClone(candidate.players) }
+      : {}),
     code: room.code,
     version: room.version,
     createdAt: room.createdAt,
@@ -695,6 +708,7 @@ export function restartQuestionGameRoom(room: GameRoom): QuestionGameRoomResult 
     room.playId === undefined &&
     room.pointAwardKeyVersion === undefined &&
     room.pointEvidenceVersion === undefined &&
+    room.pointParticipants === undefined &&
     room.awardResult === undefined;
   if (alreadyRestarted) {
     return unchanged("replayed", room);
@@ -704,6 +718,7 @@ export function restartQuestionGameRoom(room: GameRoom): QuestionGameRoomResult 
     playId: _playId,
     pointAwardKeyVersion: _pointAwardKeyVersion,
     pointEvidenceVersion: _pointEvidenceVersion,
+    pointParticipants: _pointParticipants,
     awardResult: _awardResult,
     ...roomWithoutExecution
   } = structuredClone(room);

@@ -415,6 +415,44 @@ describe("질문놀이 버전 2 점수 근거", () => {
     }]);
   });
 
+  it("완료 뒤 떠난 학생도 완료 순간 참가자 기록으로 점수 근거를 만든다", () => {
+    const completed = makeQuestionRoundRoom("dice");
+    const room: GameRoom = {
+      ...completed,
+      pointParticipants: structuredClone(completed.players),
+      players: [completed.players[0]],
+    };
+
+    const evidence = buildQuestionGameScoreEvidence(
+      room,
+      new Set(["s1"]),
+    );
+
+    expect(evidence).toEqual([
+      expect.objectContaining({
+        studentId: "s1",
+        studentName: "학생 하나",
+        validQuestions: 3,
+        activityScore: 3,
+      }),
+    ]);
+  });
+
+  it("현재 방장 식별값이 완료 순간 참가자 기록 밖이면 거절한다", () => {
+    const completed = makeQuestionRoundRoom("dice");
+    const room: GameRoom = {
+      ...completed,
+      hostId: "outside",
+      pointParticipants: structuredClone(completed.players),
+      players: [completed.players[0]],
+    };
+
+    expect(() => buildQuestionGameScoreEvidence(
+      room,
+      new Set(["s1"]),
+    )).toThrow(/방장 참가자/);
+  });
+
   it("경쟁 최고점은 담당 학생만이 아니라 교사를 포함한 방 전체에서 정한다", () => {
     const [student] = buildQuestionGameScoreEvidence(
       makeMemoryRoom({ host: 2, s1: 1 }),

@@ -179,6 +179,22 @@ describe("verified game award publication route", () => {
     expect(body.room.gameState).not.toHaveProperty("awardResult");
   });
 
+  it("publishes a departed student's verified result from the completion snapshot", async () => {
+    const completed = makeRoom();
+    mocks.loadGameRoom.mockResolvedValue(makeRoom({
+      pointParticipants: structuredClone(completed.players),
+      players: [completed.players[0]],
+    }));
+
+    const response = await patch(requestBody());
+
+    expect(response.status).toBe(200);
+    expect(mocks.loadVerifiedGameAwardResult).toHaveBeenCalledWith(
+      expect.any(Object),
+      new Set(["student-1"]),
+    );
+  });
+
   it.each([
     ["result", AWARD],
     ["awardResult", AWARD],

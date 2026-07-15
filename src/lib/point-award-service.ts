@@ -12,7 +12,11 @@ import {
   buildQuestionGameScoreEvidence,
   QuestionGameScoreEvidenceError,
 } from "@/lib/question-game-score-evidence";
-import { parseGameRoom, type GameRoom } from "@/lib/question-games-data";
+import {
+  parseGameRoom,
+  pointStudentParticipantsForRoom,
+  type GameRoom,
+} from "@/lib/question-games-data";
 import {
   isStudentInTeacherScope,
   loadTeacherStudentScope,
@@ -467,9 +471,7 @@ async function loadScopedStudentIds(
   teacherScope: TeacherStudentScope,
 ): Promise<Set<string>> {
   const participantIds = Array.from(new Set(
-    room.players
-      .filter((player) => player.id !== room.hostId)
-      .map((player) => player.id),
+    pointStudentParticipantsForRoom(room).map((player) => player.id),
   ));
   if (participantIds.length === 0) {
     throw new PointAwardError("점수를 지급할 학생 참가자가 없습니다", 409);
@@ -520,9 +522,7 @@ function buildStoredAwardRequest(
 
 function participantIdsForRoom(room: GameRoom) {
   return Array.from(new Set(
-    room.players
-      .filter((player) => player.id !== room.hostId)
-      .map((player) => player.id),
+    pointStudentParticipantsForRoom(room).map((player) => player.id),
   ));
 }
 

@@ -27,6 +27,17 @@ import {
 } from "@/lib/question-game-room-engines/ladder";
 import { assignLadderTopics } from "@/lib/question-ladder";
 
+const auth = vi.hoisted(() => ({
+  session: {
+    data: { user: { id: "host", name: "학생", role: "STUDENT" } },
+    status: "authenticated",
+  },
+}));
+
+vi.mock("next-auth/react", () => ({
+  useSession: () => auth.session,
+}));
+
 const game = BUILT_IN_GAMES.find(({ id }) => id === "ladder")!;
 const LONG_NAME = "이름이 매우 길어도 끝까지 보여야 하는 질문 탐구 학생 서연";
 const LONG_TOPIC = "별빛이 지구에 도착하는 과정과 밤하늘의 모습이 계절마다 달라지는 까닭을 여러 관점에서 살펴보는 주제"
@@ -68,6 +79,15 @@ const OPEN_CONCEPTUAL = {
   inappropriate: false,
   inappropriateReason: "",
 };
+const AWARD = {
+  awards: [{
+    studentId: "guest",
+    bonusType: "COMPLETION",
+    points: 5,
+    reason: "게임 완료",
+  }],
+  summary: "질문 사다리를 끝까지 완성했어요.",
+};
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -94,6 +114,8 @@ function makeRoom(
     createdAt: 10,
     updatedAt: 10,
     playId: PLAY_ID,
+    pointAwardKeyVersion: 2,
+    pointEvidenceVersion: 2,
     ...overrides,
   };
 }
@@ -214,6 +236,10 @@ async function openHelpFailureAndConfirm(question: string) {
 }
 
 beforeEach(() => {
+  auth.session = {
+    data: { user: { id: "host", name: "학생", role: "STUDENT" } },
+    status: "authenticated",
+  };
   vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({}, 500)));
 });
 
@@ -654,6 +680,38 @@ describe("친구 방 질문 사다리 핵심 흐름", () => {
     expect(screen.getAllByText(/왜 중요할까요\?/)).toHaveLength(6);
     expect(screen.queryByRole("button", { name: /다음 라운드|마치기|종료|상태/ })).not.toBeInTheDocument();
     expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("교사 방장의 완료 결과는 저장 질문 수와 원문으로 포인트를 받고 공유한다", async () => {
+    auth.session = {
+      data: { user: { id: "host", name: LONG_NAME, role: "TEACHER" } },
+      status: "authenticated",
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(AWARD)));
+    const room = makeRoom(makeDoneState());
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(
+      success({ ...room, awardResult: AWARD }),
+    );
+
+    render(<RoomLadder {...makeProps(room, onAction)} />);
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    expect(JSON.parse(String(
+      (fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[1]?.body,
+    ))).toEqual({
+      gameId: "ladder",
+      roomCode: "1234",
+      roomCreatedAt: 10,
+      playId: PLAY_ID,
+    });
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith(
+      "publish-award-result",
+      { playId: PLAY_ID },
+      { expectedRoom: { code: "1234", createdAt: 10, playId: PLAY_ID } },
+    ));
+    expect(screen.getAllByText("3개")).toHaveLength(2);
+    expect(screen.getAllByText(/왜 중요할까요\?/)).toHaveLength(6);
+    expect(screen.getByText("질문 사다리 완성")).toBeVisible();
   });
 
   it("참가자 부족 종료는 전용 안내와 나가기만 제공한다", () => {

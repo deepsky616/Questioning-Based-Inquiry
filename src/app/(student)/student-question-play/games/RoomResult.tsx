@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { RefreshCw, Share2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useLocale } from "next-intl";
@@ -9,6 +16,7 @@ import { RoomHeader, playerColorById } from "./roomShared";
 import { GameResultReview } from "./GameResultReview";
 import { AI_BONUS_TYPES, BonusKey, BASE_POINTS } from "@/lib/points-policy";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
+import { getQuestionGameRule } from "@/lib/question-game-rules";
 import {
   isGameAwardResult,
   type GameAward,
@@ -73,19 +81,24 @@ interface Props {
   scoreUnit: string;
   scores: ScoreEntry[];
   questions: QInfo[];
+  details?: ReactNode;
   actionLoading: boolean;
   onAction: RoomActionHandler;
   onLeave: () => void;
+  onRestart?: () => void;
+  restartLabel?: string;
+  waitingLabel?: string;
 }
 
 export default function RoomResult({
-  game, room, myId, scoreLabel, scoreUnit, scores, questions,
-  actionLoading, onAction, onLeave,
+  game, room, myId, scoreLabel, scoreUnit, scores, questions, details,
+  actionLoading, onAction, onLeave, onRestart, restartLabel, waitingLabel,
 }: Props) {
   const locale = useLocale();
   const { data: session, status: sessionStatus } = useSession();
   const text = getQuestionGameText(locale);
   const isHost = room.hostId === myId;
+  const competitiveWinner = getQuestionGameRule(game.id).score.competitiveWinner;
   const canManageAward =
     sessionStatus === "authenticated" &&
     session?.user.id === myId &&
@@ -125,7 +138,9 @@ export default function RoomResult({
   const sorted = [...scores].sort((a, b) => b.score - a.score);
   const topScore = sorted[0]?.score ?? 0;
   const winnersSet = new Set(
-    topScore > 0 ? sorted.filter((s) => s.score === topScore).map((s) => s.playerId) : []
+    competitiveWinner && topScore > 0
+      ? sorted.filter((s) => s.score === topScore).map((s) => s.playerId)
+      : [],
   );
 
   // 방에 저장된 지급 결과 (다른 참가자도 보이게)
@@ -145,6 +160,7 @@ export default function RoomResult({
   const publishing = publishingLifetime === lifetimeKey;
   const resultBusy = actionLoading || awarding || publishing;
   const award = sharedAward ?? localAward?.result ?? null;
+  const showPointAnalysis = canManageAward || award !== null;
 
   const publishAward = useCallback(async (
     awardRoom: AwardRoomIdentity,
@@ -285,7 +301,7 @@ export default function RoomResult({
   const bestQ = award?.bestQuestion;
 
   return (
-    <div className="max-w-lg mx-auto space-y-5">
+    <div className={`${details ? "max-w-4xl" : "max-w-lg"} mx-auto space-y-5`}>
       <RoomHeader
         game={game}
         room={room}
@@ -296,7 +312,7 @@ export default function RoomResult({
 
       {/* 우승자 */}
       <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 flex flex-col items-center gap-3">
-        <div className="text-6xl">🏆</div>
+        <div className="text-6xl">{competitiveWinner ? "🏆" : "✅"}</div>
         {winnersSet.size > 0 ? (
           <>
             <h2 className="text-2xl font-black text-foreground">
@@ -327,7 +343,9 @@ export default function RoomResult({
             <div key={s.playerId}
               className="flex items-center gap-3 rounded-xl p-3"
               style={{ background: isWinner ? `${game.accentColor}12` : "hsl(var(--muted))" }}>
-              <span className="text-lg w-6 text-center">{MEDALS[i] ?? `${i + 1}`}</span>
+              <span className="text-lg w-6 text-center">
+                {competitiveWinner ? (MEDALS[i] ?? `${i + 1}`) : i + 1}
+              </span>
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-black text-sm"
                 style={{ background: playerColorById(room, s.playerId) }}>
                 {s.name.charAt(0)}
@@ -335,7 +353,7 @@ export default function RoomResult({
               <span className="font-bold text-foreground flex-1">
                 {s.name}{s.playerId === myId && <span className="text-xs text-muted-foreground ml-1">({text.me})</span>}
               </span>
-              <span className="font-black" style={{ color: game.accentColor }}>
+              <span className="font-black text-foreground">
                 {s.score}{scoreUnit}
               </span>
             </div>
@@ -344,6 +362,7 @@ export default function RoomResult({
       </div>
 
       {/* 포인트 분석 */}
+      {showPointAnalysis && (
       <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-3">
         <h3 className="font-black text-foreground flex items-center gap-2">
           {text.pointAnalysis}
@@ -426,7 +445,7 @@ export default function RoomResult({
                       <span className="font-bold text-foreground flex-1 text-sm">
                         {s.name}{s.playerId === myId && <span className="text-xs text-muted-foreground ml-1">({text.me})</span>}
                       </span>
-                      <span className="font-black text-base" style={{ color: game.accentColor }}>
+                      <span className="font-black text-base text-foreground">
                         +{pts}{locale === "en" ? " pts" : "점"}
                       </span>
                     </div>
@@ -436,8 +455,8 @@ export default function RoomResult({
                           const def = AI_BONUS_TYPES[b.bonusType as BonusKey];
                           return (
                             <span key={i}
-                              className="text-xs font-medium px-2 py-0.5 rounded-full"
-                              style={{ background: `${game.accentColor}15`, color: game.accentColor }}>
+                              className="text-xs font-medium text-foreground px-2 py-0.5 rounded-full"
+                              style={{ background: `${game.accentColor}15` }}>
                               {def.emoji} {def.label} +{def.points}
                             </span>
                           );
@@ -463,18 +482,24 @@ export default function RoomResult({
             <p className="text-xs text-muted-foreground text-center pt-1">
               {text.pointBase}: {text.participation} {BASE_POINTS.PARTICIPATION},
               {text.perValidQuestion} {BASE_POINTS.PER_VALID_QUESTION},
-              {text.completion} {BASE_POINTS.COMPLETION}, {text.winnerBonus} {BASE_POINTS.WINNER_BONUS}
+              {text.completion} {BASE_POINTS.COMPLETION}
+              {competitiveWinner
+                ? `, ${text.winnerBonus} ${BASE_POINTS.WINNER_BONUS}`
+                : null}
             </p>
           </>
         )}
       </div>
+      )}
 
       {/* 우리가 만든 질문 정리 */}
-      <GameResultReview
-        title={text.madeQuestions}
-        accentColor={game.accentColor}
-        entries={questions.map((q) => ({ q: `${q.playerName} · ${q.question}` }))}
-      />
+      {details ?? (
+        <GameResultReview
+          title={text.madeQuestions}
+          accentColor={game.accentColor}
+          entries={questions.map((q) => ({ q: `${q.playerName} · ${q.question}` }))}
+        />
+      )}
 
       {/* 대기실 복귀 */}
       {isHost ? (
@@ -482,12 +507,19 @@ export default function RoomResult({
           style={{ background: game.gradientCss }}
           disabled={resultBusy}
           onClick={() => {
-            if (!resultBusy) void onAction("restart");
+            if (resultBusy) return;
+            if (onRestart) {
+              onRestart();
+            } else {
+              void onAction("restart");
+            }
           }}>
-          {text.returnLobby}
+          {restartLabel ?? text.returnLobby}
         </Button>
       ) : (
-        <p className="text-center text-muted-foreground text-sm">{text.waitingHost}</p>
+        <p className="text-center text-muted-foreground text-sm">
+          {waitingLabel ?? text.waitingHost}
+        </p>
       )}
     </div>
   );

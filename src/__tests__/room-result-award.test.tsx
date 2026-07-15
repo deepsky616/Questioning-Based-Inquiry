@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   act,
   cleanup,
@@ -56,6 +58,7 @@ const NEW_AWARD: GameAwardResult = {
   summary: "새 실행 결과입니다.",
 };
 const game = BUILT_IN_GAMES.find((item) => item.id === "dice")!;
+const competitiveGame = BUILT_IN_GAMES.find((item) => item.id === "memory")!;
 
 function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
   return {
@@ -198,6 +201,102 @@ describe("verified room result awards", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(onAction).not.toHaveBeenCalled();
+    expect(screen.queryByText(/포인트 분석/)).not.toBeInTheDocument();
+  });
+
+  it("does not present a winner or winner bonus for a cooperative game", () => {
+    renderResult(makeRoom({ awardResult: AWARD }));
+
+    expect(screen.getByText("모두 수고했어요!")).toBeVisible();
+    expect(screen.queryByText("우승!")).not.toBeInTheDocument();
+    expect(screen.queryByText("공동 우승!")).not.toBeInTheDocument();
+    expect(screen.getByText(/기본 점수/)).not.toHaveTextContent("우승");
+  });
+
+  it("keeps the winner presentation for a competitive game", () => {
+    render(
+      <RoomResult
+        game={competitiveGame}
+        room={makeRoom({ gameId: "memory", awardResult: AWARD })}
+        myId="teacher"
+        scoreLabel="짝"
+        scoreUnit="개"
+        scores={[
+          { playerId: "teacher", name: "교사", score: 0 },
+          { playerId: "student", name: "학생", score: 2 },
+        ]}
+        questions={[]}
+        actionLoading={false}
+        onAction={onAction}
+        onLeave={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("우승!")).toBeVisible();
+    expect(screen.getByText(/기본 점수/)).toHaveTextContent("우승");
+  });
+
+  it("renders custom result details in place of the generic question review", () => {
+    render(
+      <RoomResult
+        game={game}
+        room={makeRoom({ awardResult: AWARD })}
+        myId="teacher"
+        scoreLabel="질문"
+        scoreUnit="개"
+        scores={[]}
+        questions={[{
+          playerId: "student",
+          playerName: "학생",
+          question: "기본 질문 기록인가요?",
+        }]}
+        details={<section>놀이 전용 상세 결과</section>}
+        actionLoading={false}
+        onAction={onAction}
+        onLeave={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("놀이 전용 상세 결과")).toBeVisible();
+    expect(screen.queryByText("기본 질문 기록인가요?")).not.toBeInTheDocument();
+  });
+
+  it("uses readable foreground text for scores, point totals, and bonus names", () => {
+    const contrastAward: GameAwardResult = {
+      awards: [
+        ...AWARD.awards,
+        {
+          studentId: "student",
+          bonusType: "CREATIVITY",
+          points: 5,
+          reason: "새로운 관점",
+        },
+      ],
+    };
+    renderResult(makeRoom({ awardResult: contrastAward }));
+
+    expect(screen.getByText("2개")).toHaveClass("text-foreground");
+    expect(screen.getByText("+6점")).toHaveClass("text-foreground");
+    expect(screen.getByText(/창의성상/)).toHaveClass("text-foreground");
+  });
+
+  it("connects every friend-room game result to the shared result flow", () => {
+    for (const fileName of [
+      "RoomMemory.tsx",
+      "RoomStoryDice.tsx",
+      "RoomDice.tsx",
+      "RoomLadder.tsx",
+      "RoomRelay.tsx",
+      "RoomMysteryBox.tsx",
+      "RoomKaba.tsx",
+    ]) {
+      const source = readFileSync(join(
+        process.cwd(),
+        "src/app/(student)/student-question-play/games",
+        fileName,
+      ), "utf8");
+      expect(source, fileName).toContain("RoomResult");
+    }
   });
 
   it.each(["host", "insufficient-players"])(

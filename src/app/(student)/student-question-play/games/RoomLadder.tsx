@@ -32,6 +32,7 @@ import type {
 import LadderBoard from "./LadderBoard";
 import LadderQuestionComposer from "./LadderQuestionComposer";
 import { RoomHeader } from "./roomShared";
+import RoomResult from "./RoomResult";
 
 interface Props {
   game: BuiltInGame;
@@ -467,11 +468,47 @@ export default function RoomLadder({
   }
 
   if (state.phase === "done") {
+    if (state.endReason === "completed") {
+      const resultPlayers = new Map(
+        (room.pointParticipants ?? room.players).map(
+          ({ id, name }) => [id, name],
+        ),
+      );
+      for (const question of state.questions) {
+        if (!resultPlayers.has(question.playerId)) {
+          resultPlayers.set(question.playerId, question.playerName);
+        }
+      }
+      return (
+        <RoomResult
+          game={game}
+          room={room}
+          myId={myId}
+          scoreLabel={locale === "en" ? "questions" : "질문"}
+          scoreUnit={locale === "en" ? "" : "개"}
+          scores={[...resultPlayers].map(([playerId, name]) => ({
+            playerId,
+            name,
+            score: state.questions.filter(
+              (question) => question.playerId === playerId,
+            ).length,
+          }))}
+          questions={state.questions.map((question) => ({
+            playerId: question.playerId,
+            playerName: question.playerName,
+            question: question.question,
+          }))}
+          details={<LadderResultDetails state={state} locale={locale} />}
+          actionLoading={requestPending}
+          onAction={onAction}
+          onLeave={onLeave}
+        />
+      );
+    }
     return (
-      <LadderResult
+      <LadderInsufficientResult
         game={game}
         room={room}
-        state={state}
         locale={locale}
         onLeave={onLeave}
         disabled={requestPending}
@@ -641,51 +678,56 @@ export default function RoomLadder({
   );
 }
 
-function LadderResult({
+function LadderInsufficientResult({
   game,
   room,
-  state,
   locale,
   onLeave,
   disabled,
 }: {
   game: BuiltInGame;
   room: GameRoom;
-  state: LadderRoomState;
   locale: "ko" | "en";
   onLeave: () => void;
   disabled: boolean;
 }) {
-  const text = getQuestionGameText(locale);
-  if (state.endReason === "insufficient-players") {
-    return (
-      <div className="mx-auto max-w-3xl space-y-5">
-        <RoomHeader
-          game={game}
-          room={room}
-          subtitle={locale === "en" ? "Ladder ended" : "질문 사다리 종료"}
-          onLeave={onLeave}
-          disabled={disabled}
+  return (
+    <div className="mx-auto max-w-3xl space-y-5">
+      <RoomHeader
+        game={game}
+        room={room}
+        subtitle={locale === "en" ? "Ladder ended" : "질문 사다리 종료"}
+        onLeave={onLeave}
+        disabled={disabled}
+      />
+      <section className="border-y border-border bg-card px-4 py-7 text-center text-card-foreground sm:px-6">
+        <AlertTriangle
+          aria-hidden="true"
+          className="mx-auto h-12 w-12 text-amber-700 dark:text-amber-300"
         />
-        <section className="border-y border-border bg-card px-4 py-7 text-center text-card-foreground sm:px-6">
-          <AlertTriangle
-            aria-hidden="true"
-            className="mx-auto h-12 w-12 text-amber-700 dark:text-amber-300"
-          />
-          <h1 className="mt-3 text-xl font-black text-foreground">
-            {locale === "en"
-              ? "The ladder ended because there were not enough players."
-              : "참가자가 부족해 질문 사다리를 마쳤어요."}
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {locale === "en"
-              ? "Leave the room when you are ready."
-              : "확인한 뒤 방을 나가 주세요."}
-          </p>
-        </section>
-      </div>
-    );
-  }
+        <h1 className="mt-3 text-xl font-black text-foreground">
+          {locale === "en"
+            ? "The ladder ended because there were not enough players."
+            : "참가자가 부족해 질문 사다리를 마쳤어요."}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {locale === "en"
+            ? "Leave the room when you are ready."
+            : "확인한 뒤 방을 나가 주세요."}
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function LadderResultDetails({
+  state,
+  locale,
+}: {
+  state: LadderRoomState;
+  locale: "ko" | "en";
+}) {
+  const text = getQuestionGameText(locale);
 
   const orderedQuestions = [...state.questions].sort(
     (left, right) => left.round - right.round,
@@ -703,15 +745,7 @@ function LadderResult({
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
-      <RoomHeader
-        game={game}
-        room={room}
-        subtitle={locale === "en" ? "Question ladder result" : "질문 사다리 결과"}
-        onLeave={onLeave}
-        disabled={disabled}
-      />
-      <section className="border-y border-border bg-card px-4 py-7 text-card-foreground sm:px-6">
+    <section className="border-y border-border bg-card px-4 py-7 text-card-foreground sm:px-6">
         <CheckCircle2
           aria-hidden="true"
           className="mx-auto h-12 w-12 text-emerald-700 dark:text-emerald-300"
@@ -784,7 +818,6 @@ function LadderResult({
               })}
           </div>
         </section>
-      </section>
-    </div>
+    </section>
   );
 }
