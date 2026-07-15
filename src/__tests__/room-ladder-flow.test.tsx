@@ -223,6 +223,31 @@ afterEach(() => {
 });
 
 describe("친구 방 질문 사다리 핵심 흐름", () => {
+  it("공용 요청 중에는 준비, 진행 및 결과 화면에서 나가기를 잠근다", () => {
+    const insufficient: LadderRoomState = {
+      ...createLadderState(),
+      phase: "done",
+      endReason: "insufficient-players",
+    };
+    const rooms = [
+      makeRoom(createLadderState()),
+      makeRoom(makeComposeState()),
+      makeRoom(makeDoneState()),
+      makeRoom(insufficient, { players: [players[0]] }),
+    ];
+
+    for (const room of rooms) {
+      const view = render(
+        <RoomLadder
+          {...makeProps(room)}
+          actionLoading={true}
+        />,
+      );
+      expect(screen.getByRole("button", { name: /나가기/ })).toBeDisabled();
+      view.unmount();
+    }
+  });
+
   it("방장 준비는 다듬은 주제와 실행 식별값만 서버 명령으로 보낸다", async () => {
     vi.stubGlobal("crypto", { randomUUID: vi.fn(() => COMMAND_ID) });
     const room = makeRoom(createLadderState());

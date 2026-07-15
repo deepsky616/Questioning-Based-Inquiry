@@ -98,6 +98,7 @@ export default function RoomMysteryBox({
   const [guessInput, setGuessInput] = useState("");
   const [pendingKind, setPendingKind] = useState<RequestKind | null>(null);
   const isHost = room.hostId === myId;
+  const requestPending = actionLoading || pendingKind !== null;
 
   useLayoutEffect(() => {
     identityRef.current = identity;
@@ -211,6 +212,7 @@ export default function RoomMysteryBox({
           room={room}
           subtitle={locale === "en" ? "Checking shared game" : "공유 놀이 확인 중"}
           onLeave={onLeave}
+          disabled={requestPending}
         />
         <section className="border-y border-border bg-card px-4 py-6 text-center text-card-foreground">
           <p className="font-black">
@@ -229,7 +231,7 @@ export default function RoomMysteryBox({
   }
 
   if (state.phase === "setup") {
-    const startLocked = actionLoading || pendingKind !== null || !room.playId;
+    const startLocked = requestPending || !room.playId;
     return (
       <div className="mx-auto max-w-2xl space-y-5">
         <RoomHeader
@@ -237,6 +239,7 @@ export default function RoomMysteryBox({
           room={room}
           subtitle={locale === "en" ? "Ready to choose a secret object" : "비밀 물건 준비"}
           onLeave={onLeave}
+          disabled={requestPending}
         />
         <section className="space-y-5 border-y border-border bg-card px-4 py-7 text-center text-card-foreground sm:px-6">
           <PackageOpen className="mx-auto h-14 w-14 text-pink-600 dark:text-pink-300" aria-hidden="true" />
@@ -291,7 +294,7 @@ export default function RoomMysteryBox({
         room={room}
         myId={myId}
         state={state}
-        actionLoading={actionLoading || pendingKind !== null}
+        actionLoading={requestPending}
         pendingKind={pendingKind}
         onRestart={() => void sendRequest("restart", {}, "")}
         onLeave={onLeave}
@@ -303,7 +306,6 @@ export default function RoomMysteryBox({
   const currentPlayerId = state.turnOrder[state.currentTurnIdx];
   const currentPlayer = room.players.find(({ id }) => id === currentPlayerId);
   const isMyTurn = currentPlayerId === myId;
-  const requestPending = actionLoading || pendingKind !== null;
   const canSubmit = Boolean(
     isMyTurn &&
     room.playId &&
@@ -322,6 +324,7 @@ export default function RoomMysteryBox({
           ? `Activity ${state.round} of ${state.maxRounds}`
           : `${state.maxRounds}회 중 ${state.round}번째 활동`}
         onLeave={onLeave}
+        disabled={requestPending}
       />
 
       <section className="border-y border-border bg-card px-4 py-4 text-card-foreground sm:px-6">
@@ -582,6 +585,7 @@ function MysteryResult({
         room={room}
         subtitle={locale === "en" ? "Mystery box result" : "미스터리 상자 결과"}
         onLeave={onLeave}
+        disabled={actionLoading}
       />
       <section className="space-y-5 border-y border-border bg-card px-4 py-7 text-center text-card-foreground sm:px-6">
         <PackageOpen className="mx-auto h-14 w-14 text-pink-600 dark:text-pink-300" aria-hidden="true" />

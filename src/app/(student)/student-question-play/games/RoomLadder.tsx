@@ -179,6 +179,7 @@ export default function RoomLadder({
   game,
   room,
   myId,
+  actionLoading,
   onAction,
   onLeave,
 }: Props) {
@@ -199,6 +200,7 @@ export default function RoomLadder({
   const [pendingKind, setPendingKind] = useState<RequestKind | null>(null);
   const [acknowledgementVersion, setAcknowledgementVersion] = useState(0);
   const isHost = room.hostId === myId;
+  const requestPending = actionLoading || pendingKind !== null;
 
   useLayoutEffect(() => {
     lifetimeRef.current = lifetime;
@@ -348,6 +350,7 @@ export default function RoomLadder({
           room={room}
           subtitle={locale === "en" ? "Checking shared ladder" : "공유 사다리 확인 중"}
           onLeave={onLeave}
+          disabled={requestPending}
         />
         <section className="border-y border-border bg-card px-4 py-6 text-center text-card-foreground sm:px-6">
           <AlertTriangle
@@ -377,6 +380,7 @@ export default function RoomLadder({
           room={room}
           subtitle={locale === "en" ? "Preparing ladder topics" : "사다리 주제 준비"}
           onLeave={onLeave}
+          disabled={requestPending}
         />
         {isHost ? (
           <section className="space-y-5 border-y border-border bg-card px-4 py-6 text-card-foreground sm:px-6">
@@ -470,6 +474,7 @@ export default function RoomLadder({
         state={state}
         locale={locale}
         onLeave={onLeave}
+        disabled={requestPending}
       />
     );
   }
@@ -480,7 +485,12 @@ export default function RoomLadder({
   if (!myAssignment || !state.roundId || !room.playId) {
     return (
       <div className="mx-auto max-w-3xl space-y-5">
-        <RoomHeader game={game} room={room} onLeave={onLeave} />
+        <RoomHeader
+          game={game}
+          room={room}
+          onLeave={onLeave}
+          disabled={requestPending}
+        />
         <section className="border-y border-border bg-card px-4 py-6 text-center text-card-foreground">
           <p className="font-black text-foreground">
             {locale === "en"
@@ -532,6 +542,7 @@ export default function RoomLadder({
         room={room}
         subtitle={text.ladderRoundProgress(state.round, state.maxRounds)}
         onLeave={onLeave}
+        disabled={requestPending}
       />
 
       <section className="border-y border-border bg-card px-4 py-4 text-card-foreground sm:px-6">
@@ -636,12 +647,14 @@ function LadderResult({
   state,
   locale,
   onLeave,
+  disabled,
 }: {
   game: BuiltInGame;
   room: GameRoom;
   state: LadderRoomState;
   locale: "ko" | "en";
   onLeave: () => void;
+  disabled: boolean;
 }) {
   const text = getQuestionGameText(locale);
   if (state.endReason === "insufficient-players") {
@@ -652,6 +665,7 @@ function LadderResult({
           room={room}
           subtitle={locale === "en" ? "Ladder ended" : "질문 사다리 종료"}
           onLeave={onLeave}
+          disabled={disabled}
         />
         <section className="border-y border-border bg-card px-4 py-7 text-center text-card-foreground sm:px-6">
           <AlertTriangle
@@ -695,6 +709,7 @@ function LadderResult({
         room={room}
         subtitle={locale === "en" ? "Question ladder result" : "질문 사다리 결과"}
         onLeave={onLeave}
+        disabled={disabled}
       />
       <section className="border-y border-border bg-card px-4 py-7 text-card-foreground sm:px-6">
         <CheckCircle2

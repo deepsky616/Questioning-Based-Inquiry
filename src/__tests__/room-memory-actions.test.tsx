@@ -337,6 +337,34 @@ describe("메모리 준비와 주사위 서버 명령", () => {
 });
 
 describe("메모리 카드 서버 명령과 화면 상태", () => {
+  it("카드 요청 중에는 나가기를 잠그고 응답 뒤 다시 연다", async () => {
+    const room = makeRoom(makePlayState());
+    const pending = deferred<RoomActionResult>();
+    const onAction = vi.fn<RoomActionHandler>().mockReturnValue(pending.promise);
+    const onLeave = vi.fn();
+    stubCommandIds("00000000-0000-4000-8000-000000000200");
+
+    render(
+      <RoomMemory
+        {...makeProps(room, onAction)}
+        onLeave={onLeave}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "질문 카드 1" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+
+    const leave = screen.getByRole("button", { name: /나가기/ });
+    expect(leave).toBeDisabled();
+    fireEvent.click(leave);
+    expect(onLeave).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pending.resolve(success(room));
+      await pending.promise;
+    });
+    await waitFor(() => expect(leave).toBeEnabled());
+  });
+
   it("서버가 공개한 카드 상태에 맞춰 memory-flip만 보낸다", async () => {
     const room = makeRoom(makePlayState());
     const questionRoom = makeRoom(

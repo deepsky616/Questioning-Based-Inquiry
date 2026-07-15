@@ -700,6 +700,34 @@ describe("미스터리 박스 친구 방 결과", () => {
     expect(screen.getByText(/방장이 다시 시작할 때까지/)).toBeVisible();
   });
 
+  it("결과 다시 시작 요청 중에는 나가기를 잠그고 실패 뒤 다시 연다", async () => {
+    stubCommandId();
+    const pending = deferred<RoomActionResult>();
+    const room = makeRoom(publicState(completedWithWinner()), { status: "ended" });
+    const onAction = vi.fn<RoomActionHandler>().mockReturnValue(pending.promise);
+    const onLeave = vi.fn();
+    render(
+      <RoomMysteryBox
+        {...makeProps(room, onAction)}
+        onLeave={onLeave}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시작" }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+
+    const leave = screen.getByRole("button", { name: /나가기/ });
+    expect(leave).toBeDisabled();
+    fireEvent.click(leave);
+    expect(onLeave).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pending.resolve(failure(room));
+      await pending.promise;
+    });
+    await waitFor(() => expect(leave).toBeEnabled());
+  });
+
   it("화면과 놀이 지도는 공개 판독기와 허용된 명령 및 전용 방 화면만 쓴다", () => {
     const roomSource = readFileSync(
       join(process.cwd(), "src/app/(student)/student-question-play/games/RoomMysteryBox.tsx"),

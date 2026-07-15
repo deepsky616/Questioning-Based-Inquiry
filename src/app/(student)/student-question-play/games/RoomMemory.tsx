@@ -374,6 +374,7 @@ export default function RoomMemory({
           room={room}
           subtitle={text.preparing}
           onLeave={onLeave}
+          disabled={actionLoading}
         />
         <WaitingBanner text={text.preparing} />
       </div>
@@ -411,6 +412,7 @@ export default function RoomMemory({
           room={room}
           subtitle={text.memoryChooseDifficulty}
           onLeave={onLeave}
+          disabled={isPreparing || actionLoading}
         />
         <section className="space-y-4 border-y border-border bg-card px-1 py-5 text-card-foreground sm:px-5">
           <div className="flex items-center justify-between gap-3">
@@ -469,6 +471,7 @@ export default function RoomMemory({
           room={room}
           subtitle={locale === "en" ? "Rolling for turn order" : "주사위로 차례 정하는 중"}
           onLeave={onLeave}
+          disabled={rolling || actionLoading}
         />
         <section className="space-y-5 border-y border-border bg-card px-1 py-5 text-card-foreground sm:px-5">
           <div className="flex items-center justify-between gap-3">
@@ -540,6 +543,7 @@ export default function RoomMemory({
         room={room}
         subtitle={`${text.remainingCards(remainingCards)} · ${getMemoryDifficultyLabel(locale, state.difficulty)}`}
         onLeave={onLeave}
+        disabled={requestPending}
       />
 
       <section className="border-y border-border bg-card px-1 py-4 text-card-foreground sm:px-4">
