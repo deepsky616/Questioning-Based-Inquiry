@@ -11,6 +11,35 @@ function readGameSource(fileName: string) {
   return readFileSync(resolve(gameDirectory, fileName), "utf8");
 }
 
+function openingTagNear(source: string, tagName: string, marker: string) {
+  const markerIndex = source.indexOf(marker);
+  expect(markerIndex).toBeGreaterThanOrEqual(0);
+
+  const start = source.lastIndexOf(`<${tagName}`, markerIndex);
+  const end = source.indexOf(">", start);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  return source.slice(start, end + 1);
+}
+
+function staticClassListContaining(
+  source: string,
+  tagName: string,
+  requiredClass: string,
+) {
+  const openingTagPattern = new RegExp(
+    `<${tagName}\\b[^>]*className="([^"]*)"[^>]*>`,
+    "g",
+  );
+
+  for (const match of source.matchAll(openingTagPattern)) {
+    const classes = match[1].split(/\s+/);
+    if (classes.includes(requiredClass)) return classes;
+  }
+
+  return [];
+}
+
 describe("question game theme tokens", () => {
   it.each([
     "GameResultReview.tsx",
@@ -60,11 +89,47 @@ describe("question game theme tokens", () => {
     expect(shared).not.toMatch(/(?:text-gray-|bg-gray-|border-gray-)/);
   });
 
+  it("uses semantic colors on the room code copy command", () => {
+    const source = readGameSource("RoomLobby.tsx");
+    const copyButton = openingTagNear(source, "button", "onClick={copyCode}");
+
+    expect(copyButton).toMatch(/\bbg-secondary\b/);
+    expect(copyButton).toMatch(/\btext-foreground\b/);
+    expect(copyButton).toMatch(/\bborder-border\b/);
+    expect(copyButton).not.toContain("game.accentColor");
+  });
+
+  it("uses muted semantic text for story flow authors", () => {
+    const source = readGameSource("StoryDiceGame.tsx");
+    const author = openingTagNear(
+      source,
+      "p",
+      '{c.author} ({c.type === "story"',
+    );
+
+    expect(author).toMatch(/\btext-muted-foreground\b/);
+    expect(author).not.toContain("style=");
+    expect(author).not.toMatch(/#[0-9a-f]{3,8}/i);
+  });
+
   it("uses theme-aware ladder lines and labels", () => {
     const source = readGameSource("LadderBoard.tsx");
 
-    expect(source).toContain('className="fill-current text-foreground"');
-    expect(source).toContain('className="text-muted-foreground"');
+    const labelClasses = staticClassListContaining(
+      source,
+      "g",
+      "fill-current",
+    );
+    const lineClasses = staticClassListContaining(
+      source,
+      "g",
+      "text-muted-foreground",
+    );
+
+    expect(labelClasses).toEqual(
+      expect.arrayContaining(["fill-current", "text-foreground"]),
+    );
+    expect(lineClasses).toContain("text-muted-foreground");
     expect(source).not.toMatch(/text-slate-/);
   });
 

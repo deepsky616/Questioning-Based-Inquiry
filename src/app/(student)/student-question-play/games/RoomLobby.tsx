@@ -62,8 +62,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
         </div>
         <button
           onClick={copyCode}
-          className="text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          style={{ color: game.accentColor, background: `${game.accentColor}12` }}>
+          className="rounded-lg border border-border bg-secondary px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
           {copied ? (locale === "en" ? "✅ Copied!" : "✅ 복사됨!") : (locale === "en" ? "📋 Copy code" : "📋 코드 복사하기")}
         </button>
         <p className="text-muted-foreground text-xs">{locale === "en" ? "Share this code with your friends!" : "친구에게 이 코드를 알려주세요!"}</p>
