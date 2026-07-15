@@ -24,7 +24,7 @@ export function GameHeader({ game, subtitle, onBack }: GameHeaderProps) {
         <span className="text-4xl">{game.emoji}</span>
         <div>
           <h1 className="text-xl font-black">{game.title}</h1>
-          <p className="text-white/80 text-sm">{subtitle}</p>
+          <p className="text-white text-sm">{subtitle}</p>
         </div>
       </div>
     </div>

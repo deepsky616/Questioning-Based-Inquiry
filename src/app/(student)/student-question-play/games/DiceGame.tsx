@@ -202,7 +202,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
           <span className="text-4xl">{game.emoji}</span>
           <div>
             <h1 className="text-xl font-black">{game.title}</h1>
-            <p className="text-white/80 text-sm">{game.description}</p>
+            <p className="text-white text-sm">{game.description}</p>
           </div>
         </div>
       </div>
@@ -228,7 +228,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
       <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 flex flex-col items-center gap-6">
         <div className="w-36 h-36 rounded-2xl flex items-center justify-center shadow-xl"
           style={{
-            background: phase === "rolling" ? displayInfo.color : phase !== "idle" ? typeInfo.color : "#6366f1",
+            background: phase === "rolling" ? displayInfo.color : phase !== "idle" ? typeInfo.color : "#4338CA",
             transform: phase === "rolling" ? "rotate(15deg) scale(1.05)" : "rotate(0deg) scale(1)",
             transition: "background 0.1s, transform 0.1s",
           }}>
@@ -262,7 +262,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
         {phase === "idle" && (
           <Button onClick={roll}
             className="w-full py-4 text-lg font-black text-white rounded-xl"
-            style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}
+            style={{ background: "linear-gradient(135deg, #4338CA, #6D28D9)" }}
             disabled={aiLoading}>
             {text.diceRoll}
           </Button>

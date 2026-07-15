@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { BUILT_IN_GAMES } from "@/lib/question-games-data";
+import { STORY_DICE_COLOR } from "@/lib/story-dice-data";
 
 const gameDirectory = resolve(
   process.cwd(),
@@ -40,7 +42,234 @@ function staticClassListContaining(
   return [];
 }
 
+function hexRelativeLuminance(hex: string) {
+  const channels = hex
+    .replace("#", "")
+    .match(/.{2}/g)
+    ?.map((channel) => Number.parseInt(channel, 16) / 255);
+  if (!channels || channels.length !== 3) {
+    throw new Error(`Expected a six-digit hex color, received ${hex}`);
+  }
+
+  const [red, green, blue] = channels.map((channel) =>
+    channel <= 0.04045
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4,
+  );
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function whiteContrastRatio(hex: string) {
+  return 1.05 / (hexRelativeLuminance(hex) + 0.05);
+}
+
+function hexColors(value: string) {
+  return value.match(/#[0-9a-f]{6}/gi) ?? [];
+}
+
+function expectWhiteTextContrast(colors: readonly string[]) {
+  expect(colors.length).toBeGreaterThan(0);
+  for (const color of colors) {
+    expect(whiteContrastRatio(color), color).toBeGreaterThanOrEqual(4.5);
+  }
+}
+
+function declaredHexColors(source: string, declaration: string) {
+  const declarationPattern = new RegExp(
+    `(?:export\\s+)?const\\s+${declaration}\\s*=\\s*\\[([\\s\\S]*?)\\]`,
+  );
+  const match = source.match(declarationPattern);
+  expect(match, declaration).not.toBeNull();
+  return hexColors(match?.[1] ?? "");
+}
+
+function openingTagsNear(source: string, tagName: string, marker: string) {
+  const tags: string[] = [];
+  let markerIndex = source.indexOf(marker);
+
+  while (markerIndex >= 0) {
+    const start = source.lastIndexOf(`<${tagName}`, markerIndex);
+    const end = source.indexOf(">", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    tags.push(source.slice(start, end + 1));
+    markerIndex = source.indexOf(marker, markerIndex + marker.length);
+  }
+
+  expect(tags.length, marker).toBeGreaterThan(0);
+  return tags;
+}
+
 describe("question game theme tokens", () => {
+  it("keeps every built-in game palette readable under small white text", () => {
+    expect(BUILT_IN_GAMES).toHaveLength(7);
+    expect(new Set(BUILT_IN_GAMES.map((game) => game.accentColor)).size).toBe(7);
+    expect(new Set(BUILT_IN_GAMES.map((game) => game.gradientCss)).size).toBe(7);
+
+    for (const game of BUILT_IN_GAMES) {
+      expectWhiteTextContrast([
+        ...hexColors(game.gradientCss),
+        game.accentColor,
+      ]);
+    }
+  });
+
+  it("keeps every fixed game gradient readable under small white text", () => {
+    for (const fileName of [
+      "DiceGame.tsx",
+      "MysteryBoxGame.tsx",
+      "StoryDiceGame.tsx",
+    ]) {
+      expectWhiteTextContrast(hexColors(readGameSource(fileName)));
+    }
+
+    const page = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/app/(student)/student-question-play/[gameId]/page.tsx",
+      ),
+      "utf8",
+    );
+    expectWhiteTextContrast(hexColors(page));
+
+    const listPage = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/app/(student)/student-question-play/page.tsx",
+      ),
+      "utf8",
+    );
+    expectWhiteTextContrast(hexColors(listPage));
+  });
+
+  it("keeps player and story marker palettes readable under white text", () => {
+    const shared = readGameSource("roomShared.tsx");
+    const lobby = readGameSource("RoomLobby.tsx");
+    const relay = readGameSource("RelayGame.tsx");
+
+    expectWhiteTextContrast(declaredHexColors(shared, "PLAYER_COLORS"));
+    expectWhiteTextContrast(declaredHexColors(lobby, "PLAYER_COLORS"));
+    expectWhiteTextContrast(declaredHexColors(relay, "PLAYER_COLORS"));
+    const aiColor = relay.match(/const AI_COLOR = "(#[0-9a-f]{6})"/i)?.[1];
+    expect(aiColor).toBeDefined();
+    expectWhiteTextContrast(aiColor ? [aiColor] : []);
+    expectWhiteTextContrast(Object.values(STORY_DICE_COLOR));
+  });
+
+  it.each([
+    ["GameHeader.tsx", "{subtitle}"],
+    ["roomShared.tsx", "subtitle ??"],
+    ["RoomLobby.tsx", 'locale === "en" ? "Lobby with friends"'],
+    ["LadderGame.tsx", "{text.ladderSubtitle}"],
+    ["KabaGame.tsx", "{kabaText.subtitle}"],
+    ["MysteryBoxGame.tsx", "text.mysteryAiSubtitle"],
+    ["DiceGame.tsx", "{game.description}"],
+    ["RelayGame.tsx", "{text.relaySubtitle}"],
+    ["RelayGame.tsx", "{text.topic}: {finalTopic}"],
+  ])("uses opaque white text for the gradient description in %s", (fileName, marker) => {
+    const description = openingTagNear(readGameSource(fileName), "p", marker);
+
+    expect(description).toMatch(/\btext-white\b/);
+    expect(description).not.toMatch(/\btext-white\/(?:80|90)\b|\bopacity-80\b/);
+  });
+
+  it("uses opaque white text for gradient descriptions on game pages", () => {
+    const detailPage = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/app/(student)/student-question-play/[gameId]/page.tsx",
+      ),
+      "utf8",
+    );
+    const listPage = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/app/(student)/student-question-play/page.tsx",
+      ),
+      "utf8",
+    );
+
+    for (const [source, marker] of [
+      [detailPage, "{game.description}"],
+      [listPage, '{t("subtitle")}'],
+      [listPage, "{selectedGame.description}"],
+    ]) {
+      const description = openingTagNear(source, "p", marker);
+      expect(description).toMatch(/\btext-white\b/);
+      expect(description).not.toMatch(/\btext-white\/(?:80|90)\b/);
+    }
+
+    for (const marker of [
+      '{t("gameCount", { count: games.length })}',
+      "{selectedGame.playerCount}",
+      "{selectedGame.duration}",
+    ]) {
+      const badge = openingTagNear(listPage, "span", marker);
+      expect(badge).toMatch(/\bbg-black\/20\b/);
+      expect(badge).not.toMatch(/\bbg-white\/(?:20|25)\b/);
+    }
+  });
+
+  it("keeps accent colors on markers instead of small body text", () => {
+    const relay = readGameSource("RelayGame.tsx");
+    const story = readGameSource("StoryDiceGame.tsx");
+    const kaba = readGameSource("KabaGame.tsx");
+    const lobby = readGameSource("RoomLobby.tsx");
+    const review = readGameSource("GameResultReview.tsx");
+    const mystery = readGameSource("MysteryBoxGame.tsx");
+
+    expect(relay).toMatch(
+      /<p className="[^"]*text-foreground[^"]*">\s*\{item\.player\}/,
+    );
+    expect(relay).toMatch(
+      /<span className="[^"]*text-foreground[^"]*">\s*\{item\.player\}/,
+    );
+    expect(relay).not.toMatch(
+      /style=\{\{\s*color:\s*item\.isAI\s*\?\s*AI_COLOR/,
+    );
+    expect(relay).not.toContain("text-orange-500");
+    for (const tag of openingTagsNear(story, "p", "getStoryDiceCategoryLabel(locale, cat)")) {
+      expect(tag).toMatch(/\btext-foreground\b/);
+      expect(tag).not.toContain("style=");
+    }
+    for (const [source, tagName, marker] of [
+      [relay, "p", "{text.connectToQuestion}"],
+      [kaba, "span", "{kabaText.correctCount(correctCount)}"],
+      [lobby, "span", "{room.players.length}"],
+      [review, "span", "{i + 1}."],
+      [mystery, "div", "{remaining}"],
+    ]) {
+      const tag = openingTagNear(source, tagName, marker);
+      expect(tag).toMatch(/\btext-foreground\b/);
+      expect(tag).not.toMatch(/style=\{\{\s*color:/);
+    }
+  });
+
+  it("keeps both lobby waiting messages readable without fading the text", () => {
+    const source = readGameSource("RoomLobby.tsx");
+    const emptySeat = openingTagNear(source, "span", "Waiting for friends...");
+    const waitingGuest = openingTagNear(
+      source,
+      "div",
+      "Waiting for the host to start...",
+    );
+
+    expect(emptySeat).toMatch(/\btext-secondary-foreground\b/);
+    expect(emptySeat).not.toMatch(/\btext-muted-foreground\b|\banimate-pulse\b/);
+    expect(waitingGuest).toMatch(/\btext-secondary-foreground\b/);
+    expect(waitingGuest).not.toMatch(/\btext-muted-foreground\b/);
+  });
+
+  it("uses opaque white text for the shared room progress", () => {
+    const source = readGameSource("roomShared.tsx");
+    const progressGroup = openingTagNear(source, "div", "{room.players.length}");
+    const progressLabel = openingTagNear(source, "p", "{text.inProgress}");
+
+    expect(progressGroup).toMatch(/\btext-white\b/);
+    expect(progressGroup).not.toMatch(/\btext-white\/(?:80|90)\b/);
+    expect(progressLabel).not.toMatch(/\bopacity-80\b/);
+  });
+
   it.each([
     "GameResultReview.tsx",
     "RoomLobby.tsx",

@@ -64,9 +64,9 @@ export const STORY_DICE_EMOJI: Record<DiceCategory, string> = {
 };
 
 export const STORY_DICE_COLOR: Record<DiceCategory, string> = {
-  protagonist: "#EF4444",
-  place: "#10B981",
-  event: "#8B5CF6",
+  protagonist: "#B91C1C",
+  place: "#047857",
+  event: "#6D28D9",
 };
 
 /** 폴백 단어 풀에서 카테고리당 N개 랜덤 선택 (중복 없음) */

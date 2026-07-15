@@ -272,7 +272,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
           <span aria-hidden="true" className="text-4xl">{game.emoji}</span>
           <div className="min-w-0">
             <h1 className="break-words text-xl font-black">{game.title}</h1>
-            <p className="break-words text-sm text-white/80">{text.ladderSubtitle}</p>
+            <p className="break-words text-sm text-white">{text.ladderSubtitle}</p>
           </div>
         </div>
       </header>

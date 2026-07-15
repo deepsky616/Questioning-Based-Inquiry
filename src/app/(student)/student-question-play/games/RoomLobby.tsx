@@ -7,7 +7,7 @@ import { getQuestionGameText } from "@/lib/question-game-i18n";
 import { getQuestionGameRule } from "@/lib/question-game-rules";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 
-const PLAYER_COLORS = ["#F97316", "#3B82F6", "#10B981", "#8B5CF6", "#EF4444", "#EC4899", "#14B8A6", "#F59E0B"];
+const PLAYER_COLORS = ["#C2410C", "#1D4ED8", "#047857", "#6D28D9", "#B91C1C", "#BE185D", "#0F766E", "#A16207"];
 
 interface Props {
   game: BuiltInGame;
@@ -43,7 +43,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
           <span className="text-4xl">{game.emoji}</span>
           <div>
             <h1 className="text-xl font-black">{game.title}</h1>
-            <p className="text-white/80 text-sm">{locale === "en" ? "Lobby with friends" : "친구들과 함께하는 대기실"} 🎮</p>
+            <p className="text-white text-sm">{locale === "en" ? "Lobby with friends" : "친구들과 함께하는 대기실"} 🎮</p>
           </div>
         </div>
       </div>
@@ -72,7 +72,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
       <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-black text-foreground">
-            👥 {locale === "en" ? "Players" : "참가자"} <span style={{ color: game.accentColor }}>{room.players.length}</span>
+            👥 {locale === "en" ? "Players" : "참가자"} <span className="text-foreground">{room.players.length}</span>
           </h2>
           <span className="text-xs text-muted-foreground">
             {locale === "en" ? `Max ${max}` : `최대 ${max}명`}
@@ -103,7 +103,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
           {room.players.length < min && (
             <div className="flex items-center gap-3 rounded-xl bg-secondary p-3 border-2 border-dashed border-border">
               <div className="w-9 h-9 rounded-full bg-background flex items-center justify-center text-muted-foreground text-lg">+</div>
-              <span className="text-muted-foreground text-sm animate-pulse">{locale === "en" ? "Waiting for friends..." : "친구를 기다리는 중..."}</span>
+              <span className="text-secondary-foreground text-sm">{locale === "en" ? "Waiting for friends..." : "친구를 기다리는 중..."}</span>
             </div>
           )}
         </div>
@@ -129,7 +129,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
         </div>
       ) : (
         <div className="bg-secondary rounded-2xl border border-border p-5 text-center">
-          <div className="flex items-center justify-center gap-2 text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 text-secondary-foreground">
             <span className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-medium">{locale === "en" ? "Waiting for the host to start..." : "방장이 시작하기를 기다리는 중..."}</p>
           </div>

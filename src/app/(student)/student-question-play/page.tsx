@@ -34,7 +34,7 @@ export default function StudentQuestionPlayPage() {
       {/* 히어로 배너 */}
       <div
         className="relative overflow-hidden rounded-3xl mb-10 py-14 px-8 text-center text-white"
-        style={{ background: "linear-gradient(135deg, #7C3AED 0%, #EC4899 50%, #F59E0B 100%)" }}
+        style={{ background: "linear-gradient(135deg, #6D28D9 0%, #BE185D 50%, #A16207 100%)" }}
       >
         <span className="absolute top-4 left-6 text-5xl opacity-20 select-none">⭐</span>
         <span className="absolute top-8 right-10 text-4xl opacity-20 select-none">🌟</span>
@@ -47,9 +47,9 @@ export default function StudentQuestionPlayPage() {
           <h1 className="text-5xl font-black mb-3 tracking-tight" style={{ textShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
             {t("title")}
           </h1>
-          <p className="text-xl font-medium opacity-90">{t("subtitle")}</p>
+          <p className="text-xl font-medium text-white">{t("subtitle")}</p>
           <div className="mt-4 flex justify-center gap-3">
-            <span className="bg-white/20 backdrop-blur-sm rounded-full px-4 py-1 text-sm font-medium">
+            <span className="bg-black/20 backdrop-blur-sm rounded-full px-4 py-1 text-sm font-medium">
               {t("gameCount", { count: games.length })}
             </span>
           </div>
@@ -92,10 +92,10 @@ export default function StudentQuestionPlayPage() {
                     {selectedGame.title}
                   </DialogTitle>
                 </DialogHeader>
-                <p className="text-white/90 text-sm mt-1 text-center px-6">{selectedGame.description}</p>
+                <p className="text-white text-sm mt-1 text-center px-6">{selectedGame.description}</p>
                 <div className="flex gap-3 mt-3">
-                  <span className="bg-white/20 rounded-full px-3 py-0.5 text-xs font-medium">👥 {selectedGame.playerCount}</span>
-                  <span className="bg-white/20 rounded-full px-3 py-0.5 text-xs font-medium">⏱ {selectedGame.duration}</span>
+                  <span className="bg-black/20 rounded-full px-3 py-0.5 text-xs font-medium">👥 {selectedGame.playerCount}</span>
+                  <span className="bg-black/20 rounded-full px-3 py-0.5 text-xs font-medium">⏱ {selectedGame.duration}</span>
                 </div>
               </div>
 
@@ -172,7 +172,7 @@ function GameCard({ game, index, onSelect }: { game: AnyGame; index: number; onS
           {game.emoji}
         </span>
         {game.isBuiltIn && (
-          <span className="absolute top-3 right-3 bg-white/25 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-medium">
+          <span className="absolute top-3 right-3 bg-black/25 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-medium">
             {t("builtIn")}
           </span>
         )}

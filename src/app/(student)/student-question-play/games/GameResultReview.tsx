@@ -34,9 +34,13 @@ export function GameResultReview({
       </h3>
       <div className="space-y-2 max-h-72 overflow-y-auto">
         {entries.map((e, i) => (
-          <div key={i} className="rounded-xl bg-secondary p-3">
+          <div
+            key={i}
+            className="rounded-xl border-l-2 bg-secondary p-3"
+            style={{ borderLeftColor: accentColor }}
+          >
             <p className="text-sm font-bold text-foreground leading-snug">
-              <span style={{ color: accentColor }}>{i + 1}.</span> {qPrefix ? `${qPrefix} ` : ""}{e.q}
+              <span className="text-foreground">{i + 1}.</span> {qPrefix ? `${qPrefix} ` : ""}{e.q}
             </p>
             {e.a && (
               <p className="mt-1 pl-4 text-sm text-muted-foreground leading-snug">

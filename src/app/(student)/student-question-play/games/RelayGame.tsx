@@ -9,8 +9,8 @@ import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
-const PLAYER_COLORS = ["#F97316", "#3B82F6", "#10B981", "#8B5CF6", "#EF4444"];
-const AI_COLOR = "#6366f1";
+const PLAYER_COLORS = ["#C2410C", "#1D4ED8", "#047857", "#6D28D9", "#B91C1C"];
+const AI_COLOR = "#4338CA";
 
 interface ChainItem { question: string; player: string; isAI?: boolean }
 
@@ -155,7 +155,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             <span className="text-4xl">{game.emoji}</span>
             <div>
               <h1 className="text-xl font-black">{game.title}</h1>
-              <p className="text-white/80 text-sm">{text.relaySubtitle}</p>
+              <p className="text-white text-sm">{text.relaySubtitle}</p>
             </div>
           </div>
         </div>
@@ -233,7 +233,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 flex flex-col items-center gap-4">
           <div className="text-6xl">🏆</div>
           <h2 className="text-2xl font-black text-foreground">{text.relayDone}</h2>
-          <p className="text-muted-foreground text-sm">{text.topic}: <span className="font-bold text-orange-500">{finalTopic}</span></p>
+          <p className="text-muted-foreground text-sm">{text.topic}: <span className="font-bold text-foreground">{finalTopic}</span></p>
           <p className="text-muted-foreground text-sm">
             {text.relayTotal(studentQuestionCount)}
           </p>
@@ -248,7 +248,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
                 {i + 1}
               </div>
               <div className="flex-1">
-                <p className="text-xs font-bold mb-0.5" style={{ color: item.isAI ? AI_COLOR : playerColor(item.player) }}>
+                <p className="text-xs font-bold mb-0.5 text-foreground">
                   {item.player}
                 </p>
                 <p className="text-foreground text-sm leading-relaxed">{item.question}</p>
@@ -283,12 +283,12 @@ export default function RelayGame({ game, onBack, config }: Props) {
             <span className="text-3xl">{game.emoji}</span>
             <div>
               <p className="font-black">{game.title}</p>
-              <p className="text-white/80 text-xs">{text.topic}: {finalTopic}</p>
+              <p className="text-white text-xs">{text.topic}: {finalTopic}</p>
             </div>
           </div>
           <div className="text-white text-right">
             <p className="text-2xl font-black">{studentQuestionCount} / {targetQuestions}</p>
-            <p className="text-xs opacity-80">{text.connectedCount}</p>
+            <p className="text-xs">{text.connectedCount}</p>
           </div>
         </div>
       </div>
@@ -356,8 +356,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
                   borderColor: item.isAI ? AI_COLOR : game.accentColor,
                   background: item.isAI ? "hsl(var(--secondary))" : `${game.accentColor}10`,
                 } : {}}>
-                <span className="text-xs font-bold mr-1.5"
-                  style={{ color: item.isAI ? AI_COLOR : playerColor(item.player) }}>
+                <span className="text-xs font-bold mr-1.5 text-foreground">
                   {item.player}
                 </span>
                 {item.question}
@@ -389,8 +388,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             borderColor: lastItem?.isAI ? AI_COLOR : game.accentColor,
             background: lastItem?.isAI ? "hsl(var(--secondary))" : `${game.accentColor}08`,
           }}>
-          <p className="text-xs font-bold mb-1"
-            style={{ color: lastItem?.isAI ? AI_COLOR : game.accentColor }}>
+          <p className="text-xs font-bold mb-1 text-foreground">
             {text.connectToQuestion}
           </p>
           <p className="text-foreground text-sm font-medium">{prevForHint.question}</p>

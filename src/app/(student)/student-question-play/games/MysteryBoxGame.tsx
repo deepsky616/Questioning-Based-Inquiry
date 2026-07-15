@@ -383,7 +383,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
           <span className="text-4xl">{game.emoji}</span>
           <div>
             <h1 className="text-xl font-black">{game.title}</h1>
-            <p className="text-white/80 text-sm">
+            <p className="text-white text-sm">
               {isAI ? text.mysteryAiSubtitle
                 : hasTurns ? text.mysteryTurnSubtitle
                 : text.mysterySoloSubtitle}
@@ -426,7 +426,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             </div>
           )}
           <Button className="w-full py-5 text-xl font-black text-white rounded-2xl"
-            style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }}
+            style={{ background: "linear-gradient(135deg, #BE185D, #BE123C)" }}
             disabled={aiLoading} onClick={startGame}>
             {aiLoading ? text.aiPickingItem : text.start}
           </Button>
@@ -451,7 +451,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
               {isAI && <p className="mt-1 text-xs text-muted-foreground">{text.secretItem}</p>}
             </div>
             <div className="text-center">
-              <div className="text-4xl font-black" style={{ color: remaining <= 5 ? "#ef4444" : game.accentColor }}>
+              <div className="text-4xl font-black text-foreground">
                 {remaining}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -551,7 +551,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                 autoFocus />
               <div className="flex gap-2">
                 <Button className="flex-1 rounded-lg font-bold text-white"
-                  style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }}
+                  style={{ background: "linear-gradient(135deg, #BE185D, #BE123C)" }}
                   disabled={!guessInput.trim() || activityPending} onClick={makeGuess}>
                   {text.submitAnswer}
                 </Button>
@@ -567,7 +567,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
         <div className="flex flex-col items-center gap-5 rounded-lg border border-border bg-card p-10 text-card-foreground shadow-sm">
           <div className="text-8xl animate-bounce">{isAI ? aiItem?.emoji : localItem?.emoji}</div>
           <div className="text-white font-black text-2xl px-8 py-3 rounded-full"
-            style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>{text.correct} 🎉</div>
+            style={{ background: "linear-gradient(135deg, #047857, #065F46)" }}>{text.correct} 🎉</div>
           <h2 className="text-4xl font-black text-foreground">{itemName}</h2>
           <p className="text-center text-sm text-muted-foreground">
             {hasTurns && winner
@@ -579,7 +579,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
           </p>
           <ActivityReview entries={qaList} hasTurns={hasTurns} locale={locale} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
-            style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>
+            style={{ background: "linear-gradient(135deg, #BE185D, #BE123C)" }} onClick={startGame}>
             {text.retry}
           </Button>
         </div>
@@ -589,7 +589,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
       {phase === "lose" && (
         <div className="flex flex-col items-center gap-5 rounded-lg border border-border bg-card p-10 text-card-foreground shadow-sm">
           <div className="text-8xl">{isAI ? aiItem?.emoji : localItem?.emoji}</div>
-          <div className="text-white font-black text-xl px-6 py-2 rounded-full" style={{ background: "#ef4444" }}>
+          <div className="text-white font-black text-xl px-6 py-2 rounded-full" style={{ background: "#B91C1C" }}>
             {winner === AI_NAME ? text.aiWon : text.close}
           </div>
           <div className="text-center">
@@ -599,7 +599,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
           </div>
           <ActivityReview entries={qaList} hasTurns={hasTurns} locale={locale} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
-            style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>
+            style={{ background: "linear-gradient(135deg, #BE185D, #BE123C)" }} onClick={startGame}>
             {text.tryAgain}
           </Button>
         </div>

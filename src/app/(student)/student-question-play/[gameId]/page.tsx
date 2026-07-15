@@ -73,7 +73,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
         <div className="text-6xl">😢</div>
         <p className="text-muted-foreground text-lg font-medium">{t("notFound")}</p>
         <button className="mt-2 text-sm text-white px-5 py-2.5 rounded-xl font-bold"
-          style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
+          style={{ background: "linear-gradient(135deg, #6D28D9, #BE185D)" }}
           onClick={handleBack}>
           {t("backToList")}
         </button>
@@ -107,7 +107,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
           <span className="text-4xl">{game.emoji}</span>
           <div>
             <h1 className="text-xl font-black">{game.title}</h1>
-            <p className="text-white/80 text-sm">{game.description}</p>
+            <p className="text-white text-sm">{game.description}</p>
           </div>
         </div>
       </div>

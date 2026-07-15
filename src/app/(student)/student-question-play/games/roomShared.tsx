@@ -5,8 +5,8 @@ import { useLocale } from "next-intl";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
 
 export const PLAYER_COLORS = [
-  "#F97316", "#3B82F6", "#10B981", "#8B5CF6",
-  "#EF4444", "#EC4899", "#14B8A6", "#F59E0B",
+  "#C2410C", "#1D4ED8", "#047857", "#6D28D9",
+  "#B91C1C", "#BE185D", "#0F766E", "#A16207",
 ];
 
 export function playerColorById(room: GameRoom, id: string): string {
@@ -47,12 +47,12 @@ export function RoomHeader({
           <span className="text-3xl">{game.emoji}</span>
           <div>
             <p className="font-black">{game.title}</p>
-            <p className="text-white/80 text-xs">{subtitle ?? (locale === "en" ? `Room ${room.code}` : `방 ${room.code}`)}</p>
+            <p className="text-white text-xs">{subtitle ?? (locale === "en" ? `Room ${room.code}` : `방 ${room.code}`)}</p>
           </div>
         </div>
-        <div className="text-white/90 text-right">
+        <div className="text-white text-right">
           <p className="text-lg font-black">{room.players.length}</p>
-          <p className="text-xs opacity-80">{text.inProgress}</p>
+          <p className="text-xs">{text.inProgress}</p>
         </div>
       </div>
     </div>
@@ -92,7 +92,7 @@ export function TurnBar({
 export function WaitingBanner({ text }: { text: string }) {
   return (
     <div className="bg-secondary rounded-2xl border border-border p-5 text-center">
-      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+      <div className="flex items-center justify-center gap-2 text-secondary-foreground">
         <span className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin" />
         <p className="text-sm font-medium">{text}</p>
       </div>

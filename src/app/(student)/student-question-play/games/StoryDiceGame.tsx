@@ -304,7 +304,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
           {(["protagonist", "place", "event"] as DiceCategory[]).map((cat) => (
             <div key={cat} className="rounded-xl p-2 border"
               style={{ borderColor: STORY_DICE_COLOR[cat] + "40", background: STORY_DICE_COLOR[cat] + "08" }}>
-              <p className="text-xs font-bold text-center mb-1" style={{ color: STORY_DICE_COLOR[cat] }}>
+              <p className="text-xs font-bold text-center mb-1 text-foreground">
                 {STORY_DICE_EMOJI[cat]} {getStoryDiceCategoryLabel(locale, cat)}
               </p>
               <div className="flex flex-wrap gap-1 justify-center">
@@ -329,7 +329,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
               : getStoryDiceWordText(words, value, locale);
             return (
               <div key={cat} className="text-center">
-                <p className="text-xs font-bold mb-1" style={{ color: STORY_DICE_COLOR[cat] }}>
+                <p className="text-xs font-bold mb-1 text-foreground">
                   {STORY_DICE_EMOJI[cat]} {getStoryDiceCategoryLabel(locale, cat)}
                 </p>
                 <div className="rounded-2xl py-3 text-white shadow-md flex flex-col items-center gap-0.5"
@@ -352,7 +352,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
       {/* 단계별 UI */}
       {phase === "rolling" && (
         <Button className="w-full py-4 text-lg font-black text-white rounded-2xl"
-          style={{ background: "linear-gradient(135deg, #FB923C, #EF4444)" }}
+          style={{ background: "linear-gradient(135deg, #C2410C, #B91C1C)" }}
           onClick={rollDice} disabled={!!rolling}>
           {rolling ? text.diceRolling : text.storyRoll3}
         </Button>
@@ -371,7 +371,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
             value={input} onChange={(e) => setInput(e.target.value)}
             autoFocus />
           <Button className="w-full font-bold text-white rounded-xl"
-            style={{ background: "linear-gradient(135deg, #FB923C, #EF4444)" }}
+            style={{ background: "linear-gradient(135deg, #C2410C, #B91C1C)" }}
             disabled={!input.trim()}
             onClick={submitStory}>
             {text.storyStart}
@@ -385,7 +385,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
             {chain.map((c, i) => (
               <div key={i} className="flex gap-2.5 items-start">
                 <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black text-white"
-                  style={{ background: c.type === "story" ? "#f59e0b" : c.isAI ? "#6366f1" : "#ef4444" }}>
+                  style={{ background: c.type === "story" ? "#B45309" : c.isAI ? "#4338CA" : "#B91C1C" }}>
                   {c.type === "story" ? "📖" : c.type === "question" ? "?" : "💬"}
                 </div>
                 <div className={`flex-1 rounded-xl bg-secondary px-3 py-2 text-sm text-foreground ${
@@ -418,7 +418,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
                 disabled={aiLoading}
                 autoFocus />
               <Button className="w-full font-bold text-white rounded-xl"
-                style={{ background: "linear-gradient(135deg, #FB923C, #EF4444)" }}
+                style={{ background: "linear-gradient(135deg, #C2410C, #B91C1C)" }}
                 disabled={!input.trim() || aiLoading}
                 onClick={nextAction === "question" ? submitQuestion : submitAnswer}>
                 {nextAction === "question" ? text.storySubmitQuestion : text.storySubmitAnswer}

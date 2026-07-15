@@ -208,7 +208,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
           <span className="text-4xl">{game.emoji}</span>
           <div>
             <h1 className="text-xl font-black">{game.title}</h1>
-            <p className="text-white/80 text-sm">{kabaText.subtitle}</p>
+            <p className="text-white text-sm">{kabaText.subtitle}</p>
           </div>
         </div>
       </div>
@@ -234,7 +234,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
       <div className="bg-card text-foreground rounded-xl border border-border p-3">
         <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
           <span>{kabaText.round(idx + 1, TOTAL_ROUNDS)}</span>
-          <span className="font-bold" style={{ color: game.accentColor }}>
+          <span className="font-bold text-foreground">
             {kabaText.correctCount(correctCount)} ✅
           </span>
         </div>
