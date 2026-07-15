@@ -402,7 +402,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
             ))}
             {aiLoading && (
               <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200 text-sm pl-9 py-1">
-                <span className="w-3 h-3 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
+                <span className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 {text.aiThinking}
               </div>
             )}
@@ -411,7 +411,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
           {!inputDisabled && (
             <div className="bg-card text-foreground rounded-2xl border border-border shadow-sm p-4 space-y-3">
               <textarea
-                className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none h-20 disabled:bg-secondary disabled:text-muted-foreground"
+                className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none h-20 disabled:bg-secondary disabled:text-secondary-foreground"
                 placeholder={inputPlaceholder}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -427,7 +427,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
           )}
 
           {isAI && inputDisabled && !aiLoading && (
-            <div className="bg-secondary border border-border rounded-xl p-3 text-center text-muted-foreground text-sm">
+            <div className="bg-secondary border border-border rounded-xl p-3 text-center text-secondary-foreground text-sm">
               {text.storyAiWillAsk}
             </div>
           )}

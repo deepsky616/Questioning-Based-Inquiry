@@ -765,7 +765,7 @@ export async function closeQuestionGameSessions(
 
 async function paintContrastMeasurements(
   locator: Locator,
-  paintProperty: "color" | "stroke",
+  paintProperty: "color" | "stroke" | "border-right-color",
 ) {
   return locator.evaluateAll((elements, property) => {
     type Color = { red: number; green: number; blue: number; alpha: number };
@@ -836,14 +836,22 @@ async function paintContrastMeasurements(
       })
       .map((element) => {
         const style = getComputedStyle(element);
-        const paint = parse(style.getPropertyValue(property));
+        const paintValue = style.getPropertyValue(property);
+        const paint = parse(paintValue);
         const back = background(element);
         const label = element.getAttribute("aria-label") ||
           element.textContent?.trim() ||
           element.getAttribute("data-testid") ||
+          element.getAttribute("class") ||
           property;
         if (!paint) {
-          return { label, ratio: 0, hasBackgroundImage: back.hasImage };
+          return {
+            label,
+            ratio: 0,
+            hasBackgroundImage: back.hasImage,
+            paintValue,
+            backgroundColor: back.color,
+          };
         }
         const opacity = Number(style.opacity);
         const renderedPaint = composite({
@@ -854,14 +862,20 @@ async function paintContrastMeasurements(
         const backgroundLuminance = luminance(back.color);
         const ratio = (Math.max(paintLuminance, backgroundLuminance) + 0.05) /
           (Math.min(paintLuminance, backgroundLuminance) + 0.05);
-        return { label, ratio, hasBackgroundImage: back.hasImage };
+        return {
+          label,
+          ratio,
+          hasBackgroundImage: back.hasImage,
+          paintValue,
+          backgroundColor: back.color,
+        };
       });
   }, paintProperty);
 }
 
 async function expectPaintContrast(
   locator: Locator,
-  paintProperty: "color" | "stroke",
+  paintProperty: "color" | "stroke" | "border-right-color",
   minimum: number,
 ) {
   const measurements = await paintContrastMeasurements(locator, paintProperty);
@@ -873,7 +887,8 @@ async function expectPaintContrast(
     ).toBe(false);
     expect(
       measurement.ratio,
-      `${measurement.label} 대비 ${measurement.ratio.toFixed(2)}`,
+      `${measurement.label} 대비 ${measurement.ratio.toFixed(2)} ` +
+        `(색 ${measurement.paintValue}, 바탕 ${JSON.stringify(measurement.backgroundColor)})`,
     ).toBeGreaterThanOrEqual(minimum);
   }
 }
@@ -884,6 +899,23 @@ export async function expectTextContrast(locator: Locator, minimum = 4.5) {
 
 export async function expectSvgStrokeContrast(locator: Locator, minimum = 3) {
   await expectPaintContrast(locator, "stroke", minimum);
+}
+
+export async function expectLoadingRingContrast(locator: Locator, minimum = 3) {
+  await expectPaintContrast(locator, "border-right-color", minimum);
+  const topBorderAlphas = await locator.evaluateAll((elements) =>
+    elements.map((element) => {
+      const value = getComputedStyle(element).borderTopColor;
+      const match = value.match(
+        /rgba?\(\s*[0-9.]+[, ]+[0-9.]+[, ]+[0-9.]+(?:\s*[,/]\s*([0-9.]+))?\s*\)/,
+      );
+      return match?.[1] === undefined ? 1 : Number(match[1]);
+    }),
+  );
+  expect(topBorderAlphas.length).toBeGreaterThan(0);
+  for (const alpha of topBorderAlphas) {
+    expect(alpha, "회전 표시의 열린 부분이 투명해야 합니다").toBeLessThanOrEqual(0.05);
+  }
 }
 
 export async function expectNoBoxOverlap(locators: readonly Locator[]) {

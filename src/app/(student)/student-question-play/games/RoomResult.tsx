@@ -351,7 +351,7 @@ export default function RoomResult({
                 {s.name.charAt(0)}
               </div>
               <span className="font-bold text-foreground flex-1">
-                {s.name}{s.playerId === myId && <span className="text-xs text-muted-foreground ml-1">({text.me})</span>}
+                {s.name}{s.playerId === myId && <span className="text-xs text-secondary-foreground ml-1">({text.me})</span>}
               </span>
               <span className="font-black text-foreground">
                 {s.score}{scoreUnit}
@@ -370,14 +370,14 @@ export default function RoomResult({
 
         {!award && awarding && (
           <div className="flex items-center gap-3 text-muted-foreground text-sm py-4">
-            <span className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             {text.analyzingPoints}
           </div>
         )}
 
         {!award && !awarding && awardError && canManageAward && (
           <div className="space-y-3 py-2">
-            <p role="alert" className="text-sm text-red-600 text-center">
+            <p role="alert" className="text-sm text-red-700 dark:text-red-300 text-center">
               {awardError}
             </p>
             <Button
@@ -408,7 +408,7 @@ export default function RoomResult({
 
             {shareError && localAward && !sharedAward && canManageAward && (
               <div className="space-y-3 py-1">
-                <p role="alert" className="text-sm text-red-600 text-center">
+                <p role="alert" className="text-sm text-red-700 dark:text-red-300 text-center">
                   {shareError}
                 </p>
                 <Button
@@ -443,7 +443,7 @@ export default function RoomResult({
                         {s.name.charAt(0)}
                       </div>
                       <span className="font-bold text-foreground flex-1 text-sm">
-                        {s.name}{s.playerId === myId && <span className="text-xs text-muted-foreground ml-1">({text.me})</span>}
+                        {s.name}{s.playerId === myId && <span className="text-xs text-secondary-foreground ml-1">({text.me})</span>}
                       </span>
                       <span className="font-black text-base text-foreground">
                         +{pts}{locale === "en" ? " pts" : "점"}
@@ -475,7 +475,7 @@ export default function RoomResult({
                   {text.bestQuestion}
                 </p>
                 <p className="text-foreground font-bold">&ldquo;{bestQ.question}&rdquo;</p>
-                <p className="text-muted-foreground text-xs">💬 {bestQ.reason}</p>
+                <p className="text-secondary-foreground text-xs">💬 {bestQ.reason}</p>
               </div>
             )}
 

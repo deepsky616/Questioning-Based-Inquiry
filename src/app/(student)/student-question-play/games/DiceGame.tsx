@@ -213,7 +213,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
           {players.map((p, i) => (
             <div key={i}
               className={`flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all ${
-                i === currentPlayerIdx ? "text-white" : "bg-secondary text-muted-foreground"
+                i === currentPlayerIdx ? "text-white" : "bg-secondary text-secondary-foreground"
               }`}
               style={{
                 background: i === currentPlayerIdx ? game.accentColor : undefined,
@@ -270,8 +270,8 @@ export default function DiceGame({ game, onBack, config }: Props) {
 
         {phase === "ai-turn" && (
           <div className="w-full flex items-center justify-center gap-3 py-3">
-            <div className="w-6 h-6 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-            <span className="text-indigo-600 font-bold text-sm">{text.diceAiThinking}</span>
+            <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-indigo-700 dark:text-indigo-300 font-bold text-sm">{text.diceAiThinking}</span>
           </div>
         )}
       </div>
@@ -290,7 +290,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
             <div className="bg-secondary border border-border rounded-xl p-3 flex items-start gap-2">
               <span className="text-xl flex-shrink-0">🤖</span>
               <div>
-                <p className="text-indigo-600 text-xs font-bold mb-0.5">{text.diceAiQuestion}</p>
+                <p className="text-indigo-700 dark:text-indigo-300 text-xs font-bold mb-0.5">{text.diceAiQuestion}</p>
                 <p className="text-foreground text-sm">{aiQuestion}</p>
               </div>
             </div>
@@ -316,7 +316,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
         <div className="bg-secondary border border-border rounded-xl p-4 flex items-start gap-2">
           <span className="text-xl">💡</span>
           <div>
-            <p className="text-amber-700 text-xs font-bold mb-0.5">{text.diceFeedback}</p>
+            <p className="text-amber-800 dark:text-amber-300 text-xs font-bold mb-0.5">{text.diceFeedback}</p>
             <p className="text-foreground text-sm">{feedback}</p>
           </div>
         </div>
@@ -339,7 +339,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
                 </div>
               </div>
               {h.aiFeedback && (
-                <p className="text-muted-foreground text-xs bg-secondary rounded-lg px-3 py-1.5">
+                <p className="text-secondary-foreground text-xs bg-secondary rounded-lg px-3 py-1.5">
                   💡 {h.aiFeedback}
                 </p>
               )}

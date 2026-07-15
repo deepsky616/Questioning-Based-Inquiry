@@ -46,20 +46,20 @@ export default function RoomCompatibilityNotice({
       <section
         role="status"
         aria-labelledby="room-compatibility-title"
-        className="space-y-5 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center"
+        className="space-y-5 rounded-2xl border border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-50 p-6 text-center"
       >
         <AlertTriangle
-          className="mx-auto h-10 w-10 text-amber-600"
+          className="mx-auto h-10 w-10 text-amber-700 dark:text-amber-300"
           aria-hidden="true"
         />
         <div className="space-y-2">
           <h2
             id="room-compatibility-title"
-            className="text-lg font-black text-foreground"
+            className="text-lg font-black text-amber-950 dark:text-amber-50"
           >
             {isEnglish ? "Restart with the new rules" : "새 규칙으로 다시 시작"}
           </h2>
-          <p className="text-sm leading-6 text-muted-foreground">
+          <p className="text-sm leading-6 text-amber-800 dark:text-amber-200">
             {isEnglish
               ? "This room was started with an earlier rule set."
               : "이 방은 이전 규칙으로 시작되었습니다."}
@@ -83,7 +83,7 @@ export default function RoomCompatibilityNotice({
               : (isEnglish ? "Restart with new rules" : "새 규칙으로 다시 시작")}
           </Button>
         ) : (
-          <p className="rounded-xl bg-white px-4 py-3 text-sm font-medium text-muted-foreground">
+          <p className="rounded-xl border border-border bg-card text-card-foreground px-4 py-3 text-sm font-medium">
             {isEnglish
               ? "Waiting for the host to restart with the new rules."
               : "방장이 새 규칙으로 다시 시작하기를 기다리는 중입니다."}

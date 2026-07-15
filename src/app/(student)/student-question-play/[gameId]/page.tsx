@@ -132,7 +132,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
       <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-4">
         <h2 className="font-black text-foreground text-lg">{t("modeTitle")}</h2>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div data-testid="question-game-mode-options" className="grid grid-cols-3 gap-3">
           {[
             { value: "solo" as GameMode, emoji: "👤", label: t("modeSolo"), desc: t("modeSoloDesc") },
             { value: "friend" as GameMode, emoji: "👥", label: t("modeFriend"), desc: t("modeFriendDesc") },
@@ -147,7 +147,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
               }}>
               <span className="text-3xl">{m.emoji}</span>
               <span className="font-bold text-foreground text-sm">{m.label}</span>
-              <span className="text-muted-foreground text-xs text-center leading-tight">{m.desc}</span>
+              <span className="text-foreground text-xs text-center leading-tight">{m.desc}</span>
             </button>
           ))}
         </div>
@@ -159,7 +159,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
               <span className="text-2xl">👥</span>
               <div>
                 <p className="text-foreground text-sm font-bold">{t("friendModeTitle")}</p>
-                <p className="text-muted-foreground text-xs">{t("friendModeDesc")}</p>
+                <p className="text-secondary-foreground text-xs">{t("friendModeDesc")}</p>
               </div>
             </div>
           </div>
@@ -182,7 +182,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
                 <span className="text-2xl">🤖</span>
                 <div>
                   <p className="text-foreground text-sm font-bold">{t("aiPartnerTitle")}</p>
-                  <p className="text-muted-foreground text-xs">{t("aiPartnerDesc")}</p>
+                  <p className="text-secondary-foreground text-xs">{t("aiPartnerDesc")}</p>
                 </div>
               </div>
             )}

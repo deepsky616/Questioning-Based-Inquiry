@@ -299,7 +299,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
           {players.map((p, i) => (
             <div key={i}
               className={`flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all ${
-                i === playerIdx ? "text-white" : "bg-secondary text-muted-foreground"
+                i === playerIdx ? "text-white" : "bg-secondary text-secondary-foreground"
               }`}
               style={{
                 background: i === playerIdx ? game.accentColor : undefined,
@@ -314,7 +314,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
       {isAI && (
         <div className="flex gap-2">
           <div className={`flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all ${
-            !aiLoading ? "text-white" : "bg-secondary text-muted-foreground"
+            !aiLoading ? "text-white" : "bg-secondary text-secondary-foreground"
           }`}
             style={{
               background: !aiLoading ? game.accentColor : undefined,
@@ -322,7 +322,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             {myPlayerName} {!aiLoading && "🏃"}
           </div>
           <div className={`flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
-            aiLoading ? "text-white" : "bg-secondary text-muted-foreground"
+            aiLoading ? "text-white" : "bg-secondary text-secondary-foreground"
           }`}
             style={{
               background: aiLoading ? AI_COLOR : undefined,
@@ -373,7 +373,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
               <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
             </div>
             <div className="flex-1 bg-secondary border-2 border-border rounded-xl px-3 py-2.5 flex items-center gap-2">
-              <p className="text-muted-foreground text-sm font-medium">{text.aiMakingQuestion}</p>
+              <p className="text-secondary-foreground text-sm font-medium">{text.aiMakingQuestion}</p>
             </div>
           </div>
         )}
@@ -398,14 +398,14 @@ export default function RelayGame({ game, onBack, config }: Props) {
       {/* 입력 영역 — 항상 학생 차례 (AI가 응답 중일 때만 비활성화) */}
       <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-4 space-y-3">
         {localError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-red-800 dark:text-red-200 text-sm">
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200 px-3 py-2 text-sm">
             ❌ {localError}
           </div>
         )}
 
         <textarea
           ref={inputRef}
-          className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none h-24 transition-colors disabled:bg-secondary disabled:text-muted-foreground"
+          className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none h-24 transition-colors disabled:bg-secondary disabled:text-secondary-foreground"
           style={{ borderColor: "hsl(var(--input))", opacity: aiLoading ? 0.5 : 1 }}
           onFocus={(e) => { if (!aiLoading) { e.target.style.borderColor = game.accentColor; setLocalError(null); } }}
           onBlur={(e) => (e.target.style.borderColor = "hsl(var(--input))")}

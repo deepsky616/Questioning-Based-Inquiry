@@ -71,14 +71,14 @@ export function AwardBadge({ result }: { result: SingleAwardResult | null }) {
   if (!result) return null;
   if (result.awarded === 0 && result.dailyLimitReached) {
     return (
-      <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-700">
+      <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100 px-4 py-2 text-sm">
         ⏰ {result.message}
       </div>
     );
   }
   if (result.awarded > 0) {
     return (
-      <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm text-emerald-700 flex items-center gap-2">
+      <div className="rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100 px-4 py-2 text-sm flex items-center gap-2">
         <span>🏆</span>
         <span className="font-bold">
           {locale === "en" ? `+${result.awarded} points earned!` : `+${result.awarded}점 적립!`}

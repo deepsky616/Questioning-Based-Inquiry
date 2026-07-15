@@ -5,11 +5,13 @@ import {
   createQuestionGameBrowserFixture,
   createSharedQuestionGameTransport,
   expectLadderPathGeometry,
+  expectLoadingRingContrast,
   expectNoBoxOverlap,
   expectNoHorizontalPageOverflow,
   expectSvgStrokeContrast,
   expectTextContrast,
   joinStudentRoom,
+  openQuestionGameContext,
   openStudentJoinPage,
   openStudentRoom,
   openTeacherRoom,
@@ -18,6 +20,16 @@ import {
 } from "./helpers/question-game-room";
 
 test.describe.configure({ mode: "serial" });
+
+const QUESTION_GAME_PREPARATION_CASES = [
+  { id: "memory", title: "질문-대답 짝 찾기" },
+  { id: "story-dice", title: "이야기 주사위" },
+  { id: "dice", title: "질문 주사위" },
+  { id: "ladder", title: "질문 사다리" },
+  { id: "relay", title: "질문 릴레이" },
+  { id: "mystery-box", title: "미스터리 박스" },
+  { id: "kaba", title: "까바놀이" },
+] as const;
 
 test.beforeEach(({}, testInfo) => {
   test.skip(
@@ -422,6 +434,72 @@ test("화면 대비와 가로 넘침을 밝고 어두운 화면에서 지킨다"
   ];
 
   try {
+    for (const theme of ["light", "dark"] as const) {
+      const fixture = createQuestionGameBrowserFixture(
+        `preparation-contrast-${theme}`,
+      );
+      const session = await openQuestionGameContext(
+        browser,
+        fixture.students[0],
+        transport,
+        { theme, viewport: { width: 390, height: 844 } },
+      );
+      sessions.push(session);
+
+      for (const game of QUESTION_GAME_PREPARATION_CASES) {
+        await session.page.goto(`/student-question-play/${game.id}`);
+        await expect(
+          session.page.getByRole("heading", { name: game.title, exact: true }),
+        ).toBeVisible();
+        await expect.poll(() => session.page.evaluate(() =>
+          document.documentElement.classList.contains("dark")
+        )).toBe(theme === "dark");
+
+        const modeTitle = session.page.getByRole("heading", {
+          name: "어떻게 놀이할까요?",
+          exact: true,
+        });
+        const modeButtons = session.page
+          .getByTestId("question-game-mode-options")
+          .getByRole("button");
+        await expect(modeButtons).toHaveCount(3);
+        await expectTextContrast(modeTitle);
+
+        for (let index = 0; index < 3; index += 1) {
+          const modeButton = modeButtons.nth(index);
+          await modeButton.click();
+          await expectTextContrast(modeButton.locator("span").nth(1));
+          await expectTextContrast(modeButton.locator("span").nth(2));
+        }
+
+        await modeButtons.nth(1).click();
+        await expectTextContrast(session.page.getByText(
+          "방을 만들거나 방 코드로 참가해서 같이 놀아요!",
+          { exact: true },
+        ));
+        await modeButtons.nth(2).click();
+        await expectTextContrast(session.page.getByText(
+          "선생님이 설정한 Gemini 모델이 함께 놀아요",
+          { exact: true },
+        ));
+
+        if (game.id === "relay") {
+          await modeButtons.nth(0).click();
+          await session.page.getByRole("button", { name: /시작하기/ }).click();
+          await session.page.getByPlaceholder(/직접 입력하기/).fill("별");
+          await session.page.getByRole("button", {
+            name: /질문 릴레이 시작/,
+          }).click();
+          await session.page.locator("textarea").fill("별은 밝다");
+          await session.page.getByRole("button", { name: /질문 연결/ }).click();
+          await expectTextContrast(session.page.getByRole("alert").filter({
+            hasText: "질문 형태로 써야 해요!",
+          }));
+        }
+        await expectNoHorizontalPageOverflow(session.page);
+      }
+    }
+
     for (const [index, options] of mobileRelayCases.entries()) {
       const fixture = createQuestionGameBrowserFixture(`relay-contrast-${index}`);
       const host = await openStudentRoom(
@@ -495,6 +573,30 @@ test("화면 대비와 가로 넘침을 밝고 어두운 화면에서 지킨다"
       const startButton = room.page.getByRole("button", { name: /게임 시작/ });
       await expectNoBoxOverlap([roomCodeCard, playerCard, startButton]);
       await expectNoHorizontalPageOverflow(room.page);
+
+      const joinPage = await openStudentJoinPage(
+        browser,
+        fixture.students[1],
+        "mystery-box",
+        transport,
+        options,
+      );
+      sessions.push(joinPage);
+      await submitQuestionGameRoomCode(joinPage.page, "0000");
+      const joinError = joinPage.page.getByRole("alert").filter({
+        hasText: "방을 찾을 수 없습니다",
+      });
+      await expect(joinError).toBeVisible();
+      await expectTextContrast(joinError);
+      await submitQuestionGameRoomCode(joinPage.page, room.code);
+      const waitingForHost = joinPage.page.getByText(
+        "방장이 시작하기를 기다리는 중...",
+        { exact: true },
+      );
+      await expect(waitingForHost).toBeVisible();
+      await expectLoadingRingContrast(
+        waitingForHost.locator("..").locator("span.animate-spin"),
+      );
     }
   } finally {
     await closeQuestionGameSessions(sessions);

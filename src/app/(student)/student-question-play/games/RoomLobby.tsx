@@ -130,7 +130,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
       ) : (
         <div className="bg-secondary rounded-2xl border border-border p-5 text-center">
           <div className="flex items-center justify-center gap-2 text-secondary-foreground">
-            <span className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-medium">{locale === "en" ? "Waiting for the host to start..." : "방장이 시작하기를 기다리는 중..."}</p>
           </div>
         </div>

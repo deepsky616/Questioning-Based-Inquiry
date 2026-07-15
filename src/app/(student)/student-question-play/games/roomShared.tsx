@@ -76,7 +76,7 @@ export function TurnBar({
         return (
           <div key={p.id}
             className={`rounded-xl py-2 px-3 text-center text-sm font-bold transition-all ${
-              isCurrent ? "text-white" : "bg-secondary text-muted-foreground"
+              isCurrent ? "text-white" : "bg-secondary text-secondary-foreground"
             }`}
             style={{
               background: isCurrent ? playerColorById(room, p.id) : undefined,
@@ -93,7 +93,7 @@ export function WaitingBanner({ text }: { text: string }) {
   return (
     <div className="bg-secondary rounded-2xl border border-border p-5 text-center">
       <div className="flex items-center justify-center gap-2 text-secondary-foreground">
-        <span className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin" />
+        <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         <p className="text-sm font-medium">{text}</p>
       </div>
     </div>

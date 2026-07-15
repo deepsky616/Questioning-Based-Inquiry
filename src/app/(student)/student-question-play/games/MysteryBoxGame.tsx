@@ -496,7 +496,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
           {isAITurn && phase === "playing" && (
             <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-center dark:border-indigo-700 dark:bg-indigo-950">
               <div className="flex items-center justify-center gap-2 text-indigo-800 dark:text-indigo-200">
-                <span className="w-4 h-4 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 <p className="text-sm font-bold">{text.aiMakingQuestion}</p>
               </div>
             </div>
