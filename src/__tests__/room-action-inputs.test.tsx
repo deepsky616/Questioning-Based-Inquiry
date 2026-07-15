@@ -182,7 +182,7 @@ const flowCases = [
   {
     name: "이야기",
     myId: "user-1",
-    placeholder: /세 단어로 이야기를 써 보세요/,
+    label: "세 단어로 이야기를 써 보세요.",
     buttonName: /이야기 보내기/,
     input: "토끼가 학교에서 책을 발견했다.",
     room: storyRoom("story"),
@@ -190,7 +190,7 @@ const flowCases = [
   {
     name: "질문",
     myId: "user-2",
-    placeholder: /이야기에 이어질 질문/,
+    label: "이야기에 이어질 질문을 만들어 보세요.",
     buttonName: /질문 보내기/,
     input: "토끼는 왜 책을 집었나요?",
     room: storyRoom("question"),
@@ -198,7 +198,7 @@ const flowCases = [
   {
     name: "대답",
     myId: "user-1",
-    placeholder: /질문에 답해 보세요/,
+    label: "친구의 질문에 답해 보세요.",
     buttonName: /대답 보내기/,
     input: "친구에게 읽어 주려고 집었어요.",
     room: storyRoom("answer"),
@@ -214,7 +214,7 @@ describe("이야기 주사위 입력", () => {
   it.each(flowCases)("$name 제출은 실패 뒤 유지하고 성공 뒤 비운다", async ({
     name,
     myId,
-    placeholder,
+    label,
     buttonName,
     input,
     room,
@@ -232,7 +232,7 @@ describe("이야기 주사위 입력", () => {
       />,
     );
 
-    const textArea = screen.getByPlaceholderText(placeholder) as HTMLTextAreaElement;
+    const textArea = screen.getByRole("textbox", { name: label }) as HTMLTextAreaElement;
     const submitButton = screen.getByRole("button", { name: buttonName });
     await expectFailureThenSuccess(textArea, submitButton, onAction, input);
     const expectedAction = name === "이야기"

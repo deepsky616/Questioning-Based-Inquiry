@@ -41,6 +41,11 @@ const players = [
   { id: "user-2", name: "민준", isHost: false, joinedAt: 2 },
 ];
 
+const threePlayers = [
+  ...players,
+  { id: "user-3", name: "지우", isHost: false, joinedAt: 3 },
+];
+
 let idIndex = 100;
 
 function uuid(index = ++idIndex): string {
@@ -189,6 +194,46 @@ function afterOneRound(gameId: TurnGameId): GameRoom {
   });
 }
 
+function storyAfterQuestionerLeaves(): GameRoom {
+  let room = start("story-dice", threePlayers);
+  room = run(room, "user-1", "story-prepare");
+  room = run(room, "user-1", "story-roll");
+  room = run(room, "user-1", "story-submit-story", {
+    story: "토끼가 학교에서 책을 찾았다.",
+  });
+  room = run(room, "user-2", "story-submit-question", {
+    locale: "ko",
+    question: "토끼는 왜 책을 찾았나요?",
+  });
+  room = run(room, "user-1", "story-submit-answer", {
+    answer: "친구와 읽으려고 찾았어요.",
+  });
+  room = run(room, "user-3", "story-submit-question", {
+    locale: "ko",
+    question: "토끼는 책을 어디에서 찾았나요?",
+  });
+  room = run(room, "user-1", "story-submit-answer", {
+    answer: "학교에서 찾았어요.",
+  });
+  return changed(leaveQuestionGameRoom({
+    room,
+    userId: "user-3",
+    random: () => 0,
+    randomUUID: () => uuid(),
+  }));
+}
+
+function completedStoryAfterQuestionerLeaves(): GameRoom {
+  let room = storyAfterQuestionerLeaves();
+  room = run(room, "user-2", "story-submit-question", {
+    locale: "ko",
+    question: "토끼는 찾은 책을 어떻게 읽었나요?",
+  });
+  return run(room, "user-1", "story-submit-answer", {
+    answer: "친구와 함께 읽었어요.",
+  });
+}
+
 function completedDiceRoom(): GameRoom {
   let room = start("dice");
   for (let turn = 0; turn < 6; turn += 1) {
@@ -243,13 +288,97 @@ describe("차례 놀이 명령 흐름", () => {
 
     const dice = start("dice");
     const diceAction = vi.fn<RoomActionHandler>(async () => success(dice));
-    renderGame("dice", dice, "user-1", diceAction, true);
+    renderGame("dice", dice, "user-1", diceAction);
     fireEvent.click(screen.getByRole("button", { name: "주사위 굴리기" }));
     await waitFor(() => expect(diceAction).toHaveBeenCalledTimes(1));
     expect(diceAction.mock.calls[0]?.slice(0, 2)).toEqual([
       "dice-roll",
       { playId: dice.playId, roundId: dice.gameState.roundId },
     ]);
+  });
+
+  it.each([
+    ["story-dice", "이야기 준비하기"],
+    ["dice", "주사위 굴리기"],
+    ["relay", "릴레이 시작하기"],
+    ["kaba", "문장 준비하기"],
+  ] as const)("%s 전역 요청 중에는 새 놀이 명령을 보내지 않는다", (gameId, buttonName) => {
+    const room = start(gameId);
+    const onAction = vi.fn<RoomActionHandler>(async () => success(room));
+    renderGame(gameId, room, "user-1", onAction, true);
+    if (gameId === "relay") {
+      fireEvent.change(screen.getByRole("textbox", { name: "릴레이 주제" }), {
+        target: { value: "우주" },
+      });
+    }
+
+    const button = screen.getByRole("button", { name: buttonName });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["story-dice", "세 단어로 이야기를 써 보세요...", "이야기 보내기"],
+    ["dice", "주사위 면에 맞는 질문을 써 보세요...", "질문 보내기"],
+    ["relay", "앞 질문에 이어질 질문을 써 보세요...", "질문 보내기"],
+    ["kaba", "문장을 질문으로 바꿔 써 보세요...", "질문 보내기"],
+  ] as const)("%s 전역 요청 중에는 입력을 제출하지 않는다", (gameId, placeholder, buttonName) => {
+    let room = prepared(gameId);
+    if (gameId === "story-dice") room = run(room, "user-1", "story-roll");
+    if (gameId === "dice") room = run(room, "user-1", "dice-roll");
+    const onAction = vi.fn<RoomActionHandler>(async () => success(room));
+    renderGame(gameId, room, "user-1", onAction, true);
+
+    fireEvent.change(screen.getByPlaceholderText(placeholder), {
+      target: { value: "왜 그런가요?" },
+    });
+    const button = screen.getByRole("button", { name: buttonName });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it.each(["story-dice", "dice", "relay", "kaba"] as const)(
+    "%s 전역 요청 중에는 조기 종료를 보내지 않는다",
+    (gameId) => {
+      const room = afterOneRound(gameId);
+      const onAction = vi.fn<RoomActionHandler>(async () => success(room));
+      const confirm = vi.spyOn(window, "confirm");
+      renderGame(gameId, room, "user-1", onAction, true);
+
+      const button = screen.getByRole("button", { name: "놀이 일찍 마치기" });
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(onAction).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["story-dice", "이야기 준비하기"],
+    ["dice", "주사위 굴리기"],
+    ["relay", "릴레이 시작하기"],
+    ["kaba", "문장 준비하기"],
+  ] as const)("%s 명령을 처리하는 동안 나가기를 잠근다", async (gameId, buttonName) => {
+    const room = start(gameId);
+    let resolveRequest: ((result: RoomActionResult) => void) | undefined;
+    const onAction = vi.fn<RoomActionHandler>(() => new Promise((resolve) => {
+      resolveRequest = resolve;
+    }));
+    renderGame(gameId, room, "user-1", onAction);
+    if (gameId === "relay") {
+      fireEvent.change(screen.getByRole("textbox", { name: "릴레이 주제" }), {
+        target: { value: "우주" },
+      });
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: buttonName }));
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "나가기" })).toBeDisabled();
+
+    resolveRequest?.(success(room));
+    await waitFor(() => expect(screen.getByRole("button", { name: "나가기" })).toBeEnabled());
   });
 
   it("주제와 카바 준비 명령은 서버 준비만 요청한다", async () => {
@@ -336,6 +465,106 @@ describe("권위 상태 표시와 입력 가림", () => {
 
     renderGame("kaba", prepared("kaba"), "user-2");
     expect(screen.queryByPlaceholderText(/질문으로 바꿔/)).not.toBeInTheDocument();
+  });
+
+  it("질문자가 나간 이야기 방은 남은 실제 목표를 2 / 3으로 표시한다", () => {
+    renderGame("story-dice", storyAfterQuestionerLeaves(), "user-1");
+    expect(screen.getByText("질문과 대답 2 / 3쌍")).toBeInTheDocument();
+    expect(screen.queryByText("질문과 대답 2 / 2쌍")).not.toBeInTheDocument();
+  });
+
+  it("질문자가 나간 뒤 이야기를 마치면 실제 기록대로 3 / 3을 표시한다", () => {
+    renderGame("story-dice", completedStoryAfterQuestionerLeaves(), "user-1");
+    expect(screen.getByText("질문과 대답 3 / 3쌍")).toBeInTheDocument();
+    expect(screen.queryByText("질문과 대답 3 / 2쌍")).not.toBeInTheDocument();
+  });
+});
+
+describe("차례 화면 접근성과 좁은 화면 본문", () => {
+  it.each([
+    ["story-dice", "세 단어로 이야기를 써 보세요."],
+    ["dice", "주사위 유형에 맞는 질문"],
+    ["relay", "앞 질문에 이어질 질문"],
+    ["kaba", "문장을 바꾼 질문"],
+  ] as const)("%s 입력은 보이는 라벨과 연결된다", (gameId, label) => {
+    let room = prepared(gameId);
+    if (gameId === "story-dice") room = run(room, "user-1", "story-roll");
+    if (gameId === "dice") room = run(room, "user-1", "dice-roll");
+    renderGame(gameId, room, "user-1");
+
+    const input = screen.getByRole("textbox", { name: label });
+    expect(input).toHaveAttribute("id");
+    expect(document.querySelector(`label[for="${input.id}"]`)).toHaveTextContent(label);
+  });
+
+  it.each(["story-dice", "dice", "relay", "kaba"] as const)(
+    "%s 차례와 제출 진행을 같은 실시간 알림 영역에서 알린다",
+    (gameId) => {
+      const room = prepared(gameId);
+      renderGame(gameId, room, "user-1");
+
+      const liveRegion = screen.getByText("서연의 차례").closest('[aria-live="polite"]');
+      expect(liveRegion).not.toBeNull();
+      expect(liveRegion).toContainElement(screen.getByText(/라운드 ·/));
+      expect(liveRegion).toContainElement(screen.getByText(/명 제출$/));
+    },
+  );
+
+  it("공백 없는 이백 자 본문과 주제 및 문장을 줄바꿈한다", () => {
+    const longQuestion = `${"q".repeat(199)}?`;
+    const longStory = "s".repeat(200);
+    const longAnswer = "a".repeat(200);
+    const longTopic = "t".repeat(80);
+
+    let story = prepared("story-dice");
+    story = run(story, "user-1", "story-roll");
+    story = run(story, "user-1", "story-submit-story", { story: longStory });
+    story = run(story, "user-2", "story-submit-question", {
+      locale: "ko",
+      question: longQuestion,
+    });
+    story = run(story, "user-1", "story-submit-answer", { answer: longAnswer });
+    renderGame("story-dice", story, "user-1");
+    expect(screen.getByText(longStory)).toHaveClass("break-words");
+    expect(screen.getByText(longQuestion)).toHaveClass("break-words");
+    expect(screen.getByText(longAnswer)).toHaveClass("break-words");
+    cleanup();
+
+    let dice = start("dice");
+    dice = run(dice, "user-1", "dice-roll");
+    dice = run(dice, "user-1", "dice-submit-question", {
+      locale: "ko",
+      question: longQuestion,
+    });
+    renderGame("dice", dice, "user-2");
+    expect(screen.getByText(longQuestion)).toHaveClass("break-words");
+    cleanup();
+
+    let relay = start("relay");
+    relay = run(relay, "user-1", "relay-set-topic", { topic: longTopic });
+    relay = run(relay, "user-1", "relay-submit-question", {
+      locale: "ko",
+      question: longQuestion,
+    });
+    renderGame("relay", relay, "user-2");
+    expect(screen.getByText(longTopic)).toHaveClass("break-words");
+    expect(screen.getByText(longQuestion)).toHaveClass("break-words");
+    cleanup();
+
+    let kaba = prepared("kaba");
+    kaba = run(kaba, "user-1", "kaba-submit-question", {
+      locale: "ko",
+      question: longQuestion,
+    });
+    const kabaState = kaba.gameState as {
+      attempts: Array<{ sentence: { ko: string } }>;
+      sentencePlan: Array<{ text: { ko: string } }>;
+    };
+    renderGame("kaba", kaba, "user-2");
+    expect(screen.getByText(
+      kabaState.sentencePlan[kabaState.attempts.length].text.ko,
+    )).toHaveClass("break-words");
+    expect(screen.getByText(longQuestion)).toHaveClass("break-words");
   });
 });
 

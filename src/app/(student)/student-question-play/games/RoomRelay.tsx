@@ -96,6 +96,7 @@ export default function RoomRelay({
   game,
   room,
   myId,
+  actionLoading,
   onAction,
   onLeave,
 }: Props) {
@@ -129,6 +130,7 @@ export default function RoomRelay({
     onAction,
     lifetimeParts: [currentPlayerId || room.hostId, inputContext],
   });
+  const requestPending = actionLoading || pendingKind !== null;
 
   useEffect(() => {
     setTopic("");
@@ -152,7 +154,13 @@ export default function RoomRelay({
   if (!valid || !state || !room.playId) {
     return (
       <div className="mx-auto max-w-2xl space-y-5 text-foreground">
-        <GameHeader game={game} subtitle={text.safeState} onLeave={onLeave} leave={text.leave} />
+        <GameHeader
+          game={game}
+          subtitle={text.safeState}
+          onLeave={onLeave}
+          leave={text.leave}
+          disabled={requestPending}
+        />
         <p role="status" className="border border-border bg-card p-4 text-sm text-muted-foreground rounded-lg">
           {text.safeState}
         </p>
@@ -193,7 +201,7 @@ export default function RoomRelay({
 
   async function submitTopic() {
     const value = topic.trim();
-    if (!value || !isHost || activeState.phase !== "setup" || pendingKind) return;
+    if (!value || !isHost || activeState.phase !== "setup" || requestPending) return;
     retryRef.current = { context: inputContext, field: "topic", value };
     const outcome = await send(
       "relay-set-topic",
@@ -210,7 +218,7 @@ export default function RoomRelay({
 
   async function submitQuestion() {
     const value = question.trim();
-    if (!value || !isMyTurn || activeState.phase !== "question" || pendingKind) return;
+    if (!value || !isMyTurn || activeState.phase !== "question" || requestPending) return;
     retryRef.current = { context: inputContext, field: "question", value };
     const outcome = await send(
       "relay-submit-question",
@@ -231,7 +239,7 @@ export default function RoomRelay({
   }
 
   async function endEarly() {
-    if (pendingKind || !window.confirm(text.earlyEndConfirm)) return;
+    if (requestPending || !window.confirm(text.earlyEndConfirm)) return;
     await send(
       "end-game-early",
       { playId, roundId: activeState.roundId },
@@ -241,7 +249,13 @@ export default function RoomRelay({
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 text-foreground">
-      <GameHeader game={game} subtitle={text.relaySubtitle} onLeave={onLeave} leave={text.leave} />
+      <GameHeader
+        game={game}
+        subtitle={text.relaySubtitle}
+        onLeave={onLeave}
+        leave={text.leave}
+        disabled={requestPending}
+      />
 
       {state.phase === "setup" ? (
         <section className="space-y-3 border-b border-border pb-5">
@@ -258,7 +272,7 @@ export default function RoomRelay({
                 placeholder={text.relayTopicPlaceholder}
                 maxLength={80}
               />
-              <Button type="submit" disabled={!topic.trim() || pendingKind !== null} className="w-full sm:w-auto">
+              <Button type="submit" disabled={!topic.trim() || requestPending} className="w-full sm:w-auto">
                 <Play className="mr-2 h-4 w-4" aria-hidden="true" />
                 {pendingKind === "relay-set-topic" ? text.sending : text.relayStart}
               </Button>
@@ -270,11 +284,11 @@ export default function RoomRelay({
       ) : (
         <>
           <section className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">{text.relayTopicLabel}</p>
-              <p className="font-semibold">{state.topic}</p>
+              <p className="break-words font-semibold">{state.topic}</p>
             </div>
-            <div className="text-left sm:text-right">
+            <div className="min-w-0 text-left sm:text-right" aria-live="polite">
               <p className="text-sm font-semibold">{text.roundProgress(state.round, state.maxRounds, state.completedRounds)}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {text.submissionProgress(state.roundSubmittedPlayerIds.length, state.roundTargetPlayerIds.length)}
@@ -290,7 +304,11 @@ export default function RoomRelay({
               event.preventDefault();
               void submitQuestion();
             }}>
+              <label htmlFor="relay-question-input" className="text-sm font-semibold">
+                {text.relayQuestionLabel}
+              </label>
               <Textarea
+                id="relay-question-input"
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
                 placeholder={text.relayQuestionPlaceholder}
@@ -302,7 +320,7 @@ export default function RoomRelay({
                   }
                 }}
               />
-              <Button type="submit" disabled={!question.trim() || pendingKind !== null} className="w-full sm:w-auto">
+              <Button type="submit" disabled={!question.trim() || requestPending} className="w-full sm:w-auto">
                 <Send className="mr-2 h-4 w-4" aria-hidden="true" />
                 {pendingKind === "relay-submit-question" ? text.sending : text.questionSubmit}
               </Button>
@@ -318,9 +336,9 @@ export default function RoomRelay({
         ) : (
           <ol className="space-y-2">
             {state.questions.map((record) => (
-              <li key={`${record.roundId}:${record.playerId}`} className="border border-border bg-card p-3 rounded-lg">
+              <li key={`${record.roundId}:${record.playerId}`} className="min-w-0 border border-border bg-card p-3 rounded-lg">
                 <p className="text-xs text-muted-foreground">{record.round} · {record.playerName}</p>
-                <p className="mt-1 text-sm">{record.question}</p>
+                <p className="mt-1 break-words text-sm">{record.question}</p>
               </li>
             ))}
           </ol>
@@ -328,7 +346,7 @@ export default function RoomRelay({
       </section>
 
       {isHost && state.completedRounds >= 1 && (
-        <Button type="button" variant="outline" onClick={endEarly} disabled={pendingKind !== null} className="border-border">
+        <Button type="button" variant="outline" onClick={endEarly} disabled={requestPending} className="border-border">
           <Flag className="mr-2 h-4 w-4" aria-hidden="true" />
           {text.earlyEnd}
         </Button>
@@ -342,11 +360,13 @@ function GameHeader({
   subtitle,
   leave,
   onLeave,
+  disabled,
 }: {
   game: BuiltInGame;
   subtitle: string;
   leave: string;
   onLeave: () => void;
+  disabled: boolean;
 }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
@@ -354,7 +374,7 @@ function GameHeader({
         <h1 className="text-xl font-bold">{game.emoji} {game.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
       </div>
-      <Button type="button" variant="ghost" size="sm" onClick={onLeave}>
+      <Button type="button" variant="ghost" size="sm" onClick={onLeave} disabled={disabled}>
         <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
         {leave}
       </Button>

@@ -87,6 +87,7 @@ export default function RoomStoryDice({
   game,
   room,
   myId,
+  actionLoading,
   onAction,
   onLeave,
 }: Props) {
@@ -126,6 +127,7 @@ export default function RoomStoryDice({
     onAction,
     lifetimeParts: [actorId, inputContext],
   });
+  const requestPending = actionLoading || pendingKind !== null;
 
   useEffect(() => {
     setInput("");
@@ -144,7 +146,13 @@ export default function RoomStoryDice({
   if (!valid || !state || !room.playId) {
     return (
       <div className="mx-auto max-w-2xl space-y-5 text-foreground">
-        <GameHeader game={game} subtitle={text.safeState} onLeave={onLeave} leave={text.leave} />
+        <GameHeader
+          game={game}
+          subtitle={text.safeState}
+          onLeave={onLeave}
+          leave={text.leave}
+          disabled={requestPending}
+        />
         <p role="status" className="border border-border bg-card p-4 text-sm text-muted-foreground rounded-lg">
           {text.safeState}
         </p>
@@ -159,11 +167,23 @@ export default function RoomStoryDice({
       pair.playerId === player.id || pair.taggerId === player.id
     ).length,
   }));
+  const remainingTargetCount = Math.max(
+    0,
+    state.roundTargetPlayerIds.length - state.roundSubmittedPlayerIds.length,
+  );
+  const remainingRoundCount = Math.max(0, state.maxRounds - state.round);
+  const targetTotal = state.phase === "done"
+    ? state.pairs.length
+    : state.pairs.length + remainingTargetCount +
+      remainingRoundCount * state.roundTargetPlayerIds.length;
   if (state.phase === "done") {
     return (
       <div className="mx-auto max-w-2xl space-y-4 text-foreground">
         <p role="status" className="border border-border bg-secondary p-3 text-center text-sm font-semibold rounded-lg">
           {endMessage(state.endReason, text)}
+        </p>
+        <p className="text-center text-sm font-semibold">
+          {text.storyGoal(state.pairs.length, targetTotal)}
         </p>
         <RoomResult
           game={game}
@@ -186,10 +206,9 @@ export default function RoomStoryDice({
   const playId = room.playId;
   const actorName = state.playerNames[actorId] ?? "";
   const taggerName = state.playerNames[state.taggerId] ?? "";
-  const targetTotal = state.maxRounds * state.roundTargetPlayerIds.length;
 
   async function prepare() {
-    if (!isHost || activeState.phase !== "setup" || pendingKind) return;
+    if (!isHost || activeState.phase !== "setup" || requestPending) return;
     await send(
       "story-prepare",
       { playId },
@@ -198,7 +217,7 @@ export default function RoomStoryDice({
   }
 
   async function roll() {
-    if (!isActor || activeState.phase !== "roll" || pendingKind) return;
+    if (!isActor || activeState.phase !== "roll" || requestPending) return;
     await send(
       "story-roll",
       { playId, roundId: activeState.roundId },
@@ -208,7 +227,7 @@ export default function RoomStoryDice({
 
   async function submitInput() {
     const value = input.trim();
-    if (!value || !isActor || pendingKind) return;
+    if (!value || !isActor || requestPending) return;
     let action: string;
     let body: Record<string, unknown>;
     if (activeState.phase === "story") {
@@ -238,7 +257,7 @@ export default function RoomStoryDice({
   }
 
   async function endEarly() {
-    if (pendingKind || !window.confirm(text.earlyEndConfirm)) return;
+    if (requestPending || !window.confirm(text.earlyEndConfirm)) return;
     await send(
       "end-game-early",
       { playId, roundId: activeState.roundId },
@@ -264,12 +283,18 @@ export default function RoomStoryDice({
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 text-foreground">
-      <GameHeader game={game} subtitle={text.storySubtitle} onLeave={onLeave} leave={text.leave} />
+      <GameHeader
+        game={game}
+        subtitle={text.storySubtitle}
+        onLeave={onLeave}
+        leave={text.leave}
+        disabled={requestPending}
+      />
 
       {state.phase === "setup" ? (
         <section className="space-y-3 border-b border-border pb-5">
           {isHost ? (
-            <Button type="button" onClick={prepare} disabled={pendingKind !== null} className="w-full sm:w-auto">
+            <Button type="button" onClick={prepare} disabled={requestPending} className="w-full sm:w-auto">
               <Play className="mr-2 h-4 w-4" aria-hidden="true" />
               {pendingKind === "story-prepare" ? text.sending : text.storyPrepare}
             </Button>
@@ -279,14 +304,14 @@ export default function RoomStoryDice({
         </section>
       ) : (
         <>
-          <section className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
+          <section className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-border pb-4" aria-live="polite">
             <div>
               <p className="text-sm font-semibold">{text.storyTagger(taggerName)}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {text.roundProgress(state.round, state.maxRounds, state.completedRounds)}
               </p>
             </div>
-            <div className="text-left sm:text-right">
+            <div className="min-w-0 text-left sm:text-right">
               <p className="text-sm font-semibold">{text.storyGoal(state.pairs.length, targetTotal)}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {text.submissionProgress(state.roundSubmittedPlayerIds.length, state.roundTargetPlayerIds.length)}
@@ -305,7 +330,7 @@ export default function RoomStoryDice({
                   <p className="text-xs font-semibold text-muted-foreground">{getStoryDiceCategoryLabel(locale, category)}</p>
                   <ul className="mt-2 flex flex-wrap gap-1.5">
                     {state.words[category].map((word) => (
-                      <li key={word} className="bg-secondary px-2 py-1 text-xs rounded-md">
+                      <li key={word} className="break-words bg-secondary px-2 py-1 text-xs rounded-md">
                         {getLocalizedText(state.words.wordText[word], locale, word)}
                       </li>
                     ))}
@@ -322,7 +347,7 @@ export default function RoomStoryDice({
                 {WORD_CATEGORIES.map((category) => {
                   const word = state.rolledWords?.[category] ?? "";
                   return (
-                    <span key={category} className="border border-border bg-secondary px-3 py-2 text-sm font-semibold rounded-lg">
+                    <span key={category} className="min-w-0 break-words border border-border bg-secondary px-3 py-2 text-sm font-semibold rounded-lg">
                       {getLocalizedText(state.words.wordText[word], locale, word)}
                     </span>
                   );
@@ -332,7 +357,7 @@ export default function RoomStoryDice({
           )}
 
           {state.phase === "roll" && isActor && (
-            <Button type="button" onClick={roll} disabled={pendingKind !== null} className="w-full sm:w-auto">
+            <Button type="button" onClick={roll} disabled={requestPending} className="w-full sm:w-auto">
               <Dices className="mr-2 h-4 w-4" aria-hidden="true" />
               {pendingKind === "story-roll" ? text.sending : text.storyRoll}
             </Button>
@@ -357,7 +382,7 @@ export default function RoomStoryDice({
                   }
                 }}
               />
-              <Button type="submit" disabled={!input.trim() || pendingKind !== null} className="w-full sm:w-auto">
+              <Button type="submit" disabled={!input.trim() || requestPending} className="w-full sm:w-auto">
                 <Send className="mr-2 h-4 w-4" aria-hidden="true" />
                 {pendingKind?.startsWith("story-submit") ? text.sending : submitLabel}
               </Button>
@@ -373,25 +398,25 @@ export default function RoomStoryDice({
         ) : (
           <div className="space-y-2">
             {state.story && (
-              <div className="border border-border bg-card p-3 rounded-lg">
+              <div className="min-w-0 border border-border bg-card p-3 rounded-lg">
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
                   <BookOpen className="h-4 w-4" aria-hidden="true" />
                   {text.storyRecord} · {state.story.playerName}
                 </p>
-                <p className="mt-1 text-sm">{state.story.story}</p>
+                <p className="mt-1 break-words text-sm">{state.story.story}</p>
               </div>
             )}
             {state.pairs.map((pair) => (
-              <div key={`${pair.roundId}:${pair.playerId}`} className="border border-border bg-card p-3 rounded-lg">
+              <div key={`${pair.roundId}:${pair.playerId}`} className="min-w-0 border border-border bg-card p-3 rounded-lg">
                 <p className="text-xs text-muted-foreground">{pair.round} · {pair.playerName}</p>
-                <p className="mt-1 text-sm font-semibold">{pair.question}</p>
-                <p className="mt-2 border-t border-border pt-2 text-sm">{pair.answer}</p>
+                <p className="mt-1 break-words text-sm font-semibold">{pair.question}</p>
+                <p className="mt-2 break-words border-t border-border pt-2 text-sm">{pair.answer}</p>
               </div>
             ))}
             {state.pendingQuestion && (
-              <div className="border border-input bg-background p-3 rounded-lg">
+              <div className="min-w-0 border border-input bg-background p-3 rounded-lg">
                 <p className="text-xs text-muted-foreground">{state.pendingQuestion.playerName}</p>
-                <p className="mt-1 text-sm font-semibold">{state.pendingQuestion.question}</p>
+                <p className="mt-1 break-words text-sm font-semibold">{state.pendingQuestion.question}</p>
               </div>
             )}
           </div>
@@ -399,7 +424,7 @@ export default function RoomStoryDice({
       </section>
 
       {isHost && state.completedRounds >= 1 && (
-        <Button type="button" variant="outline" onClick={endEarly} disabled={pendingKind !== null} className="border-border">
+        <Button type="button" variant="outline" onClick={endEarly} disabled={requestPending} className="border-border">
           <Flag className="mr-2 h-4 w-4" aria-hidden="true" />
           {text.earlyEnd}
         </Button>
@@ -413,11 +438,13 @@ function GameHeader({
   subtitle,
   leave,
   onLeave,
+  disabled,
 }: {
   game: BuiltInGame;
   subtitle: string;
   leave: string;
   onLeave: () => void;
+  disabled: boolean;
 }) {
   return (
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
@@ -425,7 +452,7 @@ function GameHeader({
         <h1 className="text-xl font-bold">{game.emoji} {game.title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
       </div>
-      <Button type="button" variant="ghost" size="sm" onClick={onLeave}>
+      <Button type="button" variant="ghost" size="sm" onClick={onLeave} disabled={disabled}>
         <LogOut className="mr-2 h-4 w-4" aria-hidden="true" />
         {leave}
       </Button>
