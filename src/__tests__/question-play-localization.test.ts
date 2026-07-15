@@ -15,7 +15,12 @@ import {
   isQuestionFormForLocale,
 } from "@/lib/question-game-i18n";
 import { pickFallbackLocalizedPairs } from "@/lib/memory-game-data";
-import { getStoryDiceWordText, pickFallbackBilingualWords } from "@/lib/story-dice-data";
+import {
+  getStoryDiceWordText,
+  pickFallbackBilingualWords,
+  STORY_DICE_FALLBACK,
+  STORY_DICE_FALLBACK_EN,
+} from "@/lib/story-dice-data";
 
 const studentLanding = readFileSync("src/app/(student)/student-question-play/page.tsx", "utf8");
 const studentGamePage = readFileSync("src/app/(student)/student-question-play/[gameId]/page.tsx", "utf8");
@@ -153,5 +158,10 @@ describe("question play localization", () => {
     const wordKey = words.protagonist[0];
     expect(getStoryDiceWordText(words, wordKey, "ko")).toBe(wordKey);
     expect(getStoryDiceWordText(words, wordKey, "en")).toBe(words.wordText?.[wordKey].en);
+  });
+
+  it("keeps the sixteenth fallback protagonist translation aligned", () => {
+    expect(STORY_DICE_FALLBACK.protagonist[15]).toBe("도깨비");
+    expect(STORY_DICE_FALLBACK_EN.protagonist[15]).toBe("dokkaebi");
   });
 });

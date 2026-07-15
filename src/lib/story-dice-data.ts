@@ -26,7 +26,7 @@ export const STORY_DICE_FALLBACK = {
 export const STORY_DICE_FALLBACK_EN = {
   protagonist: [
     "robot", "detective", "wizard", "inventor", "alien", "student", "puppy", "pirate",
-    "dinosaur", "fairy", "knight", "cat", "scientist", "astronaut", "mermaid", "dragon",
+    "dinosaur", "fairy", "knight", "cat", "scientist", "astronaut", "mermaid", "dokkaebi",
     "turtle", "lion", "monkey", "ghost", "ninja", "princess", "prince", "giant",
   ],
   place: [
