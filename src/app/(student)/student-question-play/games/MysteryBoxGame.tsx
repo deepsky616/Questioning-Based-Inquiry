@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
-import { useSingleAward, AwardBadge } from "./useSingleAward";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
 import {
   QUESTION_GAME_LIMITS,
@@ -138,7 +137,6 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
       ? `인공지능과 번갈아 진행해요. 질문이나 추측을 합쳐 ${maxActivities}번 안에 맞혀 보세요.`
       : `질문이나 추측을 합쳐 ${maxActivities}번 안에 맞혀 보세요.`;
   const { ask, loading: aiLoading } = useAIPlay();
-  const { award, result: awardResult } = useSingleAward();
 
   // 참가자 구성 (혼자=1명 / AI=나+AI / 친구=명단)
   const playersList = (() => {
@@ -176,21 +174,6 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     activityLockRef.current = false;
     setActivityPending(false);
   }, [qaList, phase, turnIdx]);
-
-  // 적립 (혼자/AI 모드). AI 모드는 사람이 이겼을 때만 completed
-  useEffect(() => {
-    if (phase !== "win" && phase !== "lose") return;
-    if (!isSolo && !isAI) return;
-    award({
-      mode: isAI ? "ai" : "solo",
-      gameId: "mystery-box",
-      validQuestions: qaList.filter(
-        (qa) => qa.kind === "question" && qa.asker !== AI_NAME,
-      ).length,
-      completed: phase === "win",
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
 
   async function startGame() {
     const gameRun = gameRunRef.current + 1;
@@ -595,7 +578,6 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             {isAI && <><br/><span className="font-bold text-indigo-700 dark:text-indigo-300">{text.beatAi} 🏆</span></>}
           </p>
           <ActivityReview entries={qaList} hasTurns={hasTurns} locale={locale} />
-          <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>
             {text.retry}
@@ -616,7 +598,6 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             <p className="mt-1 text-sm text-muted-foreground">({isAI ? aiItem?.category : localItem?.hint})</p>
           </div>
           <ActivityReview entries={qaList} hasTurns={hasTurns} locale={locale} />
-          <AwardBadge result={awardResult} />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #F472B6, #E11D48)" }} onClick={startGame}>
             {text.tryAgain}

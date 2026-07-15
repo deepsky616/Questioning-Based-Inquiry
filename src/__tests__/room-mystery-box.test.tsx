@@ -33,15 +33,9 @@ import {
 import en from "../../messages/en.json";
 
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
-const awardMocks = vi.hoisted(() => ({ award: vi.fn() }));
 
 vi.mock("@/app/(student)/student-question-play/games/useAIPlay", () => ({
   useAIPlay: () => ({ ask: aiMocks.ask, loading: false }),
-}));
-
-vi.mock("@/app/(student)/student-question-play/games/useSingleAward", () => ({
-  useSingleAward: () => ({ award: awardMocks.award, result: null }),
-  AwardBadge: () => null,
 }));
 
 const game = BUILT_IN_GAMES.find(({ id }) => id === "mystery-box")!;
@@ -66,7 +60,6 @@ function renderEnglish(ui: ReactElement) {
 
 beforeEach(() => {
   aiMocks.ask.mockReset();
-  awardMocks.award.mockReset();
   vi.spyOn(Math, "random").mockReturnValue(0);
 });
 
@@ -716,6 +709,10 @@ describe("미스터리 박스 친구 방 결과", () => {
       join(process.cwd(), "src/app/(student)/student-question-play/[gameId]/page.tsx"),
       "utf8",
     );
+    const flowSource = readFileSync(
+      join(process.cwd(), "src/components/question-games/QuestionGameRoomFlow.tsx"),
+      "utf8",
+    );
 
     expect(roomSource).toContain("readMysteryPublicState");
     expect(roomSource).not.toMatch(/readMysteryState\s*\(/);
@@ -725,8 +722,9 @@ describe("미스터리 박스 친구 방 결과", () => {
     )).toEqual(new Set(["mystery-start", "mystery-ask", "mystery-guess", "restart"]));
     expect(roomSource).not.toContain("update-state");
     expect(roomSource).not.toContain("RoomResult");
-    expect(pageSource).toContain('import RoomMysteryBox from "../games/RoomMysteryBox"');
-    expect(pageSource).toMatch(/\"mystery-box\"\s*:\s*RoomMysteryBox/);
+    expect(pageSource).toContain("QuestionGameRoomFlow");
+    expect(flowSource).toContain("RoomMysteryBox");
+    expect(flowSource).toMatch(/\"mystery-box\"\s*:\s*RoomMysteryBox/);
     expect(pageSource).not.toContain('config={{ mode: "friend"');
   });
 });

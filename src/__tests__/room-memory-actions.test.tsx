@@ -36,22 +36,9 @@ vi.mock("next-auth/react", () => ({
 }));
 
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
-const awardMocks = vi.hoisted(() => ({
-  award: vi.fn(),
-  reset: vi.fn(),
-}));
 
 vi.mock("@/app/(student)/student-question-play/games/useAIPlay", () => ({
   useAIPlay: () => ({ ask: aiMocks.ask, loading: false }),
-}));
-
-vi.mock("@/app/(student)/student-question-play/games/useSingleAward", () => ({
-  useSingleAward: () => ({
-    award: awardMocks.award,
-    result: null,
-    reset: awardMocks.reset,
-  }),
-  AwardBadge: () => null,
 }));
 
 const game = BUILT_IN_GAMES.find((item) => item.id === "memory")!;
@@ -62,8 +49,6 @@ const players: GameRoom["players"] = [
 
 beforeEach(() => {
   aiMocks.ask.mockReset();
-  awardMocks.award.mockReset();
-  awardMocks.reset.mockReset();
 });
 
 afterEach(() => {
@@ -839,7 +824,9 @@ describe("지역 메모리 최대 시도", () => {
     expect(localAnswerCards()[0].className).toContain("dark:");
   });
 
-  it("마지막 허용 실패를 보여 준 뒤 결과로 이동하고 완료로 적립한다", async () => {
+  it("마지막 허용 실패를 보여 준 뒤 결과로 이동하고 자동 지급하지 않는다", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
     await startLocalMemory("쉬움");
     vi.useFakeTimers();
 
@@ -851,14 +838,12 @@ describe("지역 메모리 최대 시도", () => {
     }
 
     expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
-    expect(awardMocks.award).toHaveBeenCalledWith(expect.objectContaining({
-      gameId: "memory",
-      mode: "solo",
-      completed: true,
-    }));
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("마지막 허용 성공 뒤 짝이 남아도 결과로 이동한다", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
     await startLocalMemory("쉬움");
     vi.useFakeTimers();
 
@@ -874,13 +859,7 @@ describe("지역 메모리 최대 시도", () => {
     });
 
     expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
-    expect(awardMocks.award).toHaveBeenCalledTimes(1);
-    expect(awardMocks.award).toHaveBeenCalledWith({
-      mode: "solo",
-      gameId: "memory",
-      validQuestions: 1,
-      completed: true,
-    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("모든 짝을 찾으면 최대 시도 전에 결과로 이동한다", async () => {

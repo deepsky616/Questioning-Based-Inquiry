@@ -27,15 +27,9 @@ import {
 import en from "../../messages/en.json";
 
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
-const awardMocks = vi.hoisted(() => ({ award: vi.fn() }));
 
 vi.mock("@/app/(student)/student-question-play/games/useAIPlay", () => ({
   useAIPlay: () => ({ ask: aiMocks.ask, loading: false, error: null }),
-}));
-
-vi.mock("@/app/(student)/student-question-play/games/useSingleAward", () => ({
-  useSingleAward: () => ({ award: awardMocks.award, result: null, reset: vi.fn() }),
-  AwardBadge: () => null,
 }));
 
 Object.defineProperty(Element.prototype, "scrollIntoView", {
@@ -175,7 +169,6 @@ beforeEach(() => {
   vi.spyOn(Math, "random").mockReturnValue(0.1);
   aiMocks.ask.mockReset();
   aiMocks.ask.mockResolvedValue(null);
-  awardMocks.award.mockReset();
 });
 
 afterEach(() => {

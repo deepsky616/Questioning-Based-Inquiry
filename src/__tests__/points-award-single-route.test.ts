@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/db", () => ({
@@ -45,6 +47,29 @@ beforeEach(() => {
 });
 
 describe("단독 질문놀이 점수 지급", () => {
+  it("일곱 지역 놀이 화면은 자동 포인트 지급 훅을 사용하지 않는다", () => {
+    const gameFiles = [
+      "MemoryGame.tsx",
+      "MysteryBoxGame.tsx",
+      "LadderGame.tsx",
+      "StoryDiceGame.tsx",
+      "DiceGame.tsx",
+      "RelayGame.tsx",
+      "KabaGame.tsx",
+    ];
+
+    for (const file of gameFiles) {
+      const source = readFileSync(join(
+        process.cwd(),
+        "src/app/(student)/student-question-play/games",
+        file,
+      ), "utf8");
+      expect(source, file).not.toContain("useSingleAward");
+      expect(source, file).not.toContain("AwardBadge");
+      expect(source, file).not.toContain("/api/points/award-single");
+    }
+  });
+
   it("비로그인은 거부한다", async () => {
     mAuth.mockResolvedValue(null);
 
