@@ -7,9 +7,11 @@ import {
   act,
   cleanup,
   fireEvent,
+  render,
   screen,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { NextIntlClientProvider } from "next-intl";
 import StoryDiceGame from "@/app/(student)/student-question-play/games/StoryDiceGame";
 import DiceGame from "@/app/(student)/student-question-play/games/DiceGame";
 import RelayGame from "@/app/(student)/student-question-play/games/RelayGame";
@@ -17,6 +19,12 @@ import KabaGame from "@/app/(student)/student-question-play/games/KabaGame";
 import { renderWithIntl } from "@/__tests__/test-utils/render-with-intl";
 import { BUILT_IN_GAMES, type BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "@/app/(student)/student-question-play/[gameId]/page";
+import { getQuestionGameText } from "@/lib/question-game-i18n";
+import {
+  getStoryDiceWordText,
+  pickFallbackBilingualWords,
+} from "@/lib/story-dice-data";
+import en from "../../messages/en.json";
 
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
 const awardMocks = vi.hoisted(() => ({ award: vi.fn() }));
@@ -63,6 +71,25 @@ function renderLocalGame(
         players: mode === "ai" ? ["민준", "AI"] : ["민준"],
       }}
     />,
+  );
+}
+
+function renderEnglishStoryGame(mode: LocalMode = "solo") {
+  return render(
+    <NextIntlClientProvider
+      locale="en"
+      messages={en as never}
+      timeZone="Asia/Seoul"
+    >
+      <StoryDiceGame
+        game={gameById("story-dice")}
+        onBack={vi.fn()}
+        config={{
+          mode,
+          players: mode === "ai" ? ["Minjun", "AI"] : ["Minjun"],
+        }}
+      />
+    </NextIntlClientProvider>,
   );
 }
 
@@ -211,6 +238,70 @@ describe("이야기 주사위 지역 목표", () => {
     fireEvent.click(screen.getByRole("button", { name: /주사위 3개 굴리기/ }));
     await advance(1500);
     expect(screen.getByRole("textbox")).toBeVisible();
+  });
+
+  it("영어 화면의 대체 단어를 목록과 굴림 및 인공지능 문맥에 영어로 쓴다", async () => {
+    const expectedWords = pickFallbackBilingualWords(8);
+    const wordMatcher = (word: string) => (_content: string, element: Element | null) => (
+      element?.tagName === "SPAN" && (
+        element.textContent === word || element.textContent?.endsWith(` ${word}`)
+      )
+    );
+    const expected = {
+      protagonist: getStoryDiceWordText(
+        expectedWords,
+        expectedWords.protagonist[0],
+        "en",
+      ),
+      place: getStoryDiceWordText(expectedWords, expectedWords.place[0], "en"),
+      event: getStoryDiceWordText(expectedWords, expectedWords.event[0], "en"),
+    };
+    aiMocks.ask.mockImplementation(async ({ action }: { action: string }) => (
+      action === "story-dice:words"
+        ? { parsed: {} }
+        : { text: "What happened next?" }
+    ));
+    renderEnglishStoryGame("ai");
+
+    await flushPromises();
+
+    for (const word of Object.values(expected)) {
+      expect(screen.getByText(wordMatcher(word))).toBeVisible();
+    }
+    for (const word of [
+      expectedWords.protagonist[0],
+      expectedWords.place[0],
+      expectedWords.event[0],
+    ]) {
+      expect(screen.queryByText(wordMatcher(word))).not.toBeInTheDocument();
+    }
+
+    const englishText = getQuestionGameText("en");
+    fireEvent.click(screen.getByRole("button", { name: englishText.storyRoll3 }));
+    await advance(1500);
+
+    for (const word of Object.values(expected)) {
+      expect(screen.getAllByText(wordMatcher(word))).toHaveLength(2);
+    }
+    const storyInput = screen.getByRole("textbox");
+    expect(storyInput).toHaveAttribute(
+      "placeholder",
+      englishText.storyPlaceholder(
+        expected.protagonist,
+        expected.place,
+        expected.event,
+      ),
+    );
+    fireEvent.change(storyInput, {
+      target: { value: "The robot found a secret map in the forest." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: englishText.storyStart }));
+    await advance(400);
+
+    const questionRequest = aiMocks.ask.mock.calls.find(
+      ([request]) => request.action === "story-dice:ai-question",
+    )?.[0];
+    expect(questionRequest?.context).toMatchObject(expected);
   });
 
   it("혼자 모드는 질문만 낸 상태가 아니라 셋째 답안으로 묶음을 닫을 때 끝난다", async () => {

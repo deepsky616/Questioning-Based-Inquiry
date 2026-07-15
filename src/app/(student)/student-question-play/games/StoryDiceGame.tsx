@@ -7,7 +7,8 @@ import { GameHeader } from "./GameHeader";
 import { useAIPlay } from "./useAIPlay";
 import {
   STORY_DICE_EMOJI, STORY_DICE_COLOR,
-  pickFallbackBilingualWords, parseAIWords, getWordEmoji, StoryDiceWords, DiceCategory,
+  pickFallbackBilingualWords, parseAIWords, getWordEmoji, getStoryDiceWordText,
+  StoryDiceWords, DiceCategory,
 } from "@/lib/story-dice-data";
 import { getQuestionGameText, getStoryDiceCategoryLabel } from "@/lib/question-game-i18n";
 import { QUESTION_GAME_LIMITS, QUESTION_GAME_RULES } from "@/lib/question-game-rules";
@@ -184,7 +185,9 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     const res = await ask({
       action: "story-dice:ai-question",
       context: {
-        protagonist: rolled.protagonist, place: rolled.place, event: rolled.event,
+        protagonist: getStoryDiceWordText(words, rolled.protagonist, locale),
+        place: getStoryDiceWordText(words, rolled.place, locale),
+        event: getStoryDiceWordText(words, rolled.event, locale),
         story: currentChain[0]?.text ?? "",
         history,
       },
@@ -307,7 +310,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
               <div className="flex flex-wrap gap-1 justify-center">
                 {words[cat].map((w) => (
                   <span key={w} className="text-[11px] bg-white border border-gray-200 rounded-full px-2 py-0.5 text-gray-600">
-                    {getWordEmoji(w, cat, words?.emojis)} {w}
+                    {getWordEmoji(w, cat, words?.emojis)} {getStoryDiceWordText(words, w, locale)}
                   </span>
                 ))}
               </div>
@@ -321,6 +324,9 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
         <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border-2 border-amber-200 p-4 grid grid-cols-3 gap-3">
           {(["protagonist", "place", "event"] as DiceCategory[]).map((cat) => {
             const value = rolling ? rolling[cat] : rolled![cat];
+            const visibleValue = value === "?"
+              ? value
+              : getStoryDiceWordText(words, value, locale);
             return (
               <div key={cat} className="text-center">
                 <p className="text-xs font-bold mb-1" style={{ color: STORY_DICE_COLOR[cat] }}>
@@ -335,7 +341,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
                   <span className="text-3xl leading-none">
                     {value === "?" ? "🎲" : getWordEmoji(value, cat, words?.emojis)}
                   </span>
-                  <span className="text-lg font-black">{value}</span>
+                  <span className="text-lg font-black">{visibleValue}</span>
                 </div>
               </div>
             );
@@ -357,7 +363,11 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
           <p className="text-sm font-bold text-gray-700">{text.storyMakeSentence}</p>
           <textarea
             className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none h-24"
-            placeholder={text.storyPlaceholder(rolled.protagonist, rolled.place, rolled.event)}
+            placeholder={text.storyPlaceholder(
+              getStoryDiceWordText(words, rolled.protagonist, locale),
+              getStoryDiceWordText(words, rolled.place, locale),
+              getStoryDiceWordText(words, rolled.event, locale),
+            )}
             value={input} onChange={(e) => setInput(e.target.value)}
             autoFocus />
           <Button className="w-full font-bold text-white rounded-xl"
