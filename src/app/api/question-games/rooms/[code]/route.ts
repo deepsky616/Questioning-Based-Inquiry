@@ -25,7 +25,11 @@ import {
   recordMemoryRoll,
   settleMemoryRollingRoom,
 } from "@/lib/memory-room-roll";
-import { loadVerifiedGameAwardResult } from "@/lib/question-game-award-publish-service";
+import { gameAwardResultsMatch } from "@/lib/game-award-result";
+import {
+  QuestionGameAwardPublishError,
+  loadVerifiedGameAwardResult,
+} from "@/lib/question-game-award-publish-service";
 import {
   QUESTION_GAME_LIMITS,
   getQuestionGameRule,
@@ -125,15 +129,6 @@ function hasExactKeys(
 ) {
   const keys = Object.keys(value);
   return keys.length === allowed.size && keys.every((key) => allowed.has(key));
-}
-
-function awardResultsMatch(
-  first: GameRoom["awardResult"],
-  second: GameRoom["awardResult"],
-) {
-  return first !== undefined &&
-    second !== undefined &&
-    JSON.stringify(first) === JSON.stringify(second);
 }
 
 function commandSuccess(
@@ -303,13 +298,27 @@ async function publishAwardResult({
 
   let verifiedResult: GameRoom["awardResult"];
   try {
-    verifiedResult = await loadVerifiedGameAwardResult({
-      gameId: room.gameId,
-      roomCode: room.code,
-      roomCreatedAt: room.createdAt,
-      playId: room.playId,
-    }) ?? undefined;
-  } catch {
+    const allowedStudentIds = new Set(
+      room.players
+        .filter((player) => player.id !== room.hostId)
+        .map((player) => player.id),
+    );
+    verifiedResult = await loadVerifiedGameAwardResult(
+      {
+        gameId: room.gameId,
+        roomCode: room.code,
+        roomCreatedAt: room.createdAt,
+        playId: room.playId,
+      },
+      allowedStudentIds,
+    ) ?? undefined;
+  } catch (error) {
+    if (error instanceof QuestionGameAwardPublishError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
     return NextResponse.json(
       { error: "점수 결과를 불러오지 못했습니다" },
       { status: 500 },
@@ -321,7 +330,7 @@ async function publishAwardResult({
       { status: 409 },
     );
   }
-  if (awardResultsMatch(room.awardResult, verifiedResult)) {
+  if (gameAwardResultsMatch(room.awardResult, verifiedResult)) {
     return commandSuccess(room, undefined);
   }
   if (staleVersion) return roomConflict(room);
@@ -333,7 +342,7 @@ async function publishAwardResult({
   if (
     saved.room.createdAt === room.createdAt &&
     saved.room.playId === room.playId &&
-    awardResultsMatch(saved.room.awardResult, verifiedResult)
+    gameAwardResultsMatch(saved.room.awardResult, verifiedResult)
   ) {
     return commandSuccess(saved.room, undefined);
   }

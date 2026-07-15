@@ -9,6 +9,12 @@ const mocks = vi.hoisted(() => ({
   saveGameRoom: vi.fn(),
   deleteGameRoom: vi.fn(),
   loadVerifiedGameAwardResult: vi.fn(),
+  QuestionGameAwardPublishError: class QuestionGameAwardPublishError extends Error {
+    constructor(message: string, public readonly status: number) {
+      super(message);
+      this.name = "QuestionGameAwardPublishError";
+    }
+  },
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
@@ -27,6 +33,7 @@ vi.mock("@/lib/memory-room-roll", () => ({
   settleMemoryRollingRoom: (room: GameRoom) => room,
 }));
 vi.mock("@/lib/question-game-award-publish-service", () => ({
+  QuestionGameAwardPublishError: mocks.QuestionGameAwardPublishError,
   loadVerifiedGameAwardResult: mocks.loadVerifiedGameAwardResult,
 }));
 
@@ -35,13 +42,48 @@ import { PATCH } from "@/app/api/question-games/rooms/[code]/route";
 const PLAY_ID = "11111111-1111-4111-8111-111111111111";
 const COMMAND_ID = "22222222-2222-4222-8222-222222222222";
 const AWARD: GameAwardResult = {
-  awards: [{
+  awards: [
+    {
+      studentId: "student-1",
+      bonusType: "PARTICIPATION",
+      points: 1,
+      reason: "게임 참여",
+    },
+    {
+      studentId: "student-1",
+      bonusType: "COMPLETION",
+      points: 5,
+      reason: "게임 완료",
+    },
+  ],
+  bestQuestion: {
     studentId: "student-1",
-    bonusType: "COMPLETION",
-    points: 5,
-    reason: "게임 완료",
-  }],
+    question: "별은 왜 빛나나요?",
+    reason: "탐구할 거리가 분명해요.",
+  },
   summary: "질문을 끝까지 완성했어요.",
+};
+const REORDERED_AWARD: GameAwardResult = {
+  summary: "질문을 끝까지 완성했어요.",
+  bestQuestion: {
+    reason: "탐구할 거리가 분명해요.",
+    question: "별은 왜 빛나나요?",
+    studentId: "student-1",
+  },
+  awards: [
+    {
+      reason: "게임 완료",
+      points: 5,
+      bonusType: "COMPLETION",
+      studentId: "student-1",
+    },
+    {
+      reason: "게임 참여",
+      points: 1,
+      bonusType: "PARTICIPATION",
+      studentId: "student-1",
+    },
+  ],
 };
 
 function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
@@ -115,12 +157,15 @@ describe("verified game award publication route", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mocks.loadVerifiedGameAwardResult).toHaveBeenCalledWith({
-      gameId: "dice",
-      roomCode: "1234",
-      roomCreatedAt: 100,
-      playId: PLAY_ID,
-    });
+    expect(mocks.loadVerifiedGameAwardResult).toHaveBeenCalledWith(
+      {
+        gameId: "dice",
+        roomCode: "1234",
+        roomCreatedAt: 100,
+        playId: PLAY_ID,
+      },
+      new Set(["student-1"]),
+    );
     expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
       awardResult: AWARD,
       gameState: {
@@ -153,6 +198,28 @@ describe("verified game award publication route", () => {
     const response = await patch(requestBody());
 
     expect(response.status).toBe(409);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("preserves a forbidden error for logs outside the room student scope", async () => {
+    mocks.loadVerifiedGameAwardResult.mockRejectedValue(
+      new mocks.QuestionGameAwardPublishError(
+        "현재 방 참가 학생의 점수만 공개할 수 있습니다",
+        403,
+      ),
+    );
+
+    const response = await patch(requestBody());
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toEqual({
+      error: "현재 방 참가 학생의 점수만 공개할 수 있습니다",
+    });
+    expect(mocks.loadVerifiedGameAwardResult).toHaveBeenCalledWith(
+      expect.any(Object),
+      new Set(["student-1"]),
+    );
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
@@ -208,7 +275,7 @@ describe("verified game award publication route", () => {
   it("replays the same published result after a lost success response", async () => {
     mocks.loadGameRoom.mockResolvedValue(makeRoom({
       version: 8,
-      awardResult: AWARD,
+      awardResult: REORDERED_AWARD,
     }));
 
     const response = await patch(requestBody({ expectedVersion: 7 }));
@@ -221,10 +288,12 @@ describe("verified game award publication route", () => {
   it("accepts a write collision only when the same execution result is present", async () => {
     mocks.saveGameRoom.mockResolvedValue({
       kind: "conflict",
-      room: makeRoom({ version: 8, awardResult: AWARD }),
+      room: makeRoom({ version: 8, awardResult: REORDERED_AWARD }),
     });
     const replayResponse = await patch(requestBody());
+    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
 
+    mocks.saveGameRoom.mockClear();
     mocks.saveGameRoom.mockResolvedValue({
       kind: "conflict",
       room: makeRoom({ version: 8 }),
@@ -233,5 +302,6 @@ describe("verified game award publication route", () => {
 
     expect(replayResponse.status).toBe(200);
     expect(conflictResponse.status).toBe(409);
+    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
   });
 });

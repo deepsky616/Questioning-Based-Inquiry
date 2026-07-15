@@ -12,8 +12,16 @@ export interface VerifiedGameAwardIdentity {
   playId: string;
 }
 
+export class QuestionGameAwardPublishError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "QuestionGameAwardPublishError";
+  }
+}
+
 export async function loadVerifiedGameAwardResult(
   identity: VerifiedGameAwardIdentity,
+  allowedStudentIds: ReadonlySet<string>,
 ): Promise<GameAwardResult | null> {
   const logs = await prisma.pointLog.findMany({
     where: {
@@ -25,7 +33,11 @@ export async function loadVerifiedGameAwardResult(
       ),
       status: "APPROVED",
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: [
+      { createdAt: "asc" },
+      { studentId: "asc" },
+      { bonusType: "asc" },
+    ],
     select: {
       studentId: true,
       bonusType: true,
@@ -35,7 +47,12 @@ export async function loadVerifiedGameAwardResult(
       aiAnalysis: true,
     },
   });
-  return restorePublishableAwardResult(
-    logs.filter((log) => log.status === "APPROVED"),
-  );
+  const approvedLogs = logs.filter((log) => log.status === "APPROVED");
+  if (approvedLogs.some((log) => !allowedStudentIds.has(log.studentId))) {
+    throw new QuestionGameAwardPublishError(
+      "현재 방 참가 학생의 점수만 공개할 수 있습니다",
+      403,
+    );
+  }
+  return restorePublishableAwardResult(approvedLogs);
 }

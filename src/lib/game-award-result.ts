@@ -125,6 +125,48 @@ export function isGameAwardResult(value: unknown): value is GameAwardResult {
   );
 }
 
+function compareAwardIdentity(first: GameAward, second: GameAward) {
+  if (first.studentId !== second.studentId) {
+    return first.studentId < second.studentId ? -1 : 1;
+  }
+  if (first.bonusType === second.bonusType) return 0;
+  return first.bonusType < second.bonusType ? -1 : 1;
+}
+
+export function gameAwardResultsMatch(
+  first: GameAwardResult | undefined,
+  second: GameAwardResult | undefined,
+): boolean {
+  if (!first || !second || first.awards.length !== second.awards.length) {
+    return false;
+  }
+  if (first.summary !== second.summary) return false;
+
+  const firstBest = first.bestQuestion;
+  const secondBest = second.bestQuestion;
+  if (
+    (firstBest === undefined) !== (secondBest === undefined) ||
+    (firstBest !== undefined && secondBest !== undefined && (
+      firstBest.studentId !== secondBest.studentId ||
+      firstBest.question !== secondBest.question ||
+      firstBest.reason !== secondBest.reason
+    ))
+  ) {
+    return false;
+  }
+
+  const firstAwards = [...first.awards].sort(compareAwardIdentity);
+  const secondAwards = [...second.awards].sort(compareAwardIdentity);
+  return firstAwards.every((award, index) => {
+    const other = secondAwards[index];
+    return other !== undefined &&
+      award.studentId === other.studentId &&
+      award.bonusType === other.bonusType &&
+      award.points === other.points &&
+      award.reason === other.reason;
+  });
+}
+
 export function serializeGameAwardResultSnapshot(
   input: GameAwardResultSnapshotInput,
 ): string {

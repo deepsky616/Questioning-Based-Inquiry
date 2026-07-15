@@ -13,7 +13,10 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { serializeGameAwardResultSnapshot } from "@/lib/game-award-result";
-import { loadVerifiedGameAwardResult } from "@/lib/question-game-award-publish-service";
+import {
+  QuestionGameAwardPublishError,
+  loadVerifiedGameAwardResult,
+} from "@/lib/question-game-award-publish-service";
 
 const IDENTITY = {
   gameId: "dice",
@@ -21,6 +24,7 @@ const IDENTITY = {
   roomCreatedAt: 100,
   playId: "11111111-1111-4111-8111-111111111111",
 };
+const ALLOWED_STUDENT_IDS = new Set(["student-1"]);
 
 describe("verified question game award publishing", () => {
   beforeEach(() => {
@@ -55,7 +59,9 @@ describe("verified question game award publishing", () => {
       },
     ]);
 
-    await expect(loadVerifiedGameAwardResult(IDENTITY)).resolves.toEqual({
+    await expect(
+      loadVerifiedGameAwardResult(IDENTITY, ALLOWED_STUDENT_IDS),
+    ).resolves.toEqual({
       awards: [{
         studentId: "student-1",
         bonusType: "PARTICIPATION",
@@ -75,7 +81,11 @@ describe("verified question game award publishing", () => {
         roomCode: "room:1234:100:11111111-1111-4111-8111-111111111111",
         status: "APPROVED",
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: [
+        { createdAt: "asc" },
+        { studentId: "asc" },
+        { bonusType: "asc" },
+      ],
       select: {
         studentId: true,
         bonusType: true,
@@ -89,7 +99,9 @@ describe("verified question game award publishing", () => {
 
   it("returns null when the execution has no valid approved result", async () => {
     mocks.findMany.mockResolvedValue([]);
-    await expect(loadVerifiedGameAwardResult(IDENTITY)).resolves.toBeNull();
+    await expect(
+      loadVerifiedGameAwardResult(IDENTITY, ALLOWED_STUDENT_IDS),
+    ).resolves.toBeNull();
 
     mocks.findMany.mockResolvedValue([{
       studentId: "student-1",
@@ -99,6 +111,30 @@ describe("verified question game award publishing", () => {
       status: "APPROVED",
       aiAnalysis: null,
     }]);
-    await expect(loadVerifiedGameAwardResult(IDENTITY)).resolves.toBeNull();
+    await expect(
+      loadVerifiedGameAwardResult(IDENTITY, ALLOWED_STUDENT_IDS),
+    ).resolves.toBeNull();
+  });
+
+  it("rejects approved logs outside the current room student scope", async () => {
+    mocks.findMany.mockResolvedValue([{
+      studentId: "student-outside-room",
+      bonusType: "PARTICIPATION",
+      points: 5,
+      reason: "게임 참여",
+      status: "APPROVED",
+      aiAnalysis: null,
+    }]);
+
+    const request = loadVerifiedGameAwardResult(
+      IDENTITY,
+      ALLOWED_STUDENT_IDS,
+    );
+
+    await expect(request).rejects.toBeInstanceOf(QuestionGameAwardPublishError);
+    await expect(request).rejects.toMatchObject({
+      status: 403,
+      message: "현재 방 참가 학생의 점수만 공개할 수 있습니다",
+    });
   });
 });
