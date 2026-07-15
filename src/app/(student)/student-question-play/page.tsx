@@ -189,7 +189,7 @@ function GameCard({ game, index, onSelect }: { game: AnyGame; index: number; onS
           </span>
         </div>
         <button
-          className="w-full py-3 rounded-xl font-bold text-white text-sm tracking-wide transition-opacity hover:opacity-90"
+          className="w-full py-3 rounded-xl font-bold text-white text-sm tracking-wide transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           style={{ background: game.gradientCss }}
           onClick={(e) => { e.stopPropagation(); onSelect(); }}
         >

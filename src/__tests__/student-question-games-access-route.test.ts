@@ -15,6 +15,7 @@ import { GET } from "@/app/api/question-games/route";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { loadQuestionGameSettingsForTeachers } from "@/lib/question-game-settings-store";
+import { GRADIENT_PRESETS } from "@/lib/question-games-data";
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mockStudent = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
@@ -80,5 +81,36 @@ describe("학생 질문놀이 접근 경계", () => {
 
     expect(response.status).toBe(403);
     expect(mockStudent).not.toHaveBeenCalled();
+  });
+
+  it("직접 만든 놀이의 임의 CSS는 저장값과 무관하게 안전한 응답으로 바꾼다", async () => {
+    mockSettings.mockResolvedValue({
+      customGames: [{
+        id: "custom-unsafe",
+        teacherId: "teacher-1",
+        title: "직접 만든 놀이",
+        description: "설명",
+        emoji: "🎮",
+        gradientCss: 'url("https://example.com/bright.png")',
+        accentColor: "#ffffff",
+        playerCount: "2~8명",
+        duration: "10분",
+        instructions: [],
+        isBuiltIn: false,
+        order: 100,
+      }],
+      visibilityMap: {},
+      orderIds: null,
+    });
+
+    const response = await GET();
+    const games = await response.json();
+    const custom = games.find((game: { id: string }) => game.id === "custom-unsafe");
+    const fallback = GRADIENT_PRESETS.find(({ id }) => id === "indigo");
+
+    expect(custom).toMatchObject({
+      gradientCss: fallback?.css,
+      accentColor: fallback?.accent,
+    });
   });
 });

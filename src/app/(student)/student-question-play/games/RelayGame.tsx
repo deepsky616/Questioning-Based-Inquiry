@@ -162,15 +162,15 @@ export default function RelayGame({ game, onBack, config }: Props) {
 
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-6 space-y-5">
           {/* 규칙 */}
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-1.5">
-            <p className="text-orange-700 font-black text-sm">{text.gameRules}</p>
+          <div className="bg-secondary border border-border rounded-xl p-4 space-y-1.5">
+            <p className="text-foreground font-black text-sm">{text.gameRules}</p>
             {text.relayRules.map((r, i) => (
-              <p key={i} className="text-orange-600 text-sm flex items-start gap-2">
+              <p key={i} className="text-foreground text-sm flex items-start gap-2">
                 <span className="flex-shrink-0">•</span>{r}
               </p>
             ))}
             {isAI && (
-              <p className="text-indigo-600 text-sm font-bold mt-2 bg-indigo-50 rounded-lg px-3 py-1.5">
+              <p className="text-foreground text-sm font-bold mt-2 bg-muted border border-border rounded-lg px-3 py-1.5">
                 {text.relayAiOrder}
               </p>
             )}

@@ -6,6 +6,7 @@ import {
   AnyGame,
   GameVisibility,
   isGameVisibleToStudent,
+  normalizeQuestionGameTheme,
   sortGamesByOrder,
 } from "@/lib/question-games-data";
 import { loadQuestionGameSettingsForTeachers } from "@/lib/question-game-settings-store";
@@ -60,7 +61,7 @@ export async function GET() {
 
   // 선생님 없으면 기본 게임 전체 노출
   if (teacherIds.length === 0) {
-    return NextResponse.json(BUILT_IN_GAMES);
+    return NextResponse.json(BUILT_IN_GAMES.map(normalizeQuestionGameTheme));
   }
 
   const { customGames, visibilityMap, orderIds } = await loadQuestionGameSettingsForTeachers(teacherIds);
@@ -77,5 +78,7 @@ export async function GET() {
   });
 
   // 담당 교사가 지정한 순서(첫 교사 기준) 적용
-  return NextResponse.json(sortGamesByOrder(filtered, orderIds));
+  return NextResponse.json(
+    sortGamesByOrder(filtered, orderIds).map(normalizeQuestionGameTheme),
+  );
 }

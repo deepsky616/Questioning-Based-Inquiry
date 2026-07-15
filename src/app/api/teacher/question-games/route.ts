@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { BUILT_IN_GAMES, sortGamesByOrder } from "@/lib/question-games-data";
+import {
+  BUILT_IN_GAMES,
+  normalizeQuestionGameTheme,
+  sortGamesByOrder,
+} from "@/lib/question-games-data";
 import { createQuestionGame, loadQuestionGameSettings } from "@/lib/question-game-settings-store";
 
 export async function GET() {
@@ -16,7 +20,10 @@ export async function GET() {
 
   const { customGames, visibilityMap, orderIds } = await loadQuestionGameSettings(teacherId);
 
-  const allGames = sortGamesByOrder([...BUILT_IN_GAMES, ...customGames], orderIds);
+  const allGames = sortGamesByOrder(
+    [...BUILT_IN_GAMES, ...customGames],
+    orderIds,
+  ).map(normalizeQuestionGameTheme);
   return NextResponse.json({ games: allGames, visibilityMap });
 }
 
@@ -49,5 +56,8 @@ export async function POST(req: NextRequest) {
     instructions: instructions ?? [],
   });
 
-  return NextResponse.json({ game: newGame }, { status: 201 });
+  return NextResponse.json(
+    { game: normalizeQuestionGameTheme(newGame) },
+    { status: 201 },
+  );
 }

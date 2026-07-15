@@ -376,15 +376,106 @@ export interface GradientPreset {
 }
 
 export const GRADIENT_PRESETS: GradientPreset[] = [
-  { id: "violet", label: "보라", css: "linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%)", accent: "#7C3AED" },
-  { id: "orange", label: "주황", css: "linear-gradient(135deg, #FB923C 0%, #EF4444 100%)", accent: "#EF4444" },
-  { id: "blue", label: "파랑", css: "linear-gradient(135deg, #38BDF8 0%, #2563EB 100%)", accent: "#2563EB" },
-  { id: "green", label: "초록", css: "linear-gradient(135deg, #34D399 0%, #059669 100%)", accent: "#059669" },
-  { id: "yellow", label: "노랑", css: "linear-gradient(135deg, #FBBF24 0%, #F97316 100%)", accent: "#F97316" },
-  { id: "pink", label: "분홍", css: "linear-gradient(135deg, #F472B6 0%, #E11D48 100%)", accent: "#E11D48" },
-  { id: "indigo", label: "남색", css: "linear-gradient(135deg, #818CF8 0%, #6D28D9 100%)", accent: "#6D28D9" },
-  { id: "teal", label: "청록", css: "linear-gradient(135deg, #2DD4BF 0%, #0891B2 100%)", accent: "#0891B2" },
+  { id: "violet", label: "보라", css: "linear-gradient(135deg, #6D28D9 0%, #5B21B6 100%)", accent: "#6D28D9" },
+  { id: "orange", label: "주황", css: "linear-gradient(135deg, #C2410C 0%, #B91C1C 100%)", accent: "#C2410C" },
+  { id: "blue", label: "파랑", css: "linear-gradient(135deg, #0369A1 0%, #1D4ED8 100%)", accent: "#1D4ED8" },
+  { id: "green", label: "초록", css: "linear-gradient(135deg, #047857 0%, #065F46 100%)", accent: "#047857" },
+  { id: "yellow", label: "노랑", css: "linear-gradient(135deg, #A16207 0%, #C2410C 100%)", accent: "#A16207" },
+  { id: "pink", label: "분홍", css: "linear-gradient(135deg, #BE185D 0%, #BE123C 100%)", accent: "#BE185D" },
+  { id: "indigo", label: "남색", css: "linear-gradient(135deg, #4338CA 0%, #3730A3 100%)", accent: "#4338CA" },
+  { id: "teal", label: "청록", css: "linear-gradient(135deg, #0F766E 0%, #155E75 100%)", accent: "#0F766E" },
 ];
+
+const SIX_DIGIT_HEX = /^#[0-9a-f]{6}$/i;
+const SUPPORTED_GAME_GRADIENT = /^linear-gradient\(\s*-?\d{1,3}(?:\.\d+)?deg\s*,\s*(#[0-9a-f]{6})(?:\s+0%)?\s*,\s*(#[0-9a-f]{6})(?:\s+100%)?\s*\)$/i;
+const DEFAULT_GAME_THEME = GRADIENT_PRESETS.find(({ id }) => id === "indigo")!;
+
+function hexChannels(hex: string): [number, number, number] | null {
+  if (!SIX_DIGIT_HEX.test(hex)) return null;
+  return [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16),
+  ];
+}
+
+function hasReadableWhiteText(hex: string): boolean {
+  const channels = hexChannels(hex);
+  if (!channels) return false;
+  const [red, green, blue] = channels.map((value) => {
+    const channel = value / 255;
+    return channel <= 0.04045
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+  return 1.05 / (luminance + 0.05) >= 4.5;
+}
+
+function colorHue(hex: string): number | null {
+  const channels = hexChannels(hex);
+  if (!channels) return null;
+  const [red, green, blue] = channels.map((value) => value / 255);
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const delta = max - min;
+  if (delta === 0) return null;
+  const hue = max === red
+    ? ((green - blue) / delta) % 6
+    : max === green
+      ? (blue - red) / delta + 2
+      : (red - green) / delta + 4;
+  return (hue * 60 + 360) % 360;
+}
+
+function closestSafePreset(hex: string): GradientPreset {
+  const sourceHue = colorHue(hex);
+  if (sourceHue === null) return DEFAULT_GAME_THEME;
+  return GRADIENT_PRESETS.reduce((closest, preset) => {
+    const presetHue = colorHue(preset.accent);
+    const closestHue = colorHue(closest.accent);
+    if (presetHue === null || closestHue === null) return closest;
+    const distance = Math.min(
+      Math.abs(sourceHue - presetHue),
+      360 - Math.abs(sourceHue - presetHue),
+    );
+    const closestDistance = Math.min(
+      Math.abs(sourceHue - closestHue),
+      360 - Math.abs(sourceHue - closestHue),
+    );
+    return distance < closestDistance ? preset : closest;
+  }, DEFAULT_GAME_THEME);
+}
+
+export function normalizeQuestionGameTheme<
+  T extends { gradientCss: string; accentColor: string },
+>(game: T): T {
+  const gradientMatch = game.gradientCss.match(SUPPORTED_GAME_GRADIENT);
+  if (!gradientMatch) {
+    return {
+      ...game,
+      gradientCss: DEFAULT_GAME_THEME.css,
+      accentColor: DEFAULT_GAME_THEME.accent,
+    };
+  }
+
+  const gradientColors = [gradientMatch[1], gradientMatch[2]];
+  const gradientCss = gradientColors.every(hasReadableWhiteText)
+    ? game.gradientCss
+    : closestSafePreset(gradientColors[0]).css;
+  const accentColor = hasReadableWhiteText(game.accentColor)
+    ? game.accentColor
+    : closestSafePreset(
+      SIX_DIGIT_HEX.test(game.accentColor)
+        ? game.accentColor
+        : gradientColors[0],
+    ).accent;
+
+  if (gradientCss === game.gradientCss && accentColor === game.accentColor) {
+    return game;
+  }
+  return { ...game, gradientCss, accentColor };
+}
 
 export const EMOJI_PRESETS = [
   "🎮","🎯","🎲","🃏","🎪","🎭","🎨","🎸",

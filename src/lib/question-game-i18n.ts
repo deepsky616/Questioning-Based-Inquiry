@@ -476,20 +476,20 @@ export function getQuestionGameText(locale: string) {
 
 export const QUESTION_DICE_TYPES = {
   ko: [
-    { face: 1, type: "사실질문", desc: "언제, 어디서, 무엇이 일어났는지 확인하는 질문", shortDesc: "사실·정보를 확인하는 질문", example: "공룡은 언제 멸종했나요?", color: "#3b82f6" },
-    { face: 2, type: "개념질문", desc: "어떤 것의 의미나 본질을 파악하는 질문", shortDesc: "의미나 본질을 파악하는 질문", example: "민주주의란 무엇인가요?", color: "#8b5cf6" },
-    { face: 3, type: "논쟁질문", desc: "옳고 그름을 따져보는 비판적 질문", shortDesc: "옳고 그름을 따져보는 질문", example: "동물 실험은 허용되어야 할까요?", color: "#ef4444" },
-    { face: 4, type: "상상질문", desc: "아직 일어나지 않은 일을 상상하는 질문", shortDesc: "상상해보는 질문", example: "만약 사람이 날 수 있다면?", color: "#f59e0b" },
-    { face: 5, type: "비교질문", desc: "둘 이상을 비교·대조하는 질문", shortDesc: "둘을 비교·대조하는 질문", example: "강과 바다는 어떻게 다른가요?", color: "#10b981" },
-    { face: 6, type: "열린질문", desc: "정해진 답 없이 자유롭게 탐구하는 질문", shortDesc: "자유롭게 탐구하는 질문", example: "무엇이든 원하는 질문을 만들어요!", color: "#ec4899" },
+    { face: 1, type: "사실질문", desc: "언제, 어디서, 무엇이 일어났는지 확인하는 질문", shortDesc: "사실·정보를 확인하는 질문", example: "공룡은 언제 멸종했나요?", color: "#1D4ED8" },
+    { face: 2, type: "개념질문", desc: "어떤 것의 의미나 본질을 파악하는 질문", shortDesc: "의미나 본질을 파악하는 질문", example: "민주주의란 무엇인가요?", color: "#6D28D9" },
+    { face: 3, type: "논쟁질문", desc: "옳고 그름을 따져보는 비판적 질문", shortDesc: "옳고 그름을 따져보는 질문", example: "동물 실험은 허용되어야 할까요?", color: "#B91C1C" },
+    { face: 4, type: "상상질문", desc: "아직 일어나지 않은 일을 상상하는 질문", shortDesc: "상상해보는 질문", example: "만약 사람이 날 수 있다면?", color: "#92400E" },
+    { face: 5, type: "비교질문", desc: "둘 이상을 비교·대조하는 질문", shortDesc: "둘을 비교·대조하는 질문", example: "강과 바다는 어떻게 다른가요?", color: "#047857" },
+    { face: 6, type: "열린질문", desc: "정해진 답 없이 자유롭게 탐구하는 질문", shortDesc: "자유롭게 탐구하는 질문", example: "무엇이든 원하는 질문을 만들어요!", color: "#BE185D" },
   ],
   en: [
-    { face: 1, type: "factual question", desc: "A question that checks when, where, or what happened", shortDesc: "Checks facts or information", example: "When did dinosaurs disappear?", color: "#3b82f6" },
-    { face: 2, type: "concept question", desc: "A question that asks about meaning or the nature of something", shortDesc: "Explores meaning or core ideas", example: "What does democracy mean?", color: "#8b5cf6" },
-    { face: 3, type: "debate question", desc: "A critical question that weighs what is right or wrong", shortDesc: "Examines right and wrong", example: "Should animal testing be allowed?", color: "#ef4444" },
-    { face: 4, type: "imagination question", desc: "A question that imagines something that has not happened yet", shortDesc: "Uses imagination", example: "What if people could fly?", color: "#f59e0b" },
-    { face: 5, type: "comparison question", desc: "A question that compares two or more things", shortDesc: "Compares or contrasts things", example: "How are rivers and oceans different?", color: "#10b981" },
-    { face: 6, type: "open question", desc: "A question you can explore freely without one fixed answer", shortDesc: "Explores freely", example: "Make any question you want!", color: "#ec4899" },
+    { face: 1, type: "factual question", desc: "A question that checks when, where, or what happened", shortDesc: "Checks facts or information", example: "When did dinosaurs disappear?", color: "#1D4ED8" },
+    { face: 2, type: "concept question", desc: "A question that asks about meaning or the nature of something", shortDesc: "Explores meaning or core ideas", example: "What does democracy mean?", color: "#6D28D9" },
+    { face: 3, type: "debate question", desc: "A critical question that weighs what is right or wrong", shortDesc: "Examines right and wrong", example: "Should animal testing be allowed?", color: "#B91C1C" },
+    { face: 4, type: "imagination question", desc: "A question that imagines something that has not happened yet", shortDesc: "Uses imagination", example: "What if people could fly?", color: "#92400E" },
+    { face: 5, type: "comparison question", desc: "A question that compares two or more things", shortDesc: "Compares or contrasts things", example: "How are rivers and oceans different?", color: "#047857" },
+    { face: 6, type: "open question", desc: "A question you can explore freely without one fixed answer", shortDesc: "Explores freely", example: "Make any question you want!", color: "#BE185D" },
   ],
 } as const;
 

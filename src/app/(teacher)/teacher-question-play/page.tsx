@@ -172,8 +172,8 @@ export default function TeacherQuestionPlayPage() {
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: t("statAll"), value: games.length, emoji: "🎮", color: "#7C3AED" },
-          { label: t("statPublic"), value: publicCount, emoji: "🌍", color: "#10b981" },
-          { label: t("statHidden"), value: hiddenCount, emoji: "🔒", color: "#ef4444" },
+          { label: t("statPublic"), value: publicCount, emoji: "🌍", color: "#047857" },
+          { label: t("statHidden"), value: hiddenCount, emoji: "🔒", color: "#B91C1C" },
         ].map((stat) => (
           <div
             key={stat.emoji}
@@ -182,7 +182,7 @@ export default function TeacherQuestionPlayPage() {
           >
             <div className="text-3xl mb-1">{stat.emoji}</div>
             <div className="text-2xl font-black">{stat.value}</div>
-            <div className="text-sm opacity-80">{stat.label}</div>
+            <div className="text-sm text-white">{stat.label}</div>
           </div>
         ))}
       </div>
@@ -236,15 +236,15 @@ export default function TeacherQuestionPlayPage() {
                     <div className="text-white">
                       <h3 className="font-black text-lg leading-tight">{game.title}</h3>
                       {game.isBuiltIn ? (
-                        <span className="text-white/70 text-xs">{t("builtIn")}</span>
+                        <span className="text-white text-xs">{t("builtIn")}</span>
                       ) : (
-                        <span className="text-white/70 text-xs">{t("custom")}</span>
+                        <span className="text-white text-xs">{t("custom")}</span>
                       )}
                     </div>
                   </div>
                   {/* 가시성 뱃지 */}
                   <span
-                    className="bg-white/25 backdrop-blur-sm rounded-full px-3 py-1 text-white text-xs font-bold flex items-center gap-1"
+                    className="bg-black/25 backdrop-blur-sm rounded-full px-3 py-1 text-white text-xs font-bold flex items-center gap-1"
                   >
                     {visInfo.emoji} {t(`vis_${vis.type}`)}
                   </span>

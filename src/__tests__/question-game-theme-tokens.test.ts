@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { BUILT_IN_GAMES } from "@/lib/question-games-data";
+import {
+  BUILT_IN_GAMES,
+  GRADIENT_PRESETS,
+} from "@/lib/question-games-data";
+import { QUESTION_DICE_TYPES } from "@/lib/question-game-i18n";
 import { STORY_DICE_COLOR } from "@/lib/story-dice-data";
 
 const gameDirectory = resolve(
@@ -83,6 +87,12 @@ function declaredHexColors(source: string, declaration: string) {
   return hexColors(match?.[1] ?? "");
 }
 
+function inlineBackgroundHexColors(source: string) {
+  return [...source.matchAll(/background:\s*"([^"]+)"/g)].flatMap((match) =>
+    hexColors(match[1]),
+  );
+}
+
 function openingTagsNear(source: string, tagName: string, marker: string) {
   const tags: string[] = [];
   let markerIndex = source.indexOf(marker);
@@ -114,13 +124,32 @@ describe("question game theme tokens", () => {
     }
   });
 
-  it("keeps every fixed game gradient readable under small white text", () => {
+  it("keeps question dice colors readable under small white text", () => {
+    for (const locale of ["ko", "en"] as const) {
+      const colors = QUESTION_DICE_TYPES[locale].map(({ color }) => color);
+      expect(colors).toHaveLength(6);
+      expect(new Set(colors).size).toBe(6);
+      expectWhiteTextContrast(colors);
+    }
+  });
+
+  it("keeps custom game presets readable under small white text", () => {
+    expect(GRADIENT_PRESETS).toHaveLength(8);
+    expect(new Set(GRADIENT_PRESETS.map(({ id }) => id)).size).toBe(8);
+    expect(new Set(GRADIENT_PRESETS.map(({ css }) => css)).size).toBe(8);
+
+    for (const preset of GRADIENT_PRESETS) {
+      expectWhiteTextContrast([...hexColors(preset.css), preset.accent]);
+    }
+  });
+
+  it("keeps fixed inline game backgrounds readable under small white text", () => {
     for (const fileName of [
       "DiceGame.tsx",
       "MysteryBoxGame.tsx",
       "StoryDiceGame.tsx",
     ]) {
-      expectWhiteTextContrast(hexColors(readGameSource(fileName)));
+      expectWhiteTextContrast(inlineBackgroundHexColors(readGameSource(fileName)));
     }
 
     const page = readFileSync(
@@ -130,7 +159,7 @@ describe("question game theme tokens", () => {
       ),
       "utf8",
     );
-    expectWhiteTextContrast(hexColors(page));
+    expectWhiteTextContrast(inlineBackgroundHexColors(page));
 
     const listPage = readFileSync(
       resolve(
@@ -139,7 +168,7 @@ describe("question game theme tokens", () => {
       ),
       "utf8",
     );
-    expectWhiteTextContrast(hexColors(listPage));
+    expectWhiteTextContrast(inlineBackgroundHexColors(listPage));
   });
 
   it("keeps player and story marker palettes readable under white text", () => {
@@ -375,5 +404,64 @@ describe("question game theme tokens", () => {
     expect(source).toContain("hsl(var(--border))");
     expect(source).not.toMatch(/hover:text-gray-/);
     expect(source).not.toContain('"#e5e7eb"');
+  });
+
+  it("keeps teacher game statistics and header labels readable", () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/app/(teacher)/teacher-question-play/page.tsx",
+      ),
+      "utf8",
+    );
+    const statPalette = source.match(
+      /\{ label: t\("statAll"\)[\s\S]*?\]\.map\(\(stat\)/,
+    )?.[0] ?? "";
+    expectWhiteTextContrast(hexColors(statPalette));
+
+    for (const marker of ['t("builtIn")', 't("custom")']) {
+      const label = openingTagNear(source, "span", marker);
+      expect(label).toMatch(/\btext-white\b/);
+      expect(label).not.toMatch(/\btext-white\/70\b/);
+    }
+
+    const visibilityBadge = openingTagNear(source, "span", "{visInfo.emoji}");
+    expect(visibilityBadge).toMatch(/\bbg-black\/25\b/);
+    expect(visibilityBadge).not.toMatch(/\bbg-white\/25\b/);
+
+    const statLabel = openingTagNear(source, "div", "{stat.label}");
+    expect(statLabel).toMatch(/\btext-white\b/);
+    expect(statLabel).not.toMatch(/\bopacity-80\b/);
+  });
+
+  it("uses semantic surfaces for relay rules and AI guidance", () => {
+    const source = readGameSource("RelayGame.tsx");
+    const rules = openingTagNear(source, "div", "{text.gameRules}");
+    const heading = openingTagNear(source, "p", "{text.gameRules}");
+    const rule = openingTagNear(source, "p", "{r}");
+    const aiGuide = openingTagNear(source, "p", "{text.relayAiOrder}");
+
+    expect(rules).toMatch(/\bbg-secondary\b/);
+    expect(rules).toMatch(/\bborder-border\b/);
+    for (const tag of [heading, rule, aiGuide]) {
+      expect(tag).toMatch(/\btext-foreground\b/);
+      expect(tag).not.toMatch(/\btext-(?:orange|indigo)-/);
+    }
+    expect(aiGuide).toMatch(/\bbg-muted\b/);
+  });
+
+  it("keeps the student play button contrast unchanged on hover", () => {
+    const source = readFileSync(
+      resolve(
+        process.cwd(),
+        "src/app/(student)/student-question-play/page.tsx",
+      ),
+      "utf8",
+    );
+    const playButton = openingTagNear(source, "button", '{t("play")}');
+
+    expect(playButton).not.toMatch(/\bhover:opacity-/);
+    expect(playButton).not.toMatch(/\bhover:brightness-/);
+    expect(playButton).toMatch(/\bhover:shadow-/);
   });
 });
