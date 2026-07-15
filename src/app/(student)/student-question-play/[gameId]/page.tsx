@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useLocale, useTranslations } from "next-intl";
@@ -16,6 +16,7 @@ import { QuestionGameRoomFlow } from "@/components/question-games/QuestionGameRo
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { BuiltInGame } from "@/lib/question-games-data";
+import { hasStoredGameRoomMarker } from "../games/useRoom";
 
 export type GameMode = "solo" | "friend" | "ai";
 
@@ -56,7 +57,11 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
   const [mode, setMode] = useState<GameMode>("solo");
   const [playerName, setPlayerName] = useState("");
   const [startConfig, setStartConfig] = useState<GameStartConfig | null>(null);
-  const [showRoomFlow, setShowRoomFlow] = useState(false);
+  const [showRoomFlow, setShowRoomFlow] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setShowRoomFlow(hasStoredGameRoomMarker(gameId));
+  }, [gameId]);
 
   function handleBack() { router.push("/student-question-play"); }
 
@@ -65,6 +70,18 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
       ? [playerName.trim() || t("defaultPlayer"), "🤖 AI"]
       : [playerName.trim() || t("defaultPlayer")];
     setStartConfig({ mode, players });
+  }
+
+  if (showRoomFlow === null) {
+    return (
+      <p
+        role="status"
+        aria-live="polite"
+        className="py-16 text-center text-sm text-muted-foreground"
+      >
+        {t("restoringRoom")}
+      </p>
+    );
   }
 
   if (!game || !GameComponent) {

@@ -18,6 +18,7 @@ import {
 } from "@/lib/question-game-room-response";
 import {
   deleteGameRoom,
+  deleteGameRoomPresence,
   isStaleRoomAction,
   loadGameRoom,
   saveGameRoom,
@@ -44,12 +45,13 @@ import {
   restartQuestionGameRoom,
   type QuestionGameRoomResult,
 } from "@/lib/question-game-room-engine";
+import { logger } from "@/lib/logger";
 
 type Params = { params: Promise<{ code: string }> };
 
 const ROOM_CONFLICT_MESSAGE =
   "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.";
-const MEMBERSHIP_WRITE_ATTEMPTS = 3;
+const MEMBERSHIP_WRITE_ATTEMPTS = 8;
 const LEGACY_STATE_ACTIONS = new Set([
   "update-state",
   "set-state",
@@ -94,6 +96,13 @@ function isValidExpectedVersion(value: unknown): value is number {
 function roomConflict(room: GameRoom) {
   return NextResponse.json(
     { error: ROOM_CONFLICT_MESSAGE, room: toPublicGameRoom(room) },
+    { status: 409 },
+  );
+}
+
+function roomConflictWithoutRoom() {
+  return NextResponse.json(
+    { error: ROOM_CONFLICT_MESSAGE },
     { status: 409 },
   );
 }
@@ -441,6 +450,7 @@ async function joinRoom(
   userName: string,
 ) {
   let room = initialRoom;
+  const expectedCreatedAt = initialRoom.createdAt;
   if (!isBuiltInQuestionGameId(room.gameId)) {
     return NextResponse.json(
       { error: "지원하지 않는 질문놀이입니다" },
@@ -480,13 +490,28 @@ async function joinRoom(
       return NextResponse.json({ room: toPublicGameRoom(result.room) });
     }
     if (result.kind === "missing") return roomMissing();
+    if (result.room.createdAt !== expectedCreatedAt) {
+      return roomConflictForMember(result.room, userId);
+    }
     room = result.room;
   }
 
   if (room.players.some((item) => item.id === userId)) {
     return NextResponse.json({ room: toPublicGameRoom(room) });
   }
-  return roomConflict(room);
+  return roomConflictWithoutRoom();
+}
+
+async function clearMemberPresence(room: GameRoom, userId: string) {
+  try {
+    await deleteGameRoomPresence({
+      roomCode: room.code,
+      roomCreatedAt: room.createdAt,
+      userId,
+    });
+  } catch {
+    logger.warn("질문놀이 접속 기록 정리를 마치지 못했습니다");
+  }
 }
 
 async function leaveRoom(initialRoom: GameRoom, userId: string) {
@@ -494,11 +519,15 @@ async function leaveRoom(initialRoom: GameRoom, userId: string) {
   const expectedCreatedAt = initialRoom.createdAt;
 
   for (let attempt = 0; attempt < MEMBERSHIP_WRITE_ATTEMPTS; attempt++) {
+    const requesterAlreadyLeft = !room.players.some(
+      (item) => item.id === userId,
+    );
     let candidate: GameRoom;
-    if (!room.players.some((item) => item.id === userId)) {
+    if (requesterAlreadyLeft) {
       candidate = settleMemoryRollingRoom(room);
       if (candidate === room) {
-        return NextResponse.json({ room: toPublicGameRoom(room) });
+        await clearMemberPresence(initialRoom, userId);
+        return NextResponse.json({ room: null });
       }
     } else {
       const wasHost = room.hostId === userId;
@@ -514,7 +543,7 @@ async function leaveRoom(initialRoom: GameRoom, userId: string) {
           return roomDeleted();
         }
         if (result.room.createdAt !== expectedCreatedAt) {
-          return roomConflict(result.room);
+          return roomConflictForMember(result.room, userId);
         }
         room = result.room;
         continue;
@@ -529,20 +558,32 @@ async function leaveRoom(initialRoom: GameRoom, userId: string) {
 
     const result = await saveGameRoom(candidate);
     if (result.kind === "saved") {
-      return NextResponse.json({ room: toPublicGameRoom(result.room) });
+      await clearMemberPresence(initialRoom, userId);
+      return requesterAlreadyLeft
+        ? NextResponse.json({ room: null })
+        : NextResponse.json({ room: toPublicGameRoom(result.room) });
     }
     if (result.kind === "missing") return roomDeleted();
     if (result.room.createdAt !== expectedCreatedAt) {
-      return roomConflict(result.room);
+      return roomConflictForMember(result.room, userId);
     }
     room = result.room;
   }
 
   if (!room.players.some((item) => item.id === userId)) {
-    const candidate = settleMemoryRollingRoom(room);
-    if (candidate === room) {
-      return NextResponse.json({ room: toPublicGameRoom(room) });
+    const settlement = settleMemoryRollingRoom(room);
+    if (settlement === room) {
+      await clearMemberPresence(initialRoom, userId);
+      return NextResponse.json({ room: null });
     }
+
+    const saved = await saveGameRoom(settlement);
+    if (saved.kind === "saved") {
+      await clearMemberPresence(initialRoom, userId);
+      return NextResponse.json({ room: null });
+    }
+    if (saved.kind === "missing") return roomDeleted();
+    return roomConflictWithoutRoom();
   }
   return roomConflict(room);
 }
@@ -569,6 +610,7 @@ async function leaveVersion2Room(initialRoom: GameRoom, userId: string) {
     }
 
     if (result.kind === "replayed") {
+      await clearMemberPresence(initialRoom, userId);
       return NextResponse.json({ room: null });
     }
     if (result.kind !== "changed") {
@@ -580,29 +622,35 @@ async function leaveVersion2Room(initialRoom: GameRoom, userId: string) {
       if (deleted.kind === "deleted" || deleted.kind === "missing") {
         return roomDeleted();
       }
-      if (!isRoomMember(deleted.room, userId)) {
-        return NextResponse.json({ room: null });
-      }
       if (deleted.room.createdAt !== expectedCreatedAt) {
-        return roomConflict(deleted.room);
+        return roomConflictForMember(deleted.room, userId);
+      }
+      if (!isRoomMember(deleted.room, userId)) {
+        await clearMemberPresence(initialRoom, userId);
+        return NextResponse.json({ room: null });
       }
       room = deleted.room;
       continue;
     }
 
     const saved = await saveGameRoom(result.room);
-    if (saved.kind === "saved") return commandSuccess(saved.room, undefined);
-    if (saved.kind === "missing") return roomDeleted();
-    if (!isRoomMember(saved.room, userId)) {
-      return NextResponse.json({ room: null });
+    if (saved.kind === "saved") {
+      await clearMemberPresence(initialRoom, userId);
+      return commandSuccess(saved.room, undefined);
     }
+    if (saved.kind === "missing") return roomDeleted();
     if (saved.room.createdAt !== expectedCreatedAt) {
-      return roomConflict(saved.room);
+      return roomConflictForMember(saved.room, userId);
+    }
+    if (!isRoomMember(saved.room, userId)) {
+      await clearMemberPresence(initialRoom, userId);
+      return NextResponse.json({ room: null });
     }
     room = saved.room;
   }
 
   if (!isRoomMember(room, userId)) {
+    await clearMemberPresence(initialRoom, userId);
     return NextResponse.json({ room: null });
   }
   return roomConflict(room);
@@ -682,6 +730,7 @@ export async function PATCH(
   if (action === "join") return joinRoom(room, userId, userName);
   const isMember = isRoomMember(room, userId);
   if (action === "leave" && !isMember) {
+    await clearMemberPresence(room, userId);
     return NextResponse.json({ room: null });
   }
   if (!isMember) {

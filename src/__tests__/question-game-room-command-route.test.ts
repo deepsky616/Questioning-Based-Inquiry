@@ -8,10 +8,12 @@ const mocks = vi.hoisted(() => ({
   loadGameRoom: vi.fn(),
   saveGameRoom: vi.fn(),
   deleteGameRoom: vi.fn(),
+  deleteGameRoomPresence: vi.fn(),
   applyQuestionGameRoomCommand: vi.fn(),
   leaveQuestionGameRoom: vi.fn(),
   restartQuestionGameRoom: vi.fn(),
   hasQuestionGameRoomEngine: vi.fn(() => false),
+  loggerWarn: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
@@ -22,12 +24,21 @@ vi.mock("@/lib/game-room-store", () => ({
   loadGameRoom: mocks.loadGameRoom,
   saveGameRoom: mocks.saveGameRoom,
   deleteGameRoom: mocks.deleteGameRoom,
+  deleteGameRoomPresence: mocks.deleteGameRoomPresence,
   isStaleRoomAction: (room: GameRoom, expected: unknown) =>
     typeof expected === "number" && expected !== room.version,
 }));
 vi.mock("@/lib/memory-room-roll", () => ({
   recordMemoryRoll: vi.fn(),
   settleMemoryRollingRoom: vi.fn((room: GameRoom) => room),
+}));
+vi.mock("@/lib/question-game-award-publish-service", () => ({
+  QuestionGameAwardPublishError: class QuestionGameAwardPublishError extends Error {
+    constructor(message: string, public readonly status: number) {
+      super(message);
+    }
+  },
+  loadVerifiedGameAwardResult: vi.fn(),
 }));
 vi.mock("@/lib/question-game-room-engine", () => ({
   applyQuestionGameRoomCommand: mocks.applyQuestionGameRoomCommand,
@@ -37,6 +48,9 @@ vi.mock("@/lib/question-game-room-engine", () => ({
   isQuestionGameCommandId: (value: unknown) =>
     typeof value === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value),
+}));
+vi.mock("@/lib/logger", () => ({
+  logger: { warn: mocks.loggerWarn },
 }));
 
 import { PATCH } from "@/app/api/question-games/rooms/[code]/route";
@@ -156,10 +170,12 @@ beforeEach(() => {
   mocks.loadGameRoom.mockReset();
   mocks.saveGameRoom.mockReset();
   mocks.deleteGameRoom.mockReset();
+  mocks.deleteGameRoomPresence.mockReset().mockResolvedValue(undefined);
   mocks.applyQuestionGameRoomCommand.mockReset();
   mocks.leaveQuestionGameRoom.mockReset();
   mocks.restartQuestionGameRoom.mockReset();
   mocks.hasQuestionGameRoomEngine.mockReset().mockReturnValue(false);
+  mocks.loggerWarn.mockReset();
 });
 
 describe("명령 본문 경계", () => {
@@ -902,6 +918,32 @@ describe("버전 2 나가기", () => {
     expect(candidate.gameState.private).toEqual({ answer: "비밀" });
   });
 
+  it("이탈 저장 성공 뒤 접속 기록 삭제가 실패해도 성공 응답과 안전한 경고를 유지한다", async () => {
+    const room = makeV2Room();
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: 2 },
+    }));
+    mocks.deleteGameRoomPresence.mockRejectedValue(
+      new Error("postgresql://secret-user:secret-password@example.test/private"),
+    );
+
+    const response = await patch({
+      action: "leave",
+      expectedCreatedAt: room.createdAt,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      room: { players: [{ id: "user-2" }] },
+    });
+    expect(mocks.loggerWarn).toHaveBeenCalledWith(
+      "질문놀이 접속 기록 정리를 마치지 못했습니다",
+    );
+    expect(JSON.stringify(mocks.loggerWarn.mock.calls)).not.toContain("secret");
+  });
+
   it("마지막 참가자 이탈은 후보를 저장하지 않고 조건부 삭제한다", async () => {
     const room = makeV2Room({
       players: [
@@ -1031,9 +1073,85 @@ describe("버전 2 나가기", () => {
       expectedCreatedAt: room.createdAt,
     });
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ room: null });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "방 참가자만 변경할 수 있어요",
+    });
     expect(mocks.leaveQuestionGameRoom).toHaveBeenCalledOnce();
     expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
+  });
+
+  it("마지막 참가자 삭제 충돌의 참가자 교체 방은 공개 본문과 409다", async () => {
+    const room = makeV2Room({
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      ],
+    });
+    const replacement = makeV2Room({
+      createdAt: 20,
+      updatedAt: 20,
+      gameState: {
+        stateVersion: 2,
+        phase: "replacement",
+        recentCommandIds: [],
+        private: { answer: "비밀" },
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.deleteGameRoom.mockResolvedValueOnce({
+      kind: "conflict",
+      room: replacement,
+    });
+
+    const response = await patch({
+      action: "leave",
+      expectedCreatedAt: room.createdAt,
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      room: {
+        gameState: {
+          stateVersion: 2,
+          phase: "replacement",
+          recentCommandIds: [],
+        },
+      },
+    });
+    expect(mocks.deleteGameRoom).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("마지막 참가자 삭제 충돌의 비참가자 교체 방은 본문 없이 거부한다", async () => {
+    const room = makeV2Room({
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      ],
+    });
+    const replacement = makeV2Room({
+      createdAt: 20,
+      updatedAt: 20,
+      hostId: "user-2",
+      players: [
+        { id: "user-2", name: "친구", isHost: true, joinedAt: 2 },
+      ],
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.deleteGameRoom.mockResolvedValueOnce({
+      kind: "conflict",
+      room: replacement,
+    });
+
+    const response = await patch({
+      action: "leave",
+      expectedCreatedAt: room.createdAt,
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "방 참가자만 변경할 수 있어요",
+    });
+    expect(mocks.deleteGameRoom).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 });

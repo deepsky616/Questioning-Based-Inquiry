@@ -35,6 +35,7 @@ model User {
   questionLikes       QuestionLike[]       @relation("UserLikes")
   pointLogs           PointLog[]           @relation("StudentPointLogs")
   awardedLogs         PointLog[]           @relation("AwardedByTeacher")
+  gameRoomCreateAttempts GameRoomCreateAttempt[] @relation("GameRoomCreateAttempts")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -213,9 +214,32 @@ model GameRoom {
   data      Json     @map("data")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  presences GameRoomPresence[]
 
   @@index([updatedAt])
   @@map("game_rooms")
+}
+
+model GameRoomPresence {
+  roomCode      String   @map("room_code")
+  roomCreatedAt BigInt   @map("room_created_at")
+  userId        String   @map("user_id")
+  lastSeenAt    DateTime @map("last_seen_at")
+  room          GameRoom @relation(fields: [roomCode], references: [code], onDelete: Cascade)
+
+  @@id([roomCode, roomCreatedAt, userId])
+  @@index([lastSeenAt])
+  @@map("game_room_presences")
+}
+
+model GameRoomCreateAttempt {
+  id        String   @id @default(cuid()) @map("id")
+  userId    String   @map("user_id")
+  user      User     @relation("GameRoomCreateAttempts", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+  @@map("game_room_create_attempts")
 }
 
 model QuestionGameCustom {

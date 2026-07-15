@@ -19,7 +19,9 @@ export default function StudentQuestionPlayPage() {
   useEffect(() => {
     fetch("/api/question-games")
       .then((r) => r.json())
-      .then((data: AnyGame[]) => setGames(Array.isArray(data) ? data : []))
+      .then((data: AnyGame[]) =>
+        setGames(Array.isArray(data) ? data.filter((game) => game.isBuiltIn) : []),
+      )
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);

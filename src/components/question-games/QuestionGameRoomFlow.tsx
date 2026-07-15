@@ -60,11 +60,12 @@ export function QuestionGameRoomFlow({
     room,
     error,
     actionLoading,
+    isRestoring,
     createRoom,
     joinRoom,
     sendAction,
     leaveRoom,
-  } = useRoom();
+  } = useRoom(game.id);
   const [view, setView] = useState<"choice" | "join">("choice");
   const [joinCode, setJoinCode] = useState("");
 
@@ -88,6 +89,19 @@ export function QuestionGameRoomFlow({
       {error}
     </div>
   ) : null;
+
+  if (isRestoring) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="mx-auto flex min-h-48 max-w-lg flex-col items-center justify-center gap-3 border-y border-border py-10 text-center text-muted-foreground"
+      >
+        <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+        <p className="text-sm font-medium">{t("restoringRoom")}</p>
+      </div>
+    );
+  }
 
   if (room) {
     if (room.status === "waiting") {

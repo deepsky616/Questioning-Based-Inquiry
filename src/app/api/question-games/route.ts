@@ -69,6 +69,7 @@ export async function GET() {
   // 가시성 필터링
   const allGames: AnyGame[] = [...BUILT_IN_GAMES, ...customGames];
   const filtered = allGames.filter((game) => {
+    if (!game.isBuiltIn) return false;
     const vis: GameVisibility = visibilityMap[game.id] ?? { type: "all" };
     return isGameVisibleToStudent(vis, {
       grade: student?.grade,

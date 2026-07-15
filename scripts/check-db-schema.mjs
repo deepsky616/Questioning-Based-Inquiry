@@ -29,6 +29,8 @@ const REQUIRED_TABLES = [
   "point_logs",
   "app_notifications",
   "game_rooms",
+  "game_room_presences",
+  "game_room_create_attempts",
   "question_game_customs",
   "question_game_visibilities",
   "question_game_orders",

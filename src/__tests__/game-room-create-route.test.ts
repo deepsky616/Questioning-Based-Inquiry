@@ -7,11 +7,19 @@ import {
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   createGameRoom: vi.fn(),
+  consumeCreateLimit: vi.fn(),
+  cleanupIfDue: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/game-room-store", () => ({
   createGameRoom: mocks.createGameRoom,
+}));
+vi.mock("@/lib/game-room-create-rate-limit", () => ({
+  consumeGameRoomCreateLimit: mocks.consumeCreateLimit,
+}));
+vi.mock("@/lib/game-room-cleanup-service", () => ({
+  cleanupExpiredGameRoomsIfDue: mocks.cleanupIfDue,
 }));
 
 import { POST } from "@/app/api/question-games/rooms/route";
@@ -36,6 +44,8 @@ beforeEach(() => {
       gameId,
     }),
   );
+  mocks.consumeCreateLimit.mockReset().mockResolvedValue(true);
+  mocks.cleanupIfDue.mockReset().mockResolvedValue(null);
 });
 
 describe("친구 방 생성 놀이 식별값", () => {

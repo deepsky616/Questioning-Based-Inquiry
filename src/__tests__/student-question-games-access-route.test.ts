@@ -15,7 +15,6 @@ import { GET } from "@/app/api/question-games/route";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { loadQuestionGameSettingsForTeachers } from "@/lib/question-game-settings-store";
-import { GRADIENT_PRESETS } from "@/lib/question-games-data";
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mockStudent = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
@@ -83,7 +82,7 @@ describe("학생 질문놀이 접근 경계", () => {
     expect(mockStudent).not.toHaveBeenCalled();
   });
 
-  it("직접 만든 놀이의 임의 CSS는 저장값과 무관하게 안전한 응답으로 바꾼다", async () => {
+  it("직접 만든 놀이의 임의 CSS도 학생용 응답에 노출하지 않는다", async () => {
     mockSettings.mockResolvedValue({
       customGames: [{
         id: "custom-unsafe",
@@ -106,11 +105,10 @@ describe("학생 질문놀이 접근 경계", () => {
     const response = await GET();
     const games = await response.json();
     const custom = games.find((game: { id: string }) => game.id === "custom-unsafe");
-    const fallback = GRADIENT_PRESETS.find(({ id }) => id === "indigo");
 
-    expect(custom).toMatchObject({
-      gradientCss: fallback?.css,
-      accentColor: fallback?.accent,
-    });
+    expect(custom).toBeUndefined();
+    expect(games).toContainEqual(
+      expect.objectContaining({ id: "memory", isBuiltIn: true }),
+    );
   });
 });

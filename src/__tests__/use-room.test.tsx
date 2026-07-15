@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, render, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameRoom, RoomActionResult } from "@/lib/question-games-data";
 import { useRoom } from "@/app/(student)/student-question-play/games/useRoom";
@@ -1666,6 +1666,413 @@ describe("useRoom room lifetime", () => {
       expect.objectContaining({ action: "leave", expectedCreatedAt: 42 }),
     ]);
     expect(bodies[1]).not.toHaveProperty("expectedVersion");
+    unmount();
+  });
+});
+
+describe("useRoom 방 복원과 접속 확인", () => {
+  const gameId = "question-chain";
+  const markerKey = `question-game-room:${gameId}`;
+
+  function storeMarker(room: GameRoom = makeRoom()) {
+    sessionStorage.setItem(markerKey, JSON.stringify({
+      code: room.code,
+      gameId: room.gameId,
+      createdAt: room.createdAt,
+    }));
+  }
+
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("저장 표지가 없으면 복원 상태를 거치지 않고 바로 시작한다", () => {
+    const restoringStates: boolean[] = [];
+    vi.stubGlobal("fetch", vi.fn());
+
+    function RoomHarness() {
+      restoringStates.push(useRoom(gameId).isRestoring);
+      return null;
+    }
+
+    const view = render(<RoomHarness />);
+
+    expect(restoringStates).toEqual([false]);
+    view.unmount();
+  });
+
+  it("손상된 저장 표지는 요청 없이 제거한다", () => {
+    sessionStorage.setItem(markerKey, "{broken");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    expect(result.current.isRestoring).toBe(false);
+    expect(sessionStorage.getItem(markerKey)).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("같은 놀이와 수명의 표지를 기존 방 조회로 복원한다", async () => {
+    const currentRoom = makeRoom();
+    storeMarker(currentRoom);
+    const fetchMock = vi.fn(async () => jsonResponse({ room: currentRoom }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    expect(result.current.isRestoring).toBe(true);
+    await waitFor(() => expect(result.current.room).toEqual(currentRoom));
+    expect(result.current.isRestoring).toBe(false);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/question-games/rooms/1234",
+    );
+    expect(sessionStorage.getItem(markerKey)).not.toBeNull();
+    unmount();
+  });
+
+  it.each([
+    ["방 코드", { code: "5678" }],
+    ["놀이", { gameId: "relay" }],
+    ["방 생성 시각", { createdAt: 2 }],
+  ])(
+    "복원 응답의 %s이 표지와 다르면 방과 표지를 비운다",
+    async (_kind, replacement) => {
+      storeMarker();
+      const fetchMock = vi.fn(async () => jsonResponse({
+        room: { ...makeRoom(), ...replacement },
+      }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const { result, unmount } = renderHook(() => useRoom(gameId));
+
+      await waitFor(() => expect(result.current.isRestoring).toBe(false));
+      expect(result.current.room).toBeNull();
+      expect(sessionStorage.getItem(markerKey)).toBeNull();
+      unmount();
+    },
+  );
+
+  it.each([403, 404])(
+    "복원 조회가 %s이면 표지를 비운다",
+    async (status) => {
+      storeMarker();
+      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({}, status)));
+
+      const { result, unmount } = renderHook(() => useRoom(gameId));
+
+      await waitFor(() => expect(result.current.isRestoring).toBe(false));
+      expect(result.current.room).toBeNull();
+      expect(sessionStorage.getItem(markerKey)).toBeNull();
+      unmount();
+    },
+  );
+
+  it("복원 중 통신 오류에는 표지를 유지한다", async () => {
+    storeMarker();
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error("offline");
+    }));
+
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    expect(result.current.room).toBeNull();
+    expect(sessionStorage.getItem(markerKey)).not.toBeNull();
+    unmount();
+  });
+
+  it("방 연결 직후와 15초 주기 및 화면 복귀와 온라인 전환 때 접속을 알린다", async () => {
+    const currentRoom = makeRoom();
+    const intervalSpy = vi.spyOn(globalThis, "setInterval");
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      if (requestBody(init)?.action === "join") {
+        return jsonResponse({ room: currentRoom });
+      }
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([input]) =>
+        String(input).endsWith("/presence")
+      )).toHaveLength(1);
+    });
+
+    expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 15_000);
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([input]) =>
+        String(input).endsWith("/presence")
+      )).toHaveLength(2);
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([input]) =>
+        String(input).endsWith("/presence")
+      )).toHaveLength(3);
+    });
+
+    const presenceBodies = fetchMock.mock.calls
+      .filter(([input]) => String(input).endsWith("/presence"))
+      .map(([, init]) => requestBody(init));
+    expect(presenceBodies).toEqual([
+      { expectedCreatedAt: 1 },
+      { expectedCreatedAt: 1 },
+      { expectedCreatedAt: 1 },
+    ]);
+    unmount();
+  });
+
+  it("접속 확인 실패는 기존 오류를 덮지 않고 권한 상실 때 방과 표지를 비운다", async () => {
+    const currentRoom = makeRoom();
+    let presenceStatus = 200;
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: currentRoom });
+      if (body?.action === "bad") {
+        return jsonResponse({ error: "기존 놀이 오류", room: currentRoom }, 409);
+      }
+      if (String(input).endsWith("/presence")) {
+        return jsonResponse({ room: currentRoom }, presenceStatus);
+      }
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    await act(async () => {
+      await result.current.joinRoom("1234");
+      await result.current.sendAction("bad");
+    });
+    expect(result.current.error).toBe("기존 놀이 오류");
+
+    presenceStatus = 500;
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await waitFor(() => expect(result.current.error).toBe("기존 놀이 오류"));
+    expect(result.current.room).not.toBeNull();
+
+    presenceStatus = 403;
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+    await waitFor(() => expect(result.current.room).toBeNull());
+    expect(result.current.error).toBe("기존 놀이 오류");
+    expect(sessionStorage.getItem(markerKey)).toBeNull();
+    unmount();
+  });
+
+  it("접속 확인이 다른 방 수명을 반환하면 방과 표지를 비운다", async () => {
+    const currentRoom = makeRoom();
+    let presenceRoom = currentRoom;
+    let presenceStatus = 200;
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      if (requestBody(init)?.action === "join") {
+        return jsonResponse({ room: currentRoom });
+      }
+      if (String(input).endsWith("/presence")) {
+        return jsonResponse({ room: presenceRoom }, presenceStatus);
+      }
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(result.current.room).toEqual(currentRoom));
+
+    presenceStatus = 409;
+    presenceRoom = { ...currentRoom, createdAt: 2, updatedAt: 2 };
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => expect(result.current.room).toBeNull());
+    expect(sessionStorage.getItem(markerKey)).toBeNull();
+    unmount();
+  });
+
+  it("참가 재시도의 본문 없는 409는 기존 복원 표지를 유지한다", async () => {
+    const currentRoom = makeRoom();
+    let joinAttempts = 0;
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") {
+        joinAttempts += 1;
+        return joinAttempts === 1
+          ? jsonResponse({ room: currentRoom })
+          : jsonResponse({ error: "방 상태가 바뀌었어요" }, 409);
+      }
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    expect(sessionStorage.getItem(markerKey)).not.toBeNull();
+
+    await act(async () => {
+      await result.current.joinRoom("5678");
+    });
+
+    expect(result.current.room).toEqual(currentRoom);
+    expect(sessionStorage.getItem(markerKey)).not.toBeNull();
+    unmount();
+  });
+
+  it("나가기 통신 오류에는 복원 표지를 유지한다", async () => {
+    const currentRoom = makeRoom();
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: currentRoom });
+      if (body?.action === "leave") throw new Error("offline");
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    expect(sessionStorage.getItem(markerKey)).not.toBeNull();
+
+    await act(async () => {
+      await result.current.leaveRoom();
+    });
+    expect(sessionStorage.getItem(markerKey)).not.toBeNull();
+    unmount();
+  });
+
+  it.each([
+    ["서버 오류", jsonResponse({ error: "잠시 뒤 다시 시도해 주세요" }, 500)],
+    ["같은 수명 충돌", jsonResponse({
+      error: "방 상태가 바뀌었어요",
+      room: makeRoom(2),
+    }, 409)],
+    ["본문 없는 같은 수명 충돌", jsonResponse({
+      error: "방 상태가 바뀌었어요",
+    }, 409)],
+  ])("나가기 %s에는 복원 표지를 유지한다", async (_name, leaveResponse) => {
+    const currentRoom = makeRoom();
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: currentRoom });
+      if (body?.action === "leave") return leaveResponse;
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    await act(async () => {
+      await result.current.joinRoom("1234");
+      await result.current.leaveRoom();
+    });
+
+    expect(sessionStorage.getItem(markerKey)).not.toBeNull();
+    unmount();
+  });
+
+  it.each([
+    ["성공", jsonResponse({ room: null, deleted: true })],
+    ["권한 상실", jsonResponse({ error: "권한이 없어요" }, 403)],
+    ["방 없음", jsonResponse({ error: "방을 찾을 수 없어요" }, 404)],
+  ])("나가기 %s이면 복원 표지를 비운다", async (_name, leaveResponse) => {
+    const currentRoom = makeRoom();
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: currentRoom });
+      if (body?.action === "leave") return leaveResponse;
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    await act(async () => {
+      await result.current.joinRoom("1234");
+      await result.current.leaveRoom();
+    });
+
+    expect(sessionStorage.getItem(markerKey)).toBeNull();
+    unmount();
+  });
+
+  it("나가기 충돌이 새 수명을 가리키면 이전 복원 표지를 비운다", async () => {
+    const currentRoom = makeRoom();
+    const replacement = { ...currentRoom, createdAt: 2, updatedAt: 2 };
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: currentRoom });
+      if (body?.action === "leave") {
+        return jsonResponse({
+          error: "방이 새로 만들어졌어요",
+          room: replacement,
+        }, 409);
+      }
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    await act(async () => {
+      await result.current.joinRoom("1234");
+      await result.current.leaveRoom();
+    });
+
+    expect(result.current.room).toBeNull();
+    expect(sessionStorage.getItem(markerKey)).toBeNull();
     unmount();
   });
 });

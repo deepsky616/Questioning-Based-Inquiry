@@ -6,6 +6,8 @@ import {
   type RoomPlayer,
 } from "@/lib/question-games-data";
 
+export { deleteGameRoomPresence } from "@/lib/game-room-presence-store";
+
 export type GameRoomWriteResult =
   | { kind: "saved"; room: GameRoom }
   | { kind: "conflict"; room: GameRoom }
@@ -16,6 +18,11 @@ export type GameRoomDeleteResult =
   | { kind: "conflict"; room: GameRoom }
   | { kind: "missing"; room: null };
 
+export type GameRoomStoreClient = Pick<
+  Prisma.TransactionClient,
+  "gameRoom" | "$executeRaw" | "$queryRaw"
+>;
+
 function gen4() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
@@ -24,14 +31,32 @@ export function isStaleRoomAction(room: GameRoom, expectedVersion: unknown) {
   return typeof expectedVersion === "number" && expectedVersion !== room.version;
 }
 
-export async function loadGameRoom(code: string): Promise<GameRoom | null> {
-  const rec = await prisma.gameRoom.findUnique({ where: { code } });
+export async function loadGameRoom(
+  code: string,
+  client: GameRoomStoreClient = prisma,
+): Promise<GameRoom | null> {
+  const rec = await client.gameRoom.findUnique({ where: { code } });
   if (!rec) return null;
   return parseGameRoom(rec.data);
 }
 
+export async function loadLockedGameRoom(
+  code: string,
+  client: GameRoomStoreClient,
+): Promise<GameRoom | null> {
+  const records = await client.$queryRaw<Array<{ data: Prisma.JsonValue }>>`
+    SELECT "data"
+    FROM "game_rooms"
+    WHERE "code" = ${code}
+    FOR UPDATE
+  `;
+  const record = records[0];
+  return record ? parseGameRoom(record.data) : null;
+}
+
 export async function saveGameRoom(
   room: GameRoom,
+  client: GameRoomStoreClient = prisma,
 ): Promise<GameRoomWriteResult> {
   const expectedVersion = room.version ?? 1;
   const now = Date.now();
@@ -41,7 +66,7 @@ export async function saveGameRoom(
     updatedAt: now,
   };
 
-  const updated = await prisma.gameRoom.updateMany({
+  const updated = await client.gameRoom.updateMany({
     where: {
       code: room.code,
       AND: [
@@ -57,7 +82,7 @@ export async function saveGameRoom(
 
   let count = updated.count;
   if (count === 0 && expectedVersion === 1) {
-    count = await prisma.$executeRaw`
+    count = await client.$executeRaw`
       UPDATE "game_rooms"
       SET
         "data" = ${JSON.stringify(nextRoom)}::jsonb,
@@ -72,7 +97,7 @@ export async function saveGameRoom(
   }
 
   if (count === 1) return { kind: "saved", room: nextRoom };
-  const current = await loadGameRoom(room.code);
+  const current = await loadGameRoom(room.code, client);
   return current
     ? { kind: "conflict", room: current }
     : { kind: "missing", room: null };
@@ -80,9 +105,10 @@ export async function saveGameRoom(
 
 export async function deleteGameRoom(
   room: Pick<GameRoom, "code" | "version" | "createdAt">,
+  client: GameRoomStoreClient = prisma,
 ): Promise<GameRoomDeleteResult> {
   const expectedVersion = room.version ?? 1;
-  const deleted = await prisma.gameRoom.deleteMany({
+  const deleted = await client.gameRoom.deleteMany({
     where: {
       code: room.code,
       AND: [
@@ -94,7 +120,7 @@ export async function deleteGameRoom(
 
   let count = deleted.count;
   if (count === 0 && expectedVersion === 1) {
-    count = await prisma.$executeRaw`
+    count = await client.$executeRaw`
       DELETE FROM "game_rooms"
       WHERE "code" = ${room.code}
         AND (
@@ -106,7 +132,7 @@ export async function deleteGameRoom(
   }
 
   if (count === 1) return { kind: "deleted", room: null };
-  const current = await loadGameRoom(room.code);
+  const current = await loadGameRoom(room.code, client);
   return current
     ? { kind: "conflict", room: current }
     : { kind: "missing", room: null };

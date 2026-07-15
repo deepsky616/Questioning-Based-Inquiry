@@ -1,4 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+} from "react";
 import {
   isGameRoom,
   type GameRoom,
@@ -9,6 +15,16 @@ import { APP_ROOM_POLL_MS, visibleRefetchInterval } from "@/lib/query-refresh";
 
 const ROOM_REPLACED_MESSAGE =
   "방이 새로 만들어졌어요. 다시 참가해 주세요.";
+const ROOM_MARKER_PREFIX = "question-game-room:";
+const ROOM_PRESENCE_MS = 15_000;
+const useClientLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+interface RoomMarker {
+  code: string;
+  gameId: string;
+  createdAt: number;
+}
 
 function isResponseData(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -32,10 +48,69 @@ function isSameRoomVersion(current: GameRoom | null, next: GameRoom) {
     current.version === next.version;
 }
 
+function roomMarkerKey(gameId: string) {
+  return `${ROOM_MARKER_PREFIX}${gameId}`;
+}
+
+function isRoomMarker(value: unknown, gameId: string): value is RoomMarker {
+  return isResponseData(value) &&
+    typeof value.code === "string" &&
+    /^\d{4}$/.test(value.code) &&
+    value.gameId === gameId &&
+    typeof value.createdAt === "number" &&
+    Number.isFinite(value.createdAt) &&
+    value.createdAt >= 0;
+}
+
+function readRoomMarker(gameId: string): RoomMarker | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = window.sessionStorage.getItem(roomMarkerKey(gameId));
+    if (!stored) return null;
+    const marker: unknown = JSON.parse(stored);
+    if (isRoomMarker(marker, gameId)) return marker;
+    window.sessionStorage.removeItem(roomMarkerKey(gameId));
+  } catch {
+    try {
+      window.sessionStorage.removeItem(roomMarkerKey(gameId));
+    } catch {
+      // 저장소를 쓸 수 없는 환경에서는 현재 연결만 유지한다.
+    }
+  }
+  return null;
+}
+
+export function hasStoredGameRoomMarker(gameId: string) {
+  return readRoomMarker(gameId) !== null;
+}
+
+function writeRoomMarker(gameId: string, room: GameRoom) {
+  if (typeof window === "undefined" || room.gameId !== gameId) return;
+  try {
+    window.sessionStorage.setItem(roomMarkerKey(gameId), JSON.stringify({
+      code: room.code,
+      gameId: room.gameId,
+      createdAt: room.createdAt,
+    } satisfies RoomMarker));
+  } catch {
+    // 세션 저장소가 막혀 있어도 현재 방 연결은 계속 사용할 수 있다.
+  }
+}
+
+function removeRoomMarker(gameId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(roomMarkerKey(gameId));
+  } catch {
+    // 세션 저장소가 막힌 환경에서는 별도 정리를 할 수 없다.
+  }
+}
+
 interface UseRoomResult {
   room: GameRoom | null;
   error: string | null;
   actionLoading: boolean;
+  isRestoring: boolean;
   createRoom: (gameId: string) => Promise<GameRoom | null>;
   joinRoom: (code: string) => Promise<GameRoom | null>;
   sendAction: RoomActionHandler;
@@ -43,10 +118,11 @@ interface UseRoomResult {
   setActiveCode: (code: string | null) => void;
 }
 
-export function useRoom(): UseRoomResult {
+export function useRoom(gameId?: string): UseRoomResult {
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [activeCode, setActiveCodeState] = useState<string | null>(null);
   const [roomGeneration, setRoomGeneration] = useState(0);
   const roomRef = useRef<GameRoom | null>(null);
@@ -79,6 +155,10 @@ export function useRoom(): UseRoomResult {
     if (pendingActionCountRef.current === 0) setActionLoading(false);
   }, []);
 
+  const clearRoomMarker = useCallback(() => {
+    if (gameId) removeRoomMarker(gameId);
+  }, [gameId]);
+
   const clearRoom = useCallback(() => {
     advanceRoomGeneration();
     connectIntentRef.current += 1;
@@ -86,7 +166,8 @@ export function useRoom(): UseRoomResult {
     roomRef.current = null;
     setActiveCodeState(null);
     setRoom(null);
-  }, [advanceRoomGeneration]);
+    clearRoomMarker();
+  }, [advanceRoomGeneration, clearRoomMarker]);
 
   const replaceRoom = useCallback((nextRoom: GameRoom) => {
     advanceRoomGeneration();
@@ -94,8 +175,9 @@ export function useRoom(): UseRoomResult {
     roomRef.current = nextRoom;
     setActiveCodeState(nextRoom.code);
     setRoom(nextRoom);
+    if (gameId) writeRoomMarker(gameId, nextRoom);
     return nextRoom;
-  }, [advanceRoomGeneration]);
+  }, [advanceRoomGeneration, gameId]);
 
   const applyRoom = useCallback((nextRoom: GameRoom) => {
     const current = roomRef.current;
@@ -135,6 +217,67 @@ export function useRoom(): UseRoomResult {
     setRoom(null);
   }, [advanceRoomGeneration, clearRoom]);
 
+  useClientLayoutEffect(() => {
+    if (!gameId) {
+      setIsRestoring(false);
+      return;
+    }
+
+    const marker = readRoomMarker(gameId);
+    if (!marker) {
+      setIsRestoring(false);
+      return;
+    }
+    setIsRestoring(true);
+
+    let cancelled = false;
+    const restore = async () => {
+      try {
+        const res = await fetch(`/api/question-games/rooms/${marker.code}`);
+        if (cancelled) return;
+        const data = await readResponseData(res);
+        if (cancelled) return;
+        if (res.status === 403 || res.status === 404) {
+          clearRoomMarker();
+          setError(responseError(data, "방을 다시 연결할 수 없어요"));
+          return;
+        }
+        if (!res.ok) {
+          setError(responseError(data, "방을 다시 연결할 수 없어요"));
+          return;
+        }
+        if (
+          !isGameRoom(data.room) ||
+          data.room.code !== marker.code ||
+          data.room.gameId !== marker.gameId ||
+          data.room.createdAt !== marker.createdAt
+        ) {
+          clearRoomMarker();
+          setError(
+            isGameRoom(data.room) &&
+              data.room.code === marker.code &&
+              data.room.gameId === marker.gameId &&
+              data.room.createdAt !== marker.createdAt
+              ? ROOM_REPLACED_MESSAGE
+              : "방을 다시 연결할 수 없어요",
+          );
+          return;
+        }
+        setError(null);
+        replaceRoom(data.room);
+      } catch {
+        if (!cancelled) setError("네트워크 오류");
+      } finally {
+        if (!cancelled) setIsRestoring(false);
+      }
+    };
+
+    void restore();
+    return () => {
+      cancelled = true;
+    };
+  }, [clearRoomMarker, gameId, replaceRoom]);
+
   // 폴링: activeCode가 있으면 2초마다 방 상태 갱신
   useEffect(() => {
     if (!activeCode) {
@@ -152,13 +295,21 @@ export function useRoom(): UseRoomResult {
         if (cancelled || !isCurrentRequest(code, generation)) return;
         const data = await readResponseData(res);
         if (cancelled || !isCurrentRequest(code, generation)) return;
-        if (res.status === 404) {
+        if (res.status === 403 || res.status === 404) {
           setError(responseError(data, "방을 찾을 수 없어요"));
           clearRoom();
           return;
         }
         if (!res.ok) return;
         if (isGameRoom(data.room)) {
+          if (
+            data.room.code !== code ||
+            (gameId !== undefined && data.room.gameId !== gameId)
+          ) {
+            setError(ROOM_REPLACED_MESSAGE);
+            clearRoom();
+            return;
+          }
           const outcome = applyRoom(data.room);
           if (outcome.lifetimeChanged) setError(ROOM_REPLACED_MESSAGE);
         }
@@ -179,9 +330,94 @@ export function useRoom(): UseRoomResult {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     };
-  }, [activeCode, applyRoom, clearRoom, isCurrentRequest, roomGeneration]);
+  }, [activeCode, applyRoom, clearRoom, gameId, isCurrentRequest, roomGeneration]);
 
-  const createRoom = useCallback(async (gameId: string): Promise<GameRoom | null> => {
+  const connectedRoomCode = room?.code ?? null;
+  const connectedRoomGameId = room?.gameId ?? null;
+  const connectedRoomCreatedAt = room?.createdAt ?? null;
+
+  useEffect(() => {
+    if (
+      gameId === undefined ||
+      connectedRoomCode === null ||
+      connectedRoomGameId === null ||
+      connectedRoomCreatedAt === null
+    ) {
+      return;
+    }
+
+    const code = connectedRoomCode;
+    const expectedGameId = connectedRoomGameId;
+    const expectedCreatedAt = connectedRoomCreatedAt;
+    const generation = roomGenerationRef.current;
+    let cancelled = false;
+
+    const sendPresence = async () => {
+      try {
+        const res = await fetch(
+          `/api/question-games/rooms/${code}/presence`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ expectedCreatedAt }),
+          },
+        );
+        if (cancelled || !isCurrentRequest(code, generation)) return;
+        const data = await readResponseData(res);
+        if (cancelled || !isCurrentRequest(code, generation)) return;
+        const responseRoom = isGameRoom(data.room) ? data.room : null;
+        if (
+          responseRoom &&
+          (
+            responseRoom.code !== code ||
+            responseRoom.gameId !== expectedGameId ||
+            responseRoom.createdAt !== expectedCreatedAt
+          )
+        ) {
+          clearRoom();
+          return;
+        }
+        if (res.status === 403 || res.status === 404) {
+          clearRoom();
+          return;
+        }
+        if (!res.ok || !responseRoom) return;
+        applyRoom(responseRoom);
+      } catch {
+        // 접속 확인 실패는 놀이 동작 오류와 현재 화면을 바꾸지 않는다.
+      }
+    };
+
+    void sendPresence();
+    const interval = setInterval(() => {
+      void sendPresence();
+    }, ROOM_PRESENCE_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") void sendPresence();
+    };
+    const onOnline = () => {
+      void sendPresence();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("online", onOnline);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [
+    applyRoom,
+    clearRoom,
+    connectedRoomCode,
+    connectedRoomCreatedAt,
+    connectedRoomGameId,
+    gameId,
+    isCurrentRequest,
+  ]);
+
+  const createRoom = useCallback(async (requestedGameId: string): Promise<GameRoom | null> => {
     const intent = ++connectIntentRef.current;
     beginAction();
     setError(null);
@@ -189,11 +425,17 @@ export function useRoom(): UseRoomResult {
       const res = await fetch("/api/question-games/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gameId }),
+        body: JSON.stringify({ gameId: requestedGameId }),
       });
       const data = await readResponseData(res);
       if (intent !== connectIntentRef.current) return null;
-      if (!res.ok || !isGameRoom(data.room)) {
+      if (res.status === 403 || res.status === 404) clearRoomMarker();
+      if (
+        !res.ok ||
+        !isGameRoom(data.room) ||
+        data.room.gameId !== requestedGameId ||
+        (gameId !== undefined && data.room.gameId !== gameId)
+      ) {
         setError(responseError(data, "방 생성 실패"));
         return null;
       }
@@ -204,7 +446,7 @@ export function useRoom(): UseRoomResult {
     } finally {
       endAction();
     }
-  }, [beginAction, endAction, replaceRoom]);
+  }, [beginAction, clearRoomMarker, endAction, gameId, replaceRoom]);
 
   const joinRoom = useCallback(async (code: string): Promise<GameRoom | null> => {
     const intent = ++connectIntentRef.current;
@@ -218,7 +460,13 @@ export function useRoom(): UseRoomResult {
       });
       const data = await readResponseData(res);
       if (intent !== connectIntentRef.current) return null;
-      if (!res.ok || !isGameRoom(data.room) || data.room.code !== code) {
+      if (res.status === 403 || res.status === 404) clearRoomMarker();
+      if (
+        !res.ok ||
+        !isGameRoom(data.room) ||
+        data.room.code !== code ||
+        (gameId !== undefined && data.room.gameId !== gameId)
+      ) {
         setError(responseError(data, "참가 실패"));
         return null;
       }
@@ -229,7 +477,7 @@ export function useRoom(): UseRoomResult {
     } finally {
       endAction();
     }
-  }, [beginAction, endAction, replaceRoom]);
+  }, [beginAction, clearRoomMarker, endAction, gameId, replaceRoom]);
 
   const sendAction = useCallback<RoomActionHandler>(
     async (action, extra = {}, options) => {
@@ -325,10 +573,15 @@ export function useRoom(): UseRoomResult {
           }
           return { ok: false, room: outcome.room, status: 409, reason: "conflict" };
         }
-        if (res.status === 404) {
+        if (res.status === 403 || res.status === 404) {
           setError(responseError(data, "방을 찾을 수 없어요"));
           clearRoom();
-          return { ok: false, room: null, status: 404, reason: "missing" };
+          return {
+            ok: false,
+            room: null,
+            status: res.status,
+            reason: res.status === 404 ? "missing" : "rejected",
+          };
         }
         if (!res.ok || !isGameRoom(data.room) || data.room.code !== code) {
           setError(responseError(data, "작업 실패"));
@@ -397,7 +650,7 @@ export function useRoom(): UseRoomResult {
       if (!isCurrentRequest(code, generation)) return false;
       const data = await readResponseData(res);
       if (!isCurrentRequest(code, generation)) return false;
-      if (res.status === 404) {
+      if (res.status === 403 || res.status === 404) {
         setError(responseError(data, "방을 찾을 수 없어요"));
         clearRoom();
         return false;
@@ -448,7 +701,23 @@ export function useRoom(): UseRoomResult {
     } finally {
       endAction();
     }
-  }, [applyRoom, beginAction, clearRoom, endAction, isCurrentRequest]);
+  }, [
+    applyRoom,
+    beginAction,
+    clearRoom,
+    endAction,
+    isCurrentRequest,
+  ]);
 
-  return { room, error, actionLoading, createRoom, joinRoom, sendAction, leaveRoom, setActiveCode };
+  return {
+    room,
+    error,
+    actionLoading,
+    isRestoring,
+    createRoom,
+    joinRoom,
+    sendAction,
+    leaveRoom,
+    setActiveCode,
+  };
 }

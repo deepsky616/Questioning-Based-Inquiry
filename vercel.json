@@ -3,5 +3,11 @@
   "buildCommand": "npm run build",
   "devCommand": "next dev",
   "installCommand": "npm ci",
-  "regions": ["icn1"]
+  "regions": ["icn1"],
+  "crons": [
+    {
+      "path": "/api/cron/question-game-rooms/cleanup",
+      "schedule": "0 18 * * *"
+    }
+  ]
 }

@@ -127,13 +127,17 @@ export default function TeacherQuestionPlayPage() {
 
   const filtered = localizedGames.filter((g) => {
     if (tab === "all") return true;
-    if (tab === "public") return getVis(g.id).type !== "hidden";
-    if (tab === "hidden") return getVis(g.id).type === "hidden";
+    if (tab === "public") return g.isBuiltIn && getVis(g.id).type !== "hidden";
+    if (tab === "hidden") return g.isBuiltIn && getVis(g.id).type === "hidden";
     return true;
   });
 
-  const publicCount = games.filter((g) => getVis(g.id).type !== "hidden").length;
-  const hiddenCount = games.filter((g) => getVis(g.id).type === "hidden").length;
+  const publicCount = games.filter(
+    (g) => g.isBuiltIn && getVis(g.id).type !== "hidden",
+  ).length;
+  const hiddenCount = games.filter(
+    (g) => g.isBuiltIn && getVis(g.id).type === "hidden",
+  ).length;
 
   // 드래그앤드롭 순서 변경(전체 탭에서만). 저장하면 학생 목록에도 반영
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -242,12 +246,17 @@ export default function TeacherQuestionPlayPage() {
                       )}
                     </div>
                   </div>
-                  {/* 가시성 뱃지 */}
-                  <span
-                    className="bg-black/25 backdrop-blur-sm rounded-full px-3 py-1 text-white text-xs font-bold flex items-center gap-1"
-                  >
-                    {visInfo.emoji} {t(`vis_${vis.type}`)}
-                  </span>
+                  {game.isBuiltIn ? (
+                    <span
+                      className="bg-black/25 backdrop-blur-sm rounded-full px-3 py-1 text-white text-xs font-bold flex items-center gap-1"
+                    >
+                      {visInfo.emoji} {t(`vis_${vis.type}`)}
+                    </span>
+                  ) : (
+                    <span className="max-w-32 bg-black/25 backdrop-blur-sm rounded-lg px-3 py-1.5 text-center text-white text-xs font-bold leading-tight">
+                      {t("customStudentUnavailable")}
+                    </span>
+                  )}
                 </div>
 
                 {/* 카드 바디 */}
@@ -301,17 +310,19 @@ export default function TeacherQuestionPlayPage() {
                     >
                       {t("participation")}
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 text-xs rounded-xl"
-                      onClick={() => {
-                        setVisDialogGame(game);
-                        setEditVis(getVis(game.id));
-                      }}
-                    >
-                      {t("visSettings")}
-                    </Button>
+                    {game.isBuiltIn && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 text-xs rounded-xl"
+                        onClick={() => {
+                          setVisDialogGame(game);
+                          setEditVis(getVis(game.id));
+                        }}
+                      >
+                        {t("visSettings")}
+                      </Button>
+                    )}
                     {!game.isBuiltIn && (
                       <Button
                         variant="outline"

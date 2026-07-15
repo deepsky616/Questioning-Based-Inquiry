@@ -26,18 +26,28 @@ const mocks = vi.hoisted(() => ({
   saveGameRoom: vi.fn(),
   deleteGameRoom: vi.fn(),
   createGameRoom: vi.fn(),
+  consumeCreateLimit: vi.fn(),
+  cleanupIfDue: vi.fn(),
   checkRateLimit: vi.fn((): Response | null => null),
   recordMemoryRoll: vi.fn(),
   settleMemoryRollingRoom: vi.fn((room: GameRoom) => room),
   loadVerifiedGameAwardResult: vi.fn(),
+  deleteGameRoomPresence: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: mocks.checkRateLimit }));
+vi.mock("@/lib/game-room-create-rate-limit", () => ({
+  consumeGameRoomCreateLimit: mocks.consumeCreateLimit,
+}));
+vi.mock("@/lib/game-room-cleanup-service", () => ({
+  cleanupExpiredGameRoomsIfDue: mocks.cleanupIfDue,
+}));
 vi.mock("@/lib/game-room-store", () => ({
   loadGameRoom: mocks.loadGameRoom,
   saveGameRoom: mocks.saveGameRoom,
   deleteGameRoom: mocks.deleteGameRoom,
+  deleteGameRoomPresence: mocks.deleteGameRoomPresence,
   createGameRoom: mocks.createGameRoom,
   isStaleRoomAction: (room: GameRoom, expected: unknown) =>
     typeof expected === "number" && expected !== room.version,
@@ -49,7 +59,6 @@ vi.mock("@/lib/memory-room-roll", () => ({
 vi.mock("@/lib/question-game-award-publish-service", () => ({
   loadVerifiedGameAwardResult: mocks.loadVerifiedGameAwardResult,
 }));
-
 import { POST } from "@/app/api/question-games/rooms/route";
 import { GET, PATCH } from "@/app/api/question-games/rooms/[code]/route";
 
@@ -121,6 +130,9 @@ beforeEach(() => {
   mocks.checkRateLimit.mockReset().mockReturnValue(null);
   mocks.recordMemoryRoll.mockReset();
   mocks.loadVerifiedGameAwardResult.mockReset();
+  mocks.deleteGameRoomPresence.mockReset().mockResolvedValue(undefined);
+  mocks.consumeCreateLimit.mockReset().mockResolvedValue(true);
+  mocks.cleanupIfDue.mockReset().mockResolvedValue(null);
   mocks.settleMemoryRollingRoom
     .mockReset()
     .mockImplementation((room: GameRoom) => room);
@@ -219,6 +231,11 @@ describe("공개 방 응답", () => {
     expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
       gameState: { phase: "play", private: { answer: "사과" } },
     }));
+    expect(mocks.deleteGameRoomPresence).toHaveBeenCalledWith({
+      roomCode: "1234",
+      roomCreatedAt: 1,
+      userId: "user-1",
+    });
   });
 
   it("일반 성공 응답에서만 비공개 상태를 제거한다", async () => {
@@ -1458,6 +1475,114 @@ it("동시 참가 충돌 뒤 최신 참가자 목록에 다시 추가한다", as
   expect(mocks.saveGameRoom).toHaveBeenCalledTimes(2);
 });
 
+it("일곱 명이 같은 판본에서 동시에 참가해도 모두 저장한다", async () => {
+  let storedRoom = makeRoom({
+    hostId: "host",
+    players: [{ id: "host", name: "방장", isHost: true, joinedAt: 1 }],
+  });
+  let authCalls = 0;
+  let readCalls = 0;
+  let releaseReads: () => void;
+  const allReadsStarted = new Promise<void>((resolve) => {
+    releaseReads = resolve;
+  });
+  mocks.auth.mockImplementation(async () => {
+    authCalls += 1;
+    return {
+      user: { id: `user-${authCalls}`, name: `학생 ${authCalls}` },
+    };
+  });
+  mocks.loadGameRoom.mockImplementation(async () => {
+    const snapshot = storedRoom;
+    readCalls += 1;
+    if (readCalls === 7) releaseReads();
+    await allReadsStarted;
+    return snapshot;
+  });
+  mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => {
+    if (
+      candidate.version !== storedRoom.version ||
+      candidate.createdAt !== storedRoom.createdAt
+    ) {
+      return { kind: "conflict" as const, room: storedRoom };
+    }
+    storedRoom = {
+      ...candidate,
+      version: candidate.version + 1,
+      updatedAt: candidate.updatedAt + 1,
+    };
+    return { kind: "saved" as const, room: storedRoom };
+  });
+
+  const responses = await Promise.all(
+    Array.from({ length: 7 }, () => patch({ action: "join" })),
+  );
+
+  expect(responses.map((response) => response.status)).toEqual(
+    Array.from({ length: 7 }, () => 200),
+  );
+  expect(storedRoom.players).toHaveLength(8);
+  expect(new Set(storedRoom.players.map((player) => player.id)).size).toBe(8);
+  expect(storedRoom.version).toBe(8);
+});
+
+it("참가 저장 충돌의 비참가자 교체 방은 본문 없이 거부한다", async () => {
+  const current = makeRoom({
+    hostId: "host",
+    players: [{ id: "host", name: "방장", isHost: true, joinedAt: 1 }],
+  });
+  const replacement = makeRoom({
+    hostId: "host",
+    createdAt: 2,
+    updatedAt: 2,
+    players: [{ id: "host", name: "방장", isHost: true, joinedAt: 2 }],
+  });
+  mocks.loadGameRoom.mockResolvedValue(current);
+  mocks.saveGameRoom
+    .mockResolvedValueOnce({ kind: "conflict", room: replacement })
+    .mockImplementationOnce(async (candidate: GameRoom) => ({
+      kind: "saved",
+      room: { ...candidate, version: 2 },
+    }));
+
+  const response = await patch({ action: "join" });
+
+  expect(response.status).toBe(403);
+  await expect(response.json()).resolves.toEqual({
+    error: "방 참가자만 변경할 수 있어요",
+  });
+  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(1);
+});
+
+it("참가 저장 충돌의 참가자 교체 방은 공개 본문과 409를 반환한다", async () => {
+  const current = makeRoom({
+    hostId: "host",
+    players: [{ id: "host", name: "방장", isHost: true, joinedAt: 1 }],
+  });
+  const replacement = makeRoom({
+    createdAt: 2,
+    updatedAt: 2,
+    gameState: { phase: "waiting", private: { answer: "비밀" } },
+  });
+  mocks.loadGameRoom.mockResolvedValue(current);
+  mocks.saveGameRoom.mockResolvedValueOnce({
+    kind: "conflict",
+    room: replacement,
+  });
+
+  const response = await patch({ action: "join" });
+
+  expect(response.status).toBe(409);
+  await expect(response.json()).resolves.toEqual({
+    error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.",
+    room: {
+      ...replacement,
+      gameState: { phase: "waiting" },
+    },
+  });
+  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(1);
+});
+
 it("이미 참가한 사용자는 시작되고 가득 찬 방에서도 저장하지 않고 성공한다", async () => {
   mocks.loadGameRoom.mockResolvedValue(
     makeRoom({
@@ -1477,7 +1602,7 @@ it("이미 참가한 사용자는 시작되고 가득 찬 방에서도 저장하
   expect(mocks.saveGameRoom).not.toHaveBeenCalled();
 });
 
-it("참가 저장이 세 번 충돌하면 최신 방과 409를 반환한다", async () => {
+it("참가 저장이 여덟 번 충돌하면 최신 방을 숨긴 409를 반환한다", async () => {
   const current = makeRoom({
     hostId: "host",
     players: [{ id: "host", name: "방장", isHost: true, joinedAt: 1 }],
@@ -1491,7 +1616,45 @@ it("참가 저장이 세 번 충돌하면 최신 방과 409를 반환한다", as
   const response = await patch({ action: "join" });
 
   expect(response.status).toBe(409);
-  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(3);
+  await expect(response.json()).resolves.toEqual({
+    error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.",
+  });
+  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(8);
+});
+
+it("여덟 번째 참가 충돌의 최신 방에 참가가 확인되면 성공한다", async () => {
+  const current = makeRoom({
+    hostId: "host",
+    players: [{ id: "host", name: "방장", isHost: true, joinedAt: 1 }],
+  });
+  const pending = makeRoom({
+    hostId: "host",
+    version: 2,
+    players: current.players,
+  });
+  const joined = makeRoom({
+    hostId: "host",
+    version: 3,
+    players: [
+      ...current.players,
+      { id: "user-1", name: "학생", isHost: false, joinedAt: 3 },
+    ],
+  });
+  let attempts = 0;
+  mocks.loadGameRoom.mockResolvedValue(current);
+  mocks.saveGameRoom.mockImplementation(async () => {
+    attempts += 1;
+    return {
+      kind: "conflict" as const,
+      room: attempts === 8 ? joined : pending,
+    };
+  });
+
+  const response = await patch({ action: "join" });
+
+  expect(response.status).toBe(200);
+  await expect(response.json()).resolves.toEqual({ room: joined });
+  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(8);
 });
 
 it("세 번째 참가 충돌의 최신 방에 이미 참가했으면 성공한다", async () => {
@@ -1668,6 +1831,37 @@ it("나가기 저장 충돌의 최신 방 생성 시각이 다르면 새 방에�
   expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
 });
 
+it("나가기 저장 충돌의 비참가자 교체 방은 본문 없이 거부한다", async () => {
+  const current = makeRoom({
+    players: [
+      { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      { id: "other", name: "다른 학생", isHost: false, joinedAt: 2 },
+    ],
+  });
+  const replacement = makeRoom({
+    createdAt: 2,
+    updatedAt: 2,
+    hostId: "other",
+    players: [
+      { id: "other", name: "다른 학생", isHost: true, joinedAt: 2 },
+    ],
+  });
+  mocks.loadGameRoom.mockResolvedValue(current);
+  mocks.saveGameRoom.mockResolvedValueOnce({
+    kind: "conflict",
+    room: replacement,
+  });
+
+  const response = await patch({ action: "leave" });
+
+  expect(response.status).toBe(403);
+  await expect(response.json()).resolves.toEqual({
+    error: "방 참가자만 변경할 수 있어요",
+  });
+  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(1);
+  expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
+});
+
 it("마지막 주사위가 놀이 단계로 바뀐 뒤 나가기 재시도는 실제 정리 함수로 다음 차례를 맞춘다", async () => {
   const { settleMemoryRollingRoom: actualSettleMemoryRoom } =
     await vi.importActual<typeof import("@/lib/memory-room-roll")>(
@@ -1840,6 +2034,32 @@ it("나가기 삭제 충돌의 최신 방 생성 시각이 다르면 새 방을 
   expect(mocks.saveGameRoom).not.toHaveBeenCalled();
 });
 
+it("나가기 삭제 충돌의 비참가자 교체 방은 본문 없이 거부한다", async () => {
+  const current = makeRoom();
+  const replacement = makeRoom({
+    createdAt: 2,
+    updatedAt: 2,
+    hostId: "other",
+    players: [
+      { id: "other", name: "다른 학생", isHost: true, joinedAt: 2 },
+    ],
+  });
+  mocks.loadGameRoom.mockResolvedValue(current);
+  mocks.deleteGameRoom.mockResolvedValueOnce({
+    kind: "conflict",
+    room: replacement,
+  });
+
+  const response = await patch({ action: "leave" });
+
+  expect(response.status).toBe(403);
+  await expect(response.json()).resolves.toEqual({
+    error: "방 참가자만 변경할 수 있어요",
+  });
+  expect(mocks.deleteGameRoom).toHaveBeenCalledTimes(1);
+  expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+});
+
 it("마지막 참가자 삭제 충돌 뒤 최신 방에서 나가기를 다시 계산한다", async () => {
   const current = makeRoom();
   const latest = makeRoom({
@@ -1957,7 +2177,7 @@ it("이미 삭제된 방의 나가기는 성공한다", async () => {
   });
 });
 
-it("나가기 저장이 세 번 충돌하면 최신 방과 409를 반환한다", async () => {
+it("나가기 저장이 여덟 번 충돌하면 최신 방과 409를 반환한다", async () => {
   const current = makeRoom({
     players: [
       { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
@@ -1973,10 +2193,10 @@ it("나가기 저장이 세 번 충돌하면 최신 방과 409를 반환한다",
   const response = await patch({ action: "leave" });
 
   expect(response.status).toBe(409);
-  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(3);
+  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(8);
 });
 
-it("세 번째 나가기 충돌의 최신 방에서 이미 나갔으면 성공한다", async () => {
+it("동시 이탈 뒤 새 참가자가 들어와도 최신 참가자 목록을 노출하지 않는다", async () => {
   const current = makeRoom({
     players: [
       { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
@@ -1992,6 +2212,7 @@ it("세 번째 나가기 충돌의 최신 방에서 이미 나갔으면 성공�
     version: 3,
     players: [
       { id: "other", name: "다른 학생", isHost: true, joinedAt: 2 },
+      { id: "new", name: "새 학생", isHost: false, joinedAt: 3 },
     ],
   });
   mocks.loadGameRoom.mockResolvedValue(current);
@@ -2003,11 +2224,11 @@ it("세 번째 나가기 충돌의 최신 방에서 이미 나갔으면 성공�
   const response = await patch({ action: "leave" });
 
   expect(response.status).toBe(200);
-  await expect(response.json()).resolves.toEqual({ room: left });
+  await expect(response.json()).resolves.toEqual({ room: null });
   expect(mocks.saveGameRoom).toHaveBeenCalledTimes(3);
 });
 
-it("세 번째 메모리 나가기 충돌 뒤 새 완료 후보는 최신 방과 409를 반환한다", async () => {
+it("이미 이탈한 최신 메모리 방의 정산 저장 성공도 참가자 목록을 노출하지 않는다", async () => {
   const current = makeRoom({
     gameId: "memory",
     players: [
@@ -2015,39 +2236,118 @@ it("세 번째 메모리 나가기 충돌 뒤 새 완료 후보는 최신 방과
       { id: "other", name: "다른 학생", isHost: false, joinedAt: 2 },
     ],
   });
-  const pending = makeRoom({
-    gameId: "memory",
-    version: 2,
-    players: current.players,
-  });
   const latest = makeRoom({
     gameId: "memory",
     hostId: "other",
-    version: 3,
+    version: 2,
     players: [
       { id: "other", name: "다른 학생", isHost: true, joinedAt: 2 },
+      { id: "new", name: "새 학생", isHost: false, joinedAt: 3 },
     ],
   });
-  const unsettledCandidate = {
+  const settled = {
     ...latest,
-    gameState: { phase: "play", turnOrder: ["other"] },
+    gameState: { phase: "play", turnOrder: ["other", "new"] },
   };
   mocks.loadGameRoom.mockResolvedValue(current);
   mocks.settleMemoryRollingRoom.mockImplementation((candidate: GameRoom) =>
-    candidate === latest ? unsettledCandidate : candidate,
+    candidate === latest ? settled : candidate,
   );
   mocks.saveGameRoom
-    .mockResolvedValueOnce({ kind: "conflict", room: pending })
-    .mockResolvedValueOnce({ kind: "conflict", room: pending })
-    .mockResolvedValueOnce({ kind: "conflict", room: latest });
+    .mockResolvedValueOnce({ kind: "conflict", room: latest })
+    .mockResolvedValueOnce({
+      kind: "saved",
+      room: { ...settled, version: 3 },
+    });
 
   const response = await patch({ action: "leave" });
 
-  expect(response.status).toBe(409);
-  await expect(response.json()).resolves.toMatchObject({ room: latest });
-  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(3);
-  expect(mocks.settleMemoryRollingRoom).toHaveBeenLastCalledWith(latest);
+  expect(response.status).toBe(200);
+  await expect(response.json()).resolves.toEqual({ room: null });
+  expect(mocks.saveGameRoom).toHaveBeenCalledTimes(2);
+  expect(mocks.saveGameRoom).toHaveBeenLastCalledWith(settled);
 });
+
+it.each([
+  ["저장 성공", "saved", 200, { room: null }],
+  ["다시 충돌", "conflict", 409, {
+    error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.",
+  }],
+  ["방 삭제", "missing", 200, { room: null, deleted: true }],
+  ["방 수명 교체", "replacement", 409, {
+    error: "방 상태가 바뀌었어요. 화면을 최신 상태로 맞췄습니다.",
+  }],
+] as const)(
+  "여덟 번째 메모리 나가기 충돌 뒤 정산 후보의 %s을 안전하게 처리한다",
+  async (_name, finalResult, expectedStatus, expectedBody) => {
+    const current = makeRoom({
+      gameId: "memory",
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+        { id: "other", name: "다른 학생", isHost: false, joinedAt: 2 },
+      ],
+    });
+    const pending = makeRoom({
+      gameId: "memory",
+      version: 2,
+      players: current.players,
+    });
+    const latest = makeRoom({
+      gameId: "memory",
+      hostId: "other",
+      version: 3,
+      players: [
+        { id: "other", name: "다른 학생", isHost: true, joinedAt: 2 },
+      ],
+    });
+    const settlement = {
+      ...latest,
+      gameState: { phase: "play", turnOrder: ["other"] },
+    };
+    const conflicted = { ...latest, version: 4 };
+    const replacement = {
+      ...latest,
+      createdAt: 2,
+      updatedAt: 2,
+      version: 1,
+    };
+    mocks.loadGameRoom.mockResolvedValue(current);
+    mocks.settleMemoryRollingRoom.mockImplementation((candidate: GameRoom) =>
+      candidate === latest ? settlement : candidate,
+    );
+    let saveAttempts = 0;
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => {
+      saveAttempts += 1;
+      if (saveAttempts < 8) {
+        return { kind: "conflict" as const, room: pending };
+      }
+      if (saveAttempts === 8) {
+        return { kind: "conflict" as const, room: latest };
+      }
+      if (finalResult === "saved") {
+        return {
+          kind: "saved" as const,
+          room: { ...candidate, version: candidate.version + 1 },
+        };
+      }
+      if (finalResult === "missing") {
+        return { kind: "missing" as const, room: null };
+      }
+      return {
+        kind: "conflict" as const,
+        room: finalResult === "replacement" ? replacement : conflicted,
+      };
+    });
+
+    const response = await patch({ action: "leave" });
+
+    expect(response.status).toBe(expectedStatus);
+    await expect(response.json()).resolves.toEqual(expectedBody);
+    expect(mocks.saveGameRoom).toHaveBeenCalledTimes(9);
+    expect(mocks.saveGameRoom).toHaveBeenLastCalledWith(settlement);
+    expect(mocks.settleMemoryRollingRoom).toHaveBeenLastCalledWith(latest);
+  },
+);
 
 it("나가기 저장 중 방이 사라지면 삭제 성공으로 처리한다", async () => {
   mocks.loadGameRoom.mockResolvedValue(
@@ -2069,20 +2369,17 @@ it("나가기 저장 중 방이 사라지면 삭제 성공으로 처리한다", 
   });
 });
 
-it("마지막 참가자 삭제가 세 번 충돌하면 최신 방과 409를 반환한다", async () => {
+it("마지막 참가자 삭제가 여덟 번 충돌하면 최신 방과 409를 반환한다", async () => {
   const current = makeRoom();
-  const latest = makeRoom({ version: 4 });
+  const latest = makeRoom({ version: 9 });
   mocks.loadGameRoom.mockResolvedValue(current);
-  mocks.deleteGameRoom
-    .mockResolvedValueOnce({ kind: "conflict", room: makeRoom({ version: 2 }) })
-    .mockResolvedValueOnce({ kind: "conflict", room: makeRoom({ version: 3 }) })
-    .mockResolvedValueOnce({ kind: "conflict", room: latest });
+  mocks.deleteGameRoom.mockResolvedValue({ kind: "conflict", room: latest });
 
   const response = await patch({ action: "leave" });
 
   expect(response.status).toBe(409);
   await expect(response.json()).resolves.toMatchObject({ room: latest });
-  expect(mocks.deleteGameRoom).toHaveBeenCalledTimes(3);
+  expect(mocks.deleteGameRoom).toHaveBeenCalledTimes(8);
 });
 
 it("마지막 참가자 삭제 중 방이 사라지면 성공한다", async () => {

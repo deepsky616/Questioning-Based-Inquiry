@@ -29,6 +29,8 @@ const BASE_URL = "http://localhost:3000";
 const SESSION_COOKIE = "authjs.session-token";
 const SESSION_MAX_AGE_SECONDS = 60 * 60;
 const ROOM_PATH = /^\/api\/question-games\/rooms(?:\/([0-9]{4}))?\/?$/;
+const ROOM_PRESENCE_PATH =
+  /^\/api\/question-games\/rooms\/([0-9]{4})\/presence\/?$/;
 const FIXTURE_SCHOOL = "질문놀이 시험 학교";
 
 export interface QuestionGameBrowserIdentity {
@@ -515,6 +517,34 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
     }
     const request = route.request();
     const url = new URL(request.url());
+    const presenceMatch = url.pathname.match(ROOM_PRESENCE_PATH);
+    if (presenceMatch) {
+      const room = rooms.get(presenceMatch[1]);
+      if (request.method() !== "POST") {
+        return { status: 405, body: { error: "허용하지 않는 요청입니다" } };
+      }
+      if (!room) {
+        return { status: 404, body: { error: "방을 찾을 수 없습니다" } };
+      }
+      if (!room.players.some(({ id }) => id === identity.id)) {
+        return {
+          status: 403,
+          body: { error: "방 참가자만 접속을 확인할 수 있어요" },
+        };
+      }
+      const body = requestBody(route);
+      if (body.expectedCreatedAt !== room.createdAt) {
+        return {
+          status: 409,
+          body: {
+            error: "방 상태가 바뀌었어요",
+            room: publicRoom(room),
+          },
+        };
+      }
+      return resultResponse(room);
+    }
+
     const match = url.pathname.match(ROOM_PATH);
     if (!match) return { status: 404, body: { error: "방 경로를 찾을 수 없습니다" } };
     const code = match[1];
