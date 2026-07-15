@@ -239,19 +239,19 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <GameHeader game={game} subtitle={text.storyCompleteSubtitle} onBack={handleBack} />
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-3">
+        <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 flex flex-col items-center gap-3">
           <div className="text-6xl">📖</div>
-          <h2 className="text-2xl font-black text-gray-800">{text.storyDoneTitle}</h2>
-          <p className="text-gray-500 text-sm">{text.storyStats(myQs, myAs, chain.length)}</p>
+          <h2 className="text-2xl font-black text-foreground">{text.storyDoneTitle}</h2>
+          <p className="text-muted-foreground text-sm">{text.storyStats(myQs, myAs, chain.length)}</p>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3 max-h-80 overflow-y-auto">
-          <h3 className="font-black text-gray-700">{text.completedStory}</h3>
+        <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-3 max-h-80 overflow-y-auto">
+          <h3 className="font-black text-foreground">{text.completedStory}</h3>
           {chain.map((c, i) => (
             <div key={i} className="flex gap-2 items-start">
               <span className="text-base">{c.type === "story" ? "📖" : c.type === "question" ? "?" : "💬"}</span>
               <div>
-                <p className="text-xs text-gray-400">{c.author}</p>
-                <p className="text-gray-800 text-sm">{c.text}</p>
+                <p className="text-xs text-muted-foreground">{c.author}</p>
+                <p className="text-foreground text-sm">{c.text}</p>
               </div>
             </div>
           ))}
@@ -270,9 +270,9 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <GameHeader game={game} subtitle={text.storyWordsLoading} onBack={handleBack} />
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center space-y-3">
+        <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-10 text-center space-y-3">
           <div className="text-6xl animate-bounce">🎲</div>
-          <p className="text-gray-500 text-sm">
+          <p className="text-muted-foreground text-sm">
             {isAI && aiLoading ? text.storyAiWords : text.loading}
           </p>
         </div>
@@ -298,8 +298,8 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
       <GameHeader game={game} subtitle={isAI ? text.storyWithAi : text.storyTogether} onBack={handleBack} />
 
       {/* 단어 풀 */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-        <h3 className="text-xs font-black text-gray-600">{text.storyWordPool}</h3>
+      <div className="bg-card text-foreground rounded-2xl border border-border shadow-sm p-4 space-y-3">
+        <h3 className="text-xs font-black text-foreground">{text.storyWordPool}</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           {(["protagonist", "place", "event"] as DiceCategory[]).map((cat) => (
             <div key={cat} className="rounded-xl p-2 border"
@@ -309,7 +309,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
               </p>
               <div className="flex flex-wrap gap-1 justify-center">
                 {words[cat].map((w) => (
-                  <span key={w} className="text-[11px] bg-white border border-gray-200 rounded-full px-2 py-0.5 text-gray-600">
+                  <span key={w} className="text-[11px] bg-background border border-border rounded-full px-2 py-0.5 text-muted-foreground">
                     {getWordEmoji(w, cat, words?.emojis)} {getStoryDiceWordText(words, w, locale)}
                   </span>
                 ))}
@@ -321,7 +321,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
 
       {/* 주사위 결과 */}
       {(rolled || rolling) && (
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border-2 border-amber-200 p-4 grid grid-cols-3 gap-3">
+        <div className="bg-secondary text-foreground rounded-2xl border-2 border-border p-4 grid grid-cols-3 gap-3">
           {(["protagonist", "place", "event"] as DiceCategory[]).map((cat) => {
             const value = rolling ? rolling[cat] : rolled![cat];
             const visibleValue = value === "?"
@@ -359,10 +359,10 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
       )}
 
       {phase === "story" && rolled && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-          <p className="text-sm font-bold text-gray-700">{text.storyMakeSentence}</p>
+        <div className="bg-card text-foreground rounded-2xl border border-border shadow-sm p-5 space-y-3">
+          <p className="text-sm font-bold text-foreground">{text.storyMakeSentence}</p>
           <textarea
-            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none h-24"
+            className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none h-24"
             placeholder={text.storyPlaceholder(
               getStoryDiceWordText(words, rolled.protagonist, locale),
               getStoryDiceWordText(words, rolled.place, locale),
@@ -381,18 +381,18 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
 
       {phase === "qa" && (
         <>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2 max-h-72 overflow-y-auto">
+          <div className="bg-card text-foreground rounded-2xl border border-border shadow-sm p-4 space-y-2 max-h-72 overflow-y-auto">
             {chain.map((c, i) => (
               <div key={i} className="flex gap-2.5 items-start">
                 <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black text-white"
                   style={{ background: c.type === "story" ? "#f59e0b" : c.isAI ? "#6366f1" : "#ef4444" }}>
                   {c.type === "story" ? "📖" : c.type === "question" ? "?" : "💬"}
                 </div>
-                <div className="flex-1 rounded-xl px-3 py-2 text-sm"
-                  style={{
-                    background: c.type === "story" ? "#fef3c7" : c.isAI ? "#eef2ff" : "#fff7ed",
-                    border: i === chain.length - 1 ? "2px solid #fdba74" : "none",
-                  }}>
+                <div className={`flex-1 rounded-xl bg-secondary px-3 py-2 text-sm text-foreground ${
+                  i === chain.length - 1
+                    ? "border-2 border-orange-400"
+                    : "border border-transparent"
+                }`}>
                   <p className="text-[11px] font-bold mb-0.5" style={{ color: c.isAI ? "#6366f1" : "#ef4444" }}>
                     {c.author} ({c.type === "story" ? text.story : c.type === "question" ? text.question : text.answer})
                   </p>
@@ -409,9 +409,9 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
           </div>
 
           {!inputDisabled && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+            <div className="bg-card text-foreground rounded-2xl border border-border shadow-sm p-4 space-y-3">
               <textarea
-                className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none h-20"
+                className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none h-20 disabled:bg-secondary disabled:text-muted-foreground"
                 placeholder={inputPlaceholder}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -427,7 +427,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
           )}
 
           {isAI && inputDisabled && !aiLoading && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-center text-indigo-600 text-sm">
+            <div className="bg-secondary border border-border rounded-xl p-3 text-center text-muted-foreground text-sm">
               {text.storyAiWillAsk}
             </div>
           )}
@@ -436,7 +436,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
       )}
 
       {!isMulti && phase === "qa" && (
-        <p className="text-xs text-gray-400 text-center">
+        <p className="text-xs text-muted-foreground text-center">
           {text.storySoloHint}
         </p>
       )}

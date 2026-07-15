@@ -45,7 +45,9 @@ export default function RelayGame({ game, onBack, config }: Props) {
   const currentFriendPlayer = players[playerIdx] ?? "나";
   const playerColor = useCallback((name: string) => {
     const i = players.indexOf(name);
-    return i >= 0 ? PLAYER_COLORS[i % PLAYER_COLORS.length] : "#9ca3af";
+    return i >= 0
+      ? PLAYER_COLORS[i % PLAYER_COLORS.length]
+      : "hsl(var(--muted-foreground))";
   }, [players]);
 
   // 체인 끝으로 자동 스크롤
@@ -147,7 +149,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+          <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{text.backToList}</button>
           <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
             style={{ background: game.gradientCss }}>
             <span className="text-4xl">{game.emoji}</span>
@@ -158,7 +160,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-5">
+        <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-6 space-y-5">
           {/* 규칙 */}
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-1.5">
             <p className="text-orange-700 font-black text-sm">{text.gameRules}</p>
@@ -176,15 +178,15 @@ export default function RelayGame({ game, onBack, config }: Props) {
 
           {/* 주제 선택 */}
           <div>
-            <p className="text-sm font-black text-gray-700 mb-3">{text.chooseTopic}</p>
+            <p className="text-sm font-black text-foreground mb-3">{text.chooseTopic}</p>
             <div className="flex flex-wrap gap-2 mb-3">
               {presetTopics.map((t) => (
                 <button key={t}
                   className="px-3 py-1.5 rounded-full text-sm font-bold border-2 transition-all"
                   style={{
-                    borderColor: topic === t ? game.accentColor : "#e5e7eb",
-                    background: topic === t ? game.accentColor : "white",
-                    color: topic === t ? "white" : "#374151",
+                    borderColor: topic === t ? game.accentColor : "hsl(var(--input))",
+                    background: topic === t ? game.accentColor : "hsl(var(--background))",
+                    color: topic === t ? "white" : "hsl(var(--foreground))",
                   }}
                   onClick={() => { setTopic(t); setCustomTopic(""); }}>
                   {t}
@@ -193,10 +195,10 @@ export default function RelayGame({ game, onBack, config }: Props) {
             </div>
             <input
               type="text"
-              className="w-full border-2 rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors"
-              style={{ borderColor: customTopic ? game.accentColor : "#e5e7eb" }}
+              className="w-full bg-background text-foreground border-2 border-input rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors"
+              style={{ borderColor: customTopic ? game.accentColor : "hsl(var(--input))" }}
               onFocus={(e) => { e.target.style.borderColor = game.accentColor; setTopic(""); }}
-              onBlur={(e) => { if (!customTopic) e.target.style.borderColor = "#e5e7eb"; }}
+              onBlur={(e) => { if (!customTopic) e.target.style.borderColor = "hsl(var(--input))"; }}
               placeholder={text.topicPlaceholder}
               value={customTopic}
               onChange={(e) => { setCustomTopic(e.target.value); setTopic(""); }}
@@ -226,19 +228,19 @@ export default function RelayGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+          <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{text.backToList}</button>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-4">
+        <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 flex flex-col items-center gap-4">
           <div className="text-6xl">🏆</div>
-          <h2 className="text-2xl font-black text-gray-800">{text.relayDone}</h2>
-          <p className="text-gray-500 text-sm">{text.topic}: <span className="font-bold text-orange-500">{finalTopic}</span></p>
-          <p className="text-gray-500 text-sm">
+          <h2 className="text-2xl font-black text-foreground">{text.relayDone}</h2>
+          <p className="text-muted-foreground text-sm">{text.topic}: <span className="font-bold text-orange-500">{finalTopic}</span></p>
+          <p className="text-muted-foreground text-sm">
             {text.relayTotal(studentQuestionCount)}
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
-          <h3 className="font-black text-gray-700">{text.relayChain}</h3>
+        <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-3">
+          <h3 className="font-black text-foreground">{text.relayChain}</h3>
           {chain.map((item, i) => (
             <div key={i} className="flex gap-3 items-start">
               <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-black text-white mt-0.5"
@@ -249,7 +251,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
                 <p className="text-xs font-bold mb-0.5" style={{ color: item.isAI ? AI_COLOR : playerColor(item.player) }}>
                   {item.player}
                 </p>
-                <p className="text-gray-800 text-sm leading-relaxed">{item.question}</p>
+                <p className="text-foreground text-sm leading-relaxed">{item.question}</p>
               </div>
             </div>
           ))}
@@ -274,7 +276,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
     <div className="max-w-lg mx-auto space-y-4">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+        <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{text.backToList}</button>
         <div className="flex-1 rounded-2xl py-3 px-5 text-white flex items-center justify-between"
           style={{ background: game.gradientCss }}>
           <div className="flex items-center gap-3">
@@ -296,10 +298,11 @@ export default function RelayGame({ game, onBack, config }: Props) {
         <div className="flex gap-2">
           {players.map((p, i) => (
             <div key={i}
-              className="flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all"
+              className={`flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all ${
+                i === playerIdx ? "text-white" : "bg-secondary text-muted-foreground"
+              }`}
               style={{
-                background: i === playerIdx ? game.accentColor : "#f3f4f6",
-                color: i === playerIdx ? "white" : "#9ca3af",
+                background: i === playerIdx ? game.accentColor : undefined,
               }}>
               {p} {i === playerIdx && "🏃"}
             </div>
@@ -310,17 +313,19 @@ export default function RelayGame({ game, onBack, config }: Props) {
       {/* AI 모드 턴 표시 */}
       {isAI && (
         <div className="flex gap-2">
-          <div className="flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all"
+          <div className={`flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all ${
+            !aiLoading ? "text-white" : "bg-secondary text-muted-foreground"
+          }`}
             style={{
-              background: !aiLoading ? game.accentColor : "#f3f4f6",
-              color: !aiLoading ? "white" : "#9ca3af",
+              background: !aiLoading ? game.accentColor : undefined,
             }}>
             {myPlayerName} {!aiLoading && "🏃"}
           </div>
-          <div className="flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all flex items-center justify-center gap-1.5"
+          <div className={`flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${
+            aiLoading ? "text-white" : "bg-secondary text-muted-foreground"
+          }`}
             style={{
-              background: aiLoading ? AI_COLOR : "#f3f4f6",
-              color: aiLoading ? "white" : "#9ca3af",
+              background: aiLoading ? AI_COLOR : undefined,
             }}>
             🤖 AI {aiLoading && (
               <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
@@ -330,9 +335,9 @@ export default function RelayGame({ game, onBack, config }: Props) {
       )}
 
       {/* 질문 체인 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 max-h-72 overflow-y-auto space-y-2">
+      <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-4 max-h-72 overflow-y-auto space-y-2">
         {chain.length === 0 ? (
-          <div className="text-center py-6 text-gray-400 text-sm">
+          <div className="text-center py-6 text-muted-foreground text-sm">
             <p className="text-3xl mb-2">🎯</p>
             <p>{text.firstQuestionPrompt(finalTopic)}</p>
           </div>
@@ -344,13 +349,12 @@ export default function RelayGame({ game, onBack, config }: Props) {
                 {i + 1}
               </div>
               <div
-                className={`flex-1 rounded-xl px-3 py-2 text-sm leading-relaxed ${
-                  i === chain.length - 1 ? "border-2 font-medium" : "bg-gray-50 text-gray-600"
+                className={`flex-1 rounded-xl px-3 py-2 text-sm leading-relaxed text-foreground ${
+                  i === chain.length - 1 ? "border-2 font-medium" : "bg-secondary"
                 }`}
                 style={i === chain.length - 1 ? {
                   borderColor: item.isAI ? AI_COLOR : game.accentColor,
-                  background: item.isAI ? "#eef2ff" : `${game.accentColor}10`,
-                  color: "#1f2937",
+                  background: item.isAI ? "hsl(var(--secondary))" : `${game.accentColor}10`,
                 } : {}}>
                 <span className="text-xs font-bold mr-1.5"
                   style={{ color: item.isAI ? AI_COLOR : playerColor(item.player) }}>
@@ -369,8 +373,8 @@ export default function RelayGame({ game, onBack, config }: Props) {
               style={{ background: AI_COLOR }}>
               <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
             </div>
-            <div className="flex-1 bg-indigo-50 border-2 border-indigo-200 rounded-xl px-3 py-2.5 flex items-center gap-2">
-              <p className="text-indigo-500 text-sm font-medium">{text.aiMakingQuestion}</p>
+            <div className="flex-1 bg-secondary border-2 border-border rounded-xl px-3 py-2.5 flex items-center gap-2">
+              <p className="text-muted-foreground text-sm font-medium">{text.aiMakingQuestion}</p>
             </div>
           </div>
         )}
@@ -383,18 +387,18 @@ export default function RelayGame({ game, onBack, config }: Props) {
         <div className="rounded-xl border-2 px-4 py-3"
           style={{
             borderColor: lastItem?.isAI ? AI_COLOR : game.accentColor,
-            background: lastItem?.isAI ? "#eef2ff" : `${game.accentColor}08`,
+            background: lastItem?.isAI ? "hsl(var(--secondary))" : `${game.accentColor}08`,
           }}>
           <p className="text-xs font-bold mb-1"
             style={{ color: lastItem?.isAI ? AI_COLOR : game.accentColor }}>
             {text.connectToQuestion}
           </p>
-          <p className="text-gray-800 text-sm font-medium">{prevForHint.question}</p>
+          <p className="text-foreground text-sm font-medium">{prevForHint.question}</p>
         </div>
       )}
 
       {/* 입력 영역 — 항상 학생 차례 (AI가 응답 중일 때만 비활성화) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+      <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-4 space-y-3">
         {localError && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-red-600 text-sm">
             ❌ {localError}
@@ -403,10 +407,10 @@ export default function RelayGame({ game, onBack, config }: Props) {
 
         <textarea
           ref={inputRef}
-          className="w-full border-2 rounded-xl p-3 text-sm resize-none focus:outline-none h-24 transition-colors"
-          style={{ borderColor: "#e5e7eb", opacity: aiLoading ? 0.5 : 1 }}
+          className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none h-24 transition-colors disabled:bg-secondary disabled:text-muted-foreground"
+          style={{ borderColor: "hsl(var(--input))", opacity: aiLoading ? 0.5 : 1 }}
           onFocus={(e) => { if (!aiLoading) { e.target.style.borderColor = game.accentColor; setLocalError(null); } }}
-          onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+          onBlur={(e) => (e.target.style.borderColor = "hsl(var(--input))")}
           placeholder={
             aiLoading
               ? text.aiMakingPlaceholder
@@ -435,7 +439,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
           </Button>
         </div>
 
-        <p className="text-xs text-gray-400 text-center">
+        <p className="text-xs text-muted-foreground text-center">
           {text.questionFormHint}
         </p>
       </div>

@@ -11,7 +11,9 @@ export const PLAYER_COLORS = [
 
 export function playerColorById(room: GameRoom, id: string): string {
   const i = room.players.findIndex((p) => p.id === id);
-  return i >= 0 ? PLAYER_COLORS[i % PLAYER_COLORS.length] : "#9ca3af";
+  return i >= 0
+    ? PLAYER_COLORS[i % PLAYER_COLORS.length]
+    : "hsl(var(--muted-foreground))";
 }
 
 export function RoomHeader({
@@ -35,7 +37,7 @@ export function RoomHeader({
         type="button"
         onClick={onLeave}
         disabled={disabled}
-        className="text-gray-400 hover:text-gray-600 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        className="text-muted-foreground hover:text-foreground text-sm disabled:cursor-not-allowed disabled:opacity-50"
       >
         {text.leave}
       </button>
@@ -73,10 +75,11 @@ export function TurnBar({
         const isCurrent = currentId === p.id;
         return (
           <div key={p.id}
-            className="rounded-xl py-2 px-3 text-center text-sm font-bold transition-all"
+            className={`rounded-xl py-2 px-3 text-center text-sm font-bold transition-all ${
+              isCurrent ? "text-white" : "bg-secondary text-muted-foreground"
+            }`}
             style={{
-              background: isCurrent ? playerColorById(room, p.id) : "#f3f4f6",
-              color: isCurrent ? "white" : "#9ca3af",
+              background: isCurrent ? playerColorById(room, p.id) : undefined,
             }}>
             {p.name}{p.id === myId ? ` (${text.me})` : ""} {isCurrent && "🎮"}
           </div>
@@ -88,9 +91,9 @@ export function TurnBar({
 
 export function WaitingBanner({ text }: { text: string }) {
   return (
-    <div className="bg-gray-50 rounded-2xl p-5 text-center">
-      <div className="flex items-center justify-center gap-2 text-gray-500">
-        <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+    <div className="bg-secondary rounded-2xl border border-border p-5 text-center">
+      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+        <span className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin" />
         <p className="text-sm font-medium">{text}</p>
       </div>
     </div>

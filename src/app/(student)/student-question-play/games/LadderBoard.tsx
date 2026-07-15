@@ -111,7 +111,7 @@ export default function LadderBoard({
             ))}
           </g>
 
-          <g className="text-slate-600 dark:text-slate-300">
+          <g className="text-muted-foreground">
             {Array.from({ length: columnCount }, (_, column) => (
               <line
                 data-testid="ladder-base-vertical"
@@ -177,7 +177,7 @@ export default function LadderBoard({
               >
                 <circle fill="currentColor" r="12" />
                 <text
-                  className="fill-card dark:fill-slate-950"
+                  className="fill-background"
                   dominantBaseline="central"
                   fontSize="10"
                   fontWeight="900"
@@ -194,7 +194,7 @@ export default function LadderBoard({
               >
                 <path d="M 0 -13 L 13 0 L 0 13 L -13 0 Z" fill="currentColor" />
                 <text
-                  className="fill-card dark:fill-slate-950"
+                  className="fill-background"
                   dominantBaseline="central"
                   fontSize="10"
                   fontWeight="900"

@@ -251,7 +251,7 @@ describe("공통 질문 사다리 그림", () => {
     expect(source).not.toContain("assignLadderTopics");
     expect(source).not.toContain("generateLadderGrid");
     expect(source).not.toMatch(/bg-white|text-gray-/);
-    expect(source).toMatch(/text-slate-\d+ dark:text-slate-\d+/);
+    expect(source).toContain('className="text-muted-foreground"');
     expect(source).toMatch(/text-violet-\d+ dark:text-violet-\d+/);
   });
 });

@@ -159,27 +159,27 @@ export default function DiceGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+          <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{text.backToList}</button>
           <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
             style={{ background: game.gradientCss }}>
             <span className="text-4xl">{game.emoji}</span>
             <h1 className="text-xl font-black">{game.title}</h1>
           </div>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center space-y-3">
+        <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 text-center space-y-3">
           <div className="text-6xl">🎲</div>
-          <h2 className="text-2xl font-black text-gray-800">{text.diceHistory(studentQuestionCount)}</h2>
+          <h2 className="text-2xl font-black text-foreground">{text.diceHistory(studentQuestionCount)}</h2>
         </div>
         <div className="space-y-3">
           {history.map((entry, index) => (
-            <div key={index} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-2">
+            <div key={index} className="bg-card text-foreground rounded-xl border border-border p-4 flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-black text-sm"
                 style={{ background: diceTypes[entry.face - 1].color }}>
                 {entry.face}
               </div>
               <div>
-                <p className="text-xs text-gray-400">{entry.player} · {entry.type}</p>
-                <p className="text-gray-800 text-sm font-medium">{entry.question}</p>
+                <p className="text-xs text-muted-foreground">{entry.player} · {entry.type}</p>
+                <p className="text-foreground text-sm font-medium">{entry.question}</p>
               </div>
             </div>
           ))}
@@ -196,7 +196,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
     <div className="max-w-xl mx-auto space-y-6">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+        <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{text.backToList}</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>
@@ -212,10 +212,11 @@ export default function DiceGame({ game, onBack, config }: Props) {
         <div className="flex gap-2">
           {players.map((p, i) => (
             <div key={i}
-              className="flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all"
+              className={`flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all ${
+                i === currentPlayerIdx ? "text-white" : "bg-secondary text-muted-foreground"
+              }`}
               style={{
-                background: i === currentPlayerIdx ? game.accentColor : "#f3f4f6",
-                color: i === currentPlayerIdx ? "white" : "#9ca3af",
+                background: i === currentPlayerIdx ? game.accentColor : undefined,
               }}>
               {p} {i === currentPlayerIdx && "🎲"}
             </div>
@@ -224,7 +225,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
       )}
 
       {/* 주사위 영역 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-6">
+      <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 flex flex-col items-center gap-6">
         <div className="w-36 h-36 rounded-2xl flex items-center justify-center shadow-xl"
           style={{
             background: phase === "rolling" ? displayInfo.color : phase !== "idle" ? typeInfo.color : "#6366f1",
@@ -239,13 +240,13 @@ export default function DiceGame({ game, onBack, config }: Props) {
         </div>
 
         {phase === "idle" && (
-          <p className="text-gray-400 text-sm text-center">
+          <p className="text-muted-foreground text-sm text-center">
             {isMulti ? `${text.turnOf(currentPlayer)}!` : text.diceIdleSolo}
           </p>
         )}
 
         {phase === "rolling" && (
-          <p className="text-xl font-black text-gray-700 animate-pulse">{text.diceRolling}</p>
+          <p className="text-xl font-black text-foreground animate-pulse">{text.diceRolling}</p>
         )}
 
         {(phase === "result" || phase === "ai-turn") && (
@@ -254,7 +255,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
               style={{ background: typeInfo.color }}>
               {currentFace}번 — {typeInfo.type}
             </div>
-            <p className="text-gray-600 text-sm">{typeInfo.desc}</p>
+            <p className="text-muted-foreground text-sm">{typeInfo.desc}</p>
           </div>
         )}
 
@@ -277,8 +278,8 @@ export default function DiceGame({ game, onBack, config }: Props) {
 
       {/* 질문 작성 (내 차례) */}
       {phase === "result" && !isAITurn && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-          <h2 className="font-black text-gray-800 flex items-center gap-2">
+        <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-6 space-y-4">
+          <h2 className="font-black text-foreground flex items-center gap-2">
             <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs text-white font-bold"
               style={{ background: typeInfo.color }}>✏</span>
             {text.diceMakeQuestion(currentPlayer, typeInfo.type)}
@@ -286,17 +287,17 @@ export default function DiceGame({ game, onBack, config }: Props) {
 
           {/* AI가 먼저 만든 질문 표시 (AI 모드) */}
           {isAI && aiQuestion && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-start gap-2">
+            <div className="bg-secondary border border-border rounded-xl p-3 flex items-start gap-2">
               <span className="text-xl flex-shrink-0">🤖</span>
               <div>
                 <p className="text-indigo-600 text-xs font-bold mb-0.5">{text.diceAiQuestion}</p>
-                <p className="text-gray-700 text-sm">{aiQuestion}</p>
+                <p className="text-foreground text-sm">{aiQuestion}</p>
               </div>
             </div>
           )}
 
           <textarea
-            className="w-full border-2 border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-indigo-400 h-28"
+            className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-indigo-400 h-28"
             placeholder={text.dicePlaceholder(typeInfo.type)}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
@@ -312,11 +313,11 @@ export default function DiceGame({ game, onBack, config }: Props) {
 
       {/* 피드백 표시 */}
       {feedback && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-2">
+        <div className="bg-secondary border border-border rounded-xl p-4 flex items-start gap-2">
           <span className="text-xl">💡</span>
           <div>
             <p className="text-amber-700 text-xs font-bold mb-0.5">{text.diceFeedback}</p>
-            <p className="text-gray-700 text-sm">{feedback}</p>
+            <p className="text-foreground text-sm">{feedback}</p>
           </div>
         </div>
       )}
@@ -324,21 +325,21 @@ export default function DiceGame({ game, onBack, config }: Props) {
       {/* 기록 */}
       {history.length > 0 && (
         <div className="space-y-3">
-          <h3 className="font-bold text-gray-700 text-sm">{text.diceHistory(history.length)}</h3>
+          <h3 className="font-bold text-foreground text-sm">{text.diceHistory(history.length)}</h3>
           {history.map((h, i) => (
-            <div key={i} className="bg-white rounded-xl border border-gray-100 p-4 space-y-2">
+            <div key={i} className="bg-card text-foreground rounded-xl border border-border p-4 space-y-2">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-black text-sm"
                   style={{ background: diceTypes[h.face - 1].color }}>
                   {h.face}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400">{h.player} · {h.type}</p>
-                  <p className="text-gray-800 text-sm font-medium">{h.question}</p>
+                  <p className="text-xs text-muted-foreground">{h.player} · {h.type}</p>
+                  <p className="text-foreground text-sm font-medium">{h.question}</p>
                 </div>
               </div>
               {h.aiFeedback && (
-                <p className="text-amber-600 text-xs bg-amber-50 rounded-lg px-3 py-1.5">
+                <p className="text-muted-foreground text-xs bg-secondary rounded-lg px-3 py-1.5">
                   💡 {h.aiFeedback}
                 </p>
               )}

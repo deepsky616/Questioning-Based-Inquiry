@@ -101,7 +101,7 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={handleBack} className="text-muted-foreground hover:text-gray-600 text-sm">{t("backToList")}</button>
+        <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{t("backToList")}</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>
@@ -125,8 +125,8 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
               onClick={() => setMode(m.value)}
               className="rounded-xl border-2 p-4 flex flex-col items-center gap-2 transition-all hover:scale-105"
               style={{
-                borderColor: mode === m.value ? game.accentColor : "#e5e7eb",
-                background: mode === m.value ? `${game.accentColor}12` : "white",
+                borderColor: mode === m.value ? game.accentColor : "hsl(var(--border))",
+                background: mode === m.value ? `${game.accentColor}12` : "hsl(var(--background))",
               }}>
               <span className="text-3xl">{m.emoji}</span>
               <span className="font-bold text-foreground text-sm">{m.label}</span>
@@ -138,11 +138,11 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
         {/* 친구 모드: 방 안내 */}
         {mode === "friend" && (
           <div className="pt-2 border-t border-border">
-            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <div className="flex items-center gap-3 bg-secondary border border-border rounded-xl p-3">
               <span className="text-2xl">👥</span>
               <div>
-                <p className="text-amber-700 text-sm font-bold">{t("friendModeTitle")}</p>
-                <p className="text-amber-600 text-xs">{t("friendModeDesc")}</p>
+                <p className="text-foreground text-sm font-bold">{t("friendModeTitle")}</p>
+                <p className="text-muted-foreground text-xs">{t("friendModeDesc")}</p>
               </div>
             </div>
           </div>
@@ -161,11 +161,11 @@ export default function GamePage({ params }: { params: Promise<{ gameId: string 
                 className="h-8 text-sm rounded-lg" />
             </div>
             {mode === "ai" && (
-              <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl p-3">
+              <div className="flex items-center gap-3 bg-secondary border border-border rounded-xl p-3">
                 <span className="text-2xl">🤖</span>
                 <div>
-                  <p className="text-blue-700 text-sm font-bold">{t("aiPartnerTitle")}</p>
-                  <p className="text-blue-500 text-xs">{t("aiPartnerDesc")}</p>
+                  <p className="text-foreground text-sm font-bold">{t("aiPartnerTitle")}</p>
+                  <p className="text-muted-foreground text-xs">{t("aiPartnerDesc")}</p>
                 </div>
               </div>
             )}

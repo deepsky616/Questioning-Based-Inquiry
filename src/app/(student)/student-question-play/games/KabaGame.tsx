@@ -164,12 +164,12 @@ export default function KabaGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
-          <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+          <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{text.backToList}</button>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 flex flex-col items-center gap-5">
+        <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-10 flex flex-col items-center gap-5">
           <div className="text-6xl">{"⭐".repeat(stars)}</div>
-          <h2 className="text-3xl font-black text-gray-800">{kabaText.complete}</h2>
-          <p className="text-gray-500 text-center text-sm">
+          <h2 className="text-3xl font-black text-foreground">{kabaText.complete}</h2>
+          <p className="text-muted-foreground text-center text-sm">
             {kabaText.score(TOTAL_ROUNDS, correctCount)}
           </p>
           <div className="w-full space-y-2">
@@ -178,14 +178,14 @@ export default function KabaGame({ game, onBack, config }: Props) {
                 key={i}
                 data-testid="kaba-result-entry"
                 data-player-name={h.playerName}
-                className="flex items-center gap-3 bg-gray-50 rounded-xl p-3"
+                className="flex items-center gap-3 bg-secondary rounded-xl p-3"
               >
                 <span className="text-lg">{h.isCorrect ? "✅" : "❌"}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-400">{h.original}</p>
-                  <p className="text-sm font-medium text-gray-700 truncate">{h.student}</p>
+                  <p className="text-xs text-muted-foreground">{h.original}</p>
+                  <p className="text-sm font-medium text-foreground truncate">{h.student}</p>
                 </div>
-                {isMulti && <span className="text-xs text-gray-400 flex-shrink-0">{h.playerName}</span>}
+                {isMulti && <span className="text-xs text-muted-foreground flex-shrink-0">{h.playerName}</span>}
               </div>
             ))}
           </div>
@@ -202,7 +202,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
     <div className="max-w-lg mx-auto space-y-5">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={handleBack} className="text-gray-400 hover:text-gray-600 text-sm">{text.backToList}</button>
+        <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{text.backToList}</button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>
@@ -218,10 +218,11 @@ export default function KabaGame({ game, onBack, config }: Props) {
         <div className="flex gap-2">
           {players.map((p, i) => (
             <div key={i}
-              className="flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all"
+              className={`flex-1 rounded-xl py-2 px-3 text-center text-sm font-bold transition-all ${
+                i === playerIdx ? "text-white" : "bg-secondary text-muted-foreground"
+              }`}
               style={{
-                background: i === playerIdx ? game.accentColor : "#f3f4f6",
-                color: i === playerIdx ? "white" : "#9ca3af",
+                background: i === playerIdx ? game.accentColor : undefined,
               }}>
               {p} {i === playerIdx ? "🙋" : ""}
             </div>
@@ -230,32 +231,32 @@ export default function KabaGame({ game, onBack, config }: Props) {
       )}
 
       {/* 진행도 */}
-      <div className="bg-white rounded-xl border border-gray-100 p-3">
-        <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+      <div className="bg-card text-foreground rounded-xl border border-border p-3">
+        <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
           <span>{kabaText.round(idx + 1, TOTAL_ROUNDS)}</span>
           <span className="font-bold" style={{ color: game.accentColor }}>
             {kabaText.correctCount(correctCount)} ✅
           </span>
         </div>
-        <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+        <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
           <div className="h-3 rounded-full transition-all duration-500"
             style={{ background: game.gradientCss, width: `${progressPct}%` }} />
         </div>
       </div>
 
       {/* 메인 게임 카드 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border overflow-hidden">
         {/* 상단: 평서문 표시 */}
         <div className="p-6 text-center"
           style={{ background: `${game.accentColor}10` }}>
-          <p className="text-xs text-gray-400 font-medium mb-2 uppercase tracking-wider">
+          <p className="text-xs text-muted-foreground font-medium mb-2 uppercase tracking-wider">
             {kabaText.sentencePrompt(isMulti ? currentPlayer : undefined)}
           </p>
-          <div className="inline-block bg-white rounded-2xl px-8 py-5 shadow-sm border border-gray-100">
-            <p className="text-3xl font-black text-gray-800 leading-tight">{current}</p>
+          <div className="inline-block bg-background rounded-2xl px-8 py-5 shadow-sm border border-border">
+            <p className="text-3xl font-black text-foreground leading-tight">{current}</p>
           </div>
           {/* 변환 힌트 */}
-          <div className="flex items-center justify-center gap-3 mt-4 text-gray-400">
+          <div className="flex items-center justify-center gap-3 mt-4 text-muted-foreground">
             <span className="text-lg">📢</span>
             <span className="text-sm">{kabaText.hint}</span>
           </div>
@@ -268,10 +269,10 @@ export default function KabaGame({ game, onBack, config }: Props) {
               <div className="relative">
                 <input
                   type="text"
-                  className="w-full border-2 rounded-2xl px-5 py-4 text-xl font-bold text-center focus:outline-none transition-colors"
-                  style={{ borderColor: "#e5e7eb" }}
+                  className="w-full bg-background text-foreground border-2 border-input rounded-2xl px-5 py-4 text-xl font-bold text-center focus:outline-none transition-colors"
+                  style={{ borderColor: "hsl(var(--input))" }}
                   onFocus={(e) => (e.target.style.borderColor = game.accentColor)}
-                  onBlur={(e) => (e.target.style.borderColor = "#e5e7eb")}
+                  onBlur={(e) => (e.target.style.borderColor = "hsl(var(--input))")}
                   placeholder={kabaText.placeholder}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -301,26 +302,22 @@ export default function KabaGame({ game, onBack, config }: Props) {
           {phase === "feedback" && (
             <div className="space-y-4">
               {/* 내 답 표시 */}
-              <div className="text-center bg-gray-50 rounded-xl p-4">
-                <p className="text-xs text-gray-400 mb-1">{kabaText.myQuestion}</p>
-                <p className="text-xl font-black text-gray-800">{history[history.length - 1]?.student}</p>
+              <div className="text-center bg-secondary rounded-xl p-4">
+                <p className="text-xs text-muted-foreground mb-1">{kabaText.myQuestion}</p>
+                <p className="text-xl font-black text-foreground">{history[history.length - 1]?.student}</p>
               </div>
 
               {/* AI 피드백 */}
               {isAI && feedback && (
-                <div className={`rounded-2xl p-5 text-center space-y-2 ${
-                    feedback.verdict === "잘했어요"
-                    ? "bg-green-50 border-2 border-green-200"
-                    : "bg-orange-50 border-2 border-orange-200"
-                }`}>
+                <div className="rounded-2xl bg-secondary border-2 border-border p-5 text-center space-y-2">
                   <div className="text-5xl">{feedback.verdict === "잘했어요" ? "🎉" : "🤔"}</div>
                   <p className={`text-2xl font-black ${
                     feedback.verdict === "잘했어요" ? "text-green-600" : "text-orange-500"
                   }`}>
                     {feedback.verdict === "잘했어요" ? kabaText.good : kabaText.tryAgain}
                   </p>
-                  <p className="text-gray-600 text-sm">{feedback.reason}</p>
-                  <p className="text-blue-600 text-sm font-medium bg-blue-50 rounded-xl px-4 py-2">
+                  <p className="text-muted-foreground text-sm">{feedback.reason}</p>
+                  <p className="text-foreground text-sm font-medium px-4 py-2">
                     💬 {feedback.cheer}
                   </p>
                 </div>
@@ -328,11 +325,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
 
               {/* 로컬 피드백 */}
               {!isAI && localResult && (
-                <div className={`rounded-2xl p-5 text-center ${
-                  localResult === "correct"
-                    ? "bg-green-50 border-2 border-green-200"
-                    : "bg-orange-50 border-2 border-orange-200"
-                }`}>
+                <div className="rounded-2xl bg-secondary border-2 border-border p-5 text-center">
                   <div className="text-5xl mb-2">{localResult === "correct" ? "🎉" : "🤔"}</div>
                   <p className={`text-2xl font-black ${
                     localResult === "correct" ? "text-green-600" : "text-orange-500"
@@ -340,7 +333,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
                     {localResult === "correct" ? kabaText.goodBang : kabaText.tryAgainBang}
                   </p>
                   {localResult === "incorrect" && (
-                    <p className="text-gray-500 text-sm mt-2">
+                    <p className="text-muted-foreground text-sm mt-2">
                       {kabaText.localTip}
                     </p>
                   )}
@@ -360,9 +353,9 @@ export default function KabaGame({ game, onBack, config }: Props) {
 
       {/* AI 모드 안내 */}
       {isAI && phase === "input" && (
-        <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+        <div className="flex items-center gap-3 bg-secondary border border-border rounded-xl px-4 py-3">
           <span className="text-2xl">🤖</span>
-          <p className="text-blue-600 text-sm">{kabaText.aiHelp}</p>
+          <p className="text-muted-foreground text-sm">{kabaText.aiHelp}</p>
         </div>
       )}
     </div>

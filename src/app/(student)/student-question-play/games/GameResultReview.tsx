@@ -28,18 +28,18 @@ export function GameResultReview({
   const text = getQuestionGameText(useLocale());
   if (entries.length === 0) return null;
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-2 text-left">
-      <h3 className="font-black text-gray-700 text-sm">
-        {title} <span className="font-normal text-gray-400">· {entries.length}{text.count}</span>
+    <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-2 text-left">
+      <h3 className="font-black text-foreground text-sm">
+        {title} <span className="font-normal text-muted-foreground">· {entries.length}{text.count}</span>
       </h3>
       <div className="space-y-2 max-h-72 overflow-y-auto">
         {entries.map((e, i) => (
-          <div key={i} className="rounded-xl bg-gray-50 p-3">
-            <p className="text-sm font-bold text-gray-800 leading-snug">
+          <div key={i} className="rounded-xl bg-secondary p-3">
+            <p className="text-sm font-bold text-foreground leading-snug">
               <span style={{ color: accentColor }}>{i + 1}.</span> {qPrefix ? `${qPrefix} ` : ""}{e.q}
             </p>
             {e.a && (
-              <p className="mt-1 pl-4 text-sm text-gray-600 leading-snug">
+              <p className="mt-1 pl-4 text-sm text-muted-foreground leading-snug">
                 ↳ {aPrefix ? `${aPrefix} ` : ""}{e.a}
               </p>
             )}

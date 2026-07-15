@@ -295,11 +295,11 @@ export default function RoomResult({
       />
 
       {/* 우승자 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col items-center gap-3">
+      <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 flex flex-col items-center gap-3">
         <div className="text-6xl">🏆</div>
         {winnersSet.size > 0 ? (
           <>
-            <h2 className="text-2xl font-black text-gray-800">
+            <h2 className="text-2xl font-black text-foreground">
               {winnersSet.size === 1 ? text.winner : text.jointWinner}
             </h2>
             <div className="flex flex-wrap justify-center gap-2">
@@ -311,16 +311,16 @@ export default function RoomResult({
                 </span>
               ))}
             </div>
-            <p className="text-gray-400 text-sm">{topScore}{scoreUnit} {scoreLabel}</p>
+            <p className="text-muted-foreground text-sm">{topScore}{scoreUnit} {scoreLabel}</p>
           </>
         ) : (
-          <h2 className="text-xl font-black text-gray-600">{text.everyoneDidWell}</h2>
+          <h2 className="text-xl font-black text-foreground">{text.everyoneDidWell}</h2>
         )}
       </div>
 
       {/* 점수판 (게임 내 활동) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-2">
-        <h3 className="font-black text-gray-700 mb-1">{text.scoreboard}</h3>
+      <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-2">
+        <h3 className="font-black text-foreground mb-1">{text.scoreboard}</h3>
         {sorted.map((s, i) => {
           const isWinner = winnersSet.has(s.playerId);
           return (
@@ -332,8 +332,8 @@ export default function RoomResult({
                 style={{ background: playerColorById(room, s.playerId) }}>
                 {s.name.charAt(0)}
               </div>
-              <span className="font-bold text-gray-800 flex-1">
-                {s.name}{s.playerId === myId && <span className="text-xs text-gray-400 ml-1">({text.me})</span>}
+              <span className="font-bold text-foreground flex-1">
+                {s.name}{s.playerId === myId && <span className="text-xs text-muted-foreground ml-1">({text.me})</span>}
               </span>
               <span className="font-black" style={{ color: game.accentColor }}>
                 {s.score}{scoreUnit}
@@ -344,14 +344,14 @@ export default function RoomResult({
       </div>
 
       {/* 포인트 분석 */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-3">
-        <h3 className="font-black text-gray-700 flex items-center gap-2">
+      <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-3">
+        <h3 className="font-black text-foreground flex items-center gap-2">
           {text.pointAnalysis}
         </h3>
 
         {!award && awarding && (
-          <div className="flex items-center gap-3 text-gray-500 text-sm py-4">
-            <span className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center gap-3 text-muted-foreground text-sm py-4">
+            <span className="w-4 h-4 border-2 border-border border-t-transparent rounded-full animate-spin" />
             {text.analyzingPoints}
           </div>
         )}
@@ -374,7 +374,7 @@ export default function RoomResult({
         )}
 
         {!award && !awarding && !canManageAward && (
-          <p className="text-gray-400 text-sm text-center py-4">
+          <p className="text-muted-foreground text-sm text-center py-4">
             {text.waitingPointAnalysis}
           </p>
         )}
@@ -382,7 +382,7 @@ export default function RoomResult({
         {award && (
           <>
             {award.summary && (
-              <p className="text-gray-600 text-sm bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+              <p className="text-foreground text-sm bg-secondary border border-border rounded-xl px-4 py-3">
                 💬 {award.summary}
               </p>
             )}
@@ -416,15 +416,15 @@ export default function RoomResult({
                 const aiBonuses = bonuses.filter((b) => b.bonusType in AI_BONUS_TYPES);
                 return (
                   <div key={s.playerId}
-                    className="rounded-xl p-3 border border-gray-100 space-y-1.5"
+                    className="rounded-xl p-3 border border-border space-y-1.5"
                     style={{ background: s.playerId === myId ? `${game.accentColor}08` : "hsl(var(--card))" }}>
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full flex items-center justify-center text-white font-black text-xs"
                         style={{ background: playerColorById(room, s.playerId) }}>
                         {s.name.charAt(0)}
                       </div>
-                      <span className="font-bold text-gray-800 flex-1 text-sm">
-                        {s.name}{s.playerId === myId && <span className="text-xs text-gray-400 ml-1">({text.me})</span>}
+                      <span className="font-bold text-foreground flex-1 text-sm">
+                        {s.name}{s.playerId === myId && <span className="text-xs text-muted-foreground ml-1">({text.me})</span>}
                       </span>
                       <span className="font-black text-base" style={{ color: game.accentColor }}>
                         +{pts}{locale === "en" ? " pts" : "점"}
@@ -451,16 +451,16 @@ export default function RoomResult({
 
             {/* 베스트 질문 */}
             {bestQ && (
-              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl p-4 space-y-2">
-                <p className="text-yellow-600 font-black text-sm flex items-center gap-1">
+              <div className="bg-secondary border-2 border-border rounded-xl p-4 space-y-2">
+                <p className="text-amber-700 dark:text-amber-300 font-black text-sm flex items-center gap-1">
                   {text.bestQuestion}
                 </p>
-                <p className="text-gray-800 font-bold">&ldquo;{bestQ.question}&rdquo;</p>
-                <p className="text-gray-500 text-xs">💬 {bestQ.reason}</p>
+                <p className="text-foreground font-bold">&ldquo;{bestQ.question}&rdquo;</p>
+                <p className="text-muted-foreground text-xs">💬 {bestQ.reason}</p>
               </div>
             )}
 
-            <p className="text-xs text-gray-400 text-center pt-1">
+            <p className="text-xs text-muted-foreground text-center pt-1">
               {text.pointBase}: {text.participation} {BASE_POINTS.PARTICIPATION},
               {text.perValidQuestion} {BASE_POINTS.PER_VALID_QUESTION},
               {text.completion} {BASE_POINTS.COMPLETION}, {text.winnerBonus} {BASE_POINTS.WINNER_BONUS}
@@ -487,7 +487,7 @@ export default function RoomResult({
           {text.returnLobby}
         </Button>
       ) : (
-        <p className="text-center text-gray-400 text-sm">{text.waitingHost}</p>
+        <p className="text-center text-muted-foreground text-sm">{text.waitingHost}</p>
       )}
     </div>
   );
