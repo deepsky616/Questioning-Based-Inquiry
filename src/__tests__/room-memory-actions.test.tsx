@@ -28,6 +28,13 @@ import {
   type MemoryRoomState,
 } from "@/lib/question-game-room-engines/memory";
 
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({
+    data: { user: { id: "host", name: "방장", role: "STUDENT" } },
+    status: "authenticated",
+  }),
+}));
+
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
 const awardMocks = vi.hoisted(() => ({
   award: vi.fn(),

@@ -2,29 +2,31 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { RefreshCw, Share2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, playerColorById } from "./roomShared";
 import { GameResultReview } from "./GameResultReview";
-import { AI_BONUS_TYPES, BonusKey, SYSTEM_BONUS, BASE_POINTS } from "@/lib/points-policy";
+import { AI_BONUS_TYPES, BonusKey, BASE_POINTS } from "@/lib/points-policy";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
+import {
+  isGameAwardResult,
+  type GameAward,
+  type GameAwardResult,
+} from "@/lib/game-award-result";
 import type { BuiltInGame, GameRoom, RoomActionHandler } from "@/lib/question-games-data";
 
 export interface ScoreEntry { playerId: string; name: string; score: number }
 export interface QInfo { playerId: string; playerName: string; question: string }
 
-interface AwardLog { studentId: string; bonusType: string; points: number; reason: string }
-interface AwardResponse {
-  awards: AwardLog[];
-  bestQuestion?: { studentId: string; question: string; reason: string };
-  summary?: string;
-  alreadyAwarded?: boolean;
-}
+type AwardRoomIdentity = Pick<GameRoom, "code" | "createdAt"> & {
+  playId: string;
+};
 
 interface LocalAwardState {
   lifetimeKey: string;
-  awardRoom: Pick<GameRoom, "code" | "createdAt">;
-  result: AwardResponse;
+  awardRoom: AwardRoomIdentity;
+  result: GameAwardResult;
 }
 
 interface LifetimeErrorState {
@@ -36,33 +38,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isAwardResponse(value: unknown): value is AwardResponse {
-  if (!isRecord(value) || !Array.isArray(value.awards)) return false;
-  if (!value.awards.every((award) =>
-    isRecord(award) &&
-    typeof award.studentId === "string" &&
-    typeof award.bonusType === "string" &&
-    typeof award.points === "number" &&
-    Number.isFinite(award.points) &&
-    typeof award.reason === "string"
-  )) return false;
-  if (value.summary !== undefined && typeof value.summary !== "string") return false;
-  if (value.alreadyAwarded !== undefined && typeof value.alreadyAwarded !== "boolean") {
-    return false;
+function readAwardResult(value: unknown): GameAwardResult | null {
+  if (!isRecord(value)) return null;
+  const allowedKeys = new Set([
+    "awards",
+    "bestQuestion",
+    "summary",
+    "alreadyAwarded",
+  ]);
+  if (Object.keys(value).some((key) => !allowedKeys.has(key))) return null;
+  if (
+    value.alreadyAwarded !== undefined &&
+    typeof value.alreadyAwarded !== "boolean"
+  ) {
+    return null;
   }
-  if (value.bestQuestion !== undefined) {
-    if (
-      !isRecord(value.bestQuestion) ||
-      typeof value.bestQuestion.studentId !== "string" ||
-      typeof value.bestQuestion.question !== "string" ||
-      typeof value.bestQuestion.reason !== "string"
-    ) return false;
-  }
-  return true;
+  const { alreadyAwarded: _alreadyAwarded, ...candidate } = value;
+  return isGameAwardResult(candidate) ? candidate : null;
 }
 
-function lifetimeKeyOf(room: Pick<GameRoom, "code" | "createdAt">) {
-  return `${room.code}:${room.createdAt}`;
+function lifetimeKeyOf(
+  room: Pick<GameRoom, "code" | "createdAt" | "playId">,
+) {
+  return `${room.code}:${room.createdAt}:${room.playId ?? "legacy"}`;
 }
 
 const MEDALS = ["🥇", "🥈", "🥉"];
@@ -83,17 +81,32 @@ export default function RoomResult({
   game, room, myId, scoreLabel, scoreUnit, scores, questions, onAction, onLeave,
 }: Props) {
   const locale = useLocale();
+  const { data: session, status: sessionStatus } = useSession();
   const text = getQuestionGameText(locale);
   const isHost = room.hostId === myId;
+  const canManageAward =
+    sessionStatus === "authenticated" &&
+    session?.user.id === myId &&
+    session.user.role === "TEACHER" &&
+    isHost &&
+    room.status === "ended" &&
+    room.pointAwardKeyVersion === 2 &&
+    room.pointEvidenceVersion === 2 &&
+    typeof room.playId === "string" &&
+    room.gameState.stateVersion === 2 &&
+    room.gameState.phase === "done" &&
+    room.gameState.endReason === "completed";
   const lifetimeKey = lifetimeKeyOf(room);
   const currentLifetimeRef = useRef(lifetimeKey);
   const mountedRef = useRef(false);
   const autoAttemptedRef = useRef<string | null>(null);
-  const inFlightRef = useRef(new Set<string>());
+  const awardInFlightRef = useRef(new Set<string>());
+  const publishInFlightRef = useRef(new Set<string>());
   const [localAwardState, setLocalAwardState] = useState<LocalAwardState | null>(null);
   const [awardErrorState, setAwardErrorState] = useState<LifetimeErrorState | null>(null);
   const [shareErrorState, setShareErrorState] = useState<LifetimeErrorState | null>(null);
   const [awardingLifetime, setAwardingLifetime] = useState<string | null>(null);
+  const [publishingLifetime, setPublishingLifetime] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     currentLifetimeRef.current = lifetimeKey;
@@ -114,8 +127,9 @@ export default function RoomResult({
   );
 
   // 방에 저장된 지급 결과 (다른 참가자도 보이게)
-  const sharedCandidate = (room.gameState as { awardResult?: unknown }).awardResult;
-  const sharedAward = isAwardResponse(sharedCandidate) ? sharedCandidate : null;
+  const sharedAward = isGameAwardResult(room.awardResult)
+    ? room.awardResult
+    : null;
   const localAward = localAwardState?.lifetimeKey === lifetimeKey
     ? localAwardState
     : null;
@@ -126,24 +140,27 @@ export default function RoomResult({
     ? shareErrorState.message
     : null;
   const awarding = awardingLifetime === lifetimeKey;
+  const publishing = publishingLifetime === lifetimeKey;
   const award = sharedAward ?? localAward?.result ?? null;
 
-  const shareAward = useCallback(async (
-    result: AwardResponse,
-    awardRoom: Pick<GameRoom, "code" | "createdAt">,
+  const publishAward = useCallback(async (
+    awardRoom: AwardRoomIdentity,
     requestLifetimeKey: string,
   ) => {
     if (
       !mountedRef.current ||
-      currentLifetimeRef.current !== requestLifetimeKey
+      currentLifetimeRef.current !== requestLifetimeKey ||
+      publishInFlightRef.current.has(requestLifetimeKey)
     ) return;
+    publishInFlightRef.current.add(requestLifetimeKey);
+    setPublishingLifetime(requestLifetimeKey);
     setShareErrorState((current) =>
       current?.lifetimeKey === requestLifetimeKey ? null : current
     );
     try {
       const shared = await onAction(
-        "update-state",
-        { patch: { awardResult: result } },
+        "publish-award-result",
+        { playId: awardRoom.playId },
         { expectedRoom: awardRoom },
       );
       if (
@@ -166,14 +183,26 @@ export default function RoomResult({
           message: text.shareFailed,
         });
       }
+    } finally {
+      publishInFlightRef.current.delete(requestLifetimeKey);
+      if (mountedRef.current) {
+        setPublishingLifetime((current) =>
+          current === requestLifetimeKey ? null : current
+        );
+      }
     }
   }, [onAction, text.shareFailed]);
 
   const requestAward = useCallback(async () => {
-    const awardRoom = { code: room.code, createdAt: room.createdAt };
+    if (!canManageAward || !room.playId) return;
+    const awardRoom: AwardRoomIdentity = {
+      code: room.code,
+      createdAt: room.createdAt,
+      playId: room.playId,
+    };
     const requestLifetimeKey = lifetimeKeyOf(awardRoom);
-    if (inFlightRef.current.has(requestLifetimeKey)) return;
-    inFlightRef.current.add(requestLifetimeKey);
+    if (awardInFlightRef.current.has(requestLifetimeKey)) return;
+    awardInFlightRef.current.add(requestLifetimeKey);
     if (
       mountedRef.current &&
       currentLifetimeRef.current === requestLifetimeKey
@@ -184,16 +213,6 @@ export default function RoomResult({
       setAwardingLifetime(requestLifetimeKey);
     }
 
-    const contributions = scores.map((score) => ({
-      studentId: score.playerId,
-      studentName: score.name,
-      validQuestions: game.id === "bingo" ? 0 : score.score,
-      questions: questions
-        .filter((question) => question.playerId === score.playerId)
-        .map((question) => question.question),
-      isWinner: topScore > 0 && score.score === topScore,
-    }));
-
     try {
       const response = await fetch("/api/points/award", {
         method: "POST",
@@ -202,12 +221,12 @@ export default function RoomResult({
           gameId: game.id,
           roomCode: awardRoom.code,
           roomCreatedAt: awardRoom.createdAt,
-          topic: room.topic,
-          contributions,
+          playId: awardRoom.playId,
         }),
       });
       const value: unknown = await response.json().catch(() => null);
-      if (!response.ok || !isAwardResponse(value)) {
+      const result = readAwardResult(value);
+      if (!response.ok || !result) {
         throw new Error(text.awardRequestFailed);
       }
       if (
@@ -217,9 +236,9 @@ export default function RoomResult({
       setLocalAwardState({
         lifetimeKey: requestLifetimeKey,
         awardRoom,
-        result: value,
+        result,
       });
-      await shareAward(value, awardRoom, requestLifetimeKey);
+      await publishAward(awardRoom, requestLifetimeKey);
     } catch {
       if (
         mountedRef.current &&
@@ -231,29 +250,29 @@ export default function RoomResult({
         });
       }
     } finally {
-      inFlightRef.current.delete(requestLifetimeKey);
+      awardInFlightRef.current.delete(requestLifetimeKey);
       if (mountedRef.current) {
         setAwardingLifetime((current) =>
           current === requestLifetimeKey ? null : current
         );
       }
     }
-  }, [game.id, questions, room.code, room.createdAt, room.topic, scores, shareAward, text.awardFailed, text.awardRequestFailed, topScore]);
+  }, [canManageAward, game.id, publishAward, room.code, room.createdAt, room.playId, text.awardFailed, text.awardRequestFailed]);
 
   // 방장 자동 지급 (방 수명마다 1회)
   useEffect(() => {
     if (
-      !isHost ||
+      !canManageAward ||
       sharedAward ||
       autoAttemptedRef.current === lifetimeKey
     ) return;
     autoAttemptedRef.current = lifetimeKey;
     void requestAward();
-  }, [isHost, lifetimeKey, requestAward, sharedAward]);
+  }, [canManageAward, lifetimeKey, requestAward, sharedAward]);
 
   // 학생별 총 포인트 / 받은 상 집계
   const pointsByPlayer: Record<string, number> = {};
-  const bonusesByPlayer: Record<string, AwardLog[]> = {};
+  const bonusesByPlayer: Record<string, GameAward[]> = {};
   for (const a of award?.awards ?? []) {
     pointsByPlayer[a.studentId] = (pointsByPlayer[a.studentId] ?? 0) + a.points;
     if (!bonusesByPlayer[a.studentId]) bonusesByPlayer[a.studentId] = [];
@@ -328,7 +347,7 @@ export default function RoomResult({
           </div>
         )}
 
-        {!award && !awarding && awardError && isHost && (
+        {!award && !awarding && awardError && canManageAward && (
           <div className="space-y-3 py-2">
             <p role="alert" className="text-sm text-red-600 text-center">
               {awardError}
@@ -345,7 +364,7 @@ export default function RoomResult({
           </div>
         )}
 
-        {!award && !awarding && !isHost && (
+        {!award && !awarding && !canManageAward && (
           <p className="text-gray-400 text-sm text-center py-4">
             {text.waitingPointAnalysis}
           </p>
@@ -359,7 +378,7 @@ export default function RoomResult({
               </p>
             )}
 
-            {shareError && localAward && !sharedAward && isHost && (
+            {shareError && localAward && !sharedAward && canManageAward && (
               <div className="space-y-3 py-1">
                 <p role="alert" className="text-sm text-red-600 text-center">
                   {shareError}
@@ -368,8 +387,8 @@ export default function RoomResult({
                   type="button"
                   variant="outline"
                   className="w-full gap-2"
-                  onClick={() => void shareAward(
-                    localAward.result,
+                  disabled={publishing}
+                  onClick={() => void publishAward(
                     localAward.awardRoom,
                     localAward.lifetimeKey,
                   )}
@@ -461,5 +480,3 @@ export default function RoomResult({
     </div>
   );
 }
-// SYSTEM_BONUS는 표시에 사용하지 않지만 향후 확장용 유지
-void SYSTEM_BONUS;
