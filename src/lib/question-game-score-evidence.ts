@@ -69,11 +69,38 @@ function requireRoomPlayers(
     }
     byId.set(player.id, player);
   }
+  const participantHosts = participants.filter(({ isHost }) => isHost);
   if (
-    participants.filter(({ isHost }) => isHost).length !== 1 ||
+    participantHosts.length !== 1 ||
     !byId.has(room.hostId)
   ) {
     rejectEvidence("질문놀이 방장 참가자 정보를 확인할 수 없습니다");
+  }
+
+  const currentById = new Map<string, RoomPlayer>();
+  for (const player of room.players) {
+    if (
+      currentById.has(player.id) ||
+      byId.get(player.id)?.name !== player.name
+    ) {
+      rejectEvidence("현재 질문놀이 참가자 정보가 완료 시점과 맞지 않습니다");
+    }
+    currentById.set(player.id, player);
+  }
+  const currentHosts = room.players.filter(({ isHost }) => isHost);
+  if (
+    currentHosts.length !== 1 ||
+    currentHosts[0]?.id !== room.hostId
+  ) {
+    rejectEvidence("현재 질문놀이 방장 정보를 확인할 수 없습니다");
+  }
+  const completionHostId = participantHosts[0]?.id;
+  if (
+    completionHostId &&
+    currentById.has(completionHostId) &&
+    room.hostId !== completionHostId
+  ) {
+    rejectEvidence("질문놀이 방장 정보가 완료 시점과 맞지 않습니다");
   }
   return byId;
 }
@@ -81,15 +108,18 @@ function requireRoomPlayers(
 function requireNamedPlayers(
   roomPlayers: ReadonlyMap<string, RoomPlayer>,
   statePlayers: readonly TurnGamePlayer[],
+  activePlayerIds: readonly string[],
 ): void {
-  if (!hasSameIds(
-    statePlayers.map(({ id }) => id),
-    [...roomPlayers.keys()],
-  )) {
-    rejectEvidence("저장된 질문놀이 참가자 정보가 현재 방과 맞지 않습니다");
-  }
+  requirePlayerIds(roomPlayers, activePlayerIds);
+  const statePlayersById = new Map<string, TurnGamePlayer>();
   for (const player of statePlayers) {
-    if (roomPlayers.get(player.id)?.name !== player.name) {
+    if (statePlayersById.has(player.id)) {
+      rejectEvidence("저장된 질문놀이 참가자 정보가 손상되었습니다");
+    }
+    statePlayersById.set(player.id, player);
+  }
+  for (const [playerId, roomPlayer] of roomPlayers) {
+    if (statePlayersById.get(playerId)?.name !== roomPlayer.name) {
       rejectEvidence("저장된 질문놀이 참가자 이름이 현재 방과 맞지 않습니다");
     }
   }
@@ -164,6 +194,7 @@ function addQuestion(
   playerName: string,
   question: string,
 ): void {
+  if (!roomPlayers.has(playerId)) return;
   requirePlayerName(roomPlayers, playerId, playerName);
   const stored = questions.get(playerId);
   if (!stored) {
@@ -215,7 +246,10 @@ export function buildQuestionGameScoreEvidence(
     case "story-dice": {
       const state = readStoryDiceState(room.gameState);
       if (!state) rejectEvidence("저장된 이야기 주사위 점수 근거가 손상되었습니다");
-      requireNamedPlayers(roomPlayers, state.players);
+      requireNamedPlayers(roomPlayers, state.players, [
+        state.taggerId,
+        ...state.roundTargetPlayerIds,
+      ]);
       for (const pair of state.pairs) {
         addQuestion(
           roomPlayers,
@@ -231,7 +265,7 @@ export function buildQuestionGameScoreEvidence(
     case "dice": {
       const state = readDiceState(room.gameState);
       if (!state) rejectEvidence("저장된 질문 주사위 점수 근거가 손상되었습니다");
-      requireNamedPlayers(roomPlayers, state.players);
+      requireNamedPlayers(roomPlayers, state.players, state.roundTargetPlayerIds);
       for (const record of state.questions) {
         addQuestion(
           roomPlayers,
@@ -247,7 +281,14 @@ export function buildQuestionGameScoreEvidence(
     case "ladder": {
       const state = readLadderState(room.gameState);
       if (!state) rejectEvidence("저장된 질문 사다리 점수 근거가 손상되었습니다");
-      requirePlayerIds(roomPlayers, state.roundPlayerIds);
+      requireNamedPlayers(
+        roomPlayers,
+        state.assignments.map(({ playerId, playerName }) => ({
+          id: playerId,
+          name: playerName,
+        })),
+        state.roundTargetPlayerIds,
+      );
       for (const record of state.questions) {
         addQuestion(
           roomPlayers,
@@ -263,7 +304,7 @@ export function buildQuestionGameScoreEvidence(
     case "relay": {
       const state = readRelayState(room.gameState);
       if (!state) rejectEvidence("저장된 질문 릴레이 점수 근거가 손상되었습니다");
-      requireNamedPlayers(roomPlayers, state.players);
+      requireNamedPlayers(roomPlayers, state.players, state.roundTargetPlayerIds);
       if (room.topic !== state.topic) {
         rejectEvidence("저장된 질문 릴레이 주제가 현재 방과 맞지 않습니다");
       }
@@ -285,6 +326,7 @@ export function buildQuestionGameScoreEvidence(
       requirePlayerIds(roomPlayers, state.turnOrder);
       requireScoreKeys(roomPlayers, state.scores);
       for (const item of state.history) {
+        if (!roomPlayers.has(item.playerId)) continue;
         requirePlayerName(roomPlayers, item.playerId, item.playerName);
         if (item.kind === "question") {
           addQuestion(
@@ -307,9 +349,9 @@ export function buildQuestionGameScoreEvidence(
     case "kaba": {
       const state = readKabaState(room.gameState);
       if (!state) rejectEvidence("저장된 까바 놀이 점수 근거가 손상되었습니다");
-      requireNamedPlayers(roomPlayers, state.players);
-      requireScoreKeys(roomPlayers, state.scores);
+      requireNamedPlayers(roomPlayers, state.players, state.roundTargetPlayerIds);
       for (const attempt of state.attempts) {
+        if (!roomPlayers.has(attempt.playerId)) continue;
         requirePlayerName(roomPlayers, attempt.playerId, attempt.playerName);
         if (attempt.correct) {
           addQuestion(
@@ -322,8 +364,8 @@ export function buildQuestionGameScoreEvidence(
           );
         }
       }
-      for (const [playerId, score] of Object.entries(state.scores)) {
-        if (activityScores.get(playerId) !== score) {
+      for (const playerId of roomPlayers.keys()) {
+        if (activityScores.get(playerId) !== state.scores[playerId]) {
           rejectEvidence("저장된 까바 놀이 정답 수와 점수가 맞지 않습니다");
         }
       }

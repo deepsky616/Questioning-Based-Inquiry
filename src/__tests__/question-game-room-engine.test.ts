@@ -962,6 +962,40 @@ describe("질문놀이 방 판정기", () => {
       expect(result.room.updatedAt).toBe(room.updatedAt);
     });
 
+    it("이탈로 정상 완료하면 그 순간의 남은 참가자를 점수 대상으로 고정한다", () => {
+      const room = makeRoom({
+        gameId: "custom-game",
+        players: [makePlayer("a", true), makePlayer("b"), makePlayer("c")],
+        gameState: makeState({
+          turnOrder: ["a", "b", "c"],
+          currentTurnIdx: 2,
+        }),
+      });
+      const engine = makeEngine({
+        onPlayerLeave: vi.fn(({ room: candidate }) => ({
+          ...candidate,
+          status: "ended" as const,
+          gameState: {
+            ...candidate.gameState,
+            phase: "done",
+            endReason: "completed",
+          },
+        })),
+      });
+
+      const result = leaveQuestionGameRoomWithEngine(
+        { room, userId: "c" },
+        engine,
+      );
+
+      expect(result.kind).toBe("changed");
+      expect(result.room.pointParticipants).toEqual([
+        makePlayer("a", true),
+        makePlayer("b"),
+      ]);
+      expect(result.room.pointParticipants).not.toBe(result.room.players);
+    });
+
     it("이탈 훅 뒤에도 한 명 방의 참가자와 방장 및 부족 종료를 다시 고정한다", () => {
       const room = makeRoom({
         players: [makePlayer("a", true), makePlayer("b")],

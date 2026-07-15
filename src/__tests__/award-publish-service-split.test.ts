@@ -220,6 +220,18 @@ describe("award and publish route service split", () => {
         { ...room.pointParticipants[1], id: "teacher-1" },
       ],
     })).toBe(false);
+    expect(isGameRoom({
+      ...room,
+      players: structuredClone(room.pointParticipants),
+      pointParticipants: room.pointParticipants.map((player) => ({
+        ...player,
+        isHost: player.id === "student-1",
+      })),
+    })).toBe(false);
+    expect(isGameRoom({
+      ...room,
+      pointParticipants: [room.pointParticipants[0]],
+    })).toBe(false);
   });
 
   it("keeps published inquiry question logic in a service module", () => {

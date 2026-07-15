@@ -1,4 +1,8 @@
-import { applyQuestionGameRuleText } from "@/lib/question-game-rules";
+import {
+  applyQuestionGameRuleText,
+  isBuiltInQuestionGameId,
+  QUESTION_GAME_RULES,
+} from "@/lib/question-game-rules";
 import {
   isGameAwardResult,
   type GameAwardResult,
@@ -207,11 +211,50 @@ function isRoomPlayer(value: unknown): value is RoomPlayer {
   );
 }
 
-function isPointParticipantSnapshot(value: unknown): value is RoomPlayer[] {
-  if (!Array.isArray(value) || !value.every(isRoomPlayer)) return false;
-  const ids = new Set(value.map(({ id }) => id));
-  return ids.size === value.length &&
-    value.filter(({ isHost }) => isHost).length === 1;
+function isPointParticipantSnapshot(
+  value: unknown,
+  gameId: string,
+  hostId: string,
+  currentPlayers: unknown,
+): value is RoomPlayer[] {
+  if (
+    !isBuiltInQuestionGameId(gameId) ||
+    !Array.isArray(value) ||
+    !value.every(isRoomPlayer) ||
+    !Array.isArray(currentPlayers) ||
+    !currentPlayers.every(isRoomPlayer)
+  ) {
+    return false;
+  }
+  const { min, max } = QUESTION_GAME_RULES[gameId].multiplayer;
+  if (value.length < min || value.length > max) return false;
+
+  const snapshotById = new Map(value.map((player) => [player.id, player]));
+  const currentById = new Map(currentPlayers.map((player) => [player.id, player]));
+  if (
+    snapshotById.size !== value.length ||
+    currentById.size !== currentPlayers.length ||
+    currentPlayers.some((player) =>
+      snapshotById.get(player.id)?.name !== player.name
+    )
+  ) {
+    return false;
+  }
+
+  const snapshotHosts = value.filter(({ isHost }) => isHost);
+  const currentHosts = currentPlayers.filter(({ isHost }) => isHost);
+  if (
+    snapshotHosts.length !== 1 ||
+    currentHosts.length !== 1 ||
+    currentHosts[0]?.id !== hostId ||
+    !snapshotById.has(hostId)
+  ) {
+    return false;
+  }
+  const completionHostId = snapshotHosts[0]?.id;
+  return completionHostId === undefined ||
+    !currentById.has(completionHostId) ||
+    completionHostId === hostId;
 }
 
 function isRoomChainItem(value: unknown): value is RoomChainItem {
@@ -253,7 +296,12 @@ export function isGameRoom(value: unknown): value is GameRoom {
       value.pointEvidenceVersion === 1 ||
       value.pointEvidenceVersion === 2) &&
     (value.pointParticipants === undefined ||
-      isPointParticipantSnapshot(value.pointParticipants)) &&
+      isPointParticipantSnapshot(
+        value.pointParticipants,
+        value.gameId,
+        value.hostId,
+        value.players,
+      )) &&
     (value.awardResult === undefined || isGameAwardResult(value.awardResult))
   );
 }

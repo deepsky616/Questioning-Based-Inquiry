@@ -26,6 +26,12 @@ const PLAYERS = [
   { id: "host", name: "교사", isHost: true, joinedAt: 1 },
   { id: "s1", name: "학생 하나", isHost: false, joinedAt: 2 },
 ];
+const DEPARTED_PLAYER = {
+  id: "left",
+  name: "먼저 나간 학생",
+  isHost: false,
+  joinedAt: 3,
+};
 
 function completedRoom(
   gameId: GameRoom["gameId"],
@@ -434,6 +440,91 @@ describe("질문놀이 버전 2 점수 근거", () => {
         studentName: "학생 하나",
         validQuestions: 3,
         activityScore: 3,
+      }),
+    ]);
+  });
+
+  it("라운드 놀이는 완료 전 떠난 학생의 예전 질문을 무시하고 완료 참가자만 계산한다", () => {
+    const completed = makeQuestionRoundRoom("relay");
+    const gameState = completed.gameState as {
+      players: Array<{ id: string; name: string }>;
+      playerNames: Record<string, string>;
+      questions: Array<Record<string, unknown>>;
+    };
+    const room: GameRoom = {
+      ...completed,
+      pointParticipants: structuredClone(PLAYERS),
+      gameState: {
+        ...completed.gameState,
+        players: [
+          ...gameState.players,
+          { id: DEPARTED_PLAYER.id, name: DEPARTED_PLAYER.name },
+        ],
+        playerNames: {
+          ...gameState.playerNames,
+          [DEPARTED_PLAYER.id]: DEPARTED_PLAYER.name,
+        },
+        questions: [
+          ...gameState.questions,
+          {
+            roundId: ROUND_IDS[0],
+            round: 1,
+            playerId: DEPARTED_PLAYER.id,
+            playerName: DEPARTED_PLAYER.name,
+            locale: "ko",
+            question: "떠나기 전에 작성한 질문은 무엇인가요?",
+          },
+        ],
+      },
+    };
+
+    const evidence = buildQuestionGameScoreEvidence(
+      room,
+      new Set(["s1", DEPARTED_PLAYER.id]),
+    );
+
+    expect(evidence).toEqual([
+      expect.objectContaining({
+        studentId: "s1",
+        validQuestions: 3,
+        activityScore: 3,
+      }),
+    ]);
+  });
+
+  it("미스터리 박스는 완료 전 떠난 학생의 예전 활동으로 남은 학생 점수를 막지 않는다", () => {
+    const completed = makeMysteryRoom();
+    const history = completed.gameState.history as Array<Record<string, unknown>>;
+    const room: GameRoom = {
+      ...completed,
+      pointParticipants: structuredClone(PLAYERS),
+      gameState: {
+        ...completed.gameState,
+        round: 4,
+        history: [
+          {
+            kind: "question",
+            playerId: DEPARTED_PLAYER.id,
+            playerName: DEPARTED_PLAYER.name,
+            locale: "ko",
+            question: "먹을 수 있나요?",
+            answer: "yes",
+          },
+          ...history,
+        ],
+      },
+    };
+
+    const evidence = buildQuestionGameScoreEvidence(
+      room,
+      new Set(["s1", DEPARTED_PLAYER.id]),
+    );
+
+    expect(evidence).toEqual([
+      expect.objectContaining({
+        studentId: "s1",
+        validQuestions: 1,
+        activityScore: 1,
       }),
     ]);
   });
