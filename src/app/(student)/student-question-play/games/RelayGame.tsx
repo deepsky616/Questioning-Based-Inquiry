@@ -398,7 +398,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
       {/* 입력 영역 — 항상 학생 차례 (AI가 응답 중일 때만 비활성화) */}
       <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-4 space-y-3">
         {localError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-red-600 text-sm">
+          <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-red-800 dark:text-red-200 text-sm">
             ❌ {localError}
           </div>
         )}

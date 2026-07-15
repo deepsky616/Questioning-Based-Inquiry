@@ -49,7 +49,7 @@ export default function TeacherGamePreview({ params }: { params: Promise<{ gameI
         <p className="text-sm text-muted-foreground">{t("builtInOnly")}</p>
         <button
           className="mt-2 text-sm text-white px-5 py-2.5 rounded-xl font-bold"
-          style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
+          style={{ background: "linear-gradient(135deg, #6D28D9, #BE185D)" }}
           onClick={back}
         >
           {t("backToManage")}
@@ -60,11 +60,11 @@ export default function TeacherGamePreview({ params }: { params: Promise<{ gameI
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5">
-        <p className="text-sm font-semibold text-indigo-700">
+      <div className="flex items-center justify-between rounded-xl border border-border bg-secondary px-4 py-2.5">
+        <p className="text-sm font-semibold text-foreground">
           {t("previewMode")}
         </p>
-        <button onClick={back} className="text-sm font-medium text-indigo-600 hover:underline">
+        <button onClick={back} className="text-sm font-medium text-foreground hover:underline">
           {t("backShort")}
         </button>
       </div>

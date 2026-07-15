@@ -428,22 +428,27 @@ function colorHue(hex: string): number | null {
   return (hue * 60 + 360) % 360;
 }
 
-function closestSafePreset(hex: string): GradientPreset {
-  const sourceHue = colorHue(hex);
-  if (sourceHue === null) return DEFAULT_GAME_THEME;
-  return GRADIENT_PRESETS.reduce((closest, preset) => {
+function hueDistance(first: number, second: number): number {
+  return Math.min(Math.abs(first - second), 360 - Math.abs(first - second));
+}
+
+function closestSafePreset(colors: string[]): GradientPreset {
+  const sourceHues = colors
+    .map(colorHue)
+    .filter((hue): hue is number => hue !== null);
+  if (sourceHues.length === 0) return DEFAULT_GAME_THEME;
+
+  const score = (preset: GradientPreset) => {
     const presetHue = colorHue(preset.accent);
-    const closestHue = colorHue(closest.accent);
-    if (presetHue === null || closestHue === null) return closest;
-    const distance = Math.min(
-      Math.abs(sourceHue - presetHue),
-      360 - Math.abs(sourceHue - presetHue),
+    if (presetHue === null) return Number.POSITIVE_INFINITY;
+    return sourceHues.reduce(
+      (total, sourceHue) => total + hueDistance(sourceHue, presetHue),
+      0,
     );
-    const closestDistance = Math.min(
-      Math.abs(sourceHue - closestHue),
-      360 - Math.abs(sourceHue - closestHue),
-    );
-    return distance < closestDistance ? preset : closest;
+  };
+
+  return GRADIENT_PRESETS.reduce((closest, preset) => {
+    return score(preset) < score(closest) ? preset : closest;
   }, DEFAULT_GAME_THEME);
 }
 
@@ -451,24 +456,22 @@ export function normalizeQuestionGameTheme<
   T extends { gradientCss: string; accentColor: string },
 >(game: T): T {
   const gradientMatch = game.gradientCss.match(SUPPORTED_GAME_GRADIENT);
-  if (!gradientMatch) {
-    return {
-      ...game,
-      gradientCss: DEFAULT_GAME_THEME.css,
-      accentColor: DEFAULT_GAME_THEME.accent,
-    };
-  }
-
-  const gradientColors = [gradientMatch[1], gradientMatch[2]];
-  const gradientCss = gradientColors.every(hasReadableWhiteText)
-    ? game.gradientCss
-    : closestSafePreset(gradientColors[0]).css;
+  const gradientColors = gradientMatch ? [gradientMatch[1], gradientMatch[2]] : [];
+  const safeAccent = hasReadableWhiteText(game.accentColor);
+  const gradientCss = !gradientMatch
+    ? DEFAULT_GAME_THEME.css
+    : gradientColors.every(hasReadableWhiteText)
+      ? game.gradientCss
+      : closestSafePreset([
+        ...gradientColors,
+        ...(safeAccent ? [game.accentColor] : []),
+      ]).css;
   const accentColor = hasReadableWhiteText(game.accentColor)
     ? game.accentColor
     : closestSafePreset(
       SIX_DIGIT_HEX.test(game.accentColor)
-        ? game.accentColor
-        : gradientColors[0],
+        ? [game.accentColor]
+        : gradientColors,
     ).accent;
 
   if (gradientCss === game.gradientCss && accentColor === game.accentColor) {

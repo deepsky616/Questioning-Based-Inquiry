@@ -374,10 +374,10 @@ export default function TeacherQuestionPlayPage() {
                                 {s.studentNumber ? <span className="text-muted-foreground mr-1">{s.studentNumber}.</span> : null}
                                 <span className="font-medium text-foreground">{s.name}</span>
                               </td>
-                              <td className="px-3 py-2 text-right font-semibold text-indigo-600 dark:text-indigo-400">{s.plays}</td>
-                              <td className="px-3 py-2 text-right text-emerald-600 dark:text-emerald-400">{s.completions}</td>
-                              <td className="px-3 py-2 text-right text-amber-600 dark:text-amber-400">{s.goodQuestions}</td>
-                              <td className="px-3 py-2 text-right font-bold text-rose-500 dark:text-rose-400">{s.points}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-indigo-900 dark:text-indigo-200">{s.plays}</td>
+                              <td className="px-3 py-2 text-right text-emerald-900 dark:text-emerald-200">{s.completions}</td>
+                              <td className="px-3 py-2 text-right text-amber-900 dark:text-amber-200">{s.goodQuestions}</td>
+                              <td className="px-3 py-2 text-right font-bold text-rose-900 dark:text-rose-200">{s.points}</td>
                             </tr>
                           ))}
                         </tbody>

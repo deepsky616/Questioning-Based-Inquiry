@@ -84,12 +84,12 @@ export function AwardBadge({ result }: { result: SingleAwardResult | null }) {
           {locale === "en" ? `+${result.awarded} points earned!` : `+${result.awarded}점 적립!`}
         </span>
         {result.cappedByLimit && (
-          <span className="text-xs text-amber-600">
+          <span className="text-xs text-amber-900 dark:text-amber-200">
             {locale === "en" ? "(daily limit reached)" : "(일일 상한 도달)"}
           </span>
         )}
         {typeof result.dailyRemaining === "number" && result.dailyRemaining > 0 && (
-          <span className="text-xs text-emerald-500 ml-auto">
+          <span className="text-xs text-emerald-800 dark:text-emerald-200 ml-auto">
             {locale === "en"
               ? `${result.dailyRemaining} points still available today`
               : `오늘 ${result.dailyRemaining}점 더 받을 수 있어요`}

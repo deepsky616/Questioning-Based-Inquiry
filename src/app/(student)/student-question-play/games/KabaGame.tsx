@@ -312,7 +312,9 @@ export default function KabaGame({ game, onBack, config }: Props) {
                 <div className="rounded-2xl bg-secondary border-2 border-border p-5 text-center space-y-2">
                   <div className="text-5xl">{feedback.verdict === "잘했어요" ? "🎉" : "🤔"}</div>
                   <p className={`text-2xl font-black ${
-                    feedback.verdict === "잘했어요" ? "text-green-600" : "text-orange-500"
+                    feedback.verdict === "잘했어요"
+                      ? "text-green-900 dark:text-green-200"
+                      : "text-orange-800 dark:text-orange-200"
                   }`}>
                     {feedback.verdict === "잘했어요" ? kabaText.good : kabaText.tryAgain}
                   </p>
@@ -328,7 +330,9 @@ export default function KabaGame({ game, onBack, config }: Props) {
                 <div className="rounded-2xl bg-secondary border-2 border-border p-5 text-center">
                   <div className="text-5xl mb-2">{localResult === "correct" ? "🎉" : "🤔"}</div>
                   <p className={`text-2xl font-black ${
-                    localResult === "correct" ? "text-green-600" : "text-orange-500"
+                    localResult === "correct"
+                      ? "text-green-900 dark:text-green-200"
+                      : "text-orange-800 dark:text-orange-200"
                   }`}>
                     {localResult === "correct" ? kabaText.goodBang : kabaText.tryAgainBang}
                   </p>

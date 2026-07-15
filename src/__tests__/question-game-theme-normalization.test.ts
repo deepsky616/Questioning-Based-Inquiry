@@ -67,12 +67,44 @@ describe("question game theme normalization", () => {
     expect(normalized.accentColor).toBe(game.accentColor);
   });
 
-  it("replaces arbitrary CSS and its accent with the safe default without mutating input", () => {
+  it("replaces arbitrary CSS but preserves an independently safe accent without mutating input", () => {
     const fallback = questionGamesData.GRADIENT_PRESETS.find(({ id }) => id === "indigo");
     const game = {
       id: "legacy-theme",
       gradientCss: 'url("https://example.com/bright.png")',
       accentColor: "#111827",
+    };
+    const original = { ...game };
+
+    expect(questionGamesData.normalizeQuestionGameTheme(game)).toEqual({
+      ...game,
+      gradientCss: fallback?.css,
+      accentColor: game.accentColor,
+    });
+    expect(game).toEqual(original);
+  });
+
+  it("uses both supported gradient endpoints and a safe accent to choose the fallback family", () => {
+    const green = questionGamesData.GRADIENT_PRESETS.find(({ id }) => id === "green");
+    const game = {
+      gradientCss: "linear-gradient(135deg, #FFFFFF 0%, #34D399 100%)",
+      accentColor: "#065F46",
+    };
+    const normalized = questionGamesData.normalizeQuestionGameTheme(game);
+
+    expect(normalized).toEqual({
+      gradientCss: green?.css,
+      accentColor: game.accentColor,
+    });
+    expect(questionGamesData.normalizeQuestionGameTheme(game)).toEqual(normalized);
+  });
+
+  it("falls back both unsupported gradient and unsafe accent without mutating input", () => {
+    const fallback = questionGamesData.GRADIENT_PRESETS.find(({ id }) => id === "indigo");
+    const game = {
+      id: "unsafe-legacy-theme",
+      gradientCss: 'url("https://example.com/bright.png")',
+      accentColor: "#ffffff",
     };
     const original = { ...game };
 
