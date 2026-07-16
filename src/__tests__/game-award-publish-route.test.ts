@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+// 라우트가 간접 import하는 @/lib/db는 모듈 로드 시 환경변수를 검증하므로
+// 로컬(DATABASE_URL 없음)에서도 돌도록 목킹한다 — 테스트 경로는 DB를 쓰지 않는다.
+vi.mock("@/lib/db", () => ({ prisma: {} }));
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/api-rate-limit", () => ({
   checkRateLimit: mocks.checkRateLimit,
