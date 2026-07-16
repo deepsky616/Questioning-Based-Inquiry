@@ -18,6 +18,9 @@ export interface GameRunSnapshot {
   pendingRoll?: DicePendingRoll | null;
   ladderRound?: number | null;
   ladderGrid?: LadderGrid | null;
+  correctCount?: number;
+  currentSentence?: string | null;
+  kabaNextStep?: "STUDENT_ATTEMPT" | "COMPLETE";
 }
 
 export type DiceRunNextStep =
@@ -47,6 +50,10 @@ export interface SubmittedRelayQuestion {
 }
 
 export type SubmittedDiceQuestion = SubmittedRelayQuestion;
+
+export interface SubmittedKabaAttempt extends SubmittedRelayQuestion {
+  correct: boolean;
+}
 
 type PendingKind = "create" | "action" | "ai" | "complete" | null;
 
@@ -122,6 +129,9 @@ function readRun(value: unknown): GameRunSnapshot | null {
   let pendingRoll: DicePendingRoll | null | undefined;
   let ladderRound: number | null | undefined;
   let ladderGrid: LadderGrid | null | undefined;
+  let correctCount: number | undefined;
+  let currentSentence: string | null | undefined;
+  let kabaNextStep: "STUDENT_ATTEMPT" | "COMPLETE" | undefined;
   if (value.gameId === "dice") {
     if (
       (value.mode !== "SOLO" && value.mode !== "AI") ||
@@ -216,6 +226,34 @@ function readRun(value: unknown): GameRunSnapshot | null {
       ladderRound = null;
       ladderGrid = null;
     }
+  } else if (value.gameId === "kaba") {
+    const active = value.status === "ACTIVE";
+    if (
+      (value.mode !== "SOLO" && value.mode !== "AI") ||
+      (value.status !== "ACTIVE" && value.status !== "SETTLED") ||
+      value.targetCount !== 10 ||
+      value.aiTurnCount !== 0 ||
+      value.awaitingAiTurn ||
+      typeof value.correctCount !== "number" ||
+      !Number.isSafeInteger(value.correctCount) ||
+      value.correctCount < 0 ||
+      value.correctCount > value.questionCount ||
+      active !== (value.questionCount < value.targetCount) ||
+      value.kabaNextStep !== (active ? "STUDENT_ATTEMPT" : "COMPLETE")
+    ) return null;
+    if (active) {
+      if (
+        typeof value.currentSentence !== "string" ||
+        !value.currentSentence.trim() ||
+        [...value.currentSentence].length > 200
+      ) return null;
+      currentSentence = value.currentSentence;
+    } else {
+      if (value.currentSentence !== null) return null;
+      currentSentence = null;
+    }
+    correctCount = value.correctCount;
+    kabaNextStep = value.kabaNextStep as "STUDENT_ATTEMPT" | "COMPLETE";
   }
   return {
     id: value.id,
@@ -232,6 +270,9 @@ function readRun(value: unknown): GameRunSnapshot | null {
     ...(pendingRoll !== undefined ? { pendingRoll } : {}),
     ...(ladderRound !== undefined ? { ladderRound } : {}),
     ...(ladderGrid !== undefined ? { ladderGrid } : {}),
+    ...(correctCount !== undefined ? { correctCount } : {}),
+    ...(currentSentence !== undefined ? { currentSentence } : {}),
+    ...(kabaNextStep !== undefined ? { kabaNextStep } : {}),
   };
 }
 
@@ -358,6 +399,10 @@ function isRejectedAiProof(error: unknown) {
     error.aiProofRejected;
 }
 
+function isExplicitRequestRejection(error: unknown) {
+  return error instanceof QuestionGameRequestError;
+}
+
 function isSameRunProgress(first: GameRunSnapshot, second: GameRunSnapshot) {
   return (
     first.id === second.id &&
@@ -374,6 +419,9 @@ function isSameRunProgress(first: GameRunSnapshot, second: GameRunSnapshot) {
     first.pendingRoll?.face === second.pendingRoll?.face &&
     first.ladderRound === second.ladderRound &&
     JSON.stringify(first.ladderGrid) === JSON.stringify(second.ladderGrid) &&
+    first.correctCount === second.correctCount &&
+    first.currentSentence === second.currentSentence &&
+    first.kabaNextStep === second.kabaNextStep &&
     first.status === second.status
   );
 }
@@ -489,6 +537,29 @@ function isExpectedLadderQuestionAdvance(
     !next.awaitingAiTurn &&
     next.ladderRound === (completesRun ? null : current.questionCount + 2) &&
     (completesRun ? next.ladderGrid === null : Array.isArray(next.ladderGrid))
+  );
+}
+
+function isExpectedKabaAttemptAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+  correct: boolean,
+) {
+  const completesRun = current.questionCount + 1 === current.targetCount;
+  return (
+    current.gameId === "kaba" &&
+    next.gameId === "kaba" &&
+    next.id === current.id &&
+    next.mode === current.mode &&
+    next.status === (completesRun ? "SETTLED" : "ACTIVE") &&
+    next.targetCount === current.targetCount &&
+    next.version === current.version + 1 &&
+    next.questionCount === current.questionCount + 1 &&
+    next.aiTurnCount === 0 &&
+    next.correctCount === (current.correctCount ?? 0) + (correct ? 1 : 0) &&
+    !next.awaitingAiTurn &&
+    next.kabaNextStep === (completesRun ? "COMPLETE" : "STUDENT_ATTEMPT") &&
+    (completesRun ? next.currentSentence === null : Boolean(next.currentSentence))
   );
 }
 
@@ -673,11 +744,11 @@ export function useGameRun() {
       setError(null);
       return nextRun;
     } catch (requestError) {
-      const explicitlyRejected = requestError instanceof QuestionGameRequestError;
+      const explicitlyRejected = isExplicitRequestRejection(requestError);
       const message = requestErrorMessage(requestError, "주사위를 굴리지 못했습니다.");
       try {
         const recovered = await readRunResult(activeRun.id);
-        if (isExpectedDiceRollAdvance(activeRun, recovered.run)) {
+        if (!explicitlyRejected && isExpectedDiceRollAdvance(activeRun, recovered.run)) {
           if (!mountedRef.current || generationRef.current !== generation) return null;
           diceRollRequestRef.current = null;
           setUnconfirmedDiceAction(false);
@@ -758,10 +829,10 @@ export function useGameRun() {
       return { run: nextRun, result: nextResult };
     } catch (requestError) {
       const message = requestErrorMessage(requestError, "질문을 저장하지 못했습니다.");
-      const actionWasExplicitlyRejected = requestError instanceof QuestionGameRequestError;
+      const actionWasExplicitlyRejected = isExplicitRequestRejection(requestError);
       try {
         const recovered = await readRunResult(run.id);
-        const actionWasApplied =
+        const actionWasApplied = !actionWasExplicitlyRejected &&
           isExpectedQuestionAdvance(run, recovered.run);
         if (actionWasApplied) {
           if (!mountedRef.current || generationRef.current !== generation) return null;
@@ -864,10 +935,10 @@ export function useGameRun() {
       return { run: nextRun, result: nextResult };
     } catch (requestError) {
       const message = requestErrorMessage(requestError, "질문을 저장하지 못했습니다.");
-      const explicitlyRejected = requestError instanceof QuestionGameRequestError;
+      const explicitlyRejected = isExplicitRequestRejection(requestError);
       try {
         const recovered = await readRunResult(activeRun.id);
-        if (isExpectedDiceQuestionAdvance(activeRun, recovered.run)) {
+        if (!explicitlyRejected && isExpectedDiceQuestionAdvance(activeRun, recovered.run)) {
           if (!mountedRef.current || generationRef.current !== generation) return null;
           actionRequestRef.current = null;
           setRun(recovered.run);
@@ -980,10 +1051,10 @@ export function useGameRun() {
       return { run: nextRun, result: nextResult };
     } catch (requestError) {
       const message = requestErrorMessage(requestError, "질문을 저장하지 못했습니다.");
-      const explicitlyRejected = requestError instanceof QuestionGameRequestError;
+      const explicitlyRejected = isExplicitRequestRejection(requestError);
       try {
         const recovered = await readRunResult(activeRun.id);
-        if (isExpectedLadderQuestionAdvance(activeRun, recovered.run)) {
+        if (!explicitlyRejected && isExpectedLadderQuestionAdvance(activeRun, recovered.run)) {
           if (!mountedRef.current || generationRef.current !== generation) return null;
           actionRequestRef.current = null;
           setRun(recovered.run);
@@ -991,6 +1062,136 @@ export function useGameRun() {
           setUnconfirmedQuestion(null);
           setError(null);
           return recovered;
+        }
+        if (mountedRef.current && generationRef.current === generation) {
+          if (isSameRunProgress(recovered.run, activeRun)) {
+            if (explicitlyRejected) {
+              actionRequestRef.current = null;
+              setUnconfirmedQuestion(null);
+            } else {
+              setUnconfirmedQuestion(request.question);
+            }
+            setError(message);
+          } else {
+            markConflict(recovered.run);
+          }
+        }
+      } catch {
+        if (mountedRef.current && generationRef.current === generation) {
+          if (explicitlyRejected) {
+            actionRequestRef.current = null;
+            setUnconfirmedQuestion(null);
+          } else {
+            setUnconfirmedQuestion(request.question);
+          }
+          setError(message);
+        }
+      }
+      return null;
+    } finally {
+      finish(generation);
+    }
+  }, [begin, conflict, finish, markConflict, run]);
+
+  const submitKabaAttempt = useCallback(async (
+    question: string,
+    locale: string,
+    runOverride?: GameRunSnapshot,
+  ): Promise<SubmittedKabaAttempt | null> => {
+    const activeRun = runOverride ?? run;
+    if (
+      !activeRun ||
+      activeRun.gameId !== "kaba" ||
+      activeRun.status !== "ACTIVE" ||
+      activeRun.kabaNextStep !== "STUDENT_ATTEMPT" ||
+      !activeRun.currentSentence ||
+      conflict ||
+      !begin("action")
+    ) return null;
+    const generation = generationRef.current;
+    const normalizedLocale = locale === "en" ? "en" : "ko";
+    const key = [
+      activeRun.id,
+      activeRun.version,
+      "kaba-attempt",
+      normalizedLocale,
+      question,
+    ].join(":");
+    const request = actionRequestRef.current?.key === key
+      ? actionRequestRef.current
+      : { key, requestId: newRequestId(), question };
+    actionRequestRef.current = request;
+
+    const accept = (
+      nextRun: GameRunSnapshot,
+      nextResult: GameRunResult | null,
+      correct: boolean,
+    ): SubmittedKabaAttempt | null => {
+      if (!isExpectedKabaAttemptAdvance(activeRun, nextRun, correct)) return null;
+      actionRequestRef.current = null;
+      setRun(nextRun);
+      if (nextResult) setResult(nextResult);
+      setUnconfirmedQuestion(null);
+      setError(null);
+      return { run: nextRun, result: nextResult, correct };
+    };
+
+    try {
+      const value = await readJson(await fetch(
+        `/api/question-games/runs/${activeRun.id}/actions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "kaba-submit-attempt",
+            requestId: request.requestId,
+            expectedVersion: activeRun.version,
+            question,
+            locale: normalizedLocale,
+          }),
+        },
+      ));
+      let nextRun = readRun(value.run);
+      if (!nextRun || typeof value.correct !== "boolean") {
+        throw new Error("까바놀이 판정 결과를 확인할 수 없습니다.");
+      }
+      let nextResult = readSettlementResult(value.result, nextRun);
+      let correct = value.correct;
+      if (!isExpectedKabaAttemptAdvance(activeRun, nextRun, correct)) {
+        throw new Error("까바놀이 판정 결과를 확인할 수 없습니다.");
+      }
+      if (value.replayed === true) {
+        const current = await readRunResult(activeRun.id);
+        if (!isSameRunProgress(current.run, nextRun)) {
+          if (mountedRef.current && generationRef.current === generation) {
+            markConflict(current.run);
+          }
+          return null;
+        }
+        nextRun = current.run;
+        nextResult = current.result;
+        const correctDelta = (nextRun.correctCount ?? 0) - (activeRun.correctCount ?? 0);
+        if (correctDelta !== 0 && correctDelta !== 1) return null;
+        correct = correctDelta === 1;
+      }
+      if (!mountedRef.current || generationRef.current !== generation) return null;
+      return accept(nextRun, nextResult, correct);
+    } catch (requestError) {
+      const message = requestErrorMessage(requestError, "까바놀이 답을 저장하지 못했습니다.");
+      const explicitlyRejected = isExplicitRequestRejection(requestError);
+      try {
+        const recovered = await readRunResult(activeRun.id);
+        const correctDelta =
+          (recovered.run.correctCount ?? 0) - (activeRun.correctCount ?? 0);
+        if (correctDelta === 0 || correctDelta === 1) {
+          const correct = correctDelta === 1;
+          if (
+            !explicitlyRejected &&
+            isExpectedKabaAttemptAdvance(activeRun, recovered.run, correct)
+          ) {
+            if (!mountedRef.current || generationRef.current !== generation) return null;
+            return accept(recovered.run, recovered.result, correct);
+          }
         }
         if (mountedRef.current && generationRef.current === generation) {
           if (isSameRunProgress(recovered.run, activeRun)) {
@@ -1132,6 +1333,7 @@ export function useGameRun() {
         return { run: nextRun, output: recordRequest.issued.output };
       } catch (requestError) {
         const proofWasRejected = isRejectedAiProof(requestError);
+        const explicitlyRejected = isExplicitRequestRejection(requestError);
         if (proofWasRejected) {
           aiRecordRequestRef.current = null;
         }
@@ -1141,7 +1343,8 @@ export function useGameRun() {
         );
         try {
           const recovered = await readRunResult(activeRun.id);
-          const actionWasApplied = isExpectedAiAdvance(activeRun, recovered.run);
+          const actionWasApplied = !explicitlyRejected &&
+            isExpectedAiAdvance(activeRun, recovered.run);
           if (actionWasApplied) {
             if (!mountedRef.current || generationRef.current !== generation) return null;
             aiIssueRequestRef.current = null;
@@ -1277,7 +1480,7 @@ export function useGameRun() {
         return { run: nextRun, output: recordRequest.issued.output };
       } catch (requestError) {
         const proofWasRejected = isRejectedAiProof(requestError);
-        const explicitlyRejected = requestError instanceof QuestionGameRequestError;
+        const explicitlyRejected = isExplicitRequestRejection(requestError);
         if (proofWasRejected) aiRecordRequestRef.current = null;
         const message = requestErrorMessage(
           requestError,
@@ -1285,7 +1488,7 @@ export function useGameRun() {
         );
         try {
           const recovered = await readRunResult(activeRun.id);
-          if (isExpectedDiceAiAdvance(activeRun, recovered.run)) {
+          if (!explicitlyRejected && isExpectedDiceAiAdvance(activeRun, recovered.run)) {
             if (!mountedRef.current || generationRef.current !== generation) return null;
             aiIssueRequestRef.current = null;
             aiRecordRequestRef.current = null;
@@ -1412,6 +1615,7 @@ export function useGameRun() {
     submitDiceQuestion,
     submitDiceAiTurn,
     submitLadderQuestion,
+    submitKabaAttempt,
     complete,
     reset,
     clearError,

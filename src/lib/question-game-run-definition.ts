@@ -51,6 +51,9 @@ export interface QuestionGameRunPublicProgress {
   targetCount: number;
   ladderRound?: 1 | 2 | 3 | null;
   ladderGrid?: boolean[][] | null;
+  correctCount?: number;
+  currentSentence?: string | null;
+  kabaNextStep?: "STUDENT_ATTEMPT" | "COMPLETE";
 }
 
 export interface QuestionGameRunDefinition {

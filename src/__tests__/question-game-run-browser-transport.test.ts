@@ -3,6 +3,7 @@ import {
   createBrowserQuestionGameRunStore,
   type BrowserQuestionGameRunActor,
 } from "../../e2e/helpers/question-game-run";
+import { getKabaSentences } from "../lib/question-game-i18n";
 
 const studentA: BrowserQuestionGameRunActor = {
   id: "browser-run-student-a",
@@ -14,7 +15,7 @@ const studentB: BrowserQuestionGameRunActor = {
 };
 
 const ids = Array.from(
-  { length: 100 },
+  { length: 220 },
   (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
 );
 
@@ -865,5 +866,234 @@ describe("브라우저 질문놀이 실행 전송기", () => {
         locale: "ko",
       },
     }).status).toBe(400);
+  });
+
+  it("까바놀이 혼자 모드는 서버 문장 열 개를 차례로 공개하고 서버 판정 결과로 정산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const createBody = {
+      gameId: "kaba",
+      mode: "solo",
+      requestId: ids[72],
+      locale: "ko",
+    };
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: createBody,
+    });
+    const id = runId(created);
+    expect(created).toMatchObject({
+      status: 201,
+      body: {
+        replayed: false,
+        run: {
+          id,
+          gameId: "kaba",
+          mode: "SOLO",
+          status: "ACTIVE",
+          version: 1,
+          questionCount: 0,
+          correctCount: 0,
+          targetCount: 10,
+          currentSentence: getKabaSentences("ko")[0],
+          kabaNextStep: "STUDENT_ATTEMPT",
+        },
+      },
+    });
+    expect(created.body.run).not.toHaveProperty("kabaSentencePlan");
+    expect(JSON.stringify(created)).not.toContain(getKabaSentences("ko")[1]);
+
+    const seenSentences: string[] = [];
+    let response = created;
+    let firstBody: Record<string, unknown> | null = null;
+    for (let index = 0; index < 10; index += 1) {
+      const run = response.body.run as { currentSentence: string };
+      seenSentences.push(run.currentSentence);
+      const correct = index < 6;
+      const question = correct
+        ? `서버가 판정할 질문 ${index + 1}은 무엇인가요?`
+        : `질문이 아닌 답 ${index + 1}`;
+      const body = {
+        action: "kaba-submit-attempt",
+        requestId: ids[73 + index],
+        expectedVersion: index + 1,
+        locale: "ko",
+        question,
+        correct: !correct,
+        sentence: "사용자가 바꾼 문장",
+      };
+      response = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body,
+      });
+      expect(response.body.correct).toBe(correct);
+      expect(response.body.run).toMatchObject({
+        version: index + 2,
+        questionCount: index + 1,
+        correctCount: Math.min(index + 1, 6),
+      });
+      expect(JSON.stringify(response)).not.toContain(question);
+      expect(JSON.stringify(response)).not.toContain("사용자가 바꾼 문장");
+      if (index === 0) firstBody = body;
+    }
+
+    expect(new Set(seenSentences).size).toBe(10);
+    const koreanSentences = new Set<string>(getKabaSentences("ko"));
+    expect(seenSentences.every((sentence) => koreanSentences.has(sentence))).toBe(true);
+    expect(response).toMatchObject({
+      status: 200,
+      body: {
+        replayed: false,
+        correct: false,
+        run: {
+          status: "SETTLED",
+          version: 11,
+          questionCount: 10,
+          correctCount: 6,
+          currentSentence: null,
+          kabaNextStep: "COMPLETE",
+        },
+        result: {
+          awarded: 8,
+          dailyLimit: 30,
+          dailyRemaining: 22,
+          cappedByLimit: false,
+          preview: false,
+        },
+      },
+    });
+    if (!firstBody) throw new Error("첫 까바놀이 요청이 없습니다");
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: firstBody,
+    })).toMatchObject({
+      status: 200,
+      body: {
+        replayed: true,
+        correct: true,
+        run: { version: 2, questionCount: 1, correctCount: 1 },
+      },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: createBody,
+    })).toMatchObject({
+      status: 200,
+      body: { replayed: true, run: { id, status: "SETTLED", version: 11 } },
+    });
+    expect(store.dispatch(studentB, {
+      method: "GET",
+      pathname: `/api/question-games/runs/${id}/result`,
+      body: {},
+    })).toEqual({
+      status: 403,
+      body: { error: "자신의 질문놀이 실행만 이용할 수 있습니다" },
+    });
+  });
+
+  it("까바놀이 도움 모드는 영어 문장과 서버 판정 일곱 개에 십칠 점을 정산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "kaba",
+        mode: "ai",
+        requestId: ids[84],
+        locale: "en",
+      },
+    });
+    const id = runId(created);
+    expect((created.body.run as { currentSentence: string }).currentSentence)
+      .toBe(getKabaSentences("en")[0]);
+
+    let response = created;
+    for (let index = 0; index < 10; index += 1) {
+      response = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "kaba-submit-attempt",
+          requestId: ids[85 + index],
+          expectedVersion: index + 1,
+          locale: "en",
+          question: index < 7
+            ? `What is server question ${index + 1}?`
+            : `Not a question ${index + 1}`,
+        },
+      });
+    }
+
+    expect(response).toMatchObject({
+      status: 200,
+      body: {
+        run: {
+          mode: "AI",
+          status: "SETTLED",
+          questionCount: 10,
+          correctCount: 7,
+          currentSentence: null,
+          kabaNextStep: "COMPLETE",
+        },
+        result: {
+          awarded: 17,
+          dailyLimit: 50,
+          dailyRemaining: 33,
+          cappedByLimit: false,
+        },
+      },
+    });
+  });
+
+  it("까바놀이 도움 모드 점수를 학생별 하루 상한까지만 합산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+
+    const finishPerfectRun = (createIndex: number, actionStart: number) => {
+      const created = store.dispatch(studentA, {
+        method: "POST",
+        pathname: "/api/question-games/runs",
+        body: {
+          gameId: "kaba",
+          mode: "ai",
+          requestId: ids[createIndex],
+          locale: "ko",
+        },
+      });
+      const id = runId(created);
+      let response = created;
+      for (let index = 0; index < 10; index += 1) {
+        response = store.dispatch(studentA, {
+          method: "POST",
+          pathname: `/api/question-games/runs/${id}/actions`,
+          body: {
+            action: "kaba-submit-attempt",
+            requestId: ids[actionStart + index],
+            expectedVersion: index + 1,
+            locale: "ko",
+            question: `상한 확인 질문 ${createIndex}-${index + 1}은 무엇인가요?`,
+          },
+        });
+      }
+      return response;
+    };
+
+    expect(finishPerfectRun(96, 97).body.result).toMatchObject({
+      awarded: 23,
+      dailyRemaining: 27,
+      cappedByLimit: false,
+    });
+    expect(finishPerfectRun(107, 108).body.result).toMatchObject({
+      awarded: 23,
+      dailyRemaining: 4,
+      cappedByLimit: false,
+    });
+    expect(finishPerfectRun(118, 119).body.result).toMatchObject({
+      awarded: 4,
+      dailyRemaining: 0,
+      cappedByLimit: true,
+    });
   });
 });

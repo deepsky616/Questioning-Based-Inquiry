@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { isQuestionFormForLocale } from "../../src/lib/question-game-i18n";
+import {
+  getKabaSentences,
+  isQuestionFormForLocale,
+} from "../../src/lib/question-game-i18n";
 import {
   QUESTION_GAME_LIMITS,
   QUESTION_GAME_RULES,
@@ -19,7 +22,7 @@ const REQUEST_ID_PATTERN =
 type RunMode = "SOLO" | "AI";
 type RunLocale = "ko" | "en";
 type RunStatus = "ACTIVE" | "SETTLED";
-type RunGameId = "relay" | "dice" | "ladder";
+type RunGameId = "relay" | "dice" | "ladder" | "kaba";
 type DiceActor = "STUDENT" | "AI";
 type DiceNextStep =
   | "STUDENT_ROLL"
@@ -27,6 +30,7 @@ type DiceNextStep =
   | "AI_ROLL"
   | "AI_QUESTION"
   | "COMPLETE";
+type KabaNextStep = "STUDENT_ATTEMPT" | "COMPLETE";
 
 interface DicePendingRoll {
   actor: DiceActor;
@@ -97,6 +101,8 @@ interface StoredRun {
   topicHashes: string[];
   questionHashes: string[];
   ladderGrids: boolean[][][];
+  kabaSentencePlan: string[];
+  correctCount: number;
   expiresAt: string;
   completedAt: string | null;
   result: RunResult | null;
@@ -105,6 +111,7 @@ interface StoredRun {
   currentAiTurn: IssuedAiTurn | null;
   nextStep?: DiceNextStep;
   pendingRoll?: DicePendingRoll;
+  kabaNextStep?: KabaNextStep;
 }
 
 interface CreationReplay {
@@ -168,6 +175,14 @@ function requireQuestion(value: unknown, locale: RunLocale) {
     !isQuestionFormForLocale(question, locale)
   ) {
     throw new BrowserRunError("질문 형태로 입력해 주세요", 400);
+  }
+  return question;
+}
+
+function requireKabaAttempt(value: unknown) {
+  const question = typeof value === "string" ? value.trim() : "";
+  if (!question || [...question].length > QUESTION_GAME_LIMITS.question) {
+    throw new BrowserRunError("바꾼 문장을 입력해 주세요", 400);
   }
   return question;
 }
@@ -245,6 +260,16 @@ function publicRun(run: StoredRun) {
               : null,
         }
       : {}),
+    ...(run.gameId === "kaba"
+      ? {
+          correctCount: run.correctCount,
+          currentSentence:
+            run.status === "ACTIVE"
+              ? run.kabaSentencePlan[run.questionCount] ?? null
+              : null,
+          kabaNextStep: run.kabaNextStep,
+        }
+      : {}),
   };
 }
 
@@ -284,7 +309,10 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     const dailyLimit = run.mode === "SOLO" ? DAILY_LIMITS.SOLO : DAILY_LIMITS.AI;
     const dailyKey = `${run.ownerId}:${run.mode}`;
     const earned = dailyEarned.get(dailyKey) ?? 0;
-    const requested = run.questionCount * policy.PER_VALID_QUESTION + policy.COMPLETION;
+    const validQuestionCount = run.gameId === "kaba"
+      ? run.correctCount
+      : run.questionCount;
+    const requested = validQuestionCount * policy.PER_VALID_QUESTION + policy.COMPLETION;
     const awarded = run.preview ? 0 : Math.max(0, Math.min(requested, dailyLimit - earned));
     if (!run.preview) dailyEarned.set(dailyKey, earned + awarded);
     run.status = "SETTLED";
@@ -301,6 +329,7 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       run.nextStep = "COMPLETE";
       delete run.pendingRoll;
     }
+    if (run.gameId === "kaba") run.kabaNextStep = "COMPLETE";
   };
 
   const createRun = (
@@ -309,7 +338,12 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
   ) => {
     const requestId = requireRequestId(body.requestId);
     const gameId = typeof body.gameId === "string" ? body.gameId : "";
-    if (gameId !== "relay" && gameId !== "dice" && gameId !== "ladder") {
+    if (
+      gameId !== "relay" &&
+      gameId !== "dice" &&
+      gameId !== "ladder" &&
+      gameId !== "kaba"
+    ) {
       throw new BrowserRunError("이 질문놀이는 서버 점수 기록을 아직 지원하지 않습니다", 409);
     }
     const mode = parseMode(body.mode);
@@ -357,6 +391,13 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
             (_, roundIndex) => createServerLadderGrid(topicHashes.length, roundIndex),
           )
         : [],
+      kabaSentencePlan: gameId === "kaba"
+        ? [...getKabaSentences(locale)].slice(
+            0,
+            QUESTION_GAME_RULES.kaba.targets[mode === "SOLO" ? "solo" : "ai"].count,
+          )
+        : [],
+      correctCount: 0,
       expiresAt: "2099-12-31T23:59:59.000Z",
       completedAt: null,
       result: null,
@@ -364,6 +405,7 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       aiIssues: new Map(),
       currentAiTurn: null,
       ...(gameId === "dice" ? { nextStep: "STUDENT_ROLL" as const } : {}),
+      ...(gameId === "kaba" ? { kabaNextStep: "STUDENT_ATTEMPT" as const } : {}),
     };
     runs.set(run.id, run);
     creations.set(creationKey, { fingerprint: creationFingerprint, runId: run.id });
@@ -673,6 +715,61 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     return success(200, { ...response, replayed: false });
   };
 
+  const submitKabaAttempt = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const locale = parseLocale(body.locale);
+    const question = requireKabaAttempt(body.question);
+    const questionHash = hashPrivateText("question", question);
+    const actionFingerprint = fingerprint({
+      action: "kaba-submit-attempt",
+      locale,
+      questionHash,
+    });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    if (run.status !== "ACTIVE" || run.gameId !== "kaba") {
+      throw new BrowserRunError("문장을 제출할 수 없는 실행입니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (locale !== run.locale) {
+      throw new BrowserRunError("실행을 만든 언어로 문장을 바꿔 주세요", 409);
+    }
+    if (
+      run.kabaNextStep !== "STUDENT_ATTEMPT" ||
+      run.questionCount >= run.targetCount ||
+      !run.kabaSentencePlan[run.questionCount]
+    ) {
+      throw new BrowserRunError("지금은 문장을 제출할 차례가 아닙니다", 409);
+    }
+
+    const correct = isQuestionFormForLocale(question, locale);
+    run.questionHashes.push(questionHash);
+    run.questionCount += 1;
+    if (correct) run.correctCount += 1;
+    run.version += 1;
+    if (run.questionCount === run.targetCount) settle(run);
+    const response = {
+      run: publicRun(run),
+      correct,
+      ...(run.result ? { result: run.result } : {}),
+    };
+    run.actions.set(requestId, {
+      fingerprint: actionFingerprint,
+      response: cloneBody(response),
+    });
+    return success(200, { ...response, replayed: false });
+  };
+
   const applyAction = (run: StoredRun, body: Record<string, unknown>) => {
     const requestId = requireRequestId(body.requestId);
     if (body.action === "relay-submit-question") {
@@ -692,6 +789,9 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     }
     if (body.action === "ladder-submit-question") {
       return submitLadderQuestion(run, body, requestId);
+    }
+    if (body.action === "kaba-submit-attempt") {
+      return submitKabaAttempt(run, body, requestId);
     }
     throw new BrowserRunError("지원하지 않는 질문놀이 동작입니다", 400);
   };

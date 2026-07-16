@@ -117,12 +117,16 @@ export function ensureLadderProgress(
   activeRun = true,
 ) {
   const expectedTopicCount = mode === "SOLO" ? SOLO_TOPIC_COUNT : AI_TOPIC_COUNT;
+  const progressVersion = state.questionCount + 1;
+  const expectedRunVersion = progressVersion + (
+    !activeRun && state.result === undefined ? 1 : 0
+  );
   const expectedStep: LadderRunNextStep = state.questionCount === state.targetCount
     ? "COMPLETE"
     : "QUESTION";
   if (
     state.topicHashes.length !== expectedTopicCount ||
-    runVersion !== state.questionCount + 1 ||
+    runVersion !== expectedRunVersion ||
     state.activitySequence !== state.questionCount ||
     state.nextStep !== expectedStep ||
     new Set(state.questionHashes).size !== state.questionHashes.length ||

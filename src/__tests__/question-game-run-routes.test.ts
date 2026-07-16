@@ -136,6 +136,11 @@ const DICE_AI_RECORD_IDS = [
   "00000000-0000-4000-8000-000000000092",
 ];
 const LADDER_TOPICS = ["우주", "바다", "날씨", "식물"];
+const KABA_ACTION_IDS = Array.from(
+  { length: 10 },
+  (_, index) => `00000000-0000-4000-8000-${String(201 + index).padStart(12, "0")}`,
+);
+const KABA_ALTERNATE_FINAL_ACTION_ID = "00000000-0000-4000-8000-000000000221";
 const COMPLETE_ID = "00000000-0000-4000-8000-000000000020";
 
 const users = new Map<string, { id: string; role: string; totalPoints: number }>();
@@ -217,6 +222,36 @@ async function createLadder(
     topics,
     locale: "ko",
   });
+}
+
+async function createKaba(
+  mode: "solo" | "ai" = "solo",
+  locale: "ko" | "en" = "ko",
+) {
+  return postCreate({
+    gameId: "kaba",
+    mode,
+    requestId: CREATE_ID,
+    locale,
+  });
+}
+
+async function submitKabaAttempt(
+  index: number,
+  question = `${index + 1}번째 문장은 질문인가요?`,
+  expectedVersion = index + 1,
+  id = "run-1",
+  locale: "ko" | "en" = "ko",
+  extra: Record<string, unknown> = {},
+) {
+  return postAction({
+    action: "kaba-submit-attempt",
+    requestId: KABA_ACTION_IDS[index],
+    expectedVersion,
+    question,
+    locale,
+    ...extra,
+  }, id);
 }
 
 async function submitLadderQuestion(
@@ -1884,6 +1919,46 @@ describe("질문 주사위 서버 실행 경로", () => {
 });
 
 describe("질문 사다리 서버 실행 경로", () => {
+  it("만료된 실행을 한 단계 오른 버전으로 닫고 결과를 읽는다", async () => {
+    await createLadder();
+    const run = runs.get("run-1");
+    if (!run) throw new Error("missing run");
+    run.expiresAt = new Date(0);
+
+    const response = await readResult();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      run: { status: "EXPIRED", version: 2, questionCount: 0 },
+      result: null,
+    });
+  });
+
+  it("활성 상한으로 자동 포기된 실행을 같은 생성 요청으로 다시 읽는다", async () => {
+    await createLadder();
+    for (const [requestId, topic] of [
+      [SECOND_CREATE_ID, "바다"],
+      [THIRD_CREATE_ID, "날씨"],
+      [FOURTH_CREATE_ID, "공룡"],
+    ] as const) {
+      await postCreate({
+        gameId: "ladder",
+        mode: "solo",
+        requestId,
+        topics: [topic, `${topic} 둘`, `${topic} 셋`, `${topic} 넷`],
+        locale: "ko",
+      });
+    }
+
+    const replay = await createLadder();
+
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({
+      replayed: true,
+      run: { id: "run-1", status: "ABANDONED", version: 2, questionCount: 0 },
+    });
+  });
+
   it("혼자 모드 주제 네 개를 해시로만 저장하고 첫째 서버 사다리를 공개한다", async () => {
     const response = await createLadder();
     const body = await response.json() as {
@@ -2154,5 +2229,344 @@ describe("질문 사다리 서버 실행 경로", () => {
     expect(wrongLocale.status).toBe(409);
     expect(activities).toHaveLength(1);
     expect(runs.get("run-1")).toMatchObject({ version: 2 });
+  });
+});
+
+describe("까바놀이 서버 실행 경로", () => {
+  it("만료된 실행을 한 단계 오른 버전으로 닫고 결과를 읽는다", async () => {
+    await createKaba();
+    const run = runs.get("run-1");
+    if (!run) throw new Error("missing run");
+    run.expiresAt = new Date(0);
+
+    const response = await readResult();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      run: { status: "EXPIRED", version: 2, questionCount: 0 },
+      result: null,
+    });
+  });
+
+  it("활성 상한으로 자동 포기된 실행을 같은 생성 요청으로 다시 읽는다", async () => {
+    await createKaba();
+    for (const requestId of [SECOND_CREATE_ID, THIRD_CREATE_ID, FOURTH_CREATE_ID]) {
+      await postCreate({ gameId: "kaba", mode: "solo", requestId, locale: "ko" });
+    }
+
+    const replay = await createKaba();
+
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({
+      replayed: true,
+      run: { id: "run-1", status: "ABANDONED", version: 2, questionCount: 0 },
+    });
+  });
+
+  it("주제 없이 서로 다른 서버 문장 열 개를 만들고 같은 생성 요청에는 같은 계획을 돌려준다", async () => {
+    const response = await createKaba();
+    const body = await response.json() as {
+      run: { currentSentence: string; correctCount: number; kabaNextStep: string };
+    };
+    const state = runs.get("run-1")?.state as { sentencePlan: string[] };
+    const replay = await createKaba();
+
+    expect(response.status).toBe(201);
+    expect(body.run).toMatchObject({
+      questionCount: 0,
+      correctCount: 0,
+      currentSentence: expect.any(String),
+      kabaNextStep: "STUDENT_ATTEMPT",
+    });
+    expect(state.sentencePlan).toHaveLength(10);
+    expect(new Set(state.sentencePlan)).toHaveProperty("size", 10);
+    expect(state.sentencePlan.every((key) => /^kaba-\d{2}$/.test(key))).toBe(true);
+    expect(JSON.stringify(state)).not.toContain(body.run.currentSentence);
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({
+      replayed: true,
+      run: { currentSentence: body.run.currentSentence },
+    });
+  });
+
+  it("서버가 질문 꼴을 판정하고 화면의 문장과 정답값을 무시하며 같은 요청을 한 번만 기록한다", async () => {
+    await createKaba();
+    const correct = await submitKabaAttempt(
+      0,
+      "고양이가 자나요?",
+      1,
+      "run-1",
+      "ko",
+      { sentence: "화면이 바꾼 문장", correct: false },
+    );
+    const replay = await submitKabaAttempt(
+      0,
+      "고양이가 자나요?",
+      1,
+      "run-1",
+      "ko",
+      { sentence: "다른 화면 문장", correct: true },
+    );
+    const conflictingReplay = await submitKabaAttempt(
+      0,
+      "같은 요청의 다른 질문인가요?",
+      1,
+    );
+    const incorrect = await submitKabaAttempt(
+      1,
+      "이 문장은 질문이 아닙니다",
+      2,
+      "run-1",
+      "ko",
+      { sentence: "또 다른 문장", correct: true },
+    );
+
+    expect(correct.status).toBe(200);
+    await expect(correct.json()).resolves.toMatchObject({
+      correct: true,
+      run: { questionCount: 1, correctCount: 1 },
+    });
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({
+      correct: true,
+      replayed: true,
+      run: { version: 2, questionCount: 1 },
+    });
+    expect(conflictingReplay.status).toBe(409);
+    expect(incorrect.status).toBe(200);
+    await expect(incorrect.json()).resolves.toMatchObject({
+      correct: false,
+      run: { questionCount: 2, correctCount: 1 },
+    });
+    expect(activities).toHaveLength(2);
+    for (const activity of activities) {
+      expect(Object.keys(activity.payload as Record<string, unknown>).sort()).toEqual([
+        "correct",
+        "inputHash",
+        "inputLength",
+        "sentenceKey",
+      ]);
+    }
+    const stored = JSON.stringify({ state: runs.get("run-1")?.state, activities });
+    expect(stored).not.toContain("고양이가 자나요?");
+    expect(stored).not.toContain("이 문장은 질문이 아닙니다");
+    expect(stored).not.toContain("화면이 바꾼 문장");
+  });
+
+  it("혼자 모드 정답 열 개를 확인해 십이 점을 정산하고 재전송과 결과 조회 및 완료 요청으로 복구한다", async () => {
+    await createKaba();
+    const questions = Array.from(
+      { length: 10 },
+      (_, index) => `${index + 1}번째 문장은 질문인가요?`,
+    );
+    let final: Response | undefined;
+    for (let index = 0; index < questions.length; index += 1) {
+      final = await submitKabaAttempt(index, questions[index]);
+      expect(final.status).toBe(200);
+    }
+    if (!final) throw new Error("missing final response");
+
+    await expect(final.json()).resolves.toMatchObject({
+      correct: true,
+      run: {
+        status: "SETTLED",
+        version: 11,
+        questionCount: 10,
+        correctCount: 10,
+        currentSentence: null,
+        kabaNextStep: "COMPLETE",
+      },
+      result: { awarded: 12, dailyLimit: 30, preview: false },
+    });
+    expect(pointLogs).toHaveLength(1);
+    expect(pointLogs[0]).toMatchObject({
+      gameId: "ACTIVITY_SOLO",
+      bonusType: "ACTIVITY_SOLO_kaba",
+      points: 12,
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(12);
+    expect(activities).toHaveLength(10);
+    expect(activities.reduce((sum, activity) => sum + activity.validQuestionCount, 0)).toBe(10);
+    for (const question of questions) {
+      expect(JSON.stringify({ state: runs.get("run-1")?.state, activities })).not.toContain(question);
+    }
+
+    const replay = await submitKabaAttempt(9, questions[9]);
+    const result = await readResult();
+    const complete = await postComplete({ requestId: COMPLETE_ID, expectedVersion: 11 });
+    await expect(replay.json()).resolves.toMatchObject({
+      replayed: true,
+      correct: true,
+      result: { awarded: 12 },
+    });
+    await expect(result.json()).resolves.toMatchObject({
+      run: { status: "SETTLED", currentSentence: null, kabaNextStep: "COMPLETE" },
+      result: { awarded: 12, alreadySettled: true },
+    });
+    await expect(complete.json()).resolves.toMatchObject({
+      replayed: true,
+      result: { awarded: 12, alreadySettled: true },
+    });
+    expect(pointLogs).toHaveLength(1);
+    expect(users.get("student-1")?.totalPoints).toBe(12);
+  });
+
+  it("인공지능 모드는 서버 정답 일곱 개만 점수 근거로 삼아 십칠 점을 정산한다", async () => {
+    await createKaba("ai");
+    let final: Response | undefined;
+    for (let index = 0; index < 10; index += 1) {
+      const question = index < 7
+        ? `${index + 1}번째 문장은 질문인가요?`
+        : `${index + 1}번째 문장은 평서문입니다`;
+      final = await submitKabaAttempt(index, question);
+    }
+    if (!final) throw new Error("missing final response");
+
+    await expect(final.json()).resolves.toMatchObject({
+      correct: false,
+      run: { status: "SETTLED", questionCount: 10, correctCount: 7, aiTurnCount: 0 },
+      result: { awarded: 17, dailyLimit: 50 },
+    });
+    expect(pointLogs[0]).toMatchObject({ gameId: "ACTIVITY_AI", points: 17 });
+    expect(users.get("student-1")?.totalPoints).toBe(17);
+  });
+
+  it("마지막 시도 전에 서버 활동이 빠지면 정산을 거부한다", async () => {
+    await createKaba();
+    for (let index = 0; index < 9; index += 1) {
+      await submitKabaAttempt(index);
+    }
+    activities.splice(0, 1);
+
+    const response = await submitKabaAttempt(9);
+
+    expect(response.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 10 });
+    expect(activities).toHaveLength(8);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+  });
+
+  it("마지막 시도 전에 저장된 문장 키가 서버 계획과 달라지면 정산을 거부한다", async () => {
+    await createKaba();
+    for (let index = 0; index < 9; index += 1) {
+      await submitKabaAttempt(index);
+    }
+    const firstPayload = activities[0]?.payload as { sentenceKey: string };
+    firstPayload.sentenceKey = "kaba-99";
+
+    const response = await submitKabaAttempt(9);
+
+    expect(response.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 10 });
+    expect(activities).toHaveLength(9);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+  });
+
+  it("서로 다른 마지막 시도가 동시에 오면 한 요청만 정산한다", async () => {
+    await createKaba();
+    for (let index = 0; index < 9; index += 1) {
+      await submitKabaAttempt(index);
+    }
+
+    const responses = await Promise.all([
+      submitKabaAttempt(9, "첫 번째 마지막 문장은 질문인가요?"),
+      postAction({
+        action: "kaba-submit-attempt",
+        requestId: KABA_ALTERNATE_FINAL_ACTION_ID,
+        expectedVersion: 10,
+        question: "두 번째 마지막 문장은 질문인가요?",
+        locale: "ko",
+      }),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(pointLogs).toHaveLength(1);
+    expect(activities.filter((activity) => activity.type === "KABA_ATTEMPT")).toHaveLength(10);
+    expect(users.get("student-1")?.totalPoints).toBe(12);
+  });
+
+  it("마지막 활동 저장 실패는 시도와 포인트를 모두 되돌리고 같은 요청 재시도로 정산한다", async () => {
+    await createKaba();
+    for (let index = 0; index < 9; index += 1) {
+      await submitKabaAttempt(index);
+    }
+    mocks.activityCreate.mockRejectedValueOnce(new Error("private-kaba-storage-value"));
+
+    const failed = await submitKabaAttempt(9);
+
+    expect(failed.status).toBe(500);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 10 });
+    expect(activities).toHaveLength(9);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+
+    const retry = await submitKabaAttempt(9);
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({ result: { awarded: 12 } });
+    expect(pointLogs).toHaveLength(1);
+    expect(users.get("student-1")?.totalPoints).toBe(12);
+  });
+
+  it("교사 미리보기는 서버 판정 결과만 남기고 포인트를 만들지 않는다", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
+    await createKaba();
+    let final: Response | undefined;
+    for (let index = 0; index < 10; index += 1) {
+      final = await submitKabaAttempt(index);
+    }
+    if (!final) throw new Error("missing final response");
+
+    await expect(final.json()).resolves.toMatchObject({
+      run: { preview: true, status: "SETTLED", correctCount: 10 },
+      result: { awarded: 0, preview: true },
+    });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("teacher-1")?.totalPoints).toBe(0);
+  });
+
+  it("혼자 모드 하루 상한에 이 점만 남으면 이 점만 지급한다", async () => {
+    pointLogs.push({
+      studentId: "student-1",
+      gameId: "ACTIVITY_SOLO",
+      gameRunId: "old-run",
+      bonusType: "ACTIVITY_SOLO_relay",
+      points: 28,
+      reason: "이전 실행",
+      status: "APPROVED",
+      createdAt: new Date(),
+    });
+    await createKaba();
+    let final: Response | undefined;
+    for (let index = 0; index < 10; index += 1) {
+      final = await submitKabaAttempt(index);
+    }
+    if (!final) throw new Error("missing final response");
+
+    await expect(final.json()).resolves.toMatchObject({
+      result: { awarded: 2, dailyRemaining: 0, cappedByLimit: true },
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(2);
+    expect(pointLogs.filter((log) => log.gameRunId === "run-1")).toHaveLength(1);
+  });
+
+  it("빈 입력과 문장 부호 및 비속어와 다른 실행 언어는 활동으로 기록하지 않는다", async () => {
+    await createKaba();
+    const punctuation = await submitKabaAttempt(0, "???");
+    const profanity = await submitKabaAttempt(0, "fuck인가요?");
+    const wrongLocale = await submitKabaAttempt(
+      0,
+      "Is this a question?",
+      1,
+      "run-1",
+      "en",
+    );
+
+    expect(punctuation.status).toBe(400);
+    expect(profanity.status).toBe(400);
+    expect(wrongLocale.status).toBe(409);
+    expect(activities).toHaveLength(0);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 1 });
   });
 });

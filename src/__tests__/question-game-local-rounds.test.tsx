@@ -359,6 +359,128 @@ function installDiceRunServer(
   return fetchMock;
 }
 
+const KABA_SENTENCES = [
+  "하늘이 맑습니다.",
+  "별이 밝게 빛납니다.",
+  "새가 나무 위에 앉았습니다.",
+  "친구가 운동장에서 달립니다.",
+  "비가 창문을 두드립니다.",
+  "강물이 바다로 흐릅니다.",
+  "꽃이 봄에 피어납니다.",
+  "달이 구름 뒤에 숨었습니다.",
+  "바람이 나뭇잎을 흔듭니다.",
+  "책이 책상 위에 놓여 있습니다.",
+] as const;
+
+function kabaRunSnapshot(
+  mode: LocalMode,
+  version: number,
+  questionCount: number,
+  correctCount: number,
+) {
+  const active = questionCount < KABA_SENTENCES.length;
+  return {
+    id: `kaba-${mode}`,
+    gameId: "kaba",
+    mode: mode.toUpperCase(),
+    status: active ? "ACTIVE" : "SETTLED",
+    version,
+    targetCount: KABA_SENTENCES.length,
+    questionCount,
+    aiTurnCount: 0,
+    awaitingAiTurn: false,
+    preview: false,
+    correctCount,
+    currentSentence: active ? KABA_SENTENCES[questionCount] : null,
+    kabaNextStep: active ? "STUDENT_ATTEMPT" : "COMPLETE",
+  };
+}
+
+function installKabaRunServer(
+  mode: LocalMode,
+  options: {
+    judgements?: readonly boolean[];
+    loseResponseAt?: number;
+    rejectAfterConcurrentAdvanceAt?: number;
+  } = {},
+) {
+  let version = 1;
+  let questionCount = 0;
+  let correctCount = 0;
+  let lostResponse = false;
+  let result: Record<string, unknown> | null = null;
+  const responsesByRequestId = new Map<string, Record<string, unknown>>();
+
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+
+    if (url === "/api/question-games/runs") {
+      return new Response(JSON.stringify({
+        run: kabaRunSnapshot(mode, version, questionCount, correctCount),
+      }), { status: 201, headers: { "content-type": "application/json" } });
+    }
+
+    if (url.endsWith("/result")) {
+      return Response.json({
+        run: kabaRunSnapshot(mode, version, questionCount, correctCount),
+        result,
+      });
+    }
+
+    if (url.endsWith("/actions") && body.action === "kaba-submit-attempt") {
+      const replayed = responsesByRequestId.get(body.requestId);
+      if (replayed) return Response.json({ ...replayed, replayed: true });
+      if (body.expectedVersion !== version || questionCount >= KABA_SENTENCES.length) {
+        return Response.json({ error: "까바놀이 상태가 바뀌었습니다." }, { status: 409 });
+      }
+
+      const attemptIndex = questionCount;
+      const correct = options.judgements?.[attemptIndex] ?? true;
+      questionCount += 1;
+      correctCount += correct ? 1 : 0;
+      version += 1;
+
+      if (questionCount === KABA_SENTENCES.length) {
+        const awarded = mode === "ai" ? correctCount * 2 + 3 : correctCount + 2;
+        const dailyLimit = mode === "ai" ? 50 : 30;
+        result = {
+          awarded,
+          dailyLimit,
+          dailyRemaining: dailyLimit - awarded,
+          cappedByLimit: false,
+          preview: false,
+        };
+      }
+
+      if (options.rejectAfterConcurrentAdvanceAt === attemptIndex) {
+        return Response.json(
+          { error: "까바놀이 상태가 다른 화면에서 바뀌었습니다." },
+          { status: 409 },
+        );
+      }
+
+      const response = {
+        run: kabaRunSnapshot(mode, version, questionCount, correctCount),
+        result,
+        correct,
+        replayed: false,
+      };
+      responsesByRequestId.set(body.requestId, response);
+
+      if (options.loseResponseAt === attemptIndex && !lostResponse) {
+        lostResponse = true;
+        throw new TypeError("응답 연결이 끊겼습니다.");
+      }
+      return Response.json(response);
+    }
+
+    return Response.json({ error: "지원하지 않는 시험 요청" }, { status: 404 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 async function startRelay(mode: LocalMode) {
   installRelayRunServer(mode);
   renderLocalGame("relay", RelayGame, mode);
@@ -375,7 +497,7 @@ async function submitRelayQuestion(value: string) {
 
 async function submitKaba(value: string) {
   fireEvent.change(screen.getByRole("textbox"), { target: { value } });
-  fireEvent.click(screen.getByRole("button", { name: /AI 선생님께 확인받기/ }));
+  fireEvent.click(screen.getByRole("button", { name: /확인/ }));
   await flushPromises();
 }
 
@@ -850,34 +972,102 @@ describe("질문 릴레이 지역 목표", () => {
 });
 
 describe("까바 지역 목표", () => {
-  it("인공지능 모드도 첫 학생 차례로 열 번 기록한 뒤 결과로 간다", async () => {
+  it("혼자 모드는 서버의 혼합 판정으로 열 번을 마치고 정답 수에 맞춰 적립한다", async () => {
+    const judgements = [true, false, true, true, false, true, false, true, true, false];
+    installKabaRunServer("solo", { judgements });
+    renderLocalGame("kaba", KabaGame, "solo");
+    await flushPromises();
+
+    for (let index = 0; index < 10; index += 1) {
+      await submitKaba(`${index + 1}번째로 바꾼 문장인가요?`);
+      expect(screen.getByText(judgements[index] ? "잘했어요!" : "다시 해봐요!")).toBeVisible();
+      fireEvent.click(screen.getByRole("button", {
+        name: index === 9 ? /결과 보기/ : /다음 문장/,
+      }));
+    }
+
+    expect(screen.getByText("완성!")).toBeVisible();
+    expect(screen.getByText("10문제 중 6개 맞혔어요!")).toBeVisible();
+    expect(screen.getByText("+8점 적립!")).toBeVisible();
+    expect(aiMocks.ask).not.toHaveBeenCalled();
+  });
+
+  it("인공지능 모드는 서버가 모두 맞다고 판정한 열 번을 마치고 23점을 적립한다", async () => {
+    installKabaRunServer("ai");
+    aiMocks.ask.mockResolvedValue({
+      text: "판정: 잘했어요\n이유: 질문 형태입니다.\n격려: 계속 이어 가세요.",
+    });
     renderLocalGame("kaba", KabaGame, "ai");
+    await flushPromises();
 
     for (let index = 0; index < 10; index += 1) {
       expect(screen.queryByText(/AI의 차례/)).not.toBeInTheDocument();
       await submitKaba(`${index + 1}번째 문장은 질문인가요?`);
-      if (index < 9) {
-        expect(screen.queryByText("완성!")).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole("button", { name: /다음 문장/ }));
-      }
+      expect(screen.getByText("잘했어요")).toBeVisible();
+      fireEvent.click(screen.getByRole("button", {
+        name: index === 9 ? /결과 보기/ : /다음 문장/,
+      }));
     }
 
-    fireEvent.click(screen.getByRole("button", { name: /결과 보기/ }));
     expect(screen.getByText("완성!")).toBeVisible();
     expect(screen.getByText("10문제 중 10개 맞혔어요!")).toBeVisible();
+    expect(screen.getByText("+23점 적립!")).toBeVisible();
     const entries = screen.getAllByTestId("kaba-result-entry");
     expect(entries).toHaveLength(10);
     for (const entry of entries) expect(entry).toHaveAttribute("data-player-name", "민준");
     expect(aiMocks.ask).toHaveBeenCalledTimes(10);
   });
 
-  it("빈 또는 판독할 수 없는 인공지능 응답은 지역 질문 모양으로 판정한다", async () => {
-    aiMocks.ask.mockResolvedValue({ text: "판정 형식이 없는 응답" });
+  it("인공지능 문구가 긍정이어도 서버의 틀린 판정을 뒤집지 않는다", async () => {
+    installKabaRunServer("ai", { judgements: [false] });
+    aiMocks.ask.mockResolvedValue({
+      text: "판정: 잘했어요\n이유: 아주 좋은 질문입니다.\n격려: 잘했어요.",
+    });
     renderLocalGame("kaba", KabaGame, "ai");
+    await flushPromises();
 
-    await submitKaba("질문이 아닌 문장입니다");
+    await submitKaba("서버가 틀렸다고 판정할 문장인가요?");
 
     expect(screen.getByText("다시해봐요")).toBeVisible();
+    expect(screen.getByText("질문 형태로 다시 바꿔 보세요.")).toBeVisible();
+    expect(screen.queryByText("잘했어요", { selector: "p" })).not.toBeInTheDocument();
+    expect(screen.queryByText("아주 좋은 질문입니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("잘했어요.")).not.toBeInTheDocument();
+  });
+
+  it("저장 뒤 응답이 끊겨도 결과 조회로 같은 시도의 서버 판정을 복구한다", async () => {
+    const fetchMock = installKabaRunServer("solo", {
+      judgements: [true],
+      loseResponseAt: 0,
+    });
+    renderLocalGame("kaba", KabaGame, "solo");
+    await flushPromises();
+
+    await submitKaba("응답이 끊겨도 저장된 질문인가요?");
+
+    expect(screen.getByText("잘했어요!")).toBeVisible();
+    expect(screen.getByText(/1개 맞힘/)).toBeVisible();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/actions")))
+      .toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/result")))
+      .toHaveLength(1);
+  });
+
+  it("다른 화면 제출로 명시적으로 거절된 시도를 현재 화면의 성공으로 기록하지 않는다", async () => {
+    installKabaRunServer("solo", {
+      judgements: [true],
+      rejectAfterConcurrentAdvanceAt: 0,
+    });
+    renderLocalGame("kaba", KabaGame, "solo");
+    await flushPromises();
+
+    await submitKaba("현재 화면에서 작성한 질문인가요?");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "질문놀이 상태가 다른 화면에서 변경되었습니다.",
+    );
+    expect(screen.queryByText("잘했어요!")).not.toBeInTheDocument();
+    expect(screen.queryAllByTestId("kaba-result-entry")).toHaveLength(0);
   });
 });
 

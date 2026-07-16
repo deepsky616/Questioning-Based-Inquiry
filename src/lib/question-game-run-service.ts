@@ -40,6 +40,11 @@ import {
   type DiceRunState,
 } from "@/lib/question-game-dice-definition";
 import {
+  ensureKabaProgress,
+  parseKabaState,
+  type KabaRunState,
+} from "@/lib/question-game-kaba-definition";
+import {
   ensureLadderProgress,
   ladderDestination,
   parseLadderState,
@@ -62,6 +67,7 @@ const DICE_ROLL_ACTIVITY_TYPE = "DICE_ROLL";
 const DICE_QUESTION_ACTIVITY_TYPE = "DICE_QUESTION";
 const DICE_AI_QUESTION_ACTIVITY_TYPE = "DICE_AI_QUESTION";
 const LADDER_QUESTION_ACTIVITY_TYPE = "LADDER_QUESTION";
+const KABA_ATTEMPT_ACTIVITY_TYPE = "KABA_ATTEMPT";
 const COMPLETE_ACTIVITY_TYPE = "RUN_COMPLETE";
 
 type ActorRole = "STUDENT" | "TEACHER";
@@ -285,6 +291,30 @@ function validateQuestionText(value: unknown, locale: RunLocale) {
     throw new QuestionGameRunError("질문에 사용할 수 없는 표현이 있습니다", 400);
   }
   return { question, questionLength };
+}
+
+function validateKabaAttemptText(value: unknown) {
+  const question = typeof value === "string" ? value.trim() : "";
+  const questionLength = [...question].length;
+  if (!question || questionLength > QUESTION_GAME_LIMITS.question) {
+    throw new QuestionGameRunError("바꾼 문장은 이백 자 안으로 입력해 주세요", 400);
+  }
+  const meaningfulCharacterCount = question.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
+  if (meaningfulCharacterCount < 2) {
+    throw new QuestionGameRunError("바꾼 문장에는 글자나 숫자를 두 글자 이상 넣어 주세요", 400);
+  }
+  if (checkProfanity(question).flagged) {
+    throw new QuestionGameRunError("바꾼 문장에 사용할 수 없는 표현이 있습니다", 400);
+  }
+  return { question, questionLength };
+}
+
+function kabaAttemptHash(
+  sentenceKey: string,
+  locale: RunLocale,
+  question: string,
+) {
+  return hashActivityText("question", `kaba:${locale}:${sentenceKey}\0${question}`);
 }
 
 function publicRun(run: StoredRun) {
@@ -920,6 +950,133 @@ async function settleLadderRun(
   };
 }
 
+interface PendingKabaAttemptEvidence {
+  sequence: number;
+  sentenceKey: string;
+  inputHash: string;
+  inputLength: number;
+  correct: boolean;
+}
+
+async function verifyKabaActivitySequence(
+  tx: RunTransaction,
+  run: StoredRun,
+  state: KabaRunState,
+  pendingAttempt?: PendingKabaAttemptEvidence,
+) {
+  const stored = await tx.gameActivity.findMany({
+    where: {
+      runId: run.id,
+      type: { in: [KABA_ATTEMPT_ACTIVITY_TYPE] },
+    },
+    orderBy: { sequence: "asc" },
+    select: {
+      sequence: true,
+      type: true,
+      payload: true,
+      validQuestionCount: true,
+    },
+  });
+  const evidence = pendingAttempt
+    ? [
+        ...stored,
+        {
+          sequence: pendingAttempt.sequence,
+          type: KABA_ATTEMPT_ACTIVITY_TYPE,
+          payload: pendingAttempt,
+          validQuestionCount: pendingAttempt.correct ? 1 : 0,
+        },
+      ]
+    : stored;
+  if (
+    evidence.length !== state.activitySequence ||
+    evidence.length !== state.targetCount
+  ) {
+    throw new QuestionGameRunError("서버에서 까바놀이 활동 순서를 확인할 수 없습니다", 409);
+  }
+
+  let verifiedQuestionCount = 0;
+  const verifiedHashes: string[] = [];
+  for (let index = 0; index < evidence.length; index += 1) {
+    const activity = evidence[index];
+    const payload = isRecord(activity?.payload) ? activity.payload : null;
+    if (
+      activity?.sequence !== index + 1 ||
+      activity.type !== KABA_ATTEMPT_ACTIVITY_TYPE ||
+      !payload ||
+      payload.sentenceKey !== state.sentencePlan[index] ||
+      typeof payload.inputHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(payload.inputHash) ||
+      payload.inputHash !== state.questionHashes[index] ||
+      typeof payload.inputLength !== "number" ||
+      !Number.isSafeInteger(payload.inputLength) ||
+      payload.inputLength < 1 ||
+      payload.inputLength > QUESTION_GAME_LIMITS.question ||
+      typeof payload.correct !== "boolean" ||
+      activity.validQuestionCount !== (payload.correct ? 1 : 0)
+    ) {
+      throw new QuestionGameRunError("서버에서 까바놀이 활동 순서를 확인할 수 없습니다", 409);
+    }
+    verifiedHashes.push(payload.inputHash);
+    if (payload.correct) verifiedQuestionCount += 1;
+  }
+  if (
+    verifiedHashes.length !== state.questionCount ||
+    verifiedHashes.some((hash, index) => hash !== state.questionHashes[index]) ||
+    verifiedQuestionCount !== state.correctCount
+  ) {
+    throw new QuestionGameRunError("서버에서 까바놀이 완료를 확인할 수 없습니다", 409);
+  }
+  return { verifiedQuestionCount, verifiedAiTurnCount: 0 };
+}
+
+async function settleKabaRun(
+  tx: RunTransaction,
+  actor: { id: string; role: ActorRole },
+  run: StoredRun,
+  state: KabaRunState,
+  mode: RunMode,
+  completedAt: Date,
+  pendingAttempt?: PendingKabaAttemptEvidence,
+): Promise<RelaySettlement> {
+  if (state.kabaNextStep !== "COMPLETE" || state.result) {
+    throw new QuestionGameRunError("질문놀이의 정해진 차례를 모두 마쳐 주세요", 409);
+  }
+  const { verifiedQuestionCount, verifiedAiTurnCount } =
+    await verifyKabaActivitySequence(tx, run, state, pendingAttempt);
+  const { day, result } = await awardVerifiedQuestionGameRun(
+    tx,
+    actor,
+    run,
+    mode,
+    completedAt,
+    verifiedQuestionCount,
+  );
+  const settledState: KabaRunState = {
+    ...state,
+    questionHashes: [],
+    result,
+  };
+  const nextRun = await tx.gameRun.update({
+    where: { id: run.id },
+    data: {
+      status: "SETTLED",
+      state: toJson(settledState),
+      version: run.version + 1,
+      scoreDate: day,
+      completedAt,
+      settledAt: completedAt,
+    },
+  });
+  return {
+    run: nextRun as StoredRun,
+    result,
+    verifiedQuestionCount,
+    verifiedAiTurnCount,
+    scoreDate: day,
+  };
+}
+
 export async function createQuestionGameRun(actorId: string, input: unknown, now = new Date()) {
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
@@ -930,8 +1087,8 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
   let topicHash: string;
   let topicLength: number;
   let topicHashes: string[] | undefined;
-  if (gameId === "dice") {
-    topicHash = hashActivityText("topic", "dice");
+  if (gameId === "dice" || gameId === "kaba") {
+    topicHash = hashActivityText("topic", gameId);
     topicLength = 0;
   } else if (gameId === "ladder") {
     const ladderTopics = validateLadderTopics(input.topics, mode);
@@ -1886,6 +2043,149 @@ async function submitQuestionLadderQuestion(
   });
 }
 
+async function submitKabaAttempt(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const locale = parseLocale(input.locale);
+  const { question, questionLength } = validateKabaAttemptText(input.question);
+  const requestInputHash = hashActivityText("question", question);
+  const requestFingerprint = fingerprint({
+    action: input.action,
+    locale,
+    inputHash: requestInputHash,
+  });
+
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "kaba") {
+      throw new QuestionGameRunError("이 질문놀이는 까바놀이 제출을 지원하지 않습니다", 409, {
+        unsupported: true,
+      });
+    }
+    const mode = storedRunMode(run.mode);
+    const state = parseKabaState(run.state);
+    ensureKabaProgress(state, run.version);
+    if (state.locale !== locale) {
+      throw new QuestionGameRunError("실행을 만든 언어로 질문해 주세요", 409);
+    }
+    if (state.kabaNextStep !== "STUDENT_ATTEMPT") {
+      throw new QuestionGameRunError("까바놀이 시도를 모두 마쳤습니다", 409);
+    }
+    const sentenceKey = state.sentencePlan[state.questionCount];
+    if (!sentenceKey) {
+      throw new QuestionGameRunError("까바놀이 문장 순서가 손상되었습니다", 409);
+    }
+    const correct = isQuestionFormForLocale(question, locale);
+    const inputHash = kabaAttemptHash(sentenceKey, locale, question);
+    const nextQuestionCount = state.questionCount + 1;
+    const nextState: KabaRunState = {
+      ...state,
+      questionCount: nextQuestionCount,
+      correctCount: state.correctCount + (correct ? 1 : 0),
+      activitySequence: state.activitySequence + 1,
+      kabaNextStep: nextQuestionCount === state.targetCount
+        ? "COMPLETE"
+        : "STUDENT_ATTEMPT",
+      questionHashes: [...state.questionHashes, inputHash],
+    };
+    ensureKabaProgress(nextState, run.version + 1);
+    const evidence: PendingKabaAttemptEvidence = {
+      sequence: nextState.activitySequence,
+      sentenceKey,
+      inputHash,
+      inputLength: questionLength,
+      correct,
+    };
+
+    if (nextState.kabaNextStep === "COMPLETE") {
+      const completedAt = await lockedDatabaseClock(tx);
+      ensureActive(run, completedAt);
+      const settlement = await settleKabaRun(
+        tx,
+        actor,
+        run,
+        nextState,
+        mode,
+        completedAt,
+        evidence,
+      );
+      const response = {
+        run: publicRunWithRole(settlement.run, actor.role),
+        result: settlement.result,
+        correct,
+      };
+      await tx.gameActivity.create({
+        data: {
+          runId: run.id,
+          actorId: actor.id,
+          requestId,
+          requestFingerprint,
+          sequence: nextState.activitySequence,
+          type: KABA_ATTEMPT_ACTIVITY_TYPE,
+          payload: toJson({
+            sentenceKey,
+            inputHash,
+            inputLength: questionLength,
+            correct,
+          }),
+          validQuestionCount: correct ? 1 : 0,
+          scoreValue: settlement.result.awarded,
+          responseSnapshot: toJson(response),
+        },
+      });
+      return { ...response, replayed: false };
+    }
+
+    const nextRun = await tx.gameRun.update({
+      where: { id: run.id },
+      data: { state: toJson(nextState), version: run.version + 1 },
+    });
+    const response = {
+      run: publicRunWithRole(nextRun as StoredRun, actor.role),
+      correct,
+    };
+    await tx.gameActivity.create({
+      data: {
+        runId: run.id,
+        actorId: actor.id,
+        requestId,
+        requestFingerprint,
+        sequence: nextState.activitySequence,
+        type: KABA_ATTEMPT_ACTIVITY_TYPE,
+        payload: toJson({
+          sentenceKey,
+          inputHash,
+          inputLength: questionLength,
+          correct,
+        }),
+        validQuestionCount: correct ? 1 : 0,
+        scoreValue: 0,
+        responseSnapshot: toJson(response),
+      },
+    });
+    return { ...response, replayed: false };
+  });
+}
+
 export async function applyQuestionGameRunAction(
   actorId: string,
   runId: string,
@@ -1895,6 +2195,16 @@ export async function applyQuestionGameRunAction(
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
   const expectedVersion = requireVersion(input.expectedVersion);
+  if (input.action === "kaba-submit-attempt") {
+    return submitKabaAttempt(
+      actorId,
+      runId,
+      input,
+      requestId,
+      expectedVersion,
+      now,
+    );
+  }
   if (input.action === "ladder-submit-question") {
     return submitQuestionLadderQuestion(
       actorId,
@@ -2076,7 +2386,12 @@ export async function completeQuestionGameRun(
       }
       return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
     }
-    if (run.gameId !== "relay" && run.gameId !== "dice" && run.gameId !== "ladder") {
+    if (
+      run.gameId !== "relay" &&
+      run.gameId !== "dice" &&
+      run.gameId !== "ladder" &&
+      run.gameId !== "kaba"
+    ) {
       throw new QuestionGameRunError("이 질문놀이는 서버 완료를 아직 지원하지 않습니다", 409, {
         unsupported: true,
       });
@@ -2087,15 +2402,23 @@ export async function completeQuestionGameRun(
       ? parseRelayState(run.state)
       : run.gameId === "dice"
         ? parseDiceState(run.state)
-        : parseLadderState(run.state);
+        : run.gameId === "ladder"
+          ? parseLadderState(run.state)
+          : parseKabaState(run.state);
     if (run.gameId === "relay") {
       ensureRelayProgress(state as RelayRunState, mode, run.version, run.status === "ACTIVE");
     } else if (run.gameId === "dice") {
       ensureDiceProgress(state as DiceRunState, mode, run.version, run.status === "ACTIVE");
-    } else {
+    } else if (run.gameId === "ladder") {
       ensureLadderProgress(
         state as LadderRunState,
         mode,
+        run.version,
+        run.status === "ACTIVE",
+      );
+    } else {
+      ensureKabaProgress(
+        state as KabaRunState,
         run.version,
         run.status === "ACTIVE",
       );
@@ -2134,14 +2457,23 @@ export async function completeQuestionGameRun(
             mode,
             completedAt,
           )
-        : await settleLadderRun(
-            tx,
-            actor,
-            run,
-            state as LadderRunState,
-            mode,
-            completedAt,
-          );
+        : run.gameId === "ladder"
+          ? await settleLadderRun(
+              tx,
+              actor,
+              run,
+              state as LadderRunState,
+              mode,
+              completedAt,
+            )
+          : await settleKabaRun(
+              tx,
+              actor,
+              run,
+              state as KabaRunState,
+              mode,
+              completedAt,
+            );
     const response = {
       run: publicRunWithRole(settlement.run, actor.role),
       result: settlement.result,
