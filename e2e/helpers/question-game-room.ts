@@ -24,6 +24,7 @@ import type {
   RoomCommandResult,
   RoomPlayer,
 } from "../../src/lib/question-games-data";
+import { createBrowserQuestionGameRunStore } from "./question-game-run";
 
 const BASE_URL = "http://localhost:3000";
 const SESSION_COOKIE = "authjs.session-token";
@@ -291,6 +292,7 @@ async function installAuxiliaryRoutes(context: BrowserContext) {
 
 export function createSharedQuestionGameTransport(): SharedQuestionGameTransport {
   const rooms = new Map<string, GameRoom>();
+  const runs = createBrowserQuestionGameRunStore();
   let nextCode = 1000;
   let nextUuid = 1;
   let clock = 1_900_000_000_000;
@@ -576,6 +578,16 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
   return {
     async install(context, identity) {
       await installAuxiliaryRoutes(context);
+      await context.route("**/api/question-games/runs**", async (route) => {
+        const request = route.request();
+        const url = new URL(request.url());
+        const response = await enqueue(() => runs.dispatch(identity, {
+          method: request.method(),
+          pathname: url.pathname,
+          body: requestBody(route),
+        }));
+        await fulfill(route, response);
+      });
       await context.route("**/api/question-games/rooms**", async (route) => {
         const response = await enqueue(() => dispatch(route, identity));
         await fulfill(route, response);
@@ -592,6 +604,7 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
       disposed = true;
       await serial;
       rooms.clear();
+      runs.clear();
     },
   };
 }

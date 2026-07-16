@@ -36,6 +36,8 @@ model User {
   pointLogs           PointLog[]           @relation("StudentPointLogs")
   awardedLogs         PointLog[]           @relation("AwardedByTeacher")
   gameRoomCreateAttempts GameRoomCreateAttempt[] @relation("GameRoomCreateAttempts")
+  ownedGameRuns       GameRun[]            @relation("GameRunOwner")
+  gameActivities      GameActivity[]       @relation("GameActivityActor")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -65,13 +67,17 @@ model PointLog {
   awardedBy   User?    @relation("AwardedByTeacher", fields: [awardedById], references: [id])
   decidedById String?  @map("decided_by_id")
   decidedAt   DateTime? @map("decided_at")
+  gameRunId   String?  @map("game_run_id")
+  gameRun     GameRun? @relation("GameRunPointLogs", fields: [gameRunId], references: [id], onDelete: Restrict)
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@unique([studentId, gameId, roomCode, bonusType], name: "uniq_point_award")
   @@unique([relatedQuestionId, bonusType], name: "uniq_point_per_question")
   @@unique([relatedCommentId, bonusType], name: "uniq_point_per_comment")
+  @@unique([studentId, gameRunId, bonusType], name: "uniq_point_per_game_run")
   @@index([studentId, createdAt])
   @@index([gameId, createdAt])
+  @@index([gameRunId])
   @@index([status])
   @@index([sessionId])
   @@map("point_logs")
@@ -240,6 +246,60 @@ model GameRoomCreateAttempt {
 
   @@index([userId, createdAt])
   @@map("game_room_create_attempts")
+}
+
+model GameRun {
+  id                         String         @id @default(cuid())
+  gameId                     String         @map("game_id")
+  mode                       String         @map("mode")
+  ownerId                    String?        @map("owner_id")
+  owner                      User?          @relation("GameRunOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  creationRequestId          String         @map("creation_request_id")
+  creationRequestFingerprint String         @map("creation_request_fingerprint")
+  roomLifetimeKey            String?        @unique @map("room_lifetime_key")
+  participants               Json           @default("[]") @map("participants")
+  status                     String         @default("ACTIVE") @map("status")
+  state                      Json           @map("state")
+  version                    Int            @default(1) @map("version")
+  scoreDate                  String?        @map("score_date")
+  completedAt                DateTime?      @map("completed_at")
+  settledAt                  DateTime?      @map("settled_at")
+  expiresAt                  DateTime       @map("expires_at")
+  createdAt                  DateTime       @default(now()) @map("created_at")
+  updatedAt                  DateTime       @updatedAt @map("updated_at")
+  activities                 GameActivity[]
+  pointLogs                  PointLog[]     @relation("GameRunPointLogs")
+
+  @@unique([ownerId, creationRequestId], name: "uniq_game_run_creation_request")
+  @@index([ownerId, status, updatedAt])
+  @@index([ownerId, status, expiresAt])
+  @@index([status, expiresAt])
+  @@index([status, updatedAt, id])
+  @@index([mode, scoreDate])
+  @@map("game_runs")
+}
+
+model GameActivity {
+  id                 String   @id @default(cuid())
+  runId              String   @map("run_id")
+  run                GameRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  actorId            String?  @map("actor_id")
+  actor              User?    @relation("GameActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+  requestId          String   @map("request_id")
+  requestFingerprint String   @map("request_fingerprint")
+  sequence           Int      @map("sequence")
+  type               String   @map("type")
+  payload            Json     @map("payload")
+  validQuestionCount Int      @default(0) @map("valid_question_count")
+  scoreValue         Int      @default(0) @map("score_value")
+  responseSnapshot   Json     @map("response_snapshot")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@unique([runId, requestId], name: "uniq_game_activity_request")
+  @@unique([runId, sequence], name: "uniq_game_activity_sequence")
+  @@index([actorId, createdAt])
+  @@index([runId, type])
+  @@map("game_activities")
 }
 
 model QuestionGameCustom {

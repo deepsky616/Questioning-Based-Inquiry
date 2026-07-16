@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/question-game-rooms/cleanup",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/game-runs/cleanup",
+      "schedule": "30 18 * * *"
     }
   ]
 }

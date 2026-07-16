@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as { scripts?: Record<string, string> };
 const dbCheckScript = readFileSync("scripts/check-db-schema.mjs", "utf8");
+const prismaEnvRunner = readFileSync("scripts/run-prisma-with-env.mjs", "utf8");
 const diffGuardPath = "scripts/check-prisma-diff.mjs";
 const diffGuardScript = existsSync(diffGuardPath) ? readFileSync(diffGuardPath, "utf8") : "";
 const vercelConfigPath = "vercel.json";
@@ -11,12 +12,10 @@ const vercelConfig = existsSync(vercelConfigPath)
   : null;
 
 describe("Prisma deployment guards", () => {
-  it("runs schema guards after prisma generate and before the production build", () => {
+  it("checks migration status before generating the production client and running schema guards", () => {
     expect(packageJson.scripts?.["db:diff:check"]).toBe("node scripts/check-prisma-diff.mjs");
-    // generate가 가드보다 먼저여야 한다 — db:check가 PrismaClient를 쓰므로
-    // Vercel(의존성 캐시)에서는 generate 전에 실행되면 초기화 에러로 빌드가 죽는다
     expect(packageJson.scripts?.build).toBe(
-      "prisma generate && npm run db:diff:check && npm run db:check && npm run db:security:check && next build",
+      "npm run db:migrate:status && prisma generate && npm run db:diff:check && npm run db:check && npm run db:security:check && next build",
     );
     expect(vercelConfig?.buildCommand).toBe("npm run build");
   });
@@ -51,6 +50,12 @@ describe("Prisma deployment guards", () => {
     expect(dbCheckScript).toContain(".env.local");
     expect(diffGuardScript).toContain("loadLocalEnv");
     expect(diffGuardScript).toContain(".env.local");
+  });
+
+  it("uses an existing DATABASE_URL without requiring a local env file", () => {
+    expect(prismaEnvRunner).toMatch(
+      /let databaseUrl = process\.env\.DATABASE_URL\?\.trim\(\);[\s\S]*if \(!databaseUrl && existsSync/,
+    );
   });
 
   it("limits Prisma diff runtime so Vercel builds cannot hang indefinitely", () => {

@@ -1,18 +1,23 @@
-// prisma CLI는 .env만 읽고 .env.local을 읽지 않는다 — 이 래퍼가 .env.local의
-// DATABASE_URL을 주입해 마이그레이션 명령을 실행한다.
+// 배포 환경의 DATABASE_URL을 우선 사용하고, 로컬에서만 .env.local로 보완한다.
 // 사용: node scripts/run-prisma-with-env.mjs migrate status
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-const envFile = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
-const match = envFile.match(/^DATABASE_URL="?([^"\n]+)"?$/m);
-if (!match) {
-  console.error("DATABASE_URL not found in .env.local");
+let databaseUrl = process.env.DATABASE_URL?.trim();
+const localEnvUrl = new URL("../.env.local", import.meta.url);
+if (!databaseUrl && existsSync(localEnvUrl)) {
+  const envFile = readFileSync(localEnvUrl, "utf8");
+  const match = envFile.match(/^DATABASE_URL="?([^"\n]+)"?$/m);
+  databaseUrl = match?.[1]?.trim();
+}
+
+if (!databaseUrl) {
+  console.error("DATABASE_URL is required for Prisma migration commands.");
   process.exit(1);
 }
 
 const result = spawnSync("npx", ["prisma", ...process.argv.slice(2)], {
   stdio: "inherit",
-  env: { ...process.env, DATABASE_URL: match[1] },
+  env: { ...process.env, DATABASE_URL: databaseUrl },
 });
 process.exit(result.status ?? 1);

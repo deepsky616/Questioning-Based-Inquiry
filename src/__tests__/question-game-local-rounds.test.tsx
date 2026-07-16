@@ -146,10 +146,91 @@ async function submitDiceQuestion(value: string) {
   await flushPromises();
 }
 
-function startRelay(mode: LocalMode) {
+function relayRunSnapshot(
+  id: string,
+  mode: LocalMode,
+  version: number,
+  questionCount: number,
+  status = "ACTIVE",
+  aiTurnCount = 0,
+) {
+  return {
+    id,
+    gameId: "relay",
+    mode: mode.toUpperCase(),
+    status,
+    version,
+    targetCount: 3,
+    questionCount,
+    aiTurnCount,
+    awaitingAiTurn:
+      mode === "ai" &&
+      questionCount === aiTurnCount + 1 &&
+      questionCount < 3,
+    preview: false,
+  };
+}
+
+function installRelayRunServer(
+  mode: LocalMode,
+  issueAiTurn?: () => Promise<Response>,
+) {
+  let version = 1;
+  let questionCount = 0;
+  let aiTurnCount = 0;
+  const runId = `relay-${mode}`;
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    if (url === "/api/question-games/runs") {
+      return new Response(JSON.stringify({
+        run: relayRunSnapshot(runId, mode, version, questionCount, "ACTIVE", aiTurnCount),
+      }), { status: 201, headers: { "content-type": "application/json" } });
+    }
+    if (url.endsWith("/ai-turn")) {
+      if (issueAiTurn) return issueAiTurn();
+      return Response.json({
+        output: `인공지능 연결 질문 ${aiTurnCount + 1}은 무엇인가요?`,
+        proof: `proof-${aiTurnCount + 1}`,
+        expiresAt: "2099-07-16T03:01:30.000Z",
+        runVersion: version,
+      });
+    }
+    if (url.endsWith("/actions")) {
+      version += 1;
+      if (body.action === "relay-record-ai-turn") aiTurnCount += 1;
+      else questionCount += 1;
+      return Response.json({
+        run: relayRunSnapshot(runId, mode, version, questionCount, "ACTIVE", aiTurnCount),
+      });
+    }
+    if (url.endsWith("/complete")) {
+      version += 1;
+      const awarded = mode === "ai" ? 9 : 5;
+      const dailyLimit = mode === "ai" ? 50 : 30;
+      return Response.json({
+        run: relayRunSnapshot(runId, mode, version, questionCount, "SETTLED", aiTurnCount),
+        result: {
+          awarded,
+          dailyLimit,
+          dailyRemaining: dailyLimit - awarded,
+          cappedByLimit: false,
+          preview: false,
+        },
+      });
+    }
+    return Response.json({ error: "지원하지 않는 시험 요청" }, { status: 404 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+async function startRelay(mode: LocalMode) {
+  installRelayRunServer(mode);
   renderLocalGame("relay", RelayGame, mode);
   fireEvent.click(screen.getByRole("button", { name: "우주" }));
   fireEvent.click(screen.getByRole("button", { name: /질문 릴레이 시작/ }));
+  await flushPromises();
 }
 
 async function submitRelayQuestion(value: string) {
@@ -173,6 +254,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vi.useRealTimers();
 });
@@ -440,7 +522,7 @@ describe("질문 주사위 지역 목표", () => {
 
 describe("질문 릴레이 지역 목표", () => {
   it("혼자 모드는 학생 질문 셋째 제출 직후 자동 종료한다", async () => {
-    startRelay("solo");
+    await startRelay("solo");
     await submitRelayQuestion("우주에는 무엇이 있나요?");
     await submitRelayQuestion("그 별은 왜 빛나나요?");
     expect(screen.queryByText("릴레이 완성!")).not.toBeInTheDocument();
@@ -448,15 +530,15 @@ describe("질문 릴레이 지역 목표", () => {
 
     expect(screen.getByText("릴레이 완성!")).toBeVisible();
     expect(screen.getByText("총 3개의 질문이 이어졌어요!")).toBeVisible();
+    expect(screen.getByText("+5점 적립!")).toBeVisible();
   });
 
   it("인공지능 질문을 목표에서 빼고 셋째 학생 질문 뒤 추가 요청 없이 끝난다", async () => {
-    let generated = 0;
-    aiMocks.ask.mockImplementation(async () => {
-      generated += 1;
-      return { text: `인공지능 연결 질문 ${generated}은 무엇인가요?` };
-    });
-    startRelay("ai");
+    const fetchMock = installRelayRunServer("ai");
+    renderLocalGame("relay", RelayGame, "ai");
+    fireEvent.click(screen.getByRole("button", { name: "우주" }));
+    fireEvent.click(screen.getByRole("button", { name: /질문 릴레이 시작/ }));
+    await flushPromises();
 
     await submitRelayQuestion("우주에는 무엇이 있나요?");
     await submitRelayQuestion("그 별은 왜 빛나나요?");
@@ -464,29 +546,48 @@ describe("질문 릴레이 지역 목표", () => {
     await submitRelayQuestion("그 빛은 어디까지 가나요?");
 
     expect(screen.getByText("릴레이 완성!")).toBeVisible();
-    expect(aiMocks.ask).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/ai-turn")))
+      .toHaveLength(2);
     expect(screen.getByText("총 3개의 질문이 이어졌어요!")).toBeVisible();
+    expect(screen.getByText("+9점 적립!")).toBeVisible();
   });
 
-  it("목록으로 나간 뒤 도착한 이전 인공지능 응답을 기록하지 않는다", async () => {
-    const delayed = deferred<{ text: string } | null>();
+  it("인공지능 요청 중 목록 이동을 막고 바깥 종료 뒤 늦은 응답을 기록하지 않는다", async () => {
+    const delayed = deferred<Response>();
     const onBack = vi.fn();
-    aiMocks.ask.mockReturnValue(delayed.promise);
-    renderLocalGame("relay", RelayGame, "ai", onBack);
+    const fetchMock = installRelayRunServer("ai", () => delayed.promise);
+    const view = renderLocalGame("relay", RelayGame, "ai", onBack);
     fireEvent.click(screen.getByRole("button", { name: "우주" }));
     fireEvent.click(screen.getByRole("button", { name: /질문 릴레이 시작/ }));
+    await flushPromises();
 
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "우주에는 무엇이 있나요?" } });
     fireEvent.click(screen.getByRole("button", { name: /질문 제출/ }));
-    fireEvent.click(screen.getByRole("button", { name: /목록/ }));
-    expect(onBack).toHaveBeenCalledTimes(1);
+    await flushPromises();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/ai-turn")))
+      .toHaveLength(1);
+    const back = screen.getByRole("button", { name: /목록/ });
+    expect(back).toBeDisabled();
+    fireEvent.click(back);
+    expect(onBack).not.toHaveBeenCalled();
+    view.unmount();
 
     await act(async () => {
-      delayed.resolve({ text: "늦게 도착한 인공지능 질문은 무엇인가요?" });
+      delayed.resolve(Response.json({
+        output: "늦게 도착한 인공지능 질문은 무엇인가요?",
+        proof: "late-proof",
+        expiresAt: "2099-07-16T03:01:30.000Z",
+        runVersion: 2,
+      }));
       await delayed.promise;
     });
 
     expect(screen.queryAllByText("늦게 도착한 인공지능 질문은 무엇인가요?")).toHaveLength(0);
+    expect(fetchMock.mock.calls.filter(([url, init]) => {
+      if (!String(url).endsWith("/actions")) return false;
+      const body = JSON.parse(String((init as RequestInit | undefined)?.body));
+      return body.action === "relay-record-ai-turn";
+    })).toHaveLength(0);
   });
 });
 

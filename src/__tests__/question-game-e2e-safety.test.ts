@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const helperPath = "e2e/helpers/question-game-room.ts";
+const runHelperPath = "e2e/helpers/question-game-run.ts";
 const specPath = "e2e/question-games-reliability.spec.ts";
 
 function readSource(path: string) {
@@ -11,9 +12,10 @@ function readSource(path: string) {
 describe("question game browser safety boundary", () => {
   it("keeps the database-free browser helper and reliability spec", () => {
     expect(existsSync(helperPath)).toBe(true);
+    expect(existsSync(runHelperPath)).toBe(true);
     expect(existsSync(specPath)).toBe(true);
 
-    const source = `${readSource(helperPath)}\n${readSource(specPath)}`;
+    const source = [helperPath, runHelperPath, specPath].map(readSource).join("\n");
     expect(source).not.toMatch(/@prisma\/client|PrismaClient|DATABASE_URL/);
     expect(source).not.toMatch(/(?:from|import\()\s*["'][^"']*test-db/);
     expect(source).not.toMatch(/prepareTest|cleanupTestArtifacts|\bprisma\b/i);
@@ -30,6 +32,7 @@ describe("question game browser safety boundary", () => {
     expect(helper).toContain("restartQuestionGameRoom");
     expect(helper).toContain("toPublicGameRoom");
     expect(helper).toContain("context.route(");
+    expect(helper).toContain("createBrowserQuestionGameRunStore");
   });
 
   it("forbids arbitrary sleeps and requires split reliability flows", () => {

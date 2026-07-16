@@ -16,4 +16,15 @@ describe("질문놀이 방 예약 정리 설정", () => {
   it("예약 요청 비밀값을 환경 설정 예시에 안내한다", () => {
     expect(readFileSync(".env.example", "utf8")).toContain("CRON_SECRET=");
   });
+
+  it("매일 한국 시각 새벽 세 시 삼십 분에 실행 정리 경로를 호출한다", () => {
+    const config = JSON.parse(readFileSync("vercel.json", "utf8")) as {
+      crons?: Array<{ path: string; schedule: string }>;
+    };
+
+    expect(config.crons).toContainEqual({
+      path: "/api/cron/game-runs/cleanup",
+      schedule: "30 18 * * *",
+    });
+  });
 });

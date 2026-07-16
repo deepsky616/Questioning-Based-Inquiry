@@ -260,7 +260,8 @@ describe("question game focused contrast regressions", () => {
     expect(relay).toContain(
       "text-secondary-foreground text-sm font-medium",
     );
-    expect(relay).toContain("disabled:text-secondary-foreground");
+    expect(relay).toContain("readOnly={interactionBusy || questionNeedsConfirmation}");
+    expect(relay).not.toContain("disabled:text-secondary-foreground");
     expect(dice).toContain("bg-secondary text-secondary-foreground");
     expect(dice).toContain(
       "text-secondary-foreground text-xs bg-secondary",
