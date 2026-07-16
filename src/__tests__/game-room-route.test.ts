@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   settleMemoryRollingRoom: vi.fn((room: GameRoom) => room),
   loadVerifiedGameAwardResult: vi.fn(),
   deleteGameRoomPresence: vi.fn(),
+  generateMysteryAiAnswer: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
@@ -55,6 +56,19 @@ vi.mock("@/lib/game-room-store", () => ({
 vi.mock("@/lib/memory-room-roll", () => ({
   recordMemoryRoll: mocks.recordMemoryRoll,
   settleMemoryRollingRoom: mocks.settleMemoryRollingRoom,
+}));
+vi.mock("@/lib/mystery-box-ai-answer", () => ({
+  findMysteryAiAnswerRequest: (
+    result: {
+      kind?: unknown;
+      resolution?: { playerId?: unknown } & Record<string, unknown>;
+    },
+    userId: string,
+  ) => result.kind === "resolution-required" &&
+      result.resolution?.playerId === userId
+    ? { ...result.resolution }
+    : null,
+  generateMysteryAiAnswer: mocks.generateMysteryAiAnswer,
 }));
 vi.mock("@/lib/question-game-award-publish-service", () => ({
   loadVerifiedGameAwardResult: mocks.loadVerifiedGameAwardResult,
@@ -131,6 +145,7 @@ beforeEach(() => {
   mocks.recordMemoryRoll.mockReset();
   mocks.loadVerifiedGameAwardResult.mockReset();
   mocks.deleteGameRoomPresence.mockReset().mockResolvedValue(undefined);
+  mocks.generateMysteryAiAnswer.mockReset();
   mocks.consumeCreateLimit.mockReset().mockResolvedValue(true);
   mocks.cleanupIfDue.mockReset().mockResolvedValue(null);
   mocks.settleMemoryRollingRoom
@@ -381,6 +396,140 @@ describe("미스터리 박스 실제 공개 응답", () => {
     } finally {
       random.mockRestore();
     }
+  });
+
+  it("미등록 질문은 서버 에이아이 답과 출처를 한 번 저장하고 클라이언트 해결값을 무시한다", async () => {
+    const question = "비가 오면 잘 자라나요?";
+    const state = makeMysteryPlayState();
+    const room = makeMysteryRoom(state);
+    let savedCandidate: GameRoom | null = null;
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.generateMysteryAiAnswer.mockImplementation(
+      async (_userId: string, request: Record<string, unknown>) => ({
+        ...request,
+        answer: "yes",
+      }),
+    );
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => {
+      savedCandidate = structuredClone(candidate);
+      return {
+        kind: "saved" as const,
+        room: { ...candidate, version: candidate.version + 1 },
+      };
+    });
+
+    const response = await patch({
+      action: "mystery-ask",
+      commandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      playId,
+      roundId,
+      locale: "ko",
+      question,
+      answer: "no",
+      answerSource: "client",
+      itemId: "book",
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mocks.generateMysteryAiAnswer).toHaveBeenCalledWith("user-1", {
+      itemId: "apple",
+      playerId: "user-1",
+      locale: "ko",
+      question,
+    });
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "game-room-mystery-ai:user-1",
+      20,
+    );
+    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
+    expect(savedCandidate!.gameState).toMatchObject({
+      scores: { "user-1": 1, "user-2": 0 },
+      history: [{
+        kind: "question",
+        playerId: "user-1",
+        locale: "ko",
+        question,
+        answer: "yes",
+        answerSource: "ai",
+      }],
+      private: { itemId: "apple" },
+    });
+    expect(body.room.gameState.history[0]).toMatchObject({
+      question,
+      answer: "yes",
+      answerSource: "ai",
+    });
+    expect(body.room.gameState).not.toHaveProperty("private");
+    expect(JSON.stringify(body)).not.toContain("apple");
+  });
+
+  it("등록된 규칙 질문은 에이아이 없이 기존 답을 저장한다", async () => {
+    const question = "먹을 수 있나요?";
+    const state = makeMysteryPlayState();
+    const room = makeMysteryRoom(state);
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved" as const,
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({
+      action: "mystery-ask",
+      commandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      playId,
+      roundId,
+      locale: "ko",
+      question,
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.room.gameState.history[0]).toMatchObject({
+      question,
+      answer: "yes",
+    });
+    expect(body.room.gameState.history[0]).not.toHaveProperty("answerSource");
+    expect(mocks.generateMysteryAiAnswer).not.toHaveBeenCalled();
+    expect(mocks.checkRateLimit).not.toHaveBeenCalledWith(
+      "game-room-mystery-ai:user-1",
+      20,
+    );
+    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
+  });
+
+  it("미등록 질문의 에이아이 실패는 질문과 차례를 소비하거나 저장하지 않는다", async () => {
+    const question = "비가 오면 잘 자라나요?";
+    const state = makeMysteryPlayState();
+    const room = makeMysteryRoom(state);
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.generateMysteryAiAnswer.mockRejectedValue(
+      new Error(`raw apple ${question}`),
+    );
+
+    const response = await patch({
+      action: "mystery-ask",
+      commandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      playId,
+      roundId,
+      locale: "ko",
+      question,
+    });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "답변을 준비하지 못했어요. 질문은 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.",
+    });
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    expect(state.history).toEqual([]);
+    expect(state.scores).toEqual({ "user-1": 0, "user-2": 0 });
+    expect(state.currentTurnIdx).toBe(0);
   });
 
   it("조회와 같은 명령 재생 응답은 저장 상태를 바꾸지 않고 비밀을 뺀다", async () => {
