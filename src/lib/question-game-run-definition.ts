@@ -35,6 +35,7 @@ export interface QuestionGameRunCreateStateInput {
   locale: QuestionGameRunLocale;
   topicHash: string;
   topicLength: number;
+  topicHashes?: string[];
 }
 
 export interface QuestionGameRunProgressContext {
@@ -48,6 +49,8 @@ export interface QuestionGameRunPublicProgress {
   aiTurnCount: number;
   awaitingAiTurn: boolean;
   targetCount: number;
+  ladderRound?: 1 | 2 | 3 | null;
+  ladderGrid?: boolean[][] | null;
 }
 
 export interface QuestionGameRunDefinition {

@@ -612,4 +612,258 @@ describe("브라우저 질문놀이 실행 전송기", () => {
       dailyRemaining: 20,
     });
   });
+
+  it("질문 사다리 주제 네 개와 서버 사다리 세 라운드를 처리하고 마지막 질문에서 정산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const topics = ["우주", "바다", "날씨", "식물"];
+    const createBody = {
+      gameId: "ladder",
+      mode: "solo",
+      requestId: ids[60],
+      topics,
+      locale: "ko",
+    };
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: createBody,
+    });
+    const id = runId(created);
+    expect(created).toMatchObject({
+      status: 201,
+      body: {
+        replayed: false,
+        run: {
+          id,
+          gameId: "ladder",
+          mode: "SOLO",
+          status: "ACTIVE",
+          version: 1,
+          targetCount: 3,
+          questionCount: 0,
+          aiTurnCount: 0,
+          awaitingAiTurn: false,
+          ladderRound: 1,
+        },
+      },
+    });
+    const firstGrid = (created.body.run as { ladderGrid: boolean[][] }).ladderGrid;
+    expect(firstGrid).toHaveLength(10);
+    expect(firstGrid.every((row) => row.length === 3)).toBe(true);
+    for (const topic of topics) {
+      expect(JSON.stringify(created)).not.toContain(topic);
+    }
+
+    const questions = [
+      "우주에는 어떤 비밀이 있나요?",
+      "바다는 왜 계속 움직이나요?",
+      "식물은 빛을 어떻게 이용하나요?",
+    ];
+    const startColumns = [0, 3, 1];
+    let finalResponse = created;
+    let finalBody: Record<string, unknown> | null = null;
+    for (let index = 0; index < questions.length; index += 1) {
+      const actionBody = {
+        action: "ladder-submit-question",
+        requestId: ids[61 + index],
+        expectedVersion: index + 1,
+        startColumn: startColumns[index],
+        question: questions[index],
+        locale: "ko",
+      };
+      finalResponse = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: actionBody,
+      });
+      if (index === 0) {
+        expect(finalResponse).toMatchObject({
+          status: 200,
+          body: {
+            replayed: false,
+            run: {
+              status: "ACTIVE",
+              version: 2,
+              questionCount: 1,
+              ladderRound: 2,
+            },
+          },
+        });
+        const secondGrid = (finalResponse.body.run as { ladderGrid: boolean[][] }).ladderGrid;
+        expect(secondGrid).toHaveLength(10);
+        expect(secondGrid).not.toEqual(firstGrid);
+        expect(store.dispatch(studentA, {
+          method: "POST",
+          pathname: `/api/question-games/runs/${id}/actions`,
+          body: actionBody,
+        })).toMatchObject({
+          status: 200,
+          body: {
+            replayed: true,
+            run: { version: 2, questionCount: 1, ladderRound: 2 },
+          },
+        });
+      }
+      expect(JSON.stringify(finalResponse)).not.toContain(questions[index]);
+      if (index === questions.length - 1) finalBody = actionBody;
+    }
+
+    expect(finalResponse).toMatchObject({
+      status: 200,
+      body: {
+        replayed: false,
+        run: {
+          status: "SETTLED",
+          version: 4,
+          questionCount: 3,
+          aiTurnCount: 0,
+          awaitingAiTurn: false,
+          ladderRound: null,
+          ladderGrid: null,
+        },
+        result: {
+          awarded: 5,
+          dailyLimit: 30,
+          dailyRemaining: 25,
+          cappedByLimit: false,
+          preview: false,
+        },
+      },
+    });
+    if (!finalBody) throw new Error("마지막 질문 요청이 없습니다");
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: finalBody,
+    })).toMatchObject({
+      status: 200,
+      body: {
+        replayed: true,
+        run: { status: "SETTLED", version: 4 },
+        result: { awarded: 5 },
+      },
+    });
+    expect(store.dispatch(studentA, {
+      method: "GET",
+      pathname: `/api/question-games/runs/${id}/result`,
+      body: {},
+    })).toMatchObject({
+      status: 200,
+      body: {
+        run: { status: "SETTLED", version: 4, ladderRound: null },
+        result: { awarded: 5, alreadySettled: true },
+      },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: createBody,
+    })).toMatchObject({
+      status: 200,
+      body: { replayed: true, run: { id, status: "SETTLED", version: 4 } },
+    });
+    expect(store.dispatch(studentB, {
+      method: "GET",
+      pathname: `/api/question-games/runs/${id}/result`,
+      body: {},
+    })).toEqual({
+      status: 403,
+      body: { error: "자신의 질문놀이 실행만 이용할 수 있습니다" },
+    });
+  });
+
+  it("질문 사다리 도움 모드는 주제 두 개를 받고 학생 질문 셋에 구 점을 정산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const topics = ["도전", "협력"];
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "ladder",
+        mode: "ai",
+        requestId: ids[65],
+        topics,
+        locale: "ko",
+      },
+    });
+    const id = runId(created);
+    expect(created).toMatchObject({
+      status: 201,
+      body: {
+        run: {
+          gameId: "ladder",
+          mode: "AI",
+          status: "ACTIVE",
+          ladderRound: 1,
+          aiTurnCount: 0,
+          awaitingAiTurn: false,
+        },
+      },
+    });
+    const grid = (created.body.run as { ladderGrid: boolean[][] }).ladderGrid;
+    expect(grid).toHaveLength(10);
+    expect(grid.every((row) => row.length === 1)).toBe(true);
+    for (const topic of topics) expect(JSON.stringify(created)).not.toContain(topic);
+
+    let finalResponse = created;
+    for (let index = 0; index < 3; index += 1) {
+      const question = `도움 사다리 질문 ${index + 1}은 무엇인가요?`;
+      finalResponse = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "ladder-submit-question",
+          requestId: ids[66 + index],
+          expectedVersion: index + 1,
+          startColumn: index % 2,
+          question,
+          locale: "ko",
+        },
+      });
+      expect(JSON.stringify(finalResponse)).not.toContain(question);
+    }
+    expect(finalResponse).toMatchObject({
+      status: 200,
+      body: {
+        run: {
+          status: "SETTLED",
+          version: 4,
+          questionCount: 3,
+          aiTurnCount: 0,
+          ladderRound: null,
+          ladderGrid: null,
+        },
+        result: {
+          awarded: 9,
+          dailyLimit: 50,
+          dailyRemaining: 41,
+          cappedByLimit: false,
+          preview: false,
+        },
+      },
+    });
+
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "ladder",
+        mode: "solo",
+        requestId: ids[70],
+        topics: ["하나", "둘"],
+        locale: "ko",
+      },
+    }).status).toBe(400);
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "ladder",
+        mode: "ai",
+        requestId: ids[71],
+        topics: ["하나", "둘", "셋", "넷"],
+        locale: "ko",
+      },
+    }).status).toBe(400);
+  });
 });

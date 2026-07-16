@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { LadderGrid } from "@/lib/question-ladder";
 
 export interface GameRunSnapshot {
   id: string;
@@ -15,6 +16,8 @@ export interface GameRunSnapshot {
   preview: boolean;
   nextStep?: DiceRunNextStep;
   pendingRoll?: DicePendingRoll | null;
+  ladderRound?: number | null;
+  ladderGrid?: LadderGrid | null;
 }
 
 export type DiceRunNextStep =
@@ -117,6 +120,8 @@ function readRun(value: unknown): GameRunSnapshot | null {
   ) return null;
   let nextStep: DiceRunNextStep | undefined;
   let pendingRoll: DicePendingRoll | null | undefined;
+  let ladderRound: number | null | undefined;
+  let ladderGrid: LadderGrid | null | undefined;
   if (value.gameId === "dice") {
     if (
       (value.mode !== "SOLO" && value.mode !== "AI") ||
@@ -181,6 +186,36 @@ function readRun(value: unknown): GameRunSnapshot | null {
       (expectedPendingActor === null && pendingRoll !== null) ||
       (expectedPendingActor !== null && pendingRoll?.actor !== expectedPendingActor)
     ) return null;
+  } else if (value.gameId === "ladder") {
+    const columnCount = value.mode === "AI" ? 2 : value.mode === "SOLO" ? 4 : 0;
+    const active = value.status === "ACTIVE";
+    if (
+      columnCount === 0 ||
+      (value.status !== "ACTIVE" && value.status !== "SETTLED") ||
+      value.targetCount !== 3 ||
+      value.aiTurnCount !== 0 ||
+      value.awaitingAiTurn ||
+      active !== (value.questionCount < value.targetCount)
+    ) return null;
+    if (active) {
+      if (
+        value.ladderRound !== value.questionCount + 1 ||
+        !Array.isArray(value.ladderGrid) ||
+        value.ladderGrid.length !== 10 ||
+        value.ladderGrid.some((row) =>
+          !Array.isArray(row) ||
+          row.length !== columnCount - 1 ||
+          row.some((rung) => typeof rung !== "boolean") ||
+          row.some((rung, index) => rung && row[index + 1] === true)
+        )
+      ) return null;
+      ladderRound = value.ladderRound;
+      ladderGrid = value.ladderGrid as boolean[][];
+    } else {
+      if (value.ladderRound !== null || value.ladderGrid !== null) return null;
+      ladderRound = null;
+      ladderGrid = null;
+    }
   }
   return {
     id: value.id,
@@ -195,6 +230,8 @@ function readRun(value: unknown): GameRunSnapshot | null {
     preview: value.preview,
     ...(nextStep ? { nextStep } : {}),
     ...(pendingRoll !== undefined ? { pendingRoll } : {}),
+    ...(ladderRound !== undefined ? { ladderRound } : {}),
+    ...(ladderGrid !== undefined ? { ladderGrid } : {}),
   };
 }
 
@@ -261,6 +298,13 @@ function readSettlementResult(
   if (run.status === "SETTLED") {
     const result = readResult(value);
     if (!result) throw new Error("포인트 지급 결과를 확인할 수 없습니다.");
+    const expectedDailyLimit = run.mode === "SOLO" ? 30 : run.mode === "AI" ? 50 : null;
+    if (
+      result.preview !== run.preview ||
+      (expectedDailyLimit !== null && result.dailyLimit !== expectedDailyLimit)
+    ) {
+      throw new Error("포인트 지급 결과가 질문놀이 실행과 일치하지 않습니다.");
+    }
     return result;
   }
   if (value !== undefined && value !== null) {
@@ -317,6 +361,9 @@ function isRejectedAiProof(error: unknown) {
 function isSameRunProgress(first: GameRunSnapshot, second: GameRunSnapshot) {
   return (
     first.id === second.id &&
+    first.gameId === second.gameId &&
+    first.mode === second.mode &&
+    first.preview === second.preview &&
     first.version === second.version &&
     first.targetCount === second.targetCount &&
     first.questionCount === second.questionCount &&
@@ -325,6 +372,8 @@ function isSameRunProgress(first: GameRunSnapshot, second: GameRunSnapshot) {
     first.nextStep === second.nextStep &&
     first.pendingRoll?.actor === second.pendingRoll?.actor &&
     first.pendingRoll?.face === second.pendingRoll?.face &&
+    first.ladderRound === second.ladderRound &&
+    JSON.stringify(first.ladderGrid) === JSON.stringify(second.ladderGrid) &&
     first.status === second.status
   );
 }
@@ -422,6 +471,27 @@ function isExpectedDiceAiAdvance(
   );
 }
 
+function isExpectedLadderQuestionAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+) {
+  const completesRun = current.questionCount + 1 === current.targetCount;
+  return (
+    current.gameId === "ladder" &&
+    next.gameId === "ladder" &&
+    next.id === current.id &&
+    next.mode === current.mode &&
+    next.status === (completesRun ? "SETTLED" : "ACTIVE") &&
+    next.targetCount === current.targetCount &&
+    next.version === current.version + 1 &&
+    next.questionCount === current.questionCount + 1 &&
+    next.aiTurnCount === 0 &&
+    !next.awaitingAiTurn &&
+    next.ladderRound === (completesRun ? null : current.questionCount + 2) &&
+    (completesRun ? next.ladderGrid === null : Array.isArray(next.ladderGrid))
+  );
+}
+
 export function useGameRun() {
   const mountedRef = useRef(false);
   const generationRef = useRef(0);
@@ -486,14 +556,20 @@ export function useGameRun() {
   const start = useCallback(async (
     gameId: string,
     mode: "solo" | "ai",
-    topic: string,
+    topic: string | readonly string[],
     locale: string,
   ) => {
     if (!begin("create")) return null;
     const generation = generationRef.current;
     const normalizedLocale = locale === "en" ? "en" : "ko";
-    const normalizedTopic = topic.trim();
-    const key = `${gameId}:${mode}:${normalizedLocale}:${normalizedTopic}`;
+    const expectedMode = mode === "ai" ? "AI" : "SOLO";
+    const normalizedTopic = typeof topic === "string" ? topic.trim() : "";
+    const normalizedTopics = Array.isArray(topic)
+      ? topic.map((item) => item.trim())
+      : null;
+    const key = `${gameId}:${mode}:${normalizedLocale}:${normalizedTopics
+      ? JSON.stringify(normalizedTopics)
+      : normalizedTopic}`;
     const request = createRequestRef.current?.key === key
       ? createRequestRef.current
       : { key, requestId: newRequestId() };
@@ -506,13 +582,17 @@ export function useGameRun() {
           gameId,
           mode,
           requestId: request.requestId,
-          topic: normalizedTopic,
+          ...(normalizedTopics ? { topics: normalizedTopics } : { topic: normalizedTopic }),
           locale: normalizedLocale,
         }),
       });
       const value = await readJson(response);
       const nextRun = readRun(value.run);
       if (!nextRun) throw new Error("질문놀이 실행 정보를 확인할 수 없습니다.");
+      if (nextRun.gameId !== gameId || nextRun.mode !== expectedMode) {
+        createRequestRef.current = null;
+        throw new Error("요청한 질문놀이 실행과 서버 응답이 일치하지 않습니다.");
+      }
       if (nextRun.status !== "ACTIVE") {
         createRequestRef.current = null;
         throw new Error("이미 닫힌 질문놀이 실행입니다. 다시 시작해 주세요.");
@@ -788,6 +868,122 @@ export function useGameRun() {
       try {
         const recovered = await readRunResult(activeRun.id);
         if (isExpectedDiceQuestionAdvance(activeRun, recovered.run)) {
+          if (!mountedRef.current || generationRef.current !== generation) return null;
+          actionRequestRef.current = null;
+          setRun(recovered.run);
+          if (recovered.result) setResult(recovered.result);
+          setUnconfirmedQuestion(null);
+          setError(null);
+          return recovered;
+        }
+        if (mountedRef.current && generationRef.current === generation) {
+          if (isSameRunProgress(recovered.run, activeRun)) {
+            if (explicitlyRejected) {
+              actionRequestRef.current = null;
+              setUnconfirmedQuestion(null);
+            } else {
+              setUnconfirmedQuestion(request.question);
+            }
+            setError(message);
+          } else {
+            markConflict(recovered.run);
+          }
+        }
+      } catch {
+        if (mountedRef.current && generationRef.current === generation) {
+          if (explicitlyRejected) {
+            actionRequestRef.current = null;
+            setUnconfirmedQuestion(null);
+          } else {
+            setUnconfirmedQuestion(request.question);
+          }
+          setError(message);
+        }
+      }
+      return null;
+    } finally {
+      finish(generation);
+    }
+  }, [begin, conflict, finish, markConflict, run]);
+
+  const submitLadderQuestion = useCallback(async (
+    question: string,
+    startColumn: number,
+    locale: string,
+    runOverride?: GameRunSnapshot,
+  ): Promise<SubmittedRelayQuestion | null> => {
+    const activeRun = runOverride ?? run;
+    if (
+      !activeRun ||
+      activeRun.gameId !== "ladder" ||
+      activeRun.status !== "ACTIVE" ||
+      activeRun.ladderRound !== activeRun.questionCount + 1 ||
+      !Array.isArray(activeRun.ladderGrid) ||
+      !Number.isSafeInteger(startColumn) ||
+      startColumn < 0 ||
+      startColumn >= (activeRun.mode === "AI" ? 2 : 4) ||
+      conflict ||
+      !begin("action")
+    ) return null;
+    const generation = generationRef.current;
+    const normalizedLocale = locale === "en" ? "en" : "ko";
+    const key = [
+      activeRun.id,
+      activeRun.version,
+      "ladder-question",
+      startColumn,
+      normalizedLocale,
+      question,
+    ].join(":");
+    const request = actionRequestRef.current?.key === key
+      ? actionRequestRef.current
+      : { key, requestId: newRequestId(), question };
+    actionRequestRef.current = request;
+    try {
+      const value = await readJson(await fetch(
+        `/api/question-games/runs/${activeRun.id}/actions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "ladder-submit-question",
+            requestId: request.requestId,
+            expectedVersion: activeRun.version,
+            startColumn,
+            question,
+            locale: normalizedLocale,
+          }),
+        },
+      ));
+      let nextRun = readRun(value.run);
+      if (!nextRun || !isExpectedLadderQuestionAdvance(activeRun, nextRun)) {
+        throw new Error("질문 저장 결과를 확인할 수 없습니다.");
+      }
+      let nextResult = readSettlementResult(value.result, nextRun);
+      if (value.replayed === true) {
+        const current = await readRunResult(activeRun.id);
+        if (!isSameRunProgress(current.run, nextRun)) {
+          if (mountedRef.current && generationRef.current === generation) {
+            markConflict(current.run);
+          }
+          return null;
+        }
+        nextRun = current.run;
+        nextResult = current.result;
+      }
+      if (!mountedRef.current || generationRef.current !== generation) return null;
+      actionRequestRef.current = null;
+      setRun(nextRun);
+      if (nextResult) setResult(nextResult);
+      setUnconfirmedQuestion(null);
+      setError(null);
+      return { run: nextRun, result: nextResult };
+    } catch (requestError) {
+      const message = requestErrorMessage(requestError, "질문을 저장하지 못했습니다.");
+      const explicitlyRejected = requestError instanceof QuestionGameRequestError;
+      try {
+        const recovered = await readRunResult(activeRun.id);
+        if (isExpectedLadderQuestionAdvance(activeRun, recovered.run)) {
           if (!mountedRef.current || generationRef.current !== generation) return null;
           actionRequestRef.current = null;
           setRun(recovered.run);
@@ -1215,6 +1411,7 @@ export function useGameRun() {
     submitRelayAiTurn,
     submitDiceQuestion,
     submitDiceAiTurn,
+    submitLadderQuestion,
     complete,
     reset,
     clearError,

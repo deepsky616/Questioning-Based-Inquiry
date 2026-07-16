@@ -102,6 +102,7 @@ import { POST as applyAction } from "@/app/api/question-games/runs/[id]/actions/
 import { POST as createAiTurn } from "@/app/api/question-games/runs/[id]/ai-turn/route";
 import { POST as completeRun } from "@/app/api/question-games/runs/[id]/complete/route";
 import { GET as getResult } from "@/app/api/question-games/runs/[id]/result/route";
+import { traceLadderColumns } from "@/lib/question-ladder";
 
 const CREATE_ID = "00000000-0000-4000-8000-000000000001";
 const SECOND_CREATE_ID = "00000000-0000-4000-8000-000000000002";
@@ -134,6 +135,7 @@ const DICE_AI_RECORD_IDS = [
   "00000000-0000-4000-8000-000000000091",
   "00000000-0000-4000-8000-000000000092",
 ];
+const LADDER_TOPICS = ["우주", "바다", "날씨", "식물"];
 const COMPLETE_ID = "00000000-0000-4000-8000-000000000020";
 
 const users = new Map<string, { id: string; role: string; totalPoints: number }>();
@@ -202,6 +204,36 @@ async function createDice(mode: "solo" | "ai" = "solo") {
     requestId: CREATE_ID,
     locale: "ko",
   });
+}
+
+async function createLadder(
+  mode: "solo" | "ai" = "solo",
+  topics = mode === "solo" ? LADDER_TOPICS : LADDER_TOPICS.slice(0, 2),
+) {
+  return postCreate({
+    gameId: "ladder",
+    mode,
+    requestId: CREATE_ID,
+    topics,
+    locale: "ko",
+  });
+}
+
+async function submitLadderQuestion(
+  index: number,
+  expectedVersion = index + 1,
+  question = `사다리 질문 ${index + 1}은 왜 필요할까요?`,
+  startColumn = 0,
+  id = "run-1",
+) {
+  return postAction({
+    action: "ladder-submit-question",
+    requestId: ACTION_IDS[index],
+    expectedVersion,
+    startColumn,
+    question,
+    locale: "ko",
+  }, id);
 }
 
 async function rollDice(index: number, expectedVersion: number, id = "run-1") {
@@ -681,7 +713,7 @@ describe("질문놀이 서버 실행 경로", () => {
 
   it("아직 준비되지 않은 놀이는 실행을 저장하지 않고 거절한다", async () => {
     const response = await postCreate({
-      gameId: "ladder",
+      gameId: "memory",
       mode: "solo",
       requestId: CREATE_ID,
       topic: "우주",
@@ -789,7 +821,7 @@ describe("질문놀이 서버 실행 경로", () => {
     await postCreate({ gameId: "relay", mode: "solo", requestId: THIRD_CREATE_ID, topic: "날씨", locale: "ko" });
 
     const response = await postCreate({
-      gameId: "ladder",
+      gameId: "memory",
       mode: "solo",
       requestId: FOURTH_CREATE_ID,
       topic: "우주",
@@ -1848,5 +1880,279 @@ describe("질문 주사위 서버 실행 경로", () => {
     expect(users.get("student-1")?.totalPoints).toBe(2);
     expect(pointLogs.filter((log) => log.gameRunId === "run-1")).toHaveLength(1);
     expect(pointLogs.find((log) => log.gameRunId === "run-1")?.points).toBe(2);
+  });
+});
+
+describe("질문 사다리 서버 실행 경로", () => {
+  it("혼자 모드 주제 네 개를 해시로만 저장하고 첫째 서버 사다리를 공개한다", async () => {
+    const response = await createLadder();
+    const body = await response.json() as {
+      run: { ladderRound: number; ladderGrid: boolean[][] };
+    };
+    const state = runs.get("run-1")?.state as {
+      topicHashes: string[];
+      grids: boolean[][][];
+    };
+
+    expect(response.status).toBe(201);
+    expect(body.run).toMatchObject({ ladderRound: 1 });
+    expect(body.run.ladderGrid).toHaveLength(10);
+    expect(body.run.ladderGrid.every((row) => row.length === 3)).toBe(true);
+    expect(state.topicHashes).toHaveLength(4);
+    expect(state.grids).toHaveLength(3);
+    expect(JSON.stringify(runs.get("run-1")?.state)).not.toContain("우주");
+    expect(JSON.stringify(runs.get("run-1")?.state)).not.toContain("바다");
+  });
+
+  it.each([
+    ["solo", ["하나", "둘"], "질문 사다리 주제를 4개 입력해 주세요"],
+    ["ai", ["하나", "둘", "셋", "넷"], "질문 사다리 주제를 2개 입력해 주세요"],
+    ["solo", ["하나", "둘", "셋", "fuck"], "주제에 사용할 수 없는 표현이 있습니다"],
+  ] as const)("%s 모드의 잘못된 주제 배열을 거부한다", async (mode, topics, error) => {
+    const response = await createLadder(mode, [...topics]);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error });
+    expect(runs).toHaveLength(0);
+  });
+
+  it("세 질문을 현재 사다리 도착 주제에 묶어 기록하고 마지막 질문에서 오 점을 정산한다", async () => {
+    const created = await createLadder();
+    expect(created.status).toBe(201);
+    const state = runs.get("run-1")?.state as {
+      grids: boolean[][][];
+      topicHashes: string[];
+    };
+    const expectedEvidence = state.grids.map((grid) => {
+      const path = traceLadderColumns(0, grid);
+      const destinationColumn = path.at(-1);
+      if (destinationColumn === undefined) throw new Error("missing ladder destination");
+      return { destinationColumn, topicHash: state.topicHashes[destinationColumn] };
+    });
+
+    const first = await submitLadderQuestion(0);
+    const second = await submitLadderQuestion(1);
+    const final = await submitLadderQuestion(2);
+
+    expect(first.status).toBe(200);
+    await expect(first.json()).resolves.toMatchObject({
+      run: { status: "ACTIVE", version: 2, questionCount: 1, ladderRound: 2 },
+    });
+    await expect(second.json()).resolves.toMatchObject({
+      run: { status: "ACTIVE", version: 3, questionCount: 2, ladderRound: 3 },
+    });
+    expect(final.status).toBe(200);
+    await expect(final.json()).resolves.toMatchObject({
+      run: {
+        status: "SETTLED",
+        version: 4,
+        questionCount: 3,
+        ladderRound: null,
+        ladderGrid: null,
+      },
+      result: { awarded: 5, preview: false },
+    });
+    expect(activities.map(({ sequence, type }) => ({ sequence, type }))).toEqual([
+      { sequence: 1, type: "LADDER_QUESTION" },
+      { sequence: 2, type: "LADDER_QUESTION" },
+      { sequence: 3, type: "LADDER_QUESTION" },
+    ]);
+    expect(activities.map((activity) => activity.payload)).toEqual([
+      expect.objectContaining({ round: 1, startColumn: 0, ...expectedEvidence[0] }),
+      expect.objectContaining({ round: 2, startColumn: 0, ...expectedEvidence[1] }),
+      expect.objectContaining({ round: 3, startColumn: 0, ...expectedEvidence[2] }),
+    ]);
+    const stored = JSON.stringify({ run: runs.get("run-1"), activities });
+    for (const question of [
+      "사다리 질문 1은 왜 필요할까요?",
+      "사다리 질문 2은 왜 필요할까요?",
+      "사다리 질문 3은 왜 필요할까요?",
+    ]) expect(stored).not.toContain(question);
+    expect(pointLogs).toHaveLength(1);
+    expect(pointLogs[0]).toMatchObject({
+      gameId: "ACTIVITY_SOLO",
+      bonusType: "ACTIVITY_SOLO_ladder",
+      points: 5,
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+  });
+
+  it("인공지능 모드는 주제 두 개와 학생 질문 셋을 확인해 구 점을 정산한다", async () => {
+    expect((await createLadder("ai")).status).toBe(201);
+    expect((await submitLadderQuestion(0)).status).toBe(200);
+    expect((await submitLadderQuestion(1)).status).toBe(200);
+    const final = await submitLadderQuestion(2);
+
+    expect(final.status).toBe(200);
+    await expect(final.json()).resolves.toMatchObject({
+      run: { status: "SETTLED", aiTurnCount: 0 },
+      result: { awarded: 9, dailyLimit: 50 },
+    });
+    expect(pointLogs[0]).toMatchObject({ gameId: "ACTIVITY_AI", points: 9 });
+    expect(users.get("student-1")?.totalPoints).toBe(9);
+  });
+
+  it("마지막 질문과 완료 및 결과 조회를 다시 보내도 한 번 정산한 결과를 복구한다", async () => {
+    await createLadder();
+    await submitLadderQuestion(0);
+    await submitLadderQuestion(1);
+    const final = await submitLadderQuestion(2);
+    const replay = await submitLadderQuestion(2);
+    const result = await readResult();
+    const complete = await postComplete({ requestId: COMPLETE_ID, expectedVersion: 4 });
+    const completeBody = await complete.json();
+
+    expect(final.status).toBe(200);
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({
+      replayed: true,
+      run: { status: "SETTLED", version: 4 },
+      result: { awarded: 5 },
+    });
+    await expect(result.json()).resolves.toMatchObject({
+      run: { status: "SETTLED", ladderRound: null, ladderGrid: null },
+      result: { awarded: 5, alreadySettled: true },
+    });
+    expect(complete.status).toBe(200);
+    expect(completeBody).toMatchObject({
+      replayed: true,
+      result: { awarded: 5, alreadySettled: true },
+    });
+    expect(pointLogs).toHaveLength(1);
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+  });
+
+  it("마지막 질문 전에 저장된 사다리 근거가 빠지면 정산을 거부한다", async () => {
+    await createLadder();
+    await submitLadderQuestion(0);
+    await submitLadderQuestion(1);
+    activities.splice(0, 1);
+
+    const response = await submitLadderQuestion(2);
+
+    expect(response.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 3 });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+  });
+
+  it("저장된 도착 열 근거가 서버 사다리와 다르면 정산을 거부한다", async () => {
+    await createLadder();
+    await submitLadderQuestion(0);
+    await submitLadderQuestion(1);
+    const firstPayload = activities[0]?.payload as { destinationColumn: number };
+    firstPayload.destinationColumn = firstPayload.destinationColumn === 0 ? 1 : 0;
+
+    const response = await submitLadderQuestion(2);
+
+    expect(response.status).toBe(409);
+    expect(pointLogs).toHaveLength(0);
+  });
+
+  it("서로 다른 마지막 질문이 동시에 오면 한 요청만 정산한다", async () => {
+    await createLadder();
+    await submitLadderQuestion(0);
+    await submitLadderQuestion(1);
+
+    const responses = await Promise.all([
+      submitLadderQuestion(2, 3, "첫 번째 마지막 사다리 질문은 무엇일까요?"),
+      postAction({
+        action: "ladder-submit-question",
+        requestId: ALTERNATE_FINAL_ACTION_ID,
+        expectedVersion: 3,
+        startColumn: 1,
+        question: "두 번째 마지막 사다리 질문은 무엇일까요?",
+        locale: "ko",
+      }),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(pointLogs).toHaveLength(1);
+    expect(activities.filter((activity) => activity.type === "LADDER_QUESTION")).toHaveLength(3);
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+  });
+
+  it("마지막 활동 저장이 실패하면 질문과 포인트를 모두 되돌리고 재시도한다", async () => {
+    await createLadder();
+    await submitLadderQuestion(0);
+    await submitLadderQuestion(1);
+    mocks.activityCreate.mockRejectedValueOnce(new Error("private-ladder-storage-value"));
+
+    const failed = await submitLadderQuestion(2);
+
+    expect(failed.status).toBe(500);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 3 });
+    expect(activities).toHaveLength(2);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+
+    const retry = await submitLadderQuestion(2);
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({ result: { awarded: 5 } });
+    expect(pointLogs).toHaveLength(1);
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+  });
+
+  it("교사 미리보기는 완료 결과만 남기고 포인트를 만들지 않는다", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
+    await createLadder();
+    await submitLadderQuestion(0);
+    await submitLadderQuestion(1);
+
+    const final = await submitLadderQuestion(2);
+
+    expect(final.status).toBe(200);
+    await expect(final.json()).resolves.toMatchObject({
+      run: { preview: true, status: "SETTLED" },
+      result: { awarded: 0, preview: true },
+    });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("teacher-1")?.totalPoints).toBe(0);
+  });
+
+  it("혼자 모드 하루 상한에 이 점만 남으면 이 점만 지급한다", async () => {
+    pointLogs.push({
+      studentId: "student-1",
+      gameId: "ACTIVITY_SOLO",
+      gameRunId: "old-run",
+      bonusType: "ACTIVITY_SOLO_relay",
+      points: 28,
+      reason: "이전 실행",
+      status: "APPROVED",
+      createdAt: new Date(),
+    });
+    await createLadder();
+    await submitLadderQuestion(0);
+    await submitLadderQuestion(1);
+
+    const final = await submitLadderQuestion(2);
+
+    expect(final.status).toBe(200);
+    await expect(final.json()).resolves.toMatchObject({
+      result: { awarded: 2, dailyRemaining: 0, cappedByLimit: true },
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(2);
+  });
+
+  it("잘못된 시작점과 중복 질문 및 다른 언어 질문을 기록하지 않는다", async () => {
+    await createLadder();
+    const invalidStart = await submitLadderQuestion(0, 1, undefined, 4);
+    const first = await submitLadderQuestion(0);
+    const duplicate = await submitLadderQuestion(1, 2, "사다리 질문 1은 왜 필요할까요?");
+    const wrongLocale = await postAction({
+      action: "ladder-submit-question",
+      requestId: ACTION_IDS[1],
+      expectedVersion: 2,
+      startColumn: 0,
+      question: "Why should this ladder question be asked?",
+      locale: "en",
+    });
+
+    expect(invalidStart.status).toBe(400);
+    expect(first.status).toBe(200);
+    expect(duplicate.status).toBe(409);
+    expect(wrongLocale.status).toBe(409);
+    expect(activities).toHaveLength(1);
+    expect(runs.get("run-1")).toMatchObject({ version: 2 });
   });
 });

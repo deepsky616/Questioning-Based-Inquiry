@@ -17,6 +17,7 @@ interface LadderQuestionComposerProps {
   roundKey: string;
   topic: string;
   onConfirm: (question: string) => Promise<boolean>;
+  inputLocked?: boolean;
 }
 
 export default function LadderQuestionComposer({
@@ -24,6 +25,7 @@ export default function LadderQuestionComposer({
   roundKey,
   topic,
   onConfirm,
+  inputLocked = false,
 }: LadderQuestionComposerProps) {
   const text = getQuestionGameText(locale);
   const [phase, setPhase] = useState<ComposerPhase>("writing");
@@ -202,10 +204,14 @@ export default function LadderQuestionComposer({
         </label>
         <textarea
           aria-describedby={`ladder-question-help-${roundKey}`}
+          aria-readonly={inputLocked}
           className="h-28 w-full resize-none rounded-lg border-2 border-input bg-background p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-violet-600 dark:focus:border-violet-300"
           id={`ladder-question-${roundKey}`}
-          onChange={(event) => handleQuestionChange(event.target.value)}
+          onChange={(event) => {
+            if (!inputLocked) handleQuestionChange(event.target.value);
+          }}
           placeholder={text.ladderQuestionPlaceholder(topic)}
+          readOnly={inputLocked}
           value={question}
         />
         <div

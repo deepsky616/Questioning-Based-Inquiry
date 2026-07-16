@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   assignLadderTopics,
-  generateLadderGrid,
   type LadderGrid,
   type LadderTopicAssignment,
 } from "@/lib/question-ladder";
@@ -20,6 +19,7 @@ import type { GameStartConfig } from "../[gameId]/page";
 import LadderBoard, { type LadderBoardAssignment } from "./LadderBoard";
 import LadderQuestionComposer from "./LadderQuestionComposer";
 import { useAIPlay } from "./useAIPlay";
+import { useGameRun, type GameRunSnapshot } from "./useGameRun";
 
 const MAX_ROUNDS = QUESTION_GAME_RULES.ladder.targets.solo.count;
 const SOLO_COLUMN_COUNT = 4;
@@ -63,6 +63,18 @@ export default function LadderGame({ game, onBack, config }: Props) {
   const myName = config.players[0]?.trim() || text.me;
   const aiName = config.players[1]?.trim() || "AI";
   const { ask } = useAIPlay();
+  const {
+    run,
+    result: runResult,
+    pending: runPending,
+    error: runError,
+    conflict: runConflict,
+    unconfirmedQuestion,
+    start: startRun,
+    submitLadderQuestion,
+    reset: resetRun,
+    clearError: clearRunError,
+  } = useGameRun();
 
   const [phase, setPhase] = useState<LocalPhase>("setup");
   const [round, setRound] = useState<RoundNumber>(1);
@@ -95,6 +107,8 @@ export default function LadderGame({ game, onBack, config }: Props) {
       (assignment) => assignment.startColumn !== selectedStartColumn,
     );
   const latestQuestion = questions.at(-1);
+  const runBusy = runPending !== null;
+  const backBlocked = runBusy || unconfirmedQuestion !== null;
 
   const boardAssignments: LadderBoardAssignment[] = topicAssignments.map(
     (assignment) => {
@@ -113,11 +127,18 @@ export default function LadderGame({ game, onBack, config }: Props) {
     );
   }
 
-  function prepareRound(nextRound: RoundNumber) {
-    const nextGrid = generateLadderGrid(columnCount, Math.random);
+  function applyServerRound(activeRun: GameRunSnapshot, nextRound: RoundNumber) {
+    if (
+      activeRun.gameId !== "ladder" ||
+      activeRun.mode !== (isAI ? "AI" : "SOLO") ||
+      activeRun.status !== "ACTIVE" ||
+      activeRun.ladderRound !== nextRound ||
+      !activeRun.ladderGrid
+    ) return false;
+    const nextGrid = activeRun.ladderGrid;
     const nextAssignments = assignLadderTopics(normalizedTopics(), nextGrid);
     roundSerialRef.current += 1;
-    const nextRoundKey = `local-round-${nextRound}-${roundSerialRef.current}`;
+    const nextRoundKey = `${activeRun.id}-${activeRun.version}-${roundSerialRef.current}`;
 
     aiRequestRef.current += 1;
     activeRoundKeyRef.current = nextRoundKey;
@@ -129,6 +150,25 @@ export default function LadderGame({ game, onBack, config }: Props) {
     setAiQuestion("");
     setAiQuestionState("idle");
     setPhase("reveal");
+    return true;
+  }
+
+  async function startLadder() {
+    if (runBusy || runConflict) return;
+    clearRunError();
+    const activeRun = run ?? await startRun(
+      game.id,
+      isAI ? "ai" : "solo",
+      normalizedTopics(),
+      locale,
+    );
+    if (activeRun) applyServerRound(activeRun, 1);
+  }
+
+  function prepareRound(nextRound: RoundNumber) {
+    if (!run || runBusy || runConflict) return;
+    clearRunError();
+    applyServerRound(run, nextRound);
   }
 
   async function requestAIQuestion(
@@ -183,7 +223,23 @@ export default function LadderGame({ game, onBack, config }: Props) {
   }
 
   async function confirmQuestion(question: string): Promise<boolean> {
-    if (phase !== "compose" || !selectedAssignment) return false;
+    if (
+      phase !== "compose" ||
+      !selectedAssignment ||
+      selectedStartColumn === null ||
+      !run ||
+      runBusy ||
+      runConflict
+    ) return false;
+
+    clearRunError();
+    const saved = await submitLadderQuestion(
+      question,
+      selectedStartColumn,
+      locale,
+      run,
+    );
+    if (!saved) return false;
 
     const record: LocalQuestionRecord = {
       round,
@@ -194,7 +250,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
     };
     setQuestions((current) => [...current, record]);
 
-    if (round === MAX_ROUNDS) {
+    if (saved.result || saved.run.status === "SETTLED") {
       aiRequestRef.current += 1;
       activeRoundKeyRef.current = "";
       setPhase("done");
@@ -217,6 +273,15 @@ export default function LadderGame({ game, onBack, config }: Props) {
     setRoundKey("local-round-1-0");
     setAiQuestion("");
     setAiQuestionState("idle");
+    resetRun();
+  }
+
+  function handleBack() {
+    if (backBlocked) return;
+    aiRequestRef.current += 1;
+    activeRoundKeyRef.current = "";
+    resetRun();
+    onBack();
   }
 
   function renderAIQuestion() {
@@ -259,8 +324,9 @@ export default function LadderGame({ game, onBack, config }: Props) {
     <div className="mx-auto max-w-3xl space-y-5 text-foreground">
       <header className="flex items-center gap-3">
         <button
-          className="shrink-0 text-sm font-bold text-muted-foreground hover:text-foreground"
-          onClick={onBack}
+          className="shrink-0 text-sm font-bold text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={backBlocked}
+          onClick={handleBack}
           type="button"
         >
           {text.backToList}
@@ -277,7 +343,24 @@ export default function LadderGame({ game, onBack, config }: Props) {
         </div>
       </header>
 
-      {phase === "setup" && (
+      {runConflict && (
+        <div className="space-y-3">
+          <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+            {runConflict}
+          </div>
+          <Button className="w-full" onClick={handleBack} type="button" variant="outline">
+            {locale === "en" ? "Return to game selection" : "놀이 선택으로 돌아가기"}
+          </Button>
+        </div>
+      )}
+
+      {!runConflict && runError && (
+        <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200">
+          {runError}
+        </div>
+      )}
+
+      {!runConflict && phase === "setup" && (
         <section className="space-y-5 rounded-lg border border-border bg-card p-5 text-card-foreground">
           <div className="space-y-1">
             <h2 className="font-black text-foreground">{text.ladderSetupTitle}</h2>
@@ -314,10 +397,11 @@ export default function LadderGame({ game, onBack, config }: Props) {
           </div>
           <Button
             className={PRIMARY_ACTION_CLASS}
-            onClick={() => prepareRound(1)}
+            disabled={runBusy}
+            onClick={() => void startLadder()}
             type="button"
           >
-            {text.drawLadder}
+            {runPending === "create" ? text.loading : text.drawLadder}
           </Button>
         </section>
       )}
@@ -371,6 +455,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
               </div>
               <div className={isAI ? "grid min-w-0 gap-4 lg:grid-cols-2" : "min-w-0"}>
                 <LadderQuestionComposer
+                  inputLocked={runBusy || unconfirmedQuestion !== null || Boolean(runConflict)}
                   locale={locale}
                   onConfirm={confirmQuestion}
                   roundKey={roundKey}
@@ -437,6 +522,31 @@ export default function LadderGame({ game, onBack, config }: Props) {
               </li>
             ))}
           </ol>
+          {runResult && (
+            <div
+              role="status"
+              className={`rounded-lg border px-4 py-3 text-sm ${
+                runResult.awarded > 0
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100"
+                  : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+              }`}
+            >
+              <p className="font-bold">
+                {runResult.preview
+                  ? (locale === "en" ? "Preview completed without points." : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                  : runResult.awarded > 0
+                    ? (locale === "en" ? `+${runResult.awarded} points earned!` : `+${runResult.awarded}점 적립!`)
+                    : (locale === "en" ? "The daily point limit has been reached." : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+              </p>
+              {!runResult.preview && runResult.dailyRemaining > 0 && (
+                <p className="mt-1 text-xs">
+                  {locale === "en"
+                    ? `${runResult.dailyRemaining} points are still available today.`
+                    : `오늘 ${runResult.dailyRemaining}점 더 받을 수 있어요.`}
+                </p>
+              )}
+            </div>
+          )}
           <Button
             className="w-full whitespace-normal rounded-lg border-border bg-background text-foreground"
             onClick={resetGame}

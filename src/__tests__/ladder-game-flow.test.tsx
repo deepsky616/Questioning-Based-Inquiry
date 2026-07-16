@@ -101,6 +101,98 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+const SOLO_LADDER_GRID = [
+  [true, false, false],
+  [false, true, false],
+  [false, false, true],
+  ...Array.from({ length: 7 }, () => [false, false, false]),
+];
+const AI_LADDER_GRID = [
+  [true],
+  ...Array.from({ length: 9 }, () => [false]),
+];
+
+function installLadderFetch(
+  classification: unknown = null,
+  firstActionFailure: "before" | "after" | null = null,
+  createModeOverride: "SOLO" | "AI" | null = null,
+  resultPreview = false,
+) {
+  let mode: "SOLO" | "AI" = "SOLO";
+  let questionCount = 0;
+  let version = 1;
+  const currentRun = () => {
+    const settled = questionCount === 3;
+    return {
+      id: "ladder-run",
+      gameId: "ladder",
+      mode,
+      status: settled ? "SETTLED" : "ACTIVE",
+      version,
+      targetCount: 3,
+      questionCount,
+      aiTurnCount: 0,
+      awaitingAiTurn: false,
+      preview: false,
+      ladderRound: settled ? null : questionCount + 1,
+      ladderGrid: settled ? null : mode === "AI" ? AI_LADDER_GRID : SOLO_LADDER_GRID,
+    };
+  };
+  const result = () => questionCount === 3
+    ? {
+        awarded: mode === "AI" ? 9 : 5,
+        dailyLimit: mode === "AI" ? 50 : 30,
+        dailyRemaining: mode === "AI" ? 41 : 25,
+        cappedByLimit: false,
+        preview: resultPreview,
+      }
+    : null;
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url === "/api/classify") {
+      return classification === null
+        ? jsonResponse({}, 500)
+        : jsonResponse(classification);
+    }
+    if (url === "/api/question-games/runs") {
+      const body = JSON.parse(String(init?.body)) as { mode?: string };
+      mode = body.mode === "ai" ? "AI" : "SOLO";
+      return jsonResponse({
+        run: {
+          ...currentRun(),
+          ...(createModeOverride
+            ? {
+                mode: createModeOverride,
+                ladderGrid: createModeOverride === "AI" ? AI_LADDER_GRID : SOLO_LADDER_GRID,
+              }
+            : {}),
+        },
+      });
+    }
+    if (url.endsWith("/actions")) {
+      const body = JSON.parse(String(init?.body)) as { action?: string };
+      if (body.action !== "ladder-submit-question") return jsonResponse({}, 400);
+      if (firstActionFailure === "before") {
+        firstActionFailure = null;
+        throw new Error("response lost before apply");
+      }
+      questionCount += 1;
+      version += 1;
+      if (firstActionFailure === "after") {
+        firstActionFailure = null;
+        throw new Error("response lost after apply");
+      }
+      return jsonResponse({ run: currentRun(), result: result() });
+    }
+    if (url.endsWith("/result")) {
+      return jsonResponse({ run: currentRun(), result: result() });
+    }
+    return jsonResponse({}, 404);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 function renderGame(
   mode: "solo" | "ai" = "solo",
   theme: "light" | "dark" = "light",
@@ -119,8 +211,9 @@ function renderGame(
   );
 }
 
-function drawLadder() {
+async function drawLadder() {
   fireEvent.click(screen.getByRole("button", { name: /사다리 그리기/ }));
+  await screen.findByRole("img", { name: "질문 사다리" });
 }
 
 function chooseStart(start: number) {
@@ -156,11 +249,11 @@ afterEach(() => {
 });
 
 describe("지역 질문 사다리 세 라운드", () => {
-  it("혼자 하기에서 시작점을 고른 뒤에만 공통 사다리의 배정 주제로 질문을 쓴다", () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({}, 500)));
+  it("혼자 하기에서 시작점을 고른 뒤에만 공통 사다리의 배정 주제로 질문을 쓴다", async () => {
+    installLadderFetch();
     renderGame();
 
-    drawLadder();
+    await drawLadder();
 
     expect(screen.getByRole("img", { name: "질문 사다리" })).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "전체 배정" })).toBeInTheDocument();
@@ -182,13 +275,10 @@ describe("지역 질문 사다리 세 라운드", () => {
   });
 
   it("첫째와 둘째 질문 뒤 새 사다리를 거치고 셋째 질문 뒤에만 셋을 완료로 보여 준다", async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
-      jsonResponse({}, 500),
-    );
-    vi.stubGlobal("fetch", fetchMock);
+    const fetchMock = installLadderFetch();
     renderGame();
 
-    drawLadder();
+    await drawLadder();
     chooseStart(1);
     expect(
       screen.getByRole("textbox", { name: "주제 D 주제 질문" }),
@@ -220,6 +310,7 @@ describe("지역 질문 사다리 세 라운드", () => {
     expect(screen.getByText("첫째 주제는 왜 달라질까요?")).toBeInTheDocument();
     expect(screen.getByText("둘째 주제는 어떻게 이어질까요?")).toBeInTheDocument();
     expect(screen.getByText("셋째 주제에서 무엇을 알아볼까요?")).toBeInTheDocument();
+    expect(screen.getByText("+5점 적립!")).toBeInTheDocument();
     expect(
       fetchMock.mock.calls.some(([url]) =>
         String(url).startsWith("/api/points/award"),
@@ -228,9 +319,9 @@ describe("지역 질문 사다리 세 라운드", () => {
   });
 
   it("분류 성공 도움말을 보고 공통 작성기에서 질문을 확정한다", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(OPEN_CONCEPTUAL)));
+    installLadderFetch(OPEN_CONCEPTUAL);
     renderGame();
-    drawLadder();
+    await drawLadder();
     chooseStart(1);
 
     const input = screen.getByRole("textbox", { name: "주제 D 주제 질문" });
@@ -244,14 +335,74 @@ describe("지역 질문 사다리 세 라운드", () => {
     expect(await screen.findByText("첫째 라운드 질문")).toBeInTheDocument();
     expect(screen.getByText("주제 D는 왜 다른 주제와 이어질까요?")).toBeInTheDocument();
   });
+
+  it("질문 저장 응답이 유실되어도 결과 조회로 한 번만 다음 라운드에 간다", async () => {
+    installLadderFetch(null, "after");
+    renderGame();
+    await drawLadder();
+    chooseStart(1);
+
+    await confirmWithoutHelp("응답이 사라져도 질문은 한 번만 저장될까요?");
+
+    expect(await screen.findByText("첫째 라운드 질문")).toBeInTheDocument();
+    expect(screen.getAllByText("응답이 사라져도 질문은 한 번만 저장될까요?")).toHaveLength(1);
+  });
+
+  it("요청한 방식과 다른 실행 만들기 응답은 화면에 적용하지 않는다", async () => {
+    installLadderFetch(null, null, "SOLO");
+    renderGame("ai");
+
+    fireEvent.click(screen.getByRole("button", { name: /사다리 그리기/ }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "요청한 질문놀이 실행과 서버 응답이 일치하지 않습니다",
+    );
+    expect(screen.queryByRole("img", { name: "질문 사다리" })).not.toBeInTheDocument();
+  });
+
+  it("실행과 미리보기 값이 다른 포인트 결과는 완료 화면에 적용하지 않는다", async () => {
+    installLadderFetch(null, null, null, true);
+    renderGame();
+    await drawLadder();
+
+    for (let roundIndex = 0; roundIndex < 3; roundIndex += 1) {
+      chooseStart(1);
+      await confirmWithoutHelp(`${roundIndex + 1}번째 미리보기 결과를 확인할까요?`);
+      if (roundIndex < 2) {
+        fireEvent.click(await screen.findByRole("button", { name: "다음 라운드" }));
+      }
+    }
+
+    expect(await screen.findByText(/포인트 지급 결과가 질문놀이 실행과 일치하지 않습니다/)).toBeInTheDocument();
+    expect(screen.queryByText("질문 사다리 완성")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /목록/ })).toBeDisabled();
+  });
+
+  it("적용 여부가 불확실한 질문은 입력을 보존하고 목록 이동을 잠근 뒤 같은 요청으로 다시 확인한다", async () => {
+    installLadderFetch(null, "before");
+    renderGame();
+    await drawLadder();
+    chooseStart(1);
+    const input = screen.getByRole("textbox", { name: "주제 D 주제 질문" });
+
+    await confirmWithoutHelp("불확실한 질문도 안전하게 다시 확인할까요?");
+
+    expect(await screen.findByText(/질문을 확정하지 못했어요/)).toBeInTheDocument();
+    expect(input).toHaveValue("불확실한 질문도 안전하게 다시 확인할까요?");
+    expect(input).toHaveAttribute("readonly");
+    expect(screen.getByRole("button", { name: /목록/ })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "도움말 없이 확정" }));
+    expect(await screen.findByText("첫째 라운드 질문")).toBeInTheDocument();
+  });
 });
 
 describe("인공지능과 함께하는 질문 사다리", () => {
   it("학생과 인공지능 배정을 같은 사다리에 두고 서로의 실제 도착 주제를 쓴다", async () => {
     aiMocks.ask.mockResolvedValue({ text: "주제 B는 무엇과 이어질까요?\n둘째 줄" });
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({}, 500)));
+    installLadderFetch();
     renderGame("ai");
-    drawLadder();
+    await drawLadder();
 
     const beforeSelection = screen.getByRole("list", { name: "전체 배정" });
     expect(within(beforeSelection).queryByText("민준")).not.toBeInTheDocument();
@@ -292,9 +443,9 @@ describe("인공지능과 함께하는 질문 사다리", () => {
     ["빈 응답", { text: "   \n " }],
   ])("인공지능 응답 %s이 도움말 없는 확정과 다음 라운드를 막지 않는다", async (_, response) => {
     aiMocks.ask.mockResolvedValue(response);
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({}, 500)));
+    installLadderFetch();
     renderGame("ai");
-    drawLadder();
+    await drawLadder();
     chooseStart(1);
 
     await confirmWithoutHelp("학생 질문은 왜 계속 이어질까요?");
@@ -309,9 +460,9 @@ describe("인공지능과 함께하는 질문 사다리", () => {
     aiMocks.ask
       .mockImplementationOnce(() => firstRequest.promise)
       .mockResolvedValueOnce({ text: "둘째 라운드 인공지능 질문은 무엇일까요?" });
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({}, 500)));
+    installLadderFetch();
     renderGame("ai");
-    drawLadder();
+    await drawLadder();
     chooseStart(1);
     await confirmWithoutHelp("첫째 학생 질문은 무엇일까요?");
     fireEvent.click(await screen.findByRole("button", { name: "다음 라운드" }));
@@ -331,9 +482,9 @@ describe("인공지능과 함께하는 질문 사다리", () => {
   });
 
   it("셋째 학생 질문을 확정하기 전에는 인공지능 모드를 끝내지 않는다", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({}, 500)));
+    installLadderFetch();
     renderGame("ai");
-    drawLadder();
+    await drawLadder();
 
     chooseStart(1);
     await confirmWithoutHelp("첫째 학생 질문은 왜 필요할까요?");
@@ -353,6 +504,7 @@ describe("인공지능과 함께하는 질문 사다리", () => {
     expect(
       screen.getByRole("list", { name: "확정한 질문 셋" }).children,
     ).toHaveLength(3);
+    expect(screen.getByText("+9점 적립!")).toBeInTheDocument();
   });
 });
 
@@ -360,12 +512,13 @@ describe("지역 사다리 화면 경계", () => {
   it.each(["light", "dark"] as const)(
     "%s 화면에서 새 핵심 동작 단추의 계산 대비가 사 점 오 이상이다",
     async (theme) => {
-      vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({}, 500)));
+      installLadderFetch();
       renderGame("solo", theme);
 
       const drawButton = screen.getByRole("button", { name: /사다리 그리기/ });
       expectActionButtonContrast(drawButton, theme);
       fireEvent.click(drawButton);
+      await screen.findByRole("img", { name: "질문 사다리" });
       chooseStart(1);
       await confirmWithoutHelp("핵심 동작 단추는 충분히 잘 보일까요?");
 
@@ -410,8 +563,10 @@ describe("지역 사다리 화면 경계", () => {
     expect(source).not.toContain("useSingleAward");
     expect(source).not.toContain("AwardBadge");
     expect(source).not.toMatch(/\/api\/points\/award/);
-    expect(source).toContain("generateLadderGrid");
+    expect(source).not.toContain("generateLadderGrid");
+    expect(source).not.toContain("Math.random");
     expect(source).toContain("assignLadderTopics");
+    expect(source).toContain("submitLadderQuestion");
     expect(source).toContain("<LadderBoard");
     expect(source).toContain("<LadderQuestionComposer");
     expect(source).not.toMatch(/function generateLadder\s*\(/);

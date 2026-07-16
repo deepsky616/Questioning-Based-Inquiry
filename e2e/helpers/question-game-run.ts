@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { isQuestionFormForLocale } from "../../src/lib/question-game-i18n";
 import {
   QUESTION_GAME_LIMITS,
@@ -18,7 +19,7 @@ const REQUEST_ID_PATTERN =
 type RunMode = "SOLO" | "AI";
 type RunLocale = "ko" | "en";
 type RunStatus = "ACTIVE" | "SETTLED";
-type RunGameId = "relay" | "dice";
+type RunGameId = "relay" | "dice" | "ladder";
 type DiceActor = "STUDENT" | "AI";
 type DiceNextStep =
   | "STUDENT_ROLL"
@@ -93,6 +94,9 @@ interface StoredRun {
   questionCount: number;
   aiTurnCount: number;
   questions: string[];
+  topicHashes: string[];
+  questionHashes: string[];
+  ladderGrids: boolean[][][];
   expiresAt: string;
   completedAt: string | null;
   result: RunResult | null;
@@ -172,13 +176,47 @@ function fingerprint(value: unknown) {
   return JSON.stringify(value);
 }
 
+function hashPrivateText(kind: "topic" | "question", value: string) {
+  return createHash("sha256")
+    .update(`browser-question-game:${kind}\0${value}`, "utf8")
+    .digest("hex");
+}
+
+function requireLadderTopics(value: unknown, mode: RunMode) {
+  const expectedCount = mode === "SOLO" ? 4 : 2;
+  if (!Array.isArray(value) || value.length !== expectedCount) {
+    throw new BrowserRunError(
+      `질문 사다리 주제를 ${expectedCount}개 입력해 주세요`,
+      400,
+    );
+  }
+  return Array.from({ length: expectedCount }, (_, index) =>
+    hashPrivateText("topic", requireTopic(value[index]))
+  );
+}
+
+function createServerLadderGrid(columnCount: number, roundIndex: number) {
+  const rungCount = columnCount - 1;
+  return Array.from({ length: 10 }, (_, rowIndex) => {
+    const phase = rowIndex + roundIndex;
+    const selectedRung = phase % rungCount;
+    const hasRung = phase % 4 !== 0;
+    return Array.from(
+      { length: rungCount },
+      (_, rungIndex) => hasRung && rungIndex === selectedRung,
+    );
+  });
+}
+
 function publicRun(run: StoredRun) {
-  const awaitingAiTurn = run.gameId === "dice"
-    ? run.status === "ACTIVE" && run.mode === "AI" && run.nextStep === "AI_QUESTION"
-    : run.status === "ACTIVE" &&
+  const awaitingAiTurn = run.gameId === "relay"
+    ? run.status === "ACTIVE" &&
       run.mode === "AI" &&
       run.questionCount === run.aiTurnCount + 1 &&
-      run.questionCount < run.targetCount;
+      run.questionCount < run.targetCount
+    : run.gameId === "dice"
+      ? run.status === "ACTIVE" && run.mode === "AI" && run.nextStep === "AI_QUESTION"
+      : false;
   return {
     id: run.id,
     gameId: run.gameId,
@@ -196,6 +234,15 @@ function publicRun(run: StoredRun) {
       ? {
           nextStep: run.nextStep,
           pendingRoll: run.pendingRoll ?? null,
+        }
+      : {}),
+    ...(run.gameId === "ladder"
+      ? {
+          ladderRound: run.status === "ACTIVE" ? run.questionCount + 1 : null,
+          ladderGrid:
+            run.status === "ACTIVE"
+              ? run.ladderGrids[run.questionCount] ?? null
+              : null,
         }
       : {}),
   };
@@ -262,13 +309,21 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
   ) => {
     const requestId = requireRequestId(body.requestId);
     const gameId = typeof body.gameId === "string" ? body.gameId : "";
-    if (gameId !== "relay" && gameId !== "dice") {
+    if (gameId !== "relay" && gameId !== "dice" && gameId !== "ladder") {
       throw new BrowserRunError("이 질문놀이는 서버 점수 기록을 아직 지원하지 않습니다", 409);
     }
     const mode = parseMode(body.mode);
     const locale = parseLocale(body.locale);
-    const topic = gameId === "dice" ? "" : requireTopic(body.topic);
-    const creationFingerprint = fingerprint({ gameId, mode, locale, topic });
+    const topic = gameId === "relay" ? requireTopic(body.topic) : "";
+    const topicHashes = gameId === "ladder"
+      ? requireLadderTopics(body.topics, mode)
+      : [];
+    const creationFingerprint = fingerprint({
+      gameId,
+      mode,
+      locale,
+      ...(gameId === "ladder" ? { topicHashes } : { topic }),
+    });
     const creationKey = `${actor.id}:${requestId}`;
     const existing = creations.get(creationKey);
     if (existing) {
@@ -294,6 +349,14 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       questionCount: 0,
       aiTurnCount: 0,
       questions: [],
+      topicHashes,
+      questionHashes: [],
+      ladderGrids: gameId === "ladder"
+        ? Array.from(
+            { length: 3 },
+            (_, roundIndex) => createServerLadderGrid(topicHashes.length, roundIndex),
+          )
+        : [],
       expiresAt: "2099-12-31T23:59:59.000Z",
       completedAt: null,
       result: null,
@@ -551,6 +614,65 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     return success(200, { ...response, replayed: false });
   };
 
+  const submitLadderQuestion = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const locale = parseLocale(body.locale);
+    const question = requireQuestion(body.question, locale);
+    const questionHash = hashPrivateText("question", question);
+    const startColumn = body.startColumn;
+    const columnCount = run.mode === "SOLO" ? 4 : 2;
+    if (
+      typeof startColumn !== "number" ||
+      !Number.isSafeInteger(startColumn) ||
+      startColumn < 0 ||
+      startColumn >= columnCount
+    ) {
+      throw new BrowserRunError("질문 사다리 시작점이 올바르지 않습니다", 400);
+    }
+    const actionFingerprint = fingerprint({
+      action: "ladder-submit-question",
+      locale,
+      startColumn,
+      questionHash,
+    });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    if (run.status !== "ACTIVE" || run.gameId !== "ladder") {
+      throw new BrowserRunError("질문을 등록할 수 없는 실행입니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (locale !== run.locale) {
+      throw new BrowserRunError("실행을 만든 언어로 질문해 주세요", 409);
+    }
+    if (run.questionHashes.includes(questionHash)) {
+      throw new BrowserRunError("같은 질문은 다시 등록할 수 없습니다", 409);
+    }
+
+    run.questionCount += 1;
+    run.version += 1;
+    run.questionHashes.push(questionHash);
+    if (run.questionCount === run.targetCount) settle(run);
+    const response = {
+      run: publicRun(run),
+      ...(run.result ? { result: run.result } : {}),
+    };
+    run.actions.set(requestId, {
+      fingerprint: actionFingerprint,
+      response: cloneBody(response),
+    });
+    return success(200, { ...response, replayed: false });
+  };
+
   const applyAction = (run: StoredRun, body: Record<string, unknown>) => {
     const requestId = requireRequestId(body.requestId);
     if (body.action === "relay-submit-question") {
@@ -567,6 +689,9 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     }
     if (body.action === "dice-record-ai-question") {
       return recordDiceAiQuestion(run, body, requestId);
+    }
+    if (body.action === "ladder-submit-question") {
+      return submitLadderQuestion(run, body, requestId);
     }
     throw new BrowserRunError("지원하지 않는 질문놀이 동작입니다", 400);
   };

@@ -40,6 +40,12 @@ import {
   type DiceRunState,
 } from "@/lib/question-game-dice-definition";
 import {
+  ensureLadderProgress,
+  ladderDestination,
+  parseLadderState,
+  type LadderRunState,
+} from "@/lib/question-game-ladder-definition";
+import {
   ensureRelayProgress,
   parseRelayState,
   type RelayRunState,
@@ -55,6 +61,7 @@ const RELAY_AI_ACTIVITY_TYPE = "RELAY_AI_TURN";
 const DICE_ROLL_ACTIVITY_TYPE = "DICE_ROLL";
 const DICE_QUESTION_ACTIVITY_TYPE = "DICE_QUESTION";
 const DICE_AI_QUESTION_ACTIVITY_TYPE = "DICE_AI_QUESTION";
+const LADDER_QUESTION_ACTIVITY_TYPE = "LADDER_QUESTION";
 const COMPLETE_ACTIVITY_TYPE = "RUN_COMPLETE";
 
 type ActorRole = "STUDENT" | "TEACHER";
@@ -242,6 +249,23 @@ function validateTopic(value: unknown): { topic: string; topicLength: number } {
     throw new QuestionGameRunError("주제에 사용할 수 없는 표현이 있습니다", 400);
   }
   return { topic, topicLength };
+}
+
+function validateLadderTopics(value: unknown, mode: RunMode) {
+  const expectedCount = mode === "SOLO" ? 4 : 2;
+  if (!Array.isArray(value) || value.length !== expectedCount) {
+    throw new QuestionGameRunError(
+      `질문 사다리 주제를 ${expectedCount}개 입력해 주세요`,
+      400,
+    );
+  }
+  const topics = value.map((item) => validateTopic(item));
+  const topicHashes = topics.map(({ topic }) => hashActivityText("topic", topic));
+  return {
+    topicHashes,
+    topicHash: fingerprint(topicHashes),
+    topicLength: topics.reduce((sum, topic) => sum + topic.topicLength, 0),
+  };
 }
 
 function validateQuestionText(value: unknown, locale: RunLocale) {
@@ -761,6 +785,141 @@ async function settleDiceRun(
   };
 }
 
+interface PendingLadderQuestionEvidence {
+  sequence: number;
+  round: number;
+  startColumn: number;
+  destinationColumn: number;
+  topicHash: string;
+  locale: RunLocale;
+  questionHash: string;
+}
+
+async function verifyLadderActivitySequence(
+  tx: RunTransaction,
+  run: StoredRun,
+  state: LadderRunState,
+  pendingQuestion?: PendingLadderQuestionEvidence,
+) {
+  const stored = await tx.gameActivity.findMany({
+    where: {
+      runId: run.id,
+      type: { in: [LADDER_QUESTION_ACTIVITY_TYPE] },
+    },
+    orderBy: { sequence: "asc" },
+    select: {
+      sequence: true,
+      type: true,
+      payload: true,
+      validQuestionCount: true,
+    },
+  });
+  const evidence = pendingQuestion
+    ? [
+        ...stored,
+        {
+          sequence: pendingQuestion.sequence,
+          type: LADDER_QUESTION_ACTIVITY_TYPE,
+          payload: pendingQuestion,
+          validQuestionCount: 1,
+        },
+      ]
+    : stored;
+  if (evidence.length !== state.activitySequence) {
+    throw new QuestionGameRunError("서버에서 질문 사다리 활동 순서를 확인할 수 없습니다", 409);
+  }
+
+  const verifiedQuestionHashes: string[] = [];
+  for (let index = 0; index < evidence.length; index += 1) {
+    const activity = evidence[index];
+    const payload = isRecord(activity?.payload) ? activity.payload : null;
+    const grid = state.grids[index];
+    let expectedDestination = -1;
+    if (payload && grid && typeof payload.startColumn === "number") {
+      try {
+        expectedDestination = ladderDestination(payload.startColumn, grid);
+      } catch {
+        expectedDestination = -1;
+      }
+    }
+    const expectedTopicHash = state.topicHashes[expectedDestination];
+    if (
+      activity?.sequence !== index + 1 ||
+      activity.type !== LADDER_QUESTION_ACTIVITY_TYPE ||
+      activity.validQuestionCount !== 1 ||
+      !payload ||
+      payload.round !== index + 1 ||
+      typeof payload.startColumn !== "number" ||
+      !Number.isSafeInteger(payload.startColumn) ||
+      payload.destinationColumn !== expectedDestination ||
+      typeof expectedTopicHash !== "string" ||
+      payload.topicHash !== expectedTopicHash ||
+      payload.locale !== state.locale ||
+      typeof payload.questionHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(payload.questionHash) ||
+      payload.questionHash !== state.questionHashes[index]
+    ) {
+      throw new QuestionGameRunError("서버에서 질문 사다리 활동 순서를 확인할 수 없습니다", 409);
+    }
+    verifiedQuestionHashes.push(payload.questionHash);
+  }
+
+  if (
+    verifiedQuestionHashes.length !== state.questionCount ||
+    verifiedQuestionHashes.length !== state.targetCount
+  ) {
+    throw new QuestionGameRunError("서버에서 질문 사다리 완료를 확인할 수 없습니다", 409);
+  }
+  return { verifiedQuestionCount: verifiedQuestionHashes.length, verifiedAiTurnCount: 0 };
+}
+
+async function settleLadderRun(
+  tx: RunTransaction,
+  actor: { id: string; role: ActorRole },
+  run: StoredRun,
+  state: LadderRunState,
+  mode: RunMode,
+  completedAt: Date,
+  pendingQuestion?: PendingLadderQuestionEvidence,
+): Promise<RelaySettlement> {
+  if (state.nextStep !== "COMPLETE" || state.result) {
+    throw new QuestionGameRunError("질문놀이의 정해진 차례를 모두 마쳐 주세요", 409);
+  }
+  const { verifiedQuestionCount, verifiedAiTurnCount } =
+    await verifyLadderActivitySequence(tx, run, state, pendingQuestion);
+  const { day, result } = await awardVerifiedQuestionGameRun(
+    tx,
+    actor,
+    run,
+    mode,
+    completedAt,
+    verifiedQuestionCount,
+  );
+  const settledState: LadderRunState = {
+    ...state,
+    questionHashes: [],
+    result,
+  };
+  const nextRun = await tx.gameRun.update({
+    where: { id: run.id },
+    data: {
+      status: "SETTLED",
+      state: toJson(settledState),
+      version: run.version + 1,
+      scoreDate: day,
+      completedAt,
+      settledAt: completedAt,
+    },
+  });
+  return {
+    run: nextRun as StoredRun,
+    result,
+    verifiedQuestionCount,
+    verifiedAiTurnCount,
+    scoreDate: day,
+  };
+}
+
 export async function createQuestionGameRun(actorId: string, input: unknown, now = new Date()) {
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
@@ -768,10 +927,22 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
   const gameId = typeof input.gameId === "string" ? input.gameId : "";
   if (!gameId) throw new QuestionGameRunError("질문놀이 식별값이 필요합니다", 400);
   const locale = parseLocale(input.locale);
-  const { topic, topicLength } = gameId === "dice"
-    ? { topic: "dice", topicLength: 0 }
-    : validateTopic(input.topic);
-  const topicHash = hashActivityText("topic", topic);
+  let topicHash: string;
+  let topicLength: number;
+  let topicHashes: string[] | undefined;
+  if (gameId === "dice") {
+    topicHash = hashActivityText("topic", "dice");
+    topicLength = 0;
+  } else if (gameId === "ladder") {
+    const ladderTopics = validateLadderTopics(input.topics, mode);
+    topicHash = ladderTopics.topicHash;
+    topicLength = ladderTopics.topicLength;
+    topicHashes = ladderTopics.topicHashes;
+  } else {
+    const topic = validateTopic(input.topic);
+    topicHash = hashActivityText("topic", topic.topic);
+    topicLength = topic.topicLength;
+  }
   const requestFingerprint = fingerprint({ gameId, mode, locale, topicHash });
 
   return serializable(async (tx) => {
@@ -832,6 +1003,7 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
       locale,
       topicHash,
       topicLength,
+      ...(topicHashes ? { topicHashes } : {}),
     });
     const run = await tx.gameRun.create({
       data: {
@@ -1565,6 +1737,155 @@ async function recordRelayAiTurn(
   });
 }
 
+async function submitQuestionLadderQuestion(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const locale = parseLocale(input.locale);
+  const { question, questionLength } = validateQuestionText(input.question, locale);
+  const questionHash = hashActivityText("question", question);
+  const startColumn = input.startColumn;
+  if (
+    typeof startColumn !== "number" ||
+    !Number.isSafeInteger(startColumn) ||
+    startColumn < 0
+  ) {
+    throw new QuestionGameRunError("질문 사다리 시작점이 올바르지 않습니다", 400);
+  }
+  const requestFingerprint = fingerprint({
+    action: input.action,
+    locale,
+    questionHash,
+    startColumn,
+  });
+
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "ladder") {
+      throw new QuestionGameRunError("이 질문놀이는 사다리 질문을 지원하지 않습니다", 409, {
+        unsupported: true,
+      });
+    }
+    const mode = storedRunMode(run.mode);
+    const state = parseLadderState(run.state);
+    ensureLadderProgress(state, mode, run.version);
+    if (state.locale !== locale) {
+      throw new QuestionGameRunError("실행을 만든 언어로 질문해 주세요", 409);
+    }
+    if (state.nextStep !== "QUESTION" || state.questionCount >= state.targetCount) {
+      throw new QuestionGameRunError("목표 질문 수를 모두 채웠습니다", 409);
+    }
+    if (state.questionHashes.includes(questionHash)) {
+      throw new QuestionGameRunError("같은 질문은 다시 등록할 수 없습니다", 409);
+    }
+    const roundIndex = state.questionCount;
+    const grid = state.grids[roundIndex];
+    if (!grid) {
+      throw new QuestionGameRunError("질문 사다리 실행 상태가 손상되었습니다", 409);
+    }
+    const destinationColumn = ladderDestination(startColumn, grid);
+    const topicHash = state.topicHashes[destinationColumn];
+    if (!topicHash) {
+      throw new QuestionGameRunError("질문 사다리 실행 상태가 손상되었습니다", 409);
+    }
+    const nextQuestionCount = state.questionCount + 1;
+    const nextState: LadderRunState = {
+      ...state,
+      questionCount: nextQuestionCount,
+      activitySequence: state.activitySequence + 1,
+      nextStep: nextQuestionCount === state.targetCount ? "COMPLETE" : "QUESTION",
+      questionHashes: [...state.questionHashes, questionHash],
+    };
+    ensureLadderProgress(nextState, mode, run.version + 1);
+    const evidence: PendingLadderQuestionEvidence = {
+      sequence: nextState.activitySequence,
+      round: roundIndex + 1,
+      startColumn,
+      destinationColumn,
+      topicHash,
+      locale,
+      questionHash,
+    };
+
+    if (nextState.nextStep === "COMPLETE") {
+      const completedAt = await lockedDatabaseClock(tx);
+      ensureActive(run, completedAt);
+      const settlement = await settleLadderRun(
+        tx,
+        actor,
+        run,
+        nextState,
+        mode,
+        completedAt,
+        evidence,
+      );
+      const response = {
+        run: publicRunWithRole(settlement.run, actor.role),
+        result: settlement.result,
+      };
+      await tx.gameActivity.create({
+        data: {
+          runId: run.id,
+          actorId: actor.id,
+          requestId,
+          requestFingerprint,
+          sequence: nextState.activitySequence,
+          type: LADDER_QUESTION_ACTIVITY_TYPE,
+          payload: toJson({
+            ...evidence,
+            questionLength,
+            autoSettled: true,
+            scoreDate: settlement.scoreDate,
+          }),
+          validQuestionCount: 1,
+          scoreValue: settlement.result.awarded,
+          responseSnapshot: toJson(response),
+        },
+      });
+      return { ...response, replayed: false };
+    }
+
+    const nextRun = await tx.gameRun.update({
+      where: { id: run.id },
+      data: { state: toJson(nextState), version: run.version + 1 },
+    });
+    const response = { run: publicRunWithRole(nextRun as StoredRun, actor.role) };
+    await tx.gameActivity.create({
+      data: {
+        runId: run.id,
+        actorId: actor.id,
+        requestId,
+        requestFingerprint,
+        sequence: nextState.activitySequence,
+        type: LADDER_QUESTION_ACTIVITY_TYPE,
+        payload: toJson({ ...evidence, questionLength }),
+        validQuestionCount: 1,
+        scoreValue: 0,
+        responseSnapshot: toJson(response),
+      },
+    });
+    return { ...response, replayed: false };
+  });
+}
+
 export async function applyQuestionGameRunAction(
   actorId: string,
   runId: string,
@@ -1574,6 +1895,16 @@ export async function applyQuestionGameRunAction(
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
   const expectedVersion = requireVersion(input.expectedVersion);
+  if (input.action === "ladder-submit-question") {
+    return submitQuestionLadderQuestion(
+      actorId,
+      runId,
+      input,
+      requestId,
+      expectedVersion,
+      now,
+    );
+  }
   if (input.action === "dice-roll") {
     return rollQuestionDice(actorId, runId, input, requestId, expectedVersion, now);
   }
@@ -1745,7 +2076,7 @@ export async function completeQuestionGameRun(
       }
       return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
     }
-    if (run.gameId !== "relay" && run.gameId !== "dice") {
+    if (run.gameId !== "relay" && run.gameId !== "dice" && run.gameId !== "ladder") {
       throw new QuestionGameRunError("이 질문놀이는 서버 완료를 아직 지원하지 않습니다", 409, {
         unsupported: true,
       });
@@ -1754,11 +2085,20 @@ export async function completeQuestionGameRun(
     const mode = storedRunMode(run.mode);
     const state = run.gameId === "relay"
       ? parseRelayState(run.state)
-      : parseDiceState(run.state);
+      : run.gameId === "dice"
+        ? parseDiceState(run.state)
+        : parseLadderState(run.state);
     if (run.gameId === "relay") {
       ensureRelayProgress(state as RelayRunState, mode, run.version, run.status === "ACTIVE");
-    } else {
+    } else if (run.gameId === "dice") {
       ensureDiceProgress(state as DiceRunState, mode, run.version, run.status === "ACTIVE");
+    } else {
+      ensureLadderProgress(
+        state as LadderRunState,
+        mode,
+        run.version,
+        run.status === "ACTIVE",
+      );
     }
     if (run.status === "SETTLED") {
       if (!state.result) {
@@ -1785,14 +2125,23 @@ export async function completeQuestionGameRun(
           mode,
           completedAt,
         )
-      : await settleDiceRun(
-          tx,
-          actor,
-          run,
-          state as DiceRunState,
-          mode,
-          completedAt,
-        );
+      : run.gameId === "dice"
+        ? await settleDiceRun(
+            tx,
+            actor,
+            run,
+            state as DiceRunState,
+            mode,
+            completedAt,
+          )
+        : await settleLadderRun(
+            tx,
+            actor,
+            run,
+            state as LadderRunState,
+            mode,
+            completedAt,
+          );
     const response = {
       run: publicRunWithRole(settlement.run, actor.role),
       result: settlement.result,

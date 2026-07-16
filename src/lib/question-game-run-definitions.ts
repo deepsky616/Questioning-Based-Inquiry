@@ -1,10 +1,12 @@
 import type { QuestionGameRunDefinition } from "@/lib/question-game-run-definition";
 import { diceRunDefinition } from "@/lib/question-game-dice-definition";
+import { ladderRunDefinition } from "@/lib/question-game-ladder-definition";
 import { relayRunDefinition } from "@/lib/question-game-relay-definition";
 
 const definitions = new Map<string, QuestionGameRunDefinition>([
   [relayRunDefinition.gameId, relayRunDefinition],
   [diceRunDefinition.gameId, diceRunDefinition],
+  [ladderRunDefinition.gameId, ladderRunDefinition],
 ]);
 
 export function findQuestionGameRunDefinition(
