@@ -32,6 +32,7 @@ import type { GameRoom } from "@/lib/question-games-data";
 import {
   buildAwardList,
   buildRoomAwardKey,
+  ensureQuestionGameRoomPoints,
 } from "@/lib/point-award-service";
 import { POST } from "@/app/api/points/award/route";
 
@@ -162,6 +163,48 @@ function makeV2RelayRoom(
       topic: "우주",
     },
     ...overrides,
+  });
+}
+
+function makeStudentHostedV2RelayRoom(): GameRoom {
+  const players = [
+    { id: "s1", name: "학생 방장", isHost: true, joinedAt: 1 },
+    { id: "s2", name: "학생 친구", isHost: false, joinedAt: 2 },
+    { id: "t1", name: "교사", isHost: false, joinedAt: 3 },
+  ];
+  const questions = V2_ROUND_IDS.flatMap((roundId, roundIndex) =>
+    players.map((player, playerIndex) => ({
+      roundId,
+      round: roundIndex + 1,
+      playerId: player.id,
+      playerName: player.name,
+      locale: "ko" as const,
+      question: `${roundIndex + 1}-${playerIndex + 1}번째 질문은 무엇인가요?`,
+    })),
+  );
+  return makeV2RelayRoom({
+    hostId: "s1",
+    players,
+    gameState: {
+      stateVersion: 2,
+      game: "relay",
+      phase: "done",
+      recentCommandIds: [],
+      roundId: V2_ROUND_IDS[2],
+      round: 3,
+      maxRounds: 3,
+      completedRounds: 3,
+      endReason: "completed",
+      players: players.map(({ id, name }) => ({ id, name })),
+      playerNames: { s1: "학생 방장", s2: "학생 친구", t1: "교사" },
+      roundPlayerIds: ["s1", "s2", "t1"],
+      roundTargetPlayerIds: ["s1", "s2", "t1"],
+      roundSubmittedPlayerIds: ["s1", "s2", "t1"],
+      turnOrder: ["s1", "s2", "t1"],
+      currentTurnIdx: 0,
+      questions,
+      topic: "우주",
+    },
   });
 }
 
@@ -314,6 +357,185 @@ beforeEach(() => {
 });
 
 describe("포인트 지급 요청 검증", () => {
+  it("학생 방장과 학생 친구에게 자동 지급하고 교사 참가자는 제외한다", async () => {
+    const room = makeStudentHostedV2RelayRoom();
+    const accounts = [
+      { id: "s1", role: "STUDENT" },
+      { id: "s2", role: "STUDENT" },
+      { id: "t1", role: "TEACHER" },
+    ];
+    mUserFindMany.mockResolvedValue(accounts);
+    txUserFindMany.mockResolvedValue(accounts);
+    useLockedRoom(room);
+    mGenerateJson.mockRejectedValue(new Error("분석 실패"));
+
+    const result = await ensureQuestionGameRoomPoints(room);
+
+    expect(result?.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s1", bonusType: "PARTICIPATION" }),
+      expect.objectContaining({ studentId: "s2", bonusType: "PARTICIPATION" }),
+      expect.objectContaining({ studentId: "s1", bonusType: "COMPLETION" }),
+      expect.objectContaining({ studentId: "s2", bonusType: "COMPLETION" }),
+    ]));
+    expect(result?.awards).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "t1" }),
+    ]));
+    expect(txUserUpdate).toHaveBeenCalledTimes(2);
+    expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "s1" },
+    }));
+    expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "s2" },
+    }));
+  });
+
+  it("남은 친구 놀이 하루 상한보다 실행 묶음이 크면 남은 점수를 한 항목으로 지급한다", async () => {
+    const room = {
+      ...makeStudentHostedV2RelayRoom(),
+      updatedAt: Date.parse("2026-07-15T14:59:00.000Z"),
+    };
+    const accounts = [
+      { id: "s1", role: "STUDENT" },
+      { id: "s2", role: "STUDENT" },
+      { id: "t1", role: "TEACHER" },
+    ];
+    mUserFindMany.mockResolvedValue(accounts);
+    txUserFindMany.mockResolvedValue(accounts);
+    useLockedRoom(room);
+    txPointLogFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { studentId: "s1", points: 115 },
+        { studentId: "s2", points: 100 },
+      ]);
+    mGenerateJson.mockResolvedValue({ bonuses: [] });
+
+    const result = await ensureQuestionGameRoomPoints(room);
+
+    expect(result?.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "FRIEND_DAILY_LIMIT",
+        points: 5,
+      }),
+      expect.objectContaining({ studentId: "s2", bonusType: "PARTICIPATION" }),
+    ]));
+    expect(result?.awards).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "PARTICIPATION",
+      }),
+    ]));
+    expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "s1" },
+      data: { totalPoints: { increment: 5 } },
+    }));
+    expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "s2" },
+    }));
+    expect(txPointLogFindMany).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: expect.objectContaining({
+        createdAt: {
+          gte: new Date("2026-07-14T15:00:00.000Z"),
+          lt: new Date("2026-07-15T15:00:00.000Z"),
+        },
+      }),
+    }));
+    expect(txPointLogCreateMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          createdAt: new Date("2026-07-15T14:59:00.000Z"),
+        }),
+      ]),
+    });
+  });
+
+  it("친구 놀이 하루 상한을 이미 채웠으면 실행별 0점 확정 기록을 남긴다", async () => {
+    const room = makeStudentHostedV2RelayRoom();
+    const accounts = [
+      { id: "s1", role: "STUDENT" },
+      { id: "s2", role: "STUDENT" },
+      { id: "t1", role: "TEACHER" },
+    ];
+    mUserFindMany.mockResolvedValue(accounts);
+    txUserFindMany.mockResolvedValue(accounts);
+    useLockedRoom(room);
+    txPointLogFindMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { studentId: "s1", points: 120 },
+        { studentId: "s2", points: 120 },
+      ]);
+
+    const result = await ensureQuestionGameRoomPoints(room);
+
+    expect(result?.awards).toEqual([
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "FRIEND_DAILY_LIMIT",
+        points: 0,
+      }),
+      expect.objectContaining({
+        studentId: "s2",
+        bonusType: "FRIEND_DAILY_LIMIT",
+        points: 0,
+      }),
+    ]);
+    expect(txPointLogCreateMany).toHaveBeenCalledOnce();
+    expect(txUserUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each(["host", "insufficient-players"])(
+    "%s 종료 방은 자동 지급하지 않는다",
+    async (endReason) => {
+      const base = makeStudentHostedV2RelayRoom();
+      const room = {
+        ...base,
+        gameState: { ...base.gameState, endReason },
+      };
+
+      const result = await ensureQuestionGameRoomPoints(room);
+
+      expect(result).toBeNull();
+      expect(mUserFindMany).not.toHaveBeenCalled();
+      expect(mTx).not.toHaveBeenCalled();
+    },
+  );
+
+  it("같은 실행의 승인 기록이 있으면 자동 지급을 다시 쓰지 않는다", async () => {
+    const room = makeStudentHostedV2RelayRoom();
+    mUserFindMany.mockResolvedValue([
+      { id: "s1", role: "STUDENT" },
+      { id: "s2", role: "STUDENT" },
+      { id: "t1", role: "TEACHER" },
+    ]);
+    mFindMany.mockResolvedValue([
+      {
+        studentId: "s1",
+        bonusType: "PARTICIPATION",
+        points: 1,
+        reason: "게임 참여",
+        status: "APPROVED",
+        aiAnalysis: null,
+      },
+      {
+        studentId: "s2",
+        bonusType: "PARTICIPATION",
+        points: 1,
+        reason: "게임 참여",
+        status: "APPROVED",
+        aiAnalysis: null,
+      },
+    ]);
+
+    const result = await ensureQuestionGameRoomPoints(room);
+
+    expect(result?.awards).toHaveLength(2);
+    expect(mTx).not.toHaveBeenCalled();
+    expect(txPointLogCreateMany).not.toHaveBeenCalled();
+    expect(txUserUpdate).not.toHaveBeenCalled();
+  });
+
   it("비로그인은 401, 일반 필수 항목 누락은 400", async () => {
     mAuth.mockResolvedValue(null);
     expect((await POST(awardReq(BODY))).status).toBe(401);
@@ -365,22 +587,55 @@ describe("포인트 지급 요청 검증", () => {
     expect(mTx).not.toHaveBeenCalled();
   });
 
-  it("학생이 자기 방의 방장이고 저장 상태를 채워도 지급할 수 없다", async () => {
-    const studentRoom = makeRoom({
-      hostId: "s1",
-      players: [{ id: "s1", name: "학생", isHost: true, joinedAt: 1 }],
-    });
+  it("학생 방장은 버전 2 정상 완료 방의 자동 지급을 다시 요청할 수 있다", async () => {
+    const studentRoom = makeStudentHostedV2RelayRoom();
+    const accounts = [
+      { id: "s1", role: "STUDENT" },
+      { id: "s2", role: "STUDENT" },
+      { id: "t1", role: "TEACHER" },
+    ];
     mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
-    mLoadGameRoom.mockResolvedValue(studentRoom);
+    mUserFindMany.mockResolvedValue(accounts);
+    txUserFindMany.mockResolvedValue(accounts);
+    useLockedRoom(studentRoom);
 
-    const res = await POST(awardReq(BODY));
+    const res = await POST(awardReq(v2Body("relay")));
+
+    expect(res.status).toBe(200);
+    expect(mLoadGameRoom).toHaveBeenCalledWith("1234");
+    expect(txPointLogCreateMany).toHaveBeenCalledOnce();
+    expect(txUserUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  it("교사도 방장이 아닌 버전 2 참가자이면 자동 지급을 다시 요청할 수 있다", async () => {
+    const room = makeStudentHostedV2RelayRoom();
+    const accounts = [
+      { id: "s1", role: "STUDENT" },
+      { id: "s2", role: "STUDENT" },
+      { id: "t1", role: "TEACHER" },
+    ];
+    mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
+    mUserFindMany.mockResolvedValue(accounts);
+    txUserFindMany.mockResolvedValue(accounts);
+    useLockedRoom(room);
+
+    const res = await POST(awardReq(v2Body("relay")));
+
+    expect(res.status).toBe(200);
+    expect(txPointLogCreateMany).toHaveBeenCalledOnce();
+    expect(txUserUpdate).toHaveBeenCalledTimes(2);
+    expect(mUserFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("현재 방 참가자가 아닌 학생은 자동 지급을 요청할 수 없다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "outside", role: "STUDENT" } });
+    mLoadGameRoom.mockResolvedValue(makeStudentHostedV2RelayRoom());
+
+    const res = await POST(awardReq(v2Body("relay")));
 
     expect(res.status).toBe(403);
-    expect(mLoadGameRoom).not.toHaveBeenCalled();
-    expect(mGenerateJson).not.toHaveBeenCalled();
+    expect(mUserFindMany).not.toHaveBeenCalled();
     expect(mTx).not.toHaveBeenCalled();
-    expect(txPointLogCreateMany).not.toHaveBeenCalled();
-    expect(txUserUpdate).not.toHaveBeenCalled();
   });
 
   it("끝나지 않은 방은 점수를 지급하지 않는다", async () => {

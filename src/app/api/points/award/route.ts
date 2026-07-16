@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/api-rate-limit";
-import { awardGamePoints, PointAwardError } from "@/lib/point-award-service";
+import {
+  awardGamePoints,
+  awardGamePointsForParticipant,
+  PointAwardError,
+} from "@/lib/point-award-service";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -10,20 +14,25 @@ export async function POST(req: NextRequest) {
   }
 
   const currentUser = session.user as { id: string; role?: string };
-  if (currentUser.role !== "TEACHER") {
-    return NextResponse.json(
-      { error: "교사만 질문놀이 점수를 지급할 수 있습니다" },
-      { status: 403 },
-    );
-  }
-
   const userId = currentUser.id;
   const limited = checkRateLimit(`points-award:${userId}`, 10);
   if (limited) return limited;
 
   try {
     const body = await req.json().catch(() => ({}));
-    const result = await awardGamePoints(body, userId, currentUser.role);
+    const isVersion2Request =
+      typeof body === "object" &&
+      body !== null &&
+      "playId" in body;
+    if (!isVersion2Request && currentUser.role !== "TEACHER") {
+      throw new PointAwardError(
+        "버전 2 질문놀이 참가자만 점수 지급을 확인할 수 있습니다",
+        403,
+      );
+    }
+    const result = isVersion2Request
+      ? await awardGamePointsForParticipant(body, userId, currentUser.role)
+      : await awardGamePoints(body, userId, currentUser.role ?? "");
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof PointAwardError) {

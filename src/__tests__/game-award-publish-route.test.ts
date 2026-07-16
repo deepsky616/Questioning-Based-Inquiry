@@ -167,7 +167,7 @@ describe("verified game award publication route", () => {
         roomCreatedAt: 100,
         playId: PLAY_ID,
       },
-      new Set(["student-1"]),
+      new Set(["teacher-1", "student-1"]),
     );
     expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
       awardResult: AWARD,
@@ -194,7 +194,7 @@ describe("verified game award publication route", () => {
     expect(response.status).toBe(200);
     expect(mocks.loadVerifiedGameAwardResult).toHaveBeenCalledWith(
       expect.any(Object),
-      new Set(["student-1"]),
+      new Set(["teacher-1", "student-1"]),
     );
   });
 
@@ -237,14 +237,14 @@ describe("verified game award publication route", () => {
     });
     expect(mocks.loadVerifiedGameAwardResult).toHaveBeenCalledWith(
       expect.any(Object),
-      new Set(["student-1"]),
+      new Set(["teacher-1", "student-1"]),
     );
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("allows only a teacher who is the current room host", async () => {
+  it("학생과 교사를 구분하지 않고 현재 방 참가자가 결과를 공개할 수 있다", async () => {
     mocks.auth.mockResolvedValue({
-      user: { id: "teacher-1", name: "학생 방장", role: "STUDENT" },
+      user: { id: "student-1", name: "학생", role: "STUDENT" },
     });
     const studentResponse = await patch(requestBody());
 
@@ -254,8 +254,19 @@ describe("verified game award publication route", () => {
     mocks.loadGameRoom.mockResolvedValue(makeRoom({ hostId: "student-1" }));
     const nonHostResponse = await patch(requestBody());
 
-    expect(studentResponse.status).toBe(403);
-    expect(nonHostResponse.status).toBe(403);
+    expect(studentResponse.status).toBe(200);
+    expect(nonHostResponse.status).toBe(200);
+    expect(mocks.loadVerifiedGameAwardResult).toHaveBeenCalledTimes(2);
+  });
+
+  it("현재 방 참가자가 아니면 결과를 공개할 수 없다", async () => {
+    mocks.auth.mockResolvedValue({
+      user: { id: "outside", name: "외부 학생", role: "STUDENT" },
+    });
+
+    const response = await patch(requestBody());
+
+    expect(response.status).toBe(403);
     expect(mocks.loadVerifiedGameAwardResult).not.toHaveBeenCalled();
   });
 

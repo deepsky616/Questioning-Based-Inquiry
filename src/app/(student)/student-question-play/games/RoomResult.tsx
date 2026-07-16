@@ -99,11 +99,10 @@ export default function RoomResult({
   const text = getQuestionGameText(locale);
   const isHost = room.hostId === myId;
   const competitiveWinner = getQuestionGameRule(game.id).score.competitiveWinner;
-  const canManageAward =
+  const canRecoverAward =
     sessionStatus === "authenticated" &&
     session?.user.id === myId &&
-    session.user.role === "TEACHER" &&
-    isHost &&
+    room.players.some((player) => player.id === myId) &&
     room.status === "ended" &&
     room.pointAwardKeyVersion === 2 &&
     room.pointEvidenceVersion === 2 &&
@@ -160,7 +159,7 @@ export default function RoomResult({
   const publishing = publishingLifetime === lifetimeKey;
   const resultBusy = actionLoading || awarding || publishing;
   const award = sharedAward ?? localAward?.result ?? null;
-  const showPointAnalysis = canManageAward || award !== null;
+  const showPointAnalysis = canRecoverAward || award !== null;
 
   const publishAward = useCallback(async (
     awardRoom: AwardRoomIdentity,
@@ -213,7 +212,7 @@ export default function RoomResult({
   }, [onAction, text.shareFailed]);
 
   const requestAward = useCallback(async () => {
-    if (!canManageAward || !room.playId) return;
+    if (!canRecoverAward || !room.playId) return;
     const awardRoom: AwardRoomIdentity = {
       code: room.code,
       createdAt: room.createdAt,
@@ -276,18 +275,18 @@ export default function RoomResult({
         );
       }
     }
-  }, [canManageAward, game.id, publishAward, room.code, room.createdAt, room.playId, text.awardFailed, text.awardRequestFailed]);
+  }, [canRecoverAward, game.id, publishAward, room.code, room.createdAt, room.playId, text.awardFailed, text.awardRequestFailed]);
 
-  // 방장 자동 지급 (방 수명마다 1회)
+  // 완료된 실행의 포인트 지급 상태를 참가자 화면마다 한 번 확인한다.
   useEffect(() => {
     if (
-      !canManageAward ||
+      !canRecoverAward ||
       sharedAward ||
       autoAttemptedRef.current === lifetimeKey
     ) return;
     autoAttemptedRef.current = lifetimeKey;
     void requestAward();
-  }, [canManageAward, lifetimeKey, requestAward, sharedAward]);
+  }, [canRecoverAward, lifetimeKey, requestAward, sharedAward]);
 
   // 학생별 총 포인트 / 받은 상 집계
   const pointsByPlayer: Record<string, number> = {};
@@ -375,7 +374,7 @@ export default function RoomResult({
           </div>
         )}
 
-        {!award && !awarding && awardError && canManageAward && (
+        {!award && !awarding && awardError && canRecoverAward && (
           <div className="space-y-3 py-2">
             <p role="alert" className="text-sm text-red-700 dark:text-red-300 text-center">
               {awardError}
@@ -392,7 +391,7 @@ export default function RoomResult({
           </div>
         )}
 
-        {!award && !awarding && !canManageAward && (
+        {!award && !awarding && !canRecoverAward && (
           <p className="text-muted-foreground text-sm text-center py-4">
             {text.waitingPointAnalysis}
           </p>
@@ -406,7 +405,7 @@ export default function RoomResult({
               </p>
             )}
 
-            {shareError && localAward && !sharedAward && canManageAward && (
+            {shareError && localAward && !sharedAward && canRecoverAward && (
               <div className="space-y-3 py-1">
                 <p role="alert" className="text-sm text-red-700 dark:text-red-300 text-center">
                   {shareError}

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   leaveQuestionGameRoom: vi.fn(),
   restartQuestionGameRoom: vi.fn(),
   hasQuestionGameRoomEngine: vi.fn(() => false),
+  ensureQuestionGameRoomPoints: vi.fn(),
   loggerWarn: vi.fn(),
 }));
 
@@ -43,6 +44,9 @@ vi.mock("@/lib/question-game-award-publish-service", () => ({
     }
   },
   loadVerifiedGameAwardResult: vi.fn(),
+}));
+vi.mock("@/lib/point-award-service", () => ({
+  ensureQuestionGameRoomPoints: mocks.ensureQuestionGameRoomPoints,
 }));
 vi.mock("@/lib/question-game-room-engine", () => ({
   applyQuestionGameRoomCommand: mocks.applyQuestionGameRoomCommand,
@@ -185,6 +189,7 @@ beforeEach(() => {
   mocks.leaveQuestionGameRoom.mockReset();
   mocks.restartQuestionGameRoom.mockReset();
   mocks.hasQuestionGameRoomEngine.mockReset().mockReturnValue(false);
+  mocks.ensureQuestionGameRoomPoints.mockReset().mockResolvedValue(null);
   mocks.loggerWarn.mockReset();
 });
 
@@ -453,6 +458,50 @@ describe("버전 2 명령 경계", () => {
       result: { retryAfterMs: 500 },
     });
     expect(mocks.saveGameRoom).toHaveBeenCalledWith(candidate);
+  });
+
+  it("버전 2 놀이의 정상 완료를 저장한 직후 포인트 지급을 보장한다", async () => {
+    const room = makeV2Room();
+    const candidate = makeV2Room({
+      status: "ended",
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [COMMAND_ID],
+      },
+    });
+    const saved = { ...candidate, version: 2, updatedAt: 20 };
+    const awardResult = {
+      awards: [{
+        studentId: "user-1",
+        bonusType: "PARTICIPATION",
+        points: 1,
+        reason: "게임 참여",
+      }],
+    };
+    const settled = { ...saved, version: 3, awardResult };
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.applyQuestionGameRoomCommand.mockReturnValue({
+      kind: "changed",
+      room: candidate,
+    });
+    mocks.ensureQuestionGameRoomPoints.mockResolvedValue(awardResult);
+    mocks.saveGameRoom
+      .mockResolvedValueOnce({ kind: "saved", room: saved })
+      .mockResolvedValueOnce({ kind: "saved", room: settled });
+
+    const response = await patch(commandBody());
+
+    expect(response.status).toBe(200);
+    expect(mocks.ensureQuestionGameRoomPoints).toHaveBeenCalledWith(saved);
+    expect(mocks.saveGameRoom).toHaveBeenNthCalledWith(2, {
+      ...saved,
+      awardResult,
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      room: { awardResult },
+    });
   });
 
   it.each([

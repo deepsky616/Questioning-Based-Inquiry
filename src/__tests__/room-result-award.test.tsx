@@ -190,18 +190,34 @@ describe("verified room result awards", () => {
     expect(screen.getByText("+1점")).toBeVisible();
   });
 
-  it("does not request points for a student host", async () => {
+  it("recovers and shows the verified point result for a student host", async () => {
+    const studentHostAward: GameAwardResult = {
+      awards: [{
+        studentId: "teacher",
+        bonusType: "PARTICIPATION",
+        points: 6,
+        reason: "학생 방장 활동",
+      }],
+      summary: "학생 방장 지급 결과입니다.",
+    };
     auth.session = {
       data: { user: { id: "teacher", name: "학생", role: "STUDENT" } },
       status: "authenticated",
     };
+    fetchMock.mockResolvedValue(jsonResponse({
+      ...studentHostAward,
+      alreadyAwarded: true,
+    }));
 
     renderResult();
-    await act(async () => {});
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(onAction).not.toHaveBeenCalled();
-    expect(screen.queryByText(/포인트 분석/)).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(screen.getByText("+6점")).toBeVisible();
+    await waitFor(() => expect(onAction).toHaveBeenCalledWith(
+      "publish-award-result",
+      { playId: PLAY_ID },
+      { expectedRoom: { code: "1234", createdAt: 100, playId: PLAY_ID } },
+    ));
   });
 
   it("does not present a winner or winner bonus for a cooperative game", () => {
@@ -317,19 +333,71 @@ describe("verified room result awards", () => {
     },
   );
 
-  it("retries an award request before publishing", async () => {
+  it("shows and retries a failed award request for a student participant", async () => {
+    auth.session = {
+      data: { user: { id: "student", name: "학생", role: "STUDENT" } },
+      status: "authenticated",
+    };
     fetchMock
       .mockResolvedValueOnce(new Response("실패", { status: 500 }))
       .mockResolvedValueOnce(jsonResponse(AWARD));
 
-    renderResult();
+    renderResult(makeRoom(), "student");
 
     const retry = await screen.findByRole("button", { name: "포인트 다시 받기" });
+    expect(screen.getByRole("alert")).toHaveTextContent("포인트를 받지 못했어요.");
     expect(onAction).not.toHaveBeenCalled();
     fireEvent.click(retry);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(onAction).toHaveBeenCalledOnce());
+  });
+
+  it("does not request points for an authenticated user outside the room", async () => {
+    auth.session = {
+      data: { user: { id: "outsider", name: "외부 사용자", role: "STUDENT" } },
+      status: "authenticated",
+    };
+
+    renderResult(makeRoom(), "outsider");
+    await act(async () => {});
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(onAction).not.toHaveBeenCalled();
+  });
+
+  it("does not repeat recovery for the same completed play after rerendering", async () => {
+    auth.session = {
+      data: { user: { id: "student", name: "학생", role: "STUDENT" } },
+      status: "authenticated",
+    };
+    const room = makeRoom();
+    const view = renderResult(room, "student");
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(onAction).toHaveBeenCalledOnce());
+
+    view.rerender(
+      <RoomResult
+        game={game}
+        room={{ ...room }}
+        myId="student"
+        scoreLabel="질문"
+        scoreUnit="개"
+        scores={[
+          { playerId: "teacher", name: "교사", score: 0 },
+          { playerId: "student", name: "학생", score: 2 },
+        ]}
+        questions={[]}
+        actionLoading={false}
+        onAction={onAction}
+        onLeave={vi.fn()}
+      />,
+    );
+    await act(async () => {});
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(onAction).toHaveBeenCalledOnce();
   });
 
   it("locks leaving and restarting while the point request is pending", async () => {

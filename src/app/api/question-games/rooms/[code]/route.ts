@@ -7,7 +7,7 @@ import {
   RELAY_ACTIVITY_LIMITS,
 } from "@/lib/points-policy";
 import {
-  pointStudentParticipantsForRoom,
+  pointParticipantsForRoom,
   type GameRoom,
   type RoomChainItem,
   type RoomPlayer,
@@ -27,7 +27,10 @@ import {
   recordMemoryRoll,
   settleMemoryRollingRoom,
 } from "@/lib/memory-room-roll";
-import { gameAwardResultsMatch } from "@/lib/game-award-result";
+import {
+  gameAwardResultsMatch,
+  isGameAwardResult,
+} from "@/lib/game-award-result";
 import {
   QuestionGameAwardPublishError,
   loadVerifiedGameAwardResult,
@@ -50,6 +53,7 @@ import {
   generateMysteryAiAnswer,
 } from "@/lib/mystery-box-ai-answer";
 import type { MysteryAnswerResolution } from "@/lib/mystery-box-rules";
+import { ensureQuestionGameRoomPoints } from "@/lib/point-award-service";
 import { logger } from "@/lib/logger";
 
 type Params = { params: Promise<{ code: string }> };
@@ -155,6 +159,39 @@ function commandSuccess(
     room: toPublicGameRoom(room),
     ...(publicResult === undefined ? {} : { result: publicResult }),
   });
+}
+
+function isCompletedVersion2Room(room: GameRoom) {
+  return room.status === "ended" &&
+    room.pointAwardKeyVersion === 2 &&
+    room.pointEvidenceVersion === 2 &&
+    room.gameState.stateVersion === 2 &&
+    room.gameState.phase === "done" &&
+    room.gameState.endReason === "completed";
+}
+
+async function ensureCompletedRoomPoints(room: GameRoom): Promise<GameRoom> {
+  if (!isCompletedVersion2Room(room)) return room;
+  if (isGameAwardResult(room.awardResult)) return room;
+
+  try {
+    const awardResult = await ensureQuestionGameRoomPoints(room);
+    if (!awardResult || gameAwardResultsMatch(room.awardResult, awardResult)) {
+      return room;
+    }
+    const saved = await saveGameRoom({ ...room, awardResult });
+    if (saved.kind === "saved") return saved.room;
+    if (
+      saved.kind === "conflict" &&
+      saved.room.createdAt === room.createdAt &&
+      saved.room.playId === room.playId
+    ) {
+      return saved.room;
+    }
+  } catch {
+    logger.warn("질문놀이 포인트 자동 지급을 마치지 못했습니다");
+  }
+  return room;
 }
 
 function questionGameFailure(
@@ -280,7 +317,10 @@ async function handleQuestionGameCommand({
 
   const saved = await saveGameRoom(result.room);
   if (saved.kind === "saved") {
-    return commandSuccess(saved.room, result.result);
+    return commandSuccess(
+      await ensureCompletedRoomPoints(saved.room),
+      result.result,
+    );
   }
   if (saved.kind === "missing") return roomMissing();
   if (!isRoomMember(saved.room, userId)) return roomForbidden();
@@ -303,12 +343,10 @@ async function publishAwardResult({
   room,
   body,
   userId,
-  userRole,
 }: {
   room: GameRoom;
   body: Record<string, unknown>;
   userId: string;
-  userRole: string | undefined;
 }) {
   if (!hasExactKeys(body, PUBLISH_AWARD_RESULT_KEYS)) {
     return invalidRequest("점수 결과 공개 요청이 올바르지 않습니다");
@@ -328,18 +366,6 @@ async function publishAwardResult({
   if (!isQuestionGameCommandId(body.playId)) {
     return invalidRequest("놀이 실행 식별값이 올바르지 않습니다");
   }
-  if (userRole !== "TEACHER") {
-    return NextResponse.json(
-      { error: "교사만 점수 결과를 공개할 수 있어요" },
-      { status: 403 },
-    );
-  }
-  if (room.hostId !== userId) {
-    return NextResponse.json(
-      { error: "방장 교사만 점수 결과를 공개할 수 있어요" },
-      { status: 403 },
-    );
-  }
   if (
     body.expectedCreatedAt !== room.createdAt ||
     room.playId !== body.playId ||
@@ -358,7 +384,7 @@ async function publishAwardResult({
   let verifiedResult: GameRoom["awardResult"];
   try {
     const allowedStudentIds = new Set(
-      pointStudentParticipantsForRoom(room).map((player) => player.id),
+      pointParticipantsForRoom(room).map((player) => player.id),
     );
     verifiedResult = await loadVerifiedGameAwardResult(
       {
@@ -718,7 +744,7 @@ export async function GET(
   const userId = (session.user as { id: string }).id;
   const limited = checkRateLimit(`game-room-read:${userId}`, 120);
   if (limited) return limited;
-  const room = await loadGameRoom(code);
+  let room = await loadGameRoom(code);
   if (!room) {
     return NextResponse.json({ error: "방을 찾을 수 없습니다" }, { status: 404 });
   }
@@ -728,6 +754,7 @@ export async function GET(
       { status: 403 },
     );
   }
+  room = await ensureCompletedRoomPoints(room);
   return NextResponse.json({ room: toPublicGameRoom(room) });
 }
 
@@ -743,7 +770,6 @@ export async function PATCH(
   }
   const userId = (session.user as { id: string }).id;
   const userName = (session.user as { name?: string }).name ?? "학생";
-  const userRole = (session.user as { role?: string }).role;
 
   const rawBody = await req.text().catch(() => null);
   if (
@@ -799,7 +825,7 @@ export async function PATCH(
   }
 
   if (action === "publish-award-result") {
-    return publishAwardResult({ room, body, userId, userRole });
+    return publishAwardResult({ room, body, userId });
   }
 
   const isVersion2 = room.gameState.stateVersion === 2;

@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   loadVerifiedGameAwardResult: vi.fn(),
   deleteGameRoomPresence: vi.fn(),
   generateMysteryAiAnswer: vi.fn(),
+  ensureQuestionGameRoomPoints: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
@@ -76,6 +77,9 @@ vi.mock("@/lib/mystery-box-ai-answer", () => ({
 }));
 vi.mock("@/lib/question-game-award-publish-service", () => ({
   loadVerifiedGameAwardResult: mocks.loadVerifiedGameAwardResult,
+}));
+vi.mock("@/lib/point-award-service", () => ({
+  ensureQuestionGameRoomPoints: mocks.ensureQuestionGameRoomPoints,
 }));
 import { POST } from "@/app/api/question-games/rooms/route";
 import { GET, PATCH } from "@/app/api/question-games/rooms/[code]/route";
@@ -150,6 +154,7 @@ beforeEach(() => {
   mocks.loadVerifiedGameAwardResult.mockReset();
   mocks.deleteGameRoomPresence.mockReset().mockResolvedValue(undefined);
   mocks.generateMysteryAiAnswer.mockReset();
+  mocks.ensureQuestionGameRoomPoints.mockReset().mockResolvedValue(null);
   mocks.consumeCreateLimit.mockReset().mockResolvedValue(true);
   mocks.cleanupIfDue.mockReset().mockResolvedValue(null);
   mocks.settleMemoryRollingRoom
@@ -296,6 +301,145 @@ describe("공개 방 응답", () => {
     const body = await response.json();
     expect(body.room.gameState).toEqual({ phase: "play" });
     expect(room.gameState.private).toEqual({ answer: "사과" });
+  });
+
+  it("정상 완료 방 조회는 빠진 포인트 지급과 결과 저장을 다시 시도한다", async () => {
+    const awardResult = {
+      awards: [{
+        studentId: "user-1",
+        bonusType: "PARTICIPATION",
+        points: 1,
+        reason: "게임 참여",
+      }],
+    };
+    const room = makeRoom({
+      status: "ended",
+      playId: "11111111-1111-4111-8111-111111111111",
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+      },
+    });
+    const settled = { ...room, version: room.version + 1, awardResult };
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.ensureQuestionGameRoomPoints.mockResolvedValue(awardResult);
+    mocks.saveGameRoom.mockResolvedValue({ kind: "saved", room: settled });
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    expect(mocks.ensureQuestionGameRoomPoints).toHaveBeenCalledWith(room);
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith({ ...room, awardResult });
+    await expect(response.json()).resolves.toMatchObject({
+      room: { awardResult },
+    });
+  });
+
+  it("정상 완료 방의 첫 지급 실패 뒤 다음 조회에서 다시 지급한다", async () => {
+    const awardResult = {
+      awards: [{
+        studentId: "user-1",
+        bonusType: "COMPLETION",
+        points: 5,
+        reason: "게임 완료",
+      }],
+    };
+    const room = makeRoom({
+      status: "ended",
+      playId: "11111111-1111-4111-8111-111111111111",
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.ensureQuestionGameRoomPoints
+      .mockRejectedValueOnce(new Error("일시 오류"))
+      .mockResolvedValueOnce(awardResult);
+    mocks.saveGameRoom.mockResolvedValue({
+      kind: "saved",
+      room: { ...room, version: 2, awardResult },
+    });
+
+    const first = await get();
+    const second = await get();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(mocks.ensureQuestionGameRoomPoints).toHaveBeenCalledTimes(2);
+    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
+    await expect(second.json()).resolves.toMatchObject({
+      room: { awardResult },
+    });
+  });
+
+  it("점수 결과 저장 충돌에 같은 실행의 최신 방을 반환한다", async () => {
+    const awardResult = {
+      awards: [{
+        studentId: "user-1",
+        bonusType: "COMPLETION",
+        points: 5,
+        reason: "게임 완료",
+      }],
+    };
+    const room = makeRoom({
+      status: "ended",
+      playId: "11111111-1111-4111-8111-111111111111",
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+      },
+    });
+    const latest = { ...room, version: 2, awardResult };
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.ensureQuestionGameRoomPoints.mockResolvedValue(awardResult);
+    mocks.saveGameRoom.mockResolvedValue({ kind: "conflict", room: latest });
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      room: { version: 2, awardResult },
+    });
+  });
+
+  it("검증된 점수 결과가 이미 있는 완료 방 조회는 지급을 다시 확인하지 않는다", async () => {
+    const awardResult = {
+      awards: [{
+        studentId: "user-1",
+        bonusType: "COMPLETION",
+        points: 5,
+        reason: "게임 완료",
+      }],
+    };
+    const room = makeRoom({
+      status: "ended",
+      playId: "11111111-1111-4111-8111-111111111111",
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      awardResult,
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+
+    const response = await get();
+
+    expect(response.status).toBe(200);
+    expect(mocks.ensureQuestionGameRoomPoints).not.toHaveBeenCalled();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
   it("참가 응답에서 비공개 상태를 제거한다", async () => {

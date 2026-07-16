@@ -31,6 +31,7 @@ export const AI_POINTS = {
 export const DAILY_LIMITS = {
   SOLO: 30, // 혼자 모드 일일 누적 상한
   AI: 50,   // AI 모드 일일 누적 상한
+  FRIEND: 120, // 친구 방 일일 누적 상한
 } as const;
 
 // ── AI 보너스 상 정의 ────────────────────────────────────
@@ -94,6 +95,7 @@ export function pointBonusLabel(bonusType: string): { label: string; emoji: stri
     case "VALID_QUESTIONS": return { label: "좋은 질문", emoji: "❓" };
     case "COMPLETION": return { label: "게임 완료", emoji: "✅" };
     case "WINNER": return { label: "우승", emoji: "👑" };
+    case "FRIEND_DAILY_LIMIT": return { label: "친구 놀이 하루 상한", emoji: "🎯" };
     case "TEACHER_GRANT": return { label: "교사 지급", emoji: "🎁" };
     case "TEACHER_REVOKE": return { label: "교사 회수", emoji: "↩️" };
     default: return { label: "포인트 획득", emoji: "🎯" };
@@ -128,6 +130,7 @@ const ACTIVITY_EMOJI: Record<string, string> = {
   VALID_QUESTIONS: "❓",
   COMPLETION: "✅",
   WINNER: "👑",
+  FRIEND_DAILY_LIMIT: "🎯",
   TEACHER_GRANT: "🎁",
   TEACHER_ADJUSTED: "🧑‍🏫",
   TEACHER_REVOKE: "↩️",
