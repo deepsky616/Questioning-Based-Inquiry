@@ -62,6 +62,7 @@ const mocks = vi.hoisted(() => ({
   runCreate: vi.fn(),
   runUpdate: vi.fn(),
   activityFindUnique: vi.fn(),
+  activityFindMany: vi.fn(),
   activityCreate: vi.fn(),
   activityAggregate: vi.fn(),
   activityCount: vi.fn(),
@@ -86,6 +87,7 @@ vi.mock("@/lib/db", () => {
     },
     gameActivity: {
       findUnique: mocks.activityFindUnique,
+      findMany: mocks.activityFindMany,
       create: mocks.activityCreate,
       aggregate: mocks.activityAggregate,
       count: mocks.activityCount,
@@ -119,6 +121,18 @@ const AI_TURN_IDS = [
 const AI_RECORD_IDS = [
   "00000000-0000-4000-8000-000000000041",
   "00000000-0000-4000-8000-000000000042",
+];
+const DICE_ACTION_IDS = Array.from(
+  { length: 10 },
+  (_, index) => `00000000-0000-4000-8000-${String(61 + index).padStart(12, "0")}`,
+);
+const DICE_AI_TURN_IDS = [
+  "00000000-0000-4000-8000-000000000081",
+  "00000000-0000-4000-8000-000000000082",
+];
+const DICE_AI_RECORD_IDS = [
+  "00000000-0000-4000-8000-000000000091",
+  "00000000-0000-4000-8000-000000000092",
 ];
 const COMPLETE_ID = "00000000-0000-4000-8000-000000000020";
 
@@ -179,6 +193,69 @@ async function createRelay(mode: "solo" | "ai" = "solo") {
     topic: "우주",
     locale: "ko",
   });
+}
+
+async function createDice(mode: "solo" | "ai" = "solo") {
+  return postCreate({
+    gameId: "dice",
+    mode,
+    requestId: CREATE_ID,
+    locale: "ko",
+  });
+}
+
+async function rollDice(index: number, expectedVersion: number, id = "run-1") {
+  return postAction({
+    action: "dice-roll",
+    requestId: DICE_ACTION_IDS[index],
+    expectedVersion,
+    face: 6,
+  }, id);
+}
+
+async function submitDiceQuestion(
+  index: number,
+  expectedVersion: number,
+  question = `주사위 질문 ${index + 1}은 왜 필요할까요?`,
+  id = "run-1",
+) {
+  return postAction({
+    action: "dice-submit-question",
+    requestId: DICE_ACTION_IDS[index],
+    expectedVersion,
+    question,
+    locale: "ko",
+    face: 6,
+  }, id);
+}
+
+async function requestDiceAiQuestion(
+  index: number,
+  expectedVersion: number,
+  id = "run-1",
+) {
+  return postAiTurn({
+    requestId: DICE_AI_TURN_IDS[index],
+    expectedVersion,
+    locale: "ko",
+  }, id);
+}
+
+async function recordDiceAiQuestion(
+  index: number,
+  expectedVersion: number,
+  output: string,
+  proof: string,
+  id = "run-1",
+) {
+  return postAction({
+    action: "dice-record-ai-question",
+    requestId: DICE_AI_RECORD_IDS[index],
+    generationRequestId: DICE_AI_TURN_IDS[index],
+    expectedVersion,
+    output,
+    proof,
+  }, id);
 }
 
 async function submitQuestion(
@@ -335,6 +412,7 @@ beforeEach(() => {
         },
         gameActivity: {
           findUnique: mocks.activityFindUnique,
+          findMany: mocks.activityFindMany,
           create: mocks.activityCreate,
           aggregate: mocks.activityAggregate,
           count: mocks.activityCount,
@@ -408,6 +486,14 @@ beforeEach(() => {
     const key = where.uniq_game_activity_request;
     return activities.find((activity) => activity.runId === key.runId && activity.requestId === key.requestId) ?? null;
   });
+  mocks.activityFindMany.mockImplementation(async ({ where }: {
+    where: { runId: string; type?: { in: string[] } };
+  }) => activities
+    .filter((activity) =>
+      activity.runId === where.runId &&
+      (!where.type || where.type.in.includes(activity.type))
+    )
+    .sort((left, right) => left.sequence - right.sequence));
   mocks.activityCreate.mockImplementation(async ({ data }: { data: Omit<StoredActivity, "id" | "createdAt"> }) => {
     const activity: StoredActivity = { id: `activity-${activities.length + 1}`, createdAt: new Date(), ...data };
     activities.push(activity);
@@ -595,7 +681,7 @@ describe("질문놀이 서버 실행 경로", () => {
 
   it("아직 준비되지 않은 놀이는 실행을 저장하지 않고 거절한다", async () => {
     const response = await postCreate({
-      gameId: "dice",
+      gameId: "ladder",
       mode: "solo",
       requestId: CREATE_ID,
       topic: "우주",
@@ -703,7 +789,7 @@ describe("질문놀이 서버 실행 경로", () => {
     await postCreate({ gameId: "relay", mode: "solo", requestId: THIRD_CREATE_ID, topic: "날씨", locale: "ko" });
 
     const response = await postCreate({
-      gameId: "dice",
+      gameId: "ladder",
       mode: "solo",
       requestId: FOURTH_CREATE_ID,
       topic: "우주",
@@ -1502,5 +1588,265 @@ describe("질문놀이 서버 실행 경로", () => {
     });
     expect(pointLogs).toHaveLength(0);
     expect(users.get("teacher-1")?.totalPoints).toBe(0);
+  });
+});
+
+describe("질문 주사위 서버 실행 경로", () => {
+  it("서버가 주사위 얼굴을 정하고 같은 굴리기 요청에는 같은 얼굴을 돌려준다", async () => {
+    const created = await createDice();
+    const first = await rollDice(0, 1);
+    const firstBody = await first.json() as {
+      run: { nextStep: string; pendingRoll: { actor: string; face: number } };
+    };
+    const replay = await rollDice(0, 1);
+    const replayBody = await replay.json() as typeof firstBody;
+
+    expect(created.status).toBe(201);
+    expect(first.status).toBe(200);
+    expect(replay.status).toBe(200);
+    expect(firstBody.run).toMatchObject({
+      nextStep: "STUDENT_QUESTION",
+      pendingRoll: { actor: "STUDENT" },
+    });
+    expect(firstBody.run.pendingRoll.face).toBeGreaterThanOrEqual(1);
+    expect(firstBody.run.pendingRoll.face).toBeLessThanOrEqual(6);
+    expect(replayBody.run.pendingRoll.face).toBe(firstBody.run.pendingRoll.face);
+    expect(activities.filter((activity) => activity.type === "DICE_ROLL")).toHaveLength(1);
+  });
+
+  it("혼자 모드에서 굴리기와 질문 세 번을 확인하고 같은 거래에서 오 점을 지급한다", async () => {
+    const created = await createDice();
+    const createdBody = await created.json() as { run: Record<string, unknown> };
+    expect(created.status).toBe(201);
+    expect(createdBody.run).toMatchObject({
+      gameId: "dice",
+      status: "ACTIVE",
+      version: 1,
+      questionCount: 0,
+      nextStep: "STUDENT_ROLL",
+      pendingRoll: null,
+    });
+
+    let version = 1;
+    let finalBody: Record<string, unknown> | undefined;
+    for (let questionIndex = 0; questionIndex < 3; questionIndex += 1) {
+      const rolled = await rollDice(questionIndex * 2, version);
+      expect(rolled.status).toBe(200);
+      version += 1;
+      const submitted = await submitDiceQuestion(questionIndex * 2 + 1, version);
+      expect(submitted.status).toBe(200);
+      version += 1;
+      finalBody = await submitted.json() as Record<string, unknown>;
+    }
+
+    expect(finalBody).toMatchObject({
+      run: { status: "SETTLED", version: 7, questionCount: 3, nextStep: "COMPLETE" },
+      result: { awarded: 5, preview: false },
+    });
+    expect(activities.map((activity) => activity.sequence)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(activities.map((activity) => activity.type)).toEqual([
+      "DICE_ROLL",
+      "DICE_QUESTION",
+      "DICE_ROLL",
+      "DICE_QUESTION",
+      "DICE_ROLL",
+      "DICE_QUESTION",
+    ]);
+    expect(pointLogs).toHaveLength(1);
+    expect(pointLogs[0]).toMatchObject({
+      gameId: "ACTIVITY_SOLO",
+      bonusType: "ACTIVITY_SOLO_dice",
+      points: 5,
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+
+    const finalReplay = await submitDiceQuestion(5, 6);
+    expect(finalReplay.status).toBe(200);
+    await expect(finalReplay.json()).resolves.toMatchObject({
+      run: { status: "SETTLED", version: 7 },
+      result: { awarded: 5 },
+      replayed: true,
+    });
+    expect(pointLogs).toHaveLength(1);
+
+    const recovered = await postComplete({ requestId: COMPLETE_ID, expectedVersion: 7 });
+    expect(recovered.status).toBe(200);
+    await expect(recovered.json()).resolves.toMatchObject({
+      run: { status: "SETTLED", version: 7 },
+      result: { awarded: 5, alreadySettled: true },
+    });
+    expect(pointLogs).toHaveLength(1);
+  });
+
+  it("도움 모드에서 학생 질문 셋과 얼굴에 묶인 인공지능 질문 둘을 확인해 구 점을 지급한다", async () => {
+    const aiOutputs = [
+      "이 유형으로 첫 질문을 어떻게 만들 수 있을까요?",
+      "같은 유형의 다른 질문은 무엇일까요?",
+    ];
+    mocks.generateText
+      .mockResolvedValueOnce(aiOutputs[0])
+      .mockResolvedValueOnce(aiOutputs[1]);
+    expect((await createDice("ai")).status).toBe(201);
+
+    let version = 1;
+    for (let questionIndex = 0; questionIndex < 3; questionIndex += 1) {
+      expect((await rollDice(questionIndex * 4, version)).status).toBe(200);
+      version += 1;
+      const student = await submitDiceQuestion(questionIndex * 4 + 1, version);
+      expect(student.status).toBe(200);
+      version += 1;
+      if (questionIndex === 2) {
+        await expect(student.json()).resolves.toMatchObject({
+          run: { status: "SETTLED", version: 11, nextStep: "COMPLETE" },
+          result: { awarded: 9 },
+        });
+        break;
+      }
+
+      expect((await rollDice(questionIndex * 4 + 2, version)).status).toBe(200);
+      version += 1;
+      const issued = await requestDiceAiQuestion(questionIndex, version);
+      expect(issued.status).toBe(200);
+      const issuedBody = await issued.json() as { output: string; proof: string };
+      const recorded = await recordDiceAiQuestion(
+        questionIndex,
+        version,
+        issuedBody.output,
+        issuedBody.proof,
+      );
+      expect(recorded.status).toBe(200);
+      version += 1;
+    }
+
+    expect(activities.filter((activity) => activity.type === "DICE_ROLL")).toHaveLength(5);
+    expect(activities.filter((activity) => activity.type === "DICE_QUESTION")).toHaveLength(3);
+    expect(activities.filter((activity) => activity.type === "DICE_AI_QUESTION")).toHaveLength(2);
+    expect(pointLogs).toHaveLength(1);
+    expect(pointLogs[0]).toMatchObject({ gameId: "ACTIVITY_AI", points: 9 });
+    expect(users.get("student-1")?.totalPoints).toBe(9);
+    const stored = JSON.stringify({ runs: [...runs.values()], activities, pointLogs });
+    for (const rawText of [
+      ...aiOutputs,
+      "주사위 질문 2은 왜 필요할까요?",
+      "주사위 질문 6은 왜 필요할까요?",
+      "주사위 질문 10은 왜 필요할까요?",
+    ]) {
+      expect(stored).not.toContain(rawText);
+    }
+  });
+
+  it("인공지능 질문 증명을 발급한 뒤 주사위 얼굴이 달라지면 기록하지 않는다", async () => {
+    await createDice("ai");
+    await rollDice(0, 1);
+    await submitDiceQuestion(1, 2);
+    await rollDice(2, 3);
+    const issued = await requestDiceAiQuestion(0, 4);
+    const issuedBody = await issued.json() as { output: string; proof: string };
+    const state = runs.get("run-1")?.state as {
+      pendingRoll: { actor: "AI"; face: number };
+    };
+    state.pendingRoll.face = state.pendingRoll.face === 6 ? 5 : state.pendingRoll.face + 1;
+
+    const response = await recordDiceAiQuestion(0, 4, issuedBody.output, issuedBody.proof);
+
+    expect(response.status).toBe(409);
+    expect(activities.filter((activity) => activity.type === "DICE_AI_QUESTION")).toHaveLength(0);
+    expect(pointLogs).toHaveLength(0);
+  });
+
+  it("마지막 질문에서 저장된 굴리기 증거 순서가 빠졌으면 정산을 거부한다", async () => {
+    await createDice();
+    await rollDice(0, 1);
+    await submitDiceQuestion(1, 2);
+    await rollDice(2, 3);
+    await submitDiceQuestion(3, 4);
+    await rollDice(4, 5);
+    activities.splice(0, 1);
+
+    const response = await submitDiceQuestion(5, 6);
+
+    expect(response.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 6 });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+  });
+
+  it("서로 다른 마지막 질문 요청이 동시에 오면 한 건만 정산한다", async () => {
+    await createDice();
+    await rollDice(0, 1);
+    await submitDiceQuestion(1, 2);
+    await rollDice(2, 3);
+    await submitDiceQuestion(3, 4);
+    await rollDice(4, 5);
+
+    const responses = await Promise.all([
+      submitDiceQuestion(5, 6, "마지막 주사위 질문은 무엇일까요?"),
+      postAction({
+        action: "dice-submit-question",
+        requestId: ALTERNATE_FINAL_ACTION_ID,
+        expectedVersion: 6,
+        question: "동시에 보낸 다른 마지막 질문은 무엇일까요?",
+        locale: "ko",
+      }),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(pointLogs).toHaveLength(1);
+    expect(pointLogs[0]?.points).toBe(5);
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+    expect(activities.filter((activity) => activity.type === "DICE_QUESTION")).toHaveLength(3);
+  });
+
+  it("교사 미리보기 질문 주사위는 완료해도 점수를 지급하지 않는다", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
+    await createDice();
+    let version = 1;
+    let finalResponse: Response | undefined;
+    for (let questionIndex = 0; questionIndex < 3; questionIndex += 1) {
+      await rollDice(questionIndex * 2, version);
+      version += 1;
+      finalResponse = await submitDiceQuestion(questionIndex * 2 + 1, version);
+      version += 1;
+    }
+
+    if (!finalResponse) throw new Error("missing final response");
+    expect(finalResponse.status).toBe(200);
+    await expect(finalResponse.json()).resolves.toMatchObject({
+      run: { preview: true, status: "SETTLED" },
+      result: { awarded: 0, preview: true },
+    });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("teacher-1")?.totalPoints).toBe(0);
+  });
+
+  it("혼자 모드 일일 상한에 이 점만 남으면 이 점만 지급한다", async () => {
+    pointLogs.push({
+      studentId: "student-1",
+      gameId: "ACTIVITY_SOLO",
+      gameRunId: "old-run",
+      bonusType: "ACTIVITY_SOLO_dice",
+      points: 28,
+      reason: "이전 실행",
+      status: "APPROVED",
+      createdAt: new Date(),
+    });
+    await createDice();
+    let version = 1;
+    let finalResponse: Response | undefined;
+    for (let questionIndex = 0; questionIndex < 3; questionIndex += 1) {
+      await rollDice(questionIndex * 2, version);
+      version += 1;
+      finalResponse = await submitDiceQuestion(questionIndex * 2 + 1, version);
+      version += 1;
+    }
+
+    if (!finalResponse) throw new Error("missing final response");
+    expect(finalResponse.status).toBe(200);
+    await expect(finalResponse.json()).resolves.toMatchObject({
+      result: { awarded: 2, dailyRemaining: 0, cappedByLimit: true },
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(2);
+    expect(pointLogs.filter((log) => log.gameRunId === "run-1")).toHaveLength(1);
+    expect(pointLogs.find((log) => log.gameRunId === "run-1")?.points).toBe(2);
   });
 });

@@ -225,6 +225,140 @@ function installRelayRunServer(
   return fetchMock;
 }
 
+function diceRunSnapshot(
+  id: string,
+  mode: LocalMode,
+  version: number,
+  questionCount: number,
+  aiTurnCount: number,
+  nextStep: "STUDENT_ROLL" | "STUDENT_QUESTION" | "AI_ROLL" | "AI_QUESTION" | "COMPLETE",
+  pendingRoll: { actor: "STUDENT" | "AI"; face: number } | null,
+  status = "ACTIVE",
+) {
+  return {
+    id,
+    gameId: "dice",
+    mode: mode.toUpperCase(),
+    status,
+    version,
+    targetCount: 3,
+    questionCount,
+    aiTurnCount,
+    awaitingAiTurn: nextStep === "AI_QUESTION",
+    nextStep,
+    pendingRoll,
+    preview: false,
+  };
+}
+
+function installDiceRunServer(
+  mode: LocalMode,
+  options: { failFirstAiTurn?: boolean } = {},
+) {
+  const runId = `dice-${mode}`;
+  let version = 1;
+  let questionCount = 0;
+  let aiTurnCount = 0;
+  let nextStep: "STUDENT_ROLL" | "STUDENT_QUESTION" | "AI_ROLL" | "AI_QUESTION" | "COMPLETE" = "STUDENT_ROLL";
+  let pendingRoll: { actor: "STUDENT" | "AI"; face: number } | null = null;
+  let status = "ACTIVE";
+  let failedAiTurn = false;
+  let result: Record<string, unknown> | null = null;
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    if (url === "/api/question-games/runs") {
+      return new Response(JSON.stringify({
+        run: diceRunSnapshot(
+          runId,
+          mode,
+          version,
+          questionCount,
+          aiTurnCount,
+          nextStep,
+          pendingRoll,
+          status,
+        ),
+      }), { status: 201, headers: { "content-type": "application/json" } });
+    }
+    if (url.endsWith("/result")) {
+      return Response.json({
+        run: diceRunSnapshot(
+          runId,
+          mode,
+          version,
+          questionCount,
+          aiTurnCount,
+          nextStep,
+          pendingRoll,
+          status,
+        ),
+        result,
+      });
+    }
+    if (url.endsWith("/ai-turn")) {
+      if (options.failFirstAiTurn && !failedAiTurn) {
+        failedAiTurn = true;
+        return Response.json({ error: "인공지능 응답이 지연되고 있습니다" }, { status: 503 });
+      }
+      return Response.json({
+        output: `인공지능 예시 질문 ${aiTurnCount + 1}은 무엇인가요?`,
+        proof: `dice-proof-${aiTurnCount + 1}`,
+        expiresAt: "2099-07-16T03:01:30.000Z",
+        runVersion: version,
+      });
+    }
+    if (url.endsWith("/actions") && body.action === "dice-roll") {
+      const actor = nextStep === "AI_ROLL" ? "AI" : "STUDENT";
+      pendingRoll = { actor, face: (version % 6) + 1 };
+      nextStep = actor === "AI" ? "AI_QUESTION" : "STUDENT_QUESTION";
+      version += 1;
+    } else if (url.endsWith("/actions") && body.action === "dice-submit-question") {
+      questionCount += 1;
+      pendingRoll = null;
+      version += 1;
+      if (questionCount === 3) {
+        status = "SETTLED";
+        nextStep = "COMPLETE";
+        const awarded = mode === "ai" ? 9 : 5;
+        const dailyLimit = mode === "ai" ? 50 : 30;
+        result = {
+          awarded,
+          dailyLimit,
+          dailyRemaining: dailyLimit - awarded,
+          cappedByLimit: false,
+          preview: false,
+        };
+      } else {
+        nextStep = mode === "ai" ? "AI_ROLL" : "STUDENT_ROLL";
+      }
+    } else if (url.endsWith("/actions") && body.action === "dice-record-ai-question") {
+      aiTurnCount += 1;
+      pendingRoll = null;
+      nextStep = "STUDENT_ROLL";
+      version += 1;
+    } else {
+      return Response.json({ error: "지원하지 않는 시험 요청" }, { status: 404 });
+    }
+    return Response.json({
+      run: diceRunSnapshot(
+        runId,
+        mode,
+        version,
+        questionCount,
+        aiTurnCount,
+        nextStep,
+        pendingRoll,
+        status,
+      ),
+      result,
+      replayed: false,
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
 async function startRelay(mode: LocalMode) {
   installRelayRunServer(mode);
   renderLocalGame("relay", RelayGame, mode);
@@ -418,9 +552,134 @@ describe("이야기 주사위 지역 목표", () => {
 });
 
 describe("질문 주사위 지역 목표", () => {
+  it.each([
+    [
+      "혼자 모드의 인공지능 질문 수",
+      diceRunSnapshot("dice-invalid-solo-count", "solo", 3, 1, 1, "STUDENT_ROLL", null),
+    ],
+    [
+      "인공지능 모드의 차례 수",
+      diceRunSnapshot("dice-invalid-ai-count", "ai", 3, 0, 1, "STUDENT_ROLL", null),
+    ],
+    [
+      "완료 단계와 정산 상태",
+      diceRunSnapshot("dice-invalid-complete", "solo", 7, 3, 0, "COMPLETE", null, "ACTIVE"),
+    ],
+    [
+      "허용되지 않은 상태",
+      diceRunSnapshot("dice-invalid-status", "solo", 1, 0, 0, "STUDENT_ROLL", null, "PAUSED"),
+    ],
+  ])("%s가 맞지 않는 실행 응답을 열지 않는다", async (_case, invalidRun) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/question-games/runs") {
+        return Response.json({ run: invalidRun }, { status: 201 });
+      }
+      return Response.json({ error: "등록되면 안 되는 요청" }, { status: 500 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderLocalGame("dice", DiceGame, invalidRun.mode === "AI" ? "ai" : "solo");
+
+    fireEvent.click(screen.getByRole("button", { name: /주사위.*굴리기/ }));
+    await flushPromises();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("실행 정보를 확인할 수 없습니다");
+    expect(fetchMock.mock.calls).toHaveLength(1);
+  });
+
+  it("굴림 응답이 유실된 뒤 실행이 그대로면 목록 이동을 막는다", async () => {
+    const onBack = vi.fn();
+    const initialRun = diceRunSnapshot(
+      "dice-uncertain-roll",
+      "solo",
+      1,
+      0,
+      0,
+      "STUDENT_ROLL",
+      null,
+    );
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      if (url === "/api/question-games/runs") {
+        return Response.json({ run: initialRun }, { status: 201 });
+      }
+      if (url.endsWith("/actions") && body.action === "dice-roll") {
+        throw new TypeError("굴림 응답 끊김");
+      }
+      if (url.endsWith("/result")) {
+        return Response.json({ run: initialRun, result: null });
+      }
+      return Response.json({ error: "알 수 없는 요청" }, { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderLocalGame("dice", DiceGame, "solo", onBack);
+
+    fireEvent.click(screen.getByRole("button", { name: /주사위.*굴리기/ }));
+    await flushPromises();
+    await flushPromises();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("굴림 응답 끊김");
+    const back = screen.getByRole("button", { name: /목록/ });
+    expect(back).toBeDisabled();
+    fireEvent.click(back);
+    expect(onBack).not.toHaveBeenCalled();
+  });
+
+  it("인공지능 모드의 학생 질문 뒤 다음 단계가 틀리면 화면 차례로 반영하지 않는다", async () => {
+    const runId = "dice-invalid-question-step";
+    let rolled = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      if (url === "/api/question-games/runs") {
+        return Response.json({
+          run: diceRunSnapshot(runId, "ai", 1, 0, 0, "STUDENT_ROLL", null),
+        }, { status: 201 });
+      }
+      if (url.endsWith("/actions") && body.action === "dice-roll") {
+        rolled = true;
+        return Response.json({
+          run: diceRunSnapshot(
+            runId,
+            "ai",
+            2,
+            0,
+            0,
+            "STUDENT_QUESTION",
+            { actor: "STUDENT", face: 4 },
+          ),
+        });
+      }
+      if (url.endsWith("/actions") && body.action === "dice-submit-question") {
+        return Response.json({
+          run: diceRunSnapshot(runId, "ai", 3, 1, 0, "STUDENT_ROLL", null),
+        });
+      }
+      if (url.endsWith("/result") && rolled) {
+        return Response.json({
+          run: diceRunSnapshot(runId, "ai", 3, 1, 0, "STUDENT_ROLL", null),
+          result: null,
+        });
+      }
+      return Response.json({ error: "알 수 없는 요청" }, { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderLocalGame("dice", DiceGame, "ai");
+
+    await rollQuestionDice();
+    await submitDiceQuestion("다음 차례를 확인하는 질문인가요?");
+    await flushPromises();
+
+    expect(screen.getByRole("alert")).toHaveTextContent("질문 저장 결과를 확인할 수 없습니다");
+    expect(screen.queryByText("다음 차례를 확인하는 질문인가요?", { selector: "p" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toHaveAttribute("readonly");
+  });
+
   it.each(["solo", "ai"] as const)(
     "%s 모드는 굴림 뒤 질문을 내기 전 다시 굴릴 수 없다",
     async (mode) => {
+      installDiceRunServer(mode);
       renderLocalGame("dice", DiceGame, mode);
 
       await rollQuestionDice();
@@ -432,6 +691,7 @@ describe("질문 주사위 지역 목표", () => {
   );
 
   it("혼자 모드는 학생 질문 셋째 제출 직후 결과로 간다", async () => {
+    installDiceRunServer("solo");
     renderLocalGame("dice", DiceGame);
 
     for (let index = 0; index < 3; index += 1) {
@@ -444,17 +704,12 @@ describe("질문 주사위 지역 목표", () => {
 
     expect(screen.getByRole("button", { name: /다른 놀이 하러 가기/ })).toBeVisible();
     expect(screen.getByText("📝 질문 기록 (3개)")).toBeVisible();
+    expect(screen.getByText("+5점 적립!")).toBeVisible();
   });
 
   it("인공지능 질문을 기록하고 학생에게 돌려보낸 뒤 학생 질문 셋에서 끝난다", async () => {
-    let generated = 0;
-    aiMocks.ask.mockImplementation(async ({ action }: { action: string }) => {
-      if (action === "dice:generate") {
-        generated += 1;
-        return { text: `인공지능 예시 질문 ${generated}은 무엇인가요?` };
-      }
-      return { text: "질문을 잘 만들었어요." };
-    });
+    const fetchMock = installDiceRunServer("ai");
+    aiMocks.ask.mockResolvedValue({ text: "질문을 잘 만들었어요." });
     renderLocalGame("dice", DiceGame, "ai");
 
     await rollQuestionDice();
@@ -472,28 +727,31 @@ describe("질문 주사위 지역 목표", () => {
     await submitDiceQuestion("셋째 학생 질문은 무엇인가요?");
 
     expect(screen.getByRole("button", { name: /다른 놀이 하러 가기/ })).toBeVisible();
-    expect(aiMocks.ask.mock.calls.filter(([request]) => request.action === "dice:generate")).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/ai-turn"))).toHaveLength(2);
+    expect(screen.getByText("+9점 적립!")).toBeVisible();
   });
 
-  it("인공지능 질문이 비어도 학생 차례로 돌아온다", async () => {
+  it("인공지능 질문 발급이 실패하면 같은 차례를 다시 시도한다", async () => {
+    installDiceRunServer("ai", { failFirstAiTurn: true });
     renderLocalGame("dice", DiceGame, "ai");
     await rollQuestionDice();
     await submitDiceQuestion("첫째 학생 질문은 무엇인가요?");
     await rollQuestionDice();
 
+    expect(screen.getByRole("button", { name: /인공지능 질문 다시 만들기/ })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /인공지능 질문 다시 만들기/ }));
+    await flushPromises();
+
+    expect(screen.getByText("인공지능 예시 질문 1은 무엇인가요?")).toBeVisible();
     expect(screen.getByText(/민준.*🎲/)).toBeVisible();
     expect(screen.getByRole("button", { name: /주사위.*굴리기/ })).toBeEnabled();
   });
 
   it("셋째 학생 질문은 끝나지 않는 피드백을 기다리지 않고 바로 끝난다", async () => {
+    installDiceRunServer("ai");
     const pendingFeedback = deferred<{ text: string } | null>();
-    let generated = 0;
     let feedbackCalls = 0;
-    aiMocks.ask.mockImplementation(({ action }: { action: string }) => {
-      if (action === "dice:generate") {
-        generated += 1;
-        return Promise.resolve({ text: `인공지능 예시 질문 ${generated}은 무엇인가요?` });
-      }
+    aiMocks.ask.mockImplementation(() => {
       feedbackCalls += 1;
       return feedbackCalls === 1
         ? Promise.resolve({ text: "질문을 잘 만들었어요." })

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { generateText } from "@/lib/ai";
 import { AiBusyError, AiKeyMissingError, AiQuotaError } from "@/lib/ai-errors";
+import { getQuestionDiceTypes } from "@/lib/question-game-i18n";
 import {
   authenticatedQuestionGameActorId,
   questionGameRunFailure,
@@ -18,6 +19,31 @@ import {
 type Params = { params: Promise<{ id: string }> };
 
 function promptFor(prepared: PreparedQuestionGameAiTurn) {
+  if (prepared.gameId === "dice") {
+    const face = prepared.diceFace;
+    const typeInfo = face ? getQuestionDiceTypes(prepared.locale)[face - 1] : undefined;
+    if (!typeInfo) {
+      throw new QuestionGameRunError("질문 주사위 얼굴 정보가 올바르지 않습니다", 409);
+    }
+    if (prepared.locale === "en") {
+      return {
+        systemInstruction: [
+          "You are a question dice partner for school students.",
+          "Return exactly one new question in English and nothing else.",
+          `Write a ${typeInfo.type} that matches this guide: ${typeInfo.desc}`,
+        ].join("\n"),
+        prompt: `The dice rolled ${face}. Write one ${typeInfo.type}.`,
+      };
+    }
+    return {
+      systemInstruction: [
+        "당신은 학생과 함께하는 질문 주사위 짝입니다.",
+        "한국어로 된 새로운 질문 하나만 쓰고 다른 말은 쓰지 마세요.",
+        `${typeInfo.type}을 다음 안내에 맞게 작성하세요: ${typeInfo.desc}`,
+      ].join("\n"),
+      prompt: `주사위 ${face}번이 나왔습니다. ${typeInfo.type} 하나를 작성하세요.`,
+    };
+  }
   if (prepared.locale === "en") {
     return {
       systemInstruction: [
@@ -87,7 +113,13 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json(prepared.cachedResponse);
   }
 
-  const prompt = promptFor(prepared);
+  let prompt: ReturnType<typeof promptFor>;
+  try {
+    prompt = promptFor(prepared);
+  } catch (error) {
+    await releaseLease(prepared);
+    return questionGameRunFailure(error);
+  }
   let generatedOutput: string;
   try {
     generatedOutput = await generateText({

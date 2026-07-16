@@ -18,6 +18,19 @@ const REQUEST_ID_PATTERN =
 type RunMode = "SOLO" | "AI";
 type RunLocale = "ko" | "en";
 type RunStatus = "ACTIVE" | "SETTLED";
+type RunGameId = "relay" | "dice";
+type DiceActor = "STUDENT" | "AI";
+type DiceNextStep =
+  | "STUDENT_ROLL"
+  | "STUDENT_QUESTION"
+  | "AI_ROLL"
+  | "AI_QUESTION"
+  | "COMPLETE";
+
+interface DicePendingRoll {
+  actor: DiceActor;
+  face: number;
+}
 
 export interface BrowserQuestionGameRunActor {
   id: string;
@@ -63,13 +76,14 @@ interface IssuedAiTurn {
   proofId: string;
   expiresAt: string;
   runVersion: number;
+  diceFace?: number;
 }
 
 interface StoredRun {
   id: string;
   ownerId: string;
   preview: boolean;
-  gameId: "relay";
+  gameId: RunGameId;
   mode: RunMode;
   locale: RunLocale;
   topic: string;
@@ -85,6 +99,8 @@ interface StoredRun {
   actions: Map<string, ReplayEntry>;
   aiIssues: Map<string, ReplayEntry>;
   currentAiTurn: IssuedAiTurn | null;
+  nextStep?: DiceNextStep;
+  pendingRoll?: DicePendingRoll;
 }
 
 interface CreationReplay {
@@ -157,6 +173,12 @@ function fingerprint(value: unknown) {
 }
 
 function publicRun(run: StoredRun) {
+  const awaitingAiTurn = run.gameId === "dice"
+    ? run.status === "ACTIVE" && run.mode === "AI" && run.nextStep === "AI_QUESTION"
+    : run.status === "ACTIVE" &&
+      run.mode === "AI" &&
+      run.questionCount === run.aiTurnCount + 1 &&
+      run.questionCount < run.targetCount;
   return {
     id: run.id,
     gameId: run.gameId,
@@ -165,15 +187,17 @@ function publicRun(run: StoredRun) {
     version: run.version,
     questionCount: run.questionCount,
     aiTurnCount: run.aiTurnCount,
-    awaitingAiTurn:
-      run.status === "ACTIVE" &&
-      run.mode === "AI" &&
-      run.questionCount === run.aiTurnCount + 1 &&
-      run.questionCount < run.targetCount,
+    awaitingAiTurn,
     targetCount: run.targetCount,
     preview: run.preview,
     expiresAt: run.expiresAt,
     completedAt: run.completedAt,
+    ...(run.gameId === "dice"
+      ? {
+          nextStep: run.nextStep,
+          pendingRoll: run.pendingRoll ?? null,
+        }
+      : {}),
   };
 }
 
@@ -186,6 +210,7 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
   const creations = new Map<string, CreationReplay>();
   const dailyEarned = new Map<string, number>();
   let nextUuid = 1;
+  let nextDiceFace = 1;
   let clock = Date.parse("2030-03-17T00:00:00.000Z");
 
   const randomUuid = () => {
@@ -225,6 +250,10 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       preview: run.preview,
     };
     run.currentAiTurn = null;
+    if (run.gameId === "dice") {
+      run.nextStep = "COMPLETE";
+      delete run.pendingRoll;
+    }
   };
 
   const createRun = (
@@ -233,12 +262,12 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
   ) => {
     const requestId = requireRequestId(body.requestId);
     const gameId = typeof body.gameId === "string" ? body.gameId : "";
-    if (gameId !== "relay") {
+    if (gameId !== "relay" && gameId !== "dice") {
       throw new BrowserRunError("이 질문놀이는 서버 점수 기록을 아직 지원하지 않습니다", 409);
     }
     const mode = parseMode(body.mode);
     const locale = parseLocale(body.locale);
-    const topic = requireTopic(body.topic);
+    const topic = gameId === "dice" ? "" : requireTopic(body.topic);
     const creationFingerprint = fingerprint({ gameId, mode, locale, topic });
     const creationKey = `${actor.id}:${requestId}`;
     const existing = creations.get(creationKey);
@@ -255,13 +284,13 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       id: randomUuid(),
       ownerId: actor.id,
       preview: actor.role === "TEACHER",
-      gameId: "relay",
+      gameId,
       mode,
       locale,
       topic,
       status: "ACTIVE",
       version: 1,
-      targetCount: QUESTION_GAME_RULES.relay.targets[mode === "SOLO" ? "solo" : "ai"].count,
+      targetCount: QUESTION_GAME_RULES[gameId].targets[mode === "SOLO" ? "solo" : "ai"].count,
       questionCount: 0,
       aiTurnCount: 0,
       questions: [],
@@ -271,6 +300,7 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       actions: new Map(),
       aiIssues: new Map(),
       currentAiTurn: null,
+      ...(gameId === "dice" ? { nextStep: "STUDENT_ROLL" as const } : {}),
     };
     runs.set(run.id, run);
     creations.set(creationKey, { fingerprint: creationFingerprint, runId: run.id });
@@ -296,7 +326,7 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       }
       return replayResponse(replay);
     }
-    if (run.status !== "ACTIVE") {
+    if (run.status !== "ACTIVE" || run.gameId !== "relay") {
       throw new BrowserRunError("이미 끝난 질문놀이 실행입니다", 409);
     }
     if (requireVersion(body.expectedVersion) !== run.version) {
@@ -348,7 +378,7 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       }
       return replayResponse(replay);
     }
-    if (run.status !== "ACTIVE" || run.mode !== "AI") {
+    if (run.status !== "ACTIVE" || run.gameId !== "relay" || run.mode !== "AI") {
       throw new BrowserRunError("인공지능 질문을 기록할 수 없는 실행입니다", 409);
     }
     if (requireVersion(body.expectedVersion) !== run.version) {
@@ -374,6 +404,153 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     return success(200, { ...response, replayed: false });
   };
 
+  const rollDice = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const actionFingerprint = fingerprint({ action: "dice-roll" });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    if (run.status !== "ACTIVE" || run.gameId !== "dice") {
+      throw new BrowserRunError("주사위를 굴릴 수 없는 실행입니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.nextStep !== "STUDENT_ROLL" && run.nextStep !== "AI_ROLL") {
+      throw new BrowserRunError("지금은 주사위를 굴릴 차례가 아닙니다", 409);
+    }
+
+    const actor: DiceActor = run.nextStep === "AI_ROLL" ? "AI" : "STUDENT";
+    const face = nextDiceFace;
+    nextDiceFace = nextDiceFace === 6 ? 1 : nextDiceFace + 1;
+    run.pendingRoll = { actor, face };
+    run.nextStep = actor === "AI" ? "AI_QUESTION" : "STUDENT_QUESTION";
+    run.version += 1;
+    const response = { run: publicRun(run) };
+    run.actions.set(requestId, {
+      fingerprint: actionFingerprint,
+      response: cloneBody(response),
+    });
+    return success(200, { ...response, replayed: false });
+  };
+
+  const submitDiceQuestion = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const locale = parseLocale(body.locale);
+    const question = requireQuestion(body.question, locale);
+    const actionFingerprint = fingerprint({
+      action: "dice-submit-question",
+      locale,
+      question,
+    });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    if (run.status !== "ACTIVE" || run.gameId !== "dice") {
+      throw new BrowserRunError("질문을 등록할 수 없는 실행입니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (locale !== run.locale) {
+      throw new BrowserRunError("실행을 만든 언어로 질문해 주세요", 409);
+    }
+    if (run.nextStep !== "STUDENT_QUESTION" || run.pendingRoll?.actor !== "STUDENT") {
+      throw new BrowserRunError("학생 주사위를 먼저 굴려 주세요", 409);
+    }
+    if (run.questions.includes(question)) {
+      throw new BrowserRunError("같은 질문은 다시 등록할 수 없습니다", 409);
+    }
+
+    run.questionCount += 1;
+    run.version += 1;
+    run.questions.push(question);
+    delete run.pendingRoll;
+    if (run.questionCount === run.targetCount) {
+      run.nextStep = "COMPLETE";
+      settle(run);
+    } else {
+      run.nextStep = run.mode === "AI" ? "AI_ROLL" : "STUDENT_ROLL";
+    }
+    const response = {
+      run: publicRun(run),
+      ...(run.result ? { result: run.result } : {}),
+    };
+    run.actions.set(requestId, {
+      fingerprint: actionFingerprint,
+      response: cloneBody(response),
+    });
+    return success(200, { ...response, replayed: false });
+  };
+
+  const recordDiceAiQuestion = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const generationRequestId = requireRequestId(body.generationRequestId);
+    const output = requireQuestion(body.output, run.locale);
+    const proof = typeof body.proof === "string" ? body.proof : "";
+    const actionFingerprint = fingerprint({
+      action: "dice-record-ai-question",
+      generationRequestId,
+      output,
+      proof,
+    });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    if (run.status !== "ACTIVE" || run.gameId !== "dice" || run.mode !== "AI") {
+      throw new BrowserRunError("인공지능 질문을 기록할 수 없는 실행입니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.nextStep !== "AI_QUESTION" || run.pendingRoll?.actor !== "AI") {
+      throw new BrowserRunError("지금은 인공지능 질문 차례가 아닙니다", 409);
+    }
+    const issued = run.currentAiTurn;
+    if (
+      !issued ||
+      issued.generationRequestId !== generationRequestId ||
+      issued.output !== output ||
+      issued.proof !== proof ||
+      issued.diceFace !== run.pendingRoll.face
+    ) {
+      throw new BrowserRunError("인공지능 차례 증명이 실행 상태와 일치하지 않습니다", 409);
+    }
+
+    run.aiTurnCount += 1;
+    run.version += 1;
+    run.currentAiTurn = null;
+    delete run.pendingRoll;
+    run.nextStep = "STUDENT_ROLL";
+    const response = { run: publicRun(run) };
+    run.actions.set(requestId, {
+      fingerprint: actionFingerprint,
+      response: cloneBody(response),
+    });
+    return success(200, { ...response, replayed: false });
+  };
+
   const applyAction = (run: StoredRun, body: Record<string, unknown>) => {
     const requestId = requireRequestId(body.requestId);
     if (body.action === "relay-submit-question") {
@@ -382,6 +559,15 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     if (body.action === "relay-record-ai-turn") {
       return recordAiTurn(run, body, requestId);
     }
+    if (body.action === "dice-roll") {
+      return rollDice(run, body, requestId);
+    }
+    if (body.action === "dice-submit-question") {
+      return submitDiceQuestion(run, body, requestId);
+    }
+    if (body.action === "dice-record-ai-question") {
+      return recordDiceAiQuestion(run, body, requestId);
+    }
     throw new BrowserRunError("지원하지 않는 질문놀이 동작입니다", 400);
   };
 
@@ -389,14 +575,13 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     const requestId = requireRequestId(body.requestId);
     const expectedVersion = requireVersion(body.expectedVersion);
     const locale = parseLocale(body.locale);
-    const topic = requireTopic(body.topic);
-    const previousQuestion = requireQuestion(body.previousQuestion, locale);
-    const issueFingerprint = fingerprint({
-      expectedVersion,
-      locale,
-      topic,
-      previousQuestion,
-    });
+    const topic = run.gameId === "relay" ? requireTopic(body.topic) : "";
+    const previousQuestion = run.gameId === "relay"
+      ? requireQuestion(body.previousQuestion, locale)
+      : "";
+    const issueFingerprint = fingerprint(run.gameId === "relay"
+      ? { expectedVersion, locale, topic, previousQuestion }
+      : { expectedVersion, locale });
     const replay = run.aiIssues.get(requestId);
     if (replay) {
       if (replay.fingerprint !== issueFingerprint) {
@@ -407,35 +592,49 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       }
       return success(200, replay.response);
     }
-    if (
-      run.status !== "ACTIVE" ||
-      run.mode !== "AI" ||
-      run.questionCount !== run.aiTurnCount + 1 ||
-      run.questionCount >= run.targetCount
-    ) {
+    if (run.status !== "ACTIVE" || run.mode !== "AI") {
       throw new BrowserRunError("지금은 인공지능 질문 차례가 아닙니다", 409);
     }
-    if (expectedVersion !== run.version || locale !== run.locale || topic !== run.topic) {
+    if (expectedVersion !== run.version || locale !== run.locale) {
       throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
     }
-    if (run.questions.at(-1) !== previousQuestion) {
-      throw new BrowserRunError("직전 학생 질문이 실행 상태와 일치하지 않습니다", 409);
+    if (run.gameId === "relay") {
+      if (
+        run.questionCount !== run.aiTurnCount + 1 ||
+        run.questionCount >= run.targetCount
+      ) {
+        throw new BrowserRunError("지금은 인공지능 질문 차례가 아닙니다", 409);
+      }
+      if (topic !== run.topic) {
+        throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+      }
+      if (run.questions.at(-1) !== previousQuestion) {
+        throw new BrowserRunError("직전 학생 질문이 실행 상태와 일치하지 않습니다", 409);
+      }
+    } else if (run.nextStep !== "AI_QUESTION" || run.pendingRoll?.actor !== "AI") {
+      throw new BrowserRunError("지금은 인공지능 질문 차례가 아닙니다", 409);
     }
     if (run.currentAiTurn) {
       throw new BrowserRunError("인공지능 질문을 이미 만들고 있습니다", 409);
     }
+    const diceFace = run.gameId === "dice" ? run.pendingRoll?.face : undefined;
     const issued: IssuedAiTurn = {
       generationRequestId: requestId,
-      output: locale === "en"
-        ? `What is connected AI question ${run.aiTurnCount + 1}?`
-        : `인공지능 연결 질문 ${run.aiTurnCount + 1}은 무엇인가요?`,
+      output: run.gameId === "dice"
+        ? locale === "en"
+          ? `What question fits dice face ${diceFace}?`
+          : `주사위 ${diceFace}번에 맞는 질문은 무엇인가요?`
+        : locale === "en"
+          ? `What is connected AI question ${run.aiTurnCount + 1}?`
+          : `인공지능 연결 질문 ${run.aiTurnCount + 1}은 무엇인가요?`,
       proof: `browser-proof-${randomUuid()}`,
       proofId: randomUuid(),
       expiresAt: "2099-12-31T23:59:59.000Z",
       runVersion: run.version,
+      ...(diceFace ? { diceFace } : {}),
     };
     run.currentAiTurn = issued;
-    const response = { ...issued };
+    const { diceFace: _diceFace, ...response } = issued;
     run.aiIssues.set(requestId, {
       fingerprint: issueFingerprint,
       response: cloneBody(response),

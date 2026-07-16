@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
+import { useGameRun, type GameRunSnapshot } from "./useGameRun";
 import { getQuestionDiceTypes, getQuestionGameText } from "@/lib/question-game-i18n";
-import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
+import { QUESTION_GAME_LIMITS, QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 
@@ -29,7 +30,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
   const { mode, players } = config;
   const isMulti = mode !== "solo";
   const isAI = mode === "ai";
-  const targetQuestions = QUESTION_GAME_RULES.dice.targets[isAI ? "ai" : "solo"].count;
+  const localTargetQuestions = QUESTION_GAME_RULES.dice.targets[isAI ? "ai" : "solo"].count;
 
   const [phase, setPhase] = useState<"idle" | "rolling" | "result" | "ai-turn" | "done">("idle");
   const [currentFace, setCurrentFace] = useState(1);
@@ -41,17 +42,41 @@ export default function DiceGame({ game, onBack, config }: Props) {
   const [feedback, setFeedback] = useState("");
 
   const { ask, loading: aiLoading } = useAIPlay();
+  const {
+    run,
+    result: runResult,
+    pending: runPending,
+    error: runError,
+    conflict: runConflict,
+    unconfirmedQuestion,
+    unconfirmedDiceAction,
+    start: startRun,
+    rollDice,
+    submitDiceQuestion,
+    submitDiceAiTurn,
+    reset: resetRun,
+    clearError: clearRunError,
+  } = useGameRun();
   const aiRequestRef = useRef(0);
   const rollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const currentPlayer = players[currentPlayerIdx] ?? text.me;
   const isAITurn = isAI && currentPlayerIdx === 1;
-  const studentQuestionCount = history.filter((entry) => !entry.isAI).length;
+  const targetQuestions = run?.targetCount ?? localTargetQuestions;
+  const studentQuestionCount = run?.questionCount
+    ?? history.filter((entry) => !entry.isAI).length;
+  const runBusy = runPending !== null;
+  const serverAiLoading = runPending === "ai";
+  const questionNeedsConfirmation = unconfirmedQuestion !== null;
+  const interactionBusy = runBusy || runConflict !== null;
+  const backBlocked = runBusy || questionNeedsConfirmation || unconfirmedDiceAction;
 
   function handleBack() {
+    if (backBlocked) return;
     aiRequestRef.current += 1;
     if (rollTimerRef.current) clearInterval(rollTimerRef.current);
     rollTimerRef.current = null;
+    resetRun();
     onBack();
   }
 
@@ -60,57 +85,74 @@ export default function DiceGame({ game, onBack, config }: Props) {
     if (rollTimerRef.current) clearInterval(rollTimerRef.current);
   }, []);
 
-  const roll = useCallback(() => {
-    if (phase !== "idle" || rollTimerRef.current) return;
+  async function recordAiQuestion(activeRun: GameRunSnapshot) {
+    const recorded = await submitDiceAiTurn(locale, activeRun);
+    if (!recorded) return;
+    const face = activeRun.pendingRoll?.face;
+    if (!face) return;
+    const type = diceTypes[face - 1];
+    setAiQuestion(recorded.output);
+    setHistory((entries) => [{
+      player: players[1] ?? "AI",
+      face,
+      type: type.type,
+      question: recorded.output,
+      isAI: true,
+    }, ...entries]);
+    setCurrentPlayerIdx(0);
+    setPhase("idle");
+  }
+
+  async function roll() {
+    if (phase !== "idle" || rollTimerRef.current || interactionBusy) return;
+    clearRunError();
+    const activeRun = run ?? await startRun(
+      game.id,
+      isAI ? "ai" : "solo",
+      "",
+      locale,
+    );
+    if (!activeRun) return;
+    const rolledRun = await rollDice(activeRun);
+    const final = rolledRun?.pendingRoll?.face;
+    if (!rolledRun || !final) return;
+
+    const rolledByAi = rolledRun.pendingRoll?.actor === "AI";
     setPhase("rolling");
     setQuestion("");
-    if (isAITurn) setAiQuestion("");
+    if (rolledByAi) setAiQuestion("");
     setFeedback("");
     let count = 0;
-    const final = Math.ceil(Math.random() * 6);
     rollTimerRef.current = setInterval(() => {
       setDisplayFace(Math.ceil(Math.random() * 6));
-      count++;
-      if (count >= 14) {
-        if (rollTimerRef.current) clearInterval(rollTimerRef.current);
-        rollTimerRef.current = null;
-        setDisplayFace(final);
-        setCurrentFace(final);
-        if (isAITurn) {
-          setPhase("ai-turn");
-          // AI가 자동으로 질문 생성
-          const typeInfo = diceTypes[final - 1];
-          const requestId = ++aiRequestRef.current;
-          ask({
-            action: "dice:generate",
-            context: { questionType: typeInfo.type, typeDesc: typeInfo.desc },
-          }).then((res) => {
-            if (requestId !== aiRequestRef.current) return;
-            const generated = res?.text.trim();
-            if (generated) {
-              setAiQuestion(generated);
-              setHistory((entries) => [{
-                player: players[1] ?? "AI",
-                face: final,
-                type: typeInfo.type,
-                question: generated,
-                isAI: true,
-              }, ...entries]);
-            }
-            setCurrentPlayerIdx(0);
-            setPhase("idle");
-          });
-        } else {
-          setPhase("result");
-        }
+      count += 1;
+      if (count < 14) return;
+      if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+      rollTimerRef.current = null;
+      setDisplayFace(final);
+      setCurrentFace(final);
+      if (rolledByAi) {
+        setPhase("ai-turn");
+        void recordAiQuestion(rolledRun);
+      } else {
+        setPhase("result");
       }
     }, 100);
-  }, [phase, isAITurn, ask, diceTypes, players]);
+  }
+
+  async function retryAiQuestion() {
+    if (!run || run.nextStep !== "AI_QUESTION" || runBusy) return;
+    clearRunError();
+    await recordAiQuestion(run);
+  }
 
   async function submit() {
-    const trimmed = question.trim();
-    if (!trimmed) return;
+    const trimmed = (unconfirmedQuestion ?? question).trim();
+    if (!trimmed || interactionBusy) return;
     const typeInfo = diceTypes[currentFace - 1];
+    clearRunError();
+    const saved = await submitDiceQuestion(trimmed, locale);
+    if (!saved) return;
     const studentEntry: RoundEntry = {
       player: currentPlayer,
       face: currentFace,
@@ -118,7 +160,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
       question: trimmed,
     };
 
-    if (studentQuestionCount + 1 >= targetQuestions) {
+    if (saved.result || saved.run.status === "SETTLED") {
       aiRequestRef.current += 1;
       setHistory([studentEntry, ...history]);
       setFeedback("");
@@ -159,7 +201,14 @@ export default function DiceGame({ game, onBack, config }: Props) {
     return (
       <div className="max-w-xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
-          <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{text.backToList}</button>
+          <button
+            type="button"
+            disabled={backBlocked}
+            onClick={handleBack}
+            className="text-muted-foreground hover:text-foreground text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {text.backToList}
+          </button>
           <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
             style={{ background: game.gradientCss }}>
             <span className="text-4xl">{game.emoji}</span>
@@ -170,6 +219,31 @@ export default function DiceGame({ game, onBack, config }: Props) {
           <div className="text-6xl">🎲</div>
           <h2 className="text-2xl font-black text-foreground">{text.diceHistory(studentQuestionCount)}</h2>
         </div>
+        {runResult && (
+          <div
+            role="status"
+            className={`rounded-xl border px-4 py-3 text-sm ${
+              runResult.awarded > 0
+                ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100"
+                : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+            }`}
+          >
+            <p className="font-bold">
+              {runResult.preview
+                ? (locale === "en" ? "Preview completed without points." : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                : runResult.awarded > 0
+                  ? (locale === "en" ? `+${runResult.awarded} points earned!` : `+${runResult.awarded}점 적립!`)
+                  : (locale === "en" ? "The daily point limit has been reached." : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+            </p>
+            {!runResult.preview && runResult.dailyRemaining > 0 && (
+              <p className="mt-1 text-xs">
+                {locale === "en"
+                  ? `${runResult.dailyRemaining} points are still available today.`
+                  : `오늘 ${runResult.dailyRemaining}점 더 받을 수 있어요.`}
+              </p>
+            )}
+          </div>
+        )}
         <div className="space-y-3">
           {history.map((entry, index) => (
             <div key={index} className="bg-card text-foreground rounded-xl border border-border p-4 flex items-center gap-2">
@@ -196,7 +270,14 @@ export default function DiceGame({ game, onBack, config }: Props) {
     <div className="max-w-xl mx-auto space-y-6">
       {/* 헤더 */}
       <div className="flex items-center gap-3">
-        <button onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm">{text.backToList}</button>
+        <button
+          type="button"
+          disabled={backBlocked}
+          onClick={handleBack}
+          className="text-muted-foreground hover:text-foreground text-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {text.backToList}
+        </button>
         <div className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
           style={{ background: game.gradientCss }}>
           <span className="text-4xl">{game.emoji}</span>
@@ -206,6 +287,23 @@ export default function DiceGame({ game, onBack, config }: Props) {
           </div>
         </div>
       </div>
+
+      {runConflict && (
+        <div className="space-y-3">
+          <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100 px-3 py-2 text-sm">
+            {runConflict}
+          </div>
+          <Button type="button" variant="outline" className="w-full" onClick={handleBack}>
+            {locale === "en" ? "Return to game selection" : "놀이 선택으로 돌아가기"}
+          </Button>
+        </div>
+      )}
+
+      {!runConflict && runError && phase !== "ai-turn" && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200 px-3 py-2 text-sm">
+          {runError}
+        </div>
+      )}
 
       {/* 플레이어 턴 표시 (멀티/AI) */}
       {isMulti && (
@@ -260,18 +358,39 @@ export default function DiceGame({ game, onBack, config }: Props) {
         )}
 
         {phase === "idle" && (
-          <Button onClick={roll}
+          <Button onClick={() => void roll()}
             className="w-full py-4 text-lg font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #4338CA, #6D28D9)" }}
-            disabled={aiLoading}>
-            {text.diceRoll}
+            disabled={runBusy || runConflict !== null}>
+            {runPending === "create" || runPending === "action" ? text.loading : text.diceRoll}
           </Button>
         )}
 
         {phase === "ai-turn" && (
-          <div className="w-full flex items-center justify-center gap-3 py-3">
-            <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <span className="text-indigo-700 dark:text-indigo-300 font-bold text-sm">{text.diceAiThinking}</span>
+          <div className="w-full space-y-3 py-3">
+            {serverAiLoading ? (
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <span className="text-indigo-700 dark:text-indigo-300 font-bold text-sm">{text.diceAiThinking}</span>
+              </div>
+            ) : (
+              <>
+                {runError && (
+                  <div role="alert" className="rounded-xl border border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200 px-3 py-2 text-sm">
+                    {runError}
+                  </div>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full font-bold"
+                  disabled={runBusy || runConflict !== null}
+                  onClick={() => void retryAiQuestion()}
+                >
+                  {locale === "en" ? "Retry AI question" : "인공지능 질문 다시 만들기"}
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -297,16 +416,29 @@ export default function DiceGame({ game, onBack, config }: Props) {
           )}
 
           <textarea
+            maxLength={QUESTION_GAME_LIMITS.question}
+            aria-label={locale === "en" ? "Enter a dice question" : "주사위 질문 입력"}
             className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-indigo-400 h-28"
             placeholder={text.dicePlaceholder(typeInfo.type)}
             value={question}
-            onChange={(e) => setQuestion(e.target.value)}
+            readOnly={interactionBusy || questionNeedsConfirmation}
+            aria-readonly={interactionBusy || questionNeedsConfirmation}
+            onChange={(e) => {
+              if (!interactionBusy && !questionNeedsConfirmation) {
+                setQuestion(e.target.value);
+                clearRunError();
+              }
+            }}
           />
-          <Button onClick={submit}
+          <Button onClick={() => void submit()}
             className="w-full font-bold text-white rounded-xl"
             style={{ background: typeInfo.color, opacity: question.trim() ? 1 : 0.5 }}
-            disabled={!question.trim() || aiLoading}>
-            {aiLoading ? text.diceFeedbackLoading : text.submit}
+            disabled={!question.trim() || interactionBusy || aiLoading}>
+            {runPending === "action"
+              ? text.sending
+              : questionNeedsConfirmation
+                ? (locale === "en" ? "Check saved question again" : "질문 저장 다시 확인")
+                : aiLoading ? text.diceFeedbackLoading : text.submit}
           </Button>
         </div>
       )}

@@ -13,6 +13,20 @@ export interface GameRunSnapshot {
   aiTurnCount: number;
   awaitingAiTurn: boolean;
   preview: boolean;
+  nextStep?: DiceRunNextStep;
+  pendingRoll?: DicePendingRoll | null;
+}
+
+export type DiceRunNextStep =
+  | "STUDENT_ROLL"
+  | "STUDENT_QUESTION"
+  | "AI_ROLL"
+  | "AI_QUESTION"
+  | "COMPLETE";
+
+export interface DicePendingRoll {
+  actor: "STUDENT" | "AI";
+  face: number;
 }
 
 export interface GameRunResult {
@@ -29,6 +43,8 @@ export interface SubmittedRelayQuestion {
   result: GameRunResult | null;
 }
 
+export type SubmittedDiceQuestion = SubmittedRelayQuestion;
+
 type PendingKind = "create" | "action" | "ai" | "complete" | null;
 
 interface RetriableRequest {
@@ -40,7 +56,7 @@ interface RetriableActionRequest extends RetriableRequest {
   question: string;
 }
 
-interface IssuedRelayAiTurn {
+interface IssuedQuestionGameAiTurn {
   output: string;
   proof: string;
   runVersion: number;
@@ -49,13 +65,15 @@ interface IssuedRelayAiTurn {
 
 interface RetriableAiRecordRequest extends RetriableRequest {
   generationRequestId: string;
-  issued: IssuedRelayAiTurn;
+  issued: IssuedQuestionGameAiTurn;
 }
 
 export interface RecordedRelayAiTurn {
   run: GameRunSnapshot;
   output: string;
 }
+
+export type RecordedDiceAiTurn = RecordedRelayAiTurn;
 
 const RUN_CONFLICT_MESSAGE =
   "질문놀이 상태가 다른 화면에서 변경되었습니다. 새 실행으로 다시 시작해 주세요.";
@@ -97,6 +115,73 @@ function readRun(value: unknown): GameRunSnapshot | null {
     typeof value.awaitingAiTurn !== "boolean" ||
     typeof value.preview !== "boolean"
   ) return null;
+  let nextStep: DiceRunNextStep | undefined;
+  let pendingRoll: DicePendingRoll | null | undefined;
+  if (value.gameId === "dice") {
+    if (
+      (value.mode !== "SOLO" && value.mode !== "AI") ||
+      (value.status !== "ACTIVE" && value.status !== "SETTLED") ||
+      value.nextStep !== "STUDENT_ROLL" &&
+      value.nextStep !== "STUDENT_QUESTION" &&
+      value.nextStep !== "AI_ROLL" &&
+      value.nextStep !== "AI_QUESTION" &&
+      value.nextStep !== "COMPLETE"
+    ) return null;
+    nextStep = value.nextStep;
+    if (value.pendingRoll === null || value.pendingRoll === undefined) {
+      pendingRoll = null;
+    } else {
+      if (
+        !isRecord(value.pendingRoll) ||
+        (value.pendingRoll.actor !== "STUDENT" && value.pendingRoll.actor !== "AI") ||
+        typeof value.pendingRoll.face !== "number" ||
+        !Number.isSafeInteger(value.pendingRoll.face) ||
+        value.pendingRoll.face < 1 ||
+        value.pendingRoll.face > 6
+      ) return null;
+      pendingRoll = {
+        actor: value.pendingRoll.actor,
+        face: value.pendingRoll.face,
+      };
+    }
+    const expectedPendingActor = nextStep === "STUDENT_QUESTION"
+      ? "STUDENT"
+      : nextStep === "AI_QUESTION"
+        ? "AI"
+        : null;
+    const hasPendingRoll = pendingRoll !== null;
+    let expectedNextStep: DiceRunNextStep;
+    if (value.mode === "SOLO") {
+      if (value.aiTurnCount !== 0) return null;
+      expectedNextStep = value.questionCount === value.targetCount
+        ? "COMPLETE"
+        : hasPendingRoll
+          ? "STUDENT_QUESTION"
+          : "STUDENT_ROLL";
+    } else if (
+      value.questionCount === value.targetCount &&
+      value.aiTurnCount === value.targetCount - 1
+    ) {
+      expectedNextStep = "COMPLETE";
+    } else if (value.questionCount === value.aiTurnCount) {
+      expectedNextStep = hasPendingRoll ? "STUDENT_QUESTION" : "STUDENT_ROLL";
+    } else if (
+      value.questionCount === value.aiTurnCount + 1 &&
+      value.questionCount < value.targetCount
+    ) {
+      expectedNextStep = hasPendingRoll ? "AI_QUESTION" : "AI_ROLL";
+    } else {
+      return null;
+    }
+    if (
+      nextStep !== expectedNextStep ||
+      (nextStep === "COMPLETE") !== (value.status === "SETTLED") ||
+      value.awaitingAiTurn !== (nextStep === "AI_QUESTION") ||
+      ((nextStep === "AI_ROLL" || nextStep === "AI_QUESTION") && value.mode !== "AI") ||
+      (expectedPendingActor === null && pendingRoll !== null) ||
+      (expectedPendingActor !== null && pendingRoll?.actor !== expectedPendingActor)
+    ) return null;
+  }
   return {
     id: value.id,
     ...(typeof value.gameId === "string" ? { gameId: value.gameId } : {}),
@@ -108,10 +193,12 @@ function readRun(value: unknown): GameRunSnapshot | null {
     aiTurnCount: value.aiTurnCount,
     awaitingAiTurn: value.awaitingAiTurn,
     preview: value.preview,
+    ...(nextStep ? { nextStep } : {}),
+    ...(pendingRoll !== undefined ? { pendingRoll } : {}),
   };
 }
 
-function readIssuedRelayAiTurn(value: unknown): IssuedRelayAiTurn | null {
+function readIssuedQuestionGameAiTurn(value: unknown): IssuedQuestionGameAiTurn | null {
   if (!isRecord(value)) return null;
   const expiresAtMs = typeof value.expiresAt === "string"
     ? Date.parse(value.expiresAt)
@@ -235,6 +322,9 @@ function isSameRunProgress(first: GameRunSnapshot, second: GameRunSnapshot) {
     first.questionCount === second.questionCount &&
     first.aiTurnCount === second.aiTurnCount &&
     first.awaitingAiTurn === second.awaitingAiTurn &&
+    first.nextStep === second.nextStep &&
+    first.pendingRoll?.actor === second.pendingRoll?.actor &&
+    first.pendingRoll?.face === second.pendingRoll?.face &&
     first.status === second.status
   );
 }
@@ -264,12 +354,81 @@ function isExpectedAiAdvance(
   );
 }
 
+function isExpectedDiceRollAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+) {
+  const expectedActor = current.nextStep === "AI_ROLL" ? "AI" : "STUDENT";
+  const expectedNextStep = expectedActor === "AI" ? "AI_QUESTION" : "STUDENT_QUESTION";
+  return (
+    current.gameId === "dice" &&
+    next.gameId === "dice" &&
+    next.id === current.id &&
+    next.mode === current.mode &&
+    next.status === "ACTIVE" &&
+    next.targetCount === current.targetCount &&
+    next.version === current.version + 1 &&
+    next.questionCount === current.questionCount &&
+    next.aiTurnCount === current.aiTurnCount &&
+    next.nextStep === expectedNextStep &&
+    next.pendingRoll?.actor === expectedActor &&
+    next.awaitingAiTurn === (expectedActor === "AI")
+  );
+}
+
+function isExpectedDiceQuestionAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+) {
+  const completesRun = current.questionCount + 1 === current.targetCount;
+  const expectedNextStep = completesRun
+    ? "COMPLETE"
+    : current.mode === "AI"
+      ? "AI_ROLL"
+      : "STUDENT_ROLL";
+  return (
+    current.gameId === "dice" &&
+    next.gameId === "dice" &&
+    next.id === current.id &&
+    next.mode === current.mode &&
+    next.status === (completesRun ? "SETTLED" : "ACTIVE") &&
+    next.targetCount === current.targetCount &&
+    next.version === current.version + 1 &&
+    next.questionCount === current.questionCount + 1 &&
+    next.aiTurnCount === current.aiTurnCount &&
+    next.nextStep === expectedNextStep &&
+    !next.awaitingAiTurn &&
+    next.pendingRoll == null
+  );
+}
+
+function isExpectedDiceAiAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+) {
+  return (
+    current.gameId === "dice" &&
+    next.gameId === "dice" &&
+    next.id === current.id &&
+    next.mode === current.mode &&
+    next.status === "ACTIVE" &&
+    next.targetCount === current.targetCount &&
+    next.version === current.version + 1 &&
+    next.questionCount === current.questionCount &&
+    next.aiTurnCount === current.aiTurnCount + 1 &&
+    next.nextStep === "STUDENT_ROLL" &&
+    !next.awaitingAiTurn &&
+    next.pendingRoll == null
+  );
+}
+
 export function useGameRun() {
   const mountedRef = useRef(false);
   const generationRef = useRef(0);
   const inFlightRef = useRef(false);
   const createRequestRef = useRef<RetriableRequest | null>(null);
   const actionRequestRef = useRef<RetriableActionRequest | null>(null);
+  const diceRollRequestRef = useRef<RetriableRequest | null>(null);
   const aiIssueRequestRef = useRef<RetriableRequest | null>(null);
   const aiRecordRequestRef = useRef<RetriableAiRecordRequest | null>(null);
   const completeRequestRef = useRef<RetriableRequest | null>(null);
@@ -279,6 +438,7 @@ export function useGameRun() {
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
   const [unconfirmedQuestion, setUnconfirmedQuestion] = useState<string | null>(null);
+  const [unconfirmedDiceAction, setUnconfirmedDiceAction] = useState(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -307,6 +467,7 @@ export function useGameRun() {
 
   const markConflict = useCallback((latestRun?: GameRunSnapshot) => {
     actionRequestRef.current = null;
+    diceRollRequestRef.current = null;
     aiIssueRequestRef.current = null;
     aiRecordRequestRef.current = null;
     completeRequestRef.current = null;
@@ -317,6 +478,7 @@ export function useGameRun() {
       });
     }
     setUnconfirmedQuestion(null);
+    setUnconfirmedDiceAction(false);
     setError(null);
     setConflict(RUN_CONFLICT_MESSAGE);
   }, []);
@@ -358,6 +520,7 @@ export function useGameRun() {
       if (!mountedRef.current || generationRef.current !== generation) return null;
       createRequestRef.current = null;
       actionRequestRef.current = null;
+      diceRollRequestRef.current = null;
       aiIssueRequestRef.current = null;
       aiRecordRequestRef.current = null;
       completeRequestRef.current = null;
@@ -365,6 +528,7 @@ export function useGameRun() {
       setResult(null);
       setConflict(null);
       setUnconfirmedQuestion(null);
+      setUnconfirmedDiceAction(false);
       return nextRun;
     } catch (requestError) {
       if (mountedRef.current && generationRef.current === generation) {
@@ -377,6 +541,93 @@ export function useGameRun() {
       finish(generation);
     }
   }, [begin, finish]);
+
+  const rollDice = useCallback(async (
+    runOverride?: GameRunSnapshot,
+  ): Promise<GameRunSnapshot | null> => {
+    const activeRun = runOverride ?? run;
+    if (
+      !activeRun ||
+      activeRun.gameId !== "dice" ||
+      (activeRun.nextStep !== "STUDENT_ROLL" && activeRun.nextStep !== "AI_ROLL") ||
+      conflict ||
+      !begin("action")
+    ) return null;
+    const generation = generationRef.current;
+    const key = `${activeRun.id}:${activeRun.version}:dice-roll`;
+    const request = diceRollRequestRef.current?.key === key
+      ? diceRollRequestRef.current
+      : { key, requestId: newRequestId() };
+    diceRollRequestRef.current = request;
+    try {
+      const value = await readJson(await fetch(
+        `/api/question-games/runs/${activeRun.id}/actions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "dice-roll",
+            requestId: request.requestId,
+            expectedVersion: activeRun.version,
+          }),
+        },
+      ));
+      let nextRun = readRun(value.run);
+      if (!nextRun || !isExpectedDiceRollAdvance(activeRun, nextRun)) {
+        throw new Error("주사위 결과를 확인할 수 없습니다.");
+      }
+      if (value.replayed === true) {
+        const current = await readRunResult(activeRun.id);
+        if (!isSameRunProgress(current.run, nextRun)) {
+          if (mountedRef.current && generationRef.current === generation) {
+            markConflict(current.run);
+          }
+          return null;
+        }
+        nextRun = current.run;
+      }
+      if (!mountedRef.current || generationRef.current !== generation) return null;
+      diceRollRequestRef.current = null;
+      setUnconfirmedDiceAction(false);
+      setRun(nextRun);
+      setError(null);
+      return nextRun;
+    } catch (requestError) {
+      const explicitlyRejected = requestError instanceof QuestionGameRequestError;
+      const message = requestErrorMessage(requestError, "주사위를 굴리지 못했습니다.");
+      try {
+        const recovered = await readRunResult(activeRun.id);
+        if (isExpectedDiceRollAdvance(activeRun, recovered.run)) {
+          if (!mountedRef.current || generationRef.current !== generation) return null;
+          diceRollRequestRef.current = null;
+          setUnconfirmedDiceAction(false);
+          setRun(recovered.run);
+          setError(null);
+          return recovered.run;
+        }
+        if (!isSameRunProgress(recovered.run, activeRun)) {
+          if (mountedRef.current && generationRef.current === generation) {
+            markConflict(recovered.run);
+          }
+          return null;
+        }
+      } catch {
+        // 적용 여부가 불확실하면 같은 요청 식별값으로 다시 확인한다.
+      }
+      if (mountedRef.current && generationRef.current === generation) {
+        if (explicitlyRejected) {
+          diceRollRequestRef.current = null;
+          setUnconfirmedDiceAction(false);
+        } else {
+          setUnconfirmedDiceAction(true);
+        }
+        setError(message);
+      }
+      return null;
+    } finally {
+      finish(generation);
+    }
+  }, [begin, conflict, finish, markConflict, run]);
 
   const submitRelayQuestion = useCallback(async (
     question: string,
@@ -472,6 +723,109 @@ export function useGameRun() {
     }
   }, [begin, conflict, finish, markConflict, run]);
 
+  const submitDiceQuestion = useCallback(async (
+    question: string,
+    locale: string,
+    runOverride?: GameRunSnapshot,
+  ): Promise<SubmittedDiceQuestion | null> => {
+    const activeRun = runOverride ?? run;
+    if (
+      !activeRun ||
+      activeRun.gameId !== "dice" ||
+      activeRun.nextStep !== "STUDENT_QUESTION" ||
+      activeRun.pendingRoll?.actor !== "STUDENT" ||
+      conflict ||
+      !begin("action")
+    ) return null;
+    const generation = generationRef.current;
+    const normalizedLocale = locale === "en" ? "en" : "ko";
+    const key = `${activeRun.id}:${activeRun.version}:dice-question:${normalizedLocale}:${question}`;
+    const request = actionRequestRef.current?.key === key
+      ? actionRequestRef.current
+      : { key, requestId: newRequestId(), question };
+    actionRequestRef.current = request;
+    try {
+      const value = await readJson(await fetch(
+        `/api/question-games/runs/${activeRun.id}/actions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "dice-submit-question",
+            requestId: request.requestId,
+            expectedVersion: activeRun.version,
+            question,
+            locale: normalizedLocale,
+          }),
+        },
+      ));
+      let nextRun = readRun(value.run);
+      if (!nextRun || !isExpectedDiceQuestionAdvance(activeRun, nextRun)) {
+        throw new Error("질문 저장 결과를 확인할 수 없습니다.");
+      }
+      let nextResult = readSettlementResult(value.result, nextRun);
+      if (value.replayed === true) {
+        const current = await readRunResult(activeRun.id);
+        if (!isSameRunProgress(current.run, nextRun)) {
+          if (mountedRef.current && generationRef.current === generation) {
+            markConflict(current.run);
+          }
+          return null;
+        }
+        nextRun = current.run;
+        nextResult = current.result;
+      }
+      if (!mountedRef.current || generationRef.current !== generation) return null;
+      actionRequestRef.current = null;
+      setRun(nextRun);
+      if (nextResult) setResult(nextResult);
+      setUnconfirmedQuestion(null);
+      setError(null);
+      return { run: nextRun, result: nextResult };
+    } catch (requestError) {
+      const message = requestErrorMessage(requestError, "질문을 저장하지 못했습니다.");
+      const explicitlyRejected = requestError instanceof QuestionGameRequestError;
+      try {
+        const recovered = await readRunResult(activeRun.id);
+        if (isExpectedDiceQuestionAdvance(activeRun, recovered.run)) {
+          if (!mountedRef.current || generationRef.current !== generation) return null;
+          actionRequestRef.current = null;
+          setRun(recovered.run);
+          if (recovered.result) setResult(recovered.result);
+          setUnconfirmedQuestion(null);
+          setError(null);
+          return recovered;
+        }
+        if (mountedRef.current && generationRef.current === generation) {
+          if (isSameRunProgress(recovered.run, activeRun)) {
+            if (explicitlyRejected) {
+              actionRequestRef.current = null;
+              setUnconfirmedQuestion(null);
+            } else {
+              setUnconfirmedQuestion(request.question);
+            }
+            setError(message);
+          } else {
+            markConflict(recovered.run);
+          }
+        }
+      } catch {
+        if (mountedRef.current && generationRef.current === generation) {
+          if (explicitlyRejected) {
+            actionRequestRef.current = null;
+            setUnconfirmedQuestion(null);
+          } else {
+            setUnconfirmedQuestion(request.question);
+          }
+          setError(message);
+        }
+      }
+      return null;
+    } finally {
+      finish(generation);
+    }
+  }, [begin, conflict, finish, markConflict, run]);
+
   const submitRelayAiTurn = useCallback(async (
     topic: string,
     previousQuestion: string,
@@ -502,7 +856,7 @@ export function useGameRun() {
 
     try {
       if (!recordRequest) {
-        let issued: IssuedRelayAiTurn;
+        let issued: IssuedQuestionGameAiTurn;
         try {
           const value = await readJson(await fetch(
             `/api/question-games/runs/${activeRun.id}/ai-turn`,
@@ -518,7 +872,7 @@ export function useGameRun() {
               }),
             },
           ));
-          const parsed = readIssuedRelayAiTurn(value);
+          const parsed = readIssuedQuestionGameAiTurn(value);
           if (!parsed || parsed.runVersion !== activeRun.version) {
             throw new Error("인공지능 질문 발급 결과를 확인할 수 없습니다.");
           }
@@ -576,6 +930,7 @@ export function useGameRun() {
         if (!mountedRef.current || generationRef.current !== generation) return null;
         aiIssueRequestRef.current = null;
         aiRecordRequestRef.current = null;
+        setUnconfirmedDiceAction(false);
         setRun(nextRun);
         setError(null);
         return { run: nextRun, output: recordRequest.issued.output };
@@ -609,6 +964,151 @@ export function useGameRun() {
           // 일반 기록 실패는 같은 요청을 보관하고, 증명 거절은 위에서 폐기한다.
         }
         if (mountedRef.current && generationRef.current === generation) {
+          setError(message);
+        }
+        return null;
+      }
+    } finally {
+      finish(generation);
+    }
+  }, [begin, conflict, finish, markConflict, run]);
+
+  const submitDiceAiTurn = useCallback(async (
+    locale: string,
+    runOverride?: GameRunSnapshot,
+  ): Promise<RecordedDiceAiTurn | null> => {
+    const activeRun = runOverride ?? run;
+    if (
+      !activeRun ||
+      activeRun.gameId !== "dice" ||
+      activeRun.nextStep !== "AI_QUESTION" ||
+      activeRun.pendingRoll?.actor !== "AI" ||
+      conflict ||
+      !begin("ai")
+    ) return null;
+    const generation = generationRef.current;
+    const normalizedLocale = locale === "en" ? "en" : "ko";
+    const key = [
+      activeRun.id,
+      activeRun.version,
+      "dice-ai-question",
+      normalizedLocale,
+      activeRun.pendingRoll.face,
+    ].join(":");
+    const issueRequest = aiIssueRequestRef.current?.key === key
+      ? aiIssueRequestRef.current
+      : { key, requestId: newRequestId() };
+    aiIssueRequestRef.current = issueRequest;
+    let recordRequest = aiRecordRequestRef.current?.key === key
+      ? aiRecordRequestRef.current
+      : null;
+
+    try {
+      if (!recordRequest) {
+        let issued: IssuedQuestionGameAiTurn;
+        try {
+          const value = await readJson(await fetch(
+            `/api/question-games/runs/${activeRun.id}/ai-turn`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                requestId: issueRequest.requestId,
+                expectedVersion: activeRun.version,
+                locale: normalizedLocale,
+              }),
+            },
+          ));
+          const parsed = readIssuedQuestionGameAiTurn(value);
+          if (!parsed || parsed.runVersion !== activeRun.version) {
+            throw new Error("인공지능 질문 발급 결과를 확인할 수 없습니다.");
+          }
+          issued = parsed;
+        } catch (requestError) {
+          if (mountedRef.current && generationRef.current === generation) {
+            setError(requestErrorMessage(
+              requestError,
+              "인공지능 질문을 만들지 못했습니다.",
+            ));
+          }
+          return null;
+        }
+        if (!mountedRef.current || generationRef.current !== generation) return null;
+        recordRequest = {
+          key,
+          requestId: newRequestId(),
+          generationRequestId: issueRequest.requestId,
+          issued,
+        };
+        aiRecordRequestRef.current = recordRequest;
+      }
+
+      try {
+        const value = await readJson(await fetch(
+          `/api/question-games/runs/${activeRun.id}/actions`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "dice-record-ai-question",
+              requestId: recordRequest.requestId,
+              generationRequestId: recordRequest.generationRequestId,
+              expectedVersion: activeRun.version,
+              output: recordRequest.issued.output,
+              proof: recordRequest.issued.proof,
+            }),
+          },
+        ));
+        let nextRun = readRun(value.run);
+        if (!nextRun || !isExpectedDiceAiAdvance(activeRun, nextRun)) {
+          throw new Error("인공지능 질문 기록 결과를 확인할 수 없습니다.");
+        }
+        if (value.replayed === true) {
+          const current = await readRunResult(activeRun.id);
+          if (!isSameRunProgress(current.run, nextRun)) {
+            if (mountedRef.current && generationRef.current === generation) {
+              markConflict(current.run);
+            }
+            return null;
+          }
+          nextRun = current.run;
+        }
+        if (!mountedRef.current || generationRef.current !== generation) return null;
+        aiIssueRequestRef.current = null;
+        aiRecordRequestRef.current = null;
+        setRun(nextRun);
+        setError(null);
+        return { run: nextRun, output: recordRequest.issued.output };
+      } catch (requestError) {
+        const proofWasRejected = isRejectedAiProof(requestError);
+        const explicitlyRejected = requestError instanceof QuestionGameRequestError;
+        if (proofWasRejected) aiRecordRequestRef.current = null;
+        const message = requestErrorMessage(
+          requestError,
+          "인공지능 질문을 기록하지 못했습니다.",
+        );
+        try {
+          const recovered = await readRunResult(activeRun.id);
+          if (isExpectedDiceAiAdvance(activeRun, recovered.run)) {
+            if (!mountedRef.current || generationRef.current !== generation) return null;
+            aiIssueRequestRef.current = null;
+            aiRecordRequestRef.current = null;
+            setUnconfirmedDiceAction(false);
+            setRun(recovered.run);
+            setError(null);
+            return { run: recovered.run, output: recordRequest.issued.output };
+          }
+          if (!isSameRunProgress(recovered.run, activeRun)) {
+            if (mountedRef.current && generationRef.current === generation) {
+              markConflict(recovered.run);
+            }
+            return null;
+          }
+        } catch {
+          // 일반 기록 실패는 같은 요청을 보관하고, 증명 거절은 새 증명을 받는다.
+        }
+        if (mountedRef.current && generationRef.current === generation) {
+          setUnconfirmedDiceAction(!explicitlyRejected);
           setError(message);
         }
         return null;
@@ -686,6 +1186,7 @@ export function useGameRun() {
     inFlightRef.current = false;
     createRequestRef.current = null;
     actionRequestRef.current = null;
+    diceRollRequestRef.current = null;
     aiIssueRequestRef.current = null;
     aiRecordRequestRef.current = null;
     completeRequestRef.current = null;
@@ -695,6 +1196,7 @@ export function useGameRun() {
     setError(null);
     setConflict(null);
     setUnconfirmedQuestion(null);
+    setUnconfirmedDiceAction(false);
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
@@ -706,9 +1208,13 @@ export function useGameRun() {
     error,
     conflict,
     unconfirmedQuestion,
+    unconfirmedDiceAction,
     start,
+    rollDice,
     submitRelayQuestion,
     submitRelayAiTurn,
+    submitDiceQuestion,
+    submitDiceAiTurn,
     complete,
     reset,
     clearError,

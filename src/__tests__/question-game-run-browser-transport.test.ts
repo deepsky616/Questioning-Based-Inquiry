@@ -14,7 +14,7 @@ const studentB: BrowserQuestionGameRunActor = {
 };
 
 const ids = Array.from(
-  { length: 12 },
+  { length: 100 },
   (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
 );
 
@@ -290,6 +290,326 @@ describe("브라우저 질문놀이 실행 전송기", () => {
     });
     expect(recordReplay).toMatchObject({
       body: { replayed: true, run: { version: 3, aiTurnCount: 1 } },
+    });
+  });
+
+  it("질문 주사위 혼자 모드의 굴리기와 질문을 세 번 처리하고 마지막 질문에서 정산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const createBody = {
+      gameId: "dice",
+      mode: "solo",
+      requestId: ids[12],
+      locale: "ko",
+    };
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: createBody,
+    });
+    const id = runId(created);
+    expect(created).toMatchObject({
+      status: 201,
+      body: {
+        run: {
+          gameId: "dice",
+          status: "ACTIVE",
+          version: 1,
+          nextStep: "STUDENT_ROLL",
+          pendingRoll: null,
+        },
+      },
+    });
+
+    let version = 1;
+    let finalResponse = created;
+    for (let index = 0; index < 3; index += 1) {
+      const rollBody = {
+        action: "dice-roll",
+        requestId: ids[13 + index * 2],
+        expectedVersion: version,
+        face: 99,
+      };
+      const rolled = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: rollBody,
+      });
+      const rolledRun = rolled.body.run as {
+        pendingRoll: { actor: string; face: number };
+      };
+      expect(rolledRun.pendingRoll).toMatchObject({ actor: "STUDENT" });
+      expect(rolledRun.pendingRoll.face).toBeGreaterThanOrEqual(1);
+      expect(rolledRun.pendingRoll.face).toBeLessThanOrEqual(6);
+      if (index === 0) {
+        const replay = store.dispatch(studentA, {
+          method: "POST",
+          pathname: `/api/question-games/runs/${id}/actions`,
+          body: rollBody,
+        });
+        expect(replay).toMatchObject({
+          status: 200,
+          body: {
+            replayed: true,
+            run: {
+              version: 2,
+              pendingRoll: { actor: "STUDENT", face: rolledRun.pendingRoll.face },
+            },
+          },
+        });
+      }
+      version += 1;
+
+      finalResponse = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "dice-submit-question",
+          requestId: ids[14 + index * 2],
+          expectedVersion: version,
+          question: `주사위 질문 ${index + 1}은 무엇인가요?`,
+          locale: "ko",
+        },
+      });
+      version += 1;
+    }
+
+    expect(finalResponse).toMatchObject({
+      status: 200,
+      body: {
+        replayed: false,
+        run: {
+          status: "SETTLED",
+          version: 7,
+          questionCount: 3,
+          nextStep: "COMPLETE",
+          pendingRoll: null,
+        },
+        result: {
+          awarded: 5,
+          dailyLimit: 30,
+          dailyRemaining: 25,
+          preview: false,
+        },
+      },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "dice-submit-question",
+        requestId: ids[18],
+        expectedVersion: 6,
+        question: "주사위 질문 3은 무엇인가요?",
+        locale: "ko",
+      },
+    })).toMatchObject({
+      status: 200,
+      body: {
+        replayed: true,
+        run: { status: "SETTLED", version: 7 },
+        result: { awarded: 5, dailyRemaining: 25 },
+      },
+    });
+    expect(store.dispatch(studentB, {
+      method: "GET",
+      pathname: `/api/question-games/runs/${id}/result`,
+      body: {},
+    })).toEqual({
+      status: 403,
+      body: { error: "자신의 질문놀이 실행만 이용할 수 있습니다" },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: createBody,
+    })).toMatchObject({
+      status: 200,
+      body: { replayed: true, run: { id, status: "SETTLED", version: 7 } },
+    });
+  });
+
+  it("질문 주사위 도움 모드에서 학생과 인공지능 차례를 지키고 구 점을 정산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "dice",
+        mode: "ai",
+        requestId: ids[20],
+        locale: "ko",
+      },
+    });
+    const id = runId(created);
+    let version = 1;
+    let finalResponse = created;
+
+    for (let index = 0; index < 3; index += 1) {
+      const studentRoll = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "dice-roll",
+          requestId: ids[21 + index * 5],
+          expectedVersion: version,
+        },
+      });
+      expect(studentRoll.body.run).toMatchObject({
+        nextStep: "STUDENT_QUESTION",
+        pendingRoll: { actor: "STUDENT" },
+      });
+      version += 1;
+
+      finalResponse = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "dice-submit-question",
+          requestId: ids[22 + index * 5],
+          expectedVersion: version,
+          question: `도움 모드 질문 ${index + 1}은 무엇인가요?`,
+          locale: "ko",
+        },
+      });
+      version += 1;
+      if (index === 2) break;
+      expect(finalResponse.body.run).toMatchObject({
+        nextStep: "AI_ROLL",
+        pendingRoll: null,
+      });
+
+      const aiRoll = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "dice-roll",
+          requestId: ids[23 + index * 5],
+          expectedVersion: version,
+        },
+      });
+      expect(aiRoll.body.run).toMatchObject({
+        nextStep: "AI_QUESTION",
+        awaitingAiTurn: true,
+        pendingRoll: { actor: "AI" },
+      });
+      version += 1;
+
+      const issueBody = {
+        requestId: ids[24 + index * 5],
+        expectedVersion: version,
+        locale: "ko",
+      };
+      const issued = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/ai-turn`,
+        body: issueBody,
+      });
+      expect(store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/ai-turn`,
+        body: issueBody,
+      })).toEqual(issued);
+      const issuedBody = issued.body as { output: string; proof: string };
+      const recordBody = {
+        action: "dice-record-ai-question",
+        requestId: ids[25 + index * 5],
+        generationRequestId: issueBody.requestId,
+        expectedVersion: version,
+        output: issuedBody.output,
+        proof: issuedBody.proof,
+      };
+      const recorded = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: recordBody,
+      });
+      expect(recorded.body.run).toMatchObject({
+        nextStep: "STUDENT_ROLL",
+        pendingRoll: null,
+        aiTurnCount: index + 1,
+        awaitingAiTurn: false,
+      });
+      expect(store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: recordBody,
+      })).toMatchObject({
+        body: { replayed: true, run: { aiTurnCount: index + 1 } },
+      });
+      version += 1;
+    }
+
+    expect(finalResponse).toMatchObject({
+      status: 200,
+      body: {
+        run: {
+          status: "SETTLED",
+          version: 11,
+          questionCount: 3,
+          aiTurnCount: 2,
+          nextStep: "COMPLETE",
+        },
+        result: {
+          awarded: 9,
+          dailyLimit: 50,
+          dailyRemaining: 41,
+          preview: false,
+        },
+      },
+    });
+  });
+
+  it("질문 주사위 점수를 같은 학생과 모드의 하루 누계에 합산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+
+    const finishSoloDice = (createIndex: number, actionStart: number) => {
+      const created = store.dispatch(studentA, {
+        method: "POST",
+        pathname: "/api/question-games/runs",
+        body: {
+          gameId: "dice",
+          mode: "solo",
+          requestId: ids[createIndex],
+          locale: "ko",
+        },
+      });
+      const id = runId(created);
+      let version = 1;
+      let response = created;
+      for (let index = 0; index < 3; index += 1) {
+        response = store.dispatch(studentA, {
+          method: "POST",
+          pathname: `/api/question-games/runs/${id}/actions`,
+          body: {
+            action: "dice-roll",
+            requestId: ids[actionStart + index * 2],
+            expectedVersion: version,
+          },
+        });
+        version += 1;
+        response = store.dispatch(studentA, {
+          method: "POST",
+          pathname: `/api/question-games/runs/${id}/actions`,
+          body: {
+            action: "dice-submit-question",
+            requestId: ids[actionStart + index * 2 + 1],
+            expectedVersion: version,
+            question: `하루 누계 질문 ${index + 1}은 무엇인가요?`,
+            locale: "ko",
+          },
+        });
+        version += 1;
+      }
+      return response;
+    };
+
+    expect(finishSoloDice(40, 41).body.result).toMatchObject({
+      awarded: 5,
+      dailyRemaining: 25,
+    });
+    expect(finishSoloDice(47, 48).body.result).toMatchObject({
+      awarded: 5,
+      dailyRemaining: 20,
     });
   });
 });
