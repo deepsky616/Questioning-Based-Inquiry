@@ -62,6 +62,7 @@ export async function generateMysteryAiAnswer(
 
   const response = await generateJson<unknown>({
     userId,
+    modelOverride: "gemini-2.5-flash-lite",
     prompt: JSON.stringify({
       hiddenItem: item.names[request.locale],
       locale: request.locale,
@@ -70,6 +71,7 @@ export async function generateMysteryAiAnswer(
     systemInstruction: MYSTERY_AI_SYSTEM_INSTRUCTION,
     temperature: 0,
     maxOutputTokens: 32,
+    thinkingBudget: 0,
     timeoutMs: 8_000,
     responseMimeType: "application/json",
     responseJsonSchema: MYSTERY_AI_RESPONSE_JSON_SCHEMA,

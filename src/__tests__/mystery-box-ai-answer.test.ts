@@ -78,8 +78,10 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     const options = mocks.generateJson.mock.calls[0][0];
     expect(options).toMatchObject({
       userId: "player-1",
+      modelOverride: "gemini-2.5-flash-lite",
       temperature: 0,
       maxOutputTokens: 32,
+      thinkingBudget: 0,
       timeoutMs: 8_000,
       responseMimeType: "application/json",
       responseJsonSchema: {

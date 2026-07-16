@@ -55,7 +55,7 @@ describe("callGemini — 재시도·페일오버·모델 선택", () => {
     });
   });
 
-  it("구조화 출력 상한·시간 제한·응답 형식과 틀을 요청에 전달한다", async () => {
+  it("구조화 출력 상한·사고 예산·시간 제한·응답 형식과 틀을 요청에 전달한다", async () => {
     const responseJsonSchema = {
       type: "object",
       additionalProperties: false,
@@ -70,6 +70,7 @@ describe("callGemini — 재시도·페일오버·모델 선택", () => {
       userId: "u1",
       prompt: "구조화 제이슨",
       maxOutputTokens: 32,
+      thinkingBudget: 0,
       timeoutMs: 8_000,
       responseMimeType: "application/json",
       responseJsonSchema,
@@ -81,10 +82,48 @@ describe("callGemini — 재시도·페일오버·모델 선택", () => {
       config: {
         httpOptions: { timeout: 8_000 },
         maxOutputTokens: 32,
+        thinkingConfig: { thinkingBudget: 0 },
         responseMimeType: "application/json",
         responseJsonSchema,
       },
     });
+  });
+
+  it("사고 예산은 대체 모델 호출에도 같은 값으로 전달한다", async () => {
+    vi.useFakeTimers();
+    mResolve.mockResolvedValue({ apiKey: "k", model: "gemini-2.5-pro" });
+    generateContent
+      .mockRejectedValueOnce(busyErr())
+      .mockRejectedValueOnce(busyErr())
+      .mockResolvedValueOnce(ok("{}"));
+
+    const pending = generateJson({
+      userId: "u1",
+      prompt: "짧은 구조화 분류",
+      modelOverride: "gemini-2.5-flash-lite",
+      thinkingBudget: 0,
+      maxOutputTokens: 32,
+    });
+    await vi.runAllTimersAsync();
+
+    await expect(pending).resolves.toEqual({});
+    expect(calledModels()).toEqual([
+      "gemini-2.5-flash-lite",
+      "gemini-2.5-flash-lite",
+      "gemini-2.5-flash",
+    ]);
+    for (let callNumber = 1; callNumber <= 3; callNumber += 1) {
+      expect(generateContent).toHaveBeenNthCalledWith(
+        callNumber,
+        expect.objectContaining({
+          config: {
+            thinkingConfig: { thinkingBudget: 0 },
+            maxOutputTokens: 32,
+          },
+        }),
+      );
+    }
+    vi.useRealTimers();
   });
 
   it("quality 작업은 크기와 무관하게 flash + 낮은 온도로 호출한다", async () => {

@@ -28,6 +28,8 @@ export interface GenerateOptions {
   modelOverride?: string;
   /** 특정 요청의 최대 응답 토큰 수. 없으면 모델 기본값을 쓴다. */
   maxOutputTokens?: number;
+  /** 특정 요청의 사고 토큰 예산. 없으면 모델 기본값을 쓴다. */
+  thinkingBudget?: number;
   /** 특정 요청의 통신 시간 제한. 밀리초 단위이다. */
   timeoutMs?: number;
   /** 구조화 응답에 사용할 응답 형식. */
@@ -67,6 +69,7 @@ async function callGeminiWithMetadata({
   apiKeyOverride,
   modelOverride,
   maxOutputTokens,
+  thinkingBudget,
   timeoutMs,
   responseMimeType,
   responseJsonSchema,
@@ -89,6 +92,9 @@ async function callGeminiWithMetadata({
           ...(systemInstruction ? { systemInstruction } : {}),
           ...(temp != null ? { temperature: temp } : {}),
           ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+          ...(thinkingBudget !== undefined
+            ? { thinkingConfig: { thinkingBudget } }
+            : {}),
           ...(timeoutMs !== undefined
             ? { httpOptions: { timeout: timeoutMs } }
             : {}),
