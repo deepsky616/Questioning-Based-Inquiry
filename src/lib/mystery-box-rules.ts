@@ -19,6 +19,14 @@ export type MysteryAttribute = typeof MYSTERY_ATTRIBUTES[number];
 export type MysteryLocale = "ko" | "en";
 export type MysteryAnswer = "yes" | "no" | "unknown";
 
+export interface MysteryAnswerResolution {
+  itemId: string;
+  playerId: string;
+  locale: MysteryLocale;
+  question: string;
+  answer: MysteryAnswer;
+}
+
 export interface MysteryItem {
   id: string;
   names: Record<MysteryLocale, string>;

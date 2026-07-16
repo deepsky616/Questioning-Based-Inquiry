@@ -4,6 +4,7 @@ import {
   getMysteryItem,
   isMysteryGuessCorrect,
   type MysteryAnswer,
+  type MysteryAnswerResolution,
   type MysteryItem,
   type MysteryLocale,
 } from "@/lib/mystery-box-rules";
@@ -29,6 +30,7 @@ export type MysteryHistoryItem =
       locale: MysteryLocale;
       question: string;
       answer: MysteryAnswer;
+      answerSource?: "ai";
     }
   | {
       kind: "guess";
@@ -140,20 +142,25 @@ function isMysteryHistoryItem(value: unknown): value is MysteryHistoryItem {
     return false;
   }
   if (value.kind === "question") {
-    return hasExactKeys(value, [
-      "kind",
-      "playerId",
-      "playerName",
-      "locale",
-      "question",
-      "answer",
-    ]) &&
+    return hasExactKeys(
+      value,
+      [
+        "kind",
+        "playerId",
+        "playerName",
+        "locale",
+        "question",
+        "answer",
+      ],
+      ["answerSource"],
+    ) &&
       (value.locale === "ko" || value.locale === "en") &&
       isBoundedStoredText(value.question, QUESTION_GAME_LIMITS.question) &&
       /[?？]/u.test(value.question) &&
       (value.answer === "yes" ||
         value.answer === "no" ||
-        value.answer === "unknown");
+        value.answer === "unknown") &&
+      (value.answerSource === undefined || value.answerSource === "ai");
   }
   return value.kind === "guess" &&
     hasExactKeys(value, [
@@ -244,19 +251,21 @@ function hasValidHistorySemantics(state: MysteryRoomState): boolean {
   const item = getMysteryItem(state.private.itemId);
   if (!item) return false;
 
-  return state.history.every((historyItem) =>
-    historyItem.kind === "question"
-      ? classifyMysteryQuestion(
-          historyItem.question,
-          item,
-          historyItem.locale,
-        ) === historyItem.answer
-      : isMysteryGuessCorrect(
-          historyItem.guess,
-          item,
-          historyItem.locale,
-        ) === historyItem.correct
-  );
+  return state.history.every((historyItem) => {
+    if (historyItem.kind === "question") {
+      if (historyItem.answerSource === "ai") return true;
+      return classifyMysteryQuestion(
+        historyItem.question,
+        item,
+        historyItem.locale,
+      ) === historyItem.answer;
+    }
+    return isMysteryGuessCorrect(
+      historyItem.guess,
+      item,
+      historyItem.locale,
+    ) === historyItem.correct;
+  });
 }
 
 function hasValidPhase(state: MysteryRoomState): boolean {
@@ -439,6 +448,9 @@ function projectMysteryHistoryItem(
         ...common,
         question: value.question,
         answer: value.answer,
+        ...(value.answerSource === "ai"
+          ? { answerSource: value.answerSource }
+          : {}),
       }
     : value.kind === "guess"
       ? {
@@ -535,6 +547,26 @@ function invalid(
 
 function readLocale(value: unknown): MysteryLocale | null {
   return value === "ko" || value === "en" ? value : null;
+}
+
+function isMysteryAnswerResolution(
+  value: unknown,
+): value is MysteryAnswerResolution {
+  return isRecord(value) &&
+    hasExactKeys(value, [
+      "itemId",
+      "playerId",
+      "locale",
+      "question",
+      "answer",
+    ]) &&
+    typeof value.itemId === "string" &&
+    typeof value.playerId === "string" &&
+    (value.locale === "ko" || value.locale === "en") &&
+    typeof value.question === "string" &&
+    (value.answer === "yes" ||
+      value.answer === "no" ||
+      value.answer === "unknown");
 }
 
 function currentTurnPlayerId(state: MysteryRoomState): string | null {
@@ -738,6 +770,34 @@ function askMysteryQuestion(
     };
   }
 
+  const ruleAnswer = classifyMysteryQuestion(question, item, locale);
+  const resolution = context.mysteryAnswerResolution;
+  let answer = ruleAnswer;
+  let answerSource: "ai" | undefined;
+  if (ruleAnswer === "unknown") {
+    if (!(
+      isMysteryAnswerResolution(resolution) &&
+      resolution.itemId === item.id &&
+      resolution.playerId === context.userId &&
+      resolution.locale === locale &&
+      resolution.question === question
+    )) {
+      return {
+        kind: "resolution-required",
+        room: context.room,
+        resolution: {
+          itemId: item.id,
+          playerId: context.userId,
+          locale,
+          question,
+        },
+        message: "미스터리 박스 질문 답변 해결이 필요합니다",
+      };
+    }
+    answer = resolution.answer;
+    answerSource = "ai";
+  }
+
   return finishOrAdvanceMysteryActivity(
     context,
     state,
@@ -750,7 +810,8 @@ function askMysteryQuestion(
         playerName: context.userName,
         locale,
         question,
-        answer: classifyMysteryQuestion(question, item, locale),
+        answer,
+        ...(answerSource ? { answerSource } : {}),
       },
     ],
     { ...state.scores, [context.userId]: score + 1 },

@@ -3,6 +3,7 @@ import {
   isBuiltInQuestionGameId,
   type BuiltInQuestionGameId,
 } from "@/lib/question-game-rules";
+import type { MysteryAnswerResolution } from "@/lib/mystery-box-rules";
 import type {
   GameRoom,
   RoomCommandResult,
@@ -41,6 +42,7 @@ export interface QuestionGameRoomCommandInput {
   now: number;
   random: () => number;
   randomUUID: () => string;
+  mysteryAnswerResolution?: MysteryAnswerResolution;
 }
 
 export interface QuestionGameRoomEngineContext
@@ -61,6 +63,12 @@ type QuestionGameEngineFailure<
 export type QuestionGameEngineResult =
   | { kind: "changed"; room: GameRoom; result?: RoomCommandResult }
   | { kind: "replayed"; room: GameRoom; result?: RoomCommandResult }
+  | {
+      kind: "resolution-required";
+      room: GameRoom;
+      resolution: Omit<MysteryAnswerResolution, "answer">;
+      message: string;
+    }
   | QuestionGameEngineFailure<"invalid">
   | QuestionGameEngineFailure<"forbidden">
   | QuestionGameEngineFailure<"conflict">
@@ -134,7 +142,7 @@ function serializedBytes(value: unknown): number | null {
 
 type QuestionGameFailureKind = Exclude<
   QuestionGameRoomResult["kind"],
-  "changed" | "replayed"
+  "changed" | "replayed" | "resolution-required"
 >;
 
 function unchanged(
@@ -326,6 +334,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
     now,
     random,
     randomUUID,
+    mysteryAnswerResolution,
   } = input;
 
   if (!room.players.some(({ id }) => id === userId)) {
@@ -447,6 +456,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
         now,
         random,
         randomUUID: checkedRandomUUID,
+        mysteryAnswerResolution,
       });
     } catch {
       return unchanged(
@@ -479,6 +489,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
       now,
       random,
       randomUUID: checkedRandomUUID,
+      mysteryAnswerResolution,
     });
   } catch {
     return unchanged(
@@ -501,6 +512,13 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
 
   if (engineResult.kind === "replayed") {
     return unchanged("replayed", room, engineResult.result);
+  }
+  if (engineResult.kind === "resolution-required") {
+    return {
+      ...engineResult,
+      room,
+      resolution: structuredClone(engineResult.resolution),
+    };
   }
   if (engineResult.kind !== "changed") {
     return unchanged(engineResult.kind, room, engineResult.message);

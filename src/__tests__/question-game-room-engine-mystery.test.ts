@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameRoom } from "@/lib/question-games-data";
+import type { MysteryAnswerResolution } from "@/lib/mystery-box-rules";
 import {
   applyQuestionGameRoomCommand,
   leaveQuestionGameRoom,
@@ -97,6 +98,7 @@ function applyMystery(
     userName?: string;
     commandIndex?: number;
     nextRoundId?: string;
+    mysteryAnswerResolution?: MysteryAnswerResolution;
   } = {},
 ) {
   return applyQuestionGameRoomCommand({
@@ -115,6 +117,9 @@ function applyMystery(
     now: 400,
     random: () => 0,
     randomUUID: () => options.nextRoundId ?? commandId(90),
+    ...(options.mysteryAnswerResolution === undefined
+      ? {}
+      : { mysteryAnswerResolution: options.mysteryAnswerResolution }),
   });
 }
 
@@ -250,14 +255,52 @@ describe("미스터리 박스 방 판정기", () => {
     expect(state.private).toEqual({ itemId: "apple" });
   });
 
-  it("모름 질문도 한 활동을 쓰고 같은 참가자의 연속 제출을 막는다", () => {
+  it("규칙이 모르는 질문은 상태를 바꾸지 않고 해결값을 요청한다", () => {
+    const room = prepareRoom();
+    const result = applyMystery(
+      room,
+      "mystery-ask",
+      { locale: "ko", question: "무슨 소리가 나나요?" },
+      { nextRoundId: commandId(92) },
+    );
+
+    expect(result).toMatchObject({
+      kind: "resolution-required",
+      room,
+      resolution: {
+        itemId: "apple",
+        playerId: "host",
+        locale: "ko",
+        question: "무슨 소리가 나나요?",
+      },
+    });
+    expect(result.room).toBe(room);
+    expect(room.gameState).toMatchObject({
+      round: 1,
+      roundId: ROUND_ID,
+      currentTurnIdx: 0,
+      history: [],
+      scores: { host: 0, guest: 0 },
+    });
+  });
+
+  it("묶인 해결값은 에이아이 출처와 함께 질문을 한 번 기록한다", () => {
     const room = prepareRoom();
     const nextRoundId = commandId(92);
     const asked = changedRoom(applyMystery(
       room,
       "mystery-ask",
       { locale: "ko", question: "무슨 소리가 나나요?" },
-      { nextRoundId },
+      {
+        nextRoundId,
+        mysteryAnswerResolution: {
+          itemId: "apple",
+          playerId: "host",
+          locale: "ko",
+          question: "무슨 소리가 나나요?",
+          answer: "unknown",
+        },
+      },
     ));
     const state = asked.gameState as unknown as MysteryRoomState;
 
@@ -265,11 +308,17 @@ describe("미스터리 박스 방 판정기", () => {
       round: 2,
       roundId: nextRoundId,
       currentTurnIdx: 1,
+      scores: { host: 1, guest: 0 },
     });
-    expect(state.history.at(-1)).toMatchObject({
+    expect(state.history).toEqual([{
       kind: "question",
+      playerId: "host",
+      playerName: "Host",
+      locale: "ko",
+      question: "무슨 소리가 나나요?",
       answer: "unknown",
-    });
+      answerSource: "ai",
+    }]);
 
     const repeated = applyMystery(
       asked,
@@ -278,6 +327,81 @@ describe("미스터리 박스 방 판정기", () => {
       { commandIndex: 12, nextRoundId: commandId(93) },
     );
     expect(repeated).toMatchObject({ kind: "forbidden", room: asked });
+  });
+
+  it.each([
+    ["물건", { itemId: "book" }],
+    ["참가자", { playerId: "guest" }],
+    ["언어", { locale: "en" }],
+    ["질문", { question: "다른 질문인가요?" }],
+    ["답", { answer: "maybe" }],
+  ] as const)("%s이 다른 해결값을 사용하지 않는다", (_name, changedBinding) => {
+    const room = prepareRoom();
+    const result = applyMystery(
+      room,
+      "mystery-ask",
+      { locale: "ko", question: "무슨 소리가 나나요?" },
+      {
+        mysteryAnswerResolution: {
+          itemId: "apple",
+          playerId: "host",
+          locale: "ko",
+          question: "무슨 소리가 나나요?",
+          answer: "yes",
+          ...changedBinding,
+        } as unknown as MysteryAnswerResolution,
+      },
+    );
+
+    expect(result).toMatchObject({ kind: "resolution-required", room });
+    expect(result.room).toBe(room);
+  });
+
+  it("클라이언트 본문의 답과 출처는 해결값으로 사용하지 않는다", () => {
+    const room = prepareRoom();
+    const result = applyMystery(room, "mystery-ask", {
+      locale: "ko",
+      question: "무슨 소리가 나나요?",
+      answer: "yes",
+      answerSource: "ai",
+      mysteryAnswerResolution: {
+        itemId: "apple",
+        playerId: "host",
+        locale: "ko",
+        question: "무슨 소리가 나나요?",
+        answer: "yes",
+      },
+    });
+
+    expect(result).toMatchObject({ kind: "resolution-required", room });
+  });
+
+  it("규칙이 판정한 질문에는 에이아이 해결값을 적용하지 않는다", () => {
+    const room = prepareRoom();
+    const nextRoom = changedRoom(applyMystery(
+      room,
+      "mystery-ask",
+      { locale: "ko", question: "먹을 수 있나요?" },
+      {
+        mysteryAnswerResolution: {
+          itemId: "apple",
+          playerId: "host",
+          locale: "ko",
+          question: "먹을 수 있나요?",
+          answer: "no",
+        },
+      },
+    ));
+    const state = nextRoom.gameState as unknown as MysteryRoomState;
+
+    expect(state.history).toEqual([{
+      kind: "question",
+      playerId: "host",
+      playerName: "Host",
+      locale: "ko",
+      question: "먹을 수 있나요?",
+      answer: "yes",
+    }]);
   });
 
   it("질문과 추측을 섞어도 활동마다 라운드와 차례를 한 번만 넘긴다", () => {
@@ -295,7 +419,7 @@ describe("미스터리 박스 방 판정기", () => {
         nextRoundId: commandId(171),
       },
     ));
-    room = askCurrentPlayer(room, 72, 172, "무슨 소리가 나나요?");
+    room = askCurrentPlayer(room, 72, 172);
     state = room.gameState as unknown as MysteryRoomState;
 
     expect(state).toMatchObject({
@@ -669,6 +793,66 @@ describe("미스터리 박스 방 판정기", () => {
     expect(readMysteryState({
       ...state,
       history: [{ ...question, locale: "en" }],
+    })).toBeNull();
+    expect(readMysteryState(state)).toEqual(state);
+  });
+
+  it("기존 출처 없는 기록과 새 에이아이 출처 기록을 함께 읽는다", () => {
+    const room = changedRoom(applyMystery(
+      prepareRoom(),
+      "mystery-ask",
+      { locale: "ko", question: "무슨 소리가 나나요?" },
+      {
+        commandIndex: 67,
+        mysteryAnswerResolution: {
+          itemId: "apple",
+          playerId: "host",
+          locale: "ko",
+          question: "무슨 소리가 나나요?",
+          answer: "yes",
+        },
+      },
+    ));
+    const state = room.gameState as unknown as MysteryRoomState;
+    const aiQuestion = state.history[0];
+    const { answerSource: _answerSource, ...legacyQuestion } = aiQuestion as
+      typeof aiQuestion & { answerSource?: "ai" };
+    const legacyState = {
+      ...state,
+      history: [{ ...legacyQuestion, answer: "unknown" }],
+    };
+    const publicRoom = toPublicGameRoom(room);
+
+    expect(readMysteryState(state)).toEqual(state);
+    expect(readMysteryState(legacyState)).toEqual(legacyState);
+    expect(publicRoom.gameState).toHaveProperty("history.0.answerSource", "ai");
+    expect(readMysteryPublicState(publicRoom.gameState)).toEqual(
+      publicRoom.gameState,
+    );
+  });
+
+  it("에이아이 출처는 허용된 값만 읽는다", () => {
+    const room = changedRoom(applyMystery(
+      prepareRoom(),
+      "mystery-ask",
+      { locale: "ko", question: "무슨 소리가 나나요?" },
+      {
+        commandIndex: 68,
+        mysteryAnswerResolution: {
+          itemId: "apple",
+          playerId: "host",
+          locale: "ko",
+          question: "무슨 소리가 나나요?",
+          answer: "no",
+        },
+      },
+    ));
+    const state = room.gameState as unknown as MysteryRoomState;
+    const question = state.history[0];
+
+    expect(readMysteryState({
+      ...state,
+      history: [{ ...question, answerSource: "model" }],
     })).toBeNull();
   });
 
