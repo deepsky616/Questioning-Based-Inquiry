@@ -253,7 +253,10 @@ export function MyQuestionsView() {
       : value === "controversial" ? tCls("controversial.label")
       : value;
 
-  const QuestionRows = ({ list }: { list: Question[] }) =>
+  // 렌더 본문 안에서 정의한 컴포넌트(<QuestionRows/>)는 매 렌더마다 타입이 새로 만들어져
+  // React가 하위 트리 전체를 리마운트한다 — 12초 폴링 갱신 때 작성 중인 댓글 초안이
+  // 사라지므로, 컴포넌트가 아닌 일반 함수 호출로 렌더한다.
+  const renderQuestionRows = (list: Question[]) =>
     list.length === 0 ? (
       <EmptyState icon="📝" title={t("empty")} description={t("emptyDesc")} />
     ) : (
@@ -676,7 +679,7 @@ export function MyQuestionsView() {
           />
         </CardHeader>
         <CardContent>
-          <QuestionRows list={displayed} />
+          {renderQuestionRows(displayed)}
         </CardContent>
       </Card>
     </div>
