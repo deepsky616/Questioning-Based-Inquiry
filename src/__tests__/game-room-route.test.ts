@@ -17,7 +17,11 @@ import {
   createLadderState,
   type LadderRoomState,
 } from "@/lib/question-game-room-engines/ladder";
-import { hasQuestionGameRoomEngine } from "@/lib/question-game-room-engine";
+import {
+  applyQuestionGameRoomCommand,
+  hasQuestionGameRoomEngine,
+} from "@/lib/question-game-room-engine";
+import { readRelayPublicState } from "@/lib/question-game-room-engines/turn-games";
 import { assignLadderTopics, generateLadderGrid } from "@/lib/question-ladder";
 
 const mocks = vi.hoisted(() => ({
@@ -157,6 +161,111 @@ describe("방 판정기 등록 경계", () => {
   it("기본 제공 놀이 일곱 개가 모두 서버 판정기에 등록되어 있다", () => {
     expect(BUILT_IN_GAMES.map(({ id }) => [id, hasQuestionGameRoomEngine(id)]))
       .toEqual(BUILT_IN_GAMES.map(({ id }) => [id, true]));
+  });
+});
+
+describe("질문 릴레이 실제 저장소 반환 경계", () => {
+  const playId = "11111111-1111-4111-8111-111111111111";
+  const roundId = "22222222-2222-4222-8222-222222222222";
+  const startCommandId = "33333333-3333-4333-8333-333333333333";
+  const topicCommandId = "44444444-4444-4444-8444-444444444444";
+  const firstCommandId = "55555555-5555-4555-8555-555555555555";
+  const secondCommandId = "66666666-6666-4666-8666-666666666666";
+
+  function changedRelayRoom(
+    room: GameRoom,
+    userId: string,
+    action: string,
+    body: Record<string, unknown>,
+    randomUUID: () => string,
+  ): GameRoom {
+    const user = room.players.find(({ id }) => id === userId)!;
+    const result = applyQuestionGameRoomCommand({
+      room,
+      userId,
+      userName: user.name,
+      action,
+      body,
+      now: 10,
+      random: () => 0,
+      randomUUID,
+    });
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") throw new Error("질문 릴레이 변경 결과가 필요합니다");
+    return result.room;
+  }
+
+  function storedRelayRoom(): GameRoom {
+    let room = makeRoom({
+      gameId: "relay",
+      players: makePlayers(2),
+    });
+    room = changedRelayRoom(room, "user-1", "start", {
+      commandId: startCommandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+    }, () => playId);
+    room = changedRelayRoom(room, "user-1", "relay-set-topic", {
+      commandId: topicCommandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      playId,
+      topic: "우주",
+    }, () => roundId);
+    room = changedRelayRoom(room, "user-1", "relay-submit-question", {
+      commandId: firstCommandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      playId,
+      roundId,
+      locale: "ko",
+      question: "우주에는 왜 별이 많을까요?",
+    }, () => "77777777-7777-4777-8777-777777777777");
+    return {
+      ...room,
+      chain: room.chain.map((item) => ({
+        round: item.round,
+        roundId: item.roundId,
+        playerId: item.playerId,
+        question: item.question,
+        playerName: item.playerName,
+      })),
+    };
+  }
+
+  it("자료 저장소에서 속성 순서가 바뀐 첫 질문 뒤 친구의 둘째 질문을 저장한다", async () => {
+    const room = storedRelayRoom();
+    const state = readRelayPublicState(room.gameState)!;
+    mocks.auth.mockResolvedValue({
+      user: { id: "user-2", name: "학생 2" },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved" as const,
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({
+      action: "relay-submit-question",
+      commandId: secondCommandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      playId,
+      roundId: state.roundId,
+      locale: "ko",
+      question: "별빛은 지구까지 얼마나 걸려서 올까요?",
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
+      chain: expect.arrayContaining([
+        expect.objectContaining({
+          playerId: "user-2",
+          question: "별빛은 지구까지 얼마나 걸려서 올까요?",
+        }),
+      ]),
+    }));
   });
 });
 

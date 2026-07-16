@@ -193,6 +193,13 @@ const COMMON_BODY_KEYS = [
 ] as const;
 const COMMON_ROUND_BODY_KEYS = [...COMMON_BODY_KEYS, "roundId"] as const;
 const PLAYER_KEYS = ["id", "name"] as const;
+const RELAY_CHAIN_ITEM_KEYS = [
+  "question",
+  "playerId",
+  "playerName",
+  "round",
+  "roundId",
+] as const;
 const LOCALIZED_TEXT_KEYS = ["ko", "en"] as const;
 const STORY_WORD_KEYS = ["protagonist", "place", "event"] as const;
 const BASE_ROUND_KEYS = [
@@ -884,6 +891,25 @@ function relayChain(questions: readonly RelayQuestionRecord[]): RoomChainItem[] 
   }));
 }
 
+function relayChainMatchesQuestions(
+  chain: readonly RoomChainItem[],
+  questions: readonly RelayQuestionRecord[],
+): boolean {
+  return chain.length === questions.length && chain.every((item, index) => {
+    const question = questions[index];
+    return question !== undefined &&
+      hasExactKeys(
+        item as unknown as Record<string, unknown>,
+        RELAY_CHAIN_ITEM_KEYS,
+      ) &&
+      item.question === question.question &&
+      item.playerId === question.playerId &&
+      item.playerName === question.playerName &&
+      item.round === question.round &&
+      item.roundId === question.roundId;
+  });
+}
+
 function changedRelay(
   context: QuestionGameRoomEngineContext,
   state: RelayRoomState,
@@ -1409,7 +1435,7 @@ function advanceRelayRound(
 
 function relayRoomMatchesState(room: GameRoom, state: RelayRoomState): boolean {
   return stateMatchesRoom(room, state) && room.topic === state.topic &&
-    JSON.stringify(room.chain) === JSON.stringify(relayChain(state.questions));
+    relayChainMatchesQuestions(room.chain, state.questions);
 }
 
 function applyRelayCommand(context: QuestionGameRoomEngineContext): QuestionGameEngineResult {

@@ -246,6 +246,44 @@ describe("질문 릴레이 판정기", () => {
     expect((room.gameState as unknown as RelayRoomState).round).toBe(2);
   });
 
+  it("자료 저장소가 체인 항목 속성 순서를 바꿔도 다음 친구가 질문을 잇는다", () => {
+    let room = setRelayTopic();
+    room = submitRelayTurn(room, 62);
+    room = {
+      ...room,
+      chain: room.chain.map((item) => ({
+        round: item.round,
+        roundId: item.roundId,
+        playerId: item.playerId,
+        question: item.question,
+        playerName: item.playerName,
+      })),
+    };
+    const state = readRelayPublicState(room.gameState)!;
+    const nextPlayerId = state.turnOrder[state.currentTurnIdx];
+
+    expect(run(room, nextPlayerId, "relay-submit-question", 63, {
+      locale: "ko",
+      question: "별빛은 지구까지 얼마나 걸려서 올까요?",
+    }).kind).toBe("changed");
+  });
+
+  it("체인 항목의 실제 값이 다르면 손상 상태로 계속 거절한다", () => {
+    let room = setRelayTopic();
+    room = submitRelayTurn(room, 64);
+    room = {
+      ...room,
+      chain: room.chain.map((item) => ({ ...item, question: "바뀐 질문인가요?" })),
+    };
+    const state = readRelayPublicState(room.gameState)!;
+    const nextPlayerId = state.turnOrder[state.currentTurnIdx];
+
+    expect(run(room, nextPlayerId, "relay-submit-question", 65, {
+      locale: "ko",
+      question: "별은 모두 같은 색으로 보일까요?",
+    }).kind).toBe("corrupt");
+  });
+
   it("중복 질문과 비속어 질문을 기존 경계에서 거절한다", () => {
     let room = setRelayTopic();
     room = submitRelayTurn(room, 70);
