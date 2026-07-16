@@ -13,11 +13,54 @@ const studentB: BrowserQuestionGameRunActor = {
   id: "browser-run-student-b",
   role: "STUDENT",
 };
+const teacher: BrowserQuestionGameRunActor = {
+  id: "browser-run-teacher",
+  role: "TEACHER",
+};
 
 const ids = Array.from(
-  { length: 220 },
+  { length: 360 },
   (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
 );
+
+type PublicMemoryCard = {
+  id: string;
+  type: "q" | "a";
+  state: "HIDDEN" | "REVEALED" | "TAKEN";
+  contentKey?: string;
+};
+
+type PublicMemoryRun = {
+  id: string;
+  status: "ACTIVE" | "SETTLED";
+  version: number;
+  questionCount: number;
+  aiTurnCount: number;
+  targetCount: number;
+  awaitingAiTurn: boolean;
+  memoryDifficulty: "easy" | "normal" | "hard";
+  memoryNextStep:
+    | "STUDENT_QUESTION"
+    | "STUDENT_ANSWER"
+    | "AI_TURN"
+    | "RESOLVE_MISS"
+    | "COMPLETE";
+  studentMatchCount: number;
+  aiMatchCount: number;
+  memoryQuestionCards: PublicMemoryCard[];
+  memoryAnswerCards: PublicMemoryCard[];
+  memoryMissReveal: null | {
+    id: string;
+    actor: "STUDENT" | "AI";
+    result: "MISS";
+    resolveAt: number;
+  };
+  memoryReview: null | Array<{ contentKey: string }>;
+};
+
+function memoryRun(response: { body: Record<string, unknown> }) {
+  return response.body.run as PublicMemoryRun;
+}
 
 function runId(response: { body: Record<string, unknown> }) {
   return (response.body.run as { id: string }).id;
@@ -1526,5 +1569,488 @@ describe("브라우저 질문놀이 실행 전송기", () => {
         },
       },
     });
+  });
+
+  it.each([
+    ["easy", 18, 6],
+    ["normal", 30, 10],
+    ["hard", 45, 15],
+  ] as const)("카드 짝 찾기 %s 실행은 고정 보드와 최대 시도를 숨김 상태로 만든다", (
+    difficulty,
+    targetCount,
+    pairCount,
+  ) => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "memory",
+        mode: "solo",
+        difficulty,
+        requestId: ids[170],
+        locale: "ko",
+      },
+    });
+    const run = memoryRun(created);
+
+    expect(created.status).toBe(201);
+    expect(run).toMatchObject({
+      status: "ACTIVE",
+      version: 1,
+      questionCount: 0,
+      aiTurnCount: 0,
+      targetCount,
+      memoryDifficulty: difficulty,
+      memoryNextStep: "STUDENT_QUESTION",
+      studentMatchCount: 0,
+      aiMatchCount: 0,
+      memoryMissReveal: null,
+      memoryReview: null,
+    });
+    expect(run.memoryQuestionCards).toHaveLength(pairCount);
+    expect(run.memoryAnswerCards).toHaveLength(pairCount);
+    for (const card of [...run.memoryQuestionCards, ...run.memoryAnswerCards]) {
+      expect(card).toMatchObject({ state: "HIDDEN" });
+      expect(card).not.toHaveProperty("contentKey");
+    }
+  });
+
+  it("카드 짝 찾기 생성과 카드 뒤집기를 재생하고 다른 입력과 오래된 버전을 거절한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const createBody = {
+      gameId: "memory",
+      mode: "solo",
+      difficulty: "easy",
+      requestId: ids[171],
+      locale: "ko",
+    };
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: createBody,
+    });
+    const id = runId(created);
+    const initial = memoryRun(created);
+    const questionBody = {
+      action: "memory-flip-card",
+      requestId: ids[172],
+      expectedVersion: 1,
+      cardId: initial.memoryQuestionCards[0].id,
+    };
+    const questioned = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: questionBody,
+    });
+    const questionedRun = memoryRun(questioned);
+
+    expect(questionedRun).toMatchObject({
+      version: 2,
+      questionCount: 0,
+      memoryNextStep: "STUDENT_ANSWER",
+    });
+    expect(questionedRun.memoryQuestionCards[0]).toMatchObject({
+      state: "REVEALED",
+      contentKey: "memory-pair-01",
+    });
+    expect(questionedRun.memoryQuestionCards[1]).not.toHaveProperty("contentKey");
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: questionBody,
+    })).toMatchObject({
+      status: 200,
+      body: { replayed: true, run: { version: 2 } },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: { ...questionBody, cardId: initial.memoryQuestionCards[1].id },
+    })).toEqual({
+      status: 409,
+      body: { error: "같은 요청 식별값에 다른 동작이 들어왔습니다" },
+    });
+
+    const answered = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "memory-flip-card",
+        requestId: ids[173],
+        expectedVersion: 2,
+        cardId: initial.memoryAnswerCards[0].id,
+      },
+    });
+    const answeredRun = memoryRun(answered);
+    expect(answeredRun).toMatchObject({
+      status: "ACTIVE",
+      version: 3,
+      questionCount: 1,
+      studentMatchCount: 1,
+      memoryNextStep: "STUDENT_QUESTION",
+    });
+    expect(answeredRun.memoryQuestionCards[0].state).toBe("TAKEN");
+    expect(answeredRun.memoryAnswerCards[0].state).toBe("TAKEN");
+
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "memory-flip-card",
+        requestId: ids[174],
+        expectedVersion: 1,
+        cardId: initial.memoryQuestionCards[1].id,
+      },
+    })).toEqual({
+      status: 409,
+      body: { error: "질문놀이 실행 상태가 바뀌었습니다" },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: { ...createBody, difficulty: "hard" },
+    }).status).toBe(409);
+  });
+
+  it("학생의 틀린 짝은 공개 뒤 해소하고 혼자 모드는 학생 차례를 유지한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "memory",
+        mode: "solo",
+        difficulty: "easy",
+        requestId: ids[175],
+        locale: "ko",
+      },
+    });
+    const id = runId(created);
+    const initial = memoryRun(created);
+    store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "memory-flip-card",
+        requestId: ids[176],
+        expectedVersion: 1,
+        cardId: initial.memoryQuestionCards[0].id,
+      },
+    });
+    const missed = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "memory-flip-card",
+        requestId: ids[177],
+        expectedVersion: 2,
+        cardId: initial.memoryAnswerCards[1].id,
+      },
+    });
+    const missedRun = memoryRun(missed);
+    expect(missedRun).toMatchObject({
+      version: 3,
+      questionCount: 1,
+      memoryNextStep: "RESOLVE_MISS",
+      memoryMissReveal: {
+        actor: "STUDENT",
+        result: "MISS",
+        resolveAt: expect.any(Number),
+      },
+    });
+    expect(missedRun.memoryQuestionCards[0].state).toBe("REVEALED");
+    expect(missedRun.memoryAnswerCards[1].state).toBe("REVEALED");
+    const revealId = missedRun.memoryMissReveal?.id;
+    if (!revealId) throw new Error("실패 공개 식별값이 없습니다");
+
+    const resolveBody = {
+      action: "memory-resolve-miss",
+      requestId: ids[178],
+      expectedVersion: 3,
+      revealId,
+    };
+    const resolved = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: resolveBody,
+    });
+    const resolvedRun = memoryRun(resolved);
+    expect(resolvedRun).toMatchObject({
+      status: "ACTIVE",
+      version: 4,
+      memoryNextStep: "STUDENT_QUESTION",
+      memoryMissReveal: null,
+    });
+    expect(resolvedRun.memoryQuestionCards[0]).toMatchObject({ state: "HIDDEN" });
+    expect(resolvedRun.memoryQuestionCards[0]).not.toHaveProperty("contentKey");
+    expect(resolvedRun.memoryAnswerCards[1]).not.toHaveProperty("contentKey");
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: resolveBody,
+    })).toMatchObject({ body: { replayed: true, run: { version: 4 } } });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: { ...resolveBody, revealId: "different-reveal" },
+    }).status).toBe(409);
+  });
+
+  it("도움 모드의 학생 실패 뒤 인공지능이 서버가 고른 두 카드로 시도하고 학생에게 돌려준다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "memory",
+        mode: "ai",
+        difficulty: "easy",
+        requestId: ids[180],
+        locale: "ko",
+      },
+    });
+    const id = runId(created);
+    const initial = memoryRun(created);
+    store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "memory-flip-card",
+        requestId: ids[181],
+        expectedVersion: 1,
+        cardId: initial.memoryQuestionCards[0].id,
+      },
+    });
+    const studentMiss = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "memory-flip-card",
+        requestId: ids[182],
+        expectedVersion: 2,
+        cardId: initial.memoryAnswerCards[1].id,
+      },
+    });
+    const studentReveal = memoryRun(studentMiss).memoryMissReveal;
+    if (!studentReveal) throw new Error("학생 실패 공개가 없습니다");
+    const aiReady = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "memory-resolve-miss",
+        requestId: ids[183],
+        expectedVersion: 3,
+        revealId: studentReveal.id,
+      },
+    });
+    expect(memoryRun(aiReady)).toMatchObject({
+      version: 4,
+      awaitingAiTurn: true,
+      memoryNextStep: "AI_TURN",
+    });
+
+    const aiBody = {
+      action: "memory-ai-turn",
+      requestId: ids[184],
+      expectedVersion: 4,
+    };
+    const aiPlayed = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: aiBody,
+    });
+    const aiPlayedRun = memoryRun(aiPlayed);
+    expect(aiPlayedRun).toMatchObject({
+      version: 5,
+      questionCount: 2,
+      aiTurnCount: 1,
+      awaitingAiTurn: false,
+      memoryNextStep: "RESOLVE_MISS",
+      memoryMissReveal: { actor: "AI", result: "MISS" },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: aiBody,
+    })).toMatchObject({ body: { replayed: true, run: { aiTurnCount: 1 } } });
+    const aiReveal = aiPlayedRun.memoryMissReveal;
+    if (!aiReveal) throw new Error("인공지능 실패 공개가 없습니다");
+    const studentReady = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "memory-resolve-miss",
+        requestId: ids[185],
+        expectedVersion: 5,
+        revealId: aiReveal.id,
+      },
+    });
+    expect(memoryRun(studentReady)).toMatchObject({
+      version: 6,
+      awaitingAiTurn: false,
+      memoryNextStep: "STUDENT_QUESTION",
+    });
+  });
+
+  it.each([
+    ["혼자", "solo", studentA, 8, 30, false],
+    ["도움", "ai", studentA, 15, 50, false],
+    ["교사 미리보기", "solo", teacher, 0, 30, true],
+  ] as const)("카드 짝 찾기 %s 실행은 모든 짝을 일찍 찾으면 활동 결과를 한 번 정산한다", (
+    _case,
+    mode,
+    actor,
+    awarded,
+    dailyLimit,
+    preview,
+  ) => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = store.dispatch(actor, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "memory",
+        mode,
+        difficulty: "easy",
+        requestId: ids[200],
+        locale: "ko",
+      },
+    });
+    const id = runId(created);
+    const initial = memoryRun(created);
+    let version = 1;
+    let final = created;
+    for (let index = 0; index < 6; index += 1) {
+      store.dispatch(actor, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "memory-flip-card",
+          requestId: ids[201 + index * 2],
+          expectedVersion: version,
+          cardId: initial.memoryQuestionCards[index].id,
+        },
+      });
+      version += 1;
+      final = store.dispatch(actor, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "memory-flip-card",
+          requestId: ids[202 + index * 2],
+          expectedVersion: version,
+          cardId: initial.memoryAnswerCards[index].id,
+        },
+      });
+      version += 1;
+    }
+    expect(final).toMatchObject({
+      status: 200,
+      body: {
+        run: {
+          status: "SETTLED",
+          version: 13,
+          questionCount: 6,
+          aiTurnCount: 0,
+          studentMatchCount: 6,
+          aiMatchCount: 0,
+          memoryNextStep: "COMPLETE",
+          memoryReview: expect.arrayContaining([
+            { contentKey: "memory-pair-01" },
+            { contentKey: "memory-pair-06" },
+          ]),
+        },
+        result: {
+          awarded,
+          dailyLimit,
+          dailyRemaining: dailyLimit - awarded,
+          cappedByLimit: false,
+          preview,
+        },
+      },
+    });
+    expect(memoryRun(final).memoryReview).toHaveLength(6);
+  });
+
+  it("마지막 허용 실패는 공개를 해소할 때 혼자 모드 완료 점수를 정산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "memory",
+        mode: "solo",
+        difficulty: "easy",
+        requestId: ids[260],
+        locale: "ko",
+      },
+    });
+    const id = runId(created);
+    const initial = memoryRun(created);
+    let version = 1;
+    let final = created;
+    for (let attempt = 0; attempt < 18; attempt += 1) {
+      store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "memory-flip-card",
+          requestId: ids[261 + attempt * 3],
+          expectedVersion: version,
+          cardId: initial.memoryQuestionCards[0].id,
+        },
+      });
+      version += 1;
+      const missed = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "memory-flip-card",
+          requestId: ids[262 + attempt * 3],
+          expectedVersion: version,
+          cardId: initial.memoryAnswerCards[1].id,
+        },
+      });
+      version += 1;
+      const reveal = memoryRun(missed).memoryMissReveal;
+      if (!reveal) throw new Error("최대 시도 실패 공개가 없습니다");
+      expect(memoryRun(missed).memoryNextStep).toBe("RESOLVE_MISS");
+      final = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "memory-resolve-miss",
+          requestId: ids[263 + attempt * 3],
+          expectedVersion: version,
+          revealId: reveal.id,
+        },
+      });
+      version += 1;
+    }
+    expect(final).toMatchObject({
+      status: 200,
+      body: {
+        run: {
+          status: "SETTLED",
+          version: 55,
+          questionCount: 18,
+          studentMatchCount: 0,
+          memoryNextStep: "COMPLETE",
+          memoryMissReveal: null,
+        },
+        result: {
+          awarded: 2,
+          dailyLimit: 30,
+          dailyRemaining: 28,
+        },
+      },
+    });
+    const finalRun = memoryRun(final);
+    for (const card of [...finalRun.memoryQuestionCards, ...finalRun.memoryAnswerCards]) {
+      expect(card.state).toBe("REVEALED");
+      expect(card.contentKey).toMatch(/^memory-pair-/);
+    }
+    expect(finalRun.memoryReview).toHaveLength(6);
   });
 });

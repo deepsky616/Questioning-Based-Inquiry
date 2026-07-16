@@ -36,6 +36,7 @@ export interface QuestionGameRunCreateStateInput {
   topicHash: string;
   topicLength: number;
   topicHashes?: string[];
+  difficulty?: "easy" | "normal" | "hard";
 }
 
 export interface QuestionGameRunProgressContext {
@@ -71,6 +72,34 @@ export interface QuestionGameRunPublicProgress {
     place: string;
     event: string;
   } | null;
+  memoryNextStep?:
+    | "STUDENT_QUESTION"
+    | "STUDENT_ANSWER"
+    | "AI_TURN"
+    | "RESOLVE_MISS"
+    | "COMPLETE";
+  memoryDifficulty?: "easy" | "normal" | "hard";
+  studentMatchCount?: number;
+  aiMatchCount?: number;
+  memoryQuestionCards?: Array<{
+    id: string;
+    type: "q";
+    state: "HIDDEN" | "REVEALED" | "TAKEN";
+    contentKey?: string;
+  }>;
+  memoryAnswerCards?: Array<{
+    id: string;
+    type: "a";
+    state: "HIDDEN" | "REVEALED" | "TAKEN";
+    contentKey?: string;
+  }>;
+  memoryMissReveal?: {
+    id: string;
+    actor: "STUDENT" | "AI";
+    result: "MISS";
+    resolveAt: number;
+  } | null;
+  memoryReview?: Array<{ contentKey: string }> | null;
 }
 
 export interface QuestionGameRunDefinition {

@@ -24,6 +24,41 @@ export interface GameRunSnapshot {
   storyDiceNextStep?: StoryDiceRunNextStep;
   storyWordPool?: StoryDiceWordPool;
   storyRolledWords?: StoryDiceRolledWords | null;
+  memoryDifficulty?: MemoryRunDifficulty;
+  memoryNextStep?: MemoryRunNextStep;
+  studentMatchCount?: number;
+  aiMatchCount?: number;
+  memoryQuestionCards?: MemoryRunCard[];
+  memoryAnswerCards?: MemoryRunCard[];
+  memoryMissReveal?: MemoryMissReveal | null;
+  memoryReview?: MemoryReviewEntry[] | null;
+}
+
+export type MemoryRunDifficulty = "easy" | "normal" | "hard";
+
+export type MemoryRunNextStep =
+  | "STUDENT_QUESTION"
+  | "STUDENT_ANSWER"
+  | "AI_TURN"
+  | "RESOLVE_MISS"
+  | "COMPLETE";
+
+export interface MemoryRunCard {
+  id: string;
+  type: "q" | "a";
+  state: "HIDDEN" | "REVEALED" | "TAKEN";
+  contentKey?: string;
+}
+
+export interface MemoryMissReveal {
+  id: string;
+  actor: "STUDENT" | "AI";
+  result: "MISS";
+  resolveAt: number;
+}
+
+export interface MemoryReviewEntry {
+  contentKey: string;
 }
 
 export type StoryDiceRunNextStep =
@@ -80,6 +115,8 @@ export interface SubmittedKabaAttempt extends SubmittedRelayQuestion {
 
 export type SubmittedStoryDiceAction = SubmittedRelayQuestion;
 
+export type SubmittedMemoryAction = SubmittedRelayQuestion;
+
 type PendingKind = "create" | "action" | "ai" | "complete" | null;
 
 interface RetriableRequest {
@@ -101,6 +138,15 @@ interface IssuedQuestionGameAiTurn {
 interface RetriableAiRecordRequest extends RetriableRequest {
   generationRequestId: string;
   issued: IssuedQuestionGameAiTurn;
+}
+
+export type UnconfirmedMemoryAction =
+  | { action: "memory-flip-card"; cardId: string }
+  | { action: "memory-ai-turn" }
+  | { action: "memory-resolve-miss"; revealId: string };
+
+export interface GameRunStartOptions {
+  difficulty?: MemoryRunDifficulty;
 }
 
 export interface RecordedRelayAiTurn {
@@ -128,6 +174,71 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const MEMORY_CONTENT_KEY_PATTERN = /^memory-pair-(0[1-9]|1[0-9]|20)$/;
+const MEMORY_RUN_CONFIG: Record<
+  MemoryRunDifficulty,
+  { pairCount: number; targetCount: number }
+> = {
+  easy: { pairCount: 6, targetCount: 18 },
+  normal: { pairCount: 10, targetCount: 30 },
+  hard: { pairCount: 15, targetCount: 45 },
+};
+
+function readMemoryCards(
+  value: unknown,
+  type: "q" | "a",
+  expectedCount: number,
+): MemoryRunCard[] | null {
+  if (!Array.isArray(value) || value.length !== expectedCount) return null;
+  const cards: MemoryRunCard[] = [];
+  for (const item of value) {
+    if (
+      !isRecord(item) ||
+      typeof item.id !== "string" ||
+      !item.id ||
+      item.id !== item.id.trim() ||
+      [...item.id].length > 128 ||
+      item.type !== type ||
+      (item.state !== "HIDDEN" && item.state !== "REVEALED" && item.state !== "TAKEN")
+    ) return null;
+    if (item.state === "HIDDEN") {
+      if (item.contentKey !== undefined) return null;
+      cards.push({ id: item.id, type, state: "HIDDEN" });
+      continue;
+    }
+    if (
+      typeof item.contentKey !== "string" ||
+      !MEMORY_CONTENT_KEY_PATTERN.test(item.contentKey)
+    ) return null;
+    cards.push({
+      id: item.id,
+      type,
+      state: item.state,
+      contentKey: item.contentKey,
+    });
+  }
+  if (new Set(cards.map((card) => card.id)).size !== cards.length) return null;
+  const visibleKeys = cards.flatMap((card) => card.contentKey ? [card.contentKey] : []);
+  if (new Set(visibleKeys).size !== visibleKeys.length) return null;
+  return cards;
+}
+
+function readMemoryReview(value: unknown, expectedCount: number): MemoryReviewEntry[] | null {
+  if (!Array.isArray(value) || value.length !== expectedCount) return null;
+  const review: MemoryReviewEntry[] = [];
+  for (const item of value) {
+    if (
+      !isRecord(item) ||
+      typeof item.contentKey !== "string" ||
+      !MEMORY_CONTENT_KEY_PATTERN.test(item.contentKey)
+    ) return null;
+    review.push({ contentKey: item.contentKey });
+  }
+  return new Set(review.map((item) => item.contentKey)).size === review.length
+    ? review
+    : null;
+}
+
 function readRun(value: unknown): GameRunSnapshot | null {
   if (!isRecord(value)) return null;
   if (
@@ -147,7 +258,9 @@ function readRun(value: unknown): GameRunSnapshot | null {
     !Number.isSafeInteger(value.aiTurnCount) ||
     value.aiTurnCount < 0 ||
     value.aiTurnCount > value.targetCount ||
-    (value.gameId !== "story-dice" && value.aiTurnCount >= value.targetCount) ||
+    (value.gameId !== "story-dice" &&
+      value.gameId !== "memory" &&
+      value.aiTurnCount >= value.targetCount) ||
     typeof value.awaitingAiTurn !== "boolean" ||
     typeof value.preview !== "boolean"
   ) return null;
@@ -161,7 +274,169 @@ function readRun(value: unknown): GameRunSnapshot | null {
   let storyDiceNextStep: StoryDiceRunNextStep | undefined;
   let storyWordPool: StoryDiceWordPool | undefined;
   let storyRolledWords: StoryDiceRolledWords | null | undefined;
-  if (value.gameId === "dice") {
+  let memoryDifficulty: MemoryRunDifficulty | undefined;
+  let memoryNextStep: MemoryRunNextStep | undefined;
+  let studentMatchCount: number | undefined;
+  let aiMatchCount: number | undefined;
+  let memoryQuestionCards: MemoryRunCard[] | undefined;
+  let memoryAnswerCards: MemoryRunCard[] | undefined;
+  let memoryMissReveal: MemoryMissReveal | null | undefined;
+  let memoryReview: MemoryReviewEntry[] | null | undefined;
+  if (value.gameId === "memory") {
+    const difficulty = value.memoryDifficulty;
+    const nextStep = value.memoryNextStep;
+    const active = value.status === "ACTIVE";
+    if (
+      (value.mode !== "SOLO" && value.mode !== "AI") ||
+      (value.status !== "ACTIVE" && value.status !== "SETTLED") ||
+      (difficulty !== "easy" && difficulty !== "normal" && difficulty !== "hard") ||
+      (nextStep !== "STUDENT_QUESTION" &&
+        nextStep !== "STUDENT_ANSWER" &&
+        nextStep !== "AI_TURN" &&
+        nextStep !== "RESOLVE_MISS" &&
+        nextStep !== "COMPLETE")
+    ) return null;
+    const config = MEMORY_RUN_CONFIG[difficulty];
+    if (value.targetCount !== config.targetCount) return null;
+    const questionCards = readMemoryCards(
+      value.memoryQuestionCards,
+      "q",
+      config.pairCount,
+    );
+    const answerCards = readMemoryCards(
+      value.memoryAnswerCards,
+      "a",
+      config.pairCount,
+    );
+    if (!questionCards || !answerCards) return null;
+    const allCardIds = [...questionCards, ...answerCards].map((card) => card.id);
+    if (new Set(allCardIds).size !== allCardIds.length) return null;
+    if (
+      typeof value.studentMatchCount !== "number" ||
+      !Number.isSafeInteger(value.studentMatchCount) ||
+      value.studentMatchCount < 0 ||
+      typeof value.aiMatchCount !== "number" ||
+      !Number.isSafeInteger(value.aiMatchCount) ||
+      value.aiMatchCount < 0
+    ) return null;
+    const takenQuestionKeys = questionCards.flatMap((card) =>
+      card.state === "TAKEN" && card.contentKey ? [card.contentKey] : []);
+    const takenAnswerKeys = answerCards.flatMap((card) =>
+      card.state === "TAKEN" && card.contentKey ? [card.contentKey] : []);
+    const revealedQuestions = questionCards.filter((card) => card.state === "REVEALED");
+    const revealedAnswers = answerCards.filter((card) => card.state === "REVEALED");
+    const totalMatchCount = value.studentMatchCount + value.aiMatchCount;
+    if (
+      takenQuestionKeys.length !== totalMatchCount ||
+      takenAnswerKeys.length !== totalMatchCount ||
+      JSON.stringify([...takenQuestionKeys].sort()) !==
+        JSON.stringify([...takenAnswerKeys].sort()) ||
+      totalMatchCount > config.pairCount ||
+      value.aiTurnCount > value.questionCount ||
+      value.studentMatchCount > value.questionCount - value.aiTurnCount ||
+      value.aiMatchCount > value.aiTurnCount ||
+      (value.mode === "SOLO" && (value.aiTurnCount !== 0 || value.aiMatchCount !== 0))
+    ) return null;
+    if (nextStep === "STUDENT_ANSWER") {
+      if (revealedQuestions.length !== 1 || revealedAnswers.length !== 0) return null;
+    } else if (nextStep === "RESOLVE_MISS") {
+      if (
+        revealedQuestions.length !== 1 ||
+        revealedAnswers.length !== 1 ||
+        revealedQuestions[0].contentKey === revealedAnswers[0].contentKey
+      ) return null;
+    } else if (nextStep === "COMPLETE") {
+      const revealedQuestionKeys = revealedQuestions.flatMap((card) =>
+        card.contentKey ? [card.contentKey] : []);
+      const revealedAnswerKeys = revealedAnswers.flatMap((card) =>
+        card.contentKey ? [card.contentKey] : []);
+      if (
+        questionCards.some((card) => card.state === "HIDDEN") ||
+        answerCards.some((card) => card.state === "HIDDEN") ||
+        revealedQuestions.length !== config.pairCount - totalMatchCount ||
+        revealedAnswers.length !== config.pairCount - totalMatchCount ||
+        JSON.stringify([...revealedQuestionKeys].sort()) !==
+          JSON.stringify([...revealedAnswerKeys].sort())
+      ) return null;
+    } else if (revealedQuestions.length !== 0 || revealedAnswers.length !== 0) {
+      return null;
+    }
+    let missReveal: MemoryMissReveal | null;
+    if (value.memoryMissReveal === null) {
+      missReveal = null;
+    } else if (
+      isRecord(value.memoryMissReveal) &&
+      typeof value.memoryMissReveal.id === "string" &&
+      value.memoryMissReveal.id !== "" &&
+      value.memoryMissReveal.id === value.memoryMissReveal.id.trim() &&
+      [...value.memoryMissReveal.id].length <= 128 &&
+      (value.memoryMissReveal.actor === "STUDENT" || value.memoryMissReveal.actor === "AI") &&
+      value.memoryMissReveal.result === "MISS" &&
+      typeof value.memoryMissReveal.resolveAt === "number" &&
+      Number.isSafeInteger(value.memoryMissReveal.resolveAt) &&
+      value.memoryMissReveal.resolveAt > 0
+    ) {
+      missReveal = {
+        id: value.memoryMissReveal.id,
+        actor: value.memoryMissReveal.actor,
+        result: "MISS",
+        resolveAt: value.memoryMissReveal.resolveAt,
+      };
+    } else {
+      return null;
+    }
+    const pendingMissCount = missReveal ? 1 : 0;
+    const resolvedMissCount = value.questionCount - totalMatchCount - pendingMissCount;
+    const partialStudentFlip = nextStep === "STUDENT_ANSWER" ? 1 : 0;
+    const expectedVersion = 1 +
+      (value.questionCount - value.aiTurnCount) * 2 +
+      value.aiTurnCount +
+      resolvedMissCount +
+      partialStudentFlip;
+    const expectedActor = value.mode === "AI" && resolvedMissCount % 2 === 1
+      ? "AI"
+      : "STUDENT";
+    if (
+      resolvedMissCount < 0 ||
+      value.version !== expectedVersion ||
+      (nextStep === "RESOLVE_MISS") !== (missReveal !== null) ||
+      (missReveal !== null && missReveal.actor !== expectedActor) ||
+      value.awaitingAiTurn !== (nextStep === "AI_TURN") ||
+      (nextStep === "STUDENT_QUESTION" && expectedActor !== "STUDENT") ||
+      (nextStep === "STUDENT_ANSWER" && expectedActor !== "STUDENT") ||
+      (nextStep === "AI_TURN" && expectedActor !== "AI") ||
+      (nextStep === "COMPLETE") !== !active ||
+      (active && totalMatchCount >= config.pairCount) ||
+      (active && value.questionCount === value.targetCount && nextStep !== "RESOLVE_MISS") ||
+      (!active && value.questionCount !== value.targetCount && totalMatchCount !== config.pairCount)
+    ) return null;
+    if (!Object.prototype.hasOwnProperty.call(value, "memoryReview")) return null;
+    const review = active
+      ? value.memoryReview === null
+        ? null
+        : undefined
+      : readMemoryReview(value.memoryReview, config.pairCount);
+    if (review === undefined || (!active && review === null)) return null;
+    if (review) {
+      const reviewKeys = new Set(review.map((item) => item.contentKey));
+      const visibleQuestionKeys = questionCards.flatMap((card) =>
+        card.contentKey ? [card.contentKey] : []);
+      if (
+        takenQuestionKeys.some((key) => !reviewKeys.has(key)) ||
+        takenAnswerKeys.some((key) => !reviewKeys.has(key)) ||
+        visibleQuestionKeys.length !== config.pairCount ||
+        visibleQuestionKeys.some((key) => !reviewKeys.has(key))
+      ) return null;
+    }
+    memoryDifficulty = difficulty;
+    memoryNextStep = nextStep;
+    studentMatchCount = value.studentMatchCount;
+    aiMatchCount = value.aiMatchCount;
+    memoryQuestionCards = questionCards;
+    memoryAnswerCards = answerCards;
+    memoryMissReveal = missReveal;
+    memoryReview = review;
+  } else if (value.gameId === "dice") {
     if (
       (value.mode !== "SOLO" && value.mode !== "AI") ||
       (value.status !== "ACTIVE" && value.status !== "SETTLED") ||
@@ -378,6 +653,14 @@ function readRun(value: unknown): GameRunSnapshot | null {
     ...(storyDiceNextStep !== undefined ? { storyDiceNextStep } : {}),
     ...(storyWordPool !== undefined ? { storyWordPool } : {}),
     ...(storyRolledWords !== undefined ? { storyRolledWords } : {}),
+    ...(memoryDifficulty !== undefined ? { memoryDifficulty } : {}),
+    ...(memoryNextStep !== undefined ? { memoryNextStep } : {}),
+    ...(studentMatchCount !== undefined ? { studentMatchCount } : {}),
+    ...(aiMatchCount !== undefined ? { aiMatchCount } : {}),
+    ...(memoryQuestionCards !== undefined ? { memoryQuestionCards } : {}),
+    ...(memoryAnswerCards !== undefined ? { memoryAnswerCards } : {}),
+    ...(memoryMissReveal !== undefined ? { memoryMissReveal } : {}),
+    ...(memoryReview !== undefined ? { memoryReview } : {}),
   };
 }
 
@@ -530,6 +813,14 @@ function isSameRunProgress(first: GameRunSnapshot, second: GameRunSnapshot) {
     first.storyDiceNextStep === second.storyDiceNextStep &&
     JSON.stringify(first.storyWordPool) === JSON.stringify(second.storyWordPool) &&
     JSON.stringify(first.storyRolledWords) === JSON.stringify(second.storyRolledWords) &&
+    first.memoryDifficulty === second.memoryDifficulty &&
+    first.memoryNextStep === second.memoryNextStep &&
+    first.studentMatchCount === second.studentMatchCount &&
+    first.aiMatchCount === second.aiMatchCount &&
+    JSON.stringify(first.memoryQuestionCards) === JSON.stringify(second.memoryQuestionCards) &&
+    JSON.stringify(first.memoryAnswerCards) === JSON.stringify(second.memoryAnswerCards) &&
+    JSON.stringify(first.memoryMissReveal) === JSON.stringify(second.memoryMissReveal) &&
+    JSON.stringify(first.memoryReview) === JSON.stringify(second.memoryReview) &&
     first.status === second.status
   );
 }
@@ -777,6 +1068,263 @@ function isExpectedStoryDiceAnswerAdvance(
   );
 }
 
+function memoryCards(run: GameRunSnapshot) {
+  return run.memoryQuestionCards && run.memoryAnswerCards
+    ? [...run.memoryQuestionCards, ...run.memoryAnswerCards]
+    : null;
+}
+
+function sameMemoryCardsExcept(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+  mutableIds: ReadonlySet<string>,
+) {
+  const currentCards = memoryCards(current);
+  const nextCards = memoryCards(next);
+  if (!currentCards || !nextCards || currentCards.length !== nextCards.length) return false;
+  const nextById = new Map(nextCards.map((card) => [card.id, card]));
+  return currentCards.every((card) => {
+    const nextCard = nextById.get(card.id);
+    if (!nextCard || nextCard.type !== card.type) return false;
+    return mutableIds.has(card.id) || JSON.stringify(nextCard) === JSON.stringify(card);
+  });
+}
+
+function validMemoryCompletionCards(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+  newlyTakenIds: ReadonlySet<string>,
+) {
+  const currentCards = memoryCards(current);
+  const nextCards = memoryCards(next);
+  if (!currentCards || !nextCards || currentCards.length !== nextCards.length) return false;
+  const nextById = new Map(nextCards.map((card) => [card.id, card]));
+  return currentCards.every((card) => {
+    const nextCard = nextById.get(card.id);
+    if (!nextCard || nextCard.type !== card.type || nextCard.state === "HIDDEN") return false;
+    if (card.state === "TAKEN") return JSON.stringify(nextCard) === JSON.stringify(card);
+    if (newlyTakenIds.has(card.id)) return nextCard.state === "TAKEN";
+    return nextCard.state === "REVEALED";
+  });
+}
+
+function sameMemoryRunIdentity(current: GameRunSnapshot, next: GameRunSnapshot) {
+  return (
+    current.gameId === "memory" &&
+    next.gameId === "memory" &&
+    next.id === current.id &&
+    next.mode === current.mode &&
+    next.preview === current.preview &&
+    next.memoryDifficulty === current.memoryDifficulty &&
+    next.targetCount === current.targetCount &&
+    next.version === current.version + 1
+  );
+}
+
+function isExpectedMemoryFlipAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+  cardId: string,
+) {
+  if (!sameMemoryRunIdentity(current, next)) return false;
+  const currentCards = memoryCards(current);
+  const nextCards = memoryCards(next);
+  const selected = currentCards?.find((card) => card.id === cardId);
+  const nextSelected = nextCards?.find((card) => card.id === cardId);
+  if (!currentCards || !nextCards || !selected || !nextSelected || selected.state !== "HIDDEN") {
+    return false;
+  }
+  if (current.memoryNextStep === "STUDENT_QUESTION") {
+    return (
+      selected.type === "q" &&
+      nextSelected.type === "q" &&
+      nextSelected.state === "REVEALED" &&
+      Boolean(nextSelected.contentKey) &&
+      next.status === "ACTIVE" &&
+      next.memoryNextStep === "STUDENT_ANSWER" &&
+      next.questionCount === current.questionCount &&
+      next.aiTurnCount === current.aiTurnCount &&
+      next.studentMatchCount === current.studentMatchCount &&
+      next.aiMatchCount === current.aiMatchCount &&
+      next.memoryMissReveal === null &&
+      next.memoryReview === null &&
+      !next.awaitingAiTurn &&
+      sameMemoryCardsExcept(current, next, new Set([cardId]))
+    );
+  }
+  if (current.memoryNextStep !== "STUDENT_ANSWER" || selected.type !== "a") return false;
+  const revealedQuestion = current.memoryQuestionCards?.find(
+    (card) => card.state === "REVEALED",
+  );
+  const nextQuestion = next.memoryQuestionCards?.find(
+    (card) => card.id === revealedQuestion?.id,
+  );
+  if (!revealedQuestion?.contentKey || !nextQuestion || !nextSelected.contentKey) return false;
+  const isMatch = revealedQuestion.contentKey === nextSelected.contentKey;
+  const nextTotalMatches = (next.studentMatchCount ?? 0) + (next.aiMatchCount ?? 0);
+  const pairCount = next.memoryQuestionCards?.length ?? 0;
+  const completesRun = next.questionCount === next.targetCount || nextTotalMatches === pairCount;
+  const cardsAreValid = completesRun && isMatch
+    ? validMemoryCompletionCards(
+        current,
+        next,
+        new Set([revealedQuestion.id, cardId]),
+      )
+    : sameMemoryCardsExcept(current, next, new Set([revealedQuestion.id, cardId]));
+  if (
+    next.questionCount !== current.questionCount + 1 ||
+    next.aiTurnCount !== current.aiTurnCount ||
+    next.aiMatchCount !== current.aiMatchCount ||
+    !cardsAreValid
+  ) return false;
+  if (isMatch) {
+    return (
+      nextQuestion.state === "TAKEN" &&
+      nextSelected.state === "TAKEN" &&
+      nextQuestion.contentKey === nextSelected.contentKey &&
+      next.studentMatchCount === (current.studentMatchCount ?? 0) + 1 &&
+      next.memoryMissReveal === null &&
+      next.status === (completesRun ? "SETTLED" : "ACTIVE") &&
+      next.memoryNextStep === (completesRun ? "COMPLETE" : "STUDENT_QUESTION") &&
+      next.awaitingAiTurn === false &&
+      (completesRun ? Array.isArray(next.memoryReview) : next.memoryReview === null)
+    );
+  }
+  return (
+    nextQuestion.state === "REVEALED" &&
+    nextSelected.state === "REVEALED" &&
+    next.studentMatchCount === current.studentMatchCount &&
+    next.memoryNextStep === "RESOLVE_MISS" &&
+    next.status === "ACTIVE" &&
+    next.memoryMissReveal?.actor === "STUDENT" &&
+    next.memoryMissReveal.result === "MISS" &&
+    next.memoryReview === null &&
+    !next.awaitingAiTurn
+  );
+}
+
+function isExpectedMemoryAiAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+) {
+  if (
+    !sameMemoryRunIdentity(current, next) ||
+    current.mode !== "AI" ||
+    current.memoryNextStep !== "AI_TURN" ||
+    next.questionCount !== current.questionCount + 1 ||
+    next.aiTurnCount !== current.aiTurnCount + 1 ||
+    next.studentMatchCount !== current.studentMatchCount
+  ) return false;
+  const currentCards = memoryCards(current);
+  const nextCards = memoryCards(next);
+  if (!currentCards || !nextCards) return false;
+  const nextById = new Map(nextCards.map((card) => [card.id, card]));
+  const changed = currentCards.filter((card) => {
+    const nextCard = nextById.get(card.id);
+    return !nextCard || JSON.stringify(nextCard) !== JSON.stringify(card);
+  });
+  if (changed.some((card) => card.state !== "HIDDEN")) return false;
+  const newlyTaken = changed.filter((card) => nextById.get(card.id)?.state === "TAKEN");
+  const newlyRevealed = changed.filter((card) => nextById.get(card.id)?.state === "REVEALED");
+  const selected = newlyTaken.length === 2 ? newlyTaken : newlyRevealed;
+  if (
+    selected.length !== 2 ||
+    !selected.some((card) => card.type === "q") ||
+    !selected.some((card) => card.type === "a")
+  ) return false;
+  const nextSelected = selected.map((card) => nextById.get(card.id));
+  const nextQuestion = nextSelected.find((card) => card?.type === "q");
+  const nextAnswer = nextSelected.find((card) => card?.type === "a");
+  if (!nextQuestion?.contentKey || !nextAnswer?.contentKey) return false;
+  const isMatch = newlyTaken.length === 2 &&
+    nextQuestion.contentKey === nextAnswer.contentKey;
+  const nextTotalMatches = (next.studentMatchCount ?? 0) + (next.aiMatchCount ?? 0);
+  const pairCount = next.memoryQuestionCards?.length ?? 0;
+  const completesRun = next.questionCount === next.targetCount || nextTotalMatches === pairCount;
+  if (isMatch) {
+    const cardsAreValid = completesRun
+      ? validMemoryCompletionCards(
+          current,
+          next,
+          new Set(newlyTaken.map((card) => card.id)),
+        )
+      : changed.length === 2 &&
+        sameMemoryCardsExcept(current, next, new Set(newlyTaken.map((card) => card.id)));
+    return (
+      cardsAreValid &&
+      nextQuestion.state === "TAKEN" &&
+      nextAnswer.state === "TAKEN" &&
+      next.aiMatchCount === (current.aiMatchCount ?? 0) + 1 &&
+      next.memoryMissReveal === null &&
+      next.status === (completesRun ? "SETTLED" : "ACTIVE") &&
+      next.memoryNextStep === (completesRun ? "COMPLETE" : "AI_TURN") &&
+      next.awaitingAiTurn === !completesRun &&
+      (completesRun ? Array.isArray(next.memoryReview) : next.memoryReview === null)
+    );
+  }
+  return (
+    changed.length === 2 &&
+    newlyRevealed.length === 2 &&
+    newlyTaken.length === 0 &&
+    sameMemoryCardsExcept(current, next, new Set(newlyRevealed.map((card) => card.id))) &&
+    nextQuestion.contentKey !== nextAnswer.contentKey &&
+    nextQuestion.state === "REVEALED" &&
+    nextAnswer.state === "REVEALED" &&
+    next.aiMatchCount === current.aiMatchCount &&
+    next.status === "ACTIVE" &&
+    next.memoryNextStep === "RESOLVE_MISS" &&
+    next.memoryMissReveal?.actor === "AI" &&
+    next.memoryMissReveal.result === "MISS" &&
+    next.memoryReview === null &&
+    !next.awaitingAiTurn
+  );
+}
+
+function isExpectedMemoryResolveAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+  revealId: string,
+) {
+  if (
+    !sameMemoryRunIdentity(current, next) ||
+    current.memoryNextStep !== "RESOLVE_MISS" ||
+    current.memoryMissReveal?.id !== revealId ||
+    next.questionCount !== current.questionCount ||
+    next.aiTurnCount !== current.aiTurnCount ||
+    next.studentMatchCount !== current.studentMatchCount ||
+    next.aiMatchCount !== current.aiMatchCount ||
+    next.memoryMissReveal !== null
+  ) return false;
+  const revealed = memoryCards(current)?.filter((card) => card.state === "REVEALED") ?? [];
+  const nextCards = memoryCards(next);
+  if (revealed.length !== 2 || !nextCards) return false;
+  const completesRun = current.questionCount === current.targetCount;
+  const cardsAreValid = completesRun
+    ? validMemoryCompletionCards(current, next, new Set())
+    : revealed.every((card) => {
+        const restored = nextCards.find((candidate) => candidate.id === card.id);
+        return restored?.state === "HIDDEN" && restored.contentKey === undefined;
+      }) && sameMemoryCardsExcept(
+        current,
+        next,
+        new Set(revealed.map((card) => card.id)),
+      );
+  if (!cardsAreValid) return false;
+  const expectedNextStep = completesRun
+    ? "COMPLETE"
+    : current.memoryMissReveal.actor === "AI"
+      ? "STUDENT_QUESTION"
+      : current.mode === "AI"
+        ? "AI_TURN"
+        : "STUDENT_QUESTION";
+  return (
+    next.status === (completesRun ? "SETTLED" : "ACTIVE") &&
+    next.memoryNextStep === expectedNextStep &&
+    next.awaitingAiTurn === (expectedNextStep === "AI_TURN") &&
+    (completesRun ? Array.isArray(next.memoryReview) : next.memoryReview === null)
+  );
+}
+
 export function useGameRun() {
   const mountedRef = useRef(false);
   const generationRef = useRef(0);
@@ -785,6 +1333,7 @@ export function useGameRun() {
   const actionRequestRef = useRef<RetriableActionRequest | null>(null);
   const diceRollRequestRef = useRef<RetriableRequest | null>(null);
   const storyRollRequestRef = useRef<RetriableRequest | null>(null);
+  const memoryActionRequestRef = useRef<RetriableRequest | null>(null);
   const aiIssueRequestRef = useRef<RetriableRequest | null>(null);
   const aiRecordRequestRef = useRef<RetriableAiRecordRequest | null>(null);
   const completeRequestRef = useRef<RetriableRequest | null>(null);
@@ -795,6 +1344,8 @@ export function useGameRun() {
   const [conflict, setConflict] = useState<string | null>(null);
   const [unconfirmedQuestion, setUnconfirmedQuestion] = useState<string | null>(null);
   const [unconfirmedDiceAction, setUnconfirmedDiceAction] = useState(false);
+  const [unconfirmedMemoryAction, setUnconfirmedMemoryAction] =
+    useState<UnconfirmedMemoryAction | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -825,6 +1376,7 @@ export function useGameRun() {
     actionRequestRef.current = null;
     diceRollRequestRef.current = null;
     storyRollRequestRef.current = null;
+    memoryActionRequestRef.current = null;
     aiIssueRequestRef.current = null;
     aiRecordRequestRef.current = null;
     completeRequestRef.current = null;
@@ -836,6 +1388,7 @@ export function useGameRun() {
     }
     setUnconfirmedQuestion(null);
     setUnconfirmedDiceAction(false);
+    setUnconfirmedMemoryAction(null);
     setError(null);
     setConflict(RUN_CONFLICT_MESSAGE);
   }, []);
@@ -845,6 +1398,7 @@ export function useGameRun() {
     mode: "solo" | "ai",
     topic: string | readonly string[],
     locale: string,
+    options: GameRunStartOptions = {},
   ) => {
     if (!begin("create")) return null;
     const generation = generationRef.current;
@@ -854,9 +1408,10 @@ export function useGameRun() {
     const normalizedTopics = Array.isArray(topic)
       ? topic.map((item) => item.trim())
       : null;
+    const memoryDifficulty = options.difficulty;
     const key = `${gameId}:${mode}:${normalizedLocale}:${normalizedTopics
       ? JSON.stringify(normalizedTopics)
-      : normalizedTopic}`;
+      : normalizedTopic}:${memoryDifficulty ?? ""}`;
     const request = createRequestRef.current?.key === key
       ? createRequestRef.current
       : { key, requestId: newRequestId() };
@@ -870,6 +1425,7 @@ export function useGameRun() {
           mode,
           requestId: request.requestId,
           ...(normalizedTopics ? { topics: normalizedTopics } : { topic: normalizedTopic }),
+          ...(memoryDifficulty ? { difficulty: memoryDifficulty } : {}),
           locale: normalizedLocale,
         }),
       });
@@ -880,6 +1436,10 @@ export function useGameRun() {
         createRequestRef.current = null;
         throw new Error("요청한 질문놀이 실행과 서버 응답이 일치하지 않습니다.");
       }
+      if (gameId === "memory" && nextRun.memoryDifficulty !== memoryDifficulty) {
+        createRequestRef.current = null;
+        throw new Error("요청한 카드 짝 찾기 난이도와 서버 응답이 일치하지 않습니다.");
+      }
       if (nextRun.status !== "ACTIVE") {
         createRequestRef.current = null;
         throw new Error("이미 닫힌 질문놀이 실행입니다. 다시 시작해 주세요.");
@@ -889,6 +1449,7 @@ export function useGameRun() {
       actionRequestRef.current = null;
       diceRollRequestRef.current = null;
       storyRollRequestRef.current = null;
+      memoryActionRequestRef.current = null;
       aiIssueRequestRef.current = null;
       aiRecordRequestRef.current = null;
       completeRequestRef.current = null;
@@ -897,6 +1458,7 @@ export function useGameRun() {
       setConflict(null);
       setUnconfirmedQuestion(null);
       setUnconfirmedDiceAction(false);
+      setUnconfirmedMemoryAction(null);
       return nextRun;
     } catch (requestError) {
       if (mountedRef.current && generationRef.current === generation) {
@@ -909,6 +1471,152 @@ export function useGameRun() {
       finish(generation);
     }
   }, [begin, finish]);
+
+  const executeMemoryAction = useCallback(async (
+    action: UnconfirmedMemoryAction["action"],
+    value: string | null,
+    runOverride?: GameRunSnapshot,
+  ): Promise<SubmittedMemoryAction | null> => {
+    const activeRun = runOverride ?? run;
+    if (
+      !activeRun ||
+      activeRun.gameId !== "memory" ||
+      activeRun.status !== "ACTIVE" ||
+      conflict
+    ) return null;
+    const selectedCard = value
+      ? memoryCards(activeRun)?.find((card) => card.id === value)
+      : null;
+    const validAction = action === "memory-flip-card"
+      ? Boolean(
+          selectedCard?.state === "HIDDEN" &&
+          ((activeRun.memoryNextStep === "STUDENT_QUESTION" && selectedCard.type === "q") ||
+            (activeRun.memoryNextStep === "STUDENT_ANSWER" && selectedCard.type === "a")),
+        )
+      : action === "memory-ai-turn"
+        ? activeRun.mode === "AI" && activeRun.memoryNextStep === "AI_TURN" && value === null
+        : activeRun.memoryNextStep === "RESOLVE_MISS" &&
+          activeRun.memoryMissReveal?.id === value;
+    if (!validAction || !begin(action === "memory-ai-turn" ? "ai" : "action")) return null;
+    const generation = generationRef.current;
+    const key = `${activeRun.id}:${activeRun.version}:${action}:${value ?? ""}`;
+    const request = memoryActionRequestRef.current?.key === key
+      ? memoryActionRequestRef.current
+      : { key, requestId: newRequestId() };
+    memoryActionRequestRef.current = request;
+    const uncertainAction: UnconfirmedMemoryAction = action === "memory-flip-card"
+      ? { action, cardId: value as string }
+      : action === "memory-resolve-miss"
+        ? { action, revealId: value as string }
+        : { action };
+    const expectedAdvance = (nextRun: GameRunSnapshot) => action === "memory-flip-card"
+      ? isExpectedMemoryFlipAdvance(activeRun, nextRun, value as string)
+      : action === "memory-ai-turn"
+        ? isExpectedMemoryAiAdvance(activeRun, nextRun)
+        : isExpectedMemoryResolveAdvance(activeRun, nextRun, value as string);
+    const fallback = action === "memory-flip-card"
+      ? "카드를 뒤집지 못했습니다."
+      : action === "memory-ai-turn"
+        ? "인공지능 차례를 진행하지 못했습니다."
+        : "보여 준 카드를 다시 덮지 못했습니다.";
+    try {
+      const responseValue = await readJson(await fetch(
+        `/api/question-games/runs/${activeRun.id}/actions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            requestId: request.requestId,
+            expectedVersion: activeRun.version,
+            ...(action === "memory-flip-card" ? { cardId: value } : {}),
+            ...(action === "memory-resolve-miss" ? { revealId: value } : {}),
+          }),
+        },
+      ));
+      let nextRun = readRun(responseValue.run);
+      if (!nextRun || !expectedAdvance(nextRun)) {
+        throw new Error("카드 짝 찾기 진행 결과를 확인할 수 없습니다.");
+      }
+      let nextResult = readSettlementResult(responseValue.result, nextRun);
+      if (responseValue.replayed === true) {
+        const current = await readRunResult(activeRun.id);
+        if (!isSameRunProgress(current.run, nextRun)) {
+          if (mountedRef.current && generationRef.current === generation) {
+            markConflict(current.run);
+          }
+          return null;
+        }
+        nextRun = current.run;
+        nextResult = current.result;
+      }
+      if (!mountedRef.current || generationRef.current !== generation) return null;
+      memoryActionRequestRef.current = null;
+      setRun(nextRun);
+      if (nextResult) setResult(nextResult);
+      setUnconfirmedMemoryAction(null);
+      setError(null);
+      return { run: nextRun, result: nextResult };
+    } catch (requestError) {
+      const explicitlyRejected = isExplicitRequestRejection(requestError);
+      const message = requestErrorMessage(requestError, fallback);
+      try {
+        const recovered = await readRunResult(activeRun.id);
+        if (!explicitlyRejected && expectedAdvance(recovered.run)) {
+          if (!mountedRef.current || generationRef.current !== generation) return null;
+          memoryActionRequestRef.current = null;
+          setRun(recovered.run);
+          if (recovered.result) setResult(recovered.result);
+          setUnconfirmedMemoryAction(null);
+          setError(null);
+          return recovered;
+        }
+        if (mountedRef.current && generationRef.current === generation) {
+          if (isSameRunProgress(recovered.run, activeRun)) {
+            if (explicitlyRejected) {
+              memoryActionRequestRef.current = null;
+              setUnconfirmedMemoryAction(null);
+            } else {
+              setUnconfirmedMemoryAction(uncertainAction);
+            }
+            setError(message);
+          } else {
+            markConflict(recovered.run);
+          }
+        }
+      } catch {
+        if (mountedRef.current && generationRef.current === generation) {
+          if (explicitlyRejected) {
+            memoryActionRequestRef.current = null;
+            setUnconfirmedMemoryAction(null);
+          } else {
+            setUnconfirmedMemoryAction(uncertainAction);
+          }
+          setError(message);
+        }
+      }
+      return null;
+    } finally {
+      finish(generation);
+    }
+  }, [begin, conflict, finish, markConflict, run]);
+
+  const flipMemoryCard = useCallback((
+    cardId: string,
+    runOverride?: GameRunSnapshot,
+  ) => executeMemoryAction("memory-flip-card", cardId, runOverride), [executeMemoryAction]);
+
+  const runMemoryAiTurn = useCallback((runOverride?: GameRunSnapshot) =>
+    executeMemoryAction("memory-ai-turn", null, runOverride), [executeMemoryAction]);
+
+  const resolveMemoryMiss = useCallback((
+    revealId: string,
+    runOverride?: GameRunSnapshot,
+  ) => executeMemoryAction(
+    "memory-resolve-miss",
+    revealId,
+    runOverride,
+  ), [executeMemoryAction]);
 
   const rollDice = useCallback(async (
     runOverride?: GameRunSnapshot,
@@ -2211,6 +2919,7 @@ export function useGameRun() {
     actionRequestRef.current = null;
     diceRollRequestRef.current = null;
     storyRollRequestRef.current = null;
+    memoryActionRequestRef.current = null;
     aiIssueRequestRef.current = null;
     aiRecordRequestRef.current = null;
     completeRequestRef.current = null;
@@ -2221,6 +2930,7 @@ export function useGameRun() {
     setConflict(null);
     setUnconfirmedQuestion(null);
     setUnconfirmedDiceAction(false);
+    setUnconfirmedMemoryAction(null);
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
@@ -2233,7 +2943,11 @@ export function useGameRun() {
     conflict,
     unconfirmedQuestion,
     unconfirmedDiceAction,
+    unconfirmedMemoryAction,
     start,
+    flipMemoryCard,
+    runMemoryAiTurn,
+    resolveMemoryMiss,
     rollDice,
     rollStoryDice,
     submitRelayQuestion,

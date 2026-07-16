@@ -4,308 +4,237 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { GameHeader } from "./GameHeader";
-import { useAIPlay } from "./useAIPlay";
 import { GameResultReview } from "./GameResultReview";
 import {
-  MEMORY_DIFFICULTY, MemoryDifficulty, QAPair,
-  pickFallbackPairs, parseAIPairs, shuffle,
+  MEMORY_DIFFICULTY,
+  MEMORY_FALLBACK_PAIRS,
+  MEMORY_FALLBACK_PAIRS_EN,
+  type MemoryDifficulty,
 } from "@/lib/memory-game-data";
 import { getMemoryDifficultyLabel, getQuestionGameText } from "@/lib/question-game-i18n";
 import { QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
+import {
+  useGameRun,
+  type GameRunSnapshot,
+  type MemoryRunCard,
+  type UnconfirmedMemoryAction,
+} from "./useGameRun";
 
-interface Card {
-  id: string;
-  pairId: string;
-  type: "q" | "a";
+interface Props {
+  game: BuiltInGame;
+  onBack: () => void;
+  config: GameStartConfig;
 }
 
-interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
-
-const MISS_DELAY = 1800;
 const AI_NAME = "🤖 AI";
-const AI_THINK_MS = 1200;
+const AI_THINK_MS = 1_200;
+const MISS_REVEAL_WAIT_MS = 1_900;
+const CONTENT_KEY_PATTERN = /^memory-pair-(0[1-9]|1[0-9]|20)$/;
+
+function pairForContentKey(contentKey: string, locale: string) {
+  const match = contentKey.match(CONTENT_KEY_PATTERN);
+  const index = match ? Number(match[1]) - 1 : -1;
+  const source = locale === "en" ? MEMORY_FALLBACK_PAIRS_EN : MEMORY_FALLBACK_PAIRS;
+  return source[index] ?? null;
+}
+
+function cardText(card: MemoryRunCard, locale: string) {
+  if (!card.contentKey) return null;
+  const pair = pairForContentKey(card.contentKey, locale);
+  return card.type === "q" ? pair?.question ?? null : pair?.answer ?? null;
+}
 
 export default function MemoryGame({ game, onBack, config }: Props) {
   const locale = useLocale();
   const text = getQuestionGameText(locale);
-  const { mode } = config;
-  const isAI = mode === "ai";
-  const isSolo = mode === "solo";
+  const isAI = config.mode === "ai";
+  const studentName = config.players[0]?.trim() || text.me;
+  const [phase, setPhase] = useState<"setup" | "starting" | "play">("setup");
+  const [selectedDifficulty, setSelectedDifficulty] =
+    useState<MemoryDifficulty>("normal");
+  const autoAiKeyRef = useRef<string | null>(null);
+  const autoResolveKeyRef = useRef<string | null>(null);
+  const lastStudentCardRef = useRef<string | null>(null);
+  const {
+    run,
+    result,
+    pending,
+    error,
+    conflict,
+    unconfirmedMemoryAction,
+    start,
+    flipMemoryCard,
+    runMemoryAiTurn,
+    resolveMemoryMiss,
+    reset,
+    clearError,
+  } = useGameRun();
 
-  // 참가자 구성
-  const playersList = (() => {
-    if (isSolo) return [config.players[0]?.trim() || text.me];
-    if (isAI) return [config.players[0]?.trim() || text.me, AI_NAME];
-    return config.players.length > 0 ? config.players : [text.me];
-  })();
-  const hasOpponents = playersList.length > 1;
+  const requestBlocked = pending !== null || unconfirmedMemoryAction !== null;
+  const inputBlocked = requestBlocked || Boolean(conflict);
 
-  const [phase, setPhase] = useState<"setup" | "generating" | "play" | "done">("setup");
-  const [difficulty, setDifficulty] = useState<MemoryDifficulty>("normal");
-  const maximumAttempts = QUESTION_GAME_RULES.memory.targets[
-    isAI ? "ai" : "solo"
-  ][difficulty];
-  const [pairs, setPairs] = useState<QAPair[]>([]);
-  const [qCards, setQCards] = useState<Card[]>([]);
-  const [aCards, setACards] = useState<Card[]>([]);
-  const [revealed, setRevealed] = useState<string[]>([]);
-  const [taken, setTaken] = useState<string[]>([]);
-  const [tries, setTries] = useState(0);
-  // 차례 + 점수 (멀티/AI 모드)
-  const [turnIdx, setTurnIdx] = useState(0);
-  const [scores, setScores] = useState<Record<string, number>>(
-    Object.fromEntries(playersList.map((p) => [p, 0]))
-  );
-
-  // AI 기억력: 본 카드들의 (id, pairId)
-  const seenRef = useRef<Map<string, string>>(new Map());
-
-  const { ask, loading: aiLoading } = useAIPlay();
-  const missTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const currentPlayer = playersList[turnIdx % playersList.length] ?? text.me;
-  const isAITurn = isAI && currentPlayer === AI_NAME;
-  const isHumanTurn = !isAITurn;
-
-  /* 난이도 + 페어 생성 */
-  async function startGame(diff: MemoryDifficulty) {
-    setDifficulty(diff);
-    setPhase("generating");
-    const cfg = MEMORY_DIFFICULTY[diff];
-    const res = await ask({ action: "memory:pairs", context: { count: String(cfg.pairs) } });
-    let p: QAPair[] | null = null;
-    if (res?.text) p = parseAIPairs(res.text, cfg.pairs);
-    if (!p) p = pickFallbackPairs(cfg.pairs, locale);
-
-    const q: Card[] = p.map((pp, i) => ({ id: `q-${i}`, pairId: pp.id, type: "q" }));
-    const a: Card[] = p.map((pp, i) => ({ id: `a-${i}`, pairId: pp.id, type: "a" }));
-    setPairs(p);
-    setQCards(shuffle(q));
-    setACards(shuffle(a));
-    setRevealed([]);
-    setTaken([]);
-    setTries(0);
-    setTurnIdx(0);
-    setScores(Object.fromEntries(playersList.map((pl) => [pl, 0])));
-    seenRef.current = new Map();
-    setPhase("play");
-  }
-
-  function findPair(pid: string) { return pairs.find((p) => p.id === pid); }
-  const isFlipped = (c: Card) => revealed.includes(c.id) || taken.includes(c.id);
-  const isTaken = (c: Card) => taken.includes(c.id);
-
-  /* 카드 뒤집기 */
-  function flip(card: Card): "match" | "miss" | "noop" {
-    if (phase !== "play") return "noop";
-    if (isFlipped(card)) return "noop";
-    if (revealed.length >= 2) return "noop";
-    if (revealed.length === 0 && card.type !== "q") return "noop";
-    if (revealed.length === 1 && card.type !== "a") return "noop";
-    if (missTimerRef.current) return "noop";
-
-    seenRef.current.set(card.id, card.pairId);
-    const newRevealed = [...revealed, card.id];
-    setRevealed(newRevealed);
-
-    if (newRevealed.length === 2) {
-      const nextTries = tries + 1;
-      const reachedMaximum = nextTries >= maximumAttempts;
-      setTries(nextTries);
-      const [qId, aId] = newRevealed;
-      const qCard = qCards.find((c) => c.id === qId);
-      const aCard = aCards.find((c) => c.id === aId);
-      const match = !!(qCard && aCard && qCard.pairId === aCard.pairId);
-
-      if (match) {
-        setTimeout(() => {
-          const newTaken = [...taken, qId, aId];
-          setTaken(newTaken);
-          setRevealed([]);
-          setScores((s) => ({ ...s, [currentPlayer]: (s[currentPlayer] ?? 0) + 1 }));
-          if (
-            newTaken.length >= qCards.length + aCards.length ||
-            reachedMaximum
-          ) {
-            setPhase("done");
-          }
-        }, 500);
-        return "match";
-      } else {
-        // miss: 잠시 후 복원 + 차례 넘김 (멀티/AI 모드만)
-        missTimerRef.current = setTimeout(() => {
-          setRevealed([]);
-          missTimerRef.current = null;
-          if (reachedMaximum) {
-            setPhase("done");
-          } else if (hasOpponents) {
-            setTurnIdx((t) => (t + 1) % playersList.length);
-          }
-        }, MISS_DELAY);
-        return "miss";
-      }
-    }
-    return "noop";
-  }
-
-  function userFlip(card: Card) {
-    if (!isHumanTurn) return;
-    flip(card);
-  }
-
-  /* AI 차례: 단계별로 카드 선택 (revealed 상태 변화에 따라 재실행) */
   useEffect(() => {
-    if (!isAITurn || phase !== "play") return;
-    if (missTimerRef.current) return;
+    if (
+      phase !== "play" ||
+      !run ||
+      run.memoryNextStep !== "AI_TURN" ||
+      pending !== null ||
+      conflict ||
+      error ||
+      unconfirmedMemoryAction
+    ) return;
+    const key = `${run.id}:${run.version}:memory-ai-turn`;
+    if (autoAiKeyRef.current === key) return;
+    const timer = setTimeout(() => {
+      autoAiKeyRef.current = key;
+      void runMemoryAiTurn(run);
+    }, AI_THINK_MS);
+    return () => clearTimeout(timer);
+  }, [conflict, error, pending, phase, run, runMemoryAiTurn, unconfirmedMemoryAction]);
 
-    const seen = seenRef.current;
-    const availableQ = qCards.filter((c) => !taken.includes(c.id));
-    const availableA = aCards.filter((c) => !taken.includes(c.id));
+  useEffect(() => {
+    const reveal = run?.memoryMissReveal;
+    if (
+      phase !== "play" ||
+      !run ||
+      run.memoryNextStep !== "RESOLVE_MISS" ||
+      !reveal ||
+      pending !== null ||
+      conflict ||
+      error ||
+      unconfirmedMemoryAction
+    ) return;
+    const key = `${run.id}:${run.version}:${reveal.id}`;
+    if (autoResolveKeyRef.current === key) return;
+    const timer = setTimeout(() => {
+      autoResolveKeyRef.current = key;
+      void resolveMemoryMiss(reveal.id, run);
+    }, MISS_REVEAL_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [conflict, error, pending, phase, resolveMemoryMiss, run, unconfirmedMemoryAction]);
 
-    // 1단계: 질문 카드 선택 (revealed가 비어 있을 때)
-    if (revealed.length === 0) {
-      if (availableQ.length === 0) return;
-      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
-      aiTimerRef.current = setTimeout(() => {
-        // 본 적 있는 카드들 중 짝이 맞는 페어가 있으면 그 질문 우선
-        const seenQs = availableQ.filter((c) => seen.has(c.id));
-        const seenAs = availableA.filter((c) => seen.has(c.id));
-        let pickedQ: Card | undefined;
-        for (const q of seenQs) {
-          if (seenAs.some((a) => a.pairId === q.pairId)) { pickedQ = q; break; }
-        }
-        if (!pickedQ) {
-          // 본 적 없는 질문 카드 우선 (탐색)
-          const unseenQ = availableQ.filter((c) => !seen.has(c.id));
-          pickedQ = unseenQ.length > 0
-            ? unseenQ[Math.floor(Math.random() * unseenQ.length)]
-            : availableQ[Math.floor(Math.random() * availableQ.length)];
-        }
-        flip(pickedQ);
-      }, AI_THINK_MS);
-    }
-
-    // 2단계: 대답 카드 선택 (revealed에 질문이 들어있을 때)
-    if (revealed.length === 1) {
-      const revealedQId = revealed[0];
-      const revealedQ = qCards.find((c) => c.id === revealedQId);
-      if (!revealedQ || availableA.length === 0) return;
-      if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
-      aiTimerRef.current = setTimeout(() => {
-        // 짝이 맞는 대답 카드를 본 적이 있으면 그것 선택 (똑똑한 매칭)
-        let pickedA: Card | undefined =
-          availableA.find((c) => c.pairId === revealedQ.pairId && seen.has(c.id));
-        if (!pickedA) {
-          // 본 적 없는 대답 카드 우선 (탐색)
-          const unseenA = availableA.filter((c) => !seen.has(c.id));
-          pickedA = unseenA.length > 0
-            ? unseenA[Math.floor(Math.random() * unseenA.length)]
-            : availableA[Math.floor(Math.random() * availableA.length)];
-        }
-        flip(pickedA);
-      }, AI_THINK_MS);
-    }
-
-    return () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAITurn, phase, revealed, taken.length, qCards, aCards]);
-
-  /* 결과 */
-  if (phase === "done") {
-    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-    const topScore = sorted[0]?.[1] ?? 0;
-    const winners = sorted.filter(([, s]) => s === topScore && topScore > 0);
-    return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <GameHeader game={game} subtitle={locale === "en" ? "Complete!" : "완성!"} onBack={onBack} />
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-card p-8 text-card-foreground shadow-sm">
-          <div className="text-6xl">🏆</div>
-          <h2 className="text-2xl font-black text-foreground">{text.memoryDone}</h2>
-          {hasOpponents && winners.length > 0 ? (
-            <>
-              <p className="text-sm text-muted-foreground">{winners.length === 1 ? text.winner : text.jointWinner}</p>
-              <div className="flex flex-wrap gap-2">
-                {winners.map(([name]) => (
-                  <span key={name} className="px-3 py-1 rounded-full text-white text-sm font-black"
-                    style={{ background: game.gradientCss }}>
-                    👑 {name}
-                  </span>
-                ))}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">{getMemoryDifficultyLabel(locale, difficulty)} · {text.attempts(tries)}</p>
-          )}
-        </div>
-
-        {/* 점수판 */}
-        {hasOpponents && (
-          <div className="space-y-2 rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
-            <h3 className="mb-1 text-sm font-black text-foreground">{text.scoreboard}</h3>
-            {sorted.map(([name, score], i) => (
-              <div key={name} className="flex items-center gap-3 rounded-lg bg-muted p-3">
-                <span className="text-lg w-6 text-center">{["🥇", "🥈", "🥉"][i] ?? `${i + 1}`}</span>
-                <span className="flex-1 font-bold text-foreground">{name}</span>
-                <span className="font-black text-violet-700 dark:text-violet-300">
-                  {score}{locale === "en" ? ` ${text.pair}` : text.pair}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 질문-대답 짝 정리 */}
-        <GameResultReview
-          title={text.memoryPairsTitle}
-          accentColor={game.accentColor}
-          entries={pairs.map((p) => ({ q: p.question, a: p.answer }))}
-          qPrefix="💧"
-          aPrefix="⭐"
-        />
-
-        <Button className="w-full py-4 font-black text-white rounded-xl"
-          style={{ background: game.gradientCss }}
-          onClick={() => setPhase("setup")}>
-          {text.retry}
-        </Button>
-      </div>
+  async function startGame(difficulty: MemoryDifficulty) {
+    setSelectedDifficulty(difficulty);
+    setPhase("starting");
+    clearError();
+    const created = await start(
+      "memory",
+      isAI ? "ai" : "solo",
+      "",
+      locale,
+      { difficulty },
     );
+    if (created) {
+      autoAiKeyRef.current = null;
+      autoResolveKeyRef.current = null;
+      lastStudentCardRef.current = null;
+      setPhase("play");
+    }
   }
 
-  /* 난이도 선택 */
+  function restart() {
+    reset();
+    autoAiKeyRef.current = null;
+    autoResolveKeyRef.current = null;
+    lastStudentCardRef.current = null;
+    setPhase("setup");
+  }
+
+  function handleBack() {
+    if (requestBlocked) return;
+    reset();
+    onBack();
+  }
+
+  function handleStudentCard(card: MemoryRunCard) {
+    if (!run || inputBlocked || card.state !== "HIDDEN") return;
+    const expectedType = run.memoryNextStep === "STUDENT_QUESTION"
+      ? "q"
+      : run.memoryNextStep === "STUDENT_ANSWER"
+        ? "a"
+        : null;
+    if (card.type !== expectedType) return;
+    lastStudentCardRef.current = card.id;
+    void flipMemoryCard(card.id, run);
+  }
+
+  function retryMemoryAction() {
+    if (!run || pending !== null || conflict) return;
+    const uncertain = unconfirmedMemoryAction;
+    if (uncertain?.action === "memory-flip-card") {
+      void flipMemoryCard(uncertain.cardId, run);
+      return;
+    }
+    if (uncertain?.action === "memory-ai-turn") {
+      void runMemoryAiTurn(run);
+      return;
+    }
+    if (uncertain?.action === "memory-resolve-miss") {
+      void resolveMemoryMiss(uncertain.revealId, run);
+      return;
+    }
+    if (run.memoryNextStep === "AI_TURN") {
+      void runMemoryAiTurn(run);
+      return;
+    }
+    if (run.memoryNextStep === "RESOLVE_MISS" && run.memoryMissReveal) {
+      void resolveMemoryMiss(run.memoryMissReveal.id, run);
+      return;
+    }
+    const cardId = lastStudentCardRef.current;
+    const card = cardId
+      ? [...(run.memoryQuestionCards ?? []), ...(run.memoryAnswerCards ?? [])]
+        .find((candidate) => candidate.id === cardId)
+      : null;
+    if (card?.state === "HIDDEN") void flipMemoryCard(card.id, run);
+  }
+
   if (phase === "setup") {
     return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <GameHeader game={game} subtitle={
-          isSolo ? text.soloModeSubtitle
-          : isAI ? text.aiModeSubtitle
-          : text.friendModeSubtitle(playersList.length)
-        } onBack={onBack} />
+      <div className="mx-auto max-w-lg space-y-5">
+        <GameHeader
+          game={game}
+          subtitle={isAI ? text.aiModeSubtitle : text.soloModeSubtitle}
+          onBack={handleBack}
+        />
         <div className="space-y-4 rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
           <h2 className="font-black text-foreground">{text.memoryChooseDifficulty}</h2>
-          {hasOpponents && (
+          {isAI && (
             <div className="flex flex-wrap gap-2">
-              {playersList.map((p, i) => (
-                <span key={p} className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-foreground">
-                  {i + 1}. {p}
+              {[studentName, AI_NAME].map((name, index) => (
+                <span
+                  key={name}
+                  className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-foreground"
+                >
+                  {index + 1}. {name}
                 </span>
               ))}
             </div>
           )}
           <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(MEMORY_DIFFICULTY) as MemoryDifficulty[]).map((d) => {
-              const cfg = MEMORY_DIFFICULTY[d];
+            {(Object.keys(MEMORY_DIFFICULTY) as MemoryDifficulty[]).map((difficulty) => {
+              const config = MEMORY_DIFFICULTY[difficulty];
+              const maximum = QUESTION_GAME_RULES.memory.targets[
+                isAI ? "ai" : "solo"
+              ][difficulty];
               return (
-                <button key={d} onClick={() => startGame(d)}
-                  className="rounded-lg border-2 border-border bg-background p-4 text-foreground transition-colors hover:border-violet-500">
-                  <p className="text-sm font-black">{getMemoryDifficultyLabel(locale, d)}</p>
-                  <p className="mt-1 text-2xl font-black text-violet-700 dark:text-violet-300">
-                    {cfg.cards}{locale === "en" ? ` ${text.card}` : text.card}
+                <button
+                  key={difficulty}
+                  type="button"
+                  onClick={() => void startGame(difficulty)}
+                  className="rounded-lg border-2 border-border bg-background p-3 text-foreground transition-colors hover:border-violet-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <p className="text-sm font-black">
+                    {getMemoryDifficultyLabel(locale, difficulty)}
                   </p>
-                  <p className="text-xs font-semibold text-muted-foreground">{cfg.pairs}{locale === "en" ? ` ${text.pair}` : text.pair}</p>
+                  <p className="mt-1 text-2xl font-black text-violet-700 dark:text-violet-300">
+                    {config.cards}{locale === "en" ? ` ${text.card}` : text.card}
+                  </p>
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    {locale === "en" ? `${maximum} attempts` : `최대 ${maximum}회`}
+                  </p>
                 </button>
               );
             })}
@@ -315,161 +244,391 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     );
   }
 
-  /* 생성 중 */
-  if (phase === "generating") {
+  if (phase === "starting") {
     return (
-      <div className="max-w-lg mx-auto space-y-5">
-        <GameHeader game={game} subtitle={text.memoryGeneratingCards} onBack={onBack} />
-        <div className="rounded-lg border border-border bg-card p-10 text-center text-card-foreground shadow-sm">
-          <div className="text-6xl animate-bounce mb-3">🃏</div>
-          <p className="text-sm font-bold text-muted-foreground">
-            {aiLoading ? text.memoryAiGenerating : text.preparing}
-          </p>
+      <div className="mx-auto max-w-lg space-y-5">
+        <GameHeader
+          game={game}
+          subtitle={text.memoryGeneratingCards}
+          onBack={handleBack}
+          backDisabled={requestBlocked}
+        />
+        <div className="space-y-4 rounded-lg border border-border bg-card p-8 text-center text-card-foreground shadow-sm">
+          {pending === "create" ? (
+            <>
+              <div className="mb-3 text-6xl animate-bounce">🃏</div>
+              <p role="status" className="text-sm font-bold text-muted-foreground">
+                {text.preparing}
+              </p>
+            </>
+          ) : (
+            <>
+              <div
+                role="alert"
+                className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-700 dark:bg-red-950 dark:text-red-100"
+              >
+                {error ?? (locale === "en"
+                  ? "Could not prepare the cards."
+                  : "카드를 준비하지 못했습니다.")}
+              </div>
+              <Button
+                type="button"
+                className="w-full font-bold"
+                onClick={() => void startGame(selectedDifficulty)}
+              >
+                {locale === "en" ? "Try again" : "다시 시작하기"}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     );
   }
 
-  /* 게임 진행 */
-  const cfg = MEMORY_DIFFICULTY[difficulty];
-  const remaining = qCards.length + aCards.length - taken.length;
-  const cols = cfg.pairs <= 6 ? 3 : 5;
+  if (!run || run.gameId !== "memory") {
+    return (
+      <div className="mx-auto max-w-lg space-y-5">
+        <GameHeader game={game} subtitle={text.memoryGeneratingCards} onBack={handleBack} />
+        <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">
+          {locale === "en" ? "Could not read the game." : "카드 짝 찾기 실행을 읽지 못했습니다."}
+        </div>
+        <Button type="button" className="w-full" onClick={restart}>
+          {locale === "en" ? "Start over" : "새로 시작하기"}
+        </Button>
+      </div>
+    );
+  }
+
+  if (conflict) {
+    return (
+      <div className="mx-auto max-w-lg space-y-5">
+        <GameHeader game={game} subtitle={text.memoryChooseDifficulty} onBack={handleBack} />
+        <div role="alert" className="rounded-lg border border-amber-400 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+          {conflict}
+        </div>
+        <Button type="button" className="w-full font-bold" onClick={restart}>
+          {locale === "en" ? "Start a new game" : "새 실행 시작하기"}
+        </Button>
+      </div>
+    );
+  }
+
+  if (run.status === "SETTLED" && run.memoryNextStep === "COMPLETE") {
+    const reviewEntries = (run.memoryReview ?? []).flatMap(({ contentKey }) => {
+      const pair = pairForContentKey(contentKey, locale);
+      return pair ? [{ q: pair.question, a: pair.answer }] : [];
+    });
+    return (
+      <div className="mx-auto max-w-lg space-y-5">
+        <GameHeader
+          game={game}
+          subtitle={locale === "en" ? "Complete!" : "완성!"}
+          onBack={handleBack}
+          backDisabled={requestBlocked}
+        />
+        <div className="space-y-4 rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
+          <div className="text-center">
+            <div className="text-6xl">🏆</div>
+            <h2 className="mt-2 text-2xl font-black text-foreground">{text.memoryDone}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {getMemoryDifficultyLabel(locale, run.memoryDifficulty ?? selectedDifficulty)} · {text.attempts(run.questionCount)}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <ScoreRow name={studentName} score={run.studentMatchCount ?? 0} />
+            {isAI && <ScoreRow name={AI_NAME} score={run.aiMatchCount ?? 0} />}
+          </div>
+          {result && (
+            <div
+              role="status"
+              className={`rounded-lg border p-3 text-sm ${
+                result.awarded > 0
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100"
+                  : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+              }`}
+            >
+              <p className="font-bold">
+                {result.preview
+                  ? (locale === "en"
+                      ? "Preview completed without points."
+                      : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                  : result.awarded > 0
+                    ? (locale === "en"
+                        ? `+${result.awarded} points earned!`
+                        : `+${result.awarded}점 적립!`)
+                    : (locale === "en"
+                        ? "The daily point limit has been reached."
+                        : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+              </p>
+              {!result.preview && result.cappedByLimit && (
+                <p className="mt-1 text-xs">
+                  {locale === "en"
+                    ? "The award was limited by today's point cap."
+                    : "오늘 포인트 상한에 맞춰 일부만 적립됐어요."}
+                </p>
+              )}
+              {!result.preview && result.dailyRemaining > 0 && (
+                <p className="mt-1 text-xs">
+                  {locale === "en"
+                    ? `${result.dailyRemaining} points are still available today.`
+                    : `오늘 ${result.dailyRemaining}점 더 받을 수 있어요.`}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+        <GameResultReview
+          title={text.memoryPairsTitle}
+          accentColor={game.accentColor}
+          entries={reviewEntries}
+          qPrefix="💧"
+          aPrefix="⭐"
+        />
+        <Button
+          type="button"
+          className="w-full py-4 font-black text-white"
+          style={{ background: game.gradientCss }}
+          onClick={restart}
+        >
+          {text.retry}
+        </Button>
+      </div>
+    );
+  }
+
+  const difficulty = run.memoryDifficulty ?? selectedDifficulty;
+  const pairCount = MEMORY_DIFFICULTY[difficulty].pairs;
+  const columns = pairCount <= 6 ? 3 : 5;
+  const questionCards = run.memoryQuestionCards ?? [];
+  const answerCards = run.memoryAnswerCards ?? [];
+  const remainingCards = [...questionCards, ...answerCards]
+    .filter((card) => card.state !== "TAKEN").length;
+  const currentName = run.memoryNextStep === "AI_TURN" ||
+      (run.memoryNextStep === "RESOLVE_MISS" && run.memoryMissReveal?.actor === "AI")
+    ? AI_NAME
+    : studentName;
+  const subtitle = `${text.turnOf(currentName)} · ${text.remainingCards(remainingCards)} · ${
+    locale === "en"
+      ? `Attempts ${run.questionCount}/${run.targetCount}`
+      : `시도 ${run.questionCount}/${run.targetCount}`
+  }`;
+  const canRetry = Boolean(
+    unconfirmedMemoryAction ||
+    run.memoryNextStep === "AI_TURN" ||
+    run.memoryNextStep === "RESOLVE_MISS" ||
+    run.memoryNextStep === "STUDENT_QUESTION" ||
+    run.memoryNextStep === "STUDENT_ANSWER",
+  );
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      <GameHeader game={game}
-        subtitle={hasOpponents
-          ? `${text.turnOf(currentPlayer)} · ${text.remainingCards(remaining)} · ${locale === "en" ? `Attempts ${tries}/${maximumAttempts}` : `시도 ${tries}/${maximumAttempts}`}`
-          : `${text.remainingCards(remaining)} · ${locale === "en" ? `Attempts ${tries}/${maximumAttempts}` : `시도 ${tries}/${maximumAttempts}`}`}
-        onBack={onBack} />
+    <div className="mx-auto max-w-2xl space-y-4">
+      <GameHeader
+        game={game}
+        subtitle={subtitle}
+        onBack={handleBack}
+        backDisabled={requestBlocked}
+      />
 
-      {/* 점수판 (멀티/AI 모드) */}
-      {hasOpponents && (
-        <div className="flex gap-1 overflow-x-auto pb-1">
-          {playersList.map((p, i) => {
-            const isCurrent = i === turnIdx % playersList.length;
-            return (
-              <div key={p}
-                className={`flex flex-shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs ${
-                  isCurrent
-                    ? "bg-violet-700 text-white dark:bg-violet-300 dark:text-violet-950"
-                    : "bg-muted text-foreground"
-                }`}>
-                <span className="font-bold">{p}</span>
-                <span className="font-black">{scores[p] ?? 0}</span>
-              </div>
-            );
-          })}
+      {error && (
+        <div className="space-y-2 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-950 dark:border-red-700 dark:bg-red-950 dark:text-red-100">
+          <p role="alert">{error}</p>
+          {canRetry && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full font-bold"
+              disabled={pending !== null}
+              onClick={retryMemoryAction}
+            >
+              {locale === "en" ? "Retry this turn" : "이 차례 다시 확인하기"}
+            </Button>
+          )}
         </div>
       )}
 
-      {/* AI 생각 중 */}
-      {isAITurn && revealed.length === 0 && (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-center dark:border-indigo-800 dark:bg-indigo-950">
-          <div className="flex items-center justify-center gap-2 text-indigo-700 dark:text-indigo-200">
-            <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      {isAI && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <ScoreChip
+            name={studentName}
+            score={run.studentMatchCount ?? 0}
+            active={currentName === studentName}
+          />
+          <ScoreChip
+            name={AI_NAME}
+            score={run.aiMatchCount ?? 0}
+            active={currentName === AI_NAME}
+          />
+        </div>
+      )}
+
+      {run.memoryNextStep === "AI_TURN" && (
+        <div className="rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-center text-indigo-950 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-100">
+          <div className="flex items-center justify-center gap-2">
+            {pending === "ai" && (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            )}
             <p className="text-sm font-bold">{text.aiChoosingCard}</p>
           </div>
         </div>
       )}
 
-      {/* 질문 카드 */}
-      <div className="rounded-lg border border-border bg-card p-3 text-card-foreground shadow-sm">
-        <p className="mb-2 text-xs font-black text-blue-700 dark:text-blue-300">{text.questionCard}</p>
-        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {qCards.map((c) => {
-            const flipped = isFlipped(c);
-            const tk = isTaken(c);
-            const pair = findPair(c.pairId);
-            return (
-              <button key={c.id} onClick={() => !flipped && userFlip(c)}
-                disabled={flipped || revealed.length >= 2 || !isHumanTurn}
-                className={`flex aspect-[3/4] items-center justify-center overflow-y-auto rounded-lg border-2 p-2 text-center transition-colors ${
-                  tk
-                    ? "border-blue-300 bg-blue-100 text-blue-950 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100"
-                    : flipped
-                      ? "border-blue-500 bg-blue-50 text-blue-950 dark:border-blue-400 dark:bg-blue-950 dark:text-blue-50"
-                      : "border-blue-900 bg-blue-700 text-white dark:border-blue-300 dark:bg-blue-600"
-                } ${!isHumanTurn || flipped ? "cursor-default" : "cursor-pointer"}`}>
-                {flipped ? (
-                  <AutoFitText text={pair?.question ?? "?"} />
-                ) : (
-                  <span className="text-3xl">❓</span>
-                )}
-              </button>
-            );
-          })}
+      {run.memoryNextStep === "RESOLVE_MISS" && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-center text-sm font-bold text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+          {locale === "en"
+            ? "The cards do not match. They will turn back over shortly."
+            : "짝이 달라요. 잠시 확인한 뒤 카드를 다시 덮습니다."}
         </div>
-      </div>
+      )}
 
-      {/* 대답 카드 */}
-      <div className="rounded-lg border border-border bg-card p-3 text-card-foreground shadow-sm">
-        <p className="mb-2 text-xs font-black text-amber-700 dark:text-amber-300">{text.answerCard}</p>
-        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {aCards.map((c) => {
-            const flipped = isFlipped(c);
-            const tk = isTaken(c);
-            const pair = findPair(c.pairId);
-            return (
-              <button key={c.id} onClick={() => !flipped && userFlip(c)}
-                disabled={flipped || revealed.length !== 1 || !isHumanTurn}
-                className={`flex aspect-[3/4] items-center justify-center overflow-y-auto rounded-lg border-2 p-2 text-center transition-colors ${
-                  tk
-                    ? "border-amber-300 bg-amber-100 text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-                    : flipped
-                      ? "border-amber-500 bg-amber-50 text-amber-950 dark:border-amber-400 dark:bg-amber-950 dark:text-amber-50"
-                      : "border-amber-700 bg-amber-400 text-slate-950 dark:border-amber-300 dark:bg-amber-300 dark:text-slate-950"
-                } ${!isHumanTurn || flipped ? "cursor-default" : "cursor-pointer"}`}>
-                {flipped ? (
-                  <AutoFitText text={pair?.answer ?? "!"} />
-                ) : (
-                  <span className="text-3xl">❗</span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <MemoryCardSection
+        title={text.questionCard}
+        cards={questionCards}
+        columns={columns}
+        locale={locale}
+        disabled={inputBlocked || run.memoryNextStep !== "STUDENT_QUESTION"}
+        onCard={handleStudentCard}
+      />
+      <MemoryCardSection
+        title={text.answerCard}
+        cards={answerCards}
+        columns={columns}
+        locale={locale}
+        disabled={inputBlocked || run.memoryNextStep !== "STUDENT_ANSWER"}
+        onCard={handleStudentCard}
+      />
 
       <p className="text-center text-xs font-semibold text-muted-foreground">
-        {isHumanTurn && revealed.length === 0 && text.pickQuestionCard}
-        {isHumanTurn && revealed.length === 1 && text.pickAnswerCard}
-        {isHumanTurn && revealed.length === 2 && text.checkingPair}
-        {isAITurn && revealed.length > 0 && text.aiFlippingCard}
+        {run.memoryNextStep === "STUDENT_QUESTION" && text.pickQuestionCard}
+        {run.memoryNextStep === "STUDENT_ANSWER" && text.pickAnswerCard}
+        {run.memoryNextStep === "AI_TURN" && text.aiFlippingCard}
+        {run.memoryNextStep === "RESOLVE_MISS" && text.checkingPair}
       </p>
     </div>
   );
 }
 
-/**
- * 카드 안에 글씨를 최대한 크게 채우되, 카드 밖으로 넘치지 않도록 폰트 크기를 자동 조절한다.
- * 부모(카드)의 안쪽 크기에 맞을 때까지 글씨 크기를 줄인다.
- */
+function MemoryCardSection({
+  title,
+  cards,
+  columns,
+  locale,
+  disabled,
+  onCard,
+}: {
+  title: string;
+  cards: MemoryRunCard[];
+  columns: number;
+  locale: string;
+  disabled: boolean;
+  onCard: (card: MemoryRunCard) => void;
+}) {
+  const type = cards[0]?.type ?? (title.includes("대답") ? "a" : "q");
+  const question = type === "q";
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 text-card-foreground shadow-sm">
+      <p className={`mb-2 text-xs font-black ${
+        question
+          ? "text-blue-700 dark:text-blue-300"
+          : "text-amber-700 dark:text-amber-300"
+      }`}>
+        {title}
+      </p>
+      <div
+        className="grid gap-2"
+        style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+      >
+        {cards.map((card, index) => {
+          const visible = card.state !== "HIDDEN";
+          const taken = card.state === "TAKEN";
+          const content = cardText(card, locale);
+          const hiddenLabel = locale === "en"
+            ? `${question ? "Question" : "Answer"} card ${index + 1}`
+            : `${question ? "질문" : "대답"} 카드 ${index + 1}`;
+          return (
+            <button
+              key={card.id}
+              type="button"
+              aria-label={visible ? undefined : hiddenLabel}
+              onClick={() => onCard(card)}
+              disabled={disabled || visible}
+              className={`flex aspect-[3/4] items-center justify-center overflow-y-auto rounded-lg border-2 p-2 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                question
+                  ? taken
+                    ? "border-blue-300 bg-blue-100 text-blue-950 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-100"
+                    : visible
+                      ? "border-blue-500 bg-blue-50 text-blue-950 dark:border-blue-400 dark:bg-blue-950 dark:text-blue-50"
+                      : "border-blue-900 bg-blue-700 text-white dark:border-blue-300 dark:bg-blue-600"
+                  : taken
+                    ? "border-amber-300 bg-amber-100 text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+                    : visible
+                      ? "border-amber-500 bg-amber-50 text-amber-950 dark:border-amber-400 dark:bg-amber-950 dark:text-amber-50"
+                      : "border-amber-700 bg-amber-400 text-slate-950 dark:border-amber-300 dark:bg-amber-300 dark:text-slate-950"
+              } ${disabled || visible ? "cursor-default" : "cursor-pointer"}`}
+            >
+              {visible ? (
+                <AutoFitText text={content ?? "?"} />
+              ) : (
+                <span className="text-3xl" aria-hidden="true">{question ? "❓" : "❗"}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ScoreChip({ name, score, active }: { name: string; score: number; active: boolean }) {
+  return (
+    <div className={`flex flex-shrink-0 items-center gap-2 rounded-full px-3 py-1 text-xs ${
+      active
+        ? "bg-violet-700 text-white dark:bg-violet-300 dark:text-violet-950"
+        : "bg-muted text-foreground"
+    }`}>
+      <span className="font-bold">{name}</span>
+      <span className="font-black">{score}</span>
+    </div>
+  );
+}
+
+function ScoreRow({ name, score }: { name: string; score: number }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg bg-muted p-3 text-foreground">
+      <span className="flex-1 font-bold">{name}</span>
+      <span className="font-black text-violet-700 dark:text-violet-300">{score}</span>
+    </div>
+  );
+}
+
 function AutoFitText({ text, max = 20, min = 9 }: { text: string; max?: number; min?: number }) {
   const ref = useRef<HTMLSpanElement>(null);
 
   useLayoutEffect(() => {
     const fit = () => {
-      const el = ref.current;
-      const parent = el?.parentElement;
-      if (!el || !parent) return;
-      const cs = getComputedStyle(parent);
-      const maxW = parent.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-      const maxH = parent.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const element = ref.current;
+      const parent = element?.parentElement;
+      if (!element || !parent) return;
+      const style = getComputedStyle(parent);
+      const maxWidth = parent.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight);
+      const maxHeight = parent.clientHeight -
+        parseFloat(style.paddingTop) -
+        parseFloat(style.paddingBottom);
       let size = max;
-      el.style.fontSize = `${size}px`;
-      while (size > min && (el.scrollHeight > maxH || el.scrollWidth > maxW)) {
+      element.style.fontSize = `${size}px`;
+      while (size > min && (element.scrollHeight > maxHeight || element.scrollWidth > maxWidth)) {
         size -= 1;
-        el.style.fontSize = `${size}px`;
+        element.style.fontSize = `${size}px`;
       }
     };
     fit();
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-  }, [text, max, min]);
+  }, [max, min, text]);
 
   return (
-    <span ref={ref} className="block w-full font-semibold break-keep" style={{ lineHeight: 1.15 }}>
+    <span ref={ref} className="block w-full break-keep font-semibold" style={{ lineHeight: 1.15 }}>
       {text}
     </span>
   );

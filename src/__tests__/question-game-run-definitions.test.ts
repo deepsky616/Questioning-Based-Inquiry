@@ -16,6 +16,7 @@ describe("질문놀이 실행 정의", () => {
     expect(findQuestionGameRunDefinition("ladder")?.gameId).toBe("ladder");
     expect(findQuestionGameRunDefinition("kaba")?.gameId).toBe("kaba");
     expect(findQuestionGameRunDefinition("story-dice")?.gameId).toBe("story-dice");
+    expect(findQuestionGameRunDefinition("memory")?.gameId).toBe("memory");
     expect(findQuestionGameRunDefinition("not-supported")).toBeUndefined();
   });
 
@@ -661,5 +662,192 @@ describe("질문놀이 실행 정의", () => {
       runVersion: 3,
       activeRun: false,
     })).toThrowError(QuestionGameRunError);
+  });
+
+  it.each([
+    ["easy", 6, 18],
+    ["normal", 10, 30],
+    ["hard", 15, 45],
+  ] as const)(
+    "카드 짝 찾기 %s 초기 상태는 숨은 카드와 최대 시도만 공개한다",
+    (difficulty, pairCount, targetCount) => {
+      const definition = findQuestionGameRunDefinition("memory");
+      expect(definition).toBeDefined();
+      if (!definition) return;
+      const state = definition.createState({
+        mode: "AI",
+        locale: "ko",
+        topicHash: TOPIC_HASH,
+        topicLength: 0,
+        difficulty,
+      });
+
+      expect(() => definition.ensureProgress(state, {
+        mode: "AI",
+        runVersion: 1,
+        activeRun: true,
+      })).not.toThrow();
+      const progress = definition.publicProgress(state, "AI");
+      expect(progress).toMatchObject({
+        questionCount: 0,
+        aiTurnCount: 0,
+        awaitingAiTurn: false,
+        targetCount,
+        memoryDifficulty: difficulty,
+        memoryNextStep: "STUDENT_QUESTION",
+        studentMatchCount: 0,
+        aiMatchCount: 0,
+        memoryMissReveal: null,
+        memoryReview: null,
+      });
+      expect(progress.memoryQuestionCards).toHaveLength(pairCount);
+      expect(progress.memoryAnswerCards).toHaveLength(pairCount);
+      expect(progress.memoryQuestionCards).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: "q", state: "HIDDEN" }),
+      ]));
+      expect(progress.memoryAnswerCards).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: "a", state: "HIDDEN" }),
+      ]));
+      expect(JSON.stringify(progress)).not.toContain("pairKey");
+      expect(JSON.stringify(progress)).not.toContain("contentKey");
+      expect(new Set([
+        ...(progress.memoryQuestionCards ?? []).map(({ id }) => id),
+        ...(progress.memoryAnswerCards ?? []).map(({ id }) => id),
+      ]).size).toBe(pairCount * 2);
+    },
+  );
+
+  it("카드 짝 찾기는 공개하거나 얻은 카드에만 고정 자료 키를 공개한다", () => {
+    const definition = findQuestionGameRunDefinition("memory");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const initial = definition.createState({
+      mode: "SOLO",
+      locale: "ko",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+      difficulty: "easy",
+    }) as {
+      qCards: Array<{ id: string; pairKey: string; type: "q" }>;
+      pairs: Array<{ pairKey: string; contentKey: string }>;
+      seenCardIds: string[];
+      revealedIds: string[];
+      activitySequence: number;
+      memoryNextStep: string;
+    };
+    const card = initial.qCards[0];
+    const pair = initial.pairs.find(({ pairKey }) => pairKey === card.pairKey);
+    const revealed = {
+      ...initial,
+      seenCardIds: [card.id],
+      revealedIds: [card.id],
+      activitySequence: 1,
+      memoryNextStep: "STUDENT_ANSWER",
+    };
+
+    expect(() => definition.ensureProgress(revealed, {
+      mode: "SOLO",
+      runVersion: 2,
+      activeRun: true,
+    })).not.toThrow();
+    const progress = definition.publicProgress(revealed, "SOLO");
+    expect(progress.memoryQuestionCards?.find(({ id }) => id === card.id)).toEqual({
+      id: card.id,
+      type: "q",
+      state: "REVEALED",
+      contentKey: pair?.contentKey,
+    });
+    expect(progress.memoryAnswerCards?.every((item) =>
+      item.state === "HIDDEN" && !("contentKey" in item)
+    )).toBe(true);
+    expect(JSON.stringify(progress)).not.toContain("pairKey");
+  });
+
+  it("카드 짝 찾기 완료 상태는 모든 고정 자료 키를 검토 목록에 공개한다", () => {
+    const definition = findQuestionGameRunDefinition("memory");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const initial = definition.createState({
+      mode: "SOLO",
+      locale: "en",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+      difficulty: "easy",
+    }) as {
+      qCards: Array<{ id: string }>;
+      aCards: Array<{ id: string }>;
+      pairs: Array<{ contentKey: string }>;
+      [key: string]: unknown;
+    };
+    const allCardIds = [
+      ...initial.qCards.map(({ id }) => id),
+      ...initial.aCards.map(({ id }) => id),
+    ];
+    const settled = {
+      ...initial,
+      questionCount: 6,
+      activitySequence: 12,
+      studentMatchCount: 6,
+      takenIds: allCardIds,
+      seenCardIds: allCardIds,
+      memoryNextStep: "COMPLETE",
+      result: {
+        awarded: 8,
+        dailyLimit: 30,
+        dailyRemaining: 22,
+        cappedByLimit: false,
+        preview: false,
+      },
+    };
+
+    expect(() => definition.ensureProgress(settled, {
+      mode: "SOLO",
+      runVersion: 13,
+      activeRun: false,
+    })).not.toThrow();
+    const progress = definition.publicProgress(settled, "SOLO");
+    expect(progress.memoryReview).toEqual(
+      initial.pairs.map(({ contentKey }) => ({ contentKey })),
+    );
+    expect([
+      ...(progress.memoryQuestionCards ?? []),
+      ...(progress.memoryAnswerCards ?? []),
+    ].every((card) => card.state === "TAKEN" && "contentKey" in card)).toBe(true);
+  });
+
+  it("카드 짝 찾기는 중복 카드 식별값과 틀린 실행 버전을 거부한다", () => {
+    const definition = findQuestionGameRunDefinition("memory");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const initial = definition.createState({
+      mode: "AI",
+      locale: "ko",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+      difficulty: "easy",
+    }) as {
+      qCards: Array<{ id: string; pairKey: string; type: "q" }>;
+      aCards: Array<{ id: string; pairKey: string; type: "a" }>;
+      [key: string]: unknown;
+    };
+    const damaged = JSON.parse(JSON.stringify({
+      ...initial,
+      aCards: [
+        { ...initial.aCards[0], id: initial.qCards[0].id },
+        ...initial.aCards.slice(1),
+      ],
+    }));
+
+    expect(() => definition.parseState(damaged)).toThrowError(QuestionGameRunError);
+    expect(() => definition.ensureProgress(initial, {
+      mode: "AI",
+      runVersion: 2,
+      activeRun: true,
+    })).toThrowError(QuestionGameRunError);
+    expect(() => definition.ensureProgress(initial, {
+      mode: "AI",
+      runVersion: 2,
+      activeRun: false,
+    })).not.toThrow();
   });
 });

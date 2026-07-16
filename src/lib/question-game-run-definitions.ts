@@ -2,6 +2,7 @@ import type { QuestionGameRunDefinition } from "@/lib/question-game-run-definiti
 import { diceRunDefinition } from "@/lib/question-game-dice-definition";
 import { kabaRunDefinition } from "@/lib/question-game-kaba-definition";
 import { ladderRunDefinition } from "@/lib/question-game-ladder-definition";
+import { memoryRunDefinition } from "@/lib/question-game-memory-definition";
 import { relayRunDefinition } from "@/lib/question-game-relay-definition";
 import { storyDiceRunDefinition } from "@/lib/question-game-story-dice-definition";
 
@@ -11,6 +12,7 @@ const definitions = new Map<string, QuestionGameRunDefinition>([
   [ladderRunDefinition.gameId, ladderRunDefinition],
   [kabaRunDefinition.gameId, kabaRunDefinition],
   [storyDiceRunDefinition.gameId, storyDiceRunDefinition],
+  [memoryRunDefinition.gameId, memoryRunDefinition],
 ]);
 
 export function findQuestionGameRunDefinition(

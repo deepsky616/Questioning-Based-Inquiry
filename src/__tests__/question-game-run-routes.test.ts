@@ -154,6 +154,11 @@ const STORY_AI_RECORD_IDS = Array.from(
   { length: 3 },
   (_, index) => `00000000-0000-4000-8000-${String(331 + index).padStart(12, "0")}`,
 );
+const MEMORY_ACTION_IDS = Array.from(
+  { length: 128 },
+  (_, index) => `00000000-0000-4000-8000-${String(401 + index).padStart(12, "0")}`,
+);
+const MEMORY_ALTERNATE_FINAL_ACTION_ID = "00000000-0000-4000-8000-000000000539";
 const COMPLETE_ID = "00000000-0000-4000-8000-000000000020";
 
 const users = new Map<string, { id: string; role: string; totalPoints: number }>();
@@ -259,6 +264,100 @@ async function createStoryDice(
     requestId: CREATE_ID,
     locale,
   });
+}
+
+async function createMemory(
+  mode: "solo" | "ai" = "solo",
+  difficulty: "easy" | "normal" | "hard" = "easy",
+  locale: "ko" | "en" = "ko",
+) {
+  return postCreate({
+    gameId: "memory",
+    mode,
+    difficulty,
+    requestId: CREATE_ID,
+    locale,
+  });
+}
+
+type TestMemoryState = {
+  qCards: Array<{ id: string; pairKey: string; type: "q" }>;
+  aCards: Array<{ id: string; pairKey: string; type: "a" }>;
+  pairs: Array<{ pairKey: string; contentKey: string }>;
+  pendingMiss?: { id: string; actor: "STUDENT" | "AI"; resolveAt: number };
+  seenCardIds: string[];
+};
+
+function storedMemoryState(id = "run-1") {
+  const state = runs.get(id)?.state as TestMemoryState | undefined;
+  if (!state) throw new Error("missing memory state");
+  return state;
+}
+
+function memoryPairCards(index: number, id = "run-1") {
+  const state = storedMemoryState(id);
+  const pair = state.pairs[index];
+  const question = state.qCards.find(({ pairKey }) => pairKey === pair?.pairKey);
+  const answer = state.aCards.find(({ pairKey }) => pairKey === pair?.pairKey);
+  if (!pair || !question || !answer) throw new Error("missing memory pair");
+  return { pair, question, answer };
+}
+
+async function flipMemoryCard(
+  actionIndex: number,
+  expectedVersion: number,
+  cardId: string,
+  id = "run-1",
+  requestId = MEMORY_ACTION_IDS[actionIndex],
+) {
+  return postAction({
+    action: "memory-flip-card",
+    requestId,
+    expectedVersion,
+    cardId,
+  }, id);
+}
+
+async function runMemoryAiTurn(
+  actionIndex: number,
+  expectedVersion: number,
+  id = "run-1",
+  extra: Record<string, unknown> = {},
+) {
+  return postAction({
+    action: "memory-ai-turn",
+    requestId: MEMORY_ACTION_IDS[actionIndex],
+    expectedVersion,
+    ...extra,
+  }, id);
+}
+
+async function resolveMemoryMiss(
+  actionIndex: number,
+  expectedVersion: number,
+  revealId: string,
+  id = "run-1",
+) {
+  return postAction({
+    action: "memory-resolve-miss",
+    requestId: MEMORY_ACTION_IDS[actionIndex],
+    expectedVersion,
+    revealId,
+  }, id);
+}
+
+async function playAllStudentMemoryMatches(mode: "solo" | "ai" = "solo") {
+  await createMemory(mode);
+  const responses: Response[] = [];
+  let version = 1;
+  for (let index = 0; index < 6; index += 1) {
+    const { question, answer } = memoryPairCards(index);
+    responses.push(await flipMemoryCard(index * 2, version, question.id));
+    version += 1;
+    responses.push(await flipMemoryCard(index * 2 + 1, version, answer.id));
+    version += 1;
+  }
+  return { responses, version };
 }
 
 async function rollStoryDiceRun(
@@ -945,7 +1044,7 @@ describe("질문놀이 서버 실행 경로", () => {
 
   it("아직 준비되지 않은 놀이는 실행을 저장하지 않고 거절한다", async () => {
     const response = await postCreate({
-      gameId: "memory",
+      gameId: "hot-potato",
       mode: "solo",
       requestId: CREATE_ID,
       topic: "우주",
@@ -1053,7 +1152,7 @@ describe("질문놀이 서버 실행 경로", () => {
     await postCreate({ gameId: "relay", mode: "solo", requestId: THIRD_CREATE_ID, topic: "날씨", locale: "ko" });
 
     const response = await postCreate({
-      gameId: "memory",
+      gameId: "hot-potato",
       mode: "solo",
       requestId: FOURTH_CREATE_ID,
       topic: "우주",
@@ -3093,5 +3192,445 @@ describe("이야기 주사위 서버 실행 경로", () => {
       },
       result: null,
     });
+  });
+});
+
+describe("카드 짝 찾기 서버 실행 경로", () => {
+  it("난이도별 고정 이중 언어 카드 계획을 만들고 숨은 짝 키를 공개하지 않는다", async () => {
+    const missingDifficulty = await postCreate({
+      gameId: "memory",
+      mode: "solo",
+      requestId: CREATE_ID,
+      locale: "ko",
+    });
+    const created = await createMemory("solo", "easy", "en");
+    const body = await created.json() as {
+      run: {
+        memoryDifficulty: string;
+        targetCount: number;
+        memoryQuestionCards: Array<Record<string, unknown>>;
+        memoryAnswerCards: Array<Record<string, unknown>>;
+      };
+    };
+    const state = storedMemoryState();
+    const replay = await createMemory("solo", "easy", "en");
+    const conflictingReplay = await postCreate({
+      gameId: "memory",
+      mode: "solo",
+      difficulty: "normal",
+      requestId: CREATE_ID,
+      locale: "en",
+    });
+
+    expect(missingDifficulty.status).toBe(400);
+    expect(created.status).toBe(201);
+    expect(body.run).toMatchObject({
+      memoryDifficulty: "easy",
+      targetCount: 18,
+      memoryNextStep: "STUDENT_QUESTION",
+      studentMatchCount: 0,
+      aiMatchCount: 0,
+    });
+    expect(body.run.memoryQuestionCards).toHaveLength(6);
+    expect(body.run.memoryAnswerCards).toHaveLength(6);
+    expect([
+      ...body.run.memoryQuestionCards,
+      ...body.run.memoryAnswerCards,
+    ].every((card) =>
+      card.state === "HIDDEN" &&
+      card.contentKey === undefined &&
+      card.pairKey === undefined
+    )).toBe(true);
+    expect(state.pairs).toHaveLength(6);
+    expect(new Set(state.pairs.map(({ contentKey }) => contentKey)).size).toBe(6);
+    expect(state.pairs.every(({ contentKey }) =>
+      /^memory-pair-(0[1-9]|1[0-9]|20)$/.test(contentKey)
+    )).toBe(true);
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({ replayed: true, run: body.run });
+    expect(conflictingReplay.status).toBe(409);
+  });
+
+  it("질문 카드 다음에만 대답 카드를 받고 같은 요청 재전송과 다른 입력을 구분한다", async () => {
+    await createMemory();
+    const first = memoryPairCards(0);
+    const second = memoryPairCards(1);
+    const answerFirst = await flipMemoryCard(0, 1, first.answer.id);
+    const question = await flipMemoryCard(0, 1, first.question.id);
+    const replay = await flipMemoryCard(0, 1, first.question.id);
+    const conflictingReplay = await flipMemoryCard(0, 1, second.question.id);
+
+    expect(answerFirst.status).toBe(400);
+    expect(question.status).toBe(200);
+    await expect(question.json()).resolves.toMatchObject({
+      run: {
+        version: 2,
+        memoryNextStep: "STUDENT_ANSWER",
+        questionCount: 0,
+      },
+      replayed: false,
+    });
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({
+      replayed: true,
+      run: { version: 2 },
+    });
+    expect(conflictingReplay.status).toBe(409);
+    expect(activities).toHaveLength(1);
+  });
+
+  it("틀린 두 카드를 천팔백 밀리초 공개한 뒤 혼자 모드 학생 차례로 복원한다", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-07-16T00:00:00.000Z"));
+      await createMemory();
+      const first = memoryPairCards(0);
+      const second = memoryPairCards(1);
+      await flipMemoryCard(0, 1, first.question.id);
+      const missed = await flipMemoryCard(1, 2, second.answer.id);
+      const missedBody = await missed.json() as {
+        run: { memoryMissReveal: { id: string; resolveAt: number } };
+      };
+      const early = await resolveMemoryMiss(2, 3, missedBody.run.memoryMissReveal.id);
+      vi.setSystemTime(new Date("2026-07-16T00:00:01.800Z"));
+      const resolved = await resolveMemoryMiss(2, 3, missedBody.run.memoryMissReveal.id);
+
+      expect(missedBody).toMatchObject({
+        run: {
+          version: 3,
+          questionCount: 1,
+          memoryNextStep: "RESOLVE_MISS",
+          memoryMissReveal: {
+            actor: "STUDENT",
+            result: "MISS",
+          },
+        },
+      });
+      expect(early.status).toBe(409);
+      expect(resolved.status).toBe(200);
+      await expect(resolved.json()).resolves.toMatchObject({
+        run: {
+          version: 4,
+          memoryNextStep: "STUDENT_QUESTION",
+          memoryMissReveal: null,
+        },
+      });
+      expect(activities).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("인공지능은 클라이언트 카드값을 무시하고 서버가 기억한 짝을 얻는다", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-07-16T01:00:00.000Z"));
+      await createMemory("ai");
+      const first = memoryPairCards(0);
+      const second = memoryPairCards(1);
+      await flipMemoryCard(0, 1, first.question.id);
+      await flipMemoryCard(1, 2, second.answer.id);
+      const revealId = storedMemoryState().pendingMiss?.id;
+      if (!revealId) throw new Error("missing reveal id");
+      vi.setSystemTime(new Date("2026-07-16T01:00:01.800Z"));
+      await resolveMemoryMiss(2, 3, revealId);
+      storedMemoryState().seenCardIds.push(second.question.id);
+
+      const aiTurn = await runMemoryAiTurn(3, 4, "run-1", {
+        cardId: first.answer.id,
+        questionCardId: first.question.id,
+      });
+
+      expect(aiTurn.status).toBe(200);
+      await expect(aiTurn.json()).resolves.toMatchObject({
+        run: {
+          version: 5,
+          questionCount: 2,
+          aiTurnCount: 1,
+          studentMatchCount: 0,
+          aiMatchCount: 1,
+          memoryNextStep: "AI_TURN",
+        },
+      });
+      expect(activities.at(-1)?.payload).toMatchObject({
+        actor: "AI",
+        questionCardId: second.question.id,
+        answerCardId: second.answer.id,
+        result: "MATCH",
+      });
+      expect(JSON.stringify(activities.at(-1)?.payload)).not.toContain(first.answer.id);
+      expect(pointLogs).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    ["solo", 8, 30],
+    ["ai", 15, 50],
+  ] as const)(
+    "%s 모드는 학생이 찾은 여섯 짝만 점수로 삼아 즉시 정산한다",
+    async (mode, awarded, dailyLimit) => {
+      const played = await playAllStudentMemoryMatches(mode);
+      const final = played.responses.at(-1);
+      if (!final) throw new Error("missing final response");
+      const finalBody = await final.json();
+
+      expect(finalBody).toMatchObject({
+        run: {
+          status: "SETTLED",
+          version: 13,
+          questionCount: 6,
+          aiTurnCount: 0,
+          studentMatchCount: 6,
+          aiMatchCount: 0,
+          memoryNextStep: "COMPLETE",
+          memoryReview: expect.arrayContaining([
+            { contentKey: expect.stringMatching(/^memory-pair-/) },
+          ]),
+        },
+        result: { awarded, dailyLimit, preview: false },
+        replayed: false,
+      });
+      expect(pointLogs).toHaveLength(1);
+      expect(pointLogs[0]).toMatchObject({
+        gameId: mode === "solo" ? "ACTIVITY_SOLO" : "ACTIVITY_AI",
+        bonusType: `${mode === "solo" ? "ACTIVITY_SOLO" : "ACTIVITY_AI"}_memory`,
+        points: awarded,
+      });
+      expect(users.get("student-1")?.totalPoints).toBe(awarded);
+      expect(activities).toHaveLength(12);
+      expect(activities.reduce(
+        (sum, activity) => sum + activity.validQuestionCount,
+        0,
+      )).toBe(6);
+      expect(activities.every((activity) =>
+        !JSON.stringify(activity.responseSnapshot).includes("pairKey") &&
+        !JSON.stringify(activity.payload).includes("pairKey")
+      )).toBe(true);
+    },
+  );
+
+  it("최대 시도의 마지막 실패는 공개 해제 뒤 이 점으로 정산한다", async () => {
+    vi.useFakeTimers();
+    try {
+      let now = Date.parse("2026-07-16T02:00:00.000Z");
+      vi.setSystemTime(now);
+      await createMemory();
+      const first = memoryPairCards(0);
+      const second = memoryPairCards(1);
+      let version = 1;
+      let final: Response | undefined;
+      for (let attempt = 0; attempt < 18; attempt += 1) {
+        await flipMemoryCard(attempt * 3, version, first.question.id);
+        version += 1;
+        const missed = await flipMemoryCard(attempt * 3 + 1, version, second.answer.id);
+        version += 1;
+        if (attempt === 17) {
+          await expect(missed.json()).resolves.toMatchObject({
+            run: {
+              questionCount: 18,
+              memoryNextStep: "RESOLVE_MISS",
+              status: "ACTIVE",
+            },
+          });
+        }
+        const revealId = storedMemoryState().pendingMiss?.id;
+        if (!revealId) throw new Error("missing reveal id");
+        now += 1_800;
+        vi.setSystemTime(now);
+        databaseClock = new Date(now);
+        final = await resolveMemoryMiss(attempt * 3 + 2, version, revealId);
+        version += 1;
+      }
+      if (!final) throw new Error("missing final response");
+
+      expect(final.status).toBe(200);
+      await expect(final.json()).resolves.toMatchObject({
+        run: {
+          status: "SETTLED",
+          version: 55,
+          questionCount: 18,
+          studentMatchCount: 0,
+          memoryNextStep: "COMPLETE",
+        },
+        result: { awarded: 2 },
+      });
+      expect(activities).toHaveLength(54);
+      expect(pointLogs).toHaveLength(1);
+      expect(users.get("student-1")?.totalPoints).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("마지막 짝 전에 활동 근거가 빠지면 정산하지 않는다", async () => {
+    await createMemory();
+    let version = 1;
+    for (let index = 0; index < 5; index += 1) {
+      const { question, answer } = memoryPairCards(index);
+      await flipMemoryCard(index * 2, version, question.id);
+      version += 1;
+      await flipMemoryCard(index * 2 + 1, version, answer.id);
+      version += 1;
+    }
+    const last = memoryPairCards(5);
+    await flipMemoryCard(10, version, last.question.id);
+    version += 1;
+    activities.splice(0, 1);
+
+    const response = await flipMemoryCard(11, version, last.answer.id);
+
+    expect(response.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 12 });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+  });
+
+  it("서로 같은 마지막 짝 요청이 동시에 오면 한 요청만 정산한다", async () => {
+    await createMemory();
+    let version = 1;
+    for (let index = 0; index < 5; index += 1) {
+      const { question, answer } = memoryPairCards(index);
+      await flipMemoryCard(index * 2, version, question.id);
+      version += 1;
+      await flipMemoryCard(index * 2 + 1, version, answer.id);
+      version += 1;
+    }
+    const last = memoryPairCards(5);
+    await flipMemoryCard(10, version, last.question.id);
+    version += 1;
+
+    const responses = await Promise.all([
+      flipMemoryCard(11, version, last.answer.id),
+      flipMemoryCard(11, version, last.answer.id, "run-1", MEMORY_ALTERNATE_FINAL_ACTION_ID),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(pointLogs).toHaveLength(1);
+    expect(activities).toHaveLength(12);
+    expect(users.get("student-1")?.totalPoints).toBe(8);
+  });
+
+  it("마지막 활동 저장 실패는 실행과 점수를 모두 되돌리고 같은 요청으로 재시도한다", async () => {
+    await createMemory();
+    let version = 1;
+    for (let index = 0; index < 5; index += 1) {
+      const { question, answer } = memoryPairCards(index);
+      await flipMemoryCard(index * 2, version, question.id);
+      version += 1;
+      await flipMemoryCard(index * 2 + 1, version, answer.id);
+      version += 1;
+    }
+    const last = memoryPairCards(5);
+    await flipMemoryCard(10, version, last.question.id);
+    version += 1;
+    mocks.activityCreate.mockRejectedValueOnce(new Error("private-memory-storage-value"));
+
+    const failed = await flipMemoryCard(11, version, last.answer.id);
+
+    expect(failed.status).toBe(500);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 12 });
+    expect(activities).toHaveLength(11);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+
+    const retry = await flipMemoryCard(11, version, last.answer.id);
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({ result: { awarded: 8 } });
+    expect(pointLogs).toHaveLength(1);
+    expect(users.get("student-1")?.totalPoints).toBe(8);
+  });
+
+  it("진행 중 수동 완료는 거절하고 자동 정산 뒤 완료 요청은 같은 결과를 돌려준다", async () => {
+    await createMemory();
+    const premature = await postComplete({ requestId: COMPLETE_ID, expectedVersion: 1 });
+
+    expect(premature.status).toBe(409);
+    expect(pointLogs).toHaveLength(0);
+    expect(activities).toHaveLength(0);
+
+    const played = await playAllStudentMemoryMatches();
+    expect(played.responses.at(-1)?.status).toBe(200);
+    const completed = await postComplete({ requestId: COMPLETE_ID, expectedVersion: 13 });
+
+    expect(completed.status).toBe(200);
+    await expect(completed.json()).resolves.toMatchObject({
+      run: { status: "SETTLED", version: 13, memoryNextStep: "COMPLETE" },
+      result: { awarded: 8, alreadySettled: true },
+      replayed: true,
+    });
+    expect(pointLogs).toHaveLength(1);
+    expect(activities).toHaveLength(12);
+  });
+
+  it("교사 미리보기와 하루 상한 및 만료와 자동 포기를 공통 정책으로 처리한다", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
+    const teacherPlay = await playAllStudentMemoryMatches("solo");
+    const teacherFinal = teacherPlay.responses.at(-1);
+    if (!teacherFinal) throw new Error("missing teacher final");
+    await expect(teacherFinal.json()).resolves.toMatchObject({
+      run: { preview: true, status: "SETTLED" },
+      result: { awarded: 0, preview: true },
+    });
+    expect(pointLogs).toHaveLength(0);
+
+    mocks.auth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
+    runs.clear();
+    activities.splice(0);
+    pointLogs.push({
+      studentId: "student-1",
+      gameId: "ACTIVITY_SOLO",
+      gameRunId: "old-run",
+      bonusType: "ACTIVITY_SOLO_relay",
+      points: 29,
+      reason: "이전 실행",
+      status: "APPROVED",
+      createdAt: new Date(),
+    });
+    const cappedPlay = await playAllStudentMemoryMatches("solo");
+    const cappedFinal = cappedPlay.responses.at(-1);
+    if (!cappedFinal) throw new Error("missing capped final");
+    await expect(cappedFinal.json()).resolves.toMatchObject({
+      result: { awarded: 1, dailyRemaining: 0, cappedByLimit: true },
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(1);
+
+    runs.clear();
+    activities.splice(0);
+    pointLogs.splice(0);
+    await createMemory();
+    const expiring = runs.get("run-1");
+    if (!expiring) throw new Error("missing expiring run");
+    expiring.expiresAt = new Date(0);
+    const expired = await readResult();
+    await expect(expired.json()).resolves.toMatchObject({
+      run: { status: "EXPIRED", version: 2, memoryNextStep: "STUDENT_QUESTION" },
+      result: null,
+    });
+
+    const expiredReplay = await createMemory();
+    await expect(expiredReplay.json()).resolves.toMatchObject({
+      replayed: true,
+      run: { id: "run-1", status: "EXPIRED", version: 2 },
+    });
+
+    runs.clear();
+    activities.splice(0);
+    for (const requestId of [CREATE_ID, SECOND_CREATE_ID, THIRD_CREATE_ID, FOURTH_CREATE_ID]) {
+      await postCreate({
+        gameId: "memory",
+        mode: "solo",
+        difficulty: "easy",
+        requestId,
+        locale: "ko",
+      });
+    }
+    const replay = await createMemory();
+    await expect(replay.json()).resolves.toMatchObject({
+      replayed: true,
+      run: { id: "run-1", status: "ABANDONED", version: 2 },
+    });
+    expect([...runs.values()].filter((run) => run.status === "ACTIVE")).toHaveLength(3);
   });
 });

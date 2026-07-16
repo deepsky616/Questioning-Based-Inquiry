@@ -27,6 +27,10 @@ import {
   readMemoryState,
   type MemoryRoomState,
 } from "@/lib/question-game-room-engines/memory";
+import {
+  createBrowserQuestionGameRunStore,
+  type BrowserQuestionGameRunActor,
+} from "../../e2e/helpers/question-game-run";
 
 vi.mock("next-auth/react", () => ({
   useSession: () => ({
@@ -216,17 +220,6 @@ function generatedPairs(count: number) {
           ko: `대답 ${index + 1}`,
           en: `Answer ${index + 1}`,
         },
-      })),
-    ),
-  };
-}
-
-function generatedLocalPairs(count: number) {
-  return {
-    text: JSON.stringify(
-      Array.from({ length: count }, (_, index) => ({
-        question: `질문 ${index + 1}`,
-        answer: `대답 ${index + 1}`,
       })),
     ),
   };
@@ -790,117 +783,288 @@ describe("RoomMemory 명령 소스 경계", () => {
   });
 });
 
-async function startLocalMemory(difficulty: "쉬움" | "보통" | "어려움") {
-  const pairCount = difficulty === "쉬움" ? 6 : difficulty === "보통" ? 10 : 15;
-  aiMocks.ask.mockResolvedValue(generatedLocalPairs(pairCount));
-  vi.spyOn(Math, "random").mockReturnValue(0);
+type BrowserMemoryMode = "solo" | "ai";
+
+interface BrowserMemoryServerOptions {
+  loseSettledActionResponse?: boolean;
+  invalidActiveReview?: boolean;
+}
+
+const browserMemoryActor: BrowserQuestionGameRunActor = {
+  id: "memory-screen-student",
+  role: "STUDENT",
+};
+
+function installBrowserMemoryServer(options: BrowserMemoryServerOptions = {}) {
+  const store = createBrowserQuestionGameRunStore();
+  let settledActionResponseLost = false;
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const pathname = new URL(String(input), "http://localhost").pathname;
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    const response = store.dispatch(browserMemoryActor, {
+      method: init?.method ?? "GET",
+      pathname,
+      body,
+    });
+    const originalRun = response.body.run as Record<string, unknown> | undefined;
+    const responseBody = options.invalidActiveReview && originalRun?.status === "ACTIVE"
+      ? { ...response.body, run: { ...originalRun, memoryReview: [] } }
+      : response.body;
+    const run = responseBody.run as { status?: string } | undefined;
+    if (
+      options.loseSettledActionResponse &&
+      !settledActionResponseLost &&
+      pathname.endsWith("/actions") &&
+      run?.status === "SETTLED"
+    ) {
+      settledActionResponseLost = true;
+      throw new TypeError("카드 짝 찾기 정산 응답 연결이 끊겼습니다.");
+    }
+    return Response.json(responseBody, { status: response.status });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+async function flushBrowserMemory() {
+  for (let index = 0; index < 4; index += 1) await flushEffects();
+}
+
+async function startBrowserMemory(
+  difficulty: "쉬움" | "보통" | "어려움",
+  mode: BrowserMemoryMode = "solo",
+  options: BrowserMemoryServerOptions = {},
+) {
+  const fetchMock = installBrowserMemoryServer(options);
   render(
     <MemoryGame
       game={game}
       onBack={vi.fn()}
-      config={{ mode: "solo", players: ["학생"] }}
+      config={{ mode, players: mode === "ai" ? ["학생", "AI"] : ["학생"] }}
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: new RegExp(difficulty) }));
-  await screen.findByText("💧 질문 카드 (파란색)");
+  await flushBrowserMemory();
+  expect(screen.getByText("💧 질문 카드 (파란색)")).toBeInTheDocument();
+  return fetchMock;
 }
 
-function localQuestionCards() {
+function browserQuestionCards() {
   const section = screen.getByText("💧 질문 카드 (파란색)").parentElement;
   if (!section) throw new Error("질문 카드 영역이 없습니다");
   return within(section).getAllByRole("button");
 }
 
-function localAnswerCards() {
+function browserAnswerCards() {
   const section = screen.getByText("⭐ 대답 카드 (노란색)").parentElement;
   if (!section) throw new Error("대답 카드 영역이 없습니다");
   return within(section).getAllByRole("button");
 }
 
-function chooseLocalPair(questionIndex: number, answerIndex: number) {
-  fireEvent.click(localQuestionCards()[questionIndex]);
-  fireEvent.click(localAnswerCards()[answerIndex]);
+async function chooseBrowserPair(questionIndex: number, answerIndex: number) {
+  fireEvent.click(browserQuestionCards()[questionIndex]);
+  let answerButton = browserAnswerCards()[answerIndex];
+  for (
+    let attempt = 0;
+    attempt < 12 && answerButton.hasAttribute("disabled");
+    attempt += 1
+  ) {
+    await flushEffects();
+    answerButton = browserAnswerCards()[answerIndex];
+  }
+  expect(answerButton).toBeEnabled();
+  fireEvent.click(answerButton);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await flushEffects();
+    if (
+      screen.queryByText("짝 찾기 완성!") ||
+      screen.queryByText(/짝이 달라요/) ||
+      browserQuestionCards().some((button) => !button.hasAttribute("disabled"))
+    ) return;
+  }
+  throw new Error("카드 짝 확인 결과가 화면에 반영되지 않았습니다");
 }
 
-describe("지역 메모리 최대 시도", () => {
+async function resolveBrowserMiss() {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1_900);
+  });
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await flushEffects();
+    if (!screen.queryByText(/짝이 달라요/)) return;
+  }
+  throw new Error("실패한 카드가 화면에서 다시 덮이지 않았습니다");
+}
+
+function requestBodies(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls.map(([, init]) =>
+    init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {}
+  );
+}
+
+describe("카드 짝 찾기 서버 실행 화면", () => {
+  it("진행 중 복습 자료가 null이 아니면 손상된 서버 응답으로 거절한다", async () => {
+    installBrowserMemoryServer({ invalidActiveReview: true });
+    render(
+      <MemoryGame
+        game={game}
+        onBack={vi.fn()}
+        config={{ mode: "solo", players: ["학생"] }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /쉬움/ }));
+    await flushBrowserMemory();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "질문놀이 실행 정보를 확인할 수 없습니다.",
+    );
+    expect(screen.queryByText("💧 질문 카드 (파란색)")).not.toBeInTheDocument();
+  });
+
   it.each([
     ["쉬움", 18],
     ["보통", 30],
     ["어려움", 45],
   ] as const)("%s은 공통 규칙의 최대 시도 %s를 보인다", async (difficulty, max) => {
-    await startLocalMemory(difficulty);
+    const fetchMock = await startBrowserMemory(difficulty);
     expect(screen.getByText(new RegExp(`시도 0/${max}`))).toBeInTheDocument();
+    expect(requestBodies(fetchMock)[0]).toMatchObject({
+      gameId: "memory",
+      difficulty: difficulty === "쉬움" ? "easy" : difficulty === "보통" ? "normal" : "hard",
+    });
   });
 
-  it("획득 카드 글자를 흐리지 않고 카드 영역에 화면 주제 색을 쓴다", async () => {
-    await startLocalMemory("쉬움");
+  it("기기 시계가 크게 앞서도 실패 카드를 정해진 시간 동안 공개한다", async () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2099-12-31T23:59:59.000Z"));
+    const fetchMock = await startBrowserMemory("쉬움");
+
+    await chooseBrowserPair(0, 1);
+    expect(screen.getByText(/짝이 달라요/)).toBeInTheDocument();
+    expect(requestBodies(fetchMock).filter(({ action }) =>
+      action === "memory-resolve-miss"
+    )).toHaveLength(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_899);
+    });
+    expect(requestBodies(fetchMock).filter(({ action }) =>
+      action === "memory-resolve-miss"
+    )).toHaveLength(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    await flushBrowserMemory();
+    expect(requestBodies(fetchMock).filter(({ action }) =>
+      action === "memory-resolve-miss"
+    )).toHaveLength(1);
+  });
+
+  it.each([
+    ["solo", 8],
+    ["ai", 15],
+  ] as const)("%s 모드는 모든 짝을 일찍 찾으면 서버 정산 점수를 보인다", async (
+    mode,
+    awarded,
+  ) => {
+    await startBrowserMemory("쉬움", mode);
+    for (let index = 0; index < 6; index += 1) {
+      await chooseBrowserPair(index, index);
+    }
+
+    expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(`+${awarded}점 적립!`);
+    expect(screen.getByText(/하늘은 왜 파랄까/)).toBeInTheDocument();
+    expect(screen.getByText(/왜 무지개가 생길까/)).toBeInTheDocument();
+  });
+
+  it("획득 카드 글자를 흐리지 않고 카드 영역에 어두운 주제 색을 유지한다", async () => {
+    await startBrowserMemory("쉬움");
 
     const questionSection = screen.getByText("💧 질문 카드 (파란색)").parentElement;
     const answerSection = screen.getByText("⭐ 대답 카드 (노란색)").parentElement;
     expect(questionSection).toHaveClass("bg-card", "text-card-foreground");
     expect(answerSection).toHaveClass("bg-card", "text-card-foreground");
 
-    chooseLocalPair(0, 0);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
-    });
+    await chooseBrowserPair(0, 0);
 
-    expect(localQuestionCards()[0]).not.toHaveStyle({ opacity: "0.3" });
-    expect(localAnswerCards()[0]).not.toHaveStyle({ opacity: "0.3" });
-    expect(localQuestionCards()[0].className).toContain("dark:");
-    expect(localAnswerCards()[0].className).toContain("dark:");
+    expect(browserQuestionCards()[0]).not.toHaveStyle({ opacity: "0.3" });
+    expect(browserAnswerCards()[0]).not.toHaveStyle({ opacity: "0.3" });
+    expect(browserQuestionCards()[0].className).toContain("dark:");
+    expect(browserAnswerCards()[0].className).toContain("dark:");
   });
 
-  it("마지막 허용 실패를 보여 준 뒤 결과로 이동하고 자동 지급하지 않는다", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    await startLocalMemory("쉬움");
+  it("마지막 허용 실패를 공개한 뒤 해소 요청에서 이 점을 정산하고 전체 카드를 공개한다", async () => {
+    const fetchMock = await startBrowserMemory("쉬움");
     vi.useFakeTimers();
 
-    for (let attempt = 1; attempt <= 18; attempt += 1) {
-      chooseLocalPair(0, 1);
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1800);
-      });
+    for (let attempt = 0; attempt < 18; attempt += 1) {
+      await chooseBrowserPair(0, 1);
+      await resolveBrowserMiss();
     }
 
     expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("+2점 적립!");
+    expect(screen.getByText(/하늘은 왜 파랄까/)).toBeInTheDocument();
+    expect(screen.getByText(/왜 무지개가 생길까/)).toBeInTheDocument();
+    const actions = requestBodies(fetchMock).map(({ action }) => action).filter(Boolean);
+    expect(actions.at(-1)).toBe("memory-resolve-miss");
   });
 
-  it("마지막 허용 성공 뒤 짝이 남아도 결과로 이동한다", async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    await startLocalMemory("쉬움");
+  it("마지막 허용 시도에서 성공하면 남은 카드를 공개하고 삼 점을 정산한다", async () => {
+    await startBrowserMemory("쉬움");
     vi.useFakeTimers();
 
-    for (let attempt = 1; attempt < 18; attempt += 1) {
-      chooseLocalPair(0, 1);
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1800);
-      });
+    for (let attempt = 0; attempt < 17; attempt += 1) {
+      await chooseBrowserPair(0, 1);
+      await resolveBrowserMiss();
     }
-    chooseLocalPair(0, 0);
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(500);
-    });
+    await chooseBrowserPair(0, 0);
 
     expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("+3점 적립!");
+    expect(screen.getByText(/왜 무지개가 생길까/)).toBeInTheDocument();
   });
 
-  it("모든 짝을 찾으면 최대 시도 전에 결과로 이동한다", async () => {
-    await startLocalMemory("쉬움");
+  it("도움 모드에서 학생 실패와 인공지능 실패를 해소해 학생 차례로 돌아온다", async () => {
+    const fetchMock = await startBrowserMemory("쉬움", "ai");
     vi.useFakeTimers();
 
+    await chooseBrowserPair(0, 1);
+    await resolveBrowserMiss();
+    for (let cycle = 0; cycle < 4; cycle += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_900);
+      });
+      await flushBrowserMemory();
+    }
+
+    const actions = requestBodies(fetchMock).map(({ action }) => action).filter(Boolean);
+    expect(actions).toEqual(expect.arrayContaining([
+      "memory-flip-card",
+      "memory-resolve-miss",
+      "memory-ai-turn",
+    ]));
+    expect(actions.filter((action) => action === "memory-ai-turn")).toHaveLength(1);
+    expect(actions.filter((action) => action === "memory-resolve-miss")).toHaveLength(2);
+    expect(screen.getByText(/학생의 차례/)).toBeInTheDocument();
+    expect(browserQuestionCards()[0]).toBeEnabled();
+  });
+
+  it("마지막 성공 응답이 유실되어도 결과 조회로 복구해 점수를 한 번 보인다", async () => {
+    const fetchMock = await startBrowserMemory("쉬움", "solo", {
+      loseSettledActionResponse: true,
+    });
     for (let index = 0; index < 6; index += 1) {
-      chooseLocalPair(index, index);
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(500);
-      });
+      await chooseBrowserPair(index, index);
     }
 
     expect(screen.getByText("짝 찾기 완성!")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("+8점 적립!");
+    expect(fetchMock.mock.calls.some(([input, init]) =>
+      String(input).endsWith("/result") && (init?.method ?? "GET") === "GET"
+    )).toBe(true);
   });
 });

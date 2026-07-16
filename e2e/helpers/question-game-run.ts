@@ -27,7 +27,7 @@ const REQUEST_ID_PATTERN =
 type RunMode = "SOLO" | "AI";
 type RunLocale = "ko" | "en";
 type RunStatus = "ACTIVE" | "SETTLED";
-type RunGameId = "relay" | "dice" | "ladder" | "kaba" | "story-dice";
+type RunGameId = "relay" | "dice" | "ladder" | "kaba" | "story-dice" | "memory";
 type DiceActor = "STUDENT" | "AI";
 type DiceNextStep =
   | "STUDENT_ROLL"
@@ -43,6 +43,28 @@ type StoryDiceNextStep =
   | "AI_QUESTION"
   | "STUDENT_ANSWER"
   | "COMPLETE";
+type MemoryDifficulty = "easy" | "normal" | "hard";
+type MemoryNextStep =
+  | "STUDENT_QUESTION"
+  | "STUDENT_ANSWER"
+  | "AI_TURN"
+  | "RESOLVE_MISS"
+  | "COMPLETE";
+type MemoryCardState = "HIDDEN" | "REVEALED" | "TAKEN";
+
+interface MemoryCard {
+  id: string;
+  type: "q" | "a";
+  contentKey: string;
+  state: MemoryCardState;
+}
+
+interface MemoryMissReveal {
+  id: string;
+  actor: "STUDENT" | "AI";
+  result: "MISS";
+  resolveAt: number;
+}
 
 type StoryDiceWords = Record<DiceCategory, string[]>;
 type StoryDiceRoll = Record<DiceCategory, string>;
@@ -133,6 +155,13 @@ interface StoredRun {
   storyRolledWords?: StoryDiceRoll;
   storyHash?: string;
   pendingQuestionHash?: string;
+  memoryDifficulty?: MemoryDifficulty;
+  memoryNextStep?: MemoryNextStep;
+  memoryQuestionCards?: MemoryCard[];
+  memoryAnswerCards?: MemoryCard[];
+  memoryMissReveal?: MemoryMissReveal;
+  studentMatchCount: number;
+  aiMatchCount: number;
 }
 
 interface CreationReplay {
@@ -178,6 +207,11 @@ function parseMode(value: unknown): RunMode {
 function parseLocale(value: unknown): RunLocale {
   if (value === "ko" || value === "en") return value;
   throw new BrowserRunError("질문 언어값이 올바르지 않습니다", 400);
+}
+
+function parseMemoryDifficulty(value: unknown): MemoryDifficulty {
+  if (value === "easy" || value === "normal" || value === "hard") return value;
+  throw new BrowserRunError("카드 짝 찾기 난이도가 올바르지 않습니다", 400);
 }
 
 function requireTopic(value: unknown) {
@@ -286,6 +320,35 @@ function createServerLadderGrid(columnCount: number, roundIndex: number) {
   });
 }
 
+const MEMORY_PAIR_COUNTS: Record<MemoryDifficulty, number> = {
+  easy: 6,
+  normal: 10,
+  hard: 15,
+};
+
+function createMemoryCards(difficulty: MemoryDifficulty) {
+  const pairCount = MEMORY_PAIR_COUNTS[difficulty];
+  const makeCard = (type: "q" | "a", index: number): MemoryCard => ({
+    id: `memory-${type}-${String(index + 1).padStart(2, "0")}`,
+    type,
+    contentKey: `memory-pair-${String(index + 1).padStart(2, "0")}`,
+    state: "HIDDEN",
+  });
+  return {
+    questions: Array.from({ length: pairCount }, (_, index) => makeCard("q", index)),
+    answers: Array.from({ length: pairCount }, (_, index) => makeCard("a", index)),
+  };
+}
+
+function publicMemoryCards(cards: MemoryCard[] | undefined) {
+  return (cards ?? []).map(({ id, type, state, contentKey }) => ({
+    id,
+    type,
+    state,
+    ...(state === "HIDDEN" ? {} : { contentKey }),
+  }));
+}
+
 function publicRun(run: StoredRun) {
   const awaitingAiTurn = run.gameId === "relay"
     ? run.status === "ACTIVE" &&
@@ -298,6 +361,10 @@ function publicRun(run: StoredRun) {
         ? run.status === "ACTIVE" &&
           run.mode === "AI" &&
           run.storyDiceNextStep === "AI_QUESTION"
+        : run.gameId === "memory"
+          ? run.status === "ACTIVE" &&
+            run.mode === "AI" &&
+            run.memoryNextStep === "AI_TURN"
         : false;
   return {
     id: run.id,
@@ -344,6 +411,20 @@ function publicRun(run: StoredRun) {
           storyRolledWords: run.storyRolledWords ?? null,
         }
       : {}),
+    ...(run.gameId === "memory"
+      ? {
+          memoryDifficulty: run.memoryDifficulty,
+          memoryNextStep: run.memoryNextStep,
+          studentMatchCount: run.studentMatchCount,
+          aiMatchCount: run.aiMatchCount,
+          memoryQuestionCards: publicMemoryCards(run.memoryQuestionCards),
+          memoryAnswerCards: publicMemoryCards(run.memoryAnswerCards),
+          memoryMissReveal: run.memoryMissReveal ?? null,
+          memoryReview: run.status === "SETTLED"
+            ? (run.memoryQuestionCards ?? []).map(({ contentKey }) => ({ contentKey }))
+            : null,
+        }
+      : {}),
   };
 }
 
@@ -386,7 +467,11 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     const validQuestionCount = run.gameId === "kaba"
       ? run.correctCount
       : run.questionCount;
-    const requested = validQuestionCount * policy.PER_VALID_QUESTION + policy.COMPLETION;
+    const requested = run.gameId === "memory"
+      ? run.mode === "SOLO"
+        ? run.studentMatchCount + 2
+        : run.studentMatchCount * 2 + 3
+      : validQuestionCount * policy.PER_VALID_QUESTION + policy.COMPLETION;
     const awarded = run.preview ? 0 : Math.max(0, Math.min(requested, dailyLimit - earned));
     if (!run.preview) dailyEarned.set(dailyKey, earned + awarded);
     run.status = "SETTLED";
@@ -408,6 +493,16 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       run.storyDiceNextStep = "COMPLETE";
       delete run.pendingQuestionHash;
     }
+    if (run.gameId === "memory") {
+      run.memoryNextStep = "COMPLETE";
+      delete run.memoryMissReveal;
+      for (const card of [
+        ...(run.memoryQuestionCards ?? []),
+        ...(run.memoryAnswerCards ?? []),
+      ]) {
+        if (card.state === "HIDDEN") card.state = "REVEALED";
+      }
+    }
   };
 
   const createRun = (
@@ -421,12 +516,16 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       gameId !== "dice" &&
       gameId !== "ladder" &&
       gameId !== "kaba" &&
-      gameId !== "story-dice"
+      gameId !== "story-dice" &&
+      gameId !== "memory"
     ) {
       throw new BrowserRunError("이 질문놀이는 서버 점수 기록을 아직 지원하지 않습니다", 409);
     }
     const mode = parseMode(body.mode);
     const locale = parseLocale(body.locale);
+    const memoryDifficulty = gameId === "memory"
+      ? parseMemoryDifficulty(body.difficulty)
+      : undefined;
     const topic = gameId === "relay" ? requireTopic(body.topic) : "";
     const topicHashes = gameId === "ladder"
       ? requireLadderTopics(body.topics, mode)
@@ -435,6 +534,7 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       gameId,
       mode,
       locale,
+      ...(memoryDifficulty ? { memoryDifficulty } : {}),
       ...(gameId === "ladder" ? { topicHashes } : { topic }),
     });
     const creationKey = `${actor.id}:${requestId}`;
@@ -448,6 +548,10 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       return success(200, { run: publicRun(run), replayed: true });
     }
 
+    const memoryCards = memoryDifficulty ? createMemoryCards(memoryDifficulty) : undefined;
+    const targetCount = gameId === "memory"
+      ? QUESTION_GAME_RULES.memory.targets[mode === "SOLO" ? "solo" : "ai"][memoryDifficulty!]
+      : QUESTION_GAME_RULES[gameId].targets[mode === "SOLO" ? "solo" : "ai"].count;
     const run: StoredRun = {
       id: randomUuid(),
       ownerId: actor.id,
@@ -458,7 +562,7 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       topic,
       status: "ACTIVE",
       version: 1,
-      targetCount: QUESTION_GAME_RULES[gameId].targets[mode === "SOLO" ? "solo" : "ai"].count,
+      targetCount,
       questionCount: 0,
       aiTurnCount: 0,
       questions: [],
@@ -478,6 +582,8 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
         : [],
       answerHashes: [],
       correctCount: 0,
+      studentMatchCount: 0,
+      aiMatchCount: 0,
       expiresAt: "2099-12-31T23:59:59.000Z",
       completedAt: null,
       result: null,
@@ -490,6 +596,14 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
         ? {
             storyDiceNextStep: "ROLL" as const,
             storyWordPool: createStoryWordPool(locale),
+          }
+        : {}),
+      ...(gameId === "memory" && memoryDifficulty && memoryCards
+        ? {
+            memoryDifficulty,
+            memoryNextStep: "STUDENT_QUESTION" as const,
+            memoryQuestionCards: memoryCards.questions,
+            memoryAnswerCards: memoryCards.answers,
           }
         : {}),
     };
@@ -1108,6 +1222,211 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     return success(200, { ...response, replayed: false });
   };
 
+  const memoryCards = (run: StoredRun) => {
+    if (
+      run.gameId !== "memory" ||
+      !run.memoryQuestionCards ||
+      !run.memoryAnswerCards ||
+      !run.memoryNextStep
+    ) {
+      throw new BrowserRunError("카드 짝 찾기 실행 상태가 올바르지 않습니다", 409);
+    }
+    return {
+      questions: run.memoryQuestionCards,
+      answers: run.memoryAnswerCards,
+    };
+  };
+
+  const memoryResponse = (run: StoredRun) => ({
+    run: publicRun(run),
+    ...(run.result ? { result: run.result } : {}),
+  });
+
+  const rememberMemoryAction = (
+    run: StoredRun,
+    requestId: string,
+    actionFingerprint: string,
+  ) => {
+    const response = memoryResponse(run);
+    run.actions.set(requestId, {
+      fingerprint: actionFingerprint,
+      response: cloneBody(response),
+    });
+    return success(200, { ...response, replayed: false });
+  };
+
+  const flipMemoryCard = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const cardId = typeof body.cardId === "string" ? body.cardId : "";
+    if (!cardId) throw new BrowserRunError("뒤집을 카드를 골라 주세요", 400);
+    const actionFingerprint = fingerprint({ action: "memory-flip-card", cardId });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    if (run.status !== "ACTIVE" || run.gameId !== "memory") {
+      throw new BrowserRunError("카드를 뒤집을 수 없는 실행입니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    const { questions, answers } = memoryCards(run);
+    if (run.memoryNextStep === "STUDENT_QUESTION") {
+      const card = questions.find(({ id }) => id === cardId);
+      if (!card || card.state !== "HIDDEN") {
+        throw new BrowserRunError("숨겨진 질문 카드를 골라 주세요", 409);
+      }
+      card.state = "REVEALED";
+      run.memoryNextStep = "STUDENT_ANSWER";
+      run.version += 1;
+      return rememberMemoryAction(run, requestId, actionFingerprint);
+    }
+    if (run.memoryNextStep !== "STUDENT_ANSWER") {
+      throw new BrowserRunError("지금은 학생이 카드를 뒤집을 차례가 아닙니다", 409);
+    }
+    const answer = answers.find(({ id }) => id === cardId);
+    const question = questions.find(({ state }) => state === "REVEALED");
+    if (!answer || answer.state !== "HIDDEN" || !question) {
+      throw new BrowserRunError("숨겨진 대답 카드를 골라 주세요", 409);
+    }
+
+    answer.state = "REVEALED";
+    run.questionCount += 1;
+    run.version += 1;
+    if (question.contentKey === answer.contentKey) {
+      question.state = "TAKEN";
+      answer.state = "TAKEN";
+      run.studentMatchCount += 1;
+      const allPairsFound = run.studentMatchCount + run.aiMatchCount >= questions.length;
+      if (allPairsFound || run.questionCount >= run.targetCount) {
+        settle(run);
+      } else {
+        run.memoryNextStep = "STUDENT_QUESTION";
+      }
+    } else {
+      run.memoryMissReveal = {
+        id: randomUuid(),
+        actor: "STUDENT",
+        result: "MISS",
+        resolveAt: Date.now() + 1_800,
+      };
+      run.memoryNextStep = "RESOLVE_MISS";
+    }
+    return rememberMemoryAction(run, requestId, actionFingerprint);
+  };
+
+  const playMemoryAiTurn = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const actionFingerprint = fingerprint({ action: "memory-ai-turn" });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    if (
+      run.status !== "ACTIVE" ||
+      run.gameId !== "memory" ||
+      run.mode !== "AI" ||
+      run.memoryNextStep !== "AI_TURN"
+    ) {
+      throw new BrowserRunError("지금은 인공지능 카드 차례가 아닙니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    const { questions, answers } = memoryCards(run);
+    const question = questions.find(({ state }) => state === "HIDDEN");
+    const answer = question
+      ? answers.find(({ state, contentKey }) =>
+          state === "HIDDEN" && contentKey !== question.contentKey)
+        ?? answers.find(({ state, contentKey }) =>
+          state === "HIDDEN" && contentKey === question.contentKey)
+      : undefined;
+    if (!question || !answer) {
+      throw new BrowserRunError("인공지능이 고를 카드를 찾을 수 없습니다", 409);
+    }
+
+    question.state = "REVEALED";
+    answer.state = "REVEALED";
+    run.questionCount += 1;
+    run.aiTurnCount += 1;
+    run.version += 1;
+    if (question.contentKey === answer.contentKey) {
+      question.state = "TAKEN";
+      answer.state = "TAKEN";
+      run.aiMatchCount += 1;
+      const allPairsFound = run.studentMatchCount + run.aiMatchCount >= questions.length;
+      if (allPairsFound || run.questionCount >= run.targetCount) {
+        settle(run);
+      } else {
+        run.memoryNextStep = "AI_TURN";
+      }
+    } else {
+      run.memoryMissReveal = {
+        id: randomUuid(),
+        actor: "AI",
+        result: "MISS",
+        resolveAt: Date.now() + 1_800,
+      };
+      run.memoryNextStep = "RESOLVE_MISS";
+    }
+    return rememberMemoryAction(run, requestId, actionFingerprint);
+  };
+
+  const resolveMemoryMiss = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const revealId = typeof body.revealId === "string" ? body.revealId : "";
+    if (!revealId) throw new BrowserRunError("실패 공개 식별값이 올바르지 않습니다", 400);
+    const actionFingerprint = fingerprint({ action: "memory-resolve-miss", revealId });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    if (
+      run.status !== "ACTIVE" ||
+      run.gameId !== "memory" ||
+      run.memoryNextStep !== "RESOLVE_MISS" ||
+      run.memoryMissReveal?.id !== revealId
+    ) {
+      throw new BrowserRunError("해소할 실패 공개가 실행 상태와 일치하지 않습니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    const { questions, answers } = memoryCards(run);
+    for (const card of [...questions, ...answers]) {
+      if (card.state === "REVEALED") card.state = "HIDDEN";
+    }
+    const actor = run.memoryMissReveal.actor;
+    delete run.memoryMissReveal;
+    run.version += 1;
+    if (run.questionCount >= run.targetCount) {
+      settle(run);
+    } else if (run.mode === "SOLO" || actor === "AI") {
+      run.memoryNextStep = "STUDENT_QUESTION";
+    } else {
+      run.memoryNextStep = "AI_TURN";
+    }
+    return rememberMemoryAction(run, requestId, actionFingerprint);
+  };
+
   const applyAction = (run: StoredRun, body: Record<string, unknown>) => {
     const requestId = requireRequestId(body.requestId);
     if (body.action === "relay-submit-question") {
@@ -1145,6 +1464,15 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     }
     if (body.action === "story-dice-submit-answer") {
       return submitStoryDiceAnswer(run, body, requestId);
+    }
+    if (body.action === "memory-flip-card") {
+      return flipMemoryCard(run, body, requestId);
+    }
+    if (body.action === "memory-ai-turn") {
+      return playMemoryAiTurn(run, body, requestId);
+    }
+    if (body.action === "memory-resolve-miss") {
+      return resolveMemoryMiss(run, body, requestId);
     }
     throw new BrowserRunError("지원하지 않는 질문놀이 동작입니다", 400);
   };
@@ -1275,6 +1603,9 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
         result: { ...run.result, alreadySettled: true },
         replayed: true,
       });
+    }
+    if (run.gameId === "memory") {
+      throw new BrowserRunError("카드 짝 찾기는 마지막 동작에서 자동으로 정산됩니다", 409);
     }
     if (requireVersion(body.expectedVersion) !== run.version) {
       throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);

@@ -51,6 +51,15 @@ import {
   type LadderRunState,
 } from "@/lib/question-game-ladder-definition";
 import {
+  ensureMemoryProgress,
+  memoryAllCards,
+  parseMemoryState,
+  MEMORY_MISS_REVEAL_MS,
+  type MemoryActor,
+  type MemoryRunCard,
+  type MemoryRunState,
+} from "@/lib/question-game-memory-definition";
+import {
   ensureRelayProgress,
   parseRelayState,
   type RelayRunState,
@@ -81,6 +90,9 @@ const STORY_DICE_STORY_ACTIVITY_TYPE = "STORY_DICE_STORY";
 const STORY_DICE_QUESTION_ACTIVITY_TYPE = "STORY_DICE_QUESTION";
 const STORY_DICE_AI_QUESTION_ACTIVITY_TYPE = "STORY_DICE_AI_QUESTION";
 const STORY_DICE_ANSWER_ACTIVITY_TYPE = "STORY_DICE_ANSWER";
+const MEMORY_FLIP_ACTIVITY_TYPE = "MEMORY_FLIP_CARD";
+const MEMORY_AI_TURN_ACTIVITY_TYPE = "MEMORY_AI_TURN";
+const MEMORY_RESOLVE_MISS_ACTIVITY_TYPE = "MEMORY_RESOLVE_MISS";
 const COMPLETE_ACTIVITY_TYPE = "RUN_COMPLETE";
 
 type ActorRole = "STUDENT" | "TEACHER";
@@ -168,6 +180,11 @@ function parseMode(value: unknown): RunMode {
 function parseLocale(value: unknown): RunLocale {
   if (value === "ko" || value === "en") return value;
   throw new QuestionGameRunError("질문 언어값이 올바르지 않습니다", 400);
+}
+
+function parseMemoryDifficulty(value: unknown): "easy" | "normal" | "hard" {
+  if (value === "easy" || value === "normal" || value === "hard") return value;
+  throw new QuestionGameRunError("카드 짝 찾기 난이도가 올바르지 않습니다", 400);
 }
 
 function storedRunMode(value: string): RunMode {
@@ -1351,6 +1368,586 @@ async function settleStoryDiceRun(
   };
 }
 
+type MemoryActivityType =
+  | typeof MEMORY_FLIP_ACTIVITY_TYPE
+  | typeof MEMORY_AI_TURN_ACTIVITY_TYPE
+  | typeof MEMORY_RESOLVE_MISS_ACTIVITY_TYPE;
+
+interface PendingMemoryActivityEvidence {
+  sequence: number;
+  type: MemoryActivityType;
+  payload: Record<string, unknown>;
+  validQuestionCount: number;
+}
+
+interface MemoryTransition {
+  state: MemoryRunState;
+  payload: Record<string, unknown>;
+  validQuestionCount: number;
+}
+
+function appendUniqueIds(values: readonly string[], ...ids: string[]) {
+  return [...new Set([...values, ...ids])];
+}
+
+function memoryCard(
+  state: MemoryRunState,
+  cardId: string,
+  type: "q" | "a",
+  allowRevealed = false,
+): MemoryRunCard {
+  const card = memoryAllCards(state).find((candidate) => candidate.id === cardId);
+  if (!card || card.type !== type) {
+    throw new QuestionGameRunError(
+      type === "q" ? "질문 카드를 먼저 선택해 주세요" : "대답 카드를 선택해 주세요",
+      400,
+    );
+  }
+  if (
+    state.takenIds.includes(card.id) ||
+    (!allowRevealed && state.revealedIds.includes(card.id))
+  ) {
+    throw new QuestionGameRunError("이미 선택한 카드는 다시 선택할 수 없습니다", 409);
+  }
+  return card;
+}
+
+function memoryShouldComplete(state: MemoryRunState) {
+  return state.questionCount >= state.targetCount ||
+    state.takenIds.length === memoryAllCards(state).length;
+}
+
+function completeMemoryProgress(state: MemoryRunState): MemoryRunState {
+  const taken = new Set(state.takenIds);
+  const remainingIds = memoryAllCards(state)
+    .map(({ id }) => id)
+    .filter((id) => !taken.has(id));
+  const nextState: MemoryRunState = {
+    ...state,
+    memoryNextStep: "COMPLETE",
+    revealedIds: remainingIds,
+    seenCardIds: appendUniqueIds(state.seenCardIds, ...remainingIds),
+  };
+  delete nextState.pendingMiss;
+  return nextState;
+}
+
+function flipMemoryQuestion(state: MemoryRunState, cardId: string): MemoryTransition {
+  if (state.currentActor !== "STUDENT" || state.memoryNextStep !== "STUDENT_QUESTION") {
+    throw new QuestionGameRunError("지금은 학생이 질문 카드를 선택할 차례가 아닙니다", 409);
+  }
+  const card = memoryCard(state, cardId, "q");
+  return {
+    state: {
+      ...state,
+      activitySequence: state.activitySequence + 1,
+      memoryNextStep: "STUDENT_ANSWER",
+      revealedIds: [card.id],
+      seenCardIds: appendUniqueIds(state.seenCardIds, card.id),
+    },
+    payload: { actor: "STUDENT", cardId: card.id, stage: "QUESTION" },
+    validQuestionCount: 0,
+  };
+}
+
+function flipMemoryAnswer(
+  state: MemoryRunState,
+  cardId: string,
+  occurredAtMs: number,
+  revealId: string,
+): MemoryTransition {
+  if (state.currentActor !== "STUDENT" || state.memoryNextStep !== "STUDENT_ANSWER") {
+    throw new QuestionGameRunError("질문 카드를 먼저 선택해 주세요", 409);
+  }
+  const question = memoryCard(state, state.revealedIds[0] ?? "", "q", true);
+  const answer = memoryCard(state, cardId, "a");
+  const matched = question.pairKey === answer.pairKey;
+  const attempt = state.questionCount + 1;
+  let nextState: MemoryRunState = {
+    ...state,
+    questionCount: attempt,
+    activitySequence: state.activitySequence + 1,
+    seenCardIds: appendUniqueIds(state.seenCardIds, question.id, answer.id),
+  };
+  if (matched) {
+    nextState = {
+      ...nextState,
+      studentMatchCount: state.studentMatchCount + 1,
+      takenIds: appendUniqueIds(state.takenIds, question.id, answer.id),
+      revealedIds: [],
+      memoryNextStep: "STUDENT_QUESTION",
+    };
+    if (memoryShouldComplete(nextState)) nextState = completeMemoryProgress(nextState);
+    return {
+      state: nextState,
+      payload: {
+        actor: "STUDENT",
+        cardId: answer.id,
+        questionCardId: question.id,
+        stage: "ANSWER",
+        result: "MATCH",
+        attempt,
+      },
+      validQuestionCount: 1,
+    };
+  }
+
+  const resolveAt = occurredAtMs + MEMORY_MISS_REVEAL_MS;
+  nextState = {
+    ...nextState,
+    missCount: state.missCount + 1,
+    memoryNextStep: "RESOLVE_MISS",
+    revealedIds: [question.id, answer.id],
+    pendingMiss: {
+      id: revealId,
+      actor: "STUDENT",
+      result: "MISS",
+      resolveAt,
+    },
+  };
+  return {
+    state: nextState,
+    payload: {
+      actor: "STUDENT",
+      cardId: answer.id,
+      questionCardId: question.id,
+      stage: "ANSWER",
+      result: "MISS",
+      attempt,
+      revealId,
+      resolveAt,
+    },
+    validQuestionCount: 0,
+  };
+}
+
+function knownMemoryPair(state: MemoryRunState) {
+  const taken = new Set(state.takenIds);
+  const seen = new Set(state.seenCardIds);
+  for (const { pairKey } of state.pairs) {
+    const question = state.qCards.find((card) => card.pairKey === pairKey);
+    const answer = state.aCards.find((card) => card.pairKey === pairKey);
+    if (
+      question &&
+      answer &&
+      !taken.has(question.id) &&
+      !taken.has(answer.id) &&
+      seen.has(question.id) &&
+      seen.has(answer.id)
+    ) return { question, answer };
+  }
+  return null;
+}
+
+function selectMemoryAiCards(state: MemoryRunState) {
+  const known = knownMemoryPair(state);
+  if (known) return known;
+  const taken = new Set(state.takenIds);
+  const questions = state.qCards.filter(({ id }) => !taken.has(id));
+  const answers = state.aCards.filter(({ id }) => !taken.has(id));
+  if (questions.length === 0 || answers.length === 0) {
+    throw new QuestionGameRunError("인공지능이 선택할 카드가 없습니다", 409);
+  }
+  const question = questions[randomInt(0, questions.length)];
+  const matchingAnswer = answers.find((answer) => answer.pairKey === question.pairKey);
+  const answer = matchingAnswer && state.seenCardIds.includes(matchingAnswer.id)
+    ? matchingAnswer
+    : answers[randomInt(0, answers.length)];
+  return { question, answer };
+}
+
+function validateMemoryAiSelection(
+  state: MemoryRunState,
+  question: MemoryRunCard,
+  answer: MemoryRunCard,
+) {
+  const known = knownMemoryPair(state);
+  if (known) {
+    if (question.id !== known.question.id || answer.id !== known.answer.id) {
+      throw new QuestionGameRunError("서버의 인공지능 카드 선택을 확인할 수 없습니다", 409);
+    }
+    return;
+  }
+  const matchingAnswer = state.aCards.find((card) =>
+    card.pairKey === question.pairKey && !state.takenIds.includes(card.id)
+  );
+  if (
+    matchingAnswer &&
+    state.seenCardIds.includes(matchingAnswer.id) &&
+    answer.id !== matchingAnswer.id
+  ) {
+    throw new QuestionGameRunError("서버의 인공지능 카드 선택을 확인할 수 없습니다", 409);
+  }
+}
+
+function playMemoryAiTurn(
+  state: MemoryRunState,
+  questionCardId: string,
+  answerCardId: string,
+  occurredAtMs: number,
+  revealId: string,
+): MemoryTransition {
+  if (state.currentActor !== "AI" || state.memoryNextStep !== "AI_TURN") {
+    throw new QuestionGameRunError("지금은 인공지능 카드 선택 차례가 아닙니다", 409);
+  }
+  const question = memoryCard(state, questionCardId, "q");
+  const answer = memoryCard(state, answerCardId, "a");
+  const matched = question.pairKey === answer.pairKey;
+  const attempt = state.questionCount + 1;
+  let nextState: MemoryRunState = {
+    ...state,
+    questionCount: attempt,
+    aiTurnCount: state.aiTurnCount + 1,
+    activitySequence: state.activitySequence + 1,
+    seenCardIds: appendUniqueIds(state.seenCardIds, question.id, answer.id),
+  };
+  if (matched) {
+    nextState = {
+      ...nextState,
+      aiMatchCount: state.aiMatchCount + 1,
+      takenIds: appendUniqueIds(state.takenIds, question.id, answer.id),
+      revealedIds: [],
+      memoryNextStep: "AI_TURN",
+    };
+    if (memoryShouldComplete(nextState)) nextState = completeMemoryProgress(nextState);
+    return {
+      state: nextState,
+      payload: {
+        actor: "AI",
+        questionCardId: question.id,
+        answerCardId: answer.id,
+        result: "MATCH",
+        attempt,
+      },
+      validQuestionCount: 0,
+    };
+  }
+
+  const resolveAt = occurredAtMs + MEMORY_MISS_REVEAL_MS;
+  nextState = {
+    ...nextState,
+    missCount: state.missCount + 1,
+    memoryNextStep: "RESOLVE_MISS",
+    revealedIds: [question.id, answer.id],
+    pendingMiss: {
+      id: revealId,
+      actor: "AI",
+      result: "MISS",
+      resolveAt,
+    },
+  };
+  return {
+    state: nextState,
+    payload: {
+      actor: "AI",
+      questionCardId: question.id,
+      answerCardId: answer.id,
+      result: "MISS",
+      attempt,
+      revealId,
+      resolveAt,
+    },
+    validQuestionCount: 0,
+  };
+}
+
+function resolveMemoryReveal(
+  state: MemoryRunState,
+  mode: RunMode,
+  revealId: string,
+  resolvedAtMs: number,
+): MemoryTransition {
+  const pending = state.pendingMiss;
+  if (state.memoryNextStep !== "RESOLVE_MISS" || !pending) {
+    throw new QuestionGameRunError("공개를 마칠 카드가 없습니다", 409);
+  }
+  if (pending.id !== revealId) {
+    throw new QuestionGameRunError("카드 공개 식별값이 올바르지 않습니다", 409);
+  }
+  if (resolvedAtMs < pending.resolveAt) {
+    throw new QuestionGameRunError("카드를 조금 더 확인해 주세요", 409, {
+      retryAfterMs: pending.resolveAt - resolvedAtMs,
+    });
+  }
+  const nextActor: MemoryActor = mode === "AI"
+    ? pending.actor === "STUDENT" ? "AI" : "STUDENT"
+    : "STUDENT";
+  let nextState: MemoryRunState = {
+    ...state,
+    activitySequence: state.activitySequence + 1,
+    currentActor: nextActor,
+    memoryNextStep: nextActor === "AI" ? "AI_TURN" : "STUDENT_QUESTION",
+    revealedIds: [],
+  };
+  delete nextState.pendingMiss;
+  if (memoryShouldComplete(nextState)) nextState = completeMemoryProgress(nextState);
+  return {
+    state: nextState,
+    payload: {
+      revealId,
+      actor: pending.actor,
+      resolvedAt: resolvedAtMs,
+      completed: nextState.memoryNextStep === "COMPLETE",
+    },
+    validQuestionCount: 0,
+  };
+}
+
+function memoryEvidenceError(): never {
+  throw new QuestionGameRunError("서버에서 카드 짝 찾기 활동 순서를 확인할 수 없습니다", 409);
+}
+
+function onlyPayloadKeys(payload: Record<string, unknown>, keys: readonly string[]) {
+  const allowed = new Set(keys);
+  return Object.keys(payload).every((key) => allowed.has(key));
+}
+
+function sameMemoryDynamicState(actual: MemoryRunState, expected: MemoryRunState) {
+  return JSON.stringify({
+    questionCount: actual.questionCount,
+    aiTurnCount: actual.aiTurnCount,
+    activitySequence: actual.activitySequence,
+    memoryNextStep: actual.memoryNextStep,
+    currentActor: actual.currentActor,
+    studentMatchCount: actual.studentMatchCount,
+    aiMatchCount: actual.aiMatchCount,
+    missCount: actual.missCount,
+    takenIds: actual.takenIds,
+    revealedIds: actual.revealedIds,
+    seenCardIds: actual.seenCardIds,
+    pendingMiss: actual.pendingMiss ?? null,
+  }) === JSON.stringify({
+    questionCount: expected.questionCount,
+    aiTurnCount: expected.aiTurnCount,
+    activitySequence: expected.activitySequence,
+    memoryNextStep: expected.memoryNextStep,
+    currentActor: expected.currentActor,
+    studentMatchCount: expected.studentMatchCount,
+    aiMatchCount: expected.aiMatchCount,
+    missCount: expected.missCount,
+    takenIds: expected.takenIds,
+    revealedIds: expected.revealedIds,
+    seenCardIds: expected.seenCardIds,
+    pendingMiss: expected.pendingMiss ?? null,
+  });
+}
+
+async function verifyMemoryActivitySequence(
+  tx: RunTransaction,
+  run: StoredRun,
+  state: MemoryRunState,
+  mode: RunMode,
+  pendingEvidence?: PendingMemoryActivityEvidence,
+) {
+  const stored = await tx.gameActivity.findMany({
+    where: {
+      runId: run.id,
+      type: {
+        in: [
+          MEMORY_FLIP_ACTIVITY_TYPE,
+          MEMORY_AI_TURN_ACTIVITY_TYPE,
+          MEMORY_RESOLVE_MISS_ACTIVITY_TYPE,
+        ],
+      },
+    },
+    orderBy: { sequence: "asc" },
+    select: {
+      sequence: true,
+      type: true,
+      payload: true,
+      validQuestionCount: true,
+    },
+  });
+  const evidence = pendingEvidence ? [...stored, pendingEvidence] : stored;
+  if (evidence.length !== state.activitySequence) memoryEvidenceError();
+
+  let replayState: MemoryRunState = {
+    ...state,
+    questionCount: 0,
+    aiTurnCount: 0,
+    activitySequence: 0,
+    memoryNextStep: "STUDENT_QUESTION",
+    currentActor: "STUDENT",
+    studentMatchCount: 0,
+    aiMatchCount: 0,
+    missCount: 0,
+    takenIds: [],
+    revealedIds: [],
+    seenCardIds: [],
+  };
+  delete replayState.pendingMiss;
+  delete replayState.result;
+  let verifiedQuestionCount = 0;
+  let verifiedAiTurnCount = 0;
+
+  try {
+    for (let index = 0; index < evidence.length; index += 1) {
+      const activity = evidence[index];
+      const payload = isRecord(activity?.payload) ? activity.payload : null;
+      if (activity?.sequence !== index + 1 || !payload) memoryEvidenceError();
+      let transition: MemoryTransition;
+      if (activity.type === MEMORY_FLIP_ACTIVITY_TYPE) {
+        if (payload.actor !== "STUDENT" || typeof payload.cardId !== "string") {
+          memoryEvidenceError();
+        }
+        if (payload.stage === "QUESTION") {
+          if (
+            !onlyPayloadKeys(payload, ["actor", "cardId", "stage"]) ||
+            activity.validQuestionCount !== 0
+          ) memoryEvidenceError();
+          transition = flipMemoryQuestion(replayState, payload.cardId);
+        } else if (payload.stage === "ANSWER") {
+          if (
+            !onlyPayloadKeys(payload, [
+              "actor", "cardId", "questionCardId", "stage", "result", "attempt",
+              "revealId", "resolveAt",
+            ]) ||
+            typeof payload.questionCardId !== "string" ||
+            typeof payload.result !== "string" ||
+            typeof payload.attempt !== "number"
+          ) memoryEvidenceError();
+          const revealId = typeof payload.revealId === "string"
+            ? payload.revealId
+            : randomUUID();
+          const resolveAt = typeof payload.resolveAt === "number"
+            ? payload.resolveAt
+            : MEMORY_MISS_REVEAL_MS;
+          transition = flipMemoryAnswer(
+            replayState,
+            payload.cardId,
+            resolveAt - MEMORY_MISS_REVEAL_MS,
+            revealId,
+          );
+          if (
+            payload.questionCardId !== transition.payload.questionCardId ||
+            payload.result !== transition.payload.result ||
+            payload.attempt !== transition.payload.attempt ||
+            payload.revealId !== transition.payload.revealId ||
+            payload.resolveAt !== transition.payload.resolveAt ||
+            activity.validQuestionCount !== transition.validQuestionCount
+          ) memoryEvidenceError();
+        } else {
+          memoryEvidenceError();
+        }
+      } else if (activity.type === MEMORY_AI_TURN_ACTIVITY_TYPE) {
+        if (
+          !onlyPayloadKeys(payload, [
+            "actor", "questionCardId", "answerCardId", "result", "attempt",
+            "revealId", "resolveAt",
+          ]) ||
+          payload.actor !== "AI" ||
+          typeof payload.questionCardId !== "string" ||
+          typeof payload.answerCardId !== "string" ||
+          typeof payload.result !== "string" ||
+          typeof payload.attempt !== "number" ||
+          activity.validQuestionCount !== 0
+        ) memoryEvidenceError();
+        const question = memoryCard(replayState, payload.questionCardId, "q");
+        const answer = memoryCard(replayState, payload.answerCardId, "a");
+        validateMemoryAiSelection(replayState, question, answer);
+        const revealId = typeof payload.revealId === "string"
+          ? payload.revealId
+          : randomUUID();
+        const resolveAt = typeof payload.resolveAt === "number"
+          ? payload.resolveAt
+          : MEMORY_MISS_REVEAL_MS;
+        transition = playMemoryAiTurn(
+          replayState,
+          question.id,
+          answer.id,
+          resolveAt - MEMORY_MISS_REVEAL_MS,
+          revealId,
+        );
+        if (
+          payload.result !== transition.payload.result ||
+          payload.attempt !== transition.payload.attempt ||
+          payload.revealId !== transition.payload.revealId ||
+          payload.resolveAt !== transition.payload.resolveAt
+        ) memoryEvidenceError();
+        verifiedAiTurnCount += 1;
+      } else if (activity.type === MEMORY_RESOLVE_MISS_ACTIVITY_TYPE) {
+        if (
+          !onlyPayloadKeys(payload, ["revealId", "actor", "resolvedAt", "completed"]) ||
+          typeof payload.revealId !== "string" ||
+          (payload.actor !== "STUDENT" && payload.actor !== "AI") ||
+          typeof payload.resolvedAt !== "number" ||
+          typeof payload.completed !== "boolean" ||
+          activity.validQuestionCount !== 0
+        ) memoryEvidenceError();
+        transition = resolveMemoryReveal(
+          replayState,
+          mode,
+          payload.revealId,
+          payload.resolvedAt,
+        );
+        if (
+          payload.actor !== transition.payload.actor ||
+          payload.completed !== transition.payload.completed
+        ) memoryEvidenceError();
+      } else {
+        memoryEvidenceError();
+      }
+      replayState = transition.state;
+      verifiedQuestionCount += transition.validQuestionCount;
+    }
+  } catch (error) {
+    if (error instanceof QuestionGameRunError) memoryEvidenceError();
+    throw error;
+  }
+
+  if (
+    !sameMemoryDynamicState(replayState, state) ||
+    verifiedQuestionCount !== state.studentMatchCount ||
+    verifiedAiTurnCount !== state.aiTurnCount ||
+    (mode === "SOLO" && verifiedAiTurnCount !== 0)
+  ) memoryEvidenceError();
+  return { verifiedQuestionCount, verifiedAiTurnCount };
+}
+
+async function settleMemoryRun(
+  tx: RunTransaction,
+  actor: { id: string; role: ActorRole },
+  run: StoredRun,
+  state: MemoryRunState,
+  mode: RunMode,
+  completedAt: Date,
+  pendingEvidence?: PendingMemoryActivityEvidence,
+  incrementVersion = true,
+): Promise<RelaySettlement> {
+  if (state.memoryNextStep !== "COMPLETE" || state.result) {
+    throw new QuestionGameRunError("카드 짝 찾기를 끝까지 진행해 주세요", 409);
+  }
+  const { verifiedQuestionCount, verifiedAiTurnCount } =
+    await verifyMemoryActivitySequence(tx, run, state, mode, pendingEvidence);
+  const { day, result } = await awardVerifiedQuestionGameRun(
+    tx,
+    actor,
+    run,
+    mode,
+    completedAt,
+    verifiedQuestionCount,
+  );
+  const settledState: MemoryRunState = { ...state, result };
+  const nextRun = await tx.gameRun.update({
+    where: { id: run.id },
+    data: {
+      status: "SETTLED",
+      state: toJson(settledState),
+      version: run.version + (incrementVersion ? 1 : 0),
+      scoreDate: day,
+      completedAt,
+      settledAt: completedAt,
+    },
+  });
+  return {
+    run: nextRun as StoredRun,
+    result,
+    verifiedQuestionCount,
+    verifiedAiTurnCount,
+    scoreDate: day,
+  };
+}
+
 export async function createQuestionGameRun(actorId: string, input: unknown, now = new Date()) {
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
@@ -1361,7 +1958,12 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
   let topicHash: string;
   let topicLength: number;
   let topicHashes: string[] | undefined;
-  if (gameId === "dice" || gameId === "kaba" || gameId === "story-dice") {
+  let difficulty: "easy" | "normal" | "hard" | undefined;
+  if (gameId === "memory") {
+    difficulty = parseMemoryDifficulty(input.difficulty);
+    topicHash = hashActivityText("topic", gameId);
+    topicLength = 0;
+  } else if (gameId === "dice" || gameId === "kaba" || gameId === "story-dice") {
     topicHash = hashActivityText("topic", gameId);
     topicLength = 0;
   } else if (gameId === "ladder") {
@@ -1374,7 +1976,13 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
     topicHash = hashActivityText("topic", topic.topic);
     topicLength = topic.topicLength;
   }
-  const requestFingerprint = fingerprint({ gameId, mode, locale, topicHash });
+  const requestFingerprint = fingerprint({
+    gameId,
+    mode,
+    locale,
+    topicHash,
+    ...(difficulty ? { difficulty } : {}),
+  });
 
   return serializable(async (tx) => {
     const actor = await loadActor(tx, actorId, "update");
@@ -1435,6 +2043,7 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
       topicHash,
       topicLength,
       ...(topicHashes ? { topicHashes } : {}),
+      ...(difficulty ? { difficulty } : {}),
     });
     const run = await tx.gameRun.create({
       data: {
@@ -3022,6 +3631,246 @@ async function submitStoryDiceAnswer(
   });
 }
 
+async function storeMemoryTransition(
+  tx: RunTransaction,
+  actor: { id: string; role: ActorRole },
+  run: StoredRun,
+  mode: RunMode,
+  requestId: string,
+  requestFingerprint: string,
+  activityType: MemoryActivityType,
+  transition: MemoryTransition,
+) {
+  ensureMemoryProgress(transition.state, mode, run.version + 1);
+  const evidence: PendingMemoryActivityEvidence = {
+    sequence: transition.state.activitySequence,
+    type: activityType,
+    payload: transition.payload,
+    validQuestionCount: transition.validQuestionCount,
+  };
+  if (transition.state.memoryNextStep === "COMPLETE") {
+    const completedAt = await lockedDatabaseClock(tx);
+    ensureActive(run, completedAt);
+    const settlement = await settleMemoryRun(
+      tx,
+      actor,
+      run,
+      transition.state,
+      mode,
+      completedAt,
+      evidence,
+    );
+    const response = {
+      run: publicRunWithRole(settlement.run, actor.role),
+      result: settlement.result,
+    };
+    await tx.gameActivity.create({
+      data: {
+        runId: run.id,
+        actorId: actor.id,
+        requestId,
+        requestFingerprint,
+        sequence: evidence.sequence,
+        type: activityType,
+        payload: toJson(evidence.payload),
+        validQuestionCount: evidence.validQuestionCount,
+        scoreValue: settlement.result.awarded,
+        responseSnapshot: toJson(response),
+      },
+    });
+    return { ...response, replayed: false };
+  }
+
+  const nextRun = await tx.gameRun.update({
+    where: { id: run.id },
+    data: { state: toJson(transition.state), version: run.version + 1 },
+  });
+  const response = { run: publicRunWithRole(nextRun as StoredRun, actor.role) };
+  await tx.gameActivity.create({
+    data: {
+      runId: run.id,
+      actorId: actor.id,
+      requestId,
+      requestFingerprint,
+      sequence: evidence.sequence,
+      type: activityType,
+      payload: toJson(evidence.payload),
+      validQuestionCount: evidence.validQuestionCount,
+      scoreValue: 0,
+      responseSnapshot: toJson(response),
+    },
+  });
+  return { ...response, replayed: false };
+}
+
+async function flipQuestionGameMemoryCard(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  if (
+    typeof input.cardId !== "string" ||
+    !QUESTION_GAME_REQUEST_ID_PATTERN.test(input.cardId)
+  ) {
+    throw new QuestionGameRunError("카드 식별값이 올바르지 않습니다", 400);
+  }
+  const cardId = input.cardId;
+  const requestFingerprint = fingerprint({ action: input.action, cardId });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "memory") {
+      throw new QuestionGameRunError("이 질문놀이는 카드 선택을 지원하지 않습니다", 409);
+    }
+    const mode = storedRunMode(run.mode);
+    const state = parseMemoryState(run.state);
+    ensureMemoryProgress(state, mode, run.version);
+    const transition = state.memoryNextStep === "STUDENT_QUESTION"
+      ? flipMemoryQuestion(state, cardId)
+      : state.memoryNextStep === "STUDENT_ANSWER"
+        ? flipMemoryAnswer(state, cardId, now.getTime(), randomUUID())
+        : (() => {
+            throw new QuestionGameRunError("현재 차례의 카드 선택을 먼저 마쳐 주세요", 409);
+          })();
+    return storeMemoryTransition(
+      tx,
+      actor,
+      run,
+      mode,
+      requestId,
+      requestFingerprint,
+      MEMORY_FLIP_ACTIVITY_TYPE,
+      transition,
+    );
+  });
+}
+
+async function applyQuestionGameMemoryAiTurn(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const requestFingerprint = fingerprint({ action: input.action });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "memory") {
+      throw new QuestionGameRunError("이 질문놀이는 인공지능 카드 선택을 지원하지 않습니다", 409);
+    }
+    const mode = storedRunMode(run.mode);
+    if (mode !== "AI") {
+      throw new QuestionGameRunError("인공지능 함께하기 실행이 아닙니다", 409);
+    }
+    const state = parseMemoryState(run.state);
+    ensureMemoryProgress(state, mode, run.version);
+    if (state.memoryNextStep !== "AI_TURN" || state.currentActor !== "AI") {
+      throw new QuestionGameRunError("지금은 인공지능 카드 선택 차례가 아닙니다", 409);
+    }
+    const { question, answer } = selectMemoryAiCards(state);
+    const transition = playMemoryAiTurn(
+      state,
+      question.id,
+      answer.id,
+      now.getTime(),
+      randomUUID(),
+    );
+    return storeMemoryTransition(
+      tx,
+      actor,
+      run,
+      mode,
+      requestId,
+      requestFingerprint,
+      MEMORY_AI_TURN_ACTIVITY_TYPE,
+      transition,
+    );
+  });
+}
+
+async function resolveQuestionGameMemoryMiss(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  if (
+    typeof input.revealId !== "string" ||
+    !QUESTION_GAME_REQUEST_ID_PATTERN.test(input.revealId)
+  ) {
+    throw new QuestionGameRunError("카드 공개 식별값이 올바르지 않습니다", 400);
+  }
+  const revealId = input.revealId;
+  const requestFingerprint = fingerprint({ action: input.action, revealId });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "memory") {
+      throw new QuestionGameRunError("이 질문놀이는 카드 공개 해제를 지원하지 않습니다", 409);
+    }
+    const mode = storedRunMode(run.mode);
+    const state = parseMemoryState(run.state);
+    ensureMemoryProgress(state, mode, run.version);
+    const transition = resolveMemoryReveal(state, mode, revealId, now.getTime());
+    return storeMemoryTransition(
+      tx,
+      actor,
+      run,
+      mode,
+      requestId,
+      requestFingerprint,
+      MEMORY_RESOLVE_MISS_ACTIVITY_TYPE,
+      transition,
+    );
+  });
+}
+
 export async function applyQuestionGameRunAction(
   actorId: string,
   runId: string,
@@ -3031,6 +3880,36 @@ export async function applyQuestionGameRunAction(
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
   const expectedVersion = requireVersion(input.expectedVersion);
+  if (input.action === "memory-flip-card") {
+    return flipQuestionGameMemoryCard(
+      actorId,
+      runId,
+      input,
+      requestId,
+      expectedVersion,
+      now,
+    );
+  }
+  if (input.action === "memory-ai-turn") {
+    return applyQuestionGameMemoryAiTurn(
+      actorId,
+      runId,
+      input,
+      requestId,
+      expectedVersion,
+      now,
+    );
+  }
+  if (input.action === "memory-resolve-miss") {
+    return resolveQuestionGameMemoryMiss(
+      actorId,
+      runId,
+      input,
+      requestId,
+      expectedVersion,
+      now,
+    );
+  }
   if (input.action === "story-dice-roll") {
     return rollStoryDice(actorId, runId, input, requestId, expectedVersion, now);
   }
@@ -3242,7 +4121,8 @@ export async function completeQuestionGameRun(
       run.gameId !== "dice" &&
       run.gameId !== "ladder" &&
       run.gameId !== "kaba" &&
-      run.gameId !== "story-dice"
+      run.gameId !== "story-dice" &&
+      run.gameId !== "memory"
     ) {
       throw new QuestionGameRunError("이 질문놀이는 서버 완료를 아직 지원하지 않습니다", 409, {
         unsupported: true,
@@ -3256,8 +4136,10 @@ export async function completeQuestionGameRun(
         ? parseDiceState(run.state)
         : run.gameId === "ladder"
           ? parseLadderState(run.state)
-          : run.gameId === "kaba"
-            ? parseKabaState(run.state)
+        : run.gameId === "kaba"
+          ? parseKabaState(run.state)
+          : run.gameId === "memory"
+            ? parseMemoryState(run.state)
             : parseStoryDiceState(run.state);
     if (run.gameId === "relay") {
       ensureRelayProgress(state as RelayRunState, mode, run.version, run.status === "ACTIVE");
@@ -3273,6 +4155,13 @@ export async function completeQuestionGameRun(
     } else if (run.gameId === "kaba") {
       ensureKabaProgress(
         state as KabaRunState,
+        run.version,
+        run.status === "ACTIVE",
+      );
+    } else if (run.gameId === "memory") {
+      ensureMemoryProgress(
+        state as MemoryRunState,
+        mode,
         run.version,
         run.status === "ACTIVE",
       );
@@ -3336,14 +4225,25 @@ export async function completeQuestionGameRun(
                 mode,
                 completedAt,
               )
-            : await settleStoryDiceRun(
-                tx,
-                actor,
-                run,
-                state as StoryDiceRunState,
-                mode,
-                completedAt,
-              );
+            : run.gameId === "memory"
+              ? await settleMemoryRun(
+                  tx,
+                  actor,
+                  run,
+                  state as MemoryRunState,
+                  mode,
+                  completedAt,
+                  undefined,
+                  false,
+                )
+              : await settleStoryDiceRun(
+                  tx,
+                  actor,
+                  run,
+                  state as StoryDiceRunState,
+                  mode,
+                  completedAt,
+                );
     const response = {
       run: publicRunWithRole(settlement.run, actor.role),
       result: settlement.result,
