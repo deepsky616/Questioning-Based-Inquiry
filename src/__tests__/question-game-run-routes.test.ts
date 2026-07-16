@@ -141,6 +141,19 @@ const KABA_ACTION_IDS = Array.from(
   (_, index) => `00000000-0000-4000-8000-${String(201 + index).padStart(12, "0")}`,
 );
 const KABA_ALTERNATE_FINAL_ACTION_ID = "00000000-0000-4000-8000-000000000221";
+const STORY_ACTION_IDS = Array.from(
+  { length: 8 },
+  (_, index) => `00000000-0000-4000-8000-${String(301 + index).padStart(12, "0")}`,
+);
+const STORY_ALTERNATE_FINAL_ACTION_ID = "00000000-0000-4000-8000-000000000309";
+const STORY_AI_TURN_IDS = Array.from(
+  { length: 3 },
+  (_, index) => `00000000-0000-4000-8000-${String(321 + index).padStart(12, "0")}`,
+);
+const STORY_AI_RECORD_IDS = Array.from(
+  { length: 3 },
+  (_, index) => `00000000-0000-4000-8000-${String(331 + index).padStart(12, "0")}`,
+);
 const COMPLETE_ID = "00000000-0000-4000-8000-000000000020";
 
 const users = new Map<string, { id: string; role: string; totalPoints: number }>();
@@ -234,6 +247,190 @@ async function createKaba(
     requestId: CREATE_ID,
     locale,
   });
+}
+
+async function createStoryDice(
+  mode: "solo" | "ai" = "solo",
+  locale: "ko" | "en" = "ko",
+) {
+  return postCreate({
+    gameId: "story-dice",
+    mode,
+    requestId: CREATE_ID,
+    locale,
+  });
+}
+
+async function rollStoryDiceRun(
+  expectedVersion = 1,
+  requestId = STORY_ACTION_IDS[0],
+  id = "run-1",
+) {
+  return postAction({
+    action: "story-dice-roll",
+    requestId,
+    expectedVersion,
+  }, id);
+}
+
+async function submitStoryDiceStory(
+  story: string,
+  expectedVersion = 2,
+  requestId = STORY_ACTION_IDS[1],
+  id = "run-1",
+  locale: "ko" | "en" = "ko",
+) {
+  return postAction({
+    action: "story-dice-submit-story",
+    requestId,
+    expectedVersion,
+    story,
+    locale,
+  }, id);
+}
+
+async function submitStoryDiceQuestion(
+  index: number,
+  expectedVersion: number,
+  question: string,
+  id = "run-1",
+  requestId = STORY_ACTION_IDS[2 + index * 2],
+) {
+  return postAction({
+    action: "story-dice-submit-question",
+    requestId,
+    expectedVersion,
+    question,
+    locale: "ko",
+  }, id);
+}
+
+async function submitStoryDiceAnswer(
+  index: number,
+  expectedVersion: number,
+  answer: string,
+  id = "run-1",
+  requestId = STORY_ACTION_IDS[3 + index * 2],
+) {
+  return postAction({
+    action: "story-dice-submit-answer",
+    requestId,
+    expectedVersion,
+    answer,
+    locale: "ko",
+  }, id);
+}
+
+async function requestStoryDiceAiQuestion(
+  index: number,
+  expectedVersion: number,
+  story: string,
+  previousAnswer: string,
+  id = "run-1",
+) {
+  return postAiTurn({
+    requestId: STORY_AI_TURN_IDS[index],
+    expectedVersion,
+    story,
+    previousAnswer,
+    locale: "ko",
+  }, id);
+}
+
+async function recordStoryDiceAiQuestion(
+  index: number,
+  expectedVersion: number,
+  output: string,
+  proof: string,
+  id = "run-1",
+) {
+  return postAction({
+    action: "story-dice-record-ai-question",
+    requestId: STORY_AI_RECORD_IDS[index],
+    generationRequestId: STORY_AI_TURN_IDS[index],
+    expectedVersion,
+    output,
+    proof,
+  }, id);
+}
+
+function storyForRolledWords(rolled: {
+  protagonist: string;
+  place: string;
+  event: string;
+}) {
+  return `${rolled.protagonist}가 ${rolled.place}에서 ${rolled.event}을 발견했어요.`;
+}
+
+async function prepareStoryDice(mode: "solo" | "ai" = "solo") {
+  await createStoryDice(mode);
+  const rolledResponse = await rollStoryDiceRun();
+  const rolledBody = await rolledResponse.json() as {
+    run: { storyRolledWords: { protagonist: string; place: string; event: string } };
+  };
+  const story = storyForRolledWords(rolledBody.run.storyRolledWords);
+  await submitStoryDiceStory(story);
+  return { story, rolled: rolledBody.run.storyRolledWords };
+}
+
+async function playSoloStoryDice() {
+  const prepared = await prepareStoryDice("solo");
+  const questions = [
+    "주인공은 왜 그곳에 갔나요?",
+    "발견한 물건은 어떻게 빛났나요?",
+    "마지막에는 어떤 일이 생겼나요?",
+  ];
+  const answers = [
+    "친구를 만나러 갔어요.",
+    "별처럼 밝게 빛났어요.",
+    "모두 함께 집으로 돌아왔어요.",
+  ];
+  const responses: Response[] = [];
+  for (let index = 0; index < 3; index += 1) {
+    responses.push(await submitStoryDiceQuestion(index, 3 + index * 2, questions[index]));
+    responses.push(await submitStoryDiceAnswer(index, 4 + index * 2, answers[index]));
+  }
+  return { ...prepared, questions, answers, responses };
+}
+
+async function playAiStoryDice() {
+  const prepared = await prepareStoryDice("ai");
+  const outputs = [
+    "주인공은 왜 그곳에 갔나요?",
+    "그 물건은 어떻게 빛났나요?",
+    "이야기는 어떻게 끝났나요?",
+  ];
+  const answers = [
+    "친구를 만나러 갔어요.",
+    "별처럼 밝게 빛났어요.",
+    "모두 함께 집으로 돌아왔어요.",
+  ];
+  mocks.generateText
+    .mockResolvedValueOnce(outputs[0])
+    .mockResolvedValueOnce(outputs[1])
+    .mockResolvedValueOnce(outputs[2]);
+  const responses: Response[] = [];
+  let previousAnswer = "";
+  for (let index = 0; index < 3; index += 1) {
+    const issueVersion = 3 + index * 2;
+    const issued = await requestStoryDiceAiQuestion(
+      index,
+      issueVersion,
+      prepared.story,
+      previousAnswer,
+    );
+    const issuedBody = await issued.json() as { output: string; proof: string };
+    responses.push(issued);
+    responses.push(await recordStoryDiceAiQuestion(
+      index,
+      issueVersion,
+      issuedBody.output,
+      issuedBody.proof,
+    ));
+    responses.push(await submitStoryDiceAnswer(index, issueVersion + 1, answers[index]));
+    previousAnswer = answers[index];
+  }
+  return { ...prepared, outputs, answers, responses };
 }
 
 async function submitKabaAttempt(
@@ -2568,5 +2765,333 @@ describe("까바놀이 서버 실행 경로", () => {
     expect(wrongLocale.status).toBe(409);
     expect(activities).toHaveLength(0);
     expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 1 });
+  });
+});
+
+describe("이야기 주사위 서버 실행 경로", () => {
+  it("주제 없이 이중 언어 단어를 여덟 개씩 준비하고 서버 굴림을 재생한다", async () => {
+    const created = await createStoryDice("solo", "en");
+    const createdBody = await created.json() as {
+      run: {
+        storyWordPool: Record<"protagonist" | "place" | "event", string[]>;
+        storyRolledWords: null;
+      };
+    };
+    const rolled = await rollStoryDiceRun();
+    const replay = await rollStoryDiceRun();
+    const rolledBody = await rolled.json();
+    const replayBody = await replay.json();
+
+    expect(created.status).toBe(201);
+    expect(createdBody.run.storyRolledWords).toBeNull();
+    for (const words of Object.values(createdBody.run.storyWordPool)) {
+      expect(words).toHaveLength(8);
+      expect(new Set(words).size).toBe(8);
+    }
+    expect(rolledBody).toMatchObject({
+      run: {
+        version: 2,
+        storyDiceNextStep: "STORY",
+        storyRolledWords: {
+          protagonist: expect.any(String),
+          place: expect.any(String),
+          event: expect.any(String),
+        },
+      },
+      replayed: false,
+    });
+    expect(replay.status).toBe(200);
+    expect(replayBody).toMatchObject({
+      run: rolledBody.run,
+      replayed: true,
+    });
+    expect(activities).toHaveLength(1);
+  });
+
+  it("혼자 모드의 세 질문과 대답 쌍을 확인해 오 점을 한 번 지급하고 원문을 저장하지 않는다", async () => {
+    const played = await playSoloStoryDice();
+    const final = played.responses.at(-1);
+    if (!final) throw new Error("missing final response");
+    const finalBody = await final.json();
+
+    expect(finalBody).toMatchObject({
+      run: {
+        status: "SETTLED",
+        version: 9,
+        questionCount: 3,
+        aiTurnCount: 0,
+        awaitingAiTurn: false,
+        storyDiceNextStep: "COMPLETE",
+      },
+      result: { awarded: 5, dailyLimit: 30, preview: false },
+      replayed: false,
+    });
+    expect(pointLogs).toHaveLength(1);
+    expect(pointLogs[0]).toMatchObject({
+      gameId: "ACTIVITY_SOLO",
+      bonusType: "ACTIVITY_SOLO_story-dice",
+      points: 5,
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+    expect(activities).toHaveLength(8);
+    expect(activities.reduce((sum, activity) => sum + activity.validQuestionCount, 0)).toBe(3);
+
+    const stored = JSON.stringify({
+      state: runs.get("run-1")?.state,
+      activities: activities.map(({ payload, responseSnapshot, requestFingerprint }) => ({
+        payload,
+        responseSnapshot,
+        requestFingerprint,
+      })),
+    });
+    for (const raw of [played.story, ...played.questions, ...played.answers]) {
+      expect(stored).not.toContain(raw);
+    }
+
+    const replay = await submitStoryDiceAnswer(2, 8, played.answers[2]);
+    const result = await readResult();
+    const complete = await postComplete({ requestId: COMPLETE_ID, expectedVersion: 9 });
+    await expect(replay.json()).resolves.toMatchObject({
+      replayed: true,
+      result: { awarded: 5 },
+    });
+    await expect(result.json()).resolves.toMatchObject({
+      run: { status: "SETTLED", version: 9 },
+      result: { awarded: 5, alreadySettled: true },
+    });
+    await expect(complete.json()).resolves.toMatchObject({
+      replayed: true,
+      result: { awarded: 5, alreadySettled: true },
+    });
+    expect(pointLogs).toHaveLength(1);
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+  });
+
+  it("인공지능 질문 세 개의 서명과 학생 대답 세 개를 확인해 구 점을 지급한다", async () => {
+    const played = await playAiStoryDice();
+    const final = played.responses.at(-1);
+    if (!final) throw new Error("missing final response");
+
+    await expect(final.json()).resolves.toMatchObject({
+      run: {
+        status: "SETTLED",
+        version: 9,
+        questionCount: 3,
+        aiTurnCount: 3,
+        storyDiceNextStep: "COMPLETE",
+      },
+      result: { awarded: 9, dailyLimit: 50, preview: false },
+    });
+    expect(pointLogs[0]).toMatchObject({
+      gameId: "ACTIVITY_AI",
+      bonusType: "ACTIVITY_AI_story-dice",
+      points: 9,
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(9);
+    expect(activities.filter((activity) =>
+      activity.type === "STORY_DICE_AI_QUESTION"
+    )).toHaveLength(3);
+    const stored = JSON.stringify({ state: runs.get("run-1")?.state, activities });
+    for (const raw of [played.story, ...played.answers]) {
+      expect(stored).not.toContain(raw);
+    }
+  });
+
+  it("위조된 이야기 질문 증명과 다른 이야기 문맥을 활동으로 기록하지 않는다", async () => {
+    const prepared = await prepareStoryDice("ai");
+    const wrongContext = await requestStoryDiceAiQuestion(
+      0,
+      3,
+      `${prepared.story} 다른 이야기`,
+      "",
+    );
+    const issued = await requestStoryDiceAiQuestion(0, 3, prepared.story, "");
+    const issuedBody = await issued.json() as { output: string; proof: string };
+    const forged = await recordStoryDiceAiQuestion(
+      0,
+      3,
+      issuedBody.output,
+      `${issuedBody.proof}x`,
+    );
+
+    expect(wrongContext.status).toBe(409);
+    expect(forged.status).toBe(409);
+    expect(activities).toHaveLength(2);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 3 });
+    expect(pointLogs).toHaveLength(0);
+  });
+
+  it("모델 호출이 실패해도 서명한 안전 질문으로 인공지능 차례를 이어 간다", async () => {
+    const prepared = await prepareStoryDice("ai");
+    mocks.generateText.mockRejectedValueOnce(new Error("private-story-ai-error"));
+
+    const issued = await requestStoryDiceAiQuestion(0, 3, prepared.story, "");
+    const issuedBody = await issued.json() as { output: string; proof: string };
+    const recorded = await recordStoryDiceAiQuestion(
+      0,
+      3,
+      issuedBody.output,
+      issuedBody.proof,
+    );
+
+    expect(issued.status).toBe(200);
+    expect(issuedBody.output).toBe("그다음에는 어떤 일이 있었나요?");
+    expect(issuedBody.proof).toEqual(expect.any(String));
+    expect(recorded.status).toBe(200);
+    await expect(recorded.json()).resolves.toMatchObject({
+      run: { version: 4, aiTurnCount: 1, storyDiceNextStep: "STUDENT_ANSWER" },
+    });
+  });
+
+  it("앞 회차 질문과 기본 대체 질문이 겹쳐도 사용하지 않은 질문으로 다음 차례를 이어 간다", async () => {
+    const prepared = await prepareStoryDice("ai");
+    const firstQuestion = "주인공은 왜 그렇게 행동했나요?";
+    const firstAnswer = "그곳이 궁금했기 때문이에요.";
+    mocks.generateText
+      .mockResolvedValueOnce(firstQuestion)
+      .mockRejectedValueOnce(new Error("private-story-ai-error"));
+
+    const firstIssued = await requestStoryDiceAiQuestion(0, 3, prepared.story, "");
+    const firstIssuedBody = await firstIssued.json() as { output: string; proof: string };
+    const firstRecorded = await recordStoryDiceAiQuestion(
+      0,
+      3,
+      firstIssuedBody.output,
+      firstIssuedBody.proof,
+    );
+    const firstAnswered = await submitStoryDiceAnswer(0, 4, firstAnswer);
+    const secondIssued = await requestStoryDiceAiQuestion(
+      1,
+      5,
+      prepared.story,
+      firstAnswer,
+    );
+    const secondIssuedBody = await secondIssued.json() as { output: string; proof: string };
+
+    expect(firstIssued.status).toBe(200);
+    expect(firstIssuedBody.output).toBe(firstQuestion);
+    expect(firstRecorded.status).toBe(200);
+    expect(firstAnswered.status).toBe(200);
+    expect(secondIssued.status).toBe(200);
+    expect(secondIssuedBody.output).not.toBe(firstQuestion);
+    expect(secondIssuedBody.output).toMatch(/\?$/);
+    expect(secondIssuedBody.proof).toEqual(expect.any(String));
+
+    const secondRecorded = await recordStoryDiceAiQuestion(
+      1,
+      5,
+      secondIssuedBody.output,
+      secondIssuedBody.proof,
+    );
+    expect(secondRecorded.status).toBe(200);
+    await expect(secondRecorded.json()).resolves.toMatchObject({
+      run: { version: 6, aiTurnCount: 2, storyDiceNextStep: "STUDENT_ANSWER" },
+    });
+  });
+
+  it("마지막 대답 전에 저장된 활동 근거가 빠지면 정산하지 않는다", async () => {
+    const prepared = await prepareStoryDice("solo");
+    const questions = ["첫 질문은 무엇인가요?", "둘 질문은 무엇인가요?", "셋 질문은 무엇인가요?"];
+    const answers = ["첫 대답입니다.", "둘 대답입니다."];
+    await submitStoryDiceQuestion(0, 3, questions[0]);
+    await submitStoryDiceAnswer(0, 4, answers[0]);
+    await submitStoryDiceQuestion(1, 5, questions[1]);
+    await submitStoryDiceAnswer(1, 6, answers[1]);
+    await submitStoryDiceQuestion(2, 7, questions[2]);
+    activities.splice(0, 1);
+
+    const response = await submitStoryDiceAnswer(2, 8, "셋 대답입니다.");
+
+    expect(response.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 8 });
+    expect(activities).toHaveLength(6);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+    expect(JSON.stringify(runs.get("run-1")?.state)).not.toContain(prepared.story);
+  });
+
+  it("서로 다른 마지막 대답이 동시에 오면 한 요청만 정산한다", async () => {
+    await prepareStoryDice("solo");
+    await submitStoryDiceQuestion(0, 3, "첫 질문은 무엇인가요?");
+    await submitStoryDiceAnswer(0, 4, "첫 대답입니다.");
+    await submitStoryDiceQuestion(1, 5, "둘 질문은 무엇인가요?");
+    await submitStoryDiceAnswer(1, 6, "둘 대답입니다.");
+    await submitStoryDiceQuestion(2, 7, "셋 질문은 무엇인가요?");
+
+    const responses = await Promise.all([
+      submitStoryDiceAnswer(2, 8, "첫 번째 마지막 대답입니다."),
+      postAction({
+        action: "story-dice-submit-answer",
+        requestId: STORY_ALTERNATE_FINAL_ACTION_ID,
+        expectedVersion: 8,
+        answer: "두 번째 마지막 대답입니다.",
+        locale: "ko",
+      }),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(pointLogs).toHaveLength(1);
+    expect(activities.filter((activity) =>
+      activity.type === "STORY_DICE_ANSWER"
+    )).toHaveLength(3);
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+  });
+
+  it("마지막 대답 저장 실패는 실행과 활동 및 점수를 모두 되돌리고 재시도한다", async () => {
+    await prepareStoryDice("solo");
+    await submitStoryDiceQuestion(0, 3, "첫 질문은 무엇인가요?");
+    await submitStoryDiceAnswer(0, 4, "첫 대답입니다.");
+    await submitStoryDiceQuestion(1, 5, "둘 질문은 무엇인가요?");
+    await submitStoryDiceAnswer(1, 6, "둘 대답입니다.");
+    await submitStoryDiceQuestion(2, 7, "셋 질문은 무엇인가요?");
+    mocks.activityCreate.mockRejectedValueOnce(new Error("private-story-storage-value"));
+
+    const failed = await submitStoryDiceAnswer(2, 8, "셋 대답입니다.");
+
+    expect(failed.status).toBe(500);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 8 });
+    expect(activities).toHaveLength(7);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+
+    const retry = await submitStoryDiceAnswer(2, 8, "셋 대답입니다.");
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({ result: { awarded: 5 } });
+    expect(pointLogs).toHaveLength(1);
+    expect(users.get("student-1")?.totalPoints).toBe(5);
+  });
+
+  it("교사 미리보기는 같은 완료 결과를 남기되 포인트를 만들지 않는다", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
+    const played = await playSoloStoryDice();
+    const final = played.responses.at(-1);
+    if (!final) throw new Error("missing final response");
+
+    await expect(final.json()).resolves.toMatchObject({
+      run: { preview: true, status: "SETTLED", questionCount: 3 },
+      result: { awarded: 0, preview: true },
+    });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("teacher-1")?.totalPoints).toBe(0);
+  });
+
+  it("만료된 실행은 임시 인공지능 자료 없이 한 단계 오른 버전으로 닫는다", async () => {
+    await createStoryDice("ai");
+    const run = runs.get("run-1");
+    if (!run) throw new Error("missing run");
+    run.expiresAt = new Date(0);
+
+    const response = await readResult();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      run: {
+        status: "EXPIRED",
+        version: 2,
+        storyDiceNextStep: "ROLL",
+        storyRolledWords: null,
+      },
+      result: null,
+    });
   });
 });

@@ -1096,4 +1096,435 @@ describe("브라우저 질문놀이 실행 전송기", () => {
       cappedByLimit: true,
     });
   });
+
+  it("이야기 주사위 혼자 모드는 굴림과 이야기 뒤 질문과 대답 세 쌍을 재전송해도 한 번만 정산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const createBody = {
+      gameId: "story-dice",
+      mode: "solo",
+      requestId: ids[140],
+      locale: "ko",
+    };
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: createBody,
+    });
+    const id = runId(created);
+    const createdRun = created.body.run as {
+      storyWordPool: Record<"protagonist" | "place" | "event", string[]>;
+    };
+    expect(created).toMatchObject({
+      status: 201,
+      body: {
+        replayed: false,
+        run: {
+          id,
+          gameId: "story-dice",
+          mode: "SOLO",
+          status: "ACTIVE",
+          version: 1,
+          questionCount: 0,
+          aiTurnCount: 0,
+          targetCount: 3,
+          storyDiceNextStep: "ROLL",
+          storyRolledWords: null,
+        },
+      },
+    });
+    for (const words of Object.values(createdRun.storyWordPool)) {
+      expect(words).toHaveLength(8);
+      expect(new Set(words).size).toBe(8);
+    }
+
+    const rollBody = {
+      action: "story-dice-roll",
+      requestId: ids[141],
+      expectedVersion: 1,
+    };
+    const rolled = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: rollBody,
+    });
+    const rolledWords = (rolled.body.run as {
+      storyRolledWords: Record<"protagonist" | "place" | "event", string>;
+    }).storyRolledWords;
+    expect(rolled).toMatchObject({
+      status: 200,
+      body: {
+        replayed: false,
+        run: {
+          version: 2,
+          storyDiceNextStep: "STORY",
+          storyRolledWords: rolledWords,
+        },
+      },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: rollBody,
+    })).toMatchObject({
+      status: 200,
+      body: { replayed: true, run: { version: 2, storyRolledWords: rolledWords } },
+    });
+
+    const story = `${rolledWords.protagonist}은 ${rolledWords.place}에서 ${rolledWords.event}를 발견하고 친구를 도왔다.`;
+    const storyBody = {
+      action: "story-dice-submit-story",
+      requestId: ids[142],
+      expectedVersion: 2,
+      story,
+      locale: "ko",
+    };
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: storyBody,
+    })).toMatchObject({
+      status: 200,
+      body: {
+        replayed: false,
+        run: { version: 3, storyDiceNextStep: "STUDENT_QUESTION" },
+      },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: storyBody,
+    })).toMatchObject({
+      status: 200,
+      body: { replayed: true, run: { version: 3 } },
+    });
+
+    let finalResponse = created;
+    let finalAnswerBody: Record<string, unknown> | null = null;
+    for (let index = 0; index < 3; index += 1) {
+      const question = `이야기 질문 ${index + 1}은 무엇인가요?`;
+      const questionBody = {
+        action: "story-dice-submit-question",
+        requestId: ids[143 + index * 2],
+        expectedVersion: 3 + index * 2,
+        question,
+        locale: "ko",
+      };
+      const questioned = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: questionBody,
+      });
+      expect(questioned.body.run).toMatchObject({
+        version: 4 + index * 2,
+        questionCount: index,
+        storyDiceNextStep: "STUDENT_ANSWER",
+      });
+      if (index === 0) {
+        expect(store.dispatch(studentA, {
+          method: "POST",
+          pathname: `/api/question-games/runs/${id}/actions`,
+          body: questionBody,
+        })).toMatchObject({
+          status: 200,
+          body: { replayed: true, run: { version: 4, questionCount: 0 } },
+        });
+      }
+
+      const answer = `이야기 대답 ${index + 1}입니다.`;
+      const answerBody = {
+        action: "story-dice-submit-answer",
+        requestId: ids[144 + index * 2],
+        expectedVersion: 4 + index * 2,
+        answer,
+        locale: "ko",
+      };
+      finalResponse = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: answerBody,
+      });
+      expect(JSON.stringify(finalResponse)).not.toContain(question);
+      expect(JSON.stringify(finalResponse)).not.toContain(answer);
+      finalAnswerBody = answerBody;
+    }
+
+    expect(finalResponse).toMatchObject({
+      status: 200,
+      body: {
+        replayed: false,
+        run: {
+          status: "SETTLED",
+          version: 9,
+          questionCount: 3,
+          aiTurnCount: 0,
+          storyDiceNextStep: "COMPLETE",
+        },
+        result: {
+          awarded: 5,
+          dailyLimit: 30,
+          dailyRemaining: 25,
+          cappedByLimit: false,
+          preview: false,
+        },
+      },
+    });
+    if (!finalAnswerBody) throw new Error("마지막 이야기 대답 요청이 없습니다");
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: finalAnswerBody,
+    })).toMatchObject({
+      status: 200,
+      body: {
+        replayed: true,
+        run: { status: "SETTLED", version: 9 },
+        result: { awarded: 5, dailyRemaining: 25 },
+      },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: createBody,
+    })).toMatchObject({
+      status: 200,
+      body: {
+        replayed: true,
+        run: { id, status: "SETTLED", version: 9 },
+      },
+    });
+  });
+
+  it("이야기 주사위 도움 모드는 발급 증명을 기록하고 대답 세 개 뒤 아홉 점을 정산한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "story-dice",
+        mode: "ai",
+        requestId: ids[150],
+        locale: "ko",
+      },
+    });
+    const id = runId(created);
+    const rolled = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "story-dice-roll",
+        requestId: ids[151],
+        expectedVersion: 1,
+      },
+    });
+    const rolledWords = (rolled.body.run as {
+      storyRolledWords: Record<"protagonist" | "place" | "event", string>;
+    }).storyRolledWords;
+    const story = `${rolledWords.protagonist}이 ${rolledWords.place}에서 ${rolledWords.event}를 찾아 모두를 도왔다.`;
+    const storySubmitted = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "story-dice-submit-story",
+        requestId: ids[152],
+        expectedVersion: 2,
+        story,
+        locale: "ko",
+      },
+    });
+    expect(storySubmitted.body.run).toMatchObject({
+      version: 3,
+      awaitingAiTurn: true,
+      storyDiceNextStep: "AI_QUESTION",
+    });
+
+    let previousAnswer = "";
+    let finalResponse = storySubmitted;
+    for (let index = 0; index < 3; index += 1) {
+      const expectedVersion = 3 + index * 2;
+      const issueBody = {
+        requestId: ids[153 + index * 3],
+        expectedVersion,
+        story,
+        previousAnswer,
+        locale: "ko",
+      };
+      const issued = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/ai-turn`,
+        body: issueBody,
+      });
+      expect(issued).toMatchObject({
+        status: 200,
+        body: {
+          output: expect.stringMatching(/\?$/),
+          proof: expect.any(String),
+          proofId: expect.any(String),
+          expiresAt: expect.any(String),
+          runVersion: expectedVersion,
+        },
+      });
+      expect(store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/ai-turn`,
+        body: issueBody,
+      })).toEqual(issued);
+
+      const issuedBody = issued.body as { output: string; proof: string };
+      const recordBody = {
+        action: "story-dice-record-ai-question",
+        requestId: ids[154 + index * 3],
+        generationRequestId: issueBody.requestId,
+        expectedVersion,
+        output: issuedBody.output,
+        proof: issuedBody.proof,
+      };
+      const recorded = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: recordBody,
+      });
+      expect(recorded.body.run).toMatchObject({
+        version: expectedVersion + 1,
+        questionCount: index,
+        aiTurnCount: index + 1,
+        awaitingAiTurn: false,
+        storyDiceNextStep: "STUDENT_ANSWER",
+      });
+      expect(store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: recordBody,
+      })).toMatchObject({
+        status: 200,
+        body: { replayed: true, run: { aiTurnCount: index + 1 } },
+      });
+
+      previousAnswer = `인공지능 질문에 대한 대답 ${index + 1}입니다.`;
+      finalResponse = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: {
+          action: "story-dice-submit-answer",
+          requestId: ids[155 + index * 3],
+          expectedVersion: expectedVersion + 1,
+          answer: previousAnswer,
+          locale: "ko",
+        },
+      });
+    }
+
+    expect(finalResponse).toMatchObject({
+      status: 200,
+      body: {
+        run: {
+          status: "SETTLED",
+          version: 9,
+          questionCount: 3,
+          aiTurnCount: 3,
+          awaitingAiTurn: false,
+          storyDiceNextStep: "COMPLETE",
+        },
+        result: {
+          awarded: 9,
+          dailyLimit: 50,
+          dailyRemaining: 41,
+          cappedByLimit: false,
+          preview: false,
+        },
+      },
+    });
+  });
+
+  it("다른 화면이 먼저 질문을 기록하면 오래된 이야기 질문을 명시적으로 거절하고 성공으로 바꾸지 않는다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = store.dispatch(studentA, {
+      method: "POST",
+      pathname: "/api/question-games/runs",
+      body: {
+        gameId: "story-dice",
+        mode: "solo",
+        requestId: ids[165],
+        locale: "ko",
+      },
+    });
+    const id = runId(created);
+    const rolled = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "story-dice-roll",
+        requestId: ids[166],
+        expectedVersion: 1,
+      },
+    });
+    const words = (rolled.body.run as {
+      storyRolledWords: Record<"protagonist" | "place" | "event", string>;
+    }).storyRolledWords;
+    const story = `${words.protagonist}은 ${words.place}에서 ${words.event}를 발견했다.`;
+    store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "story-dice-submit-story",
+        requestId: ids[167],
+        expectedVersion: 2,
+        story,
+        locale: "ko",
+      },
+    });
+
+    const otherScreen = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "story-dice-submit-question",
+        requestId: ids[168],
+        expectedVersion: 3,
+        question: "먼저 열린 화면의 질문은 무엇인가요?",
+        locale: "ko",
+      },
+    });
+    expect(otherScreen.body.run).toMatchObject({
+      version: 4,
+      questionCount: 0,
+      storyDiceNextStep: "STUDENT_ANSWER",
+    });
+
+    const staleBody = {
+      action: "story-dice-submit-question",
+      requestId: ids[169],
+      expectedVersion: 3,
+      question: "오래된 화면의 질문은 무엇인가요?",
+      locale: "ko",
+    };
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: staleBody,
+    })).toEqual({
+      status: 409,
+      body: { error: "질문놀이 실행 상태가 바뀌었습니다" },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: staleBody,
+    }).status).toBe(409);
+    expect(store.dispatch(studentA, {
+      method: "GET",
+      pathname: `/api/question-games/runs/${id}/result`,
+      body: {},
+    })).toMatchObject({
+      status: 200,
+      body: {
+        result: null,
+        run: {
+          status: "ACTIVE",
+          version: 4,
+          questionCount: 0,
+          storyDiceNextStep: "STUDENT_ANSWER",
+        },
+      },
+    });
+  });
 });

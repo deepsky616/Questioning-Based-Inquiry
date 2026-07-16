@@ -7,11 +7,9 @@ import {
   act,
   cleanup,
   fireEvent,
-  render,
   screen,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NextIntlClientProvider } from "next-intl";
 import StoryDiceGame from "@/app/(student)/student-question-play/games/StoryDiceGame";
 import DiceGame from "@/app/(student)/student-question-play/games/DiceGame";
 import RelayGame from "@/app/(student)/student-question-play/games/RelayGame";
@@ -19,12 +17,6 @@ import KabaGame from "@/app/(student)/student-question-play/games/KabaGame";
 import { renderWithIntl } from "@/__tests__/test-utils/render-with-intl";
 import { BUILT_IN_GAMES, type BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "@/app/(student)/student-question-play/[gameId]/page";
-import { getQuestionGameText } from "@/lib/question-game-i18n";
-import {
-  getStoryDiceWordText,
-  pickFallbackBilingualWords,
-} from "@/lib/story-dice-data";
-import en from "../../messages/en.json";
 
 const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
 
@@ -68,25 +60,6 @@ function renderLocalGame(
   );
 }
 
-function renderEnglishStoryGame(mode: LocalMode = "solo") {
-  return render(
-    <NextIntlClientProvider
-      locale="en"
-      messages={en as never}
-      timeZone="Asia/Seoul"
-    >
-      <StoryDiceGame
-        game={gameById("story-dice")}
-        onBack={vi.fn()}
-        config={{
-          mode,
-          players: mode === "ai" ? ["Minjun", "AI"] : ["Minjun"],
-        }}
-      />
-    </NextIntlClientProvider>,
-  );
-}
-
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => {
@@ -108,30 +81,42 @@ async function advance(ms: number) {
   });
 }
 
-async function startStory(mode: LocalMode) {
+async function startStory(
+  mode: LocalMode,
+  options: StoryDiceRunServerOptions = {},
+) {
+  const fetchMock = installStoryDiceRunServer(mode, options);
   renderLocalGame("story-dice", StoryDiceGame, mode);
   await flushPromises();
   fireEvent.click(screen.getByRole("button", { name: /주사위 3개 굴리기/ }));
+  await flushPromises();
   await advance(1500);
   fireEvent.change(screen.getByRole("textbox"), {
-    target: { value: "고양이가 학교에서 보물을 찾았어요." },
+    target: { value: "서버 해적이 서버 미래도시에서 서버 비밀지도를 찾았어요." },
   });
   fireEvent.click(screen.getByRole("button", { name: /이야기 시작/ }));
-  if (mode === "ai") await advance(400);
+  await flushPromises();
+  if (mode === "ai") {
+    await advance(400);
+    await flushPromises();
+  }
+  return fetchMock;
 }
 
-function submitStoryQuestion(value: string) {
+async function submitStoryQuestion(value: string) {
   fireEvent.change(screen.getByPlaceholderText("이야기에 어울리는 질문을 만들어보세요..."), {
     target: { value },
   });
   fireEvent.click(screen.getByRole("button", { name: /질문 제출/ }));
+  await flushPromises();
 }
 
-function submitStoryAnswer(value: string) {
+async function submitStoryAnswer(value: string) {
   fireEvent.change(screen.getByPlaceholderText("질문에 어울리는 짧은 대답을 한 문장으로 해보세요..."), {
     target: { value },
   });
   fireEvent.click(screen.getByRole("button", { name: /대답 제출/ }));
+  await flushPromises();
 }
 
 async function rollQuestionDice() {
@@ -144,6 +129,216 @@ async function submitDiceQuestion(value: string) {
   fireEvent.change(screen.getByRole("textbox"), { target: { value } });
   fireEvent.click(screen.getByRole("button", { name: /제출/ }));
   await flushPromises();
+}
+
+const STORY_DICE_SERVER_WORDS = {
+  protagonist: [
+    "서버 로봇", "서버 탐정", "서버 마법사", "서버 발명가",
+    "서버 외계인", "서버 학생", "서버 강아지", "서버 해적",
+  ],
+  place: [
+    "서버 학교", "서버 숲", "서버 바다", "서버 우주",
+    "서버 놀이공원", "서버 무인도", "서버 동굴", "서버 미래도시",
+  ],
+  event: [
+    "서버 보물상자", "서버 비밀지도", "서버 열쇠", "서버 타임머신",
+    "서버 마법책", "서버 편지", "서버 버튼", "서버 알 수 없는 소리",
+  ],
+} as const;
+
+const STORY_DICE_SERVER_ROLL = {
+  protagonist: STORY_DICE_SERVER_WORDS.protagonist[7],
+  place: STORY_DICE_SERVER_WORDS.place[7],
+  event: STORY_DICE_SERVER_WORDS.event[1],
+};
+
+type StoryDiceRunStep =
+  | "ROLL"
+  | "STORY"
+  | "STUDENT_QUESTION"
+  | "AI_QUESTION"
+  | "STUDENT_ANSWER"
+  | "COMPLETE";
+
+interface StoryDiceRunServerOptions {
+  loseFinalAnswerResponse?: boolean;
+  loseFirstAiIssueResponse?: boolean;
+  loseFirstAiRecordResponse?: boolean;
+}
+
+function storyDiceRunSnapshot(
+  mode: LocalMode,
+  version: number,
+  questionCount: number,
+  aiTurnCount: number,
+  step: StoryDiceRunStep,
+  status: "ACTIVE" | "SETTLED",
+) {
+  return {
+    id: `story-dice-${mode}`,
+    gameId: "story-dice",
+    mode: mode.toUpperCase(),
+    status,
+    version,
+    targetCount: 3,
+    questionCount,
+    aiTurnCount,
+    awaitingAiTurn: step === "AI_QUESTION",
+    preview: false,
+    storyDiceNextStep: step,
+    storyWordPool: STORY_DICE_SERVER_WORDS,
+    storyRolledWords: step === "ROLL" ? null : STORY_DICE_SERVER_ROLL,
+  };
+}
+
+function installStoryDiceRunServer(
+  mode: LocalMode,
+  options: StoryDiceRunServerOptions = {},
+) {
+  let version = 1;
+  let questionCount = 0;
+  let aiTurnCount = 0;
+  let step: StoryDiceRunStep = "ROLL";
+  let status: "ACTIVE" | "SETTLED" = "ACTIVE";
+  let result: Record<string, unknown> | null = null;
+  let finalAnswerResponseLost = false;
+  let firstAiIssueResponseLost = false;
+  let firstAiRecordResponseLost = false;
+  let nextAiProofSequence = 1;
+  const aiIssueResponses = new Map<string, Record<string, unknown>>();
+  const aiRecordResponses = new Map<string, Record<string, unknown>>();
+
+  const currentRun = () => storyDiceRunSnapshot(
+    mode,
+    version,
+    questionCount,
+    aiTurnCount,
+    step,
+    status,
+  );
+
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+
+    if (url === "/api/question-games/runs") {
+      return new Response(JSON.stringify({ run: currentRun() }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    if (url.endsWith("/result")) {
+      return Response.json({ run: currentRun(), result });
+    }
+
+    if (url.endsWith("/ai-turn")) {
+      if (mode !== "ai" || step !== "AI_QUESTION" || body.expectedVersion !== version) {
+        return Response.json({ error: "인공지능 질문 차례가 아닙니다." }, { status: 409 });
+      }
+      const replay = aiIssueResponses.get(body.requestId);
+      if (replay) return Response.json(replay);
+      const proofSequence = nextAiProofSequence;
+      nextAiProofSequence += 1;
+      const issued = {
+        output: `인공지능 질문 ${aiTurnCount + 1}: 다음에는 어떤 일이 있었나요?`,
+        proof: `story-proof-${proofSequence}`,
+        proofId: `story-proof-id-${proofSequence}`,
+        expiresAt: "2099-07-16T03:01:30.000Z",
+        runVersion: version,
+      };
+      aiIssueResponses.set(body.requestId, issued);
+      if (options.loseFirstAiIssueResponse && !firstAiIssueResponseLost) {
+        firstAiIssueResponseLost = true;
+        throw new TypeError("인공지능 질문 발급 응답 연결이 끊겼습니다.");
+      }
+      return Response.json(issued);
+    }
+
+    if (!url.endsWith("/actions")) {
+      return Response.json({ error: "지원하지 않는 시험 요청" }, { status: 404 });
+    }
+    if (body.action === "story-dice-record-ai-question") {
+      const replay = aiRecordResponses.get(body.requestId);
+      if (replay) return Response.json({ ...replay, replayed: true });
+    }
+    if (body.expectedVersion !== version) {
+      return Response.json({ error: "이야기 주사위 상태가 바뀌었습니다." }, { status: 409 });
+    }
+    if (
+      body.action === "story-dice-submit-story" &&
+      (
+        typeof body.story !== "string" ||
+        !Object.values(STORY_DICE_SERVER_ROLL).every((word) => body.story.includes(word))
+      )
+    ) {
+      return Response.json(
+        { error: "주사위로 나온 세 단어를 모두 넣어 이야기를 써 주세요." },
+        { status: 400 },
+      );
+    }
+
+    if (body.action === "story-dice-roll" && step === "ROLL") {
+      step = "STORY";
+    } else if (body.action === "story-dice-submit-story" && step === "STORY") {
+      step = mode === "ai" ? "AI_QUESTION" : "STUDENT_QUESTION";
+    } else if (
+      body.action === "story-dice-submit-question" &&
+      mode === "solo" &&
+      step === "STUDENT_QUESTION"
+    ) {
+      step = "STUDENT_ANSWER";
+    } else if (
+      body.action === "story-dice-record-ai-question" &&
+      mode === "ai" &&
+      step === "AI_QUESTION"
+    ) {
+      aiTurnCount += 1;
+      step = "STUDENT_ANSWER";
+    } else if (body.action === "story-dice-submit-answer" && step === "STUDENT_ANSWER") {
+      questionCount += 1;
+      if (questionCount === 3) {
+        status = "SETTLED";
+        step = "COMPLETE";
+        const awarded = mode === "ai" ? 9 : 5;
+        const dailyLimit = mode === "ai" ? 50 : 30;
+        result = {
+          awarded,
+          dailyLimit,
+          dailyRemaining: dailyLimit - awarded,
+          cappedByLimit: false,
+          preview: false,
+        };
+      } else {
+        step = mode === "ai" ? "AI_QUESTION" : "STUDENT_QUESTION";
+      }
+    } else {
+      return Response.json({ error: "이야기 주사위 차례가 맞지 않습니다." }, { status: 409 });
+    }
+
+    version += 1;
+    const response = { run: currentRun(), result, replayed: false };
+    if (body.action === "story-dice-record-ai-question") {
+      aiRecordResponses.set(body.requestId, response);
+      if (options.loseFirstAiRecordResponse && !firstAiRecordResponseLost) {
+        firstAiRecordResponseLost = true;
+        throw new TypeError("인공지능 질문 기록 응답 연결이 끊겼습니다.");
+      }
+    }
+    if (
+      options.loseFinalAnswerResponse &&
+      body.action === "story-dice-submit-answer" &&
+      questionCount === 3 &&
+      !finalAnswerResponseLost
+    ) {
+      finalAnswerResponseLost = true;
+      throw new TypeError("정산 응답 연결이 끊겼습니다.");
+    }
+    return Response.json(response);
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 function relayRunSnapshot(
@@ -516,160 +711,178 @@ afterEach(() => {
 });
 
 describe("이야기 주사위 지역 목표", () => {
-  it("최초 단어 요청은 언마운트 뒤 도착한 응답을 읽지 않는다", async () => {
-    const delayed = deferred<unknown>();
-    const parsedRead = vi.fn();
-    aiMocks.ask.mockReturnValue(delayed.promise);
-    const view = renderLocalGame("story-dice", StoryDiceGame);
-    const lateResponse = {
-      get parsed() {
-        parsedRead();
-        return {
-          protagonist: ["고양이"],
-          place: ["학교"],
-          event: ["보물을 찾았어요"],
-        };
-      },
-    };
+  it("혼자 모드는 질문과 답변 세 묶음을 서버에 저장하고 5점을 받는다", async () => {
+    const fetchMock = await startStory("solo");
+    const questions = [
+      "첫째 일은 왜 일어났나요?",
+      "둘째에는 무엇을 찾았나요?",
+      "셋째에는 어떻게 해결했나요?",
+    ];
 
-    view.unmount();
-    await act(async () => {
-      delayed.resolve(lateResponse);
-      await delayed.promise;
-      await Promise.resolve();
-    });
-
-    expect(parsedRead).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["빈 객체", {}],
-    ["일부 범주만 있는 객체", {
-      protagonist: Array.from({ length: 6 }, (_, index) => `주인공 ${index + 1}`),
-      place: Array.from({ length: 6 }, (_, index) => `장소 ${index + 1}`),
-    }],
-    ["빈 범주 배열", { protagonist: [], place: [], event: [] }],
-    ["제한보다 긴 단어", {
-      protagonist: Array.from({ length: 6 }, () => "가".repeat(61)),
-      place: Array.from({ length: 6 }, () => "나".repeat(61)),
-      event: Array.from({ length: 6 }, () => "다".repeat(61)),
-    }],
-  ])("인공지능 단어의 %s는 안전한 대체 단어로 바꾼다", async (_name, parsed) => {
-    aiMocks.ask.mockResolvedValue({ parsed });
-    renderLocalGame("story-dice", StoryDiceGame);
-
-    await flushPromises();
-
-    const poolTitle = screen.getByText(/주사위 단어/);
-    const pool = poolTitle.parentElement;
-    expect(pool).not.toBeNull();
-    expect(pool?.querySelectorAll("span")).toHaveLength(24);
-    expect(pool).not.toHaveTextContent("가".repeat(61));
-
-    fireEvent.click(screen.getByRole("button", { name: /주사위 3개 굴리기/ }));
-    await advance(1500);
-    expect(screen.getByRole("textbox")).toBeVisible();
-  });
-
-  it("영어 화면의 대체 단어를 목록과 굴림 및 인공지능 문맥에 영어로 쓴다", async () => {
-    const expectedWords = pickFallbackBilingualWords(8);
-    const wordMatcher = (word: string) => (_content: string, element: Element | null) => (
-      element?.tagName === "SPAN" && (
-        element.textContent === word || element.textContent?.endsWith(` ${word}`)
-      )
-    );
-    const expected = {
-      protagonist: getStoryDiceWordText(
-        expectedWords,
-        expectedWords.protagonist[0],
-        "en",
-      ),
-      place: getStoryDiceWordText(expectedWords, expectedWords.place[0], "en"),
-      event: getStoryDiceWordText(expectedWords, expectedWords.event[0], "en"),
-    };
-    aiMocks.ask.mockImplementation(async ({ action }: { action: string }) => (
-      action === "story-dice:words"
-        ? { parsed: {} }
-        : { text: "What happened next?" }
-    ));
-    renderEnglishStoryGame("ai");
-
-    await flushPromises();
-
-    for (const word of Object.values(expected)) {
-      expect(screen.getByText(wordMatcher(word))).toBeVisible();
+    for (let index = 0; index < questions.length; index += 1) {
+      await submitStoryQuestion(questions[index]);
+      expect(screen.queryByText("이야기 주사위 끝!")).not.toBeInTheDocument();
+      await submitStoryAnswer(`${index + 1}번째 대답이에요.`);
     }
-    for (const word of [
-      expectedWords.protagonist[0],
-      expectedWords.place[0],
-      expectedWords.event[0],
-    ]) {
-      expect(screen.queryByText(wordMatcher(word))).not.toBeInTheDocument();
-    }
-
-    const englishText = getQuestionGameText("en");
-    fireEvent.click(screen.getByRole("button", { name: englishText.storyRoll3 }));
-    await advance(1500);
-
-    for (const word of Object.values(expected)) {
-      expect(screen.getAllByText(wordMatcher(word))).toHaveLength(2);
-    }
-    const storyInput = screen.getByRole("textbox");
-    expect(storyInput).toHaveAttribute(
-      "placeholder",
-      englishText.storyPlaceholder(
-        expected.protagonist,
-        expected.place,
-        expected.event,
-      ),
-    );
-    fireEvent.change(storyInput, {
-      target: { value: "The robot found a secret map in the forest." },
-    });
-    fireEvent.click(screen.getByRole("button", { name: englishText.storyStart }));
-    await advance(400);
-
-    const questionRequest = aiMocks.ask.mock.calls.find(
-      ([request]) => request.action === "story-dice:ai-question",
-    )?.[0];
-    expect(questionRequest?.context).toMatchObject(expected);
-  });
-
-  it("혼자 모드는 질문만 낸 상태가 아니라 셋째 답안으로 묶음을 닫을 때 끝난다", async () => {
-    await startStory("solo");
-
-    submitStoryQuestion("첫째 일은 왜 일어났나요?");
-    submitStoryAnswer("첫째 까닭이에요.");
-    submitStoryQuestion("둘째에는 무엇을 찾았나요?");
-    submitStoryAnswer("둘째 보물을 찾았어요.");
-    expect(screen.queryByText("이야기 주사위 끝!")).not.toBeInTheDocument();
-
-    submitStoryQuestion("셋째에는 어떻게 해결했나요?");
-    expect(screen.queryByText("이야기 주사위 끝!")).not.toBeInTheDocument();
-    submitStoryAnswer("셋째에는 함께 해결했어요.");
 
     expect(screen.getByText("이야기 주사위 끝!")).toBeVisible();
     expect(screen.getByText(/대답 3개/)).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("+5점 적립!");
+    const actionBodies = fetchMock.mock.calls
+      .filter(([url]) => String(url).endsWith("/actions"))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(actionBodies.filter((body) => body.action === "story-dice-submit-question")).toHaveLength(3);
+    expect(actionBodies.filter((body) => body.action === "story-dice-submit-answer")).toHaveLength(3);
   });
 
-  it("빈 인공지능 응답은 대체 질문을 열고 셋째 답안 뒤 추가 질문을 요청하지 않는다", async () => {
-    await startStory("ai");
+  it("인공지능 모드는 서버 질문과 답변 세 묶음을 마치고 9점을 받는다", async () => {
+    const fetchMock = await startStory("ai");
 
     for (let index = 0; index < 3; index += 1) {
-      expect(screen.getAllByText("그다음에는 어떤 일이 있었나요?")).toHaveLength(index + 1);
-      submitStoryAnswer(`${index + 1}번째 대답이에요.`);
-      if (index < 2) await advance(400);
+      expect(screen.getByText(
+        `인공지능 질문 ${index + 1}: 다음에는 어떤 일이 있었나요?`,
+      )).toBeVisible();
+      await submitStoryAnswer(`${index + 1}번째 인공지능 놀이 대답이에요.`);
+      if (index < 2) {
+        await advance(400);
+        await flushPromises();
+      }
     }
 
     expect(screen.getByText("이야기 주사위 끝!")).toBeVisible();
-    const questionCalls = aiMocks.ask.mock.calls.filter(
-      ([request]) => request.action === "story-dice:ai-question",
-    );
-    expect(questionCalls).toHaveLength(3);
-    await advance(1000);
-    expect(aiMocks.ask.mock.calls.filter(
-      ([request]) => request.action === "story-dice:ai-question",
+    expect(screen.getByRole("status")).toHaveTextContent("+9점 적립!");
+    const actionBodies = fetchMock.mock.calls
+      .filter(([url]) => String(url).endsWith("/actions"))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(actionBodies.filter(
+      (body) => body.action === "story-dice-record-ai-question",
     )).toHaveLength(3);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/ai-turn"))).toHaveLength(3);
+  });
+
+  it("서버가 내려준 단어 목록과 굴림 결과를 그대로 사용한다", async () => {
+    const fetchMock = installStoryDiceRunServer("solo");
+    renderLocalGame("story-dice", StoryDiceGame);
+    await flushPromises();
+
+    expect(screen.getByText(/서버 로봇/)).toBeVisible();
+    expect(screen.getByText(/서버 학교/)).toBeVisible();
+    expect(screen.getByText(/서버 보물상자/)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: /주사위 3개 굴리기/ }));
+    await flushPromises();
+    await advance(1500);
+
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "placeholder",
+      expect.stringContaining("서버 해적"),
+    );
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "placeholder",
+      expect.stringContaining("서버 미래도시"),
+    );
+    expect(screen.getByRole("textbox")).toHaveAttribute(
+      "placeholder",
+      expect.stringContaining("서버 비밀지도"),
+    );
+    const rollRequest = fetchMock.mock.calls.find(([, init]) => (
+      init?.body && JSON.parse(String(init.body)).action === "story-dice-roll"
+    ));
+    expect(rollRequest).toBeDefined();
+  });
+
+  it("질문 형식이 아닌 문장은 서버에 보내지 않고 입력값과 안내를 유지한다", async () => {
+    const fetchMock = await startStory("solo");
+
+    await submitStoryQuestion("이 문장은 질문 형식이 아닙니다.");
+
+    expect(screen.getByText("질문하는 문장으로 작성해 주세요.")).toBeVisible();
+    expect(screen.getByRole("textbox")).toHaveValue("이 문장은 질문 형식이 아닙니다.");
+    const questionRequests = fetchMock.mock.calls.filter(([, init]) => (
+      init?.body && JSON.parse(String(init.body)).action === "story-dice-submit-question"
+    ));
+    expect(questionRequests).toHaveLength(0);
+  });
+
+  it("마지막 답변 정산 응답이 유실되어도 서버 결과를 읽어 완료와 포인트를 복구한다", async () => {
+    const fetchMock = await startStory("solo", { loseFinalAnswerResponse: true });
+
+    for (let index = 0; index < 3; index += 1) {
+      await submitStoryQuestion(`${index + 1}번째에는 무슨 일이 있었나요?`);
+      await submitStoryAnswer(`${index + 1}번째 일을 설명하는 대답이에요.`);
+    }
+    await flushPromises();
+
+    expect(screen.getByText("이야기 주사위 끝!")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("+5점 적립!");
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/result"))).toHaveLength(1);
+    const finalAnswerRequests = fetchMock.mock.calls.filter(([, init]) => (
+      init?.body && JSON.parse(String(init.body)).action === "story-dice-submit-answer"
+    ));
+    expect(finalAnswerRequests).toHaveLength(3);
+  });
+
+  it("인공지능 질문 발급 응답이 유실되면 같은 요청 식별값으로 같은 증명을 다시 받는다", async () => {
+    const fetchMock = await startStory("ai", { loseFirstAiIssueResponse: true });
+    const question = "인공지능 질문 1: 다음에는 어떤 일이 있었나요?";
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "인공지능 질문 발급 응답 연결이 끊겼습니다.",
+    );
+    const firstIssueBodies = fetchMock.mock.calls
+      .filter(([url]) => String(url).endsWith("/ai-turn"))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(firstIssueBodies).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "인공지능 질문 다시 만들기" }));
+    await flushPromises();
+
+    const issueBodies = fetchMock.mock.calls
+      .filter(([url]) => String(url).endsWith("/ai-turn"))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(issueBodies).toHaveLength(2);
+    expect(issueBodies[1].requestId).toBe(issueBodies[0].requestId);
+    const recordBodies = fetchMock.mock.calls
+      .filter(([, init]) => (
+        init?.body &&
+        JSON.parse(String(init.body)).action === "story-dice-record-ai-question"
+      ))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(recordBodies).toHaveLength(1);
+    expect(recordBodies[0]).toMatchObject({
+      generationRequestId: issueBodies[0].requestId,
+      output: question,
+      proof: "story-proof-1",
+    });
+    expect(screen.getAllByText(question)).toHaveLength(1);
+    expect(screen.getByPlaceholderText(
+      "질문에 어울리는 짧은 대답을 한 문장으로 해보세요...",
+    )).toBeVisible();
+  });
+
+  it("인공지능 질문 기록 응답이 유실되면 결과 조회로 다음 대답 단계를 복구한다", async () => {
+    const fetchMock = await startStory("ai", { loseFirstAiRecordResponse: true });
+    const question = "인공지능 질문 1: 다음에는 어떤 일이 있었나요?";
+    const issueBodies = fetchMock.mock.calls
+      .filter(([url]) => String(url).endsWith("/ai-turn"))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    const recordBodies = fetchMock.mock.calls
+      .filter(([, init]) => (
+        init?.body &&
+        JSON.parse(String(init.body)).action === "story-dice-record-ai-question"
+      ))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+
+    expect(issueBodies).toHaveLength(1);
+    expect(recordBodies).toHaveLength(1);
+    expect(recordBodies[0].generationRequestId).toBe(issueBodies[0].requestId);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/result")))
+      .toHaveLength(1);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getAllByText(question)).toHaveLength(1);
+    expect(screen.getByPlaceholderText(
+      "질문에 어울리는 짧은 대답을 한 문장으로 해보세요...",
+    )).toBeVisible();
   });
 });
 

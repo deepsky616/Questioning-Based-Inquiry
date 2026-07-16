@@ -55,6 +55,14 @@ import {
   parseRelayState,
   type RelayRunState,
 } from "@/lib/question-game-relay-definition";
+import {
+  createStoryDiceRoll,
+  ensureStoryDiceProgress,
+  parseStoryDiceState,
+  storyDicePublicRolledWords,
+  type StoryDiceRolledWords,
+  type StoryDiceRunState,
+} from "@/lib/question-game-story-dice-definition";
 import { QUESTION_GAME_LIMITS } from "@/lib/question-game-rules";
 
 const RUN_LIFETIME_MS = 24 * 60 * 60 * 1_000;
@@ -68,12 +76,17 @@ const DICE_QUESTION_ACTIVITY_TYPE = "DICE_QUESTION";
 const DICE_AI_QUESTION_ACTIVITY_TYPE = "DICE_AI_QUESTION";
 const LADDER_QUESTION_ACTIVITY_TYPE = "LADDER_QUESTION";
 const KABA_ATTEMPT_ACTIVITY_TYPE = "KABA_ATTEMPT";
+const STORY_DICE_ROLL_ACTIVITY_TYPE = "STORY_DICE_ROLL";
+const STORY_DICE_STORY_ACTIVITY_TYPE = "STORY_DICE_STORY";
+const STORY_DICE_QUESTION_ACTIVITY_TYPE = "STORY_DICE_QUESTION";
+const STORY_DICE_AI_QUESTION_ACTIVITY_TYPE = "STORY_DICE_AI_QUESTION";
+const STORY_DICE_ANSWER_ACTIVITY_TYPE = "STORY_DICE_ANSWER";
 const COMPLETE_ACTIVITY_TYPE = "RUN_COMPLETE";
 
 type ActorRole = "STUDENT" | "TEACHER";
 
 export interface PreparedQuestionGameAiTurn {
-  gameId: "relay" | "dice";
+  gameId: "relay" | "dice" | "story-dice";
   runId: string;
   ownerId: string;
   runVersion: number;
@@ -85,6 +98,14 @@ export interface PreparedQuestionGameAiTurn {
   topicHash: string;
   previousQuestionHash: string;
   diceFace?: number;
+  story?: string;
+  previousAnswer?: string;
+  storyRolledWords?: {
+    protagonist: string;
+    place: string;
+    event: string;
+  };
+  storyPairCount?: number;
   cachedResponse?: QuestionGameAiTurnResponse;
 }
 
@@ -169,7 +190,7 @@ function activityHashSecret(): string {
 }
 
 function hashActivityText(
-  scope: "topic" | "question" | "ai-output" | "ai-context",
+  scope: "topic" | "question" | "story" | "answer" | "ai-output" | "ai-context",
   text: string,
 ): string {
   return createHmac("sha256", activityHashSecret())
@@ -315,6 +336,57 @@ function kabaAttemptHash(
   question: string,
 ) {
   return hashActivityText("question", `kaba:${locale}:${sentenceKey}\0${question}`);
+}
+
+function validateStoryDiceStoryText(value: unknown) {
+  const story = typeof value === "string" ? value.trim() : "";
+  const storyLength = [...story].length;
+  const meaningfulCharacterCount = story.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
+  if (!story || storyLength > QUESTION_GAME_LIMITS.story || meaningfulCharacterCount < 3) {
+    throw new QuestionGameRunError("이야기를 오백 자 안으로 알맞게 써 주세요", 400);
+  }
+  if (checkProfanity(story).flagged) {
+    throw new QuestionGameRunError("이야기에 사용할 수 없는 표현이 있습니다", 400);
+  }
+  return { story, storyLength };
+}
+
+function validateStoryDiceAnswerText(value: unknown) {
+  const answer = typeof value === "string" ? value.trim() : "";
+  const answerLength = [...answer].length;
+  const meaningfulCharacterCount = answer.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
+  if (!answer || answerLength > QUESTION_GAME_LIMITS.answer || meaningfulCharacterCount < 2) {
+    throw new QuestionGameRunError("대답을 오백 자 안으로 알맞게 써 주세요", 400);
+  }
+  if (checkProfanity(answer).flagged) {
+    throw new QuestionGameRunError("대답에 사용할 수 없는 표현이 있습니다", 400);
+  }
+  return { answer, answerLength };
+}
+
+function storyDiceAiContextHash(state: StoryDiceRunState) {
+  if (!state.storyHash || !state.rolledWords) {
+    throw new QuestionGameRunError("이야기 주사위 실행 상태가 손상되었습니다", 409);
+  }
+  return hashActivityText("ai-context", JSON.stringify({
+    game: "story-dice",
+    storyHash: state.storyHash,
+    rolledWords: state.rolledWords,
+  }));
+}
+
+function storyDicePreviousAnswerHash(state: StoryDiceRunState) {
+  return state.answerHashes.at(-1) ??
+    hashActivityText("ai-context", "story-dice:first-question");
+}
+
+function storyUsesRolledWords(story: string, state: StoryDiceRunState) {
+  if (!state.rolledWords) return false;
+  const normalizedStory = normalizeQuestionActivity(story);
+  const rolled = storyDicePublicRolledWords(state.rolledWords, state.locale);
+  return Object.values(rolled).every((word) =>
+    normalizedStory.includes(normalizeQuestionActivity(word))
+  );
 }
 
 function publicRun(run: StoredRun) {
@@ -1077,6 +1149,208 @@ async function settleKabaRun(
   };
 }
 
+interface PendingStoryDiceAnswerEvidence {
+  sequence: number;
+  locale: RunLocale;
+  questionHash: string;
+  answerHash: string;
+  answerLength: number;
+}
+
+async function verifyStoryDiceActivitySequence(
+  tx: RunTransaction,
+  run: StoredRun,
+  state: StoryDiceRunState,
+  mode: RunMode,
+  pendingAnswer?: PendingStoryDiceAnswerEvidence,
+) {
+  const stored = await tx.gameActivity.findMany({
+    where: {
+      runId: run.id,
+      type: {
+        in: [
+          STORY_DICE_ROLL_ACTIVITY_TYPE,
+          STORY_DICE_STORY_ACTIVITY_TYPE,
+          STORY_DICE_QUESTION_ACTIVITY_TYPE,
+          STORY_DICE_AI_QUESTION_ACTIVITY_TYPE,
+          STORY_DICE_ANSWER_ACTIVITY_TYPE,
+        ],
+      },
+    },
+    orderBy: { sequence: "asc" },
+    select: {
+      sequence: true,
+      type: true,
+      payload: true,
+      validQuestionCount: true,
+    },
+  });
+  const evidence = pendingAnswer
+    ? [
+        ...stored,
+        {
+          sequence: pendingAnswer.sequence,
+          type: STORY_DICE_ANSWER_ACTIVITY_TYPE,
+          payload: pendingAnswer,
+          validQuestionCount: 1,
+        },
+      ]
+    : stored;
+  if (
+    evidence.length !== state.activitySequence ||
+    evidence.length !== 2 + 2 * state.targetCount ||
+    !state.rolledWords ||
+    !state.storyHash ||
+    !state.storyLength
+  ) {
+    throw new QuestionGameRunError("서버에서 이야기 주사위 활동 순서를 확인할 수 없습니다", 409);
+  }
+
+  const roll = evidence[0];
+  const story = evidence[1];
+  const rollPayload = isRecord(roll?.payload) ? roll.payload : null;
+  const storyPayload = isRecord(story?.payload) ? story.payload : null;
+  if (
+    roll?.sequence !== 1 ||
+    roll.type !== STORY_DICE_ROLL_ACTIVITY_TYPE ||
+    roll.validQuestionCount !== 0 ||
+    !rollPayload ||
+    JSON.stringify(rollPayload.rolledWords) !== JSON.stringify(state.rolledWords) ||
+    story?.sequence !== 2 ||
+    story.type !== STORY_DICE_STORY_ACTIVITY_TYPE ||
+    story.validQuestionCount !== 0 ||
+    !storyPayload ||
+    storyPayload.locale !== state.locale ||
+    storyPayload.storyHash !== state.storyHash ||
+    storyPayload.storyLength !== state.storyLength
+  ) {
+    throw new QuestionGameRunError("서버에서 이야기 주사위 활동 순서를 확인할 수 없습니다", 409);
+  }
+
+  const verifiedQuestionHashes: string[] = [];
+  const verifiedAnswerHashes: string[] = [];
+  let verifiedAiTurnCount = 0;
+  for (let pairIndex = 0; pairIndex < state.targetCount; pairIndex += 1) {
+    const questionIndex = 2 + pairIndex * 2;
+    const question = evidence[questionIndex];
+    const answer = evidence[questionIndex + 1];
+    const questionPayload = isRecord(question?.payload) ? question.payload : null;
+    const answerPayload = isRecord(answer?.payload) ? answer.payload : null;
+    const expectedQuestionType = mode === "AI"
+      ? STORY_DICE_AI_QUESTION_ACTIVITY_TYPE
+      : STORY_DICE_QUESTION_ACTIVITY_TYPE;
+    const questionHash = mode === "AI"
+      ? questionPayload?.outputHash
+      : questionPayload?.questionHash;
+    const questionLength = mode === "AI"
+      ? questionPayload?.outputLength
+      : questionPayload?.questionLength;
+    if (
+      question?.sequence !== questionIndex + 1 ||
+      answer?.sequence !== questionIndex + 2 ||
+      question.type !== expectedQuestionType ||
+      answer.type !== STORY_DICE_ANSWER_ACTIVITY_TYPE ||
+      question.validQuestionCount !== 0 ||
+      answer.validQuestionCount !== 1 ||
+      !questionPayload ||
+      !answerPayload ||
+      questionPayload.locale !== state.locale ||
+      answerPayload.locale !== state.locale ||
+      typeof questionHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(questionHash) ||
+      typeof questionLength !== "number" ||
+      !Number.isSafeInteger(questionLength) ||
+      questionLength < 1 ||
+      questionLength > QUESTION_GAME_LIMITS.question ||
+      answerPayload.questionHash !== questionHash ||
+      typeof answerPayload.answerHash !== "string" ||
+      !/^[0-9a-f]{64}$/.test(answerPayload.answerHash) ||
+      typeof answerPayload.answerLength !== "number" ||
+      !Number.isSafeInteger(answerPayload.answerLength) ||
+      answerPayload.answerLength < 1 ||
+      answerPayload.answerLength > QUESTION_GAME_LIMITS.answer ||
+      (mode === "AI" && (
+        typeof questionPayload.proofId !== "string" ||
+        !QUESTION_GAME_REQUEST_ID_PATTERN.test(questionPayload.proofId) ||
+        typeof questionPayload.generationRequestId !== "string" ||
+        !QUESTION_GAME_REQUEST_ID_PATTERN.test(questionPayload.generationRequestId)
+      ))
+    ) {
+      throw new QuestionGameRunError("서버에서 이야기 주사위 활동 순서를 확인할 수 없습니다", 409);
+    }
+    verifiedQuestionHashes.push(questionHash);
+    verifiedAnswerHashes.push(answerPayload.answerHash as string);
+    if (mode === "AI") verifiedAiTurnCount += 1;
+  }
+
+  if (
+    state.questionCount !== state.targetCount ||
+    verifiedQuestionHashes.some((hash, index) => hash !== state.questionHashes[index]) ||
+    verifiedAnswerHashes.some((hash, index) => hash !== state.answerHashes[index]) ||
+    verifiedAiTurnCount !== state.aiTurnCount ||
+    (mode === "SOLO" && verifiedAiTurnCount !== 0) ||
+    (mode === "AI" && verifiedAiTurnCount !== state.targetCount)
+  ) {
+    throw new QuestionGameRunError("서버에서 이야기 주사위 완료를 확인할 수 없습니다", 409);
+  }
+  return {
+    verifiedQuestionCount: verifiedAnswerHashes.length,
+    verifiedAiTurnCount,
+  };
+}
+
+async function settleStoryDiceRun(
+  tx: RunTransaction,
+  actor: { id: string; role: ActorRole },
+  run: StoredRun,
+  state: StoryDiceRunState,
+  mode: RunMode,
+  completedAt: Date,
+  pendingAnswer?: PendingStoryDiceAnswerEvidence,
+): Promise<RelaySettlement> {
+  if (state.storyDiceNextStep !== "COMPLETE" || state.result) {
+    throw new QuestionGameRunError("질문놀이의 정해진 차례를 모두 마쳐 주세요", 409);
+  }
+  const { verifiedQuestionCount, verifiedAiTurnCount } =
+    await verifyStoryDiceActivitySequence(tx, run, state, mode, pendingAnswer);
+  const { day, result } = await awardVerifiedQuestionGameRun(
+    tx,
+    actor,
+    run,
+    mode,
+    completedAt,
+    verifiedQuestionCount,
+  );
+  const settledState: StoryDiceRunState = {
+    ...state,
+    questionHashes: [],
+    answerHashes: [],
+    result,
+  };
+  delete settledState.storyHash;
+  delete settledState.storyLength;
+  delete settledState.pendingQuestionHash;
+  delete settledState.aiGenerationLease;
+  const nextRun = await tx.gameRun.update({
+    where: { id: run.id },
+    data: {
+      status: "SETTLED",
+      state: toJson(settledState),
+      version: run.version + 1,
+      scoreDate: day,
+      completedAt,
+      settledAt: completedAt,
+    },
+  });
+  return {
+    run: nextRun as StoredRun,
+    result,
+    verifiedQuestionCount,
+    verifiedAiTurnCount,
+    scoreDate: day,
+  };
+}
+
 export async function createQuestionGameRun(actorId: string, input: unknown, now = new Date()) {
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
@@ -1087,7 +1361,7 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
   let topicHash: string;
   let topicLength: number;
   let topicHashes: string[] | undefined;
-  if (gameId === "dice" || gameId === "kaba") {
+  if (gameId === "dice" || gameId === "kaba" || gameId === "story-dice") {
     topicHash = hashActivityText("topic", gameId);
     topicLength = 0;
   } else if (gameId === "ladder") {
@@ -1198,6 +1472,12 @@ export async function prepareQuestionGameAiTurn(
   const suppliedPreviousQuestion = input.previousQuestion === undefined
     ? undefined
     : validateQuestionText(input.previousQuestion, locale).question;
+  const suppliedStory = input.story === undefined
+    ? undefined
+    : validateStoryDiceStoryText(input.story).story;
+  const suppliedPreviousAnswer = input.previousAnswer === undefined || input.previousAnswer === ""
+    ? ""
+    : validateStoryDiceAnswerText(input.previousAnswer).answer;
 
   return serializable(async (tx) => {
     const actor = await loadActor(tx, actorId);
@@ -1206,7 +1486,11 @@ export async function prepareQuestionGameAiTurn(
     if (run.version !== expectedVersion) {
       throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
     }
-    if (run.gameId !== "relay" && run.gameId !== "dice") {
+    if (
+      run.gameId !== "relay" &&
+      run.gameId !== "dice" &&
+      run.gameId !== "story-dice"
+    ) {
       throw new QuestionGameRunError("이 질문놀이는 인공지능 차례를 지원하지 않습니다", 409, {
         unsupported: true,
       });
@@ -1215,12 +1499,16 @@ export async function prepareQuestionGameAiTurn(
     if (mode !== "AI") {
       throw new QuestionGameRunError("인공지능 도움 모드에서만 이용할 수 있습니다", 409);
     }
-    let state: RelayRunState | DiceRunState;
+    let state: RelayRunState | DiceRunState | StoryDiceRunState;
     let topic: string;
     let previousQuestion: string;
     let topicHash: string;
     let previousQuestionHash: string;
     let diceFace: number | undefined;
+    let story: string | undefined;
+    let previousAnswer: string | undefined;
+    let storyRolledWords: PreparedQuestionGameAiTurn["storyRolledWords"];
+    let storyPairCount: number | undefined;
     if (run.gameId === "relay") {
       topic = suppliedTopic ?? validateTopic(undefined).topic;
       previousQuestion = suppliedPreviousQuestion ?? validateQuestionText(undefined, locale).question;
@@ -1240,7 +1528,7 @@ export async function prepareQuestionGameAiTurn(
       if (state.questionHashes.at(-1) !== previousQuestionHash) {
         throw new QuestionGameRunError("직전 학생 질문이 실행 상태와 일치하지 않습니다", 409);
       }
-    } else {
+    } else if (run.gameId === "dice") {
       state = parseDiceState(run.state);
       ensureDiceProgress(state, mode, run.version, run.status === "ACTIVE");
       if (state.nextStep !== "AI_QUESTION" || state.pendingRoll?.actor !== "AI") {
@@ -1254,6 +1542,41 @@ export async function prepareQuestionGameAiTurn(
       previousQuestion = "";
       topicHash = hashActivityText("topic", "dice");
       previousQuestionHash = diceAiContextHash(diceFace);
+    } else {
+      state = parseStoryDiceState(run.state);
+      ensureStoryDiceProgress(state, mode, run.version, run.status === "ACTIVE");
+      if (state.storyDiceNextStep !== "AI_QUESTION") {
+        throw new QuestionGameRunError("지금은 인공지능 질문 차례가 아닙니다", 409);
+      }
+      if (state.locale !== locale) {
+        throw new QuestionGameRunError("실행을 만든 언어로 질문해 주세요", 409);
+      }
+      story = suppliedStory ?? validateStoryDiceStoryText(undefined).story;
+      if (hashActivityText("story", story) !== state.storyHash) {
+        throw new QuestionGameRunError("처음 작성한 이야기가 실행 상태와 일치하지 않습니다", 409);
+      }
+      const expectedPreviousAnswerHash = storyDicePreviousAnswerHash(state);
+      if (state.questionCount === 0) {
+        if (suppliedPreviousAnswer) {
+          throw new QuestionGameRunError("첫 질문에는 직전 대답을 보낼 수 없습니다", 409);
+        }
+        previousAnswer = "";
+      } else {
+        previousAnswer = suppliedPreviousAnswer ||
+          validateStoryDiceAnswerText(undefined).answer;
+        if (hashActivityText("answer", previousAnswer) !== expectedPreviousAnswerHash) {
+          throw new QuestionGameRunError("직전 학생 대답이 실행 상태와 일치하지 않습니다", 409);
+        }
+      }
+      if (!state.rolledWords) {
+        throw new QuestionGameRunError("이야기 주사위 실행 상태가 손상되었습니다", 409);
+      }
+      storyRolledWords = storyDicePublicRolledWords(state.rolledWords, state.locale);
+      storyPairCount = state.questionCount;
+      topic = "";
+      previousQuestion = "";
+      topicHash = storyDiceAiContextHash(state);
+      previousQuestionHash = expectedPreviousAnswerHash;
     }
     if (
       state.aiGenerationLease &&
@@ -1273,6 +1596,10 @@ export async function prepareQuestionGameAiTurn(
         topicHash,
         previousQuestionHash,
         ...(diceFace ? { diceFace } : {}),
+        ...(story !== undefined ? { story } : {}),
+        ...(previousAnswer !== undefined ? { previousAnswer } : {}),
+        ...(storyRolledWords ? { storyRolledWords } : {}),
+        ...(storyPairCount !== undefined ? { storyPairCount } : {}),
       };
       if (
         lease.generationRequestId === generationRequestId &&
@@ -1315,6 +1642,10 @@ export async function prepareQuestionGameAiTurn(
       topicHash,
       previousQuestionHash,
       ...(diceFace ? { diceFace } : {}),
+      ...(story !== undefined ? { story } : {}),
+      ...(previousAnswer !== undefined ? { previousAnswer } : {}),
+      ...(storyRolledWords ? { storyRolledWords } : {}),
+      ...(storyPairCount !== undefined ? { storyPairCount } : {}),
     };
   });
 }
@@ -1352,7 +1683,7 @@ export async function issueQuestionGameAiTurn(
       throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
     }
     const mode = storedRunMode(run.mode);
-    let state: RelayRunState | DiceRunState;
+    let state: RelayRunState | DiceRunState | StoryDiceRunState;
     let lease: QuestionGameAiGenerationLease | undefined;
     if (prepared.gameId === "relay") {
       state = parseRelayState(run.state);
@@ -1366,7 +1697,7 @@ export async function issueQuestionGameAiTurn(
       ) {
         throw new QuestionGameRunError("인공지능 질문 생성 임대가 실행 상태와 일치하지 않습니다", 409);
       }
-    } else {
+    } else if (prepared.gameId === "dice") {
       state = parseDiceState(run.state);
       ensureDiceProgress(state, mode, run.version);
       lease = state.aiGenerationLease;
@@ -1377,6 +1708,32 @@ export async function issueQuestionGameAiTurn(
         state.pendingRoll.face !== prepared.diceFace ||
         prepared.topicHash !== hashActivityText("topic", "dice") ||
         prepared.previousQuestionHash !== diceAiContextHash(state.pendingRoll.face)
+      ) {
+        throw new QuestionGameRunError("인공지능 질문 생성 임대가 실행 상태와 일치하지 않습니다", 409);
+      }
+    } else {
+      state = parseStoryDiceState(run.state);
+      ensureStoryDiceProgress(state, mode, run.version);
+      lease = state.aiGenerationLease;
+      const publicRolledWords = state.rolledWords
+        ? storyDicePublicRolledWords(state.rolledWords, state.locale)
+        : undefined;
+      const suppliedPreviousAnswerHash = prepared.previousAnswer
+        ? hashActivityText("answer", prepared.previousAnswer)
+        : hashActivityText("ai-context", "story-dice:first-question");
+      if (
+        mode !== "AI" ||
+        state.storyDiceNextStep !== "AI_QUESTION" ||
+        state.locale !== prepared.locale ||
+        prepared.storyPairCount !== state.questionCount ||
+        !prepared.story ||
+        hashActivityText("story", prepared.story) !== state.storyHash ||
+        prepared.topicHash !== storyDiceAiContextHash(state) ||
+        prepared.previousQuestionHash !== storyDicePreviousAnswerHash(state) ||
+        suppliedPreviousAnswerHash !== storyDicePreviousAnswerHash(state) ||
+        !publicRolledWords ||
+        JSON.stringify(prepared.storyRolledWords) !== JSON.stringify(publicRolledWords) ||
+        state.questionHashes.includes(outputHash)
       ) {
         throw new QuestionGameRunError("인공지능 질문 생성 임대가 실행 상태와 일치하지 않습니다", 409);
       }
@@ -1416,18 +1773,24 @@ export async function releaseQuestionGameAiTurnLease(
     const mode = storedRunMode(run.mode);
     const state = prepared.gameId === "relay"
       ? parseRelayState(run.state)
-      : parseDiceState(run.state);
+      : prepared.gameId === "dice"
+        ? parseDiceState(run.state)
+        : parseStoryDiceState(run.state);
     if (prepared.gameId === "relay") {
       ensureRelayProgress(state as RelayRunState, mode, run.version);
-    } else {
+    } else if (prepared.gameId === "dice") {
       ensureDiceProgress(state as DiceRunState, mode, run.version);
+    } else {
+      ensureStoryDiceProgress(state as StoryDiceRunState, mode, run.version);
     }
     const lease = state.aiGenerationLease;
     if (
       mode !== "AI" ||
       (prepared.gameId === "relay"
         ? (state as RelayRunState).nextActor !== "AI"
-        : (state as DiceRunState).nextStep !== "AI_QUESTION") ||
+        : prepared.gameId === "dice"
+          ? (state as DiceRunState).nextStep !== "AI_QUESTION"
+          : (state as StoryDiceRunState).storyDiceNextStep !== "AI_QUESTION") ||
       !lease ||
       lease.id !== prepared.leaseId ||
       lease.generationRequestId !== prepared.generationRequestId
@@ -2186,6 +2549,479 @@ async function submitKabaAttempt(
   });
 }
 
+async function rollStoryDice(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const requestFingerprint = fingerprint({ action: input.action });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "story-dice") {
+      throw new QuestionGameRunError("이 질문놀이는 이야기 주사위 굴림을 지원하지 않습니다", 409, {
+        unsupported: true,
+      });
+    }
+    const mode = storedRunMode(run.mode);
+    const state = parseStoryDiceState(run.state);
+    ensureStoryDiceProgress(state, mode, run.version);
+    if (state.storyDiceNextStep !== "ROLL") {
+      throw new QuestionGameRunError("이야기 주사위는 한 번만 굴릴 수 있습니다", 409);
+    }
+    const rolledWords = createStoryDiceRoll(state.wordPlan);
+    const nextState: StoryDiceRunState = {
+      ...state,
+      rolledWords,
+      storyDiceNextStep: "STORY",
+      activitySequence: state.activitySequence + 1,
+    };
+    ensureStoryDiceProgress(nextState, mode, run.version + 1);
+    const nextRun = await tx.gameRun.update({
+      where: { id: run.id },
+      data: { state: toJson(nextState), version: run.version + 1 },
+    });
+    const response = { run: publicRunWithRole(nextRun as StoredRun, actor.role) };
+    await tx.gameActivity.create({
+      data: {
+        runId: run.id,
+        actorId: actor.id,
+        requestId,
+        requestFingerprint,
+        sequence: nextState.activitySequence,
+        type: STORY_DICE_ROLL_ACTIVITY_TYPE,
+        payload: toJson({ rolledWords }),
+        validQuestionCount: 0,
+        scoreValue: 0,
+        responseSnapshot: toJson(response),
+      },
+    });
+    return { ...response, replayed: false };
+  });
+}
+
+async function submitStoryDiceStory(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const locale = parseLocale(input.locale);
+  const { story, storyLength } = validateStoryDiceStoryText(input.story);
+  const storyHash = hashActivityText("story", story);
+  const requestFingerprint = fingerprint({ action: input.action, locale, storyHash });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "story-dice") {
+      throw new QuestionGameRunError("이 질문놀이는 이야기 제출을 지원하지 않습니다", 409, {
+        unsupported: true,
+      });
+    }
+    const mode = storedRunMode(run.mode);
+    const state = parseStoryDiceState(run.state);
+    ensureStoryDiceProgress(state, mode, run.version);
+    if (state.locale !== locale) {
+      throw new QuestionGameRunError("실행을 만든 언어로 이야기를 써 주세요", 409);
+    }
+    if (state.storyDiceNextStep !== "STORY" || !state.rolledWords) {
+      throw new QuestionGameRunError("이야기 주사위를 먼저 굴려 주세요", 409);
+    }
+    if (!storyUsesRolledWords(story, state)) {
+      throw new QuestionGameRunError("주사위로 나온 세 단어를 모두 넣어 이야기를 써 주세요", 400);
+    }
+    const nextState: StoryDiceRunState = {
+      ...state,
+      storyHash,
+      storyLength,
+      storyDiceNextStep: mode === "AI" ? "AI_QUESTION" : "STUDENT_QUESTION",
+      activitySequence: state.activitySequence + 1,
+    };
+    ensureStoryDiceProgress(nextState, mode, run.version + 1);
+    const nextRun = await tx.gameRun.update({
+      where: { id: run.id },
+      data: { state: toJson(nextState), version: run.version + 1 },
+    });
+    const response = { run: publicRunWithRole(nextRun as StoredRun, actor.role) };
+    await tx.gameActivity.create({
+      data: {
+        runId: run.id,
+        actorId: actor.id,
+        requestId,
+        requestFingerprint,
+        sequence: nextState.activitySequence,
+        type: STORY_DICE_STORY_ACTIVITY_TYPE,
+        payload: toJson({ locale, storyHash, storyLength }),
+        validQuestionCount: 0,
+        scoreValue: 0,
+        responseSnapshot: toJson(response),
+      },
+    });
+    return { ...response, replayed: false };
+  });
+}
+
+async function submitStoryDiceQuestion(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const locale = parseLocale(input.locale);
+  const { question, questionLength } = validateQuestionText(input.question, locale);
+  const questionHash = hashActivityText("question", question);
+  const requestFingerprint = fingerprint({ action: input.action, locale, questionHash });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "story-dice") {
+      throw new QuestionGameRunError("이 질문놀이는 이야기 질문 제출을 지원하지 않습니다", 409, {
+        unsupported: true,
+      });
+    }
+    const mode = storedRunMode(run.mode);
+    if (mode !== "SOLO") {
+      throw new QuestionGameRunError("혼자 모드에서만 직접 질문을 쓸 수 있습니다", 409);
+    }
+    const state = parseStoryDiceState(run.state);
+    ensureStoryDiceProgress(state, mode, run.version);
+    if (state.locale !== locale) {
+      throw new QuestionGameRunError("실행을 만든 언어로 질문해 주세요", 409);
+    }
+    if (state.storyDiceNextStep !== "STUDENT_QUESTION") {
+      throw new QuestionGameRunError("지금은 이야기 질문을 쓸 차례가 아닙니다", 409);
+    }
+    if (state.questionHashes.includes(questionHash)) {
+      throw new QuestionGameRunError("같은 질문은 다시 등록할 수 없습니다", 409);
+    }
+    const nextState: StoryDiceRunState = {
+      ...state,
+      storyDiceNextStep: "STUDENT_ANSWER",
+      pendingQuestionHash: questionHash,
+      questionHashes: [...state.questionHashes, questionHash],
+      activitySequence: state.activitySequence + 1,
+    };
+    ensureStoryDiceProgress(nextState, mode, run.version + 1);
+    const nextRun = await tx.gameRun.update({
+      where: { id: run.id },
+      data: { state: toJson(nextState), version: run.version + 1 },
+    });
+    const response = { run: publicRunWithRole(nextRun as StoredRun, actor.role) };
+    await tx.gameActivity.create({
+      data: {
+        runId: run.id,
+        actorId: actor.id,
+        requestId,
+        requestFingerprint,
+        sequence: nextState.activitySequence,
+        type: STORY_DICE_QUESTION_ACTIVITY_TYPE,
+        payload: toJson({ locale, questionHash, questionLength }),
+        validQuestionCount: 0,
+        scoreValue: 0,
+        responseSnapshot: toJson(response),
+      },
+    });
+    return { ...response, replayed: false };
+  });
+}
+
+async function recordStoryDiceAiQuestion(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const generationRequestId = requireRequestId(input.generationRequestId);
+  const output = typeof input.output === "string" ? input.output.trim() : "";
+  const outputLength = [...output].length;
+  if (!output || outputLength > QUESTION_GAME_LIMITS.question) {
+    throw new QuestionGameRunError("인공지능 질문이 올바르지 않습니다", 400);
+  }
+  const proof = typeof input.proof === "string" ? input.proof : "";
+  if (!proof || proof.length > 4_096) {
+    throw new QuestionGameRunError("인공지능 차례 증명이 올바르지 않습니다", 400);
+  }
+  const outputHash = hashActivityText("ai-output", output);
+  const requestFingerprint = fingerprint({
+    action: input.action,
+    generationRequestId,
+    outputHash,
+    proofHash: fingerprint(proof),
+  });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId);
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "story-dice") {
+      throw new QuestionGameRunError("이 질문놀이는 이야기 인공지능 질문을 지원하지 않습니다", 409, {
+        unsupported: true,
+      });
+    }
+    const mode = storedRunMode(run.mode);
+    if (mode !== "AI") {
+      throw new QuestionGameRunError("인공지능 도움 모드에서만 이용할 수 있습니다", 409);
+    }
+    const state = parseStoryDiceState(run.state);
+    ensureStoryDiceProgress(state, mode, run.version);
+    if (state.storyDiceNextStep !== "AI_QUESTION") {
+      throw new QuestionGameRunError("지금은 인공지능 질문 차례가 아닙니다", 409);
+    }
+    validateQuestionText(output, state.locale);
+    if (state.questionHashes.includes(outputHash)) {
+      throw new QuestionGameRunError("같은 질문은 다시 등록할 수 없습니다", 409);
+    }
+
+    let proofPayload;
+    try {
+      proofPayload = verifyQuestionGameAiProof(proof, activityHashSecret(), now);
+    } catch (error) {
+      if (error instanceof QuestionGameAiProofError) {
+        throw new QuestionGameRunError(
+          "인공지능 차례 증명이 만료되었거나 올바르지 않습니다",
+          409,
+          { aiProofRejected: true },
+        );
+      }
+      throw error;
+    }
+    const lease = state.aiGenerationLease;
+    if (
+      !lease ||
+      lease.expiresAt <= now.getTime() ||
+      lease.generationRequestId !== generationRequestId ||
+      proofPayload.runId !== run.id ||
+      proofPayload.ownerId !== actor.id ||
+      proofPayload.runVersion !== run.version ||
+      proofPayload.leaseId !== lease.id ||
+      proofPayload.generationRequestId !== generationRequestId ||
+      proofPayload.topicHash !== storyDiceAiContextHash(state) ||
+      proofPayload.previousQuestionHash !== storyDicePreviousAnswerHash(state) ||
+      proofPayload.outputHash !== outputHash
+    ) {
+      throw new QuestionGameRunError("인공지능 차례 증명이 실행 상태와 일치하지 않습니다", 409);
+    }
+
+    const stateWithoutLease = { ...state };
+    delete stateWithoutLease.aiGenerationLease;
+    const nextState: StoryDiceRunState = {
+      ...stateWithoutLease,
+      aiTurnCount: state.aiTurnCount + 1,
+      activitySequence: state.activitySequence + 1,
+      storyDiceNextStep: "STUDENT_ANSWER",
+      pendingQuestionHash: outputHash,
+      questionHashes: [...state.questionHashes, outputHash],
+    };
+    ensureStoryDiceProgress(nextState, mode, run.version + 1);
+    const nextRun = await tx.gameRun.update({
+      where: { id: run.id },
+      data: { state: toJson(nextState), version: run.version + 1 },
+    });
+    const response = { run: publicRunWithRole(nextRun as StoredRun, actor.role) };
+    await tx.gameActivity.create({
+      data: {
+        runId: run.id,
+        actorId: actor.id,
+        requestId,
+        requestFingerprint,
+        sequence: nextState.activitySequence,
+        type: STORY_DICE_AI_QUESTION_ACTIVITY_TYPE,
+        payload: toJson({
+          locale: state.locale,
+          outputLength,
+          outputHash,
+          proofId: proofPayload.proofId,
+          generationRequestId: proofPayload.generationRequestId,
+        }),
+        validQuestionCount: 0,
+        scoreValue: 0,
+        responseSnapshot: toJson(response),
+      },
+    });
+    return { ...response, replayed: false };
+  });
+}
+
+async function submitStoryDiceAnswer(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const locale = parseLocale(input.locale);
+  const { answer, answerLength } = validateStoryDiceAnswerText(input.answer);
+  const answerHash = hashActivityText("answer", answer);
+  const requestFingerprint = fingerprint({ action: input.action, locale, answerHash });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "story-dice") {
+      throw new QuestionGameRunError("이 질문놀이는 이야기 대답 제출을 지원하지 않습니다", 409, {
+        unsupported: true,
+      });
+    }
+    const mode = storedRunMode(run.mode);
+    const state = parseStoryDiceState(run.state);
+    ensureStoryDiceProgress(state, mode, run.version);
+    if (state.locale !== locale) {
+      throw new QuestionGameRunError("실행을 만든 언어로 대답해 주세요", 409);
+    }
+    if (state.storyDiceNextStep !== "STUDENT_ANSWER" || !state.pendingQuestionHash) {
+      throw new QuestionGameRunError("이야기 질문을 먼저 완성해 주세요", 409);
+    }
+    const questionHash = state.pendingQuestionHash;
+    const nextQuestionCount = state.questionCount + 1;
+    const nextState: StoryDiceRunState = {
+      ...state,
+      questionCount: nextQuestionCount,
+      activitySequence: state.activitySequence + 1,
+      storyDiceNextStep: nextQuestionCount === state.targetCount
+        ? "COMPLETE"
+        : mode === "AI"
+          ? "AI_QUESTION"
+          : "STUDENT_QUESTION",
+      answerHashes: [...state.answerHashes, answerHash],
+    };
+    delete nextState.pendingQuestionHash;
+    ensureStoryDiceProgress(nextState, mode, run.version + 1);
+    const evidence: PendingStoryDiceAnswerEvidence = {
+      sequence: nextState.activitySequence,
+      locale,
+      questionHash,
+      answerHash,
+      answerLength,
+    };
+
+    if (nextState.storyDiceNextStep === "COMPLETE") {
+      const completedAt = await lockedDatabaseClock(tx);
+      ensureActive(run, completedAt);
+      const settlement = await settleStoryDiceRun(
+        tx,
+        actor,
+        run,
+        nextState,
+        mode,
+        completedAt,
+        evidence,
+      );
+      const response = {
+        run: publicRunWithRole(settlement.run, actor.role),
+        result: settlement.result,
+      };
+      await tx.gameActivity.create({
+        data: {
+          runId: run.id,
+          actorId: actor.id,
+          requestId,
+          requestFingerprint,
+          sequence: nextState.activitySequence,
+          type: STORY_DICE_ANSWER_ACTIVITY_TYPE,
+          payload: toJson({ ...evidence, autoSettled: true, scoreDate: settlement.scoreDate }),
+          validQuestionCount: 1,
+          scoreValue: settlement.result.awarded,
+          responseSnapshot: toJson(response),
+        },
+      });
+      return { ...response, replayed: false };
+    }
+
+    const nextRun = await tx.gameRun.update({
+      where: { id: run.id },
+      data: { state: toJson(nextState), version: run.version + 1 },
+    });
+    const response = { run: publicRunWithRole(nextRun as StoredRun, actor.role) };
+    await tx.gameActivity.create({
+      data: {
+        runId: run.id,
+        actorId: actor.id,
+        requestId,
+        requestFingerprint,
+        sequence: nextState.activitySequence,
+        type: STORY_DICE_ANSWER_ACTIVITY_TYPE,
+        payload: toJson(evidence),
+        validQuestionCount: 1,
+        scoreValue: 0,
+        responseSnapshot: toJson(response),
+      },
+    });
+    return { ...response, replayed: false };
+  });
+}
+
 export async function applyQuestionGameRunAction(
   actorId: string,
   runId: string,
@@ -2195,6 +3031,21 @@ export async function applyQuestionGameRunAction(
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
   const expectedVersion = requireVersion(input.expectedVersion);
+  if (input.action === "story-dice-roll") {
+    return rollStoryDice(actorId, runId, input, requestId, expectedVersion, now);
+  }
+  if (input.action === "story-dice-submit-story") {
+    return submitStoryDiceStory(actorId, runId, input, requestId, expectedVersion, now);
+  }
+  if (input.action === "story-dice-submit-question") {
+    return submitStoryDiceQuestion(actorId, runId, input, requestId, expectedVersion, now);
+  }
+  if (input.action === "story-dice-record-ai-question") {
+    return recordStoryDiceAiQuestion(actorId, runId, input, requestId, expectedVersion, now);
+  }
+  if (input.action === "story-dice-submit-answer") {
+    return submitStoryDiceAnswer(actorId, runId, input, requestId, expectedVersion, now);
+  }
   if (input.action === "kaba-submit-attempt") {
     return submitKabaAttempt(
       actorId,
@@ -2390,7 +3241,8 @@ export async function completeQuestionGameRun(
       run.gameId !== "relay" &&
       run.gameId !== "dice" &&
       run.gameId !== "ladder" &&
-      run.gameId !== "kaba"
+      run.gameId !== "kaba" &&
+      run.gameId !== "story-dice"
     ) {
       throw new QuestionGameRunError("이 질문놀이는 서버 완료를 아직 지원하지 않습니다", 409, {
         unsupported: true,
@@ -2404,7 +3256,9 @@ export async function completeQuestionGameRun(
         ? parseDiceState(run.state)
         : run.gameId === "ladder"
           ? parseLadderState(run.state)
-          : parseKabaState(run.state);
+          : run.gameId === "kaba"
+            ? parseKabaState(run.state)
+            : parseStoryDiceState(run.state);
     if (run.gameId === "relay") {
       ensureRelayProgress(state as RelayRunState, mode, run.version, run.status === "ACTIVE");
     } else if (run.gameId === "dice") {
@@ -2416,9 +3270,16 @@ export async function completeQuestionGameRun(
         run.version,
         run.status === "ACTIVE",
       );
-    } else {
+    } else if (run.gameId === "kaba") {
       ensureKabaProgress(
         state as KabaRunState,
+        run.version,
+        run.status === "ACTIVE",
+      );
+    } else {
+      ensureStoryDiceProgress(
+        state as StoryDiceRunState,
+        mode,
         run.version,
         run.status === "ACTIVE",
       );
@@ -2466,14 +3327,23 @@ export async function completeQuestionGameRun(
               mode,
               completedAt,
             )
-          : await settleKabaRun(
-              tx,
-              actor,
-              run,
-              state as KabaRunState,
-              mode,
-              completedAt,
-            );
+          : run.gameId === "kaba"
+            ? await settleKabaRun(
+                tx,
+                actor,
+                run,
+                state as KabaRunState,
+                mode,
+                completedAt,
+              )
+            : await settleStoryDiceRun(
+                tx,
+                actor,
+                run,
+                state as StoryDiceRunState,
+                mode,
+                completedAt,
+              );
     const response = {
       run: publicRunWithRole(settlement.run, actor.role),
       result: settlement.result,

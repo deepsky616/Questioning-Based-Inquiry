@@ -54,6 +54,23 @@ export interface QuestionGameRunPublicProgress {
   correctCount?: number;
   currentSentence?: string | null;
   kabaNextStep?: "STUDENT_ATTEMPT" | "COMPLETE";
+  storyDiceNextStep?:
+    | "ROLL"
+    | "STORY"
+    | "STUDENT_QUESTION"
+    | "AI_QUESTION"
+    | "STUDENT_ANSWER"
+    | "COMPLETE";
+  storyWordPool?: {
+    protagonist: string[];
+    place: string[];
+    event: string[];
+  };
+  storyRolledWords?: {
+    protagonist: string;
+    place: string;
+    event: string;
+  } | null;
 }
 
 export interface QuestionGameRunDefinition {

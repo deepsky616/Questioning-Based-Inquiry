@@ -4,50 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { GameHeader } from "./GameHeader";
-import { useAIPlay } from "./useAIPlay";
 import {
   STORY_DICE_EMOJI, STORY_DICE_COLOR,
-  pickFallbackBilingualWords, parseAIWords, getWordEmoji, getStoryDiceWordText,
+  getWordEmoji, getStoryDiceWordText,
   StoryDiceWords, DiceCategory,
 } from "@/lib/story-dice-data";
-import { getQuestionGameText, getStoryDiceCategoryLabel } from "@/lib/question-game-i18n";
+import {
+  getQuestionGameText,
+  getStoryDiceCategoryLabel,
+  isQuestionFormForLocale,
+} from "@/lib/question-game-i18n";
 import { QUESTION_GAME_LIMITS, QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
+import { useGameRun, type GameRunSnapshot } from "./useGameRun";
 
 interface ChainItem { type: "story" | "question" | "answer"; text: string; author: string; isAI?: boolean }
 
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
-
-function pickOne<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
-
-const STORY_WORD_CATEGORIES: DiceCategory[] = ["protagonist", "place", "event"];
-
-function readSafeStoryWords(value: unknown): StoryDiceWords | null {
-  let parsed: StoryDiceWords | null = null;
-  if (typeof value === "string") {
-    parsed = parseAIWords(value);
-  } else if (value && typeof value === "object" && !Array.isArray(value)) {
-    try {
-      parsed = parseAIWords(JSON.stringify(value));
-    } catch {
-      return null;
-    }
-  }
-  if (!parsed) return null;
-
-  const safe = STORY_WORD_CATEGORIES.every((category) => {
-    const values = parsed[category];
-    return values.length >= 6 &&
-      new Set(values).size === values.length &&
-      values.every((word) =>
-        word === word.trim() &&
-        word.length > 0 &&
-        word.length <= QUESTION_GAME_LIMITS.generatedWord
-      );
-  });
-  return safe ? parsed : null;
-}
 
 function countCompletedPairs(chain: ChainItem[]): number {
   return chain.reduce((count, item, index) => (
@@ -69,20 +43,37 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   const aiName = "🤖 AI";
 
   const [phase, setPhase] = useState<"loading" | "rolling" | "story" | "qa" | "done">("loading");
-  const [words, setWords] = useState<StoryDiceWords | null>(null);
-  const [rolled, setRolled] = useState<{ protagonist: string; place: string; event: string } | null>(null);
   const [chain, setChain] = useState<ChainItem[]>([]);
   const [input, setInput] = useState("");
   const [rolling, setRolling] = useState<{ protagonist: string; place: string; event: string } | null>(null);
   const [animTick, setAnimTick] = useState(0);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const initRef = useRef(false);
   const mountedRef = useRef(true);
-  const initialWordsRequestRef = useRef(0);
   const aiQuestionRequestRef = useRef(0);
   const aiQuestionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { ask, loading: aiLoading } = useAIPlay();
+  const {
+    run,
+    result: runResult,
+    pending: runPending,
+    error: runError,
+    conflict: runConflict,
+    unconfirmedQuestion,
+    start: startRun,
+    rollStoryDice: rollStoryDiceRun,
+    submitStoryDiceStory,
+    submitStoryDiceQuestion,
+    submitStoryDiceAiTurn,
+    submitStoryDiceAnswer,
+    reset: resetRun,
+    clearError: clearRunError,
+  } = useGameRun();
+  const words: StoryDiceWords | null = run?.storyWordPool ?? null;
+  const rolled = run?.storyRolledWords ?? null;
+  const aiLoading = runPending === "ai";
+  const runBusy = runPending !== null;
+  const backBlocked = runBusy || unconfirmedQuestion !== null;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -94,59 +85,53 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     };
   }, []);
 
-  // 1) 시작 시 단어 생성
   useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-    const requestId = ++initialWordsRequestRef.current;
-    (async () => {
-      const res = await ask({ action: "story-dice:words" });
-      if (
-        !mountedRef.current ||
-        requestId !== initialWordsRequestRef.current
-      ) return;
-      const parsed = readSafeStoryWords(res?.parsed)
-        ?? readSafeStoryWords(res?.text)
-        ?? pickFallbackBilingualWords(8);
-      setWords(parsed);
-      setPhase("rolling");
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    resetRun();
+    setPhase("loading");
+    setChain([]);
+    setInput("");
+    setRolling(null);
+    setLocalError(null);
+    void startRun(game.id, isAI ? "ai" : "solo", "", locale).then((created) => {
+      if (mountedRef.current && created) setPhase("rolling");
+    });
+  }, [game.id, isAI, locale, resetRun, startRun]);
 
-  function rollDice() {
-    if (!words || rolling) return;
+  async function rollDice() {
+    if (!words || !run || rolling || runBusy || runConflict) return;
+    clearRunError();
+    setLocalError(null);
     setRolling({ protagonist: "?", place: "?", event: "?" });
+    const saved = await rollStoryDiceRun(run);
+    const final = saved?.storyRolledWords;
+    if (!saved || !final) {
+      setRolling(null);
+      return;
+    }
     let count = 0;
-    const final = {
-      protagonist: pickOne(words.protagonist),
-      place: pickOne(words.place),
-      event: pickOne(words.event),
-    };
     rollTimerRef.current = setInterval(() => {
       setAnimTick((t) => t + 1);
       setRolling({
-        protagonist: pickOne(words!.protagonist),
-        place: pickOne(words!.place),
-        event: pickOne(words!.event),
+        protagonist: words.protagonist[count % words.protagonist.length] ?? "?",
+        place: words.place[(count + 2) % words.place.length] ?? "?",
+        event: words.event[(count + 4) % words.event.length] ?? "?",
       });
       count++;
       if (count >= 14) {
         if (rollTimerRef.current) clearInterval(rollTimerRef.current);
         rollTimerRef.current = null;
         setRolling(null);
-        setRolled(final);
         setPhase("story");
       }
     }, 100);
   }
 
-  function scheduleAIQuestion(currentChain: ChainItem[]) {
+  function scheduleAIQuestion(currentChain: ChainItem[], activeRun: GameRunSnapshot) {
     const requestId = ++aiQuestionRequestRef.current;
     if (aiQuestionTimerRef.current) clearTimeout(aiQuestionTimerRef.current);
     aiQuestionTimerRef.current = setTimeout(() => {
       aiQuestionTimerRef.current = null;
-      void askAIQuestion(currentChain, requestId);
+      void askAIQuestion(currentChain, requestId, activeRun);
     }, 400);
   }
 
@@ -157,79 +142,99 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   }
 
   function handleBack() {
-    initialWordsRequestRef.current += 1;
+    if (backBlocked) return;
     cancelAIQuestion();
     if (rollTimerRef.current) clearInterval(rollTimerRef.current);
     rollTimerRef.current = null;
+    resetRun();
     onBack();
   }
 
-  function submitStory() {
-    const trimmed = input.trim();
-    if (!trimmed) return;
-    setChain([{ type: "story", text: trimmed, author: myName }]);
+  async function submitStory() {
+    const trimmed = (unconfirmedQuestion ?? input).trim();
+    if (!trimmed || !run || runBusy || runConflict) return;
+    clearRunError();
+    setLocalError(null);
+    const saved = await submitStoryDiceStory(trimmed, locale, run);
+    if (!saved) return;
+    const newChain: ChainItem[] = [{ type: "story", text: trimmed, author: myName }];
+    setChain(newChain);
     setInput("");
     setPhase("qa");
-    // AI 모드: 첫 질문은 AI가
-    if (isAI && rolled) {
-      scheduleAIQuestion([{ type: "story", text: trimmed, author: myName }]);
+    if (isAI && saved.run.storyDiceNextStep === "AI_QUESTION") {
+      scheduleAIQuestion(newChain, saved.run);
     }
   }
 
-  async function askAIQuestion(currentChain: ChainItem[], requestId: number) {
-    if (!rolled) return;
-    const history = currentChain
-      .filter((c) => c.type !== "story")
-      .map((c) => `${c.type === "question" ? "Q" : "A"}: ${c.text}`)
-      .join("\n");
-    const res = await ask({
-      action: "story-dice:ai-question",
-      context: {
-        protagonist: getStoryDiceWordText(words, rolled.protagonist, locale),
-        place: getStoryDiceWordText(words, rolled.place, locale),
-        event: getStoryDiceWordText(words, rolled.event, locale),
-        story: currentChain[0]?.text ?? "",
-        history,
-      },
-    });
+  async function askAIQuestion(
+    currentChain: ChainItem[],
+    requestId: number,
+    activeRun: GameRunSnapshot,
+  ) {
+    const story = currentChain.find((item) => item.type === "story")?.text ?? "";
+    const previousAnswer = [...currentChain]
+      .reverse()
+      .find((item) => item.type === "answer")?.text ?? "";
+    const saved = await submitStoryDiceAiTurn(story, previousAnswer, locale, activeRun);
     if (requestId !== aiQuestionRequestRef.current) return;
-    const generated = res?.text.trim();
-    const question = generated || (
-      locale.toLowerCase().startsWith("en")
-        ? "What happened next?"
-        : "그다음에는 어떤 일이 있었나요?"
-    );
+    if (!saved) return;
+    const question = saved.output;
     const newItem: ChainItem = { type: "question", text: question, author: aiName, isAI: true };
     setChain((c) => [...c, newItem]);
   }
 
-  function submitQuestion() {
-    const trimmed = input.trim();
-    if (!trimmed) return;
+  async function submitQuestion() {
+    const trimmed = (unconfirmedQuestion ?? input).trim();
+    if (!trimmed || !run || runBusy || runConflict) return;
+    if (!isQuestionFormForLocale(trimmed, locale)) {
+      setLocalError(locale === "en"
+        ? "Write the sentence as a question."
+        : "질문하는 문장으로 작성해 주세요.");
+      return;
+    }
+    clearRunError();
+    setLocalError(null);
+    const saved = await submitStoryDiceQuestion(trimmed, locale, run);
+    if (!saved) return;
     const item: ChainItem = { type: "question", text: trimmed, author: myName };
     const newChain = [...chain, item];
     setChain(newChain);
     setInput("");
-    // AI 모드: 술래가 학생일 때 AI는 질문자 → 여기는 학생이 질문 → 학생(술래)이 대답
-    // 실제로는 AI 모드에서 술래=학생, 질문자=AI이므로 학생이 답변 차례.
   }
 
-  function submitAnswer() {
-    const trimmed = input.trim();
-    if (!trimmed) return;
+  async function submitAnswer() {
+    const trimmed = (unconfirmedQuestion ?? input).trim();
+    if (!trimmed || !run || runBusy || runConflict) return;
+    clearRunError();
+    setLocalError(null);
+    const saved = await submitStoryDiceAnswer(trimmed, locale, run);
+    if (!saved) return;
     const item: ChainItem = { type: "answer", text: trimmed, author: myName };
     const newChain = [...chain, item];
     setChain(newChain);
     setInput("");
-    if (countCompletedPairs(newChain) >= targetPairs) {
+    if (saved.run.status === "SETTLED" || countCompletedPairs(newChain) >= targetPairs) {
       cancelAIQuestion();
       setPhase("done");
       return;
     }
-    // AI 모드: 다음 AI 질문 자동
-    if (isAI) {
-      scheduleAIQuestion(newChain);
+    if (isAI && saved.run.storyDiceNextStep === "AI_QUESTION") {
+      scheduleAIQuestion(newChain, saved.run);
     }
+  }
+
+  async function retryStart() {
+    clearRunError();
+    setLocalError(null);
+    const created = await startRun(game.id, isAI ? "ai" : "solo", "", locale);
+    if (mountedRef.current && created) setPhase("rolling");
+  }
+
+  function retryAIQuestion() {
+    if (!run || run.storyDiceNextStep !== "AI_QUESTION" || runBusy || runConflict) return;
+    clearRunError();
+    const requestId = ++aiQuestionRequestRef.current;
+    void askAIQuestion(chain, requestId, run);
   }
 
   /* ── 결과 ── */
@@ -238,11 +243,38 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     const myAs = chain.filter((c) => c.type === "answer" && !c.isAI).length;
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <GameHeader game={game} subtitle={text.storyCompleteSubtitle} onBack={handleBack} />
+        <GameHeader
+          game={game}
+          subtitle={text.storyCompleteSubtitle}
+          onBack={handleBack}
+          backDisabled={backBlocked}
+        />
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 flex flex-col items-center gap-3">
           <div className="text-6xl">📖</div>
           <h2 className="text-2xl font-black text-foreground">{text.storyDoneTitle}</h2>
           <p className="text-muted-foreground text-sm">{text.storyStats(myQs, myAs, chain.length)}</p>
+          {runResult && (
+            <div role="status" className={`w-full rounded-xl border px-4 py-3 text-sm ${
+              runResult.awarded > 0
+                ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100"
+                : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+            }`}>
+              <p className="font-bold">
+                {runResult.preview
+                  ? (locale === "en" ? "Preview completed without points." : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                  : runResult.awarded > 0
+                    ? (locale === "en" ? `+${runResult.awarded} points earned!` : `+${runResult.awarded}점 적립!`)
+                    : (locale === "en" ? "The daily point limit has been reached." : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+              </p>
+              {!runResult.preview && runResult.dailyRemaining > 0 && (
+                <p className="mt-1 text-xs">
+                  {locale === "en"
+                    ? `${runResult.dailyRemaining} points are still available today.`
+                    : `오늘 ${runResult.dailyRemaining}점 더 받을 수 있어요.`}
+                </p>
+              )}
+            </div>
+          )}
         </div>
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-3 max-h-80 overflow-y-auto">
           <h3 className="font-black text-foreground">{text.completedStory}</h3>
@@ -269,25 +301,36 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   if (phase === "loading" || !words) {
     return (
       <div className="max-w-lg mx-auto space-y-5">
-        <GameHeader game={game} subtitle={text.storyWordsLoading} onBack={handleBack} />
+        <GameHeader
+          game={game}
+          subtitle={text.storyWordsLoading}
+          onBack={handleBack}
+          backDisabled={backBlocked}
+        />
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-10 text-center space-y-3">
-          <div className="text-6xl animate-bounce">🎲</div>
-          <p className="text-muted-foreground text-sm">
-            {isAI && aiLoading ? text.storyAiWords : text.loading}
-          </p>
+          {runPending === "create" ? (
+            <>
+              <div className="text-6xl animate-bounce">🎲</div>
+              <p className="text-muted-foreground text-sm">{text.loading}</p>
+            </>
+          ) : (
+            <>
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200">
+                {runError ?? (locale === "en" ? "Could not prepare the story dice." : "이야기 주사위를 준비하지 못했습니다.")}
+              </div>
+              <Button type="button" variant="outline" className="w-full font-bold" onClick={() => void retryStart()}>
+                {locale === "en" ? "Try again" : "다시 시작하기"}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     );
   }
 
-  const lastChain = chain[chain.length - 1];
   const nextAction: "question" | "answer" =
-    !lastChain || lastChain.type === "story" || lastChain.type === "answer" ? "question" : "answer";
-  // 모드별 다음 입력자:
-  //  - solo: 본인이 모두
-  //  - friend: 다음 사람 (단순화)
-  //  - ai: 학생(나)은 술래 → 이야기/대답, AI = 질문자
-  const inputDisabled = isAI && nextAction === "question"; // AI 모드에서 질문은 AI 차례
+    run?.storyDiceNextStep === "STUDENT_ANSWER" ? "answer" : "question";
+  const inputDisabled = run?.storyDiceNextStep === "AI_QUESTION";
   const inputPlaceholder =
     nextAction === "question"
       ? text.storyQuestionPlaceholder
@@ -295,7 +338,23 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
 
   return (
     <div className="max-w-lg mx-auto space-y-5">
-      <GameHeader game={game} subtitle={isAI ? text.storyWithAi : text.storyTogether} onBack={handleBack} />
+      <GameHeader
+        game={game}
+        subtitle={isAI ? text.storyWithAi : text.storyTogether}
+        onBack={handleBack}
+        backDisabled={backBlocked}
+      />
+
+      {runConflict && (
+        <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+          {runConflict}
+        </div>
+      )}
+      {!runConflict && (runError || localError) && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200">
+          {localError ?? runError}
+        </div>
+      )}
 
       {/* 단어 풀 */}
       <div className="bg-card text-foreground rounded-2xl border border-border shadow-sm p-4 space-y-3">
@@ -353,8 +412,8 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
       {phase === "rolling" && (
         <Button className="w-full py-4 text-lg font-black text-white rounded-2xl"
           style={{ background: "linear-gradient(135deg, #C2410C, #B91C1C)" }}
-          onClick={rollDice} disabled={!!rolling}>
-          {rolling ? text.diceRolling : text.storyRoll3}
+          onClick={() => void rollDice()} disabled={!!rolling || runBusy || Boolean(runConflict)}>
+          {rolling || runPending === "action" ? text.diceRolling : text.storyRoll3}
         </Button>
       )}
 
@@ -368,13 +427,27 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
               getStoryDiceWordText(words, rolled.place, locale),
               getStoryDiceWordText(words, rolled.event, locale),
             )}
-            value={input} onChange={(e) => setInput(e.target.value)}
+            value={unconfirmedQuestion ?? input}
+            maxLength={QUESTION_GAME_LIMITS.story}
+            readOnly={runBusy || unconfirmedQuestion !== null}
+            aria-readonly={runBusy || unconfirmedQuestion !== null}
+            onChange={(e) => {
+              if (!runBusy && unconfirmedQuestion === null) {
+                setInput(e.target.value);
+                setLocalError(null);
+                clearRunError();
+              }
+            }}
             autoFocus />
           <Button className="w-full font-bold text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #C2410C, #B91C1C)" }}
-            disabled={!input.trim()}
-            onClick={submitStory}>
-            {text.storyStart}
+            disabled={!(unconfirmedQuestion ?? input).trim() || runBusy || Boolean(runConflict)}
+            onClick={() => void submitStory()}>
+            {runPending === "action"
+              ? text.loading
+              : unconfirmedQuestion
+                ? (locale === "en" ? "Retry save" : "다시 저장하기")
+                : text.storyStart}
           </Button>
         </div>
       )}
@@ -413,22 +486,47 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
               <textarea
                 className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none h-20 disabled:bg-secondary disabled:text-secondary-foreground"
                 placeholder={inputPlaceholder}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={aiLoading}
+                value={unconfirmedQuestion ?? input}
+                maxLength={nextAction === "question" ? QUESTION_GAME_LIMITS.question : QUESTION_GAME_LIMITS.answer}
+                readOnly={runBusy || unconfirmedQuestion !== null}
+                aria-readonly={runBusy || unconfirmedQuestion !== null}
+                onChange={(e) => {
+                  if (!runBusy && unconfirmedQuestion === null) {
+                    setInput(e.target.value);
+                    setLocalError(null);
+                    clearRunError();
+                  }
+                }}
                 autoFocus />
               <Button className="w-full font-bold text-white rounded-xl"
                 style={{ background: "linear-gradient(135deg, #C2410C, #B91C1C)" }}
-                disabled={!input.trim() || aiLoading}
-                onClick={nextAction === "question" ? submitQuestion : submitAnswer}>
-                {nextAction === "question" ? text.storySubmitQuestion : text.storySubmitAnswer}
+                disabled={!(unconfirmedQuestion ?? input).trim() || runBusy || Boolean(runConflict)}
+                onClick={() => void (nextAction === "question" ? submitQuestion() : submitAnswer())}>
+                {runPending === "action"
+                  ? text.loading
+                  : unconfirmedQuestion
+                    ? (locale === "en" ? "Retry save" : "다시 저장하기")
+                    : nextAction === "question"
+                      ? text.storySubmitQuestion
+                      : text.storySubmitAnswer}
               </Button>
             </div>
           )}
 
           {isAI && inputDisabled && !aiLoading && (
-            <div className="bg-secondary border border-border rounded-xl p-3 text-center text-secondary-foreground text-sm">
-              {text.storyAiWillAsk}
+            <div className="bg-secondary border border-border rounded-xl p-3 text-center text-secondary-foreground text-sm space-y-2">
+              <p>{text.storyAiWillAsk}</p>
+              {runError && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full font-bold"
+                  disabled={runBusy || Boolean(runConflict)}
+                  onClick={retryAIQuestion}
+                >
+                  {locale === "en" ? "Retry AI question" : "인공지능 질문 다시 만들기"}
+                </Button>
+              )}
             </div>
           )}
 

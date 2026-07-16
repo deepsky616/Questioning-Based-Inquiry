@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { QuestionGameRunError } from "@/lib/question-game-run-definition";
 import { findQuestionGameRunDefinition } from "@/lib/question-game-run-definitions";
 import { KABA_SENTENCES } from "@/lib/question-game-i18n";
+import {
+  createStoryDiceRoll,
+  createStoryDiceState,
+} from "@/lib/question-game-story-dice-definition";
 
 const TOPIC_HASH = "a".repeat(64);
 
@@ -11,6 +15,7 @@ describe("질문놀이 실행 정의", () => {
     expect(findQuestionGameRunDefinition("dice")?.gameId).toBe("dice");
     expect(findQuestionGameRunDefinition("ladder")?.gameId).toBe("ladder");
     expect(findQuestionGameRunDefinition("kaba")?.gameId).toBe("kaba");
+    expect(findQuestionGameRunDefinition("story-dice")?.gameId).toBe("story-dice");
     expect(findQuestionGameRunDefinition("not-supported")).toBeUndefined();
   });
 
@@ -476,6 +481,181 @@ describe("질문놀이 실행 정의", () => {
       runVersion: 2,
       activeRun: false,
     })).not.toThrow();
+    expect(() => definition.ensureProgress(state, {
+      mode: "SOLO",
+      runVersion: 3,
+      activeRun: false,
+    })).toThrowError(QuestionGameRunError);
+  });
+
+  it("이야기 주사위는 서버 단어를 여덟 개씩 준비하고 굴리기 단계만 공개한다", () => {
+    const definition = findQuestionGameRunDefinition("story-dice");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const state = createStoryDiceState({
+      mode: "SOLO",
+      locale: "en",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+    }, () => 0);
+
+    expect(() => definition.ensureProgress(state, {
+      mode: "SOLO",
+      runVersion: 1,
+      activeRun: true,
+    })).not.toThrow();
+    expect(definition.publicProgress(state, "SOLO")).toMatchObject({
+      questionCount: 0,
+      aiTurnCount: 0,
+      awaitingAiTurn: false,
+      targetCount: 3,
+      storyDiceNextStep: "ROLL",
+      storyRolledWords: null,
+      storyWordPool: {
+        protagonist: expect.arrayContaining([expect.any(String)]),
+        place: expect.arrayContaining([expect.any(String)]),
+        event: expect.arrayContaining([expect.any(String)]),
+      },
+    });
+    const progress = definition.publicProgress(state, "SOLO");
+    expect(progress.storyWordPool?.protagonist).toHaveLength(8);
+    expect(progress.storyWordPool?.place).toHaveLength(8);
+    expect(progress.storyWordPool?.event).toHaveLength(8);
+  });
+
+  it("이야기 주사위의 인공지능 질문과 학생 대답 차례를 실행 버전에 묶는다", () => {
+    const definition = findQuestionGameRunDefinition("story-dice");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const initial = createStoryDiceState({
+      mode: "AI",
+      locale: "ko",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+    }, () => 0);
+    const rolledWords = createStoryDiceRoll(initial.wordPlan, () => 0);
+    const ready = {
+      ...initial,
+      rolledWords,
+      storyHash: "a".repeat(64),
+      storyLength: 20,
+      activitySequence: 2,
+      storyDiceNextStep: "AI_QUESTION" as const,
+    };
+    const awaitingAnswer = {
+      ...ready,
+      aiTurnCount: 1,
+      activitySequence: 3,
+      storyDiceNextStep: "STUDENT_ANSWER" as const,
+      pendingQuestionHash: "b".repeat(64),
+      questionHashes: ["b".repeat(64)],
+    };
+    const answered = {
+      ...ready,
+      questionCount: 1,
+      aiTurnCount: 1,
+      activitySequence: 4,
+      answerHashes: ["c".repeat(64)],
+      questionHashes: ["b".repeat(64)],
+    };
+
+    expect(() => definition.ensureProgress(ready, {
+      mode: "AI",
+      runVersion: 3,
+      activeRun: true,
+    })).not.toThrow();
+    expect(() => definition.ensureProgress(awaitingAnswer, {
+      mode: "AI",
+      runVersion: 4,
+      activeRun: true,
+    })).not.toThrow();
+    expect(() => definition.ensureProgress(answered, {
+      mode: "AI",
+      runVersion: 5,
+      activeRun: true,
+    })).not.toThrow();
+    expect(() => definition.ensureProgress(answered, {
+      mode: "AI",
+      runVersion: 4,
+      activeRun: true,
+    })).toThrowError(QuestionGameRunError);
+    expect(() => definition.ensureProgress(ready, {
+      mode: "SOLO",
+      runVersion: 3,
+      activeRun: true,
+    })).toThrowError(QuestionGameRunError);
+  });
+
+  it("이야기 주사위 완료 상태는 입력 해시를 지우고 세 쌍과 세 인공지능 질문만 인정한다", () => {
+    const definition = findQuestionGameRunDefinition("story-dice");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const initial = createStoryDiceState({
+      mode: "AI",
+      locale: "ko",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+    }, () => 0);
+    const settled = {
+      ...initial,
+      rolledWords: createStoryDiceRoll(initial.wordPlan, () => 0),
+      questionCount: 3,
+      aiTurnCount: 3,
+      activitySequence: 8,
+      storyDiceNextStep: "COMPLETE" as const,
+      result: {
+        awarded: 9,
+        dailyLimit: 50,
+        dailyRemaining: 41,
+        cappedByLimit: false,
+        preview: false,
+      },
+    };
+
+    expect(() => definition.ensureProgress(settled, {
+      mode: "AI",
+      runVersion: 9,
+      activeRun: false,
+    })).not.toThrow();
+    expect(() => definition.ensureProgress({ ...settled, aiTurnCount: 2 }, {
+      mode: "AI",
+      runVersion: 9,
+      activeRun: false,
+    })).toThrowError(QuestionGameRunError);
+    expect(() => definition.parseState(JSON.parse(JSON.stringify({
+      ...initial,
+      wordPlan: {
+        ...initial.wordPlan,
+        protagonist: [
+          initial.wordPlan.protagonist[0],
+          initial.wordPlan.protagonist[0],
+          ...initial.wordPlan.protagonist.slice(2),
+        ],
+      },
+    })))).toThrowError(QuestionGameRunError);
+  });
+
+  it("이야기 주사위는 만료나 자동 포기로 한 단계 오른 실행 버전만 허용한다", () => {
+    const definition = findQuestionGameRunDefinition("story-dice");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const state = createStoryDiceState({
+      mode: "SOLO",
+      locale: "ko",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+    }, () => 0);
+
+    expect(() => definition.ensureProgress(state, {
+      mode: "SOLO",
+      runVersion: 2,
+      activeRun: false,
+    })).not.toThrow();
+    expect(() => definition.ensureProgress(state, {
+      mode: "SOLO",
+      runVersion: 1,
+      activeRun: false,
+    })).toThrowError(QuestionGameRunError);
     expect(() => definition.ensureProgress(state, {
       mode: "SOLO",
       runVersion: 3,

@@ -8,13 +8,19 @@ interface GameHeaderProps {
   game: BuiltInGame;
   subtitle: string;
   onBack: () => void;
+  backDisabled?: boolean;
 }
 
-export function GameHeader({ game, subtitle, onBack }: GameHeaderProps) {
+export function GameHeader({ game, subtitle, onBack, backDisabled = false }: GameHeaderProps) {
   const text = getQuestionGameText(useLocale());
   return (
     <div className="game-shared-header flex items-center gap-3">
-      <button onClick={onBack} className="text-muted-foreground hover:text-foreground text-sm">
+      <button
+        type="button"
+        onClick={onBack}
+        disabled={backDisabled}
+        className="text-muted-foreground hover:text-foreground text-sm disabled:cursor-not-allowed disabled:opacity-50"
+      >
         {text.backToList}
       </button>
       <div
