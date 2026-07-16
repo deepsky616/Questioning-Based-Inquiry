@@ -3,6 +3,15 @@ import { QuestionGameRunError } from "@/lib/question-game-run-definition";
 import { findQuestionGameRunDefinition } from "@/lib/question-game-run-definitions";
 import { KABA_SENTENCES } from "@/lib/question-game-i18n";
 import {
+  createMysteryState,
+  planMysteryAiActivity,
+  type MysteryAiHistoryItem,
+} from "@/lib/question-game-mystery-definition";
+import {
+  MYSTERY_ATTRIBUTES,
+  mysteryQuestionForAttribute,
+} from "@/lib/mystery-box-rules";
+import {
   createStoryDiceRoll,
   createStoryDiceState,
 } from "@/lib/question-game-story-dice-definition";
@@ -17,6 +26,7 @@ describe("질문놀이 실행 정의", () => {
     expect(findQuestionGameRunDefinition("kaba")?.gameId).toBe("kaba");
     expect(findQuestionGameRunDefinition("story-dice")?.gameId).toBe("story-dice");
     expect(findQuestionGameRunDefinition("memory")?.gameId).toBe("memory");
+    expect(findQuestionGameRunDefinition("mystery-box")?.gameId).toBe("mystery-box");
     expect(findQuestionGameRunDefinition("not-supported")).toBeUndefined();
   });
 
@@ -849,5 +859,232 @@ describe("질문놀이 실행 정의", () => {
       runVersion: 2,
       activeRun: false,
     })).not.toThrow();
+  });
+
+  it("미스터리 박스 초기 상태는 비밀 물건을 공개하지 않고 학생 차례로 시작한다", () => {
+    const definition = findQuestionGameRunDefinition("mystery-box");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const state = createMysteryState({
+      mode: "AI",
+      locale: "ko",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+    }, () => 0);
+
+    expect(state.privateItemId).toBe("apple");
+    expect(() => definition.ensureProgress(state, {
+      mode: "AI",
+      runVersion: 1,
+      activeRun: true,
+    })).not.toThrow();
+    const progress = definition.publicProgress(state, "AI");
+    expect(progress).toMatchObject({
+      questionCount: 0,
+      aiTurnCount: 0,
+      awaitingAiTurn: false,
+      targetCount: 20,
+      mysteryLocale: "ko",
+      mysteryNextStep: "STUDENT_ACTION",
+      mysteryActivityCount: 0,
+      mysteryStudentQuestionCount: 0,
+      mysteryHistory: [],
+      mysteryWinner: null,
+      mysteryEndReason: null,
+      mysteryAnswerItemId: null,
+    });
+    expect(JSON.stringify(progress)).not.toContain("apple");
+    expect(JSON.stringify(progress)).not.toContain("privateItemId");
+    expect(JSON.stringify(progress)).not.toContain("attribute");
+  });
+
+  it("미스터리 박스 인공지능 계획은 비밀 물건 없이 공개 단서만으로 결정된다", () => {
+    const first = planMysteryAiActivity([], "ko");
+    const repeated = planMysteryAiActivity([], "ko");
+
+    expect(first).toEqual(repeated);
+    expect(first.kind).toBe("QUESTION");
+    expect(first).not.toHaveProperty("itemId");
+    expect(first.text).toMatch(/[?？]$/u);
+
+    const appleHistory: MysteryAiHistoryItem[] = MYSTERY_ATTRIBUTES.map(
+      (attribute) => ({
+        kind: "QUESTION",
+        text: mysteryQuestionForAttribute(attribute, "ko"),
+        answer: attribute === "plant" ||
+            attribute === "edible" ||
+            attribute === "small" ||
+            attribute === "colorful" ||
+            attribute === "round"
+          ? "yes"
+          : "no",
+      }),
+    );
+    expect(planMysteryAiActivity(appleHistory, "ko")).toMatchObject({
+      kind: "GUESS",
+      text: "사과",
+      guessedItemId: "apple",
+    });
+  });
+
+  it("미스터리 박스는 해결된 완료 상태에서만 정답 물건 식별값을 공개한다", () => {
+    const definition = findQuestionGameRunDefinition("mystery-box");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const initial = createMysteryState({
+      mode: "SOLO",
+      locale: "en",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+    }, () => 0);
+    const completed = {
+      ...initial,
+      questionCount: 1,
+      activitySequence: 1,
+      mysteryNextStep: "COMPLETE" as const,
+      mysteryWinner: "STUDENT" as const,
+      mysteryEndReason: "SOLVED" as const,
+      history: [{
+        sequence: 1,
+        actor: "STUDENT" as const,
+        kind: "GUESS" as const,
+        locale: "en" as const,
+        text: "apple",
+        textHash: "c".repeat(64),
+        correct: true,
+        guessedItemId: "apple",
+      }],
+      result: {
+        awarded: 2,
+        dailyLimit: 30,
+        dailyRemaining: 28,
+        cappedByLimit: false,
+        preview: false,
+      },
+    };
+
+    expect(() => definition.ensureProgress(completed, {
+      mode: "SOLO",
+      runVersion: 2,
+      activeRun: false,
+    })).not.toThrow();
+    const unsettledProgress = definition.publicProgress({
+      ...completed,
+      result: undefined,
+    }, "SOLO");
+    expect(unsettledProgress.mysteryAnswerItemId).toBeNull();
+    const progress = definition.publicProgress(completed, "SOLO");
+    expect(progress.mysteryAnswerItemId).toBe("apple");
+    expect(progress.mysteryHistory).toEqual([{
+      sequence: 1,
+      actor: "STUDENT",
+      kind: "GUESS",
+      text: "apple",
+      correct: true,
+    }]);
+    expect(JSON.stringify(progress)).not.toContain("guessedItemId");
+  });
+
+  it("미스터리 박스는 활동 수와 차례 및 종료 이유가 어긋난 상태를 거부한다", () => {
+    const definition = findQuestionGameRunDefinition("mystery-box");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const initial = createMysteryState({
+      mode: "AI",
+      locale: "ko",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+    }, () => 0);
+
+    expect(() => definition.ensureProgress({
+      ...initial,
+      questionCount: 1,
+      activitySequence: 1,
+      mysteryNextStep: "AI_TURN",
+    }, {
+      mode: "AI",
+      runVersion: 2,
+      activeRun: true,
+    })).toThrowError(QuestionGameRunError);
+    expect(() => definition.ensureProgress(initial, {
+      mode: "AI",
+      runVersion: 2,
+      activeRun: false,
+    })).not.toThrow();
+    expect(() => definition.ensureProgress(initial, {
+      mode: "AI",
+      runVersion: 1,
+      activeRun: false,
+    })).toThrowError(QuestionGameRunError);
+    expect(() => definition.ensureProgress({
+      ...initial,
+      questionCount: 1,
+      activitySequence: 1,
+      mysteryStudentQuestionCount: 1,
+      mysteryNextStep: "AI_TURN",
+      history: [{
+        sequence: 1,
+        actor: "STUDENT",
+        kind: "QUESTION",
+        locale: "en",
+        text: "Is it alive?",
+        textHash: "d".repeat(64),
+        answer: "no",
+        answerSource: "RULE",
+        attribute: "living",
+        negated: false,
+      }],
+    }, {
+      mode: "AI",
+      runVersion: 2,
+      activeRun: true,
+    })).toThrowError(QuestionGameRunError);
+  });
+
+  it("미스터리 박스 파서는 입력 검사와 같이 보충 문자를 한 글자로 센다", () => {
+    const definition = findQuestionGameRunDefinition("mystery-box");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const initial = createMysteryState({
+      mode: "SOLO",
+      locale: "ko",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+    }, () => 0);
+    const question = `${"가".repeat(198)}😀?`;
+    const guess = `${"나".repeat(79)}😀`;
+
+    expect([...question]).toHaveLength(200);
+    expect([...guess]).toHaveLength(80);
+    expect(() => definition.parseState(JSON.parse(JSON.stringify({
+      ...initial,
+      questionCount: 1,
+      activitySequence: 1,
+      mysteryStudentQuestionCount: 1,
+      history: [{
+        sequence: 1,
+        actor: "STUDENT",
+        kind: "QUESTION",
+        locale: "ko",
+        text: question,
+        textHash: "e".repeat(64),
+        answer: "no",
+        answerSource: "AI",
+      }],
+    })))).not.toThrow();
+    expect(() => definition.parseState(JSON.parse(JSON.stringify({
+      ...initial,
+      questionCount: 1,
+      activitySequence: 1,
+      history: [{
+        sequence: 1,
+        actor: "STUDENT",
+        kind: "GUESS",
+        locale: "ko",
+        text: guess,
+        textHash: "f".repeat(64),
+        correct: false,
+      }],
+    })))).not.toThrow();
   });
 });

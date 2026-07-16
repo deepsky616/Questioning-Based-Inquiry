@@ -19,6 +19,14 @@ export type MysteryAttribute = typeof MYSTERY_ATTRIBUTES[number];
 export type MysteryLocale = "ko" | "en";
 export type MysteryAnswer = "yes" | "no" | "unknown";
 
+export type MysteryQuestionAnalysis =
+  | {
+      answer: Exclude<MysteryAnswer, "unknown">;
+      attribute: MysteryAttribute;
+      negated: boolean;
+    }
+  | { answer: "unknown" };
+
 export interface MysteryAnswerResolution {
   itemId: string;
   playerId: string;
@@ -403,6 +411,44 @@ const NEGATION_PATTERNS: Record<MysteryLocale, RegExp> = {
   en: /\b(?:not|never|no|without|cannot|can't|isn't|aren't|doesn't|don't|didn't|won't|wouldn't|couldn't|shouldn't|wasn't|weren't|hasn't|haven't|hadn't|inedible)\b/gu,
 };
 
+const MYSTERY_ATTRIBUTE_QUESTIONS: Record<
+  MysteryLocale,
+  Record<MysteryAttribute, string>
+> = {
+  ko: {
+    living: "살아 있나요?",
+    animal: "동물인가요?",
+    plant: "식물인가요?",
+    edible: "먹을 수 있나요?",
+    small: "작은가요?",
+    large: "큰가요?",
+    colorful: "알록달록한가요?",
+    indoor: "실내에 있나요?",
+    legs: "다리가 있나요?",
+    fly: "날 수 있나요?",
+    humanMade: "사람이 만든 것인가요?",
+    hard: "딱딱한가요?",
+    wet: "젖어 있나요?",
+    round: "둥근가요?",
+  },
+  en: {
+    living: "Is it alive?",
+    animal: "Is it an animal?",
+    plant: "Is it a plant?",
+    edible: "Is it edible?",
+    small: "Is it small?",
+    large: "Is it large?",
+    colorful: "Is it colorful?",
+    indoor: "Is it indoors?",
+    legs: "Does it have legs?",
+    fly: "Can it fly?",
+    humanMade: "Is it human-made?",
+    hard: "Is it hard?",
+    wet: "Is it wet?",
+    round: "Is it round?",
+  },
+};
+
 function normalizeText(value: string, locale: MysteryLocale): string {
   const normalized = value.normalize("NFKC").trim().replace(/\s+/gu, " ");
   return locale === "en"
@@ -473,11 +519,18 @@ export function getMysteryItem(itemId: string): MysteryItem | null {
   return MYSTERY_ITEMS.find(({ id }) => id === itemId) ?? null;
 }
 
-export function classifyMysteryQuestion(
+export function mysteryQuestionForAttribute(
+  attribute: MysteryAttribute,
+  locale: MysteryLocale,
+): string {
+  return MYSTERY_ATTRIBUTE_QUESTIONS[locale][attribute];
+}
+
+export function analyzeMysteryQuestion(
   question: string,
   item: MysteryItem,
   locale: MysteryLocale,
-): MysteryAnswer {
+): MysteryQuestionAnalysis {
   const normalized = normalizeText(question, locale);
   const detectedAttributes = MYSTERY_ATTRIBUTES.map((attribute) => ({
     attribute,
@@ -486,10 +539,10 @@ export function classifyMysteryQuestion(
       ATTRIBUTE_PATTERNS[locale][attribute],
     ),
   })).filter(({ matches }) => matches.length > 0);
-  if (detectedAttributes.length !== 1) return "unknown";
+  if (detectedAttributes.length !== 1) return { answer: "unknown" };
 
   const negations = findNegations(normalized, locale);
-  if (negations.length > 1) return "unknown";
+  if (negations.length > 1) return { answer: "unknown" };
   if (
     negations.length === 1 &&
     !detectedAttributes[0].matches.every((attributeMatch) =>
@@ -501,12 +554,26 @@ export function classifyMysteryQuestion(
       )
     )
   ) {
-    return "unknown";
+    return { answer: "unknown" };
   }
 
-  const value = item.attributes[detectedAttributes[0].attribute];
-  const answer = negations.length === 1 ? !value : value;
-  return answer ? "yes" : "no";
+  const attribute = detectedAttributes[0].attribute;
+  const negated = negations.length === 1;
+  const value = item.attributes[attribute];
+  const answer = negated ? !value : value;
+  return {
+    answer: answer ? "yes" : "no",
+    attribute,
+    negated,
+  };
+}
+
+export function classifyMysteryQuestion(
+  question: string,
+  item: MysteryItem,
+  locale: MysteryLocale,
+): MysteryAnswer {
+  return analyzeMysteryQuestion(question, item, locale).answer;
 }
 
 export function isMysteryGuessCorrect(

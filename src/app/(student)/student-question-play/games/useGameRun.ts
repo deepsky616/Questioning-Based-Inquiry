@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LadderGrid } from "@/lib/question-ladder";
+import {
+  getMysteryItem,
+  isMysteryGuessCorrect,
+} from "@/lib/mystery-box-rules";
 
 export interface GameRunSnapshot {
   id: string;
@@ -32,7 +36,36 @@ export interface GameRunSnapshot {
   memoryAnswerCards?: MemoryRunCard[];
   memoryMissReveal?: MemoryMissReveal | null;
   memoryReview?: MemoryReviewEntry[] | null;
+  mysteryLocale?: MysteryRunLocale;
+  mysteryNextStep?: MysteryRunNextStep;
+  mysteryActivityCount?: number;
+  mysteryStudentQuestionCount?: number;
+  mysteryHistory?: MysteryRunHistoryItem[];
+  mysteryWinner?: MysteryRunActor | null;
+  mysteryEndReason?: MysteryRunEndReason | null;
+  mysteryAnswerItemId?: string | null;
 }
+
+export type MysteryRunLocale = "ko" | "en";
+export type MysteryRunActor = "STUDENT" | "AI";
+export type MysteryRunNextStep = "STUDENT_ACTION" | "AI_TURN" | "COMPLETE";
+export type MysteryRunEndReason = "SOLVED" | "LIMIT";
+
+interface MysteryRunHistoryBase {
+  sequence: number;
+  actor: MysteryRunActor;
+  text: string;
+}
+
+export type MysteryRunHistoryItem =
+  | (MysteryRunHistoryBase & {
+      kind: "QUESTION";
+      answer: "yes" | "no";
+    })
+  | (MysteryRunHistoryBase & {
+      kind: "GUESS";
+      correct: boolean;
+    });
 
 export type MemoryRunDifficulty = "easy" | "normal" | "hard";
 
@@ -117,6 +150,8 @@ export type SubmittedStoryDiceAction = SubmittedRelayQuestion;
 
 export type SubmittedMemoryAction = SubmittedRelayQuestion;
 
+export type SubmittedMysteryAction = SubmittedRelayQuestion;
+
 type PendingKind = "create" | "action" | "ai" | "complete" | null;
 
 interface RetriableRequest {
@@ -144,6 +179,19 @@ export type UnconfirmedMemoryAction =
   | { action: "memory-flip-card"; cardId: string }
   | { action: "memory-ai-turn" }
   | { action: "memory-resolve-miss"; revealId: string };
+
+export type UnconfirmedMysteryAction =
+  | {
+      action: "mystery-submit-question";
+      locale: MysteryRunLocale;
+      question: string;
+    }
+  | {
+      action: "mystery-submit-guess";
+      locale: MysteryRunLocale;
+      guess: string;
+    }
+  | { action: "mystery-ai-turn" };
 
 export interface GameRunStartOptions {
   difficulty?: MemoryRunDifficulty;
@@ -239,6 +287,81 @@ function readMemoryReview(value: unknown, expectedCount: number): MemoryReviewEn
     : null;
 }
 
+const MYSTERY_PUBLIC_FIELDS = new Set([
+  "id",
+  "gameId",
+  "mode",
+  "status",
+  "version",
+  "targetCount",
+  "questionCount",
+  "aiTurnCount",
+  "awaitingAiTurn",
+  "preview",
+  "expiresAt",
+  "completedAt",
+  "mysteryLocale",
+  "mysteryNextStep",
+  "mysteryActivityCount",
+  "mysteryStudentQuestionCount",
+  "mysteryHistory",
+  "mysteryWinner",
+  "mysteryEndReason",
+  "mysteryAnswerItemId",
+]);
+
+function hasExactKeys(value: Record<string, unknown>, expected: readonly string[]) {
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return actual.length === sortedExpected.length &&
+    actual.every((key, index) => key === sortedExpected[index]);
+}
+
+function readMysteryHistory(value: unknown): MysteryRunHistoryItem[] | null {
+  if (!Array.isArray(value) || value.length > 20) return null;
+  const history: MysteryRunHistoryItem[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const item = value[index];
+    if (
+      !isRecord(item) ||
+      item.sequence !== index + 1 ||
+      (item.actor !== "STUDENT" && item.actor !== "AI") ||
+      typeof item.text !== "string" ||
+      !item.text ||
+      item.text !== item.text.trim()
+    ) return null;
+    if (item.kind === "QUESTION") {
+      if (
+        !hasExactKeys(item, ["sequence", "actor", "kind", "text", "answer"]) ||
+        (item.answer !== "yes" && item.answer !== "no") ||
+        [...item.text].length > 200
+      ) return null;
+      history.push({
+        sequence: item.sequence,
+        actor: item.actor,
+        kind: "QUESTION",
+        text: item.text,
+        answer: item.answer,
+      });
+      continue;
+    }
+    if (
+      item.kind !== "GUESS" ||
+      !hasExactKeys(item, ["sequence", "actor", "kind", "text", "correct"]) ||
+      typeof item.correct !== "boolean" ||
+      [...item.text].length > 80
+    ) return null;
+    history.push({
+      sequence: item.sequence,
+      actor: item.actor,
+      kind: "GUESS",
+      text: item.text,
+      correct: item.correct,
+    });
+  }
+  return history;
+}
+
 function readRun(value: unknown): GameRunSnapshot | null {
   if (!isRecord(value)) return null;
   if (
@@ -282,7 +405,113 @@ function readRun(value: unknown): GameRunSnapshot | null {
   let memoryAnswerCards: MemoryRunCard[] | undefined;
   let memoryMissReveal: MemoryMissReveal | null | undefined;
   let memoryReview: MemoryReviewEntry[] | null | undefined;
-  if (value.gameId === "memory") {
+  let mysteryLocale: MysteryRunLocale | undefined;
+  let mysteryNextStep: MysteryRunNextStep | undefined;
+  let mysteryActivityCount: number | undefined;
+  let mysteryStudentQuestionCount: number | undefined;
+  let mysteryHistory: MysteryRunHistoryItem[] | undefined;
+  let mysteryWinner: MysteryRunActor | null | undefined;
+  let mysteryEndReason: MysteryRunEndReason | null | undefined;
+  let mysteryAnswerItemId: string | null | undefined;
+  if (value.gameId === "mystery-box") {
+    const active = value.status === "ACTIVE";
+    const settled = value.status === "SETTLED";
+    const closedUnsettled = value.status === "EXPIRED" || value.status === "ABANDONED";
+    const locale = value.mysteryLocale;
+    const nextStep = value.mysteryNextStep;
+    const unknownPublicField = Object.keys(value).some(
+      (key) => !MYSTERY_PUBLIC_FIELDS.has(key),
+    );
+    if (
+      (value.mode !== "SOLO" && value.mode !== "AI") ||
+      (!active && !settled && !closedUnsettled) ||
+      (locale !== "ko" && locale !== "en") ||
+      (nextStep !== "STUDENT_ACTION" && nextStep !== "AI_TURN" && nextStep !== "COMPLETE") ||
+      value.targetCount !== 20 ||
+      unknownPublicField ||
+      typeof value.mysteryActivityCount !== "number" ||
+      !Number.isSafeInteger(value.mysteryActivityCount) ||
+      value.mysteryActivityCount < 0 ||
+      value.mysteryActivityCount > 20 ||
+      typeof value.mysteryStudentQuestionCount !== "number" ||
+      !Number.isSafeInteger(value.mysteryStudentQuestionCount) ||
+      value.mysteryStudentQuestionCount < 0 ||
+      value.mysteryStudentQuestionCount > value.mysteryActivityCount
+    ) return null;
+    const history = readMysteryHistory(value.mysteryHistory);
+    if (!history || history.length !== value.mysteryActivityCount) return null;
+    const aiActivities = history.filter((item) => item.actor === "AI").length;
+    const studentQuestions = history.filter(
+      (item) => item.actor === "STUDENT" && item.kind === "QUESTION",
+    ).length;
+    const actorsAreValid = value.mode === "SOLO"
+      ? history.every((item) => item.actor === "STUDENT")
+      : history.every((item, index) => item.actor === (index % 2 === 0 ? "STUDENT" : "AI"));
+    const correctGuessIndex = history.findIndex(
+      (item) => item.kind === "GUESS" && item.correct,
+    );
+    const expectedActiveNextStep = value.mode === "AI" && history.length % 2 === 1
+      ? "AI_TURN"
+      : "STUDENT_ACTION";
+    if (
+      !actorsAreValid ||
+      value.questionCount !== value.mysteryActivityCount ||
+      value.aiTurnCount !== aiActivities ||
+      value.mysteryStudentQuestionCount !== studentQuestions ||
+      value.version !== value.mysteryActivityCount + (closedUnsettled ? 2 : 1) ||
+      value.awaitingAiTurn !== (nextStep === "AI_TURN") ||
+      (value.mode === "SOLO" && value.aiTurnCount !== 0) ||
+      (nextStep === "COMPLETE") !== settled
+    ) return null;
+    if (!settled) {
+      if (
+        value.mysteryActivityCount >= 20 ||
+        nextStep !== expectedActiveNextStep ||
+        value.mysteryWinner !== null ||
+        value.mysteryEndReason !== null ||
+        value.mysteryAnswerItemId !== null ||
+        correctGuessIndex !== -1
+      ) return null;
+    } else {
+      const answerItem = typeof value.mysteryAnswerItemId === "string"
+        ? getMysteryItem(value.mysteryAnswerItemId)
+        : null;
+      if (
+        (value.mysteryWinner !== null &&
+          value.mysteryWinner !== "STUDENT" &&
+          value.mysteryWinner !== "AI") ||
+        (value.mysteryEndReason !== "SOLVED" && value.mysteryEndReason !== "LIMIT") ||
+        !answerItem
+      ) return null;
+      if (history.some((item) =>
+        item.kind === "GUESS" &&
+        item.correct !== isMysteryGuessCorrect(item.text, answerItem, locale)
+      )) return null;
+      const last = history.at(-1);
+      if (value.mysteryEndReason === "SOLVED") {
+        if (
+          !last ||
+          last.kind !== "GUESS" ||
+          !last.correct ||
+          correctGuessIndex !== history.length - 1 ||
+          value.mysteryWinner !== last.actor ||
+          !isMysteryGuessCorrect(last.text, answerItem, locale)
+        ) return null;
+      } else if (
+        value.mysteryActivityCount !== 20 ||
+        value.mysteryWinner !== null ||
+        correctGuessIndex !== -1
+      ) return null;
+    }
+    mysteryLocale = locale;
+    mysteryNextStep = nextStep;
+    mysteryActivityCount = value.mysteryActivityCount;
+    mysteryStudentQuestionCount = value.mysteryStudentQuestionCount;
+    mysteryHistory = history;
+    mysteryWinner = value.mysteryWinner as MysteryRunActor | null;
+    mysteryEndReason = value.mysteryEndReason as MysteryRunEndReason | null;
+    mysteryAnswerItemId = value.mysteryAnswerItemId as string | null;
+  } else if (value.gameId === "memory") {
     const difficulty = value.memoryDifficulty;
     const nextStep = value.memoryNextStep;
     const active = value.status === "ACTIVE";
@@ -661,6 +890,16 @@ function readRun(value: unknown): GameRunSnapshot | null {
     ...(memoryAnswerCards !== undefined ? { memoryAnswerCards } : {}),
     ...(memoryMissReveal !== undefined ? { memoryMissReveal } : {}),
     ...(memoryReview !== undefined ? { memoryReview } : {}),
+    ...(mysteryLocale !== undefined ? { mysteryLocale } : {}),
+    ...(mysteryNextStep !== undefined ? { mysteryNextStep } : {}),
+    ...(mysteryActivityCount !== undefined ? { mysteryActivityCount } : {}),
+    ...(mysteryStudentQuestionCount !== undefined
+      ? { mysteryStudentQuestionCount }
+      : {}),
+    ...(mysteryHistory !== undefined ? { mysteryHistory } : {}),
+    ...(mysteryWinner !== undefined ? { mysteryWinner } : {}),
+    ...(mysteryEndReason !== undefined ? { mysteryEndReason } : {}),
+    ...(mysteryAnswerItemId !== undefined ? { mysteryAnswerItemId } : {}),
   };
 }
 
@@ -821,6 +1060,14 @@ function isSameRunProgress(first: GameRunSnapshot, second: GameRunSnapshot) {
     JSON.stringify(first.memoryAnswerCards) === JSON.stringify(second.memoryAnswerCards) &&
     JSON.stringify(first.memoryMissReveal) === JSON.stringify(second.memoryMissReveal) &&
     JSON.stringify(first.memoryReview) === JSON.stringify(second.memoryReview) &&
+    first.mysteryLocale === second.mysteryLocale &&
+    first.mysteryNextStep === second.mysteryNextStep &&
+    first.mysteryActivityCount === second.mysteryActivityCount &&
+    first.mysteryStudentQuestionCount === second.mysteryStudentQuestionCount &&
+    JSON.stringify(first.mysteryHistory) === JSON.stringify(second.mysteryHistory) &&
+    first.mysteryWinner === second.mysteryWinner &&
+    first.mysteryEndReason === second.mysteryEndReason &&
+    first.mysteryAnswerItemId === second.mysteryAnswerItemId &&
     first.status === second.status
   );
 }
@@ -1325,6 +1572,75 @@ function isExpectedMemoryResolveAdvance(
   );
 }
 
+function sameMysteryRunIdentity(current: GameRunSnapshot, next: GameRunSnapshot) {
+  return (
+    current.gameId === "mystery-box" &&
+    next.gameId === "mystery-box" &&
+    next.id === current.id &&
+    next.mode === current.mode &&
+    next.preview === current.preview &&
+    next.mysteryLocale === current.mysteryLocale &&
+    next.targetCount === current.targetCount &&
+    next.version === current.version + 1
+  );
+}
+
+function hasMysteryHistoryAdvance(current: GameRunSnapshot, next: GameRunSnapshot) {
+  const currentHistory = current.mysteryHistory;
+  const nextHistory = next.mysteryHistory;
+  if (!currentHistory || !nextHistory || nextHistory.length !== currentHistory.length + 1) {
+    return false;
+  }
+  return currentHistory.every(
+    (item, index) => JSON.stringify(item) === JSON.stringify(nextHistory[index]),
+  );
+}
+
+function isExpectedMysteryStudentAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+  kind: "QUESTION" | "GUESS",
+  submittedText: string,
+) {
+  if (
+    !sameMysteryRunIdentity(current, next) ||
+    current.status !== "ACTIVE" ||
+    current.mysteryNextStep !== "STUDENT_ACTION" ||
+    !hasMysteryHistoryAdvance(current, next) ||
+    next.questionCount !== current.questionCount + 1 ||
+    next.mysteryActivityCount !== (current.mysteryActivityCount ?? 0) + 1 ||
+    next.aiTurnCount !== current.aiTurnCount
+  ) return false;
+  const last = next.mysteryHistory?.at(-1);
+  if (
+    !last ||
+    last.actor !== "STUDENT" ||
+    last.kind !== kind ||
+    last.text !== submittedText
+  ) return false;
+  const expectedStudentQuestions = (current.mysteryStudentQuestionCount ?? 0) +
+    (kind === "QUESTION" ? 1 : 0);
+  return next.mysteryStudentQuestionCount === expectedStudentQuestions;
+}
+
+function isExpectedMysteryAiAdvance(
+  current: GameRunSnapshot,
+  next: GameRunSnapshot,
+) {
+  if (
+    !sameMysteryRunIdentity(current, next) ||
+    current.mode !== "AI" ||
+    current.status !== "ACTIVE" ||
+    current.mysteryNextStep !== "AI_TURN" ||
+    !hasMysteryHistoryAdvance(current, next) ||
+    next.questionCount !== current.questionCount + 1 ||
+    next.mysteryActivityCount !== (current.mysteryActivityCount ?? 0) + 1 ||
+    next.aiTurnCount !== current.aiTurnCount + 1 ||
+    next.mysteryStudentQuestionCount !== current.mysteryStudentQuestionCount
+  ) return false;
+  return next.mysteryHistory?.at(-1)?.actor === "AI";
+}
+
 export function useGameRun() {
   const mountedRef = useRef(false);
   const generationRef = useRef(0);
@@ -1334,6 +1650,7 @@ export function useGameRun() {
   const diceRollRequestRef = useRef<RetriableRequest | null>(null);
   const storyRollRequestRef = useRef<RetriableRequest | null>(null);
   const memoryActionRequestRef = useRef<RetriableRequest | null>(null);
+  const mysteryActionRequestRef = useRef<RetriableRequest | null>(null);
   const aiIssueRequestRef = useRef<RetriableRequest | null>(null);
   const aiRecordRequestRef = useRef<RetriableAiRecordRequest | null>(null);
   const completeRequestRef = useRef<RetriableRequest | null>(null);
@@ -1346,6 +1663,8 @@ export function useGameRun() {
   const [unconfirmedDiceAction, setUnconfirmedDiceAction] = useState(false);
   const [unconfirmedMemoryAction, setUnconfirmedMemoryAction] =
     useState<UnconfirmedMemoryAction | null>(null);
+  const [unconfirmedMysteryAction, setUnconfirmedMysteryAction] =
+    useState<UnconfirmedMysteryAction | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -1377,6 +1696,7 @@ export function useGameRun() {
     diceRollRequestRef.current = null;
     storyRollRequestRef.current = null;
     memoryActionRequestRef.current = null;
+    mysteryActionRequestRef.current = null;
     aiIssueRequestRef.current = null;
     aiRecordRequestRef.current = null;
     completeRequestRef.current = null;
@@ -1389,6 +1709,7 @@ export function useGameRun() {
     setUnconfirmedQuestion(null);
     setUnconfirmedDiceAction(false);
     setUnconfirmedMemoryAction(null);
+    setUnconfirmedMysteryAction(null);
     setError(null);
     setConflict(RUN_CONFLICT_MESSAGE);
   }, []);
@@ -1424,7 +1745,11 @@ export function useGameRun() {
           gameId,
           mode,
           requestId: request.requestId,
-          ...(normalizedTopics ? { topics: normalizedTopics } : { topic: normalizedTopic }),
+          ...(gameId === "mystery-box"
+            ? {}
+            : normalizedTopics
+              ? { topics: normalizedTopics }
+              : { topic: normalizedTopic }),
           ...(memoryDifficulty ? { difficulty: memoryDifficulty } : {}),
           locale: normalizedLocale,
         }),
@@ -1450,6 +1775,7 @@ export function useGameRun() {
       diceRollRequestRef.current = null;
       storyRollRequestRef.current = null;
       memoryActionRequestRef.current = null;
+      mysteryActionRequestRef.current = null;
       aiIssueRequestRef.current = null;
       aiRecordRequestRef.current = null;
       completeRequestRef.current = null;
@@ -1459,6 +1785,7 @@ export function useGameRun() {
       setUnconfirmedQuestion(null);
       setUnconfirmedDiceAction(false);
       setUnconfirmedMemoryAction(null);
+      setUnconfirmedMysteryAction(null);
       return nextRun;
     } catch (requestError) {
       if (mountedRef.current && generationRef.current === generation) {
@@ -1617,6 +1944,184 @@ export function useGameRun() {
     revealId,
     runOverride,
   ), [executeMemoryAction]);
+
+  const executeMysteryAction = useCallback(async (
+    action: UnconfirmedMysteryAction["action"],
+    textValue: string | null,
+    localeValue: string,
+    runOverride?: GameRunSnapshot,
+  ): Promise<SubmittedMysteryAction | null> => {
+    const activeRun = runOverride ?? run;
+    const normalizedLocale: MysteryRunLocale = localeValue === "en" ? "en" : "ko";
+    const normalizedText = textValue?.trim() ?? null;
+    const validStudentAction =
+      activeRun?.mysteryNextStep === "STUDENT_ACTION" &&
+      activeRun.mysteryLocale === normalizedLocale &&
+      Boolean(normalizedText);
+    const validAction = action === "mystery-ai-turn"
+      ? activeRun?.mode === "AI" && activeRun.mysteryNextStep === "AI_TURN"
+      : validStudentAction;
+    if (
+      !activeRun ||
+      activeRun.gameId !== "mystery-box" ||
+      activeRun.status !== "ACTIVE" ||
+      conflict ||
+      !validAction ||
+      !begin(action === "mystery-ai-turn" ? "ai" : "action")
+    ) return null;
+    const generation = generationRef.current;
+    const key = [
+      activeRun.id,
+      activeRun.version,
+      action,
+      action === "mystery-ai-turn" ? "" : normalizedLocale,
+      normalizedText ?? "",
+    ].join(":");
+    const request = mysteryActionRequestRef.current?.key === key
+      ? mysteryActionRequestRef.current
+      : { key, requestId: newRequestId() };
+    mysteryActionRequestRef.current = request;
+    const uncertainAction: UnconfirmedMysteryAction = action === "mystery-submit-question"
+      ? { action, locale: normalizedLocale, question: normalizedText as string }
+      : action === "mystery-submit-guess"
+        ? { action, locale: normalizedLocale, guess: normalizedText as string }
+        : { action };
+    const expectedAdvance = (nextRun: GameRunSnapshot) =>
+      action === "mystery-submit-question"
+        ? isExpectedMysteryStudentAdvance(
+            activeRun,
+            nextRun,
+            "QUESTION",
+            normalizedText as string,
+          )
+        : action === "mystery-submit-guess"
+          ? isExpectedMysteryStudentAdvance(
+              activeRun,
+              nextRun,
+              "GUESS",
+              normalizedText as string,
+            )
+          : isExpectedMysteryAiAdvance(activeRun, nextRun);
+    const fallback = action === "mystery-submit-question"
+      ? "질문 답변을 받지 못했습니다."
+      : action === "mystery-submit-guess"
+        ? "정답 추측 결과를 확인하지 못했습니다."
+        : "인공지능 차례를 진행하지 못했습니다.";
+    try {
+      const responseValue = await readJson(await fetch(
+        `/api/question-games/runs/${activeRun.id}/actions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            requestId: request.requestId,
+            expectedVersion: activeRun.version,
+            ...(action === "mystery-submit-question"
+              ? { locale: normalizedLocale, question: normalizedText }
+              : {}),
+            ...(action === "mystery-submit-guess"
+              ? { locale: normalizedLocale, guess: normalizedText }
+              : {}),
+          }),
+        },
+      ));
+      let nextRun = readRun(responseValue.run);
+      if (!nextRun || !expectedAdvance(nextRun)) {
+        throw new Error("미스터리 박스 진행 결과를 확인할 수 없습니다.");
+      }
+      let nextResult = readSettlementResult(responseValue.result, nextRun);
+      if (responseValue.replayed === true) {
+        const current = await readRunResult(activeRun.id);
+        if (!isSameRunProgress(current.run, nextRun)) {
+          if (mountedRef.current && generationRef.current === generation) {
+            markConflict(current.run);
+          }
+          return null;
+        }
+        nextRun = current.run;
+        nextResult = current.result;
+      }
+      if (!mountedRef.current || generationRef.current !== generation) return null;
+      mysteryActionRequestRef.current = null;
+      setRun(nextRun);
+      if (nextResult) setResult(nextResult);
+      setUnconfirmedMysteryAction(null);
+      setError(null);
+      return { run: nextRun, result: nextResult };
+    } catch (requestError) {
+      const explicitlyRejected = isExplicitRequestRejection(requestError);
+      const message = requestErrorMessage(requestError, fallback);
+      try {
+        const recovered = await readRunResult(activeRun.id);
+        if (!explicitlyRejected && expectedAdvance(recovered.run)) {
+          if (!mountedRef.current || generationRef.current !== generation) return null;
+          mysteryActionRequestRef.current = null;
+          setRun(recovered.run);
+          if (recovered.result) setResult(recovered.result);
+          setUnconfirmedMysteryAction(null);
+          setError(null);
+          return recovered;
+        }
+        if (mountedRef.current && generationRef.current === generation) {
+          if (isSameRunProgress(recovered.run, activeRun)) {
+            if (explicitlyRejected) {
+              mysteryActionRequestRef.current = null;
+              setUnconfirmedMysteryAction(null);
+            } else {
+              setUnconfirmedMysteryAction(uncertainAction);
+            }
+            setError(message);
+          } else {
+            markConflict(recovered.run);
+          }
+        }
+      } catch {
+        if (mountedRef.current && generationRef.current === generation) {
+          if (explicitlyRejected) {
+            mysteryActionRequestRef.current = null;
+            setUnconfirmedMysteryAction(null);
+          } else {
+            setUnconfirmedMysteryAction(uncertainAction);
+          }
+          setError(message);
+        }
+      }
+      return null;
+    } finally {
+      finish(generation);
+    }
+  }, [begin, conflict, finish, markConflict, run]);
+
+  const submitMysteryQuestion = useCallback((
+    question: string,
+    locale: string,
+    runOverride?: GameRunSnapshot,
+  ) => executeMysteryAction(
+    "mystery-submit-question",
+    question,
+    locale,
+    runOverride,
+  ), [executeMysteryAction]);
+
+  const submitMysteryGuess = useCallback((
+    guess: string,
+    locale: string,
+    runOverride?: GameRunSnapshot,
+  ) => executeMysteryAction(
+    "mystery-submit-guess",
+    guess,
+    locale,
+    runOverride,
+  ), [executeMysteryAction]);
+
+  const runMysteryAiTurn = useCallback((runOverride?: GameRunSnapshot) =>
+    executeMysteryAction(
+      "mystery-ai-turn",
+      null,
+      runOverride?.mysteryLocale ?? run?.mysteryLocale ?? "ko",
+      runOverride,
+    ), [executeMysteryAction, run?.mysteryLocale]);
 
   const rollDice = useCallback(async (
     runOverride?: GameRunSnapshot,
@@ -2920,6 +3425,7 @@ export function useGameRun() {
     diceRollRequestRef.current = null;
     storyRollRequestRef.current = null;
     memoryActionRequestRef.current = null;
+    mysteryActionRequestRef.current = null;
     aiIssueRequestRef.current = null;
     aiRecordRequestRef.current = null;
     completeRequestRef.current = null;
@@ -2931,6 +3437,7 @@ export function useGameRun() {
     setUnconfirmedQuestion(null);
     setUnconfirmedDiceAction(false);
     setUnconfirmedMemoryAction(null);
+    setUnconfirmedMysteryAction(null);
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
@@ -2944,10 +3451,14 @@ export function useGameRun() {
     unconfirmedQuestion,
     unconfirmedDiceAction,
     unconfirmedMemoryAction,
+    unconfirmedMysteryAction,
     start,
     flipMemoryCard,
     runMemoryAiTurn,
     resolveMemoryMiss,
+    submitMysteryQuestion,
+    submitMysteryGuess,
+    runMysteryAiTurn,
     rollDice,
     rollStoryDice,
     submitRelayQuestion,

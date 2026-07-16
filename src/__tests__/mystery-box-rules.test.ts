@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   MYSTERY_ATTRIBUTES,
   MYSTERY_ITEMS,
+  analyzeMysteryQuestion,
   classifyMysteryQuestion,
   isMysteryGuessCorrect,
+  mysteryQuestionForAttribute,
 } from "@/lib/mystery-box-rules";
 
 const APPLE_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "apple");
@@ -88,6 +90,38 @@ describe("미스터리 박스 질문 규칙", () => {
       expected,
     );
   });
+
+  it("판정에 사용한 한 속성과 부정 여부를 함께 돌려준다", () => {
+    expect(analyzeMysteryQuestion("먹을 수 있나요?", APPLE_ITEM, "ko")).toEqual({
+      answer: "yes",
+      attribute: "edible",
+      negated: false,
+    });
+    expect(analyzeMysteryQuestion("Is it not edible?", APPLE_ITEM, "en")).toEqual({
+      answer: "no",
+      attribute: "edible",
+      negated: true,
+    });
+    expect(analyzeMysteryQuestion("무슨 소리가 나나요?", APPLE_ITEM, "ko")).toEqual({
+      answer: "unknown",
+    });
+  });
+
+  it.each(["ko", "en"] as const)(
+    "%s 고정 속성 질문은 모든 물건에서 한 속성으로 판정된다",
+    (locale) => {
+      for (const attribute of MYSTERY_ATTRIBUTES) {
+        const question = mysteryQuestionForAttribute(attribute, locale);
+        expect(question).toMatch(/[?？]$/u);
+        for (const item of MYSTERY_ITEMS) {
+          expect(analyzeMysteryQuestion(question, item, locale)).toMatchObject({
+            attribute,
+            negated: false,
+          });
+        }
+      }
+    },
+  );
 
   it.each([
     ["실내에 있나요?", "no"],

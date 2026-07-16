@@ -60,6 +60,22 @@ import {
   type MemoryRunState,
 } from "@/lib/question-game-memory-definition";
 import {
+  ensureMysteryProgress,
+  parseMysteryState,
+  planMysteryAiActivity,
+  type MysteryActor,
+  type MysteryRunHistoryItem,
+  type MysteryRunState,
+} from "@/lib/question-game-mystery-definition";
+import {
+  MYSTERY_ITEMS,
+  analyzeMysteryQuestion,
+  getMysteryItem,
+  isMysteryGuessCorrect,
+  type MysteryAnswerResolution,
+  type MysteryLocale,
+} from "@/lib/mystery-box-rules";
+import {
   ensureRelayProgress,
   parseRelayState,
   type RelayRunState,
@@ -93,6 +109,9 @@ const STORY_DICE_ANSWER_ACTIVITY_TYPE = "STORY_DICE_ANSWER";
 const MEMORY_FLIP_ACTIVITY_TYPE = "MEMORY_FLIP_CARD";
 const MEMORY_AI_TURN_ACTIVITY_TYPE = "MEMORY_AI_TURN";
 const MEMORY_RESOLVE_MISS_ACTIVITY_TYPE = "MEMORY_RESOLVE_MISS";
+const MYSTERY_STUDENT_QUESTION_ACTIVITY_TYPE = "MYSTERY_STUDENT_QUESTION";
+const MYSTERY_STUDENT_GUESS_ACTIVITY_TYPE = "MYSTERY_STUDENT_GUESS";
+const MYSTERY_AI_ACTIVITY_TYPE = "MYSTERY_AI_ACTIVITY";
 const COMPLETE_ACTIVITY_TYPE = "RUN_COMPLETE";
 
 type ActorRole = "STUDENT" | "TEACHER";
@@ -127,6 +146,23 @@ export interface QuestionGameAiTurnResponse {
   proofId: string;
   expiresAt: string;
   runVersion: number;
+}
+
+export interface MysteryRunAnswerResolution extends MysteryAnswerResolution {
+  runId: string;
+  requestId: string;
+  expectedVersion: number;
+}
+
+export interface MysteryQuestionResolutionRequired {
+  kind: "mystery-resolution-required";
+  resolution: Omit<MysteryRunAnswerResolution, "answer">;
+}
+
+export function isMysteryQuestionResolutionRequired(
+  value: unknown,
+): value is MysteryQuestionResolutionRequired {
+  return isRecord(value) && value.kind === "mystery-resolution-required";
 }
 
 interface RelaySettlement {
@@ -207,7 +243,7 @@ function activityHashSecret(): string {
 }
 
 function hashActivityText(
-  scope: "topic" | "question" | "story" | "answer" | "ai-output" | "ai-context",
+  scope: "topic" | "question" | "guess" | "story" | "answer" | "ai-output" | "ai-context",
   text: string,
 ): string {
   return createHmac("sha256", activityHashSecret())
@@ -1948,18 +1984,648 @@ async function settleMemoryRun(
   };
 }
 
+type MysteryActivityType =
+  | typeof MYSTERY_STUDENT_QUESTION_ACTIVITY_TYPE
+  | typeof MYSTERY_STUDENT_GUESS_ACTIVITY_TYPE
+  | typeof MYSTERY_AI_ACTIVITY_TYPE;
+
+interface PendingMysteryActivityEvidence {
+  sequence: number;
+  type: MysteryActivityType;
+  payload: Record<string, unknown>;
+  validQuestionCount: number;
+}
+
+interface MysteryTransition {
+  state: MysteryRunState;
+  payload: Record<string, unknown>;
+  validQuestionCount: number;
+  type: MysteryActivityType;
+}
+
+function validateMysteryGuess(value: unknown) {
+  const guess = typeof value === "string" ? value.trim() : "";
+  if (!guess || [...guess].length > QUESTION_GAME_LIMITS.shortWord) {
+    throw new QuestionGameRunError("추측은 팔십 자 안으로 입력해 주세요", 400);
+  }
+  if (checkProfanity(guess).flagged) {
+    throw new QuestionGameRunError("추측에 사용할 수 없는 표현이 있습니다", 400);
+  }
+  return guess;
+}
+
+function mysteryQuestionEntry(
+  state: MysteryRunState,
+  actor: MysteryActor,
+  question: string,
+  textHash: string,
+  answer: "yes" | "no",
+  source: "RULE" | "AI",
+): MysteryRunHistoryItem {
+  const item = getMysteryItem(state.privateItemId);
+  if (!item) {
+    throw new QuestionGameRunError("미스터리 박스 실행 상태가 손상되었습니다", 409);
+  }
+  const analysis = analyzeMysteryQuestion(question, item, state.mysteryLocale);
+  if (source === "RULE") {
+    if (analysis.answer === "unknown" || analysis.answer !== answer) {
+      throw new QuestionGameRunError("미스터리 박스 질문 판정을 확인할 수 없습니다", 409);
+    }
+    return {
+      sequence: state.activitySequence + 1,
+      actor,
+      kind: "QUESTION",
+      locale: state.mysteryLocale,
+      text: question,
+      textHash,
+      answer,
+      answerSource: "RULE",
+      attribute: analysis.attribute,
+      negated: analysis.negated,
+    };
+  }
+  if (actor !== "STUDENT" || analysis.answer !== "unknown") {
+    throw new QuestionGameRunError("미스터리 박스 질문 판정을 확인할 수 없습니다", 409);
+  }
+  return {
+    sequence: state.activitySequence + 1,
+    actor,
+    kind: "QUESTION",
+    locale: state.mysteryLocale,
+    text: question,
+    textHash,
+    answer,
+    answerSource: "AI",
+  };
+}
+
+function mysteryGuessEntry(
+  state: MysteryRunState,
+  actor: MysteryActor,
+  guess: string,
+  textHash: string,
+): MysteryRunHistoryItem {
+  const item = getMysteryItem(state.privateItemId);
+  if (!item) {
+    throw new QuestionGameRunError("미스터리 박스 실행 상태가 손상되었습니다", 409);
+  }
+  const guessedItemId = MYSTERY_ITEMS.find((candidate) =>
+    isMysteryGuessCorrect(guess, candidate, state.mysteryLocale)
+  )?.id;
+  return {
+    sequence: state.activitySequence + 1,
+    actor,
+    kind: "GUESS",
+    locale: state.mysteryLocale,
+    text: guess,
+    textHash,
+    correct: isMysteryGuessCorrect(guess, item, state.mysteryLocale),
+    ...(guessedItemId ? { guessedItemId } : {}),
+  };
+}
+
+function applyMysteryActivity(
+  state: MysteryRunState,
+  mode: RunMode,
+  activity: MysteryRunHistoryItem,
+): MysteryTransition {
+  const nextCount = state.questionCount + 1;
+  const solved = activity.kind === "GUESS" && activity.correct;
+  const complete = solved || nextCount === state.targetCount;
+  const nextState: MysteryRunState = {
+    ...state,
+    questionCount: nextCount,
+    aiTurnCount: state.aiTurnCount + (activity.actor === "AI" ? 1 : 0),
+    activitySequence: nextCount,
+    mysteryStudentQuestionCount: state.mysteryStudentQuestionCount +
+      (activity.actor === "STUDENT" && activity.kind === "QUESTION" ? 1 : 0),
+    mysteryNextStep: complete
+      ? "COMPLETE"
+      : mode === "AI" && nextCount % 2 === 1
+        ? "AI_TURN"
+        : "STUDENT_ACTION",
+    history: [...state.history, activity],
+    ...(solved ? { mysteryWinner: activity.actor } : {}),
+    ...(complete ? { mysteryEndReason: solved ? "SOLVED" : "LIMIT" } : {}),
+  };
+  const payload = activity.kind === "QUESTION"
+    ? {
+        actor: activity.actor,
+        kind: activity.kind,
+        locale: activity.locale,
+        textHash: activity.textHash,
+        answer: activity.answer,
+        answerSource: activity.answerSource,
+      }
+    : {
+        actor: activity.actor,
+        kind: activity.kind,
+        locale: activity.locale,
+        textHash: activity.textHash,
+        correct: activity.correct,
+      };
+  return {
+    state: nextState,
+    payload,
+    validQuestionCount:
+      activity.actor === "STUDENT" && activity.kind === "QUESTION" ? 1 : 0,
+    type: activity.actor === "AI"
+      ? MYSTERY_AI_ACTIVITY_TYPE
+      : activity.kind === "QUESTION"
+        ? MYSTERY_STUDENT_QUESTION_ACTIVITY_TYPE
+        : MYSTERY_STUDENT_GUESS_ACTIVITY_TYPE,
+  };
+}
+
+function mysteryEvidenceError(): never {
+  throw new QuestionGameRunError("서버에서 미스터리 박스 활동 순서를 확인할 수 없습니다", 409);
+}
+
+function verifyMysteryHistoryHash(activity: MysteryRunHistoryItem) {
+  const scope = activity.kind === "QUESTION" ? "question" : "guess";
+  if (activity.textHash !== hashActivityText(scope, activity.text)) mysteryEvidenceError();
+}
+
+async function verifyMysteryActivitySequence(
+  tx: RunTransaction,
+  run: StoredRun,
+  state: MysteryRunState,
+  mode: RunMode,
+  pending?: PendingMysteryActivityEvidence,
+) {
+  const stored = await tx.gameActivity.findMany({
+    where: {
+      runId: run.id,
+      type: {
+        in: [
+          MYSTERY_STUDENT_QUESTION_ACTIVITY_TYPE,
+          MYSTERY_STUDENT_GUESS_ACTIVITY_TYPE,
+          MYSTERY_AI_ACTIVITY_TYPE,
+        ],
+      },
+    },
+    orderBy: { sequence: "asc" },
+  });
+  const activities = [
+    ...stored.map((activity) => ({
+      sequence: activity.sequence,
+      type: activity.type as MysteryActivityType,
+      payload: activity.payload,
+      validQuestionCount: activity.validQuestionCount,
+    })),
+    ...(pending ? [pending] : []),
+  ];
+  if (activities.length !== state.activitySequence) mysteryEvidenceError();
+
+  let verifiedQuestionCount = 0;
+  let verifiedAiTurnCount = 0;
+  const item = getMysteryItem(state.privateItemId);
+  if (!item) mysteryEvidenceError();
+  for (let index = 0; index < activities.length; index += 1) {
+    const evidence = activities[index];
+    const history = state.history[index];
+    if (
+      !history ||
+      evidence.sequence !== index + 1 ||
+      !isRecord(evidence.payload)
+    ) mysteryEvidenceError();
+    verifyMysteryHistoryHash(history);
+    const payload = evidence.payload;
+    const expectedType: MysteryActivityType = history.actor === "AI"
+      ? MYSTERY_AI_ACTIVITY_TYPE
+      : history.kind === "QUESTION"
+        ? MYSTERY_STUDENT_QUESTION_ACTIVITY_TYPE
+        : MYSTERY_STUDENT_GUESS_ACTIVITY_TYPE;
+    const expectedValid = history.actor === "STUDENT" && history.kind === "QUESTION"
+      ? 1
+      : 0;
+    if (
+      evidence.type !== expectedType ||
+      evidence.validQuestionCount !== expectedValid ||
+      payload.actor !== history.actor ||
+      payload.kind !== history.kind ||
+      payload.locale !== history.locale ||
+      payload.textHash !== history.textHash
+    ) mysteryEvidenceError();
+
+    if (history.kind === "QUESTION") {
+      if (
+        !onlyPayloadKeys(payload, [
+          "actor", "kind", "locale", "textHash", "answer", "answerSource",
+        ]) ||
+        payload.answer !== history.answer ||
+        payload.answerSource !== history.answerSource
+      ) mysteryEvidenceError();
+      const analysis = analyzeMysteryQuestion(history.text, item, history.locale);
+      if (
+        (history.answerSource === "RULE" &&
+          (analysis.answer === "unknown" || analysis.answer !== history.answer)) ||
+        (history.answerSource === "AI" &&
+          (history.actor !== "STUDENT" || analysis.answer !== "unknown"))
+      ) mysteryEvidenceError();
+      if (history.actor === "STUDENT") verifiedQuestionCount += 1;
+    } else {
+      if (
+        !onlyPayloadKeys(payload, [
+          "actor", "kind", "locale", "textHash", "correct",
+        ]) ||
+        payload.correct !== history.correct ||
+        history.correct !== isMysteryGuessCorrect(history.text, item, history.locale)
+      ) mysteryEvidenceError();
+    }
+    if (history.actor === "AI") {
+      const plan = planMysteryAiActivity(state.history.slice(0, index), state.mysteryLocale);
+      if (
+        plan.kind !== history.kind ||
+        plan.text !== history.text ||
+        (plan.kind === "QUESTION" &&
+          (history.kind !== "QUESTION" || history.attribute !== plan.attribute)) ||
+        (plan.kind === "GUESS" &&
+          (history.kind !== "GUESS" || history.guessedItemId !== plan.guessedItemId))
+      ) mysteryEvidenceError();
+      verifiedAiTurnCount += 1;
+    }
+  }
+  if (
+    verifiedQuestionCount !== state.mysteryStudentQuestionCount ||
+    verifiedAiTurnCount !== state.aiTurnCount ||
+    (mode === "SOLO" && verifiedAiTurnCount !== 0)
+  ) mysteryEvidenceError();
+  return { verifiedQuestionCount, verifiedAiTurnCount };
+}
+
+async function settleMysteryRun(
+  tx: RunTransaction,
+  actor: { id: string; role: ActorRole },
+  run: StoredRun,
+  state: MysteryRunState,
+  mode: RunMode,
+  completedAt: Date,
+  pending?: PendingMysteryActivityEvidence,
+  incrementVersion = true,
+): Promise<RelaySettlement> {
+  if (state.mysteryNextStep !== "COMPLETE" || state.result) {
+    throw new QuestionGameRunError("미스터리 박스를 끝까지 진행해 주세요", 409);
+  }
+  const { verifiedQuestionCount, verifiedAiTurnCount } =
+    await verifyMysteryActivitySequence(tx, run, state, mode, pending);
+  const { day, result } = await awardVerifiedQuestionGameRun(
+    tx,
+    actor,
+    run,
+    mode,
+    completedAt,
+    verifiedQuestionCount,
+  );
+  const settledState: MysteryRunState = { ...state, result };
+  const nextRun = await tx.gameRun.update({
+    where: { id: run.id },
+    data: {
+      status: "SETTLED",
+      state: toJson(settledState),
+      version: run.version + (incrementVersion ? 1 : 0),
+      scoreDate: day,
+      completedAt,
+      settledAt: completedAt,
+    },
+  });
+  return {
+    run: nextRun as StoredRun,
+    result,
+    verifiedQuestionCount,
+    verifiedAiTurnCount,
+    scoreDate: day,
+  };
+}
+
+async function storeMysteryTransition(
+  tx: RunTransaction,
+  actor: { id: string; role: ActorRole },
+  run: StoredRun,
+  mode: RunMode,
+  requestId: string,
+  requestFingerprint: string,
+  transition: MysteryTransition,
+) {
+  ensureMysteryProgress(transition.state, mode, run.version + 1);
+  const evidence: PendingMysteryActivityEvidence = {
+    sequence: transition.state.activitySequence,
+    type: transition.type,
+    payload: transition.payload,
+    validQuestionCount: transition.validQuestionCount,
+  };
+  if (transition.state.mysteryNextStep === "COMPLETE") {
+    const completedAt = await lockedDatabaseClock(tx);
+    ensureActive(run, completedAt);
+    const settlement = await settleMysteryRun(
+      tx,
+      actor,
+      run,
+      transition.state,
+      mode,
+      completedAt,
+      evidence,
+    );
+    const response = {
+      run: publicRunWithRole(settlement.run, actor.role),
+      result: settlement.result,
+    };
+    await tx.gameActivity.create({
+      data: {
+        runId: run.id,
+        actorId: actor.id,
+        requestId,
+        requestFingerprint,
+        sequence: evidence.sequence,
+        type: evidence.type,
+        payload: toJson(evidence.payload),
+        validQuestionCount: evidence.validQuestionCount,
+        scoreValue: settlement.result.awarded,
+        responseSnapshot: toJson(response),
+      },
+    });
+    return { ...response, replayed: false };
+  }
+  const nextRun = await tx.gameRun.update({
+    where: { id: run.id },
+    data: { state: toJson(transition.state), version: run.version + 1 },
+  });
+  const response = { run: publicRunWithRole(nextRun as StoredRun, actor.role) };
+  await tx.gameActivity.create({
+    data: {
+      runId: run.id,
+      actorId: actor.id,
+      requestId,
+      requestFingerprint,
+      sequence: evidence.sequence,
+      type: evidence.type,
+      payload: toJson(evidence.payload),
+      validQuestionCount: evidence.validQuestionCount,
+      scoreValue: 0,
+      responseSnapshot: toJson(response),
+    },
+  });
+  return { ...response, replayed: false };
+}
+
+function validateMysteryResolution(
+  resolution: MysteryRunAnswerResolution,
+  expected: Omit<MysteryRunAnswerResolution, "answer">,
+) {
+  if (
+    resolution.runId !== expected.runId ||
+    resolution.requestId !== expected.requestId ||
+    resolution.expectedVersion !== expected.expectedVersion ||
+    resolution.itemId !== expected.itemId ||
+    resolution.playerId !== expected.playerId ||
+    resolution.locale !== expected.locale ||
+    resolution.question !== expected.question ||
+    (resolution.answer !== "yes" && resolution.answer !== "no")
+  ) {
+    throw new QuestionGameRunError("미스터리 박스 질문 판정을 확인할 수 없습니다", 409);
+  }
+  return resolution.answer;
+}
+
+async function submitMysteryQuestion(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+  resolution?: MysteryRunAnswerResolution,
+) {
+  const locale = parseLocale(input.locale) as MysteryLocale;
+  const { question } = validateQuestionText(input.question, locale);
+  const textHash = hashActivityText("question", question);
+  const requestFingerprint = fingerprint({ action: input.action, locale, textHash });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "mystery-box") {
+      throw new QuestionGameRunError("이 질문놀이는 미스터리 박스 질문을 지원하지 않습니다", 409);
+    }
+    const mode = storedRunMode(run.mode);
+    const state = parseMysteryState(run.state);
+    ensureMysteryProgress(state, mode, run.version);
+    if (state.mysteryNextStep !== "STUDENT_ACTION") {
+      throw new QuestionGameRunError("지금은 학생 질문 차례가 아닙니다", 409);
+    }
+    if (state.mysteryLocale !== locale) {
+      throw new QuestionGameRunError("실행을 만든 언어로 질문해 주세요", 409);
+    }
+    if (state.history.some((activity) =>
+      activity.kind === "QUESTION" && activity.textHash === textHash
+    )) {
+      throw new QuestionGameRunError("같은 질문은 다시 등록할 수 없습니다", 409);
+    }
+    const item = getMysteryItem(state.privateItemId);
+    if (!item) {
+      throw new QuestionGameRunError("미스터리 박스 실행 상태가 손상되었습니다", 409);
+    }
+    const analysis = analyzeMysteryQuestion(question, item, locale);
+    let answer: "yes" | "no";
+    let source: "RULE" | "AI";
+    if (analysis.answer === "unknown") {
+      const expectedResolution = {
+        runId: run.id,
+        requestId,
+        expectedVersion,
+        itemId: state.privateItemId,
+        playerId: actor.id,
+        locale,
+        question,
+      };
+      if (!resolution) {
+        return {
+          kind: "mystery-resolution-required",
+          resolution: expectedResolution,
+        } satisfies MysteryQuestionResolutionRequired;
+      }
+      answer = validateMysteryResolution(resolution, expectedResolution);
+      source = "AI";
+    } else {
+      if (resolution) {
+        throw new QuestionGameRunError("미스터리 박스 질문 판정이 중복되었습니다", 409);
+      }
+      answer = analysis.answer;
+      source = "RULE";
+    }
+    const entry = mysteryQuestionEntry(state, "STUDENT", question, textHash, answer, source);
+    return storeMysteryTransition(
+      tx,
+      actor,
+      run,
+      mode,
+      requestId,
+      requestFingerprint,
+      applyMysteryActivity(state, mode, entry),
+    );
+  });
+}
+
+async function submitMysteryGuess(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const locale = parseLocale(input.locale) as MysteryLocale;
+  const guess = validateMysteryGuess(input.guess);
+  const textHash = hashActivityText("guess", guess);
+  const requestFingerprint = fingerprint({ action: input.action, locale, textHash });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "mystery-box") {
+      throw new QuestionGameRunError("이 질문놀이는 미스터리 박스 추측을 지원하지 않습니다", 409);
+    }
+    const mode = storedRunMode(run.mode);
+    const state = parseMysteryState(run.state);
+    ensureMysteryProgress(state, mode, run.version);
+    if (state.mysteryNextStep !== "STUDENT_ACTION") {
+      throw new QuestionGameRunError("지금은 학생 추측 차례가 아닙니다", 409);
+    }
+    if (state.mysteryLocale !== locale) {
+      throw new QuestionGameRunError("실행을 만든 언어로 추측해 주세요", 409);
+    }
+    const entry = mysteryGuessEntry(state, "STUDENT", guess, textHash);
+    return storeMysteryTransition(
+      tx,
+      actor,
+      run,
+      mode,
+      requestId,
+      requestFingerprint,
+      applyMysteryActivity(state, mode, entry),
+    );
+  });
+}
+
+async function applyMysteryAiTurn(
+  actorId: string,
+  runId: string,
+  input: Record<string, unknown>,
+  requestId: string,
+  expectedVersion: number,
+  now: Date,
+) {
+  const requestFingerprint = fingerprint({ action: input.action });
+  return serializable(async (tx) => {
+    const actor = await loadActor(tx, actorId, "update");
+    const run = await loadOwnedRun(tx, actor.id, runId);
+    const existing = await tx.gameActivity.findUnique({
+      where: { uniq_game_activity_request: { runId, requestId } },
+    });
+    if (existing) {
+      if (existing.requestFingerprint !== requestFingerprint) {
+        throw new QuestionGameRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return { ...replaySnapshot(existing.responseSnapshot), replayed: true };
+    }
+    ensureActive(run, now);
+    if (run.version !== expectedVersion) {
+      throw new QuestionGameRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (run.gameId !== "mystery-box") {
+      throw new QuestionGameRunError("이 질문놀이는 미스터리 박스 인공지능 차례를 지원하지 않습니다", 409);
+    }
+    const mode = storedRunMode(run.mode);
+    if (mode !== "AI") {
+      throw new QuestionGameRunError("인공지능 도움 모드에서만 이용할 수 있습니다", 409);
+    }
+    const state = parseMysteryState(run.state);
+    ensureMysteryProgress(state, mode, run.version);
+    if (state.mysteryNextStep !== "AI_TURN") {
+      throw new QuestionGameRunError("지금은 인공지능 차례가 아닙니다", 409);
+    }
+    const plan = planMysteryAiActivity(state.history, state.mysteryLocale);
+    const textHash = hashActivityText(
+      plan.kind === "QUESTION" ? "question" : "guess",
+      plan.text,
+    );
+    const entry = plan.kind === "QUESTION"
+      ? (() => {
+          const item = getMysteryItem(state.privateItemId);
+          if (!item) {
+            throw new QuestionGameRunError("미스터리 박스 실행 상태가 손상되었습니다", 409);
+          }
+          const analysis = analyzeMysteryQuestion(plan.text, item, state.mysteryLocale);
+          if (analysis.answer === "unknown") {
+            throw new QuestionGameRunError("인공지능 질문 판정을 확인할 수 없습니다", 409);
+          }
+          return mysteryQuestionEntry(
+            state,
+            "AI",
+            plan.text,
+            textHash,
+            analysis.answer,
+            "RULE",
+          );
+        })()
+      : mysteryGuessEntry(state, "AI", plan.text, textHash);
+    return storeMysteryTransition(
+      tx,
+      actor,
+      run,
+      mode,
+      requestId,
+      requestFingerprint,
+      applyMysteryActivity(state, mode, entry),
+    );
+  });
+}
+
 export async function createQuestionGameRun(actorId: string, input: unknown, now = new Date()) {
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
   const mode = parseMode(input.mode);
   const gameId = typeof input.gameId === "string" ? input.gameId : "";
   if (!gameId) throw new QuestionGameRunError("질문놀이 식별값이 필요합니다", 400);
+  if (gameId === "mystery-box") {
+    const allowed = new Set(["gameId", "mode", "locale", "requestId"]);
+    if (Object.keys(input).some((key) => !allowed.has(key))) {
+      throw new QuestionGameRunError("미스터리 박스 생성 요청이 올바르지 않습니다", 400);
+    }
+  }
   const locale = parseLocale(input.locale);
   let topicHash: string;
   let topicLength: number;
   let topicHashes: string[] | undefined;
   let difficulty: "easy" | "normal" | "hard" | undefined;
-  if (gameId === "memory") {
+  if (gameId === "mystery-box") {
+    topicHash = hashActivityText("topic", gameId);
+    topicLength = 0;
+  } else if (gameId === "memory") {
     difficulty = parseMemoryDifficulty(input.difficulty);
     topicHash = hashActivityText("topic", gameId);
     topicLength = 0;
@@ -3876,10 +4542,28 @@ export async function applyQuestionGameRunAction(
   runId: string,
   input: unknown,
   now = new Date(),
+  mysteryResolution?: MysteryRunAnswerResolution,
 ) {
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
   const expectedVersion = requireVersion(input.expectedVersion);
+  if (input.action === "mystery-submit-question") {
+    return submitMysteryQuestion(
+      actorId,
+      runId,
+      input,
+      requestId,
+      expectedVersion,
+      now,
+      mysteryResolution,
+    );
+  }
+  if (input.action === "mystery-submit-guess") {
+    return submitMysteryGuess(actorId, runId, input, requestId, expectedVersion, now);
+  }
+  if (input.action === "mystery-ai-turn") {
+    return applyMysteryAiTurn(actorId, runId, input, requestId, expectedVersion, now);
+  }
   if (input.action === "memory-flip-card") {
     return flipQuestionGameMemoryCard(
       actorId,
@@ -4122,7 +4806,8 @@ export async function completeQuestionGameRun(
       run.gameId !== "ladder" &&
       run.gameId !== "kaba" &&
       run.gameId !== "story-dice" &&
-      run.gameId !== "memory"
+      run.gameId !== "memory" &&
+      run.gameId !== "mystery-box"
     ) {
       throw new QuestionGameRunError("이 질문놀이는 서버 완료를 아직 지원하지 않습니다", 409, {
         unsupported: true,
@@ -4138,6 +4823,8 @@ export async function completeQuestionGameRun(
           ? parseLadderState(run.state)
         : run.gameId === "kaba"
           ? parseKabaState(run.state)
+        : run.gameId === "mystery-box"
+          ? parseMysteryState(run.state)
           : run.gameId === "memory"
             ? parseMemoryState(run.state)
             : parseStoryDiceState(run.state);
@@ -4161,6 +4848,13 @@ export async function completeQuestionGameRun(
     } else if (run.gameId === "memory") {
       ensureMemoryProgress(
         state as MemoryRunState,
+        mode,
+        run.version,
+        run.status === "ACTIVE",
+      );
+    } else if (run.gameId === "mystery-box") {
+      ensureMysteryProgress(
+        state as MysteryRunState,
         mode,
         run.version,
         run.status === "ACTIVE",
@@ -4236,6 +4930,17 @@ export async function completeQuestionGameRun(
                   undefined,
                   false,
                 )
+              : run.gameId === "mystery-box"
+                ? await settleMysteryRun(
+                    tx,
+                    actor,
+                    run,
+                    state as MysteryRunState,
+                    mode,
+                    completedAt,
+                    undefined,
+                    false,
+                  )
               : await settleStoryDiceRun(
                   tx,
                   actor,

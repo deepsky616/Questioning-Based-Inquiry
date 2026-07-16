@@ -13,6 +13,11 @@ import {
   SOLO_POINTS,
 } from "../../src/lib/points-policy";
 import {
+  classifyMysteryQuestion,
+  getMysteryItem,
+  isMysteryGuessCorrect,
+} from "../../src/lib/mystery-box-rules";
+import {
   STORY_DICE_FALLBACK,
   STORY_DICE_FALLBACK_EN,
   type DiceCategory,
@@ -27,7 +32,14 @@ const REQUEST_ID_PATTERN =
 type RunMode = "SOLO" | "AI";
 type RunLocale = "ko" | "en";
 type RunStatus = "ACTIVE" | "SETTLED";
-type RunGameId = "relay" | "dice" | "ladder" | "kaba" | "story-dice" | "memory";
+type RunGameId =
+  | "relay"
+  | "dice"
+  | "ladder"
+  | "kaba"
+  | "story-dice"
+  | "memory"
+  | "mystery-box";
 type DiceActor = "STUDENT" | "AI";
 type DiceNextStep =
   | "STUDENT_ROLL"
@@ -51,6 +63,25 @@ type MemoryNextStep =
   | "RESOLVE_MISS"
   | "COMPLETE";
 type MemoryCardState = "HIDDEN" | "REVEALED" | "TAKEN";
+type MysteryActor = "STUDENT" | "AI";
+type MysteryNextStep = "STUDENT_ACTION" | "AI_TURN" | "COMPLETE";
+type MysteryEndReason = "SOLVED" | "LIMIT";
+
+type MysteryHistoryItem =
+  | {
+      sequence: number;
+      actor: MysteryActor;
+      kind: "QUESTION";
+      text: string;
+      answer: "yes" | "no";
+    }
+  | {
+      sequence: number;
+      actor: MysteryActor;
+      kind: "GUESS";
+      text: string;
+      correct: boolean;
+    };
 
 interface MemoryCard {
   id: string;
@@ -160,6 +191,13 @@ interface StoredRun {
   memoryQuestionCards?: MemoryCard[];
   memoryAnswerCards?: MemoryCard[];
   memoryMissReveal?: MemoryMissReveal;
+  mysteryItemId?: string;
+  mysteryNextStep?: MysteryNextStep;
+  mysteryActivityCount?: number;
+  mysteryStudentQuestionCount?: number;
+  mysteryHistory?: MysteryHistoryItem[];
+  mysteryWinner?: MysteryActor;
+  mysteryEndReason?: MysteryEndReason;
   studentMatchCount: number;
   aiMatchCount: number;
 }
@@ -240,6 +278,14 @@ function requireKabaAttempt(value: unknown) {
     throw new BrowserRunError("바꾼 문장을 입력해 주세요", 400);
   }
   return question;
+}
+
+function requireMysteryGuess(value: unknown) {
+  const guess = typeof value === "string" ? value.trim() : "";
+  if (!guess || [...guess].length > QUESTION_GAME_LIMITS.shortWord) {
+    throw new BrowserRunError("정답 추측을 여든 자 이내로 입력해 주세요", 400);
+  }
+  return guess;
 }
 
 function requireStory(value: unknown) {
@@ -365,6 +411,10 @@ function publicRun(run: StoredRun) {
           ? run.status === "ACTIVE" &&
             run.mode === "AI" &&
             run.memoryNextStep === "AI_TURN"
+          : run.gameId === "mystery-box"
+            ? run.status === "ACTIVE" &&
+              run.mode === "AI" &&
+              run.mysteryNextStep === "AI_TURN"
         : false;
   return {
     id: run.id,
@@ -425,6 +475,19 @@ function publicRun(run: StoredRun) {
             : null,
         }
       : {}),
+    ...(run.gameId === "mystery-box"
+      ? {
+          mysteryLocale: run.locale,
+          mysteryNextStep: run.mysteryNextStep,
+          mysteryActivityCount: run.mysteryActivityCount,
+          mysteryStudentQuestionCount: run.mysteryStudentQuestionCount,
+          mysteryHistory: run.mysteryHistory ?? [],
+          mysteryWinner: run.mysteryWinner ?? null,
+          mysteryEndReason: run.mysteryEndReason ?? null,
+          mysteryAnswerItemId:
+            run.status === "SETTLED" ? run.mysteryItemId ?? null : null,
+        }
+      : {}),
   };
 }
 
@@ -466,7 +529,9 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     const earned = dailyEarned.get(dailyKey) ?? 0;
     const validQuestionCount = run.gameId === "kaba"
       ? run.correctCount
-      : run.questionCount;
+      : run.gameId === "mystery-box"
+        ? run.mysteryStudentQuestionCount ?? 0
+        : run.questionCount;
     const requested = run.gameId === "memory"
       ? run.mode === "SOLO"
         ? run.studentMatchCount + 2
@@ -503,6 +568,9 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
         if (card.state === "HIDDEN") card.state = "REVEALED";
       }
     }
+    if (run.gameId === "mystery-box") {
+      run.mysteryNextStep = "COMPLETE";
+    }
   };
 
   const createRun = (
@@ -517,7 +585,8 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       gameId !== "ladder" &&
       gameId !== "kaba" &&
       gameId !== "story-dice" &&
-      gameId !== "memory"
+      gameId !== "memory" &&
+      gameId !== "mystery-box"
     ) {
       throw new BrowserRunError("이 질문놀이는 서버 점수 기록을 아직 지원하지 않습니다", 409);
     }
@@ -604,6 +673,15 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
             memoryNextStep: "STUDENT_QUESTION" as const,
             memoryQuestionCards: memoryCards.questions,
             memoryAnswerCards: memoryCards.answers,
+          }
+        : {}),
+      ...(gameId === "mystery-box"
+        ? {
+            mysteryItemId: "apple",
+            mysteryNextStep: "STUDENT_ACTION" as const,
+            mysteryActivityCount: 0,
+            mysteryStudentQuestionCount: 0,
+            mysteryHistory: [],
           }
         : {}),
     };
@@ -1222,6 +1300,247 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     return success(200, { ...response, replayed: false });
   };
 
+  const mysteryState = (run: StoredRun) => {
+    const item = run.mysteryItemId ? getMysteryItem(run.mysteryItemId) : null;
+    if (
+      run.gameId !== "mystery-box" ||
+      !item ||
+      !run.mysteryNextStep ||
+      !Number.isSafeInteger(run.mysteryActivityCount) ||
+      !Number.isSafeInteger(run.mysteryStudentQuestionCount) ||
+      !run.mysteryHistory
+    ) {
+      throw new BrowserRunError("미스터리 박스 실행 상태가 올바르지 않습니다", 409);
+    }
+    return {
+      item,
+      nextStep: run.mysteryNextStep,
+      activityCount: run.mysteryActivityCount as number,
+      studentQuestionCount: run.mysteryStudentQuestionCount as number,
+      history: run.mysteryHistory,
+    };
+  };
+
+  const rememberMysteryActivity = (
+    run: StoredRun,
+    requestId: string,
+    actionFingerprint: string,
+    item: MysteryHistoryItem,
+  ) => {
+    const state = mysteryState(run);
+    if (state.activityCount >= run.targetCount) {
+      throw new BrowserRunError("이미 끝난 미스터리 박스 실행입니다", 409);
+    }
+    run.mysteryHistory = [...state.history, item];
+    run.mysteryActivityCount = state.activityCount + 1;
+    run.questionCount += 1;
+    if (item.actor === "AI") run.aiTurnCount += 1;
+    if (item.actor === "STUDENT" && item.kind === "QUESTION") {
+      run.mysteryStudentQuestionCount = state.studentQuestionCount + 1;
+      run.questionHashes.push(hashPrivateText("question", item.text));
+    }
+    run.version += 1;
+
+    if (item.kind === "GUESS" && item.correct) {
+      run.mysteryWinner = item.actor;
+      run.mysteryEndReason = "SOLVED";
+      settle(run);
+    } else if (run.mysteryActivityCount === run.targetCount) {
+      run.mysteryEndReason = "LIMIT";
+      settle(run);
+    } else {
+      run.mysteryNextStep = run.mode === "SOLO" || item.actor === "AI"
+        ? "STUDENT_ACTION"
+        : "AI_TURN";
+    }
+
+    const response = {
+      run: publicRun(run),
+      ...(run.result ? { result: run.result } : {}),
+    };
+    run.actions.set(requestId, {
+      fingerprint: actionFingerprint,
+      response: cloneBody(response),
+    });
+    return success(200, { ...response, replayed: false });
+  };
+
+  const submitMysteryQuestion = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const locale = parseLocale(body.locale);
+    const question = requireQuestion(body.question, locale);
+    const actionFingerprint = fingerprint({
+      action: "mystery-submit-question",
+      locale,
+      question,
+    });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    const state = mysteryState(run);
+    if (run.status !== "ACTIVE") {
+      throw new BrowserRunError("이미 끝난 미스터리 박스 실행입니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (locale !== run.locale) {
+      throw new BrowserRunError("실행을 만든 언어로 질문해 주세요", 409);
+    }
+    if (state.nextStep !== "STUDENT_ACTION") {
+      throw new BrowserRunError("인공지능 차례를 먼저 마쳐 주세요", 409);
+    }
+    const questionHash = hashPrivateText("question", question);
+    if (run.questionHashes.includes(questionHash)) {
+      throw new BrowserRunError("같은 질문은 다시 등록할 수 없습니다", 409);
+    }
+    const answer = classifyMysteryQuestion(question, state.item, locale);
+    if (answer === "unknown") {
+      throw new BrowserRunError("한 가지 특징을 묻는 질문으로 다시 써 주세요", 422);
+    }
+    return rememberMysteryActivity(
+      run,
+      requestId,
+      actionFingerprint,
+      {
+        sequence: state.activityCount + 1,
+        actor: "STUDENT",
+        kind: "QUESTION",
+        text: question,
+        answer,
+      },
+    );
+  };
+
+  const submitMysteryGuess = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const locale = parseLocale(body.locale);
+    const guess = requireMysteryGuess(body.guess);
+    const actionFingerprint = fingerprint({
+      action: "mystery-submit-guess",
+      locale,
+      guess,
+    });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    const state = mysteryState(run);
+    if (run.status !== "ACTIVE") {
+      throw new BrowserRunError("이미 끝난 미스터리 박스 실행입니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+    if (locale !== run.locale) {
+      throw new BrowserRunError("실행을 만든 언어로 추측해 주세요", 409);
+    }
+    if (state.nextStep !== "STUDENT_ACTION") {
+      throw new BrowserRunError("인공지능 차례를 먼저 마쳐 주세요", 409);
+    }
+    return rememberMysteryActivity(
+      run,
+      requestId,
+      actionFingerprint,
+      {
+        sequence: state.activityCount + 1,
+        actor: "STUDENT",
+        kind: "GUESS",
+        text: guess,
+        correct: isMysteryGuessCorrect(guess, state.item, locale),
+      },
+    );
+  };
+
+  const playMysteryAiTurn = (
+    run: StoredRun,
+    body: Record<string, unknown>,
+    requestId: string,
+  ) => {
+    const actionFingerprint = fingerprint({ action: "mystery-ai-turn" });
+    const replay = run.actions.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== actionFingerprint) {
+        throw new BrowserRunError("같은 요청 식별값에 다른 동작이 들어왔습니다", 409);
+      }
+      return replayResponse(replay);
+    }
+    const state = mysteryState(run);
+    if (
+      run.status !== "ACTIVE" ||
+      run.mode !== "AI" ||
+      state.nextStep !== "AI_TURN"
+    ) {
+      throw new BrowserRunError("지금은 인공지능 미스터리 차례가 아닙니다", 409);
+    }
+    if (requireVersion(body.expectedVersion) !== run.version) {
+      throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);
+    }
+
+    const aiTurnNumber = run.aiTurnCount + 1;
+    if (aiTurnNumber % 3 === 2) {
+      const guess = run.locale === "en" ? "book" : "책";
+      return rememberMysteryActivity(
+        run,
+        requestId,
+        actionFingerprint,
+        {
+          sequence: state.activityCount + 1,
+          actor: "AI",
+          kind: "GUESS",
+          text: guess,
+          correct: isMysteryGuessCorrect(guess, state.item, run.locale),
+        },
+      );
+    }
+
+    const koreanQuestions = [
+      "먹을 수 있나요?",
+      "날 수 있나요?",
+      "둥근가요?",
+      "사람이 만든 것인가요?",
+      "작은가요?",
+    ];
+    const englishQuestions = [
+      "Is it edible?",
+      "Can it fly?",
+      "Is it round?",
+      "Is it human made?",
+      "Is it small?",
+    ];
+    const questions = run.locale === "en" ? englishQuestions : koreanQuestions;
+    const question = questions[(aiTurnNumber - 1) % questions.length];
+    const answer = classifyMysteryQuestion(question, state.item, run.locale);
+    if (answer === "unknown") {
+      throw new BrowserRunError("인공지능 미스터리 질문을 판정하지 못했습니다", 503);
+    }
+    return rememberMysteryActivity(
+      run,
+      requestId,
+      actionFingerprint,
+      {
+        sequence: state.activityCount + 1,
+        actor: "AI",
+        kind: "QUESTION",
+        text: question,
+        answer,
+      },
+    );
+  };
+
   const memoryCards = (run: StoredRun) => {
     if (
       run.gameId !== "memory" ||
@@ -1465,6 +1784,15 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
     if (body.action === "story-dice-submit-answer") {
       return submitStoryDiceAnswer(run, body, requestId);
     }
+    if (body.action === "mystery-submit-question") {
+      return submitMysteryQuestion(run, body, requestId);
+    }
+    if (body.action === "mystery-submit-guess") {
+      return submitMysteryGuess(run, body, requestId);
+    }
+    if (body.action === "mystery-ai-turn") {
+      return playMysteryAiTurn(run, body, requestId);
+    }
     if (body.action === "memory-flip-card") {
       return flipMemoryCard(run, body, requestId);
     }
@@ -1604,8 +1932,8 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
         replayed: true,
       });
     }
-    if (run.gameId === "memory") {
-      throw new BrowserRunError("카드 짝 찾기는 마지막 동작에서 자동으로 정산됩니다", 409);
+    if (run.gameId === "memory" || run.gameId === "mystery-box") {
+      throw new BrowserRunError("이 질문놀이는 마지막 동작에서 자동으로 정산됩니다", 409);
     }
     if (requireVersion(body.expectedVersion) !== run.version) {
       throw new BrowserRunError("질문놀이 실행 상태가 바뀌었습니다", 409);

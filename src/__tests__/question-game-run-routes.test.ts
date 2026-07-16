@@ -50,6 +50,7 @@ type StoredPointLog = {
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   checkRateLimit: vi.fn(),
+  generateJson: vi.fn(),
   generateText: vi.fn(),
   transaction: vi.fn(),
   queryRaw: vi.fn(),
@@ -72,7 +73,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: mocks.checkRateLimit }));
-vi.mock("@/lib/ai", () => ({ generateText: mocks.generateText }));
+vi.mock("@/lib/ai", () => ({
+  generateJson: mocks.generateJson,
+  generateText: mocks.generateText,
+}));
 vi.mock("@/lib/db", () => {
   const tx = {
     $queryRaw: mocks.queryRaw,
@@ -103,6 +107,15 @@ import { POST as createAiTurn } from "@/app/api/question-games/runs/[id]/ai-turn
 import { POST as completeRun } from "@/app/api/question-games/runs/[id]/complete/route";
 import { GET as getResult } from "@/app/api/question-games/runs/[id]/result/route";
 import { traceLadderColumns } from "@/lib/question-ladder";
+import {
+  MYSTERY_ATTRIBUTES,
+  getMysteryItem,
+  mysteryQuestionForAttribute,
+} from "@/lib/mystery-box-rules";
+import {
+  applyQuestionGameRunAction,
+  isMysteryQuestionResolutionRequired,
+} from "@/lib/question-game-run-service";
 
 const CREATE_ID = "00000000-0000-4000-8000-000000000001";
 const SECOND_CREATE_ID = "00000000-0000-4000-8000-000000000002";
@@ -159,6 +172,11 @@ const MEMORY_ACTION_IDS = Array.from(
   (_, index) => `00000000-0000-4000-8000-${String(401 + index).padStart(12, "0")}`,
 );
 const MEMORY_ALTERNATE_FINAL_ACTION_ID = "00000000-0000-4000-8000-000000000539";
+const MYSTERY_ACTION_IDS = Array.from(
+  { length: 80 },
+  (_, index) => `00000000-0000-4000-8000-${String(601 + index).padStart(12, "0")}`,
+);
+const MYSTERY_ALTERNATE_FINAL_ACTION_ID = "00000000-0000-4000-8000-000000000699";
 const COMPLETE_ID = "00000000-0000-4000-8000-000000000020";
 
 const users = new Map<string, { id: string; role: string; totalPoints: number }>();
@@ -168,6 +186,7 @@ const pointLogs: StoredPointLog[] = [];
 let userUpdateLock: Promise<void> = Promise.resolve();
 const runUpdateLocks = new Map<string, Promise<void>>();
 let databaseClock = new Date();
+let transactionDepth = 0;
 
 function jsonRequest(path: string, body: unknown) {
   return new Request(`http://localhost${path}`, {
@@ -278,6 +297,87 @@ async function createMemory(
     requestId: CREATE_ID,
     locale,
   });
+}
+
+async function createMystery(
+  mode: "solo" | "ai" = "solo",
+  locale: "ko" | "en" = "ko",
+) {
+  return postCreate({
+    gameId: "mystery-box",
+    mode,
+    requestId: CREATE_ID,
+    locale,
+  });
+}
+
+type TestMysteryState = {
+  privateItemId: string;
+  mysteryLocale: "ko" | "en";
+  questionCount: number;
+  mysteryNextStep: "STUDENT_ACTION" | "AI_TURN" | "COMPLETE";
+  history: Array<Record<string, unknown>>;
+};
+
+function storedMysteryState(id = "run-1") {
+  const state = runs.get(id)?.state as TestMysteryState | undefined;
+  if (!state) throw new Error("missing mystery state");
+  return state;
+}
+
+function mysterySecret(id = "run-1") {
+  const state = storedMysteryState(id);
+  const item = getMysteryItem(state.privateItemId);
+  if (!item) throw new Error("missing mystery item");
+  return item;
+}
+
+async function submitMysteryQuestion(
+  actionIndex: number,
+  expectedVersion: number,
+  question: string,
+  locale: "ko" | "en" = "ko",
+  id = "run-1",
+  requestId = MYSTERY_ACTION_IDS[actionIndex],
+) {
+  return postAction({
+    action: "mystery-submit-question",
+    requestId,
+    expectedVersion,
+    locale,
+    question,
+  }, id);
+}
+
+async function submitMysteryGuess(
+  actionIndex: number,
+  expectedVersion: number,
+  guess: string,
+  locale: "ko" | "en" = "ko",
+  id = "run-1",
+  requestId = MYSTERY_ACTION_IDS[actionIndex],
+) {
+  return postAction({
+    action: "mystery-submit-guess",
+    requestId,
+    expectedVersion,
+    locale,
+    guess,
+  }, id);
+}
+
+async function runMysteryAiTurn(
+  actionIndex: number,
+  expectedVersion: number,
+  extra: Record<string, unknown> = {},
+  id = "run-1",
+) {
+  return postAction({
+    action: "mystery-ai-turn",
+    requestId: MYSTERY_ACTION_IDS[actionIndex],
+    expectedVersion,
+    ...extra,
+  }, id);
 }
 
 type TestMemoryState = {
@@ -711,11 +811,13 @@ beforeEach(() => {
   userUpdateLock = Promise.resolve();
   runUpdateLocks.clear();
   databaseClock = new Date();
+  transactionDepth = 0;
   users.set("student-1", { id: "student-1", role: "STUDENT", totalPoints: 0 });
   users.set("student-2", { id: "student-2", role: "STUDENT", totalPoints: 0 });
   users.set("teacher-1", { id: "teacher-1", role: "TEACHER", totalPoints: 0 });
   mocks.auth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
   mocks.checkRateLimit.mockReturnValue(null);
+  mocks.generateJson.mockResolvedValue({ answer: "yes" });
   mocks.generateText.mockResolvedValue("그렇다면 별빛은 어디에서 시작될까요?");
   process.env.GAME_ACTIVITY_HASH_SECRET = "question-game-run-test-secret";
 
@@ -761,6 +863,7 @@ beforeEach(() => {
       }
       return [];
     };
+    transactionDepth += 1;
     try {
       return await callback({
         $queryRaw: queryRaw,
@@ -799,6 +902,7 @@ beforeEach(() => {
       }
       throw error;
     } finally {
+      transactionDepth -= 1;
       releases.reverse().forEach((release) => release());
     }
   });
@@ -3630,6 +3734,667 @@ describe("카드 짝 찾기 서버 실행 경로", () => {
     await expect(replay.json()).resolves.toMatchObject({
       replayed: true,
       run: { id: "run-1", status: "ABANDONED", version: 2 },
+    });
+    expect([...runs.values()].filter((run) => run.status === "ACTIVE")).toHaveLength(3);
+  });
+});
+
+describe("미스터리 박스 서버 실행 경로", () => {
+  it("고정 비밀 물건을 서버에서 고르고 정산 전에는 어떤 공개 자료에도 내보내지 않는다", async () => {
+    const extraTopic = await postCreate({
+      gameId: "mystery-box",
+      mode: "solo",
+      requestId: CREATE_ID,
+      locale: "ko",
+      topic: "우주",
+    });
+    const created = await createMystery();
+    const body = await created.json();
+    const secret = mysterySecret();
+    const replay = await createMystery();
+    const serialized = JSON.stringify(body);
+
+    expect(extraTopic.status).toBe(400);
+    expect(created.status).toBe(201);
+    expect(body).toMatchObject({
+      run: {
+        gameId: "mystery-box",
+        status: "ACTIVE",
+        version: 1,
+        questionCount: 0,
+        targetCount: 20,
+        mysteryLocale: "ko",
+        mysteryNextStep: "STUDENT_ACTION",
+        mysteryActivityCount: 0,
+        mysteryStudentQuestionCount: 0,
+        mysteryHistory: [],
+        mysteryWinner: null,
+        mysteryEndReason: null,
+        mysteryAnswerItemId: null,
+      },
+    });
+    expect(serialized).not.toContain("privateItemId");
+    expect(serialized).not.toContain(`"${secret.id}"`);
+    expect(serialized).not.toContain(`"${secret.names.ko}"`);
+    expect(serialized).not.toContain(`"${secret.names.en}"`);
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({ replayed: true, run: body.run });
+  });
+
+  it("규칙 질문을 원자적으로 기록하고 같은 요청 재생과 다른 질문을 구분한다", async () => {
+    await createMystery();
+    const secret = mysterySecret();
+    const response = await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const replay = await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const conflict = await submitMysteryQuestion(0, 1, "동물인가요?");
+    const duplicate = await submitMysteryQuestion(1, 2, "살아 있나요?");
+    const expectedAnswer = secret.attributes.living ? "yes" : "no";
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      replayed: false,
+      run: {
+        version: 2,
+        questionCount: 1,
+        mysteryActivityCount: 1,
+        mysteryStudentQuestionCount: 1,
+        mysteryNextStep: "STUDENT_ACTION",
+        mysteryHistory: [{
+          sequence: 1,
+          actor: "STUDENT",
+          kind: "QUESTION",
+          text: "살아 있나요?",
+          answer: expectedAnswer,
+        }],
+        mysteryAnswerItemId: null,
+      },
+    });
+    expect(replay.status).toBe(200);
+    await expect(replay.json()).resolves.toMatchObject({ replayed: true });
+    expect(conflict.status).toBe(409);
+    expect(duplicate.status).toBe(409);
+    expect(activities).toHaveLength(1);
+    expect(activities[0]).toMatchObject({
+      type: "MYSTERY_STUDENT_QUESTION",
+      validQuestionCount: 1,
+      sequence: 1,
+    });
+    const payload = JSON.stringify(activities[0].payload);
+    expect(payload).not.toContain(secret.id);
+    expect(payload).not.toMatch(/itemId|attribute|classification|private/u);
+  });
+
+  it("규칙 밖 학생 질문은 트랜잭션 밖 에이아이 판정 뒤 같은 요청으로 확정한다", async () => {
+    await createMystery();
+    mocks.generateJson.mockImplementationOnce(async () => {
+      expect(transactionDepth).toBe(0);
+      return { answer: "no" };
+    });
+
+    const response = await submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      run: {
+        version: 2,
+        questionCount: 1,
+        mysteryStudentQuestionCount: 1,
+        mysteryHistory: [{ answer: "no" }],
+        mysteryAnswerItemId: null,
+      },
+    });
+    expect(mocks.generateJson).toHaveBeenCalledOnce();
+    expect(storedMysteryState().history[0]).toMatchObject({ answerSource: "AI" });
+    expect(activities).toHaveLength(1);
+    expect(JSON.stringify(activities[0].responseSnapshot)).not.toContain(
+      storedMysteryState().privateItemId,
+    );
+  });
+
+  it.each([
+    ["unknown", 422, true],
+    ["failure", 503, false],
+  ] as const)(
+    "외부 판정 %s은 학생 활동과 실행 버전을 소비하지 않는다",
+    async (outcome, status, rewriteRequired) => {
+      await createMystery();
+      if (outcome === "unknown") {
+        mocks.generateJson.mockResolvedValueOnce({ answer: "unknown" });
+      } else {
+        mocks.generateJson.mockRejectedValueOnce(new Error("private-provider-failure"));
+      }
+
+      const response = await submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?");
+      const body = await response.json();
+
+      expect(response.status).toBe(status);
+      if (rewriteRequired) {
+        expect(body).toMatchObject({ mysteryRewriteRequired: true });
+      } else {
+        expect(body).toEqual({
+          error: "미스터리 박스 질문 판정을 잠시 처리할 수 없습니다. 다시 시도해 주세요",
+        });
+        expect(JSON.stringify(body)).not.toContain("private-provider-failure");
+        expect(JSON.stringify(body)).not.toContain(storedMysteryState().privateItemId);
+      }
+      expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 1 });
+      expect(storedMysteryState()).toMatchObject({ questionCount: 0, history: [] });
+      expect(activities).toHaveLength(0);
+      expect(pointLogs).toHaveLength(0);
+      expect(users.get("student-1")?.totalPoints).toBe(0);
+    },
+  );
+
+  it("외부 판정 사이 실행이 바뀌면 늦은 판정을 버리고 어떤 자료나 점수도 더하지 않는다", async () => {
+    await createMystery();
+    let finishProvider: ((value: { answer: "yes" }) => void) | undefined;
+    mocks.generateJson.mockImplementationOnce(() => new Promise((resolve) => {
+      finishProvider = resolve;
+    }));
+
+    const pending = submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?");
+    await vi.waitFor(() => expect(mocks.generateJson).toHaveBeenCalledOnce());
+    const competing = await submitMysteryGuess(1, 1, "없는 물건");
+    expect(competing.status).toBe(200);
+    finishProvider?.({ answer: "yes" });
+    const late = await pending;
+
+    expect(late.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 2 });
+    expect(activities).toHaveLength(1);
+    expect(activities[0]).toMatchObject({ type: "MYSTERY_STUDENT_GUESS" });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+  });
+
+  it("외부 판정 대기 중 실행이 만료되면 늦은 판정을 버리고 정답을 공개하지 않는다", async () => {
+    await createMystery();
+    let finishProvider: ((value: { answer: "yes" }) => void) | undefined;
+    mocks.generateJson.mockImplementationOnce(() => new Promise((resolve) => {
+      finishProvider = resolve;
+    }));
+
+    const pending = submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?");
+    await vi.waitFor(() => expect(mocks.generateJson).toHaveBeenCalledOnce());
+    const run = runs.get("run-1");
+    if (!run) throw new Error("missing mystery run");
+    run.expiresAt = new Date(0);
+    const expired = await readResult();
+    await expect(expired.json()).resolves.toMatchObject({
+      run: {
+        status: "EXPIRED",
+        version: 2,
+        mysteryAnswerItemId: null,
+      },
+      result: null,
+    });
+    finishProvider?.({ answer: "yes" });
+
+    const late = await pending;
+    expect(late.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "EXPIRED", version: 2 });
+    expect(activities).toHaveLength(0);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+    expect(JSON.stringify(await late.json())).not.toContain(storedMysteryState().privateItemId);
+  });
+
+  it.each([
+    ["runId", "run-other"],
+    ["requestId", MYSTERY_ACTION_IDS[1]],
+    ["expectedVersion", 2],
+  ] as const)(
+    "실행 전용 외부 판정 전달값 %s 변조를 두 번째 거래에서 거부한다",
+    async (field, changedValue) => {
+      await createMystery();
+      const input = {
+        action: "mystery-submit-question",
+        requestId: MYSTERY_ACTION_IDS[0],
+        expectedVersion: 1,
+        locale: "ko",
+        question: "학교에서 자주 볼 수 있나요?",
+      };
+      const required = await applyQuestionGameRunAction(
+        "student-1",
+        "run-1",
+        input,
+      );
+      expect(isMysteryQuestionResolutionRequired(required)).toBe(true);
+      if (!isMysteryQuestionResolutionRequired(required)) return;
+      expect(required.resolution).toMatchObject({
+        runId: "run-1",
+        requestId: MYSTERY_ACTION_IDS[0],
+        expectedVersion: 1,
+      });
+      const resolution = {
+        ...required.resolution,
+        runId: "run-1",
+        requestId: MYSTERY_ACTION_IDS[0],
+        expectedVersion: 1,
+        answer: "yes" as const,
+        [field]: changedValue,
+      };
+
+      await expect(applyQuestionGameRunAction(
+        "student-1",
+        "run-1",
+        input,
+        new Date(),
+        resolution,
+      )).rejects.toMatchObject({ status: 409 });
+      expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 1 });
+      expect(activities).toHaveLength(0);
+      expect(pointLogs).toHaveLength(0);
+    },
+  );
+
+  it("같은 규칙 밖 질문이 동시에 들어오면 한 활동만 기록하고 나머지는 저장 응답을 재생한다", async () => {
+    await createMystery();
+    mocks.generateJson.mockResolvedValue({ answer: "yes" });
+
+    const responses = await Promise.all([
+      submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?"),
+      submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?"),
+    ]);
+    const bodies = await Promise.all(responses.map((response) => response.json()));
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    expect(bodies.map((body) => body.replayed).sort()).toEqual([false, true]);
+    expect(activities).toHaveLength(1);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 2 });
+    expect(pointLogs).toHaveLength(0);
+  });
+
+  it("인공지능 차례는 외부 모델과 클라이언트 선택값 없이 공개 단서로 결정한다", async () => {
+    await createMystery("ai");
+    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const response = await runMysteryAiTurn(1, 2, {
+      itemId: "apple",
+      question: "내가 고른 질문인가요?",
+      guess: "apple",
+      correct: true,
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      run: {
+        version: 3,
+        questionCount: 2,
+        aiTurnCount: 1,
+        mysteryNextStep: "STUDENT_ACTION",
+        mysteryHistory: [
+          { actor: "STUDENT", kind: "QUESTION" },
+          { actor: "AI" },
+        ],
+        mysteryAnswerItemId: null,
+      },
+    });
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+    expect(JSON.stringify(body)).not.toContain("내가 고른 질문인가요?");
+    expect(JSON.stringify(activities.at(-1)?.payload)).not.toMatch(
+      /itemId|attribute|classification|private/u,
+    );
+  });
+
+  it.each([
+    ["solo", 3, 30],
+    ["ai", 5, 50],
+  ] as const)(
+    "%s 모드는 학생 질문만 점수로 삼고 정답 추측에서 즉시 정산한다",
+    async (mode, awarded, dailyLimit) => {
+      await createMystery(mode);
+      const premature = await postComplete({ requestId: COMPLETE_ID, expectedVersion: 1 });
+      expect(premature.status).toBe(409);
+      await submitMysteryQuestion(0, 1, "살아 있나요?");
+      let version = 2;
+      let actionIndex = 1;
+      if (mode === "ai") {
+        await runMysteryAiTurn(actionIndex, version);
+        version += 1;
+        actionIndex += 1;
+      }
+      const secret = mysterySecret();
+      const final = await submitMysteryGuess(
+        actionIndex,
+        version,
+        secret.names.ko,
+      );
+
+      expect(final.status).toBe(200);
+      await expect(final.json()).resolves.toMatchObject({
+        run: {
+          status: "SETTLED",
+          version: version + 1,
+          mysteryNextStep: "COMPLETE",
+          mysteryWinner: "STUDENT",
+          mysteryEndReason: "SOLVED",
+          mysteryAnswerItemId: secret.id,
+          mysteryStudentQuestionCount: 1,
+        },
+        result: { awarded, dailyLimit, preview: false },
+      });
+      expect(activities.reduce(
+        (sum, activity) => sum + activity.validQuestionCount,
+        0,
+      )).toBe(1);
+      expect(pointLogs).toHaveLength(1);
+      expect(users.get("student-1")?.totalPoints).toBe(awarded);
+
+      const completed = await postComplete({
+        requestId: COMPLETE_ID,
+        expectedVersion: version + 1,
+      });
+      expect(completed.status).toBe(200);
+      await expect(completed.json()).resolves.toMatchObject({
+        result: { awarded, alreadySettled: true },
+        replayed: true,
+      });
+    },
+  );
+
+  it("인공지능은 공개 단서 계획으로 정답을 맞히고 학생 질문만 점수로 계산한다", async () => {
+    await createMystery("ai");
+    let version = 1;
+    let actionIndex = 0;
+    let studentQuestionCount = 0;
+    let finalBody: Record<string, unknown> | undefined;
+
+    for (let turn = 0; turn < 20; turn += 1) {
+      const state = storedMysteryState();
+      let response: Response;
+      if (state.mysteryNextStep === "STUDENT_ACTION") {
+        const usedAttributes = new Set(state.history.flatMap((activity) =>
+          typeof activity.attribute === "string" ? [activity.attribute] : []
+        ));
+        const attribute = MYSTERY_ATTRIBUTES.find((candidate) =>
+          !usedAttributes.has(candidate)
+        );
+        if (attribute) {
+          response = await submitMysteryQuestion(
+            actionIndex,
+            version,
+            mysteryQuestionForAttribute(attribute, "ko"),
+          );
+          studentQuestionCount += 1;
+        } else {
+          response = await submitMysteryGuess(
+            actionIndex,
+            version,
+            `정답이 아닌 추측 ${turn + 1}`,
+          );
+        }
+      } else {
+        response = await runMysteryAiTurn(actionIndex, version);
+      }
+      expect(response.status).toBe(200);
+      const body = await response.json() as {
+        run: { status: string; version: number };
+        [key: string]: unknown;
+      };
+      version = body.run.version;
+      actionIndex += 1;
+      if (body.run.status === "SETTLED") {
+        finalBody = body;
+        break;
+      }
+    }
+
+    expect(finalBody).toMatchObject({
+      run: {
+        status: "SETTLED",
+        mysteryNextStep: "COMPLETE",
+        mysteryWinner: "AI",
+        mysteryEndReason: "SOLVED",
+        mysteryAnswerItemId: mysterySecret().id,
+        mysteryStudentQuestionCount: studentQuestionCount,
+      },
+      result: {
+        awarded: studentQuestionCount * 2 + 3,
+        dailyLimit: 50,
+      },
+    });
+    expect(activities.at(-1)).toMatchObject({
+      type: "MYSTERY_AI_ACTIVITY",
+      validQuestionCount: 0,
+      scoreValue: studentQuestionCount * 2 + 3,
+    });
+    expect(activities.reduce(
+      (sum, activity) => sum + activity.validQuestionCount,
+      0,
+    )).toBe(studentQuestionCount);
+    expect(users.get("student-1")?.totalPoints).toBe(studentQuestionCount * 2 + 3);
+  });
+
+  it("스무 번째 전체 활동에서 제한 종료하고 정산 뒤에만 정답을 공개한다", async () => {
+    await createMystery();
+    let final: Response | undefined;
+    for (let index = 0; index < 20; index += 1) {
+      final = await submitMysteryQuestion(
+        index,
+        index + 1,
+        `먹을 수 있나요 ${index + 1}?`,
+      );
+      if (index < 19) {
+        await expect(final.json()).resolves.toMatchObject({
+          run: { mysteryAnswerItemId: null, status: "ACTIVE" },
+        });
+      }
+    }
+    if (!final) throw new Error("missing final mystery response");
+    const secret = mysterySecret();
+
+    expect(final.status).toBe(200);
+    await expect(final.json()).resolves.toMatchObject({
+      run: {
+        status: "SETTLED",
+        version: 21,
+        questionCount: 20,
+        mysteryEndReason: "LIMIT",
+        mysteryWinner: null,
+        mysteryAnswerItemId: secret.id,
+      },
+      result: { awarded: 22 },
+    });
+    expect(activities).toHaveLength(20);
+    expect(pointLogs).toHaveLength(1);
+  });
+
+  it("마지막 활동 근거가 빠지면 정산과 점수를 거절한다", async () => {
+    await createMystery();
+    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    activities.splice(0, 1);
+    const secret = mysterySecret();
+
+    const response = await submitMysteryGuess(1, 2, secret.names.ko);
+
+    expect(response.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 2 });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+  });
+
+  it("활동 판정 근거가 바뀌면 상태 기록과 맞더라도 정산하지 않는다", async () => {
+    await createMystery();
+    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const payload = activities[0]?.payload as { answer?: string } | undefined;
+    if (!payload || (payload.answer !== "yes" && payload.answer !== "no")) {
+      throw new Error("missing mystery evidence");
+    }
+    payload.answer = payload.answer === "yes" ? "no" : "yes";
+
+    const response = await submitMysteryGuess(1, 2, mysterySecret().names.ko);
+
+    expect(response.status).toBe(409);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 2 });
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+  });
+
+  it("동시 마지막 추측은 한 건만 정산한다", async () => {
+    await createMystery();
+    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const secret = mysterySecret();
+
+    const responses = await Promise.all([
+      submitMysteryGuess(1, 2, secret.names.ko),
+      submitMysteryGuess(
+        1,
+        2,
+        secret.names.ko,
+        "ko",
+        "run-1",
+        MYSTERY_ALTERNATE_FINAL_ACTION_ID,
+      ),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(pointLogs).toHaveLength(1);
+    expect(activities).toHaveLength(2);
+    expect(users.get("student-1")?.totalPoints).toBe(3);
+  });
+
+  it("마지막 활동 저장 실패는 실행과 점수를 되돌리고 같은 요청으로 재시도한다", async () => {
+    await createMystery();
+    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const secret = mysterySecret();
+    mocks.activityCreate.mockRejectedValueOnce(new Error("private-mystery-storage"));
+
+    const failed = await submitMysteryGuess(1, 2, secret.names.ko);
+
+    expect(failed.status).toBe(500);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 2 });
+    expect(activities).toHaveLength(1);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+
+    const retry = await submitMysteryGuess(1, 2, secret.names.ko);
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({ result: { awarded: 3 } });
+    expect(pointLogs).toHaveLength(1);
+    expect(users.get("student-1")?.totalPoints).toBe(3);
+  });
+
+  it("스무 번째 외부 판정 활동 저장 실패는 실행과 점수를 모두 되돌리고 같은 요청으로 제한 정산한다", async () => {
+    await createMystery();
+    for (let index = 0; index < 19; index += 1) {
+      const response = await submitMysteryQuestion(
+        index,
+        index + 1,
+        `먹을 수 있나요 ${index + 1}?`,
+      );
+      expect(response.status).toBe(200);
+    }
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 20 });
+    expect(activities).toHaveLength(19);
+    mocks.activityCreate.mockRejectedValueOnce(new Error("private-last-mystery-storage"));
+
+    const failed = await submitMysteryQuestion(
+      19,
+      20,
+      "학교에서 자주 볼 수 있나요?",
+    );
+
+    expect(failed.status).toBe(500);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 20 });
+    expect(storedMysteryState()).toMatchObject({
+      questionCount: 19,
+      mysteryNextStep: "STUDENT_ACTION",
+    });
+    expect(activities).toHaveLength(19);
+    expect(pointLogs).toHaveLength(0);
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+
+    const retry = await submitMysteryQuestion(
+      19,
+      20,
+      "학교에서 자주 볼 수 있나요?",
+    );
+    expect(retry.status).toBe(200);
+    await expect(retry.json()).resolves.toMatchObject({
+      run: {
+        status: "SETTLED",
+        version: 21,
+        mysteryEndReason: "LIMIT",
+        mysteryAnswerItemId: mysterySecret().id,
+        mysteryStudentQuestionCount: 20,
+      },
+      result: { awarded: 22 },
+    });
+    expect(activities).toHaveLength(20);
+    expect(pointLogs).toHaveLength(1);
+    expect(users.get("student-1")?.totalPoints).toBe(22);
+    expect(mocks.generateJson).toHaveBeenCalledTimes(2);
+  });
+
+  it("교사와 하루 상한 및 만료와 자동 포기를 공통 정책으로 처리한다", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
+    await createMystery();
+    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const teacherFinal = await submitMysteryGuess(1, 2, mysterySecret().names.ko);
+    await expect(teacherFinal.json()).resolves.toMatchObject({
+      result: { awarded: 0, preview: true },
+      run: { preview: true, mysteryAnswerItemId: expect.any(String) },
+    });
+    expect(pointLogs).toHaveLength(0);
+
+    mocks.auth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
+    runs.clear();
+    activities.splice(0);
+    pointLogs.push({
+      studentId: "student-1",
+      gameId: "ACTIVITY_SOLO",
+      gameRunId: "old-run",
+      bonusType: "ACTIVITY_SOLO_relay",
+      points: 29,
+      reason: "이전 실행",
+      status: "APPROVED",
+      createdAt: new Date(),
+    });
+    await createMystery();
+    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const capped = await submitMysteryGuess(1, 2, mysterySecret().names.ko);
+    await expect(capped.json()).resolves.toMatchObject({
+      result: { awarded: 1, dailyRemaining: 0, cappedByLimit: true },
+    });
+
+    runs.clear();
+    activities.splice(0);
+    pointLogs.splice(0);
+    await createMystery();
+    const expiring = runs.get("run-1");
+    if (!expiring) throw new Error("missing expiring mystery run");
+    expiring.expiresAt = new Date(0);
+    const expired = await readResult();
+    await expect(expired.json()).resolves.toMatchObject({
+      run: {
+        status: "EXPIRED",
+        version: 2,
+        mysteryNextStep: "STUDENT_ACTION",
+        mysteryAnswerItemId: null,
+      },
+      result: null,
+    });
+
+    runs.clear();
+    activities.splice(0);
+    for (const requestId of [CREATE_ID, SECOND_CREATE_ID, THIRD_CREATE_ID, FOURTH_CREATE_ID]) {
+      await postCreate({
+        gameId: "mystery-box",
+        mode: "solo",
+        locale: "ko",
+        requestId,
+      });
+    }
+    const abandonedReplay = await createMystery();
+    await expect(abandonedReplay.json()).resolves.toMatchObject({
+      replayed: true,
+      run: {
+        id: "run-1",
+        status: "ABANDONED",
+        version: 2,
+        mysteryAnswerItemId: null,
+      },
     });
     expect([...runs.values()].filter((run) => run.status === "ACTIVE")).toHaveLength(3);
   });

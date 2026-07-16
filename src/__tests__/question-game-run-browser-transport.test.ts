@@ -2054,3 +2054,455 @@ describe("브라우저 질문놀이 실행 전송기", () => {
     expect(finalRun.memoryReview).toHaveLength(6);
   });
 });
+
+type PublicMysteryHistoryItem =
+  | {
+      sequence: number;
+      actor: "STUDENT" | "AI";
+      kind: "QUESTION";
+      text: string;
+      answer: "yes" | "no";
+    }
+  | {
+      sequence: number;
+      actor: "STUDENT" | "AI";
+      kind: "GUESS";
+      text: string;
+      correct: boolean;
+    };
+
+type PublicMysteryRun = {
+  id: string;
+  status: "ACTIVE" | "SETTLED";
+  version: number;
+  questionCount: number;
+  aiTurnCount: number;
+  targetCount: 20;
+  awaitingAiTurn: boolean;
+  mysteryLocale: "ko" | "en";
+  mysteryNextStep: "STUDENT_ACTION" | "AI_TURN" | "COMPLETE";
+  mysteryActivityCount: number;
+  mysteryStudentQuestionCount: number;
+  mysteryHistory: PublicMysteryHistoryItem[];
+  mysteryWinner: "STUDENT" | "AI" | null;
+  mysteryEndReason: "SOLVED" | "LIMIT" | null;
+  mysteryAnswerItemId: string | null;
+};
+
+const mysteryIds = Array.from(
+  { length: 100 },
+  (_, index) => `00000000-0000-4000-8001-${String(index + 1).padStart(12, "0")}`,
+);
+
+function mysteryRun(response: { body: Record<string, unknown> }) {
+  return response.body.run as PublicMysteryRun;
+}
+
+function createMysteryRun(
+  store: ReturnType<typeof createBrowserQuestionGameRunStore>,
+  mode: "solo" | "ai",
+  requestId: string,
+  actor: BrowserQuestionGameRunActor = studentA,
+) {
+  return store.dispatch(actor, {
+    method: "POST",
+    pathname: "/api/question-games/runs",
+    body: { gameId: "mystery-box", mode, requestId, locale: "ko" },
+  });
+}
+
+describe("브라우저 미스터리 박스 실행 전송기", () => {
+  it("비밀 물건을 숨기고 규칙 질문만 소비하며 요청 재생과 충돌 및 버전을 지킨다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = createMysteryRun(store, "solo", mysteryIds[0]);
+    const id = runId(created);
+    expect(created).toMatchObject({
+      status: 201,
+      body: {
+        replayed: false,
+        run: {
+          gameId: "mystery-box",
+          status: "ACTIVE",
+          version: 1,
+          questionCount: 0,
+          aiTurnCount: 0,
+          targetCount: 20,
+          awaitingAiTurn: false,
+          mysteryLocale: "ko",
+          mysteryNextStep: "STUDENT_ACTION",
+          mysteryActivityCount: 0,
+          mysteryStudentQuestionCount: 0,
+          mysteryHistory: [],
+          mysteryWinner: null,
+          mysteryEndReason: null,
+          mysteryAnswerItemId: null,
+        },
+      },
+    });
+    expect(JSON.stringify(created.body)).not.toContain("apple");
+    expect(JSON.stringify(created.body)).not.toContain("사과");
+
+    const yesBody = {
+      action: "mystery-submit-question",
+      requestId: mysteryIds[1],
+      expectedVersion: 1,
+      locale: "ko",
+      question: "먹을 수 있나요?",
+    };
+    const yes = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: yesBody,
+    });
+    expect(mysteryRun(yes)).toMatchObject({
+      version: 2,
+      questionCount: 1,
+      mysteryActivityCount: 1,
+      mysteryStudentQuestionCount: 1,
+      mysteryNextStep: "STUDENT_ACTION",
+      mysteryAnswerItemId: null,
+      mysteryHistory: [
+        {
+          sequence: 1,
+          actor: "STUDENT",
+          kind: "QUESTION",
+          text: "먹을 수 있나요?",
+          answer: "yes",
+        },
+      ],
+    });
+    const replay = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: yesBody,
+    });
+    expect(replay).toMatchObject({
+      status: 200,
+      body: { replayed: true, run: { version: 2, questionCount: 1 } },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: { ...yesBody, question: "날 수 있나요?" },
+    })).toEqual({
+      status: 409,
+      body: { error: "같은 요청 식별값에 다른 동작이 들어왔습니다" },
+    });
+
+    const ambiguous = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-submit-question",
+        requestId: mysteryIds[2],
+        expectedVersion: 2,
+        locale: "ko",
+        question: "무슨 소리가 나나요?",
+      },
+    });
+    expect(ambiguous).toEqual({
+      status: 422,
+      body: { error: "한 가지 특징을 묻는 질문으로 다시 써 주세요" },
+    });
+    const afterAmbiguous = store.dispatch(studentA, {
+      method: "GET",
+      pathname: `/api/question-games/runs/${id}/result`,
+      body: {},
+    });
+    expect(mysteryRun(afterAmbiguous)).toMatchObject({
+      version: 2,
+      questionCount: 1,
+      mysteryActivityCount: 1,
+      mysteryStudentQuestionCount: 1,
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-submit-guess",
+        requestId: mysteryIds[3],
+        expectedVersion: 1,
+        locale: "ko",
+        guess: "책",
+      },
+    })).toEqual({
+      status: 409,
+      body: { error: "질문놀이 실행 상태가 바뀌었습니다" },
+    });
+
+    const settled = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-submit-guess",
+        requestId: mysteryIds[4],
+        expectedVersion: 2,
+        locale: "ko",
+        guess: "풋사과",
+      },
+    });
+    expect(settled).toMatchObject({
+      status: 200,
+      body: {
+        run: {
+          status: "SETTLED",
+          version: 3,
+          questionCount: 2,
+          mysteryActivityCount: 2,
+          mysteryStudentQuestionCount: 1,
+          mysteryWinner: "STUDENT",
+          mysteryEndReason: "SOLVED",
+          mysteryAnswerItemId: "apple",
+        },
+        result: {
+          awarded: 3,
+          dailyLimit: 30,
+          dailyRemaining: 27,
+          preview: false,
+        },
+      },
+    });
+  });
+
+  it("학생과 인공지능 활동을 교대하고 학생 질문만 점수로 계산해 조기 정답을 공개한다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = createMysteryRun(store, "ai", mysteryIds[10]);
+    const id = runId(created);
+    const firstQuestion = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-submit-question",
+        requestId: mysteryIds[11],
+        expectedVersion: 1,
+        locale: "ko",
+        question: "먹을 수 있나요?",
+      },
+    });
+    expect(mysteryRun(firstQuestion)).toMatchObject({
+      version: 2,
+      questionCount: 1,
+      aiTurnCount: 0,
+      awaitingAiTurn: true,
+      mysteryNextStep: "AI_TURN",
+      mysteryActivityCount: 1,
+      mysteryStudentQuestionCount: 1,
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-submit-guess",
+        requestId: mysteryIds[12],
+        expectedVersion: 2,
+        locale: "ko",
+        guess: "사과",
+      },
+    }).status).toBe(409);
+
+    const aiTurn = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-ai-turn",
+        requestId: mysteryIds[13],
+        expectedVersion: 2,
+      },
+    });
+    expect(mysteryRun(aiTurn)).toMatchObject({
+      version: 3,
+      questionCount: 2,
+      aiTurnCount: 1,
+      awaitingAiTurn: false,
+      mysteryNextStep: "STUDENT_ACTION",
+      mysteryActivityCount: 2,
+      mysteryStudentQuestionCount: 1,
+      mysteryHistory: [
+        { sequence: 1, actor: "STUDENT", kind: "QUESTION", answer: "yes" },
+        { sequence: 2, actor: "AI" },
+      ],
+    });
+
+    const secondQuestion = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-submit-question",
+        requestId: mysteryIds[14],
+        expectedVersion: 3,
+        locale: "ko",
+        question: "날 수 있나요?",
+      },
+    });
+    expect(mysteryRun(secondQuestion)).toMatchObject({
+      questionCount: 3,
+      mysteryStudentQuestionCount: 2,
+      mysteryNextStep: "AI_TURN",
+    });
+    store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-ai-turn",
+        requestId: mysteryIds[15],
+        expectedVersion: 4,
+      },
+    });
+    const settled = store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-submit-guess",
+        requestId: mysteryIds[16],
+        expectedVersion: 5,
+        locale: "ko",
+        guess: "풋사과",
+      },
+    });
+    expect(settled).toMatchObject({
+      status: 200,
+      body: {
+        replayed: false,
+        run: {
+          status: "SETTLED",
+          version: 6,
+          questionCount: 5,
+          aiTurnCount: 2,
+          awaitingAiTurn: false,
+          mysteryNextStep: "COMPLETE",
+          mysteryActivityCount: 5,
+          mysteryStudentQuestionCount: 2,
+          mysteryWinner: "STUDENT",
+          mysteryEndReason: "SOLVED",
+          mysteryAnswerItemId: "apple",
+        },
+        result: {
+          awarded: 7,
+          dailyLimit: 50,
+          dailyRemaining: 43,
+          cappedByLimit: false,
+          preview: false,
+        },
+      },
+    });
+    expect(mysteryRun(settled).mysteryHistory.at(-1)).toEqual({
+      sequence: 5,
+      actor: "STUDENT",
+      kind: "GUESS",
+      text: "풋사과",
+      correct: true,
+    });
+    const result = store.dispatch(studentA, {
+      method: "GET",
+      pathname: `/api/question-games/runs/${id}/result`,
+      body: {},
+    });
+    expect(result).toMatchObject({
+      status: 200,
+      body: {
+        run: { mysteryAnswerItemId: "apple" },
+        result: { awarded: 7, alreadySettled: true },
+      },
+    });
+  });
+
+  it("인공지능 모드의 스무 번째 활동에서 즉시 끝내고 학생 질문 없는 완료 점수만 준다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = createMysteryRun(store, "ai", mysteryIds[20]);
+    const id = runId(created);
+    let version = 1;
+    let response = created;
+    for (let activity = 1; activity <= 20; activity += 1) {
+      response = store.dispatch(studentA, {
+        method: "POST",
+        pathname: `/api/question-games/runs/${id}/actions`,
+        body: activity % 2 === 1
+          ? {
+              action: "mystery-submit-guess",
+              requestId: mysteryIds[20 + activity],
+              expectedVersion: version,
+              locale: "ko",
+              guess: "책",
+            }
+          : {
+              action: "mystery-ai-turn",
+              requestId: mysteryIds[20 + activity],
+              expectedVersion: version,
+            },
+      });
+      expect(response.status).toBe(200);
+      version += 1;
+      if (activity < 20) {
+        expect(mysteryRun(response).status).toBe("ACTIVE");
+        expect(mysteryRun(response).mysteryAnswerItemId).toBeNull();
+      }
+    }
+    expect(response).toMatchObject({
+      body: {
+        run: {
+          status: "SETTLED",
+          version: 21,
+          questionCount: 20,
+          aiTurnCount: 10,
+          mysteryActivityCount: 20,
+          mysteryStudentQuestionCount: 0,
+          mysteryNextStep: "COMPLETE",
+          mysteryWinner: null,
+          mysteryEndReason: "LIMIT",
+          mysteryAnswerItemId: "apple",
+        },
+        result: {
+          awarded: 3,
+          dailyLimit: 50,
+          dailyRemaining: 47,
+        },
+      },
+    });
+    expect(store.dispatch(studentA, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${id}/actions`,
+      body: {
+        action: "mystery-submit-guess",
+        requestId: mysteryIds[41],
+        expectedVersion: 21,
+        locale: "ko",
+        guess: "책",
+      },
+    }).status).toBe(409);
+  });
+
+  it("교사 미리보기는 완료 기록을 남겨도 포인트를 지급하지 않는다", () => {
+    const store = createBrowserQuestionGameRunStore();
+    const created = createMysteryRun(store, "solo", mysteryIds[50], teacher);
+    const settled = store.dispatch(teacher, {
+      method: "POST",
+      pathname: `/api/question-games/runs/${runId(created)}/actions`,
+      body: {
+        action: "mystery-submit-guess",
+        requestId: mysteryIds[51],
+        expectedVersion: 1,
+        locale: "ko",
+        guess: "사과",
+      },
+    });
+
+    expect(settled).toMatchObject({
+      status: 200,
+      body: {
+        run: {
+          status: "SETTLED",
+          preview: true,
+          mysteryEndReason: "SOLVED",
+          mysteryAnswerItemId: "apple",
+        },
+        result: {
+          awarded: 0,
+          dailyLimit: 30,
+          dailyRemaining: 30,
+          cappedByLimit: false,
+          preview: true,
+        },
+      },
+    });
+  });
+});

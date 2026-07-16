@@ -100,6 +100,29 @@ export interface QuestionGameRunPublicProgress {
     resolveAt: number;
   } | null;
   memoryReview?: Array<{ contentKey: string }> | null;
+  mysteryLocale?: "ko" | "en";
+  mysteryNextStep?: "STUDENT_ACTION" | "AI_TURN" | "COMPLETE";
+  mysteryActivityCount?: number;
+  mysteryStudentQuestionCount?: number;
+  mysteryHistory?: Array<
+    | {
+        sequence: number;
+        actor: "STUDENT" | "AI";
+        kind: "QUESTION";
+        text: string;
+        answer: "yes" | "no";
+      }
+    | {
+        sequence: number;
+        actor: "STUDENT" | "AI";
+        kind: "GUESS";
+        text: string;
+        correct: boolean;
+      }
+  >;
+  mysteryWinner?: "STUDENT" | "AI" | null;
+  mysteryEndReason?: "SOLVED" | "LIMIT" | null;
+  mysteryAnswerItemId?: string | null;
 }
 
 export interface QuestionGameRunDefinition {

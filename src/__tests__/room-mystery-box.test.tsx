@@ -32,16 +32,11 @@ import {
 } from "@/lib/question-game-room-engines/mystery";
 import en from "../../messages/en.json";
 
-const aiMocks = vi.hoisted(() => ({ ask: vi.fn() }));
 const auth = vi.hoisted(() => ({
   session: {
     data: { user: { id: "host", name: "학생", role: "STUDENT" } },
     status: "authenticated",
   },
-}));
-
-vi.mock("@/app/(student)/student-question-play/games/useAIPlay", () => ({
-  useAIPlay: () => ({ ask: aiMocks.ask, loading: false }),
 }));
 
 vi.mock("next-auth/react", () => ({
@@ -69,12 +64,10 @@ function renderEnglish(ui: ReactElement) {
 }
 
 beforeEach(() => {
-  aiMocks.ask.mockReset();
   auth.session = {
     data: { user: { id: "host", name: "학생", role: "STUDENT" } },
     status: "authenticated",
   };
-  vi.spyOn(Math, "random").mockReturnValue(0);
 });
 
 afterEach(() => {
@@ -844,12 +837,277 @@ describe("미스터리 박스 친구 방 결과", () => {
   });
 });
 
-async function startLocal(mode: "solo" | "ai" = "solo") {
-  if (mode === "ai") {
-    aiMocks.ask.mockResolvedValueOnce({
-      parsed: { name: "사과", category: "과일", emoji: "🍎" },
+type LocalMysteryMode = "solo" | "ai";
+type LocalMysteryActor = "STUDENT" | "AI";
+type LocalMysteryHistoryItem =
+  | {
+      sequence: number;
+      actor: LocalMysteryActor;
+      kind: "QUESTION";
+      text: string;
+      answer: "yes" | "no";
+    }
+  | {
+      sequence: number;
+      actor: LocalMysteryActor;
+      kind: "GUESS";
+      text: string;
+      correct: boolean;
+    };
+
+interface LocalMysteryServerOptions {
+  loseQuestionRequestOnce?: boolean;
+  failAiOnce?: "network" | "503";
+  loseFinalResponse?: boolean;
+  closeQuestionRequestOnce?: "EXPIRED" | "ABANDONED";
+  closeAiRequestOnce?: "EXPIRED" | "ABANDONED";
+  settledAnswerItemId?: string;
+  forceFirstMatchingGuessFalse?: boolean;
+}
+
+function installLocalMysteryServer(
+  mode: LocalMysteryMode,
+  options: LocalMysteryServerOptions = {},
+) {
+  const runId = `mystery-${mode}`;
+  const history: LocalMysteryHistoryItem[] = [];
+  const responses = new Map<
+    string,
+    { fingerprint: string; response: Record<string, unknown> }
+  >();
+  let status: "ACTIVE" | "SETTLED" | "EXPIRED" | "ABANDONED" = "ACTIVE";
+  let nextStep: "STUDENT_ACTION" | "AI_TURN" | "COMPLETE" = "STUDENT_ACTION";
+  let studentQuestionCount = 0;
+  let winner: LocalMysteryActor | null = null;
+  let endReason: "SOLVED" | "LIMIT" | null = null;
+  let result: Record<string, unknown> | null = null;
+  let questionNetworkFailed = false;
+  let aiFailed = false;
+  let finalResponseLost = false;
+  let matchingGuessForcedFalse = false;
+
+  const snapshot = () => ({
+    id: runId,
+    gameId: "mystery-box",
+    mode: mode.toUpperCase(),
+    status,
+    version: history.length +
+      (status === "EXPIRED" || status === "ABANDONED" ? 2 : 1),
+    targetCount: 20,
+    questionCount: history.length,
+    aiTurnCount: history.filter(({ actor }) => actor === "AI").length,
+    awaitingAiTurn: nextStep === "AI_TURN",
+    preview: false,
+    mysteryLocale: "ko",
+    mysteryNextStep: nextStep,
+    mysteryActivityCount: history.length,
+    mysteryStudentQuestionCount: studentQuestionCount,
+    mysteryHistory: structuredClone(history),
+    mysteryWinner: winner,
+    mysteryEndReason: endReason,
+    mysteryAnswerItemId: status === "SETTLED"
+      ? options.settledAnswerItemId ?? "apple"
+      : null,
+  });
+
+  const settle = (solvedBy: LocalMysteryActor | null) => {
+    status = "SETTLED";
+    nextStep = "COMPLETE";
+    winner = solvedBy;
+    endReason = solvedBy ? "SOLVED" : "LIMIT";
+    const requested = mode === "ai"
+      ? studentQuestionCount * 2 + 3
+      : studentQuestionCount + 2;
+    const dailyLimit = mode === "ai" ? 50 : 30;
+    result = {
+      awarded: requested,
+      dailyLimit,
+      dailyRemaining: dailyLimit - requested,
+      cappedByLimit: false,
+      preview: false,
+    };
+  };
+
+  const appendActivity = (activity: LocalMysteryHistoryItem) => {
+    history.push(activity);
+    if (activity.actor === "STUDENT" && activity.kind === "QUESTION") {
+      studentQuestionCount += 1;
+    }
+    if (activity.kind === "GUESS" && activity.correct) {
+      settle(activity.actor);
+    } else if (history.length === 20) {
+      settle(null);
+    } else {
+      nextStep = mode === "ai" && activity.actor === "STUDENT"
+        ? "AI_TURN"
+        : "STUDENT_ACTION";
+    }
+  };
+
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+
+    if (url === "/api/question-games/runs") {
+      return Response.json({ run: snapshot(), replayed: false }, { status: 201 });
+    }
+    if (url.endsWith("/result")) {
+      return Response.json({
+        run: snapshot(),
+        result: result ? { ...result, alreadySettled: true } : null,
+      });
+    }
+    if (!url.endsWith("/actions")) {
+      return Response.json({ error: "지원하지 않는 시험 요청입니다" }, { status: 404 });
+    }
+
+    const requestId = typeof body.requestId === "string" ? body.requestId : "";
+    const fingerprint = JSON.stringify({
+      action: body.action,
+      locale: body.locale,
+      question: body.question,
+      guess: body.guess,
     });
-  }
+    const replay = responses.get(requestId);
+    if (replay) {
+      if (replay.fingerprint !== fingerprint) {
+        return Response.json(
+          { error: "같은 요청 식별값에 다른 동작이 들어왔습니다" },
+          { status: 409 },
+        );
+      }
+      return Response.json({ ...replay.response, replayed: true });
+    }
+    if (status !== "ACTIVE" || body.expectedVersion !== history.length + 1) {
+      return Response.json(
+        { error: "질문놀이 실행 상태가 바뀌었습니다" },
+        { status: 409 },
+      );
+    }
+
+    if (body.action === "mystery-submit-question") {
+      if (nextStep !== "STUDENT_ACTION") {
+        return Response.json(
+          { error: "인공지능 차례를 먼저 마쳐 주세요" },
+          { status: 409 },
+        );
+      }
+      if (body.question === "무슨 소리가 나나요?") {
+        return Response.json(
+          { error: "한 가지 특징을 묻는 질문으로 다시 써 주세요" },
+          { status: 422 },
+        );
+      }
+      if (body.question === "답변 서버가 확인할 수 있나요?") {
+        return Response.json(
+          { error: "질문 답변을 확인하지 못했습니다. 다시 시도해 주세요" },
+          { status: 503 },
+        );
+      }
+      if (options.closeQuestionRequestOnce && !questionNetworkFailed) {
+        questionNetworkFailed = true;
+        status = options.closeQuestionRequestOnce;
+        throw new TypeError("질문 요청 중 실행이 닫혔습니다");
+      }
+      if (options.loseQuestionRequestOnce && !questionNetworkFailed) {
+        questionNetworkFailed = true;
+        throw new TypeError("질문 요청 연결이 끊겼습니다");
+      }
+      const text = String(body.question).trim();
+      appendActivity({
+        sequence: history.length + 1,
+        actor: "STUDENT",
+        kind: "QUESTION",
+        text,
+        answer: text.includes("날 수") ? "no" : "yes",
+      });
+    } else if (body.action === "mystery-submit-guess") {
+      if (nextStep !== "STUDENT_ACTION") {
+        return Response.json(
+          { error: "인공지능 차례를 먼저 마쳐 주세요" },
+          { status: 409 },
+        );
+      }
+      const text = String(body.guess).trim();
+      const normalized = text.normalize("NFKC").toLocaleLowerCase();
+      const matchesAnswer = ["사과", "풋사과", "apple", "green apple"].includes(normalized);
+      const forceFalse = Boolean(
+        matchesAnswer &&
+        options.forceFirstMatchingGuessFalse &&
+        !matchingGuessForcedFalse,
+      );
+      if (forceFalse) matchingGuessForcedFalse = true;
+      const correct = matchesAnswer && !forceFalse;
+      appendActivity({
+        sequence: history.length + 1,
+        actor: "STUDENT",
+        kind: "GUESS",
+        text,
+        correct,
+      });
+    } else if (body.action === "mystery-ai-turn") {
+      if (mode !== "ai" || nextStep !== "AI_TURN") {
+        return Response.json(
+          { error: "지금은 인공지능 차례가 아닙니다" },
+          { status: 409 },
+        );
+      }
+      if (options.closeAiRequestOnce && !aiFailed) {
+        aiFailed = true;
+        status = options.closeAiRequestOnce;
+        throw new TypeError("인공지능 차례 중 실행이 닫혔습니다");
+      }
+      if (!aiFailed && options.failAiOnce) {
+        aiFailed = true;
+        if (options.failAiOnce === "503") {
+          return Response.json(
+            { error: "인공지능 차례를 진행하지 못했습니다" },
+            { status: 503 },
+          );
+        }
+        throw new TypeError("인공지능 차례 연결이 끊겼습니다");
+      }
+      appendActivity({
+        sequence: history.length + 1,
+        actor: "AI",
+        kind: "QUESTION",
+        text: "작은가요?",
+        answer: "yes",
+      });
+    } else {
+      return Response.json({ error: "지원하지 않는 미스터리 동작입니다" }, { status: 400 });
+    }
+
+    const response = { run: snapshot(), result, replayed: false };
+    responses.set(requestId, { fingerprint, response: structuredClone(response) });
+    if (
+      options.loseFinalResponse &&
+      snapshot().status === "SETTLED" &&
+      !finalResponseLost
+    ) {
+      finalResponseLost = true;
+      throw new TypeError("마지막 미스터리 응답 연결이 끊겼습니다");
+    }
+    return Response.json(response);
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return { fetchMock, snapshot };
+}
+
+async function flushLocalMystery() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+async function startLocalMystery(
+  mode: LocalMysteryMode = "solo",
+  options: LocalMysteryServerOptions = {},
+) {
+  const server = installLocalMysteryServer(mode, options);
   render(
     <MysteryBoxGame
       game={game}
@@ -858,286 +1116,293 @@ async function startLocal(mode: "solo" | "ai" = "solo") {
     />,
   );
   fireEvent.click(screen.getByRole("button", { name: /시작/ }));
-  await screen.findByLabelText("예 또는 아니오 질문");
+  await flushLocalMystery();
+  await screen.findByLabelText("예 또는 아니오 질문하기");
+  return server;
 }
 
-async function submitLocalQuestion(value: string, endsGame = false) {
-  const input = screen.getByLabelText("예 또는 아니오 질문");
+async function submitLocalMysteryQuestion(value: string) {
+  const input = screen.getByLabelText("예 또는 아니오 질문하기");
   fireEvent.change(input, { target: { value } });
   fireEvent.click(screen.getByRole("button", { name: /질문하기/ }));
-  if (endsGame) {
-    await waitFor(() => {
-      expect(screen.queryByLabelText("예 또는 아니오 질문")).not.toBeInTheDocument();
-    });
-  } else {
-    await waitFor(() => expect(input).toHaveValue(""));
-  }
+  await flushLocalMystery();
 }
 
-async function submitLocalGuess(value: string) {
-  fireEvent.click(screen.getByRole("button", { name: "정답 맞추기!" }));
-  const input = screen.getByLabelText("정답 추측");
+async function submitLocalMysteryGuess(value: string) {
+  fireEvent.click(screen.getByRole("button", { name: "정답 추측" }));
+  const input = screen.getByLabelText("상자 속 물건은 무엇인가요?");
   fireEvent.change(input, { target: { value } });
-  fireEvent.click(screen.getByRole("button", { name: "정답 제출!" }));
+  fireEvent.click(screen.getByRole("button", { name: "정답 제출" }));
+  await flushLocalMystery();
 }
 
-async function startEnglishLocal(mode: "solo" | "ai" = "solo") {
-  if (mode === "ai") {
-    aiMocks.ask.mockResolvedValueOnce({
-      parsed: { name: "apple", category: "fruit", emoji: "🍎" },
+function expectLocalMysteryRemaining(value: number) {
+  expect(screen.getByText(`${value}회 남음`)).toBeVisible();
+}
+
+describe("지역 미스터리 박스 서버 실행", () => {
+  it("진행 중 정답을 숨기고 질문과 추측을 서버 공개 기록으로만 그린다", async () => {
+    const { fetchMock, snapshot } = await startLocalMystery();
+    expect(JSON.stringify(snapshot())).not.toContain("apple");
+    expect(JSON.stringify(snapshot())).not.toContain("사과");
+    expect(screen.queryByText("사과")).not.toBeInTheDocument();
+
+    await submitLocalMysteryQuestion("먹을 수 있나요?");
+    expect(screen.getByText("예")).toBeVisible();
+    expectLocalMysteryRemaining(19);
+    await submitLocalMysteryGuess("책");
+    expect(screen.getByText("정답이 아님")).toBeVisible();
+    expectLocalMysteryRemaining(18);
+
+    const actionBodies = fetchMock.mock.calls
+      .filter(([url]) => String(url).endsWith("/actions"))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(actionBodies).toEqual([
+      expect.objectContaining({
+        action: "mystery-submit-question",
+        expectedVersion: 1,
+        locale: "ko",
+        question: "먹을 수 있나요?",
+      }),
+      expect.objectContaining({
+        action: "mystery-submit-guess",
+        expectedVersion: 2,
+        locale: "ko",
+        guess: "책",
+      }),
+    ]);
+    expect(actionBodies.every((body) => !(
+      "itemId" in body || "answerItemId" in body || "history" in body
+    ))).toBe(true);
+  });
+
+  it.each([
+    ["무슨 소리가 나나요?", "한 가지 특징을 묻는 질문으로 다시 써 주세요"],
+    ["답변 서버가 확인할 수 있나요?", "질문 답변을 확인하지 못했습니다. 다시 시도해 주세요"],
+  ])("서버가 %s 질문을 거절하면 입력과 활동을 그대로 둔다", async (question, message) => {
+    const { snapshot } = await startLocalMystery();
+    await submitLocalMysteryQuestion(question);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(screen.getByLabelText("예 또는 아니오 질문하기")).toHaveValue(question);
+    expectLocalMysteryRemaining(20);
+    expect(snapshot()).toMatchObject({
+      version: 1,
+      questionCount: 0,
+      mysteryActivityCount: 0,
+      mysteryHistory: [],
     });
-  }
-  renderEnglish(
-    <MysteryBoxGame
-      game={game}
-      onBack={vi.fn()}
-      config={{ mode, players: mode === "ai" ? ["Me", "AI"] : ["Me"] }}
-    />,
-  );
-  fireEvent.click(screen.getByRole("button", { name: /Start/ }));
-  await screen.findByLabelText("Yes-or-no question");
-}
-
-async function submitEnglishGuess(value: string) {
-  fireEvent.click(screen.getByRole("button", { name: "Guess!" }));
-  const input = screen.getByLabelText("Answer guess");
-  fireEvent.change(input, { target: { value } });
-  fireEvent.click(screen.getByRole("button", { name: "Submit answer!" }));
-}
-
-function expectLocalRemaining(value: number) {
-  const label = screen.getByText("남은 활동");
-  expect(label.previousElementSibling).toHaveTextContent(String(value));
-}
-
-describe("지역 미스터리 박스 활동 종료", () => {
-  it("시작 화면에서 질문과 추측을 합친 활동 상한을 안내한다", () => {
-    render(
-      <MysteryBoxGame
-        game={game}
-        onBack={vi.fn()}
-        config={{ mode: "solo", players: ["나"] }}
-      />,
-    );
-
-    expect(screen.getByText(/질문이나 추측을 합쳐 20번/)).toBeVisible();
   });
 
-  it("혼자 첫 틀린 추측을 기록하고 같은 학생이 다음 활동을 계속한다", async () => {
-    await startLocal();
-    await submitLocalGuess("책");
+  it("질문 연결 실패 뒤 입력과 요청 식별값을 보존해 한 번만 기록한다", async () => {
+    const { fetchMock, snapshot } = await startLocalMystery("solo", {
+      loseQuestionRequestOnce: true,
+    });
+    await submitLocalMysteryQuestion("먹을 수 있나요?");
 
-    expect(await screen.findByLabelText("예 또는 아니오 질문")).toBeEnabled();
-    expect(screen.getByText(/책/)).toBeVisible();
-    expect(screen.getByText("땡")).toBeVisible();
-    expectLocalRemaining(19);
-    expect(screen.queryByText("아쉬워요...")).not.toBeInTheDocument();
-  });
+    expect(screen.getByRole("alert")).toHaveTextContent("질문 요청 연결이 끊겼습니다");
+    expect(screen.getByLabelText("예 또는 아니오 질문하기")).toHaveValue("먹을 수 있나요?");
+    expect(snapshot().mysteryActivityCount).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "이 활동 다시 확인하기" }));
+    await flushLocalMystery();
 
-  it("혼자 모드에서 정답 일부는 거절하고 앞뒤 공백이 있는 별칭 전체는 허용한다", async () => {
-    await startLocal();
-    await submitLocalGuess("사");
-
-    expect(await screen.findByLabelText("예 또는 아니오 질문")).toBeEnabled();
-    expect(screen.getByText("땡")).toBeVisible();
-    await submitLocalGuess("  풋사과  ");
-
-    expect(await screen.findAllByText(/정답!/)).toHaveLength(2);
-  });
-
-  it("혼자 모드 영문 정답은 앞뒤 공백과 대소문자를 정규화해 전체 일치시킨다", async () => {
-    await startEnglishLocal();
-    await submitEnglishGuess("  APPLE  ");
-
-    expect(await screen.findAllByText(/Correct!/)).toHaveLength(2);
-  });
-
-  it("인공지능 모드의 틀린 사람 추측은 인공지능 차례로 넘긴다", async () => {
-    await startLocal("ai");
-    await submitLocalGuess("사");
-
-    expect(screen.getByText(/AI.*차례/)).toBeVisible();
-    expect(screen.getByText("땡")).toBeVisible();
-    expectLocalRemaining(19);
-  });
-
-  it("인공지능 모드 영문 정답도 앞뒤 공백과 대소문자를 정규화해 전체 일치시킨다", async () => {
-    await startEnglishLocal("ai");
-    await submitEnglishGuess("  APPLE  ");
-
-    expect(await screen.findAllByText(/Correct!/)).toHaveLength(2);
-  });
-
-  it("인공지능이 고른 내장 물건도 정답 별칭 전체를 허용한다", async () => {
-    await startLocal("ai");
-    await submitLocalGuess("풋사과");
-
-    expect(await screen.findAllByText(/정답!/)).toHaveLength(2);
-  });
-
-  it("인공지능 답변을 기다리는 동안 질문 반복과 추측을 막고 한 활동만 기록한다", async () => {
-    await startLocal("ai");
-    const pending = deferred<{ text: string }>();
-    aiMocks.ask.mockReturnValueOnce(pending.promise);
-
-    const input = screen.getByLabelText("예 또는 아니오 질문");
-    fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
-    const askButton = screen.getByRole("button", { name: /질문하기/ });
-    const guessButton = screen.getByRole("button", { name: "정답 맞추기!" });
-    fireEvent.click(askButton);
-    fireEvent.click(askButton);
-    fireEvent.click(guessButton);
-
-    expect(aiMocks.ask).toHaveBeenCalledTimes(2);
-    expect(askButton).toBeDisabled();
-    expect(guessButton).toBeDisabled();
-    expect(screen.queryByLabelText("정답 추측")).not.toBeInTheDocument();
-
-    await act(async () => { pending.resolve({ text: "네" }); });
-    await waitFor(() => expect(screen.getByText(/AI.*차례/)).toBeVisible());
+    const requestBodies = fetchMock.mock.calls
+      .filter(([, init]) => init?.body && (
+        JSON.parse(String(init.body)).action === "mystery-submit-question"
+      ))
+      .map(([, init]) => JSON.parse(String(init?.body)));
+    expect(requestBodies).toHaveLength(2);
+    expect(requestBodies[1].requestId).toBe(requestBodies[0].requestId);
+    expect(snapshot().mysteryActivityCount).toBe(1);
     expect(screen.getAllByText("먹을 수 있나요?")).toHaveLength(1);
-    expectLocalRemaining(19);
   });
 
-  it("인공지능 답변 오류가 나면 입력을 보존하고 활동 잠금을 푼다", async () => {
-    await startLocal("ai");
-    aiMocks.ask.mockRejectedValueOnce(new Error("answer failed"));
+  it.each(["network", "503"] as const)(
+    "인공지능 차례 %s 실패는 차례와 활동을 유지하고 다시 시도해 한 번만 진행한다",
+    async (failureKind) => {
+      const { fetchMock, snapshot } = await startLocalMystery("ai", {
+        failAiOnce: failureKind,
+      });
+      vi.useFakeTimers();
+      await submitLocalMysteryQuestion("먹을 수 있나요?");
+      await act(async () => { await vi.runOnlyPendingTimersAsync(); });
+      await flushLocalMystery();
 
-    const input = screen.getByLabelText("예 또는 아니오 질문");
-    fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
-    fireEvent.click(screen.getByRole("button", { name: /질문하기/ }));
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        failureKind === "network"
+          ? "인공지능 차례 연결이 끊겼습니다"
+          : "인공지능 차례를 진행하지 못했습니다",
+      );
+      expect(snapshot()).toMatchObject({
+        version: 2,
+        mysteryActivityCount: 1,
+        mysteryNextStep: "AI_TURN",
+      });
+      fireEvent.click(screen.getByRole("button", { name: /다시/ }));
+      await flushLocalMystery();
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /질문하기/ })).toBeEnabled();
+      expect(snapshot()).toMatchObject({
+        version: 3,
+        mysteryActivityCount: 2,
+        aiTurnCount: 1,
+        mysteryNextStep: "STUDENT_ACTION",
+      });
+      const aiBodies = fetchMock.mock.calls
+        .filter(([, init]) => init?.body && (
+          JSON.parse(String(init.body)).action === "mystery-ai-turn"
+        ))
+        .map(([, init]) => JSON.parse(String(init?.body)));
+      expect(aiBodies).toHaveLength(2);
+      if (failureKind === "network") {
+        expect(aiBodies[1].requestId).toBe(aiBodies[0].requestId);
+      } else {
+        expect(aiBodies[1].requestId).not.toBe(aiBodies[0].requestId);
+      }
+      expect(screen.getAllByText("작은가요?")).toHaveLength(1);
+    },
+  );
+
+  it("학생 활동 복구 중 만료된 실행은 비밀을 숨기고 새 실행 안내로 전환한다", async () => {
+    const { snapshot } = await startLocalMystery("solo", {
+      closeQuestionRequestOnce: "EXPIRED",
     });
-    expect(input).toHaveValue("먹을 수 있나요?");
-    fireEvent.click(screen.getByRole("button", { name: "정답 맞추기!" }));
-    expect(screen.getByLabelText("정답 추측")).toBeEnabled();
-  });
+    await submitLocalMysteryQuestion("먹을 수 있나요?");
 
-  it("인공지능 답변 요청이 실제 실패 값이면 질문과 차례를 보존하고 잠금을 푼다", async () => {
-    await startLocal("ai");
-    aiMocks.ask.mockResolvedValueOnce(null);
-
-    const input = screen.getByLabelText("예 또는 아니오 질문");
-    fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
-    fireEvent.click(screen.getByRole("button", { name: /질문하기/ }));
-
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /질문하기/ })).toBeEnabled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "질문놀이 상태가 다른 화면에서 변경되었습니다",
+    );
+    expect(screen.getByRole("button", { name: "새 실행 시작하기" })).toBeVisible();
+    expect(snapshot()).toMatchObject({
+      status: "EXPIRED",
+      version: 2,
+      questionCount: 0,
+      mysteryActivityCount: 0,
+      mysteryNextStep: "STUDENT_ACTION",
+      mysteryWinner: null,
+      mysteryEndReason: null,
+      mysteryAnswerItemId: null,
     });
-    expect(input).toHaveValue("먹을 수 있나요?");
-    expect(screen.getByText(/나.*차례/)).toBeVisible();
-    expect(screen.queryByText("잘 모르겠어요")).not.toBeInTheDocument();
-    expectLocalRemaining(20);
-    expect(screen.getByRole("button", { name: "정답 맞추기!" })).toBeEnabled();
+    expect(screen.queryByText("사과")).not.toBeInTheDocument();
   });
 
-  it("인공지능이 실제로 모르는 답을 보내면 정상 활동으로 기록한다", async () => {
-    await startLocal("ai");
-    aiMocks.ask.mockResolvedValueOnce({ text: "잘 모르겠어요" });
-
-    const input = screen.getByLabelText("예 또는 아니오 질문");
-    fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
-    fireEvent.click(screen.getByRole("button", { name: /질문하기/ }));
-
-    await waitFor(() => expect(screen.getByText(/AI.*차례/)).toBeVisible());
-    expect(screen.getByText("잘 모르겠어요")).toBeVisible();
-    expectLocalRemaining(19);
-  });
-
-  it("인공지능 차례의 답 요청이 실패하면 활동을 쓰지 않고 사람 차례로 돌아온다", async () => {
-    await startLocal("ai");
-    aiMocks.ask
-      .mockResolvedValueOnce({ parsed: { question: "둥근가요?" } })
-      .mockResolvedValueOnce(null);
+  it("인공지능 차례 복구 중 포기된 실행은 교대 상태를 읽고 새 실행 안내로 전환한다", async () => {
+    const { snapshot } = await startLocalMystery("ai", {
+      closeAiRequestOnce: "ABANDONED",
+    });
     vi.useFakeTimers();
+    await submitLocalMysteryQuestion("먹을 수 있나요?");
+    await act(async () => { await vi.runOnlyPendingTimersAsync(); });
+    await flushLocalMystery();
 
-    await submitLocalGuess("책");
-    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
-
-    expect(aiMocks.ask).toHaveBeenCalledTimes(3);
-    expect(screen.getByText(/나.*차례/)).toBeVisible();
-    expect(screen.queryByText("둥근가요?")).not.toBeInTheDocument();
-    expect(screen.queryByText("잘 모르겠어요")).not.toBeInTheDocument();
-    expectLocalRemaining(19);
-  });
-
-  it("인공지능 차례 만들기가 실패해도 활동을 쓰지 않고 사람 차례로 돌아온다", async () => {
-    await startLocal("ai");
-    aiMocks.ask.mockResolvedValueOnce(null);
-    vi.useFakeTimers();
-
-    await submitLocalGuess("책");
-    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
-
-    expect(aiMocks.ask).toHaveBeenCalledTimes(2);
-    expect(screen.getByText(/나.*차례/)).toBeVisible();
-    expectLocalRemaining(19);
-  });
-
-  it("같은 화면 순간의 추측 엔터와 단추 제출은 한 번만 차례를 넘긴다", async () => {
-    await startLocal("ai");
-    fireEvent.click(screen.getByRole("button", { name: "정답 맞추기!" }));
-    const input = screen.getByLabelText("정답 추측");
-    const submit = screen.getByRole("button", { name: "정답 제출!" });
-    fireEvent.change(input, { target: { value: "책" } });
-
-    act(() => {
-      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-      submit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "질문놀이 상태가 다른 화면에서 변경되었습니다",
+    );
+    expect(screen.getByRole("button", { name: "새 실행 시작하기" })).toBeVisible();
+    expect(snapshot()).toMatchObject({
+      status: "ABANDONED",
+      version: 3,
+      questionCount: 1,
+      aiTurnCount: 0,
+      awaitingAiTurn: true,
+      mysteryActivityCount: 1,
+      mysteryNextStep: "AI_TURN",
+      mysteryWinner: null,
+      mysteryEndReason: null,
+      mysteryAnswerItemId: null,
     });
-
-    expect(screen.getByText(/AI.*차례/)).toBeVisible();
-    expect(screen.getAllByText(/책/)).toHaveLength(1);
-    expect(screen.getAllByText("땡")).toHaveLength(1);
-    expectLocalRemaining(19);
+    expect(screen.queryByText("사과")).not.toBeInTheDocument();
   });
 
-  it("스무 번째 질문에서 바로 끝내고 스물한 번째 강제 추측을 열지 않는다", async () => {
-    await startLocal();
-    for (let index = 0; index < 20; index += 1) {
-      await submitLocalQuestion(`먹을 수 있나요? ${index + 1}`, index === 19);
-    }
+  it("마지막 정답 응답이 유실되어도 결과 조회로 정답과 포인트를 한 번 복구한다", async () => {
+    const { fetchMock } = await startLocalMystery("solo", {
+      loseFinalResponse: true,
+    });
+    await submitLocalMysteryGuess("사과");
 
-    expect(await screen.findByText("아쉬워요...")).toBeVisible();
-    expect(screen.getByText("사과")).toBeVisible();
-    expect(screen.queryByLabelText("정답 추측")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "정답 제출!" })).not.toBeInTheDocument();
-  });
-
-  it("스무 번째 틀린 추측을 기록한 뒤 끝낸다", async () => {
-    await startLocal();
-    for (let index = 0; index < 20; index += 1) {
-      await submitLocalGuess(`틀린 답 ${index + 1}`);
-      if (index < 19) await screen.findByLabelText("예 또는 아니오 질문");
-    }
-
-    expect(await screen.findByText("아쉬워요...")).toBeVisible();
-    expect(screen.getByText(/틀린 답 20/)).toBeVisible();
-    expect(screen.queryByLabelText("예 또는 아니오 질문")).not.toBeInTheDocument();
-  });
-
-  it("정답 추측은 스무 활동 전에도 즉시 성공 종료한다", async () => {
-    await startLocal();
-    await submitLocalGuess("사과");
-
-    expect(await screen.findAllByText(/정답!/)).toHaveLength(2);
+    expect(await screen.findByText("정답을 맞혔어요!")).toBeVisible();
     expect(screen.getAllByText("사과").length).toBeGreaterThan(0);
-    expect(screen.queryByLabelText("예 또는 아니오 질문")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("+2점 적립!");
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/result")))
+      .toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.body && (
+      JSON.parse(String(init.body)).action === "mystery-submit-guess"
+    ))).toHaveLength(1);
   });
 
-  it("지역 화면도 공통 모드별 활동 상한과 주제 색 토큰을 쓴다", () => {
+  it("정답 추측과 다른 물건 식별값이 담긴 완료 응답은 화면에 적용하지 않는다", async () => {
+    await startLocalMystery("solo", { settledAnswerItemId: "book" });
+    await submitLocalMysteryGuess("사과");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "미스터리 박스 진행 결과를 확인할 수 없습니다",
+    );
+    expect(screen.queryByText("정답을 맞혔어요!")).not.toBeInTheDocument();
+    expect(screen.queryByText("책")).not.toBeInTheDocument();
+  });
+
+  it("현재 언어의 정답 별칭과 일치하는 완료 응답은 정상적으로 적용한다", async () => {
+    await startLocalMystery();
+    await submitLocalMysteryGuess("풋사과");
+
+    expect(await screen.findByText("정답을 맞혔어요!")).toBeVisible();
+    expect(screen.getByText("사과")).toBeVisible();
+    expect(screen.getByText("풋사과")).toBeVisible();
+  });
+
+  it("이전의 실제 정답 추측을 오답으로 기록한 성공 응답은 화면에 적용하지 않는다", async () => {
+    await startLocalMystery("solo", { forceFirstMatchingGuessFalse: true });
+    await submitLocalMysteryGuess("사과");
+    await submitLocalMysteryGuess("풋사과");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "미스터리 박스 진행 결과를 확인할 수 없습니다",
+    );
+    expect(screen.queryByText("정답을 맞혔어요!")).not.toBeInTheDocument();
+  });
+
+  it("실제 정답 추측을 오답으로 기록한 횟수 제한 응답은 화면에 적용하지 않는다", async () => {
+    await startLocalMystery("solo", { forceFirstMatchingGuessFalse: true });
+    await submitLocalMysteryGuess("사과");
+    for (let index = 0; index < 19; index += 1) {
+      await submitLocalMysteryQuestion(`먹을 수 있나요 ${index + 1}?`);
+    }
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "미스터리 박스 진행 결과를 확인할 수 없습니다",
+    );
+    expect(screen.queryByText("20회 활동을 모두 마쳤어요")).not.toBeInTheDocument();
+  });
+
+  it("스무 번째 질문에서 즉시 끝내고 학생 질문만 계산한 포인트를 보여 준다", async () => {
+    await startLocalMystery();
+    for (let index = 0; index < 20; index += 1) {
+      await submitLocalMysteryQuestion(`먹을 수 있나요 ${index + 1}?`);
+    }
+
+    expect(await screen.findByText("20회 활동을 모두 마쳤어요")).toBeVisible();
+    expect(screen.getByText("사과")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("+22점 적립!");
+    expect(screen.queryByLabelText("예 또는 아니오 질문하기")).not.toBeInTheDocument();
+  });
+
+  it("어두운 주제에서도 기록과 답변에 대비 색 토큰을 사용한다", async () => {
+    document.documentElement.classList.add("dark");
+    await startLocalMystery();
+    await submitLocalMysteryQuestion("먹을 수 있나요?");
+
+    const answer = screen.getByText("예");
+    expect(answer).toHaveClass("text-muted-foreground");
     const source = readFileSync(
       join(process.cwd(), "src/app/(student)/student-question-play/games/MysteryBoxGame.tsx"),
       "utf8",
     );
-    expect(source).toContain('QUESTION_GAME_RULES["mystery-box"].targets');
-    expect(source).not.toMatch(/const\s+MAX_Q\s*=\s*20/);
+    expect(source).toContain("useGameRun");
+    expect(source).not.toContain("useAIPlay");
+    expect(source).not.toMatch(/Math\.random|itemName\s*:/);
     expect(source).toContain("bg-card");
     expect(source).toContain("text-foreground");
     expect(source).toContain("text-muted-foreground");
     expect(source).toContain("border-border");
-    expect(source).not.toContain("GameResultReview");
+    document.documentElement.classList.remove("dark");
   });
 });
