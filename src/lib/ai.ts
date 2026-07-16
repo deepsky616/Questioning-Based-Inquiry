@@ -26,6 +26,14 @@ export interface GenerateOptions {
   apiKeyOverride?: string;
   /** 특정 요청에서만 사용할 모델. 없으면 사용자/담당 교사 설정을 사용한다. */
   modelOverride?: string;
+  /** 특정 요청의 최대 응답 토큰 수. 없으면 모델 기본값을 쓴다. */
+  maxOutputTokens?: number;
+  /** 특정 요청의 통신 시간 제한. 밀리초 단위이다. */
+  timeoutMs?: number;
+  /** 구조화 응답에 사용할 응답 형식. */
+  responseMimeType?: string;
+  /** 구조화 응답에 사용할 제이슨 틀. */
+  responseJsonSchema?: unknown;
   /**
    * 샘플링 온도(0~2). 미지정 시 quality 작업은 0.1(같은 입력 → 최대한 일관된 결과),
    * 그 외에는 모델 기본값을 쓴다. 다양성이 필요한 작업(질문 게임 등)은 명시적으로 높인다.
@@ -58,6 +66,10 @@ async function callGeminiWithMetadata({
   temperature,
   apiKeyOverride,
   modelOverride,
+  maxOutputTokens,
+  timeoutMs,
+  responseMimeType,
+  responseJsonSchema,
 }: GenerateOptions): Promise<GenerateTextResult> {
   const cfg = apiKeyOverride
     ? { apiKey: apiKeyOverride, model: resolveGeminiModel(modelOverride) }
@@ -76,6 +88,12 @@ async function callGeminiWithMetadata({
         const config = {
           ...(systemInstruction ? { systemInstruction } : {}),
           ...(temp != null ? { temperature: temp } : {}),
+          ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+          ...(timeoutMs !== undefined
+            ? { httpOptions: { timeout: timeoutMs } }
+            : {}),
+          ...(responseMimeType !== undefined ? { responseMimeType } : {}),
+          ...(responseJsonSchema !== undefined ? { responseJsonSchema } : {}),
         };
         const response = await genAI.models.generateContent({
           model: modelName,

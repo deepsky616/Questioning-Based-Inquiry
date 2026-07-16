@@ -8,7 +8,14 @@ vi.mock("@google/genai", () => ({
 }));
 vi.mock("@/lib/resolve-ai-config", () => ({ resolveUserAiConfig: vi.fn() }));
 
-import { generateText, AiBusyError, AiKeyMissingError, AiQuotaError, CONSISTENT_TEMPERATURE } from "@/lib/ai";
+import {
+  generateJson,
+  generateText,
+  AiBusyError,
+  AiKeyMissingError,
+  AiQuotaError,
+  CONSISTENT_TEMPERATURE,
+} from "@/lib/ai";
 import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 
 const mResolve = resolveUserAiConfig as unknown as ReturnType<typeof vi.fn>;
@@ -35,6 +42,49 @@ describe("callGemini — 재시도·페일오버·모델 선택", () => {
     generateContent.mockResolvedValue(ok("답"));
     await generateText({ userId: "u1", prompt: "짧은 작업" });
     expect(calledModels()).toEqual(["gemini-2.5-flash-lite"]);
+  });
+
+  it("선택 설정이 없으면 기존 요청 모양을 유지한다", async () => {
+    generateContent.mockResolvedValue(ok("{}"));
+
+    await generateJson({ userId: "u1", prompt: "기본 제이슨" });
+
+    expect(generateContent).toHaveBeenCalledWith({
+      model: "gemini-2.5-flash-lite",
+      contents: "기본 제이슨",
+    });
+  });
+
+  it("구조화 출력 상한·시간 제한·응답 형식과 틀을 요청에 전달한다", async () => {
+    const responseJsonSchema = {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        answer: { type: "string", enum: ["yes", "no", "unknown"] },
+      },
+      required: ["answer"],
+    };
+    generateContent.mockResolvedValue(ok('{"answer":"yes"}'));
+
+    await generateJson({
+      userId: "u1",
+      prompt: "구조화 제이슨",
+      maxOutputTokens: 32,
+      timeoutMs: 8_000,
+      responseMimeType: "application/json",
+      responseJsonSchema,
+    });
+
+    expect(generateContent).toHaveBeenCalledWith({
+      model: "gemini-2.5-flash-lite",
+      contents: "구조화 제이슨",
+      config: {
+        httpOptions: { timeout: 8_000 },
+        maxOutputTokens: 32,
+        responseMimeType: "application/json",
+        responseJsonSchema,
+      },
+    });
   });
 
   it("quality 작업은 크기와 무관하게 flash + 낮은 온도로 호출한다", async () => {
