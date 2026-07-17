@@ -823,7 +823,7 @@ async function leaveVersion2Room(initialRoom: GameRoom, userId: string) {
 
 // 방 상태 조회 (폴링)
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: Params,
 ) {
   const { code } = await params;
@@ -845,6 +845,15 @@ export async function GET(
     );
   }
   room = await ensureCompletedRoomPoints(room);
+  // 2초 폴링 최적화: 클라이언트가 이미 같은 version의 방을 들고 있으면
+  // 본문 없이 304 — 직렬화·전송 비용을 없앤다. 지급으로 방이 저장되면
+  // version이 올라가므로 위 ensure 뒤에 비교해야 한다.
+  const knownVersion = Number(
+    new URL(req.url).searchParams.get("version") ?? NaN,
+  );
+  if (Number.isInteger(knownVersion) && knownVersion === room.version) {
+    return new NextResponse(null, { status: 304 });
+  }
   return NextResponse.json({ room: toPublicGameRoom(room) });
 }
 

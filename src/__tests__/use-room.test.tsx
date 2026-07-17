@@ -803,10 +803,10 @@ describe("useRoom request ordering", () => {
       const url = String(input);
       const body = requestBody(init);
       if (body?.action === "join") {
-        const code = url.endsWith("5678") ? "5678" : "1234";
+        const code = url.split("?")[0].endsWith("5678") ? "5678" : "1234";
         return jsonResponse({ room: makeRoom(1, code) });
       }
-      if (url.endsWith("1234")) return delayedOldPoll.promise;
+      if (url.split("?")[0].endsWith("1234")) return delayedOldPoll.promise;
       return jsonResponse({ room: makeRoom(2, "5678") });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -873,11 +873,11 @@ describe("useRoom request ordering", () => {
       const url = String(input);
       const body = requestBody(init);
       if (body?.action === "join") {
-        const code = url.endsWith("5678") ? "5678" : "1234";
+        const code = url.split("?")[0].endsWith("5678") ? "5678" : "1234";
         return jsonResponse({ room: makeRoom(1, code) });
       }
       if (body?.action === "slow") return delayedAction.promise;
-      const code = url.endsWith("5678") ? "5678" : "1234";
+      const code = url.split("?")[0].endsWith("5678") ? "5678" : "1234";
       return jsonResponse({ room: makeRoom(1, code) });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -909,11 +909,11 @@ describe("useRoom request ordering", () => {
       const url = String(input);
       const body = requestBody(init);
       if (body?.action === "join") {
-        const code = url.endsWith("5678") ? "5678" : "1234";
+        const code = url.split("?")[0].endsWith("5678") ? "5678" : "1234";
         return jsonResponse({ room: makeRoom(1, code) });
       }
       if (body?.action === "slow") return delayedAction.promise;
-      const code = url.endsWith("5678") ? "5678" : "1234";
+      const code = url.split("?")[0].endsWith("5678") ? "5678" : "1234";
       return jsonResponse({ room: makeRoom(1, code) });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -943,7 +943,7 @@ describe("useRoom request ordering", () => {
       if (body?.action === "join") {
         return jsonResponse({ room: makeRoom(1, "5678") });
       }
-      return jsonResponse({ room: makeRoom(1, String(input).slice(-4)) });
+      return jsonResponse({ room: makeRoom(1, String(input).split("?")[0].slice(-4)) });
     });
     vi.stubGlobal("fetch", fetchMock);
     const { result, unmount } = renderHook(() => useRoom());
@@ -967,7 +967,7 @@ describe("useRoom request ordering", () => {
       if (init?.method === "POST") {
         return jsonResponse({ room: makeRoom(1, "5678") });
       }
-      return jsonResponse({ room: makeRoom(1, String(input).slice(-4)) });
+      return jsonResponse({ room: makeRoom(1, String(input).split("?")[0].slice(-4)) });
     });
     vi.stubGlobal("fetch", fetchMock);
     const { result, unmount } = renderHook(() => useRoom());
@@ -991,7 +991,7 @@ describe("useRoom request ordering", () => {
       if (body?.action === "join") {
         return jsonResponse({ room: makeRoom(1, "5678") });
       }
-      return jsonResponse({ room: makeRoom(1, String(input).slice(-4)) });
+      return jsonResponse({ room: makeRoom(1, String(input).split("?")[0].slice(-4)) });
     });
     vi.stubGlobal("fetch", fetchMock);
     const { result, unmount } = renderHook(() => useRoom());
@@ -2101,6 +2101,81 @@ describe("useRoom 방 복원과 접속 확인", () => {
 
     expect(result.current.room).toBeNull();
     expect(sessionStorage.getItem(markerKey)).toBeNull();
+    unmount();
+  });
+});
+
+describe("useRoom 폴링 version 단축 응답", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("방을 보유한 상태의 확인 요청은 알고 있는 version을 쿼리로 보낸다", async () => {
+    const getUrls: string[] = [];
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: makeRoom(1) });
+      if (!init?.method) {
+        getUrls.push(String(input));
+        return jsonResponse({ room: makeRoom(1) });
+      }
+      return jsonResponse({ room: makeRoom(1) });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(result.current.room?.version).toBe(1));
+
+    await act(async () => {
+      result.current.refreshRoom();
+    });
+    await waitFor(() =>
+      expect(
+        getUrls.some((url) =>
+          url.endsWith("/api/question-games/rooms/1234?version=1"),
+        ),
+      ).toBe(true),
+    );
+    unmount();
+  });
+
+  it("304 응답이면 기존 방을 유지하고 연결 상태를 정상으로 표시한다", async () => {
+    const room = makeRoom(2);
+    let getCalls = 0;
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room });
+      if (!init?.method) {
+        getCalls += 1;
+        return new Response(null, { status: 304 });
+      }
+      return jsonResponse({ room });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    await waitFor(() => expect(result.current.room?.version).toBe(2));
+
+    await act(async () => {
+      result.current.refreshRoom();
+    });
+    await waitFor(() => expect(getCalls).toBeGreaterThan(0));
+
+    expect(result.current.room).toEqual(room);
+    expect(result.current.connectionState).toBe("connected");
+    expect(result.current.error).toBeNull();
     unmount();
   });
 });

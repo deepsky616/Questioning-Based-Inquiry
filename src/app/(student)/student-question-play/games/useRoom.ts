@@ -374,8 +374,23 @@ export function useRoom(gameId?: string): UseRoomResult {
       }
       inFlight = true;
       try {
-        const res = await fetch(`/api/question-games/rooms/${code}`);
+        // 이미 들고 있는 방의 version을 함께 보내 변화가 없으면 서버가 304로 응답한다
+        const knownVersion =
+          roomRef.current && roomRef.current.code === code
+            ? roomRef.current.version
+            : null;
+        const res = await fetch(
+          knownVersion === null
+            ? `/api/question-games/rooms/${code}`
+            : `/api/question-games/rooms/${code}?version=${knownVersion}`,
+        );
         if (cancelled || !isCurrentRequest(code, generation)) return;
+        if (res.status === 304) {
+          // 방 상태 그대로 — 연결만 정상으로 표시하고 다음 폴링을 기다린다
+          pollFailureCountRef.current = 0;
+          setConnectionState("connected");
+          return;
+        }
         const data = await readResponseData(res);
         if (cancelled || !isCurrentRequest(code, generation)) return;
         if (res.status === 403 || res.status === 404) {

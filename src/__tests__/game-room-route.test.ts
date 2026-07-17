@@ -611,6 +611,91 @@ describe("공개 방 응답", () => {
   });
 });
 
+describe("방 조회 version 단축 응답", () => {
+  function getWithVersion(version: unknown) {
+    return GET(
+      new Request(
+        `http://localhost/api/question-games/rooms/1234?version=${String(version)}`,
+      ) as never,
+      { params: Promise.resolve({ code: "1234" }) },
+    );
+  }
+
+  it("클라이언트가 아는 version과 같으면 본문 없이 304를 반환한다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(makeRoom({ version: 3 }));
+
+    const response = await getWithVersion(3);
+
+    expect(response.status).toBe(304);
+    expect(await response.text()).toBe("");
+  });
+
+  it("version이 다르면 전체 방을 반환한다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(makeRoom({ version: 5 }));
+
+    const response = await getWithVersion(3);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.room.version).toBe(5);
+  });
+
+  it("version 값이 숫자가 아니면 무시하고 전체 방을 반환한다", async () => {
+    mocks.loadGameRoom.mockResolvedValue(makeRoom({ version: 3 }));
+
+    const response = await getWithVersion("abc");
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.room.version).toBe(3);
+  });
+
+  it("비참가자는 version이 같아도 403을 받는다", async () => {
+    mocks.auth.mockResolvedValue({ user: { id: "user-9", name: "외부인" } });
+    mocks.loadGameRoom.mockResolvedValue(makeRoom({ version: 3 }));
+
+    const response = await getWithVersion(3);
+
+    expect(response.status).toBe(403);
+  });
+
+  it("완료 방 포인트 지급으로 방이 갱신되면 같은 version 요청에도 갱신된 방을 반환한다", async () => {
+    const awardResult = {
+      awards: [{
+        studentId: "user-1",
+        bonusType: "PARTICIPATION",
+        points: 1,
+        reason: "게임 참여",
+      }],
+    };
+    const room = makeRoom({
+      status: "ended",
+      version: 3,
+      playId: "11111111-1111-4111-8111-111111111111",
+      pointAwardKeyVersion: 2,
+      pointEvidenceVersion: 2,
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.ensureQuestionGameRoomPoints.mockResolvedValue(awardResult);
+    mocks.saveGameRoom.mockImplementation(async (next: GameRoom) => ({
+      kind: "saved" as const,
+      room: { ...next, version: next.version + 1 },
+    }));
+
+    const response = await getWithVersion(3);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.room.version).toBe(4);
+    expect(body.room.awardResult).toEqual(awardResult);
+  });
+});
+
 describe("미스터리 박스 실제 공개 응답", () => {
   const playId = "11111111-1111-4111-8111-111111111111";
   const roundId = "22222222-2222-4222-8222-222222222222";
