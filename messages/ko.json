@@ -1854,6 +1854,8 @@
     "act_VALID_QUESTIONS": "좋은 질문",
     "act_COMPLETION": "게임 완료",
     "act_WINNER": "우승",
+    "act_TEAM_SUCCESS": "협력 완성",
+    "act_DISCOVERY": "발견 성공",
     "act_TEACHER_GRANT": "교사 지급",
     "act_TEACHER_REVOKE": "교사 회수",
     "act_default": "포인트 획득",

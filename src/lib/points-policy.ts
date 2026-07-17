@@ -47,6 +47,27 @@ export type BonusKey = keyof typeof AI_BONUS_TYPES;
 
 export const VALID_BONUS_KEYS = Object.keys(AI_BONUS_TYPES) as BonusKey[];
 
+export const FRIEND_BEST_QUESTION_POINTS = 5;
+
+export const GAME_OUTCOME_BONUS_TYPES = {
+  TEAM_SUCCESS: {
+    key: "TEAM_SUCCESS",
+    label: "협력 완성",
+    points: 3,
+    emoji: "🤝",
+    reason: "협력 목표 완료",
+  },
+  DISCOVERY: {
+    key: "DISCOVERY",
+    label: "발견 성공",
+    points: 3,
+    emoji: "🔎",
+    reason: "미스터리 발견 성공",
+  },
+} as const;
+
+export type GameOutcomeBonusKey = keyof typeof GAME_OUTCOME_BONUS_TYPES;
+
 // ── 안전장치 ────────────────────────────────────────────
 export const MAX_BONUS_PER_STUDENT = 15; // 학생당 보너스 합산 상한
 export const MAX_BONUSES_PER_STUDENT = 3; // 학생당 받을 수 있는 상 개수 상한
@@ -57,6 +78,8 @@ export const SYSTEM_BONUS = {
   VALID_QUESTIONS: "VALID_QUESTIONS",
   COMPLETION: "COMPLETION",
   WINNER: "WINNER",
+  TEAM_SUCCESS: "TEAM_SUCCESS",
+  DISCOVERY: "DISCOVERY",
 } as const;
 
 export type SystemBonusKey = keyof typeof SYSTEM_BONUS;
@@ -78,6 +101,10 @@ export const GAME_LABEL: Record<string, string> = {
 export function pointBonusLabel(bonusType: string): { label: string; emoji: string } {
   if (bonusType in AI_BONUS_TYPES) {
     const def = AI_BONUS_TYPES[bonusType as BonusKey];
+    return { label: def.label, emoji: def.emoji };
+  }
+  if (bonusType in GAME_OUTCOME_BONUS_TYPES) {
+    const def = GAME_OUTCOME_BONUS_TYPES[bonusType as GameOutcomeBonusKey];
     return { label: def.label, emoji: def.emoji };
   }
   // 혼자/AI 모드 단일 놀이: ACTIVITY_SOLO_<gameId> / ACTIVITY_AI_<gameId>
@@ -130,6 +157,8 @@ const ACTIVITY_EMOJI: Record<string, string> = {
   VALID_QUESTIONS: "❓",
   COMPLETION: "✅",
   WINNER: "👑",
+  TEAM_SUCCESS: "🤝",
+  DISCOVERY: "🔎",
   FRIEND_DAILY_LIMIT: "🎯",
   TEACHER_GRANT: "🎁",
   TEACHER_ADJUSTED: "🧑‍🏫",

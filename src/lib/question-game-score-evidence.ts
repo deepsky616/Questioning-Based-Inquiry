@@ -18,6 +18,7 @@ import {
   type GameRoom,
   type RoomPlayer,
 } from "@/lib/question-games-data";
+import type { GameOutcomeBonusKey } from "@/lib/points-policy";
 
 const UUID_V4_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -174,6 +175,43 @@ function requireCompletedV2Room(room: GameRoom): BuiltInQuestionGameId {
     rejectEvidence("목표를 완료한 질문놀이만 점수 근거로 사용할 수 있습니다");
   }
   return room.gameId;
+}
+
+export function questionGameOutcomeBonus(
+  room: GameRoom,
+): GameOutcomeBonusKey | null {
+  const gameId = requireCompletedV2Room(room);
+  const roomPlayers = requireRoomPlayers(room, gameId);
+
+  if (gameId === "story-dice") {
+    const state = readStoryDiceState(room.gameState);
+    if (!state) rejectEvidence("저장된 이야기 주사위 점수 근거가 손상되었습니다");
+    requireNamedPlayers(roomPlayers, state.players, [
+      state.taggerId,
+      ...state.roundTargetPlayerIds,
+    ]);
+    return "TEAM_SUCCESS";
+  }
+
+  if (gameId === "relay") {
+    const state = readRelayState(room.gameState);
+    if (!state) rejectEvidence("저장된 질문 릴레이 점수 근거가 손상되었습니다");
+    requireNamedPlayers(roomPlayers, state.players, state.roundTargetPlayerIds);
+    if (room.topic !== state.topic) {
+      rejectEvidence("저장된 질문 릴레이 주제가 현재 방과 맞지 않습니다");
+    }
+    return "TEAM_SUCCESS";
+  }
+
+  if (gameId === "mystery-box") {
+    const state = readMysteryState(room.gameState);
+    if (!state) rejectEvidence("저장된 미스터리 박스 점수 근거가 손상되었습니다");
+    requirePlayerIds(roomPlayers, state.turnOrder);
+    requireScoreKeys(roomPlayers, state.scores);
+    return state.winnerId ? "DISCOVERY" : null;
+  }
+
+  return null;
 }
 
 function makeQuestionMaps(players: Iterable<string>) {

@@ -13,9 +13,14 @@ import { useSession } from "next-auth/react";
 import { useLocale } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { usePointBonusLabel } from "@/components/shared/use-point-label";
 import { RoomHeader, playerColorById } from "./roomShared";
 import { GameResultReview } from "./GameResultReview";
-import { AI_BONUS_TYPES, BonusKey, BASE_POINTS } from "@/lib/points-policy";
+import {
+  AI_BONUS_TYPES,
+  BASE_POINTS,
+  GAME_OUTCOME_BONUS_TYPES,
+} from "@/lib/points-policy";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
 import { getQuestionGameRule } from "@/lib/question-game-rules";
 import {
@@ -97,6 +102,7 @@ export default function RoomResult({
   actionLoading, onAction, onLeave, onRestart, restartLabel, waitingLabel,
 }: Props) {
   const locale = useLocale();
+  const { label: bonusLabel } = usePointBonusLabel();
   const queryClient = useQueryClient();
   const { data: session, status: sessionStatus } = useSession();
   const text = getQuestionGameText(locale);
@@ -437,7 +443,10 @@ export default function RoomResult({
               {sorted.map((s) => {
                 const pts = pointsByPlayer[s.playerId] ?? 0;
                 const bonuses = bonusesByPlayer[s.playerId] ?? [];
-                const aiBonuses = bonuses.filter((b) => b.bonusType in AI_BONUS_TYPES);
+                const highlightedBonuses = bonuses.filter((b) =>
+                  b.bonusType in AI_BONUS_TYPES ||
+                  b.bonusType in GAME_OUTCOME_BONUS_TYPES
+                );
                 return (
                   <div key={s.playerId}
                     className="rounded-xl p-3 border border-border space-y-1.5"
@@ -454,15 +463,15 @@ export default function RoomResult({
                         +{pts}{locale === "en" ? " pts" : "점"}
                       </span>
                     </div>
-                    {aiBonuses.length > 0 && (
+                    {highlightedBonuses.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 pl-9">
-                        {aiBonuses.map((b, i) => {
-                          const def = AI_BONUS_TYPES[b.bonusType as BonusKey];
+                        {highlightedBonuses.map((b, i) => {
+                          const display = bonusLabel(b.bonusType);
                           return (
                             <span key={i}
                               className="text-xs font-medium text-foreground px-2 py-0.5 rounded-full"
                               style={{ background: `${game.accentColor}15` }}>
-                              {def.emoji} {def.label} +{def.points}
+                              {display.emoji} {display.label} +{b.points}
                             </span>
                           );
                         })}

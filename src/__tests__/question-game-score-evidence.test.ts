@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GameRoom } from "@/lib/question-games-data";
 import {
   buildQuestionGameScoreEvidence,
+  questionGameOutcomeBonus,
   QuestionGameScoreEvidenceError,
 } from "@/lib/question-game-score-evidence";
 import { getKabaSentencePairs } from "@/lib/question-game-i18n";
@@ -286,6 +287,37 @@ function makeMysteryRoom(): GameRoom {
   });
 }
 
+function makeUnsolvedMysteryRoom(): GameRoom {
+  const history = Array.from({ length: 20 }, (_, index) => {
+    const player = PLAYERS[index % PLAYERS.length];
+    return {
+      kind: "question" as const,
+      playerId: player.id,
+      playerName: player.name,
+      locale: "ko" as const,
+      question: "먹을 수 있나요?",
+      answer: "yes" as const,
+    };
+  });
+
+  return completedRoom("mystery-box", {
+    stateVersion: 2,
+    game: "mystery-box",
+    phase: "done",
+    recentCommandIds: [],
+    roundId: ROUND_IDS[2],
+    round: 20,
+    maxRounds: 20,
+    turnOrder: ["host", "s1"],
+    currentTurnIdx: 0,
+    history,
+    scores: { host: 10, s1: 10 },
+    answer: { ko: "사과", en: "apple" },
+    private: { itemId: "apple" },
+    endReason: "completed",
+  });
+}
+
 function makeKabaRoom(correct: Record<"host" | "s1", number> = { host: 1, s1: 2 }): GameRoom {
   const sentencePlan = getKabaSentencePairs().slice(0, 6);
   const used = { host: 0, s1: 0 };
@@ -329,6 +361,27 @@ function makeKabaRoom(correct: Record<"host" | "s1", number> = { host: 1, s1: 2 
 }
 
 describe("질문놀이 버전 2 점수 근거", () => {
+  it.each([
+    ["story-dice", makeStoryRoom],
+    ["relay", () => makeQuestionRoundRoom("relay")],
+  ] as const)("%s 목표를 완료하면 협력 완성 보너스를 판정한다", (_gameId, makeRoom) => {
+    expect(questionGameOutcomeBonus(makeRoom())).toBe("TEAM_SUCCESS");
+  });
+
+  it("미스터리 박스 정답을 발견했을 때만 발견 성공 보너스를 판정한다", () => {
+    expect(questionGameOutcomeBonus(makeMysteryRoom())).toBe("DISCOVERY");
+    expect(questionGameOutcomeBonus(makeUnsolvedMysteryRoom())).toBeNull();
+  });
+
+  it.each([
+    ["memory", makeMemoryRoom],
+    ["dice", () => makeQuestionRoundRoom("dice")],
+    ["ladder", makeLadderRoom],
+    ["kaba", makeKabaRoom],
+  ] as const)("%s에는 별도 협력 성과 보너스를 만들지 않는다", (_gameId, makeRoom) => {
+    expect(questionGameOutcomeBonus(makeRoom())).toBeNull();
+  });
+
   it.each([
     ["story-dice", makeStoryRoom, 2],
     ["dice", () => makeQuestionRoundRoom("dice"), 3],

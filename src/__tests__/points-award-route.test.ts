@@ -1842,7 +1842,7 @@ describe("포인트 지급 저장", () => {
     expect(txUserUpdate).not.toHaveBeenCalled();
   });
 
-  it("기본 점수는 내부 수명 키로 트랜잭션 지급하고 합계를 누적한다", async () => {
+  it("서버 확정 점수는 내부 수명 키로 트랜잭션 지급하고 합계를 누적한다", async () => {
     const res = await POST(awardReq(v2Body("relay")));
     const data = await res.json();
 
@@ -1850,11 +1850,16 @@ describe("포인트 지급 저장", () => {
     expect(mTx).toHaveBeenCalledTimes(1);
     expect(txPointLogCreate).not.toHaveBeenCalled();
     expect(txPointLogCreateMany).toHaveBeenCalledTimes(1);
-    expect(txPointLogCreateMany.mock.calls[0][0].data).toHaveLength(3);
+    expect(txPointLogCreateMany.mock.calls[0][0].data).toHaveLength(4);
     expect(txUserUpdate).toHaveBeenCalledTimes(1);
     const types = data.awards.map((award: { bonusType: string }) => award.bonusType);
-    expect(types).toHaveLength(3);
-    expect(new Set(types).size).toBe(3);
+    expect(types).toHaveLength(4);
+    expect(new Set(types)).toEqual(new Set([
+      "PARTICIPATION",
+      "VALID_QUESTIONS",
+      "COMPLETION",
+      "TEAM_SUCCESS",
+    ]));
   });
 
   it("첫 기록에 종류와 버전이 있는 결과 JSON을 저장한다", async () => {
@@ -2224,6 +2229,11 @@ describe("버전 2 실행별 점수 지급", () => {
         bonusType: "VALID_QUESTIONS",
         points: 9,
       }),
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "TEAM_SUCCESS",
+        points: 3,
+      }),
     ]));
     expect(data.awards).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ studentId: "attacker-target" }),
@@ -2489,7 +2499,48 @@ describe("저장 질문 기반 인공지능 보너스", () => {
 
     expect(result.bestQuestion?.question).toBe("Why Stars?");
     expect(result.awards).toEqual(expect.arrayContaining([
-      expect.objectContaining({ studentId: "s1", bonusType: "BEST_QUESTION" }),
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "BEST_QUESTION",
+        points: 10,
+      }),
+    ]));
+  });
+
+  it.each(["dice", "ladder"])("%s의 최고 질문은 한 번만 5점을 지급한다", (gameId) => {
+    const result = buildAwardList({ ...storedRequest, gameId }, {
+      bestQuestion: {
+        studentId: "s1",
+        question: "Why Stars?",
+        reason: "탐구할 점이 분명해요.",
+      },
+      bonuses: [{
+        studentId: "s1",
+        bonusType: "BEST_QUESTION",
+        reason: "중복 추천",
+      }],
+    });
+    const bestQuestionAwards = result.awards.filter(
+      ({ bonusType }) => bonusType === "BEST_QUESTION",
+    );
+
+    expect(bestQuestionAwards).toHaveLength(1);
+    expect(bestQuestionAwards[0]).toMatchObject({ studentId: "s1", points: 5 });
+  });
+
+  it.each([
+    ["TEAM_SUCCESS", "협력 목표 완료"],
+    ["DISCOVERY", "미스터리 발견 성공"],
+  ] as const)("%s 성과는 모든 담당 학생에게 3점을 지급한다", (outcomeBonus, reason) => {
+    const result = buildAwardList({ ...storedRequest, outcomeBonus }, null);
+    const outcomeAwards = result.awards.filter(
+      ({ bonusType }) => bonusType === outcomeBonus,
+    );
+
+    expect(outcomeAwards).toHaveLength(2);
+    expect(outcomeAwards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s1", points: 3, reason }),
+      expect.objectContaining({ studentId: "s2", points: 3, reason }),
     ]));
   });
 
