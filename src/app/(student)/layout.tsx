@@ -1,74 +1,23 @@
-"use client";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
+import { STUDENT_CLIENT_NAMESPACES, pickMessages } from "@/i18n/client-namespaces";
+import { StudentShell } from "./StudentShell";
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { useTranslations } from "next-intl";
-import { PageNav } from "@/components/shared/PageNav";
-import { AppNav } from "@/components/shared/AppNav";
-import { StudentNotificationBell } from "@/components/student/StudentNotificationBell";
-import { getSessionUser } from "@/lib/auth-helpers";
-
-// 학습 흐름 순서: 홈(대시보드+상세 리포트 탭) → 질문학습 → 질문연습 → 질문하기 → 질문탐구 → 질문놀이
-// 활동 리포트는 대시보드의 '상세 리포트' 탭으로 통합되어 별도 메뉴에서 제외.
-// 개인 정보 수정은 상단 계정 메뉴에서 접근한다.
-const STUDENT_PAGES = [
-  { href: "/student-dashboard", key: "dashboard" },
-  { href: "/student-question-learning", key: "questionLearning" },
-  { href: "/student-practice", key: "practice" },
-  { href: "/student-ask", key: "ask" },
-  { href: "/student-questions", key: "explore" },
-  { href: "/student-question-play", key: "questionPlay" },
-] as const;
-
-export default function StudentLayout({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
-  const user = getSessionUser(session);
-  const router = useRouter();
-  const t = useTranslations("nav");
-  const pages = STUDENT_PAGES.map((p) => ({ href: p.href, label: t(p.key) }));
-
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    } else if (status === "authenticated" && user.role !== "STUDENT") {
-      router.push("/teacher-dashboard");
-    }
-  }, [status, user.role, router]);
-
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse">로딩 중...</div>
-      </div>
-    );
-  }
-
-  if (!session) return null;
-
+// 학생 영역 전용 번역만 클라이언트로 보낸다(전체 카탈로그 인라인 방지).
+// 새 namespace를 쓰면 STUDENT_CLIENT_NAMESPACES에 추가해야 하며,
+// 누락 시 i18n-client-payload.test.ts 가드가 실패한다.
+export default async function StudentLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [locale, messages] = await Promise.all([getLocale(), getMessages()]);
   return (
-    <div className="min-h-screen bg-background">
-      <AppNav
-        pages={pages}
-        userName={user.name ?? ""}
-        roleSuffix={t("studentSuffix")}
-        extra={<StudentNotificationBell />}
-        accountProfile={{
-          school: user.school,
-          grade: user.grade,
-          className: user.className,
-          studentNumber: user.studentNumber,
-        }}
-        accountLinks={{
-          settingsHref: "/student-settings",
-          rankingsHref: "/student-points",
-          detailedReportHref: "/student-dashboard?tab=reports",
-        }}
-      />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-        <PageNav pages={pages} />
-      </main>
-    </div>
+    <NextIntlClientProvider
+      locale={locale}
+      messages={pickMessages(messages, STUDENT_CLIENT_NAMESPACES)}
+    >
+      <StudentShell>{children}</StudentShell>
+    </NextIntlClientProvider>
   );
 }

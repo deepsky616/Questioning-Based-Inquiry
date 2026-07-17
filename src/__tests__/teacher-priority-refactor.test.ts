@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 const curriculumPage = readFileSync("src/app/(teacher)/teacher-curriculum/page.tsx", "utf8");
 const questionsPage = readFileSync("src/app/(teacher)/teacher-questions/page.tsx", "utf8");
 const dashboardPage = readFileSync("src/app/(teacher)/teacher-dashboard/page.tsx", "utf8");
-const teacherLayout = readFileSync("src/app/(teacher)/layout.tsx", "utf8");
+const teacherLayout = readFileSync("src/app/(teacher)/TeacherShell.tsx", "utf8");
 const reportsView = readFileSync("src/components/teacher/TeacherReportsView.tsx", "utf8");
 
 describe("teacher priority screen refactors", () => {

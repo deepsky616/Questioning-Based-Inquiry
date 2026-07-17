@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
-const layoutSource = readFileSync("src/app/(student)/layout.tsx", "utf8");
+const layoutSource = readFileSync("src/app/(student)/StudentShell.tsx", "utf8");
 
 function readStudentPages() {
   const pagesBlock = layoutSource.match(/const STUDENT_PAGES = \[([\s\S]*?)\] as const;/)?.[1] ?? "";
