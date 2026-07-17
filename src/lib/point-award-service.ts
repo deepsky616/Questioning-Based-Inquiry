@@ -12,6 +12,7 @@ import {
 } from "@/lib/game-award-result";
 import {
   buildQuestionGameScoreEvidence,
+  questionGameOutcomeBonus,
   QuestionGameScoreEvidenceError,
 } from "@/lib/question-game-score-evidence";
 import {
@@ -30,6 +31,8 @@ import {
   BASE_POINTS,
   DAILY_LIMITS,
   AI_BONUS_TYPES,
+  FRIEND_BEST_QUESTION_POINTS,
+  GAME_OUTCOME_BONUS_TYPES,
   VALID_BONUS_KEYS,
   MAX_BONUS_PER_STUDENT,
   MAX_BONUSES_PER_STUDENT,
@@ -39,6 +42,7 @@ import {
   normalizeQuestionActivity,
   RELAY_ACTIVITY_LIMITS,
   type BonusKey,
+  type GameOutcomeBonusKey,
 } from "@/lib/points-policy";
 
 interface StudentContribution {
@@ -60,6 +64,7 @@ interface AwardIdentity {
 interface AwardRequest extends AwardIdentity {
   topic?: string;
   contributions: StudentContribution[];
+  outcomeBonus?: GameOutcomeBonusKey;
 }
 
 interface AIBonus { studentId: string; bonusType: string; points?: number; reason: string }
@@ -632,9 +637,11 @@ function buildStoredAwardRequest(
   studentIds: Set<string>,
 ): AwardRequest {
   let contributions: StudentContribution[];
+  let outcomeBonus: GameOutcomeBonusKey | null = null;
   if (room.pointEvidenceVersion === 2) {
     try {
       contributions = buildQuestionGameScoreEvidence(room, studentIds);
+      outcomeBonus = questionGameOutcomeBonus(room);
     } catch (error) {
       if (error instanceof QuestionGameScoreEvidenceError) {
         throw new PointAwardError(error.message, error.status);
@@ -648,6 +655,7 @@ function buildStoredAwardRequest(
     ...req,
     topic: room.topic,
     contributions,
+    ...(outcomeBonus ? { outcomeBonus } : {}),
   };
 }
 
@@ -805,6 +813,12 @@ function restoreScopedAwardResult<
   return { alreadyAwarded: true, ...restored };
 }
 
+function bestQuestionPointsForGame(gameId: string): number {
+  return gameId === "dice" || gameId === "ladder"
+    ? FRIEND_BEST_QUESTION_POINTS
+    : AI_BONUS_TYPES.BEST_QUESTION.points;
+}
+
 function buildPrompt(req: AwardRequest): string {
   const gameLabel = GAME_LABEL[req.gameId] ?? req.gameId;
   return JSON.stringify({
@@ -816,7 +830,9 @@ function buildPrompt(req: AwardRequest): string {
       allowedAwards: Object.values(AI_BONUS_TYPES).map((bonus) => ({
         key: bonus.key,
         label: bonus.label,
-        points: bonus.points,
+        points: bonus.key === "BEST_QUESTION"
+          ? bestQuestionPointsForGame(req.gameId)
+          : bonus.points,
       })),
       awardOnlyWhenClearlySupported: true,
       allStudentsNeedNotReceiveAnAward: true,
@@ -892,6 +908,15 @@ export function buildAwardList(req: AwardRequest, ai: AIVerdictResponse | null):
       points: BASE_POINTS.COMPLETION,
       reason: "게임 완료",
     });
+    if (req.outcomeBonus) {
+      const outcome = GAME_OUTCOME_BONUS_TYPES[req.outcomeBonus];
+      awards.push({
+        studentId: c.studentId,
+        bonusType: outcome.key,
+        points: outcome.points,
+        reason: outcome.reason,
+      });
+    }
     if (c.isWinner) {
       awards.push({
         studentId: c.studentId,
@@ -938,12 +963,13 @@ export function buildAwardList(req: AwardRequest, ai: AIVerdictResponse | null):
 
     if (bestQuestion) {
       const bk = AI_BONUS_TYPES.BEST_QUESTION;
+      const points = bestQuestionPointsForGame(req.gameId);
       awards.push({
         studentId: bestQuestion.studentId, bonusType: bk.key,
-        points: bk.points, reason: bestQuestion.reason || "AI 베스트 질문 선정",
+        points, reason: bestQuestion.reason || "AI 베스트 질문 선정",
       });
       const s = perStudent[bestQuestion.studentId];
-      s.count++; s.sum += bk.points; s.types.add(bk.key);
+      s.count++; s.sum += points; s.types.add(bk.key);
     }
 
     const rawBonuses: unknown[] = Array.isArray(ai.bonuses) ? ai.bonuses : [];

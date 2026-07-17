@@ -313,6 +313,30 @@ describe("verified room result awards", () => {
     expect(screen.getByText(/창의성상/)).toHaveClass("text-foreground");
   });
 
+  it("성과 이름과 실제 지급 점수를 결과에 그대로 표시한다", () => {
+    const outcomeAward: GameAwardResult = {
+      awards: [
+        {
+          studentId: "student",
+          bonusType: "BEST_QUESTION",
+          points: 5,
+          reason: "가장 탐구할 만한 질문",
+        },
+        {
+          studentId: "student",
+          bonusType: "TEAM_SUCCESS",
+          points: 3,
+          reason: "협력 목표 완료",
+        },
+      ],
+    };
+    renderResult(makeRoom({ awardResult: outcomeAward }));
+
+    expect(screen.getByText(/베스트 질문상 \+5/)).toBeVisible();
+    expect(screen.getByText(/협력 완성 \+3/)).toBeVisible();
+    expect(screen.queryByText(/베스트 질문상 \+10/)).not.toBeInTheDocument();
+  });
+
   it("connects every friend-room game result to the shared result flow", () => {
     for (const fileName of [
       "RoomMemory.tsx",

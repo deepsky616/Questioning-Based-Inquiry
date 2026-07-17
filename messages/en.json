@@ -1902,6 +1902,8 @@
     "act_VALID_QUESTIONS": "Good question",
     "act_COMPLETION": "Game completed",
     "act_WINNER": "Winner",
+    "act_TEAM_SUCCESS": "Team goal completed",
+    "act_DISCOVERY": "Discovery success",
     "act_TEACHER_GRANT": "Teacher grant",
     "act_TEACHER_REVOKE": "Teacher revoke",
     "act_default": "Points earned",
