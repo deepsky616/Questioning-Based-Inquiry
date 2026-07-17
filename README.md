@@ -134,6 +134,17 @@ The rollback is pinned to the original 18-table schema and refuses automatic rol
 CONFIRM_DB_SECURITY_ROLLBACK=restore-public-data-api-access npm run db:security:rollback
 ```
 
+### Sentry error monitoring (optional)
+
+1. Create a free Sentry project (Next.js platform).
+2. Set `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` in Vercel (and `.env.local`).
+3. Redeploy. Both values empty = monitoring fully disabled (no bundle cost).
+
+Captured events: uncaught server/request errors (`onRequestError`), browser errors
+(dynamic-loaded SDK, only when the public DSN is set), and every `logger.error` call
+(server-side, so handled failures like point-award retries become alertable).
+PII is not sent (`sendDefaultPii: false`) and tracing is off to stay in the free tier.
+
 ### Resend Free setup
 
 1. Create a Resend API key.
