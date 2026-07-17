@@ -41,6 +41,7 @@ import {
 } from "@/lib/question-class-creation";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 import { normalizeStudentInquiryGuide } from "@/lib/student-inquiry-guide";
+import { withSelectedCoreIdea } from "@/lib/student-guide-source";
 import {
   KNOWLEDGE_ITEM_LIMIT,
   PROCESS_ITEM_LIMIT,
@@ -405,7 +406,7 @@ export default function CurriculumPage() {
     curriculumData && saveTitle.trim() && saveGrade && saveDate && selectedInquiryQuestions.length > 0,
   );
 
-  const buildDesignPayload = () => ({
+  const buildDesignPayload = () => withSelectedCoreIdea({
     title: saveTitle.trim(),
     curriculumAreaId: curriculumData?.id,
     subject: curriculumData?.subject,
@@ -413,7 +414,6 @@ export default function CurriculumPage() {
     grade: saveGrade,
     sessionDate: saveDate,
     area: curriculumData?.area,
-    coreIdea: curriculumData?.coreIdea,
     selectedKeywords,
     coreSentences: selectedCoreSentences,
     essentialQuestions: selectedEssentialQuestions,
@@ -425,7 +425,7 @@ export default function CurriculumPage() {
     commentsVisibleToPeers: sessionCommentsVisible,
     targetClassValue,
     targetStudentIds: selectedStudentIds,
-  });
+  }, selectedCoreIdeaLines);
 
   // 설계 저장만 수행하고 생성된 설계를 반환한다.
   const saveDesign = async (

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildStudentGuideSourceSignature } from "@/lib/student-guide-source";
+import {
+  buildStudentGuideSourceSignature,
+  withSelectedCoreIdea,
+} from "@/lib/student-guide-source";
 
 const input = {
   coreIdea: "생물은 환경과 관계를 맺는다.",
@@ -21,5 +24,17 @@ describe("학생용 설명 원문 서명", () => {
       ...input,
       inquiryQuestions: [{ type: "conceptual", content: "생산자는 무엇일까?" }],
     }));
+  });
+
+  it("저장 자료의 핵심 생각은 선택한 줄을 합친 값과 일치한다", () => {
+    const payload = withSelectedCoreIdea(
+      { title: "생태계", coreIdea: "선택하지 않은 전체 핵심 생각" },
+      ["선택한 첫 줄", "선택한 둘째 줄"],
+    );
+
+    expect(payload).toEqual({
+      title: "생태계",
+      coreIdea: "선택한 첫 줄\n선택한 둘째 줄",
+    });
   });
 });

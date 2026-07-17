@@ -9,6 +9,13 @@ export interface StudentGuideSourceInput {
 
 const clean = (value: string) => value.trim().replace(/\s+/g, " ");
 
+export function withSelectedCoreIdea<T extends object>(
+  payload: T,
+  selectedCoreIdeaLines: string[],
+): T & { coreIdea: string } {
+  return { ...payload, coreIdea: selectedCoreIdeaLines.join("\n") };
+}
+
 export function buildStudentGuideSourceSignature(input: StudentGuideSourceInput): string {
   return JSON.stringify({
     coreIdea: clean(input.coreIdea),
