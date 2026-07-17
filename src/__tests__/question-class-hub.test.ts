@@ -8,6 +8,22 @@ const actions = readFileSync(
   "src/app/(teacher)/teacher-sessions/TeacherQuestionClassActions.tsx",
   "utf8",
 );
+const workspaceNav = readFileSync(
+  "src/app/(teacher)/teacher-sessions/QuestionClassWorkspaceNav.tsx",
+  "utf8",
+);
+const createCard = readFileSync(
+  "src/app/(teacher)/teacher-sessions/TeacherSessionCreateCard.tsx",
+  "utf8",
+);
+const curriculumPage = readFileSync(
+  "src/app/(teacher)/teacher-curriculum/page.tsx",
+  "utf8",
+);
+const inquiryWorkspaceHeader = readFileSync(
+  "src/app/(teacher)/teacher-curriculum/InquiryQuestionClassWorkspaceHeader.tsx",
+  "utf8",
+);
 const monthList = readFileSync(
   "src/app/(teacher)/teacher-sessions/TeacherSessionMonthList.tsx",
   "utf8",
@@ -18,13 +34,37 @@ const row = readFileSync(
 );
 
 describe("질문수업 통합 화면 계약", () => {
-  it("탐구질문 만들기를 주 행동으로 두고 간단 만들기는 기본으로 닫는다", () => {
-    expect(actions).toContain('href="/teacher-curriculum"');
-    expect(actions).toContain('data-testid="question-class-primary-action"');
-    expect(actions).toContain("quickCreateOpen");
-    expect(actions).toContain("quickCreateOpen &&");
-    expect(actions).toContain('aria-controls="quick-question-class-form"');
-    expect(actions).toContain('aria-expanded={quickCreateOpen}');
+  it("목록과 두 만들기 화면을 항상 오갈 수 있는 작업공간 탐색을 제공한다", () => {
+    expect(workspaceNav).toContain('href="/teacher-sessions"');
+    expect(workspaceNav).toContain('href="/teacher-curriculum"');
+    expect(workspaceNav).toContain('href="/teacher-sessions?view=quick"');
+    expect(workspaceNav).toContain('aria-current={activeView === "list" ? "page" : undefined}');
+    expect(workspaceNav).toContain('aria-current={activeView === "inquiry" ? "page" : undefined}');
+    expect(workspaceNav).toContain('aria-current={activeView === "quick" ? "page" : undefined}');
+  });
+
+  it("목록과 간단 만들기는 같은 주소에서 한 화면만 표시한다", () => {
+    expect(page).toContain('searchParams.get("view") === "quick"');
+    expect(page).toContain('<QuestionClassWorkspaceNav activeView={activeView} />');
+    expect(page).toContain('activeView === "quick"');
+    expect(page).toContain('t("quickViewTitle")');
+    expect(page).toContain('t("listViewTitle")');
+  });
+
+  it("탐구 만들기 화면은 공통 탐색과 화면 제목 뒤에 도우미 안내를 둔다", () => {
+    expect(curriculumPage).toContain("<InquiryQuestionClassWorkspaceHeader />");
+    expect(inquiryWorkspaceHeader).toContain('<QuestionClassWorkspaceNav activeView="inquiry" />');
+    expect(inquiryWorkspaceHeader).toContain('tSessions("inquiryViewTitle")');
+    expect(inquiryWorkspaceHeader).toContain('tSessions("inquiryHelperTitle")');
+    expect(inquiryWorkspaceHeader.indexOf('tSessions("inquiryViewTitle")'))
+      .toBeLessThan(inquiryWorkspaceHeader.indexOf('tSessions("inquiryHelperTitle")'));
+  });
+
+  it("간단 만들기 양식은 별도 화면의 본문으로 표시하고 중복 제목을 숨긴다", () => {
+    expect(actions).not.toContain("quickCreateOpen");
+    expect(actions).toContain("<TeacherSessionCreateCard");
+    expect(actions).toContain("showHeader={false}");
+    expect(createCard).toContain("showHeader?: boolean");
   });
 
   it("기존 간단 생성 요청 계약을 유지하고 유효한 식별값에서만 완료 처리한다", () => {

@@ -22,6 +22,8 @@ interface TeacherSessionCreateCardProps {
   targetClasses: SessionTargetClass[];
   students: SessionTargetStudent[];
   onCreate: () => void;
+  showHeader?: boolean;
+  labelledBy?: string;
 }
 
 export function TeacherSessionCreateCard({
@@ -32,18 +34,22 @@ export function TeacherSessionCreateCard({
   targetClasses,
   students,
   onCreate,
+  showHeader = true,
+  labelledBy,
 }: TeacherSessionCreateCardProps) {
   const t = useTranslations("sessions");
   const tSeq = useTranslations("sequencePanel");
 
   return (
-    <Card aria-labelledby="quick-question-class-form-title">
-      <CardHeader className="pb-3">
-        <CardTitle id="quick-question-class-form-title" className="text-base">
-          {t("newSession")}
-        </CardTitle>
-        <CardDescription>{t("newSessionDesc")}</CardDescription>
-      </CardHeader>
+    <Card aria-labelledby={showHeader ? "quick-question-class-form-title" : labelledBy}>
+      {showHeader && (
+        <CardHeader className="pb-3">
+          <CardTitle id="quick-question-class-form-title" className="text-base">
+            {t("newSession")}
+          </CardTitle>
+          <CardDescription>{t("newSessionDesc")}</CardDescription>
+        </CardHeader>
+      )}
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_2fr] lg:grid-cols-[1fr_1fr_2fr]">
           <div className="space-y-1">

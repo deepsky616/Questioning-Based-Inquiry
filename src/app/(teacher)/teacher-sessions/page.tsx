@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { BookOpenCheck, CircleAlert, RefreshCw } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { isSessionAvailable, sortSessionsAsc, sortSessionsDesc, compareSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionsByMonth } from "@/lib/sessions";
 import { appQueryKeys, useTeacherSessions, useTeacherStudents } from "@/lib/app-queries";
@@ -16,6 +16,8 @@ import { useTranslations } from "next-intl";
 import { TeacherSessionListControls, type SessionListSort, type SessionParticipationFilter } from "./TeacherSessionListControls";
 import { TeacherSessionSummaryGrid } from "./TeacherSessionSummaryGrid";
 import { TeacherQuestionClassActions } from "./TeacherQuestionClassActions";
+import { QuestionClassViewHeader } from "./QuestionClassViewHeader";
+import { QuestionClassWorkspaceNav } from "./QuestionClassWorkspaceNav";
 import { TeacherSessionMonthList } from "./TeacherSessionMonthList";
 import type { QuestionSession } from "./types";
 import {
@@ -40,6 +42,7 @@ function TeacherSessionsPageContent() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const requestedSessionId = searchParams.get("session")?.trim() || null;
+  const activeView = searchParams.get("view") === "quick" ? "quick" : "list";
   const { data: sessions = [], isLoading, isError, refetch } =
     useTeacherSessions<QuestionSession>();
   // 기존 낙관적 업데이트 호출부를 그대로 유지하기 위해 캐시 기록 함수를 setSessions 이름으로 제공한다.
@@ -272,15 +275,21 @@ function TeacherSessionsPageContent() {
     <div className="space-y-6">
       <PageHeader title={tPages("teacherSessions.title")} description={tPages("teacherSessions.description")} />
 
-      <TeacherQuestionClassActions
-        students={students}
-        teacherClasses={teacherClasses}
-        targetsReady={Boolean(targetData)}
-        onHighlight={handleHighlight}
+      <QuestionClassWorkspaceNav activeView={activeView} />
+
+      <QuestionClassViewHeader
+        title={activeView === "quick" ? t("quickViewTitle") : t("listViewTitle")}
+        description={activeView === "quick" ? t("quickViewDesc") : t("listViewDesc")}
       />
 
-      {/* 세션 목록 */}
-      {isLoading ? (
+      {activeView === "quick" ? (
+        <TeacherQuestionClassActions
+          students={students}
+          teacherClasses={teacherClasses}
+          targetsReady={Boolean(targetData)}
+          onHighlight={handleHighlight}
+        />
+      ) : isLoading ? (
         <div className="text-center py-8 text-muted-foreground">{t("loading")}</div>
       ) : isError ? (
         <EmptyState
@@ -303,7 +312,6 @@ function TeacherSessionsPageContent() {
       ) : (
         <Card className="teacher-sessions-desktop-management">
           <CardHeader className="pb-3 space-y-3">
-            <CardTitle className="text-base">{t("listTitle")}</CardTitle>
             <TeacherSessionSummaryGrid
               activeCount={activeSessions.length}
               pastCount={pastSessions.length}

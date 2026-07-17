@@ -450,29 +450,37 @@ test.describe("질문수업 통합 흐름", () => {
     await page.goto("/teacher-sessions");
     await expectQuestionClassNavActive(page);
 
-    const primaryAction = page.getByTestId("question-class-primary-action");
-    await expect(primaryAction).toBeVisible();
-    await expect(primaryAction).toHaveAccessibleName(
-      "탐구질문으로 수업 만들기",
-    );
-    await expect(primaryAction).toHaveAttribute("href", "/teacher-curriculum");
+    const workspace = page.getByRole("navigation", {
+      name: "질문수업 작업공간",
+    });
+    const listView = workspace.getByRole("link", { name: "질문수업 목록" });
+    const inquiryCreate = workspace.getByRole("link", {
+      name: "탐구질문으로 수업 만들기",
+    });
+    const quickCreate = workspace.getByRole("link", {
+      name: "간단 질문수업 만들기",
+    });
 
-    const quickCreate = page.locator(
-      'button[aria-controls="quick-question-class-form"]',
-    );
-    await expect(quickCreate).toHaveAccessibleName("간단 질문수업 만들기");
-    await expect(quickCreate).toHaveAttribute("aria-expanded", "false");
+    await expect(listView).toHaveAttribute("aria-current", "page");
+    await expect(inquiryCreate).toHaveAttribute("href", "/teacher-curriculum");
+    await expect(quickCreate).toHaveAttribute("href", "/teacher-sessions?view=quick");
+    await expect(page.getByRole("heading", { name: "질문수업 목록" })).toBeVisible();
     await expect(page.locator("#quick-question-class-form")).toHaveCount(0);
 
     await quickCreate.click();
-    await expect(quickCreate).toHaveAccessibleName("간단 질문수업 닫기");
-    await expect(quickCreate).toHaveAttribute("aria-expanded", "true");
+    await expect(page).toHaveURL(/\/teacher-sessions\?view=quick$/);
+    await expect(quickCreate).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "간단 질문수업 만들기" })).toBeVisible();
     await expect(page.locator("#quick-question-class-form")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "질문수업 목록" })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
 
-    await primaryAction.click();
+    await inquiryCreate.click();
     await expect(page).toHaveURL(/\/teacher-curriculum(?:\?|$)/);
     await expectQuestionClassNavActive(page);
+    await expect(inquiryCreate).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "탐구질문으로 수업 만들기" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "탐구 질문 도우미" })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     expect(unexpectedWrites).toEqual([]);
   });
