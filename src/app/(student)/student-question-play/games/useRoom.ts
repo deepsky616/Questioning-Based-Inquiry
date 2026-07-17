@@ -11,7 +11,10 @@ import {
   type RoomActionHandler,
 } from "@/lib/question-games-data";
 import { readRoomCommandResult } from "@/lib/question-game-room-response";
-import { APP_ROOM_POLL_MS, visibleRefetchInterval } from "@/lib/query-refresh";
+import {
+  roomPollDelay,
+  visibleRefetchInterval,
+} from "@/lib/query-refresh";
 
 const ROOM_REPLACED_MESSAGE =
   "방이 새로 만들어졌어요. 다시 참가해 주세요.";
@@ -111,26 +114,38 @@ interface UseRoomResult {
   error: string | null;
   actionLoading: boolean;
   isRestoring: boolean;
+  connectionState: RoomConnectionState;
   createRoom: (gameId: string) => Promise<GameRoom | null>;
   joinRoom: (code: string) => Promise<GameRoom | null>;
   sendAction: RoomActionHandler;
   leaveRoom: () => Promise<boolean>;
   setActiveCode: (code: string | null) => void;
+  refreshRoom: () => void;
 }
+
+export type RoomConnectionState =
+  | "connecting"
+  | "connected"
+  | "delayed"
+  | "offline";
 
 export function useRoom(gameId?: string): UseRoomResult {
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [connectionState, setConnectionState] =
+    useState<RoomConnectionState>("connecting");
   const [activeCode, setActiveCodeState] = useState<string | null>(null);
   const [roomGeneration, setRoomGeneration] = useState(0);
   const roomRef = useRef<GameRoom | null>(null);
   const activeCodeRef = useRef<string | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roomGenerationRef = useRef(0);
   const connectIntentRef = useRef(0);
   const pendingActionCountRef = useRef(0);
+  const pollFailureCountRef = useRef(0);
+  const refreshRoomRef = useRef<() => void>(() => {});
 
   const advanceRoomGeneration = useCallback(() => {
     roomGenerationRef.current += 1;
@@ -166,6 +181,8 @@ export function useRoom(gameId?: string): UseRoomResult {
     roomRef.current = null;
     setActiveCodeState(null);
     setRoom(null);
+    pollFailureCountRef.current = 0;
+    setConnectionState("connecting");
     clearRoomMarker();
   }, [advanceRoomGeneration, clearRoomMarker]);
 
@@ -175,6 +192,8 @@ export function useRoom(gameId?: string): UseRoomResult {
     roomRef.current = nextRoom;
     setActiveCodeState(nextRoom.code);
     setRoom(nextRoom);
+    pollFailureCountRef.current = 0;
+    setConnectionState("connected");
     if (gameId) writeRoomMarker(gameId, nextRoom);
     return nextRoom;
   }, [advanceRoomGeneration, gameId]);
@@ -215,6 +234,8 @@ export function useRoom(gameId?: string): UseRoomResult {
     roomRef.current = null;
     setActiveCodeState(code);
     setRoom(null);
+    pollFailureCountRef.current = 0;
+    setConnectionState("connecting");
   }, [advanceRoomGeneration, clearRoom]);
 
   useClientLayoutEffect(() => {
@@ -229,6 +250,7 @@ export function useRoom(gameId?: string): UseRoomResult {
       return;
     }
     setIsRestoring(true);
+    setConnectionState("connecting");
 
     let cancelled = false;
     const restore = async () => {
@@ -244,6 +266,11 @@ export function useRoom(gameId?: string): UseRoomResult {
         }
         if (!res.ok) {
           setError(responseError(data, "방을 다시 연결할 수 없어요"));
+          setConnectionState(
+            typeof navigator !== "undefined" && navigator.onLine === false
+              ? "offline"
+              : "delayed",
+          );
           return;
         }
         if (
@@ -266,7 +293,14 @@ export function useRoom(gameId?: string): UseRoomResult {
         setError(null);
         replaceRoom(data.room);
       } catch {
-        if (!cancelled) setError("네트워크 오류");
+        if (!cancelled) {
+          setError("네트워크 오류");
+          setConnectionState(
+            typeof navigator !== "undefined" && navigator.onLine === false
+              ? "offline"
+              : "delayed",
+          );
+        }
       } finally {
         if (!cancelled) setIsRestoring(false);
       }
@@ -278,18 +312,52 @@ export function useRoom(gameId?: string): UseRoomResult {
     };
   }, [clearRoomMarker, gameId, replaceRoom]);
 
-  // 폴링: activeCode가 있으면 2초마다 방 상태 갱신
+  // 방 상태 확인은 실패할수록 간격을 늘리고, 다시 연결되면 기본 간격으로 돌아간다.
   useEffect(() => {
     if (!activeCode) {
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
+      refreshRoomRef.current = () => {};
       return;
     }
     const code = activeCode;
     const generation = roomGenerationRef.current;
     let cancelled = false;
+    let inFlight = false;
+
+    const recordFailure = () => {
+      pollFailureCountRef.current += 1;
+      const browserOffline =
+        typeof navigator !== "undefined" && navigator.onLine === false;
+      setConnectionState(
+        browserOffline || pollFailureCountRef.current >= 3
+          ? "offline"
+          : "delayed",
+      );
+    };
+
+    const schedule = () => {
+      if (cancelled || !isCurrentRequest(code, generation)) return;
+      if (pollRef.current) clearTimeout(pollRef.current);
+      const delay = visibleRefetchInterval(
+        roomPollDelay(pollFailureCountRef.current),
+      );
+      if (delay === false) {
+        pollRef.current = null;
+        return;
+      }
+      pollRef.current = setTimeout(() => { void poll(); }, delay);
+    };
 
     const poll = async () => {
-      if (visibleRefetchInterval(APP_ROOM_POLL_MS) === false) return;
+      if (
+        cancelled ||
+        inFlight ||
+        !isCurrentRequest(code, generation) ||
+        visibleRefetchInterval(roomPollDelay(0)) === false
+      ) {
+        return;
+      }
+      inFlight = true;
       try {
         const res = await fetch(`/api/question-games/rooms/${code}`);
         if (cancelled || !isCurrentRequest(code, generation)) return;
@@ -300,37 +368,59 @@ export function useRoom(gameId?: string): UseRoomResult {
           clearRoom();
           return;
         }
-        if (!res.ok) return;
-        if (isGameRoom(data.room)) {
-          if (
-            data.room.code !== code ||
-            (gameId !== undefined && data.room.gameId !== gameId)
-          ) {
-            setError(ROOM_REPLACED_MESSAGE);
-            clearRoom();
-            return;
-          }
-          const outcome = applyRoom(data.room);
-          if (outcome.lifetimeChanged) setError(ROOM_REPLACED_MESSAGE);
+        if (!res.ok || !isGameRoom(data.room)) {
+          recordFailure();
+          return;
         }
+        if (
+          data.room.code !== code ||
+          (gameId !== undefined && data.room.gameId !== gameId)
+        ) {
+          setError(ROOM_REPLACED_MESSAGE);
+          clearRoom();
+          return;
+        }
+        pollFailureCountRef.current = 0;
+        setConnectionState("connected");
+        const outcome = applyRoom(data.room);
+        if (outcome.lifetimeChanged) setError(ROOM_REPLACED_MESSAGE);
       } catch {
         if (cancelled || !isCurrentRequest(code, generation)) return;
+        recordFailure();
+      } finally {
+        inFlight = false;
+        schedule();
       }
     };
 
-    poll();
-    pollRef.current = setInterval(poll, APP_ROOM_POLL_MS);
-    const onVisibilityChange = () => {
-      if (visibleRefetchInterval(APP_ROOM_POLL_MS) !== false) void poll();
+    refreshRoomRef.current = () => {
+      if (pollRef.current) clearTimeout(pollRef.current);
+      pollRef.current = null;
+      void poll();
     };
+    void poll();
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "hidden") refreshRoomRef.current();
+    };
+    const onOnline = () => refreshRoomRef.current();
+    const onOffline = () => setConnectionState("offline");
     document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
 
     return () => {
       cancelled = true;
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+      if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
+      refreshRoomRef.current = () => {};
     };
   }, [activeCode, applyRoom, clearRoom, gameId, isCurrentRequest, roomGeneration]);
+
+  const refreshRoom = useCallback(() => {
+    refreshRoomRef.current();
+  }, []);
 
   const connectedRoomCode = room?.code ?? null;
   const connectedRoomGameId = room?.gameId ?? null;
@@ -382,6 +472,8 @@ export function useRoom(gameId?: string): UseRoomResult {
           return;
         }
         if (!res.ok || !responseRoom) return;
+        pollFailureCountRef.current = 0;
+        setConnectionState("connected");
         applyRoom(responseRoom);
       } catch {
         // 접속 확인 실패는 놀이 동작 오류와 현재 화면을 바꾸지 않는다.
@@ -545,6 +637,8 @@ export function useRoom(gameId?: string): UseRoomResult {
             reason: "superseded",
           };
         }
+        pollFailureCountRef.current = 0;
+        setConnectionState("connected");
         if (res.status === 409) {
           const responseRoom = data.room;
           let hasApplicableRoom = false;
@@ -618,6 +712,11 @@ export function useRoom(gameId?: string): UseRoomResult {
           };
         }
         setError("네트워크 오류");
+        setConnectionState(
+          typeof navigator !== "undefined" && navigator.onLine === false
+            ? "offline"
+            : "delayed",
+        );
         return {
           ok: false,
           room: roomRef.current,
@@ -649,6 +748,7 @@ export function useRoom(gameId?: string): UseRoomResult {
       });
       if (!isCurrentRequest(code, generation)) return false;
       const data = await readResponseData(res);
+      setConnectionState("connected");
       if (!isCurrentRequest(code, generation)) return false;
       if (res.status === 403 || res.status === 404) {
         setError(responseError(data, "방을 찾을 수 없어요"));
@@ -714,10 +814,12 @@ export function useRoom(gameId?: string): UseRoomResult {
     error,
     actionLoading,
     isRestoring,
+    connectionState,
     createRoom,
     joinRoom,
     sendAction,
     leaveRoom,
     setActiveCode,
+    refreshRoom,
   };
 }

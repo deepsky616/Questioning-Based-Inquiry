@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameRoom } from "@/lib/question-games-data";
-import { QUESTION_GAME_LIMITS } from "@/lib/question-game-rules";
+import {
+  BUILT_IN_QUESTION_GAME_IDS,
+  QUESTION_GAME_LIMITS,
+} from "@/lib/question-game-rules";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
@@ -510,6 +513,55 @@ describe("버전 2 명령 경계", () => {
       room: { awardResult },
     });
   });
+
+  it.each(BUILT_IN_QUESTION_GAME_IDS)(
+    "%s의 마지막 동작은 한 번만 자동 정산하고 같은 명령 재전송은 저장 없이 복구한다",
+    async (gameId) => {
+      const room = makeV2Room({ gameId });
+      const candidate = makeV2Room({
+        gameId,
+        status: "ended",
+        gameState: {
+          stateVersion: 2,
+          phase: "done",
+          endReason: "completed",
+          recentCommandIds: [COMMAND_ID],
+        },
+      });
+      const saved = { ...candidate, version: 2, updatedAt: 20 };
+      const awardResult = {
+        awards: [{
+          studentId: "user-1",
+          bonusType: "PARTICIPATION",
+          points: 1,
+          reason: "게임 참여",
+        }],
+      };
+      const settled = { ...saved, version: 3, awardResult };
+      mocks.loadGameRoom
+        .mockResolvedValueOnce(room)
+        .mockResolvedValueOnce(settled);
+      mocks.applyQuestionGameRoomCommand
+        .mockReturnValueOnce({ kind: "changed", room: candidate })
+        .mockReturnValueOnce({ kind: "replayed", room: settled });
+      mocks.ensureQuestionGameRoomPoints.mockResolvedValue(awardResult);
+      mocks.saveGameRoom
+        .mockResolvedValueOnce({ kind: "saved", room: saved })
+        .mockResolvedValueOnce({ kind: "saved", room: settled });
+
+      const first = await patch(commandBody());
+      const replay = await patch(commandBody({ expectedVersion: settled.version }));
+
+      expect(first.status).toBe(200);
+      expect(replay.status).toBe(200);
+      expect(mocks.ensureQuestionGameRoomPoints).toHaveBeenCalledOnce();
+      expect(mocks.ensureQuestionGameRoomPoints).toHaveBeenCalledWith(saved);
+      expect(mocks.saveGameRoom).toHaveBeenCalledTimes(2);
+      await expect(replay.json()).resolves.toMatchObject({
+        room: { gameId, awardResult },
+      });
+    },
+  );
 
   it.each([
     ["invalid", 400, "잘못된 명령입니다"],

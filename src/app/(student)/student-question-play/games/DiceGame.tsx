@@ -5,6 +5,7 @@ import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
 import { useGameRun, type GameRunSnapshot } from "./useGameRun";
+import { GameLearningSummary } from "./GameLearningSummary";
 import { getQuestionDiceTypes, getQuestionGameText } from "@/lib/question-game-i18n";
 import { QUESTION_GAME_LIMITS, QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
@@ -244,6 +245,13 @@ export default function DiceGame({ game, onBack, config }: Props) {
             )}
           </div>
         )}
+        <GameLearningSummary
+          mode={isAI ? "ai" : "solo"}
+          completedActivities={studentQuestionCount}
+          questions={history.filter((entry) => !entry.isAI).map((entry) => entry.question)}
+          points={runResult?.awarded}
+          accentColor={game.accentColor}
+        />
         <div className="space-y-3">
           {history.map((entry, index) => (
             <div key={index} className="bg-card text-foreground rounded-xl border border-border p-4 flex items-center gap-2">

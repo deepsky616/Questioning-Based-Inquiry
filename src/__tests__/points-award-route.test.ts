@@ -775,7 +775,7 @@ describe("포인트 지급 요청 검증", () => {
     expect(txUserUpdate).not.toHaveBeenCalled();
   });
 
-  it("남은 친구 놀이 하루 상한보다 실행 묶음이 크면 남은 점수를 한 항목으로 지급한다", async () => {
+  it("남은 친구 놀이 하루 상한보다 실행 묶음이 크면 활동 근거를 보존하며 남은 점수만 지급한다", async () => {
     const room = {
       ...makeStudentHostedV2RelayRoom(),
       pointCompletedAt: Date.parse("2026-07-15T14:59:00.000Z"),
@@ -803,16 +803,29 @@ describe("포인트 지급 요청 검증", () => {
       expect.objectContaining({
         studentId: "s1",
         bonusType: "FRIEND_DAILY_LIMIT",
-        points: 5,
+        points: 0,
       }),
-      expect.objectContaining({ studentId: "s2", bonusType: "PARTICIPATION" }),
-    ]));
-    expect(result?.awards).not.toEqual(expect.arrayContaining([
       expect.objectContaining({
         studentId: "s1",
         bonusType: "PARTICIPATION",
+        points: 1,
       }),
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "VALID_QUESTIONS",
+        points: 4,
+        reason: "유효 질문 3개",
+      }),
+      expect.objectContaining({
+        studentId: "s1",
+        bonusType: "COMPLETION",
+        points: 0,
+      }),
+      expect.objectContaining({ studentId: "s2", bonusType: "PARTICIPATION" }),
     ]));
+    expect(result?.awards
+      .filter((award) => award.studentId === "s1")
+      .reduce((sum, award) => sum + award.points, 0)).toBe(5);
     expect(txUserUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "s1" },
       data: { totalPoints: { increment: 5 } },
@@ -842,7 +855,7 @@ describe("포인트 지급 요청 검증", () => {
     });
   });
 
-  it("친구 놀이 하루 상한을 이미 채웠으면 실행별 0점 확정 기록을 남긴다", async () => {
+  it("친구 놀이 하루 상한을 이미 채웠어도 실행별 활동 근거와 0점 확정 기록을 남긴다", async () => {
     const room = makeStudentHostedV2RelayRoom();
     const accounts = [
       { id: "s1", role: "STUDENT" },
@@ -861,18 +874,17 @@ describe("포인트 지급 요청 검증", () => {
 
     const result = await ensureQuestionGameRoomPoints(room);
 
-    expect(result?.awards).toEqual([
-      expect.objectContaining({
-        studentId: "s1",
-        bonusType: "FRIEND_DAILY_LIMIT",
-        points: 0,
-      }),
-      expect.objectContaining({
-        studentId: "s2",
-        bonusType: "FRIEND_DAILY_LIMIT",
-        points: 0,
-      }),
-    ]);
+    expect(result?.awards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ studentId: "s1", bonusType: "PARTICIPATION", points: 0 }),
+      expect.objectContaining({ studentId: "s1", bonusType: "VALID_QUESTIONS", points: 0, reason: "유효 질문 3개" }),
+      expect.objectContaining({ studentId: "s1", bonusType: "COMPLETION", points: 0 }),
+      expect.objectContaining({ studentId: "s1", bonusType: "FRIEND_DAILY_LIMIT", points: 0 }),
+      expect.objectContaining({ studentId: "s2", bonusType: "PARTICIPATION", points: 0 }),
+      expect.objectContaining({ studentId: "s2", bonusType: "VALID_QUESTIONS", points: 0, reason: "유효 질문 3개" }),
+      expect.objectContaining({ studentId: "s2", bonusType: "COMPLETION", points: 0 }),
+      expect.objectContaining({ studentId: "s2", bonusType: "FRIEND_DAILY_LIMIT", points: 0 }),
+    ]));
+    expect(result?.awards).toHaveLength(8);
     expect(txPointLogCreateMany).toHaveBeenCalledOnce();
     expect(txUserUpdate).not.toHaveBeenCalled();
   });

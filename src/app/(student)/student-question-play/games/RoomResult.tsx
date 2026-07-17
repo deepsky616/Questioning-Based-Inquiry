@@ -15,6 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, playerColorById } from "./roomShared";
 import { GameResultReview } from "./GameResultReview";
+import { GameLearningSummary } from "./GameLearningSummary";
 import { AI_BONUS_TYPES, BonusKey, BASE_POINTS } from "@/lib/points-policy";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
 import { getQuestionGameRule } from "@/lib/question-game-rules";
@@ -304,6 +305,13 @@ export default function RoomResult({
   }
 
   const bestQ = award?.bestQuestion;
+  const myQuestions = questions
+    .filter((question) => question.playerId === myId)
+    .map((question) => question.question);
+  const myActivityCount = Math.max(
+    myQuestions.length,
+    scores.find((score) => score.playerId === myId)?.score ?? 0,
+  );
 
   return (
     <div className={`${details ? "max-w-4xl" : "max-w-lg"} mx-auto space-y-5`}>
@@ -496,6 +504,14 @@ export default function RoomResult({
         )}
       </div>
       )}
+
+      <GameLearningSummary
+        mode="friend"
+        completedActivities={myActivityCount}
+        questions={myQuestions}
+        points={award ? pointsByPlayer[myId] ?? 0 : undefined}
+        accentColor={game.accentColor}
+      />
 
       {/* 우리가 만든 질문 정리 */}
       {details ?? (

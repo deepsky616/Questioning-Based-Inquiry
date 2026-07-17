@@ -93,4 +93,54 @@ describe("질문놀이 방 복원 화면", () => {
     expect(screen.getByRole("status")).toHaveTextContent("방 연결을 복원하는 중...");
     expect(screen.queryByRole("button", { name: /방 개설하기/ })).not.toBeInTheDocument();
   });
+
+  it("열린 방의 연결이 늦어지면 상태와 즉시 다시 확인 동작을 보여 준다", async () => {
+    const refreshRoom = vi.fn();
+    roomHook.useRoom.mockReturnValue({
+      room: {
+        code: "1234",
+        gameId: "relay",
+        hostId: "student-1",
+        status: "waiting",
+        players: [{
+          id: "student-1",
+          name: "학생",
+          isHost: true,
+          joinedAt: 1,
+        }],
+        topic: "",
+        chain: [],
+        turnIndex: 0,
+        gameState: {},
+        version: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      error: null,
+      actionLoading: false,
+      isRestoring: false,
+      connectionState: "delayed",
+      createRoom: vi.fn(),
+      joinRoom: vi.fn(),
+      sendAction: vi.fn(),
+      leaveRoom: vi.fn(),
+      setActiveCode: vi.fn(),
+      refreshRoom,
+    });
+
+    render(
+      <QuestionGameRoomFlow
+        game={game}
+        myId="student-1"
+        allowJoin
+        onExit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status", { name: "방 연결 상태" })).toHaveTextContent(
+      "방 연결이 늦어지고 있어요. 현재 화면을 유지하며 다시 확인합니다.",
+    );
+    screen.getByRole("button", { name: "지금 다시 확인" }).click();
+    expect(refreshRoom).toHaveBeenCalledOnce();
+  });
 });

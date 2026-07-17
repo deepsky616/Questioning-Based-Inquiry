@@ -9,6 +9,7 @@ import { QUESTION_GAME_LIMITS, QUESTION_GAME_RULES } from "@/lib/question-game-r
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 import { useGameRun } from "./useGameRun";
+import { GameLearningSummary } from "./GameLearningSummary";
 
 interface AIFeedback { verdict: "잘했어요" | "다시해봐요"; reason: string; cheer: string }
 interface RoundEntry { original: string; student: string; isCorrect: boolean; playerName: string; feedback?: AIFeedback }
@@ -234,6 +235,14 @@ export default function KabaGame({ game, onBack, config }: Props) {
               </p>
             </div>
           )}
+          <GameLearningSummary
+            mode={isAI ? "ai" : "solo"}
+            completedActivities={history.length}
+            questions={history.map((entry) => entry.student)}
+            points={runResult?.awarded}
+            accentColor={game.accentColor}
+            embedded
+          />
           <Button className="w-full py-4 font-black text-white rounded-xl"
             style={{ background: game.gradientCss }} onClick={() => void restart()}>
             {text.retry}

@@ -9,6 +9,7 @@ import { getMysteryItem } from "@/lib/mystery-box-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 import { GameHeader } from "./GameHeader";
+import { GameLearningSummary } from "./GameLearningSummary";
 import {
   useGameRun,
   type MysteryRunHistoryItem,
@@ -376,6 +377,17 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
           </div>
 
           {result && <PointResult result={result} locale={locale} />}
+
+          <GameLearningSummary
+            mode={isAI ? "ai" : "solo"}
+            completedActivities={run.mysteryActivityCount ?? run.questionCount}
+            questions={(run.mysteryHistory ?? [])
+              .filter((entry) => entry.actor === "STUDENT" && entry.kind === "QUESTION")
+              .map((entry) => entry.text)}
+            points={result?.awarded}
+            accentColor={game.accentColor}
+            embedded
+          />
 
           <MysteryHistory
             entries={run.mysteryHistory ?? []}

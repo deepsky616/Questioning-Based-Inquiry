@@ -5,6 +5,7 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     user: { findUnique: vi.fn(), findMany: vi.fn() },
     pointLog: { findMany: vi.fn() },
+    gameRun: { findMany: vi.fn() },
   },
 }));
 
@@ -16,6 +17,7 @@ const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mockTeacher = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mockStudents = prisma.user.findMany as unknown as ReturnType<typeof vi.fn>;
 const mockLogs = prisma.pointLog.findMany as unknown as ReturnType<typeof vi.fn>;
+const mockRuns = prisma.gameRun.findMany as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -27,6 +29,7 @@ beforeEach(() => {
   });
   mockStudents.mockResolvedValue([]);
   mockLogs.mockResolvedValue([]);
+  mockRuns.mockResolvedValue([]);
 });
 
 describe("교사 질문놀이 통계 접근 경계", () => {
@@ -150,5 +153,138 @@ describe("교사 질문놀이 통계 접근 경계", () => {
         points: 7,
       }),
     ]);
+  });
+
+  it("혼자와 인공지능 실행의 질문 수를 점수가 아닌 서버 활동 기록으로 집계한다", async () => {
+    mockStudents.mockResolvedValue([
+      { id: "student-1", name: "학생1", studentNumber: "1" },
+      { id: "student-2", name: "학생2", studentNumber: "2" },
+    ]);
+    mockLogs.mockResolvedValue([]);
+    mockRuns.mockResolvedValue([
+      {
+        id: "solo-run",
+        gameId: "relay",
+        mode: "SOLO",
+        ownerId: "student-1",
+        settledAt: new Date("2026-07-17T03:00:00.000Z"),
+        activities: [
+          { actorId: "student-1", validQuestionCount: 1 },
+          { actorId: "student-1", validQuestionCount: 1 },
+          { actorId: "student-1", validQuestionCount: 1 },
+        ],
+        pointLogs: [],
+      },
+      {
+        id: "ai-run",
+        gameId: "relay",
+        mode: "AI",
+        ownerId: "student-1",
+        settledAt: new Date("2026-07-17T04:00:00.000Z"),
+        activities: [
+          { actorId: "student-1", validQuestionCount: 1 },
+          { actorId: null, validQuestionCount: 0 },
+          { actorId: "student-1", validQuestionCount: 1 },
+        ],
+        pointLogs: [
+          { studentId: "student-1", points: 7, status: "APPROVED" },
+        ],
+      },
+    ]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(mockRuns).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        ownerId: { in: ["student-1", "student-2"] },
+        mode: { in: ["SOLO", "AI"] },
+        status: "SETTLED",
+      },
+    }));
+    expect(body.byGame.relay).toEqual(expect.objectContaining({
+      participants: 1,
+      plays: 2,
+      completions: 2,
+      goodQuestions: 5,
+      lastPlayedAt: "2026-07-17T04:00:00.000Z",
+    }));
+    expect(body.byGame.relay.students).toEqual([
+      expect.objectContaining({
+        id: "student-1",
+        plays: 2,
+        completions: 2,
+        points: 7,
+        goodQuestions: 5,
+        modes: {
+          solo: { plays: 1, completions: 1, points: 0, goodQuestions: 3 },
+          ai: { plays: 1, completions: 1, points: 7, goodQuestions: 2 },
+          friend: { plays: 0, completions: 0, points: 0, goodQuestions: 0 },
+        },
+      }),
+    ]);
+  });
+
+  it("새 방식의 상한 기록이 기본 기록과 함께 있어도 친구 놀이를 한 판만 집계한다", async () => {
+    mockStudents.mockResolvedValue([
+      { id: "student-1", name: "학생1", studentNumber: "1" },
+    ]);
+    mockLogs.mockResolvedValue([
+      {
+        studentId: "student-1",
+        gameId: "relay",
+        roomCode: "room:1234:100:play-1",
+        bonusType: "PARTICIPATION",
+        points: 1,
+        reason: "게임 참여",
+        createdAt: new Date("2026-07-17T05:00:00.000Z"),
+      },
+      {
+        studentId: "student-1",
+        gameId: "relay",
+        roomCode: "room:1234:100:play-1",
+        bonusType: "VALID_QUESTIONS",
+        points: 0,
+        reason: "유효 질문 3개",
+        createdAt: new Date("2026-07-17T05:00:00.000Z"),
+      },
+      {
+        studentId: "student-1",
+        gameId: "relay",
+        roomCode: "room:1234:100:play-1",
+        bonusType: "COMPLETION",
+        points: 0,
+        reason: "게임 완료",
+        createdAt: new Date("2026-07-17T05:00:00.000Z"),
+      },
+      {
+        studentId: "student-1",
+        gameId: "relay",
+        roomCode: "room:1234:100:play-1",
+        bonusType: "FRIEND_DAILY_LIMIT",
+        points: 0,
+        reason: "친구 놀이 하루 포인트 상한에 도달했어요",
+        createdAt: new Date("2026-07-17T05:00:00.000Z"),
+      },
+    ]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.byGame.relay).toEqual(expect.objectContaining({
+      plays: 1,
+      completions: 1,
+      goodQuestions: 3,
+    }));
+    expect(body.byGame.relay.students[0]).toEqual(expect.objectContaining({
+      plays: 1,
+      completions: 1,
+      goodQuestions: 3,
+      modes: {
+        solo: { plays: 0, completions: 0, points: 0, goodQuestions: 0 },
+        ai: { plays: 0, completions: 0, points: 0, goodQuestions: 0 },
+        friend: { plays: 1, completions: 1, points: 1, goodQuestions: 3 },
+      },
+    }));
   });
 });

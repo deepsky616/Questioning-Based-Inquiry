@@ -5,6 +5,7 @@ import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { GameHeader } from "./GameHeader";
 import { GameResultReview } from "./GameResultReview";
+import { GameLearningSummary } from "./GameLearningSummary";
 import {
   MEMORY_DIFFICULTY,
   MEMORY_FALLBACK_PAIRS,
@@ -377,6 +378,13 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             </div>
           )}
         </div>
+        <GameLearningSummary
+          mode={isAI ? "ai" : "solo"}
+          completedActivities={run.studentMatchCount ?? 0}
+          questions={[]}
+          points={result?.awarded}
+          accentColor={game.accentColor}
+        />
         <GameResultReview
           title={text.memoryPairsTitle}
           accentColor={game.accentColor}

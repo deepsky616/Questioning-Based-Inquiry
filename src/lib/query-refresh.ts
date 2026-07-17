@@ -1,7 +1,18 @@
 export const APP_DATA_REFETCH_MS = 12000;
 export const APP_ROOM_POLL_MS = 2000;
+export const APP_ROOM_POLL_MAX_MS = 10000;
 export const APP_NOTIFICATION_POLL_MS = 25000;
 export const APP_REPORT_REFETCH_MS = 60000;
+
+export function roomPollDelay(failureCount: number): number {
+  const failures = Number.isSafeInteger(failureCount)
+    ? Math.max(0, failureCount)
+    : 0;
+  return Math.min(
+    APP_ROOM_POLL_MAX_MS,
+    APP_ROOM_POLL_MS * (2 ** Math.min(failures, 3)),
+  );
+}
 
 type Visibility = DocumentVisibilityState | "server";
 

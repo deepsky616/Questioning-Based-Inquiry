@@ -20,6 +20,7 @@ import LadderBoard, { type LadderBoardAssignment } from "./LadderBoard";
 import LadderQuestionComposer from "./LadderQuestionComposer";
 import { useAIPlay } from "./useAIPlay";
 import { useGameRun, type GameRunSnapshot } from "./useGameRun";
+import { GameLearningSummary } from "./GameLearningSummary";
 
 const MAX_ROUNDS = QUESTION_GAME_RULES.ladder.targets.solo.count;
 const SOLO_COLUMN_COUNT = 4;
@@ -547,6 +548,14 @@ export default function LadderGame({ game, onBack, config }: Props) {
               )}
             </div>
           )}
+          <GameLearningSummary
+            mode={isAI ? "ai" : "solo"}
+            completedActivities={questions.length}
+            questions={questions.map((record) => record.question)}
+            points={runResult?.awarded}
+            accentColor={game.accentColor}
+            embedded
+          />
           <Button
             className="w-full whitespace-normal rounded-lg border-border bg-background text-foreground"
             onClick={resetGame}

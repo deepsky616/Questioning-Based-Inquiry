@@ -18,6 +18,7 @@ import { QUESTION_GAME_LIMITS, QUESTION_GAME_RULES } from "@/lib/question-game-r
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 import { useGameRun, type GameRunSnapshot } from "./useGameRun";
+import { GameLearningSummary } from "./GameLearningSummary";
 
 interface ChainItem { type: "story" | "question" | "answer"; text: string; author: string; isAI?: boolean }
 
@@ -276,6 +277,15 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
             </div>
           )}
         </div>
+        <GameLearningSummary
+          mode={isAI ? "ai" : "solo"}
+          completedActivities={countCompletedPairs(chain)}
+          questions={chain
+            .filter((item) => item.type === "question" && !item.isAI)
+            .map((item) => item.text)}
+          points={runResult?.awarded}
+          accentColor={game.accentColor}
+        />
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-3 max-h-80 overflow-y-auto">
           <h3 className="font-black text-foreground">{text.completedStory}</h3>
           {chain.map((c, i) => (

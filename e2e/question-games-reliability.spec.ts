@@ -408,6 +408,11 @@ test("사다리 실제 경로를 따라 세 라운드 뒤 자동 종료한다", 
 
     await expect(host.page.getByText("질문 사다리 완성", { exact: true })).toBeVisible();
     await expect(friend.page.getByText("질문 사다리 완성", { exact: true })).toBeVisible();
+    await expect(host.page.getByRole("heading", { name: "나의 질문학습 결과" })).toBeVisible();
+    await expect(friend.page.getByRole("heading", { name: "나의 질문학습 결과" })).toBeVisible();
+    await expect(friend.page.getByText("친구와 함께", { exact: true })).toBeVisible();
+    await expectNoHorizontalPageOverflow(host.page);
+    await expectNoHorizontalPageOverflow(friend.page);
     await expect.poll(() => transport.getRoom(host.code)?.status).toBe("ended");
     expect(transport.getRoom(host.code)?.gameState).toMatchObject({
       phase: "done",

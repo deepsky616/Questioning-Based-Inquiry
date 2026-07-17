@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useGameRun } from "./useGameRun";
+import { GameLearningSummary } from "./GameLearningSummary";
 import { getQuestionGameText, getRelayTopics, isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import { QUESTION_GAME_LIMITS } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
@@ -362,6 +363,14 @@ export default function RelayGame({ game, onBack, config }: Props) {
             )}
           </div>
         )}
+
+        <GameLearningSummary
+          mode={isAI ? "ai" : "solo"}
+          completedActivities={studentQuestionCount}
+          questions={chain.filter((item) => !item.isAI).map((item) => item.question)}
+          points={runResult?.awarded}
+          accentColor={game.accentColor}
+        />
 
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-5 space-y-3">
           <h3 className="font-black text-foreground">{text.relayChain}</h3>

@@ -4,6 +4,8 @@ import {
   APP_DATA_REFETCH_MS,
   APP_NOTIFICATION_POLL_MS,
   APP_REPORT_REFETCH_MS,
+  APP_ROOM_POLL_MAX_MS,
+  roomPollDelay,
   visibleRefetchInterval,
 } from "@/lib/query-refresh";
 
@@ -17,6 +19,14 @@ describe("공통 폴링 정책", () => {
   it("화면이 보일 때만 폴링 주기를 반환한다", () => {
     expect(visibleRefetchInterval(12000, "visible")).toBe(12000);
     expect(visibleRefetchInterval(12000, "hidden")).toBe(false);
+  });
+
+  it("방 연결 실패가 이어지면 확인 간격을 늘리되 최대 간격을 넘지 않는다", () => {
+    expect(roomPollDelay(0)).toBe(2000);
+    expect(roomPollDelay(1)).toBe(4000);
+    expect(roomPollDelay(2)).toBe(8000);
+    expect(roomPollDelay(3)).toBe(APP_ROOM_POLL_MAX_MS);
+    expect(roomPollDelay(20)).toBe(APP_ROOM_POLL_MAX_MS);
   });
 
   it("주요 화면에서 숫자 폴링 값을 직접 쓰지 않는다", () => {

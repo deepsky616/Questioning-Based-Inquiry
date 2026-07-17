@@ -777,7 +777,6 @@ function assertCompleteAwardLogStudentSet(
     const isDailyLimitRecord =
       bonusTypes.size === 1 && bonusTypes.has(FRIEND_DAILY_LIMIT_BONUS);
     const hasRequiredBaseRecords =
-      !bonusTypes.has(FRIEND_DAILY_LIMIT_BONUS) &&
       bonusTypes.has(SYSTEM_BONUS.PARTICIPATION) &&
       bonusTypes.has(SYSTEM_BONUS.COMPLETION);
     if (!isDailyLimitRecord && !hasRequiredBaseRecords) {
@@ -1021,14 +1020,23 @@ async function applyFriendDailyLimit(
       DAILY_LIMITS.FRIEND - (earnedToday.get(studentId) ?? 0),
     );
     if (executionPoints <= remaining) return studentAwards;
-    return [{
-      studentId,
-      bonusType: FRIEND_DAILY_LIMIT_BONUS,
-      points: remaining,
-      reason: remaining > 0
-        ? "친구 놀이 하루 상한까지 남은 포인트"
-        : "친구 놀이 하루 포인트 상한에 도달했어요",
-    }];
+    let available = remaining;
+    const cappedAwards = studentAwards.map((award) => {
+      const points = Math.min(Math.max(0, award.points), available);
+      available -= points;
+      return { ...award, points };
+    });
+    return [
+      ...cappedAwards,
+      {
+        studentId,
+        bonusType: FRIEND_DAILY_LIMIT_BONUS,
+        points: 0,
+        reason: remaining > 0
+          ? "친구 놀이 하루 상한까지 남은 포인트만 지급했어요"
+          : "친구 놀이 하루 포인트 상한에 도달했어요",
+      },
+    ];
   });
 }
 

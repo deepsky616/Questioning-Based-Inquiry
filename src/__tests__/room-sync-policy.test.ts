@@ -13,8 +13,10 @@ const roomPagePath = "src/components/question-games/QuestionGameRoomFlow.tsx";
 describe("room sync policy", () => {
   it("keeps room polling interval in the shared refresh policy", () => {
     expect(APP_ROOM_POLL_MS).toBe(2000);
-    expect(useRoomSource).toContain("APP_ROOM_POLL_MS");
-    expect(useRoomSource).toContain("visibleRefetchInterval(APP_ROOM_POLL_MS");
+    expect(useRoomSource).toContain("roomPollDelay");
+    expect(useRoomSource).toContain("visibleRefetchInterval(");
+    expect(useRoomSource).toContain("pollFailureCountRef");
+    expect(useRoomSource).toContain("setTimeout");
     expect(useRoomSource).toContain("visibilitychange");
     expect(useRoomSource).not.toContain("const POLL_INTERVAL = 2000");
   });

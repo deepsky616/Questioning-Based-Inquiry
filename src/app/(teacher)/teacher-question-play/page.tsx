@@ -23,6 +23,10 @@ import {
 } from "@/lib/question-games-data";
 import { useTeacherStudents } from "@/lib/app-queries";
 import { formatDateOnly } from "@/lib/datetime";
+import {
+  sumQuestionGameModes,
+  type QuestionGameModeStats,
+} from "@/lib/question-game-learning-summary";
 
 type VisType = "all" | "classes" | "students" | "hidden";
 
@@ -36,7 +40,16 @@ interface Student {
   grade: string;
   className: string;
 }
-interface StudentPlay { id: string; name: string; studentNumber: string | null; plays: number; completions: number; points: number; goodQuestions: number }
+interface StudentPlay {
+  id: string;
+  name: string;
+  studentNumber: string | null;
+  plays: number;
+  completions: number;
+  points: number;
+  goodQuestions: number;
+  modes: Record<"solo" | "ai" | "friend", QuestionGameModeStats>;
+}
 interface StudentLite { id: string; name: string; studentNumber: string | null }
 interface GameStat { participants: number; plays: number; completions: number; goodQuestions: number; lastPlayedAt: string | null; students: StudentPlay[]; nonParticipants: StudentLite[] }
 
@@ -347,6 +360,7 @@ export default function TeacherQuestionPlayPage() {
           {statsDialogGame && (() => {
             const st = statsByGame[statsDialogGame.id];
             const rate = st && st.plays > 0 ? Math.round((st.completions / st.plays) * 100) : 0;
+            const modeTotals = sumQuestionGameModes(st?.students ?? []);
             return (
               <>
                 <DialogHeader>
@@ -367,6 +381,25 @@ export default function TeacherQuestionPlayPage() {
                         <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipRecent", { date: formatDateOnly(st.lastPlayedAt) })}</span>
                       )}
                     </div>
+                    <section aria-label={t("modeCompareTitle")} className="border-y border-border py-3">
+                      <h3 className="mb-2 text-xs font-bold text-foreground">{t("modeCompareTitle")}</h3>
+                      <div className="grid grid-cols-3 divide-x divide-border">
+                        {(["solo", "ai", "friend"] as const).map((mode) => (
+                          <div className="min-w-0 px-2 text-center first:pl-0 last:pr-0" key={mode}>
+                            <p className="text-xs font-bold text-foreground">{t(`mode_${mode}`)}</p>
+                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                              {t("modeStatLine", {
+                                plays: modeTotals[mode].plays,
+                                completions: modeTotals[mode].completions,
+                              })}
+                            </p>
+                            <p className="text-xs font-semibold text-foreground">
+                              {t("modePointLine", { points: modeTotals[mode].points })}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
                     <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
@@ -384,6 +417,13 @@ export default function TeacherQuestionPlayPage() {
                               <td className="px-3 py-2">
                                 {s.studentNumber ? <span className="text-muted-foreground mr-1">{s.studentNumber}.</span> : null}
                                 <span className="font-medium text-foreground">{s.name}</span>
+                                <p className="mt-0.5 whitespace-nowrap text-[11px] text-muted-foreground">
+                                  {t("studentModeLine", {
+                                    solo: s.modes?.solo.plays ?? 0,
+                                    ai: s.modes?.ai.plays ?? 0,
+                                    friend: s.modes?.friend.plays ?? 0,
+                                  })}
+                                </p>
                               </td>
                               <td className="px-3 py-2 text-right font-semibold text-indigo-900 dark:text-indigo-200">{s.plays}</td>
                               <td className="px-3 py-2 text-right text-emerald-900 dark:text-emerald-200">{s.completions}</td>

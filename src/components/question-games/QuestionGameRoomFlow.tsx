@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Home, KeyRound, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Home,
+  KeyRound,
+  Loader2,
+  RefreshCw,
+  WifiOff,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,10 +68,12 @@ export function QuestionGameRoomFlow({
     error,
     actionLoading,
     isRestoring,
+    connectionState,
     createRoom,
     joinRoom,
     sendAction,
     leaveRoom,
+    refreshRoom,
   } = useRoom(game.id);
   const [view, setView] = useState<"choice" | "join">("choice");
   const [joinCode, setJoinCode] = useState("");
@@ -90,6 +99,35 @@ export function QuestionGameRoomFlow({
     </div>
   ) : null;
 
+  const connectionNotice = room && (
+    connectionState === "delayed" || connectionState === "offline"
+  ) ? (
+    <div
+      aria-label={t("roomConnectionStatus")}
+      aria-live="polite"
+      className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+      role="status"
+    >
+      <WifiOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <p className="min-w-0 flex-1 text-sm">
+        {connectionState === "offline"
+          ? t("roomConnectionOffline")
+          : t("roomConnectionDelayed")}
+      </p>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="shrink-0"
+        disabled={actionLoading}
+        onClick={refreshRoom}
+      >
+        <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+        {t("roomConnectionRetry")}
+      </Button>
+    </div>
+  ) : null;
+
   if (isRestoring) {
     return (
       <div
@@ -107,6 +145,7 @@ export function QuestionGameRoomFlow({
     if (room.status === "waiting") {
       return (
         <>
+          {connectionNotice}
           {errorAlert}
           <RoomLobby
             game={game}
@@ -126,6 +165,7 @@ export function QuestionGameRoomFlow({
     if (RoomComponent) {
       return (
         <>
+          {connectionNotice}
           {errorAlert}
           <RoomComponent
             game={game}
@@ -141,6 +181,7 @@ export function QuestionGameRoomFlow({
 
     return (
       <>
+        {connectionNotice}
         {errorAlert}
         <div className="mx-auto max-w-lg border-y border-border py-10 text-center text-foreground">
           <p className="font-semibold">{t("notFound")}</p>
