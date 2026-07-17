@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { BookOpenText } from "lucide-react";
+import { AlignLeft, CircleHelp, Lightbulb } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Label } from "@/components/ui/label";
@@ -71,13 +71,25 @@ export function StudentLearningGuideEditor({
   useEffect(() => setKeywordDraft(formattedKeywords), [formattedKeywords]);
 
   return (
-    <div className="space-y-3">
-      <details className="group border-t border-border pt-3" open>
-        <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-foreground">
-          <BookOpenText className="h-4 w-4" aria-hidden="true" />
-          {t("coreIdeaGuideTitle")}
-        </summary>
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+    <div className="space-y-4">
+      <section
+        data-student-guide-section="core-idea"
+        className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-3.5 dark:border-amber-800/60 dark:bg-amber-950/20 sm:p-4"
+        aria-labelledby={`${fieldId}-core-idea-title`}
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200" aria-hidden="true">1</span>
+          <div className="min-w-0">
+            <h3 id={`${fieldId}-core-idea-title`} className="flex items-center gap-1.5 text-sm font-semibold text-amber-950 dark:text-amber-100">
+              <Lightbulb className="h-4 w-4" aria-hidden="true" />
+              {t("studentGuideCoreIdeaSectionTitle")}
+            </h3>
+            <p className="mt-0.5 text-xs leading-5 text-amber-800/80 dark:text-amber-200/75">
+              {t("studentGuideCoreIdeaSectionDesc")}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
           <div className="space-y-1 lg:col-span-2">
             <Label htmlFor={`${fieldId}-core-explanation`}>{t("coreIdeaExplanationLabel")}</Label>
             <textarea
@@ -104,78 +116,126 @@ export function StudentLearningGuideEditor({
               id={`${fieldId}-core-keywords`}
               rows={3}
               value={keywordDraft}
+              placeholder={t("coreIdeaKeywordsPlaceholder")}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
               onChange={(event) => {
                 setKeywordDraft(event.target.value);
                 onChange({ ...current, coreIdea: { ...coreIdea, keywords: parseInquiryKeywordLines(event.target.value) } });
               }}
             />
+            <p className="text-[11px] leading-4 text-muted-foreground">
+              {t("coreIdeaKeywordsHint")}
+            </p>
           </div>
         </div>
-      </details>
+      </section>
 
-      {coreSentences.map((sentence, index) => {
-        const guide = current.coreSentences.find((item) => item.index === index) ?? { index, explanation: "" };
-        return (
-          <details key={`sentence-${index}`} className="border-t border-border pt-3">
-            <summary className="cursor-pointer text-xs font-semibold text-foreground">
-              {t("coreSentenceGuideTitle", { n: index + 1 })} · <span className="font-normal text-muted-foreground">{sentence}</span>
-            </summary>
-            <div className="mt-2 space-y-1">
-              <Label htmlFor={`${fieldId}-sentence-${index}`}>{t("coreSentenceEasyLabel", { n: index + 1 })}</Label>
-              <textarea
-                id={`${fieldId}-sentence-${index}`}
-                rows={2}
-                value={guide.explanation}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-                onChange={(event) => onChange({
-                  ...current,
-                  coreSentences: replaceIndexed(current.coreSentences, index, { ...guide, explanation: event.target.value }),
-                })}
-              />
+      {coreSentences.length > 0 && (
+        <section
+          data-student-guide-section="core-sentence"
+          className="rounded-xl border border-sky-200/80 bg-sky-50/70 p-3.5 dark:border-sky-800/60 dark:bg-sky-950/20 sm:p-4"
+          aria-labelledby={`${fieldId}-core-sentence-title`}
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-800 dark:bg-sky-900/60 dark:text-sky-200" aria-hidden="true">2</span>
+            <div className="min-w-0">
+              <h3 id={`${fieldId}-core-sentence-title`} className="flex items-center gap-1.5 text-sm font-semibold text-sky-950 dark:text-sky-100">
+                <AlignLeft className="h-4 w-4" aria-hidden="true" />
+                {t("studentGuideCoreSentenceSectionTitle")}
+              </h3>
+              <p className="mt-0.5 text-xs leading-5 text-sky-800/80 dark:text-sky-200/75">
+                {t("studentGuideCoreSentenceSectionDesc")}
+              </p>
             </div>
-          </details>
-        );
-      })}
+          </div>
+          <div className="mt-3 space-y-2">
+            {coreSentences.map((sentence, index) => {
+              const guide = current.coreSentences.find((item) => item.index === index) ?? { index, explanation: "" };
+              return (
+                <details key={`sentence-${index}`} className="rounded-lg border border-sky-200/70 bg-background/85 px-3 py-2.5 dark:border-sky-800/50">
+                  <summary className="cursor-pointer text-xs font-semibold text-foreground">
+                    {t("coreSentenceGuideTitle", { n: index + 1 })} · <span className="font-normal text-muted-foreground">{sentence}</span>
+                  </summary>
+                  <div className="mt-2 space-y-1">
+                    <Label htmlFor={`${fieldId}-sentence-${index}`}>{t("coreSentenceEasyLabel", { n: index + 1 })}</Label>
+                    <textarea
+                      id={`${fieldId}-sentence-${index}`}
+                      rows={2}
+                      value={guide.explanation}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                      onChange={(event) => onChange({
+                        ...current,
+                        coreSentences: replaceIndexed(current.coreSentences, index, { ...guide, explanation: event.target.value }),
+                      })}
+                    />
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
-      {essentialQuestions.map((question, index) => {
-        const guide = current.essentialQuestions.find((item) => item.index === index) ?? {
-          index,
-          thinkingFocus: "",
-          perspectives: [],
-        };
-        return (
-          <details key={`question-${index}`} className="border-t border-border pt-3">
-            <summary className="cursor-pointer text-xs font-semibold text-foreground">
-              {t("essentialQuestionGuideTitle", { n: index + 1 })} · <span className="font-normal text-muted-foreground">{question}</span>
-            </summary>
-            <div className="mt-2 grid gap-3 lg:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor={`${fieldId}-question-${index}`}>{t("essentialQuestionFocusLabel", { n: index + 1 })}</Label>
-                <textarea
-                  id={`${fieldId}-question-${index}`}
-                  rows={2}
-                  value={guide.thinkingFocus}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-                  onChange={(event) => onChange({
-                    ...current,
-                    essentialQuestions: replaceIndexed(current.essentialQuestions, index, { ...guide, thinkingFocus: event.target.value }),
-                  })}
-                />
-              </div>
-              <PerspectiveEditor
-                id={`${fieldId}-perspectives-${index}`}
-                label={t("essentialQuestionPerspectivesLabel", { n: index + 1 })}
-                guide={guide}
-                onChange={(next) => onChange({
-                  ...current,
-                  essentialQuestions: replaceIndexed(current.essentialQuestions, index, next),
-                })}
-              />
+      {essentialQuestions.length > 0 && (
+        <section
+          data-student-guide-section="essential-question"
+          className="rounded-xl border border-violet-200/80 bg-violet-50/70 p-3.5 dark:border-violet-800/60 dark:bg-violet-950/20 sm:p-4"
+          aria-labelledby={`${fieldId}-essential-question-title`}
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800 dark:bg-violet-900/60 dark:text-violet-200" aria-hidden="true">3</span>
+            <div className="min-w-0">
+              <h3 id={`${fieldId}-essential-question-title`} className="flex items-center gap-1.5 text-sm font-semibold text-violet-950 dark:text-violet-100">
+                <CircleHelp className="h-4 w-4" aria-hidden="true" />
+                {t("studentGuideEssentialQuestionSectionTitle")}
+              </h3>
+              <p className="mt-0.5 text-xs leading-5 text-violet-800/80 dark:text-violet-200/75">
+                {t("studentGuideEssentialQuestionSectionDesc")}
+              </p>
             </div>
-          </details>
-        );
-      })}
+          </div>
+          <div className="mt-3 space-y-2">
+            {essentialQuestions.map((question, index) => {
+              const guide = current.essentialQuestions.find((item) => item.index === index) ?? {
+                index,
+                thinkingFocus: "",
+                perspectives: [],
+              };
+              return (
+                <details key={`question-${index}`} className="rounded-lg border border-violet-200/70 bg-background/85 px-3 py-2.5 dark:border-violet-800/50">
+                  <summary className="cursor-pointer text-xs font-semibold text-foreground">
+                    {t("essentialQuestionGuideTitle", { n: index + 1 })} · <span className="font-normal text-muted-foreground">{question}</span>
+                  </summary>
+                  <div className="mt-2 grid gap-3 lg:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor={`${fieldId}-question-${index}`}>{t("essentialQuestionFocusLabel", { n: index + 1 })}</Label>
+                      <textarea
+                        id={`${fieldId}-question-${index}`}
+                        rows={2}
+                        value={guide.thinkingFocus}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                        onChange={(event) => onChange({
+                          ...current,
+                          essentialQuestions: replaceIndexed(current.essentialQuestions, index, { ...guide, thinkingFocus: event.target.value }),
+                        })}
+                      />
+                    </div>
+                    <PerspectiveEditor
+                      id={`${fieldId}-perspectives-${index}`}
+                      label={t("essentialQuestionPerspectivesLabel", { n: index + 1 })}
+                      guide={guide}
+                      onChange={(next) => onChange({
+                        ...current,
+                        essentialQuestions: replaceIndexed(current.essentialQuestions, index, next),
+                      })}
+                    />
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -706,6 +706,7 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     const prompt = buildPrompt({
       ...PROMPT_BASE,
       step: "learning_guides",
+      selectedKeywords: ["광합성", "에너지 전환"],
       coreSentences: VALID_DESIGN.coreSentences,
       essentialQuestions: VALID_DESIGN.essentialQuestions,
       inquiryQuestions: VALID_DESIGN.inquiryQuestions,
@@ -714,6 +715,8 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     expect(prompt).toContain(VALID_DESIGN.coreIdea);
     expect(prompt).toContain(VALID_DESIGN.coreSentences[0]);
     expect(prompt).toContain(VALID_DESIGN.essentialQuestions[0]);
+    expect(prompt).toContain("[선택한 핵심어] 광합성, 에너지 전환");
+    expect(prompt).toContain("핵심 낱말을 3~5개");
     expect(prompt).toContain("원문을 바꾸지 마세요");
     expect(prompt).toContain("정답이나 결론을 제시하지 마세요");
   });

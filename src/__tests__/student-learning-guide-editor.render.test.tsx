@@ -42,4 +42,25 @@ describe("학생용 단원 이해 자료 편집", () => {
       })],
     }));
   });
+
+  it("핵심 아이디어, 핵심 문장, 핵심 질문을 서로 다른 색 영역으로 나누고 핵심 낱말 자동 입력을 안내한다", () => {
+    const { container } = render(
+      <StudentLearningGuideEditor
+        coreSentences={["식물은 빛 에너지를 양분으로 바꾼다."]}
+        essentialQuestions={["생물은 어떻게 에너지를 얻을까?"]}
+        guides={undefined}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector('[data-student-guide-section="core-idea"]'))
+      .toHaveClass("border-amber-200/80", "bg-amber-50/70");
+    expect(container.querySelector('[data-student-guide-section="core-sentence"]'))
+      .toHaveClass("border-sky-200/80", "bg-sky-50/70");
+    expect(container.querySelector('[data-student-guide-section="essential-question"]'))
+      .toHaveClass("border-violet-200/80", "bg-violet-50/70");
+    expect(screen.getByPlaceholderText("예: 광합성: 식물이 빛을 이용해 양분을 만드는 과정"))
+      .toBeInTheDocument();
+    expect(screen.getByText(/설명 만들기를 누르면.*3~5개.*자동/)).toBeInTheDocument();
+  });
 });

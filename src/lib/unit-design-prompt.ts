@@ -194,6 +194,7 @@ ${questions}
 아래 원문을 바꾸지 않고 ${gradeLabel} 학생을 위한 짧은 이해 자료를 만드세요.
 
 [교과] ${data.subject}  [영역] ${data.area}  [학년군] ${gradeLabel}
+[선택한 핵심어] ${data.selectedKeywords.join(", ") || "(선택한 핵심어 없음)"}
 [핵심 아이디어]
 ${data.coreIdea}
 [핵심 문장]
@@ -208,7 +209,7 @@ ${inquiryQuestions}
 - 정답이나 결론을 제시하지 마세요.
 - coreIdea.explanation은 핵심 아이디어를 학생 눈높이 1~2문장으로 풀어 쓰세요.
 - coreIdea.lifeConnection은 생활 속 익숙한 사례 하나만 제시하세요.
-- coreIdea.keywords는 꼭 필요한 낱말만 0~3개 고르고 쉬운 뜻을 붙이세요.
+- coreIdea.keywords는 선택한 핵심어를 우선해 학생이 꼭 알아야 할 핵심 낱말을 3~5개 고르고 쉬운 뜻을 붙이세요.
 - coreSentences는 어려운 문장에만 쉬운 표현을 만들고 원래 index를 유지하세요.
 - essentialQuestions의 thinkingFocus는 생각의 범위를 한 문장으로 안내하세요.
 - essentialQuestions의 perspectives는 원인, 변화, 관계처럼 짧은 관점만 2~3개 제시하세요.
@@ -237,7 +238,7 @@ ${data.essentialQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 
 각 탐구 질문은 핵심 질문에 가까워지는 '징검다리' 역할을 해야 합니다.
 학생용 이해 자료도 함께 생성하세요.
-- learningGuides.coreIdea: 쉽게 풀어보기, 생활 속 연결, 핵심 낱말 0~3개
+- learningGuides.coreIdea: 쉽게 풀어보기, 생활 속 연결, 선택 핵심어를 우선한 핵심 낱말 3~5개
 - learningGuides.coreSentences: 어려운 핵심 문장만 쉬운 표현으로 작성하고 원래 index 유지
 - learningGuides.essentialQuestions: 생각할 범위와 짧은 관점 2~3개, 정답이나 결론을 제시하지 않음
 각 질문의 studentGuide는 학생이 질문을 이해하도록 돕되 정답이나 결론을 미리 알려주지 않음.

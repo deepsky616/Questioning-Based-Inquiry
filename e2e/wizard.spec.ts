@@ -53,6 +53,47 @@ const GENERATE_FIXTURES: Record<string, unknown> = {
       { type: "controversial", content: "생태계 보전을 위해 개발을 제한해야 할까?" },
     ],
   },
+  learning_guides: {
+    learningGuides: {
+      coreIdea: {
+        explanation: "생물과 환경이 서로 영향을 주고받는 큰 원리를 알아봐요.",
+        lifeConnection: "학교 화단에서 곤충과 식물이 함께 살아가는 모습을 떠올려 보세요.",
+        keywords: [
+          { term: "생태계", meaning: "생물과 환경이 서로 관계를 맺는 체계" },
+          { term: "먹이 사슬", meaning: "먹고 먹히는 관계로 이어진 생물의 연결" },
+          { term: "광합성", meaning: "식물이 빛을 이용해 양분을 만드는 과정" },
+        ],
+      },
+      coreSentences: [
+        { index: 0, explanation: "생물은 혼자가 아니라 다른 생물과 이어져 살아가요." },
+        { index: 1, explanation: "에너지는 생물이 서로 먹고 먹히는 관계를 따라 이동해요." },
+      ],
+      essentialQuestions: [
+        { index: 0, thinkingFocus: "생물 사이의 관계와 변화를 살펴봐요.", perspectives: ["관계", "변화"] },
+        { index: 1, thinkingFocus: "먹이 관계가 달라질 때 생기는 일을 살펴봐요.", perspectives: ["원인", "결과"] },
+      ],
+    },
+    guides: [
+      {
+        index: 0,
+        meaning: "식물이 양분을 만들 때 필요한 조건을 찾는 질문이에요.",
+        keywords: [{ term: "광합성", meaning: "식물이 빛으로 양분을 만드는 과정" }],
+        thinkingStart: "식물이 자랄 때 필요한 것을 떠올려 보세요.",
+      },
+      {
+        index: 1,
+        meaning: "두 먹이 관계의 공통점과 차이점을 찾는 질문이에요.",
+        keywords: [{ term: "먹이 그물", meaning: "여러 먹이 사슬이 얽힌 관계" }],
+        thinkingStart: "한 생물이 여러 생물과 이어지는 모습을 살펴보세요.",
+      },
+      {
+        index: 2,
+        meaning: "개발과 생태계 보전 사이에서 판단 근거를 찾는 질문이에요.",
+        keywords: [{ term: "생태계 보전", meaning: "생물과 환경의 관계를 지키는 일" }],
+        thinkingStart: "개발의 도움과 생태계에 주는 영향을 나누어 살펴보세요.",
+      },
+    ],
+  },
 };
 
 async function stubCurriculumAndAi(page: Page) {
@@ -135,6 +176,15 @@ test.describe("탐구질문 마법사 5단계", () => {
 
     // ── 5단계: 탐구 질문 + 저장 폼 ──
     await expect(page.getByText("먹이 사슬과 먹이 그물은 어떻게 다를까?")).toBeVisible();
+
+    // 학생용 설명 자동 생성 → 핵심 낱말 자동 입력 + 네 설명 영역 색 구분
+    await page.getByRole("button", { name: "학생용 설명 만들기" }).click();
+    await expect(page.getByLabel("핵심 아이디어 핵심 낱말"))
+      .toHaveValue(/생태계: 생물과 환경이 서로 관계를 맺는 체계/);
+    await expect(page.locator('[data-student-guide-section="core-idea"]')).toHaveClass(/bg-amber-50\/70/);
+    await expect(page.locator('[data-student-guide-section="core-sentence"]')).toHaveClass(/bg-sky-50\/70/);
+    await expect(page.locator('[data-student-guide-section="essential-question"]')).toHaveClass(/bg-violet-50\/70/);
+    await expect(page.locator('[data-student-guide-section="inquiry-question"]')).toHaveClass(/bg-emerald-50\/70/);
 
     // 저장 폼: 학년 선택 + 단원명 입력 (날짜는 오늘 기본값)
     await page

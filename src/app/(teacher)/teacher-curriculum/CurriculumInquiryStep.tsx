@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Loader2, Save, WandSparkles } from "lucide-react";
+import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Loader2, Save, Search, WandSparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import DatePicker from "@/components/shared/DatePicker";
@@ -155,7 +155,24 @@ export function CurriculumInquiryStep({
           guides={learningGuides}
           onChange={onLearningGuidesChange}
         />
-        <div className="space-y-2">
+        <section
+          data-student-guide-section="inquiry-question"
+          className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-3.5 dark:border-emerald-800/60 dark:bg-emerald-950/20 sm:p-4"
+          aria-labelledby="student-guide-inquiry-question-title"
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200" aria-hidden="true">4</span>
+            <div className="min-w-0">
+              <h3 id="student-guide-inquiry-question-title" className="flex items-center gap-1.5 text-sm font-semibold text-emerald-950 dark:text-emerald-100">
+                <Search className="h-4 w-4" aria-hidden="true" />
+                {t("studentGuideInquiryQuestionSectionTitle")}
+              </h3>
+              <p className="mt-0.5 text-xs leading-5 text-emerald-800/80 dark:text-emerald-200/75">
+                {t("studentGuideInquiryQuestionSectionDesc")}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 space-y-2">
           {inquiryQuestions.map((question, index) => (
             <div
               key={index}
@@ -236,7 +253,8 @@ export function CurriculumInquiryStep({
               ＋ {t("addQuestion")}
             </Button>
           </div>
-        </div>
+          </div>
+        </section>
 
         <div className="border-t pt-4 space-y-3">
           <p className="text-sm font-semibold text-foreground">{t("saveInfo")}</p>

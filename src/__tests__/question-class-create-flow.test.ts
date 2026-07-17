@@ -37,6 +37,12 @@ const savedDesign: SavedInquiryDesign = {
 };
 
 describe("탐구질문 수업 만들기 요청 흐름", () => {
+  it("탐구 질문 학생용 설명을 앞선 세 설명과 구분되는 초록 영역으로 묶는다", () => {
+    expect(inquiryStep).toContain('data-student-guide-section="inquiry-question"');
+    expect(inquiryStep).toContain("border-emerald-200/80");
+    expect(inquiryStep).toContain("bg-emerald-50/70");
+  });
+
   it("설계 저장과 수업 생성이 모두 성공한 경우에만 성공 후속 처리를 실행한다", async () => {
     const saveDesign = vi.fn(async () => savedDesign);
     const createSession = vi.fn(async () => ({ id: "session-1", createdAt: "2026-07-13T00:00:00.000Z" }));
