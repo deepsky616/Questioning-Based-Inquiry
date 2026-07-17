@@ -47,7 +47,7 @@ vi.mock("@/components/shared/confirm-dialog", () => ({
 }));
 
 vi.mock("@/app/(teacher)/teacher-sessions/TeacherQuestionClassActions", () => ({
-  TeacherQuestionClassActions: () => null,
+  TeacherQuestionClassActions: () => <div data-testid="quick-question-class-form" />,
 }));
 
 function renderPage() {
@@ -77,6 +77,33 @@ afterEach(() => {
 });
 
 describe("질문수업 목록 상태", () => {
+  it("기본 화면에서는 세 작업공간 탐색과 목록 제목을 유지한다", () => {
+    renderPage();
+
+    expect(screen.getByRole("link", { name: ko.sessions.listViewTitle })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: ko.sessions.createInquiryQuestionClass })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: ko.sessions.createQuickQuestionClass })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: ko.sessions.listViewTitle })).toBeInTheDocument();
+    expect(screen.queryByTestId("quick-question-class-form")).not.toBeInTheDocument();
+  });
+
+  it("간단 만들기 주소에서는 탐색을 유지하고 목록 대신 만들기 양식만 표시한다", () => {
+    navigationState.search = "view=quick";
+    renderPage();
+
+    expect(screen.getByRole("link", { name: ko.sessions.createQuickQuestionClass })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("heading", { name: ko.sessions.quickViewTitle })).toBeInTheDocument();
+    expect(screen.getByText(ko.sessions.quickViewDesc)).toBeInTheDocument();
+    expect(screen.getByTestId("quick-question-class-form")).toBeInTheDocument();
+    expect(screen.queryByText(ko.sessions.emptyTitle)).not.toBeInTheDocument();
+  });
+
   it("조회 오류를 빈 목록으로 표시하지 않는다", () => {
     queryState.isError = true;
     renderPage();

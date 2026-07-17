@@ -9,7 +9,6 @@ import {
   type SessionTargetClass,
   type SessionTargetStudent,
 } from "@/lib/session-targeting";
-import { PageHeader } from "@/components/shared/PageHeader";
 import { useToast } from "@/components/ui/use-toast";
 import { useTranslations } from "next-intl";
 import {
@@ -52,11 +51,11 @@ import {
   type SavedInquiryDesign,
 } from "./types";
 import { useStudentInquiryGuides } from "./useStudentInquiryGuides";
+import { InquiryQuestionClassWorkspaceHeader } from "./InquiryQuestionClassWorkspaceHeader";
 // ── 타입 ──────────────────────────────────────────────────────────────
 type LastDesignAction = { type: "saved" | "deployed"; at: string };
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
 export default function CurriculumPage() {
-  const tPages = useTranslations("pages");
   const t = useTranslations("curriculum");
   const tc = useTranslations("common");
   const stepLabel = (n: CurriculumStep) => t(`step${n}`);
@@ -644,7 +643,7 @@ export default function CurriculumPage() {
   // ── 렌더 ──────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <PageHeader title={tPages("teacherCurriculum.title")} description={tPages("teacherCurriculum.description")} />
+      <InquiryQuestionClassWorkspaceHeader />
 
       <CurriculumMainTabs value={mainTab} savedCount={savedList.length} onChange={setMainTab} />
 

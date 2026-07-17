@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { BookOpenCheck, ChevronDown, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { appQueryKeys } from "@/lib/app-queries";
 import {
@@ -48,7 +46,7 @@ export function TeacherQuestionClassActions({
   const t = useTranslations("sessions");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const router = useRouter();
   const [sessForm, setSessForm] = useState<TeacherSessionForm>(INITIAL_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [targetDefaulted, setTargetDefaulted] = useState(false);
@@ -143,8 +141,8 @@ export function TeacherQuestionClassActions({
             getTargetGrade(previous.targetClassValue, targetClasses, students),
           )[0] ?? "",
       }));
-      setQuickCreateOpen(false);
       onHighlight(created.id);
+      router.replace(`/teacher-sessions?session=${encodeURIComponent(created.id)}`);
       toast({ variant: "success", description: t("sessionAdded") });
     } catch {
       toast({ variant: "destructive", description: t("saveFailed") });
@@ -154,51 +152,18 @@ export function TeacherQuestionClassActions({
   };
 
   return (
-    <section className="space-y-4" aria-label={t("createActionsLabel")}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <Button
-          asChild
-          size="lg"
-          className="h-11 gap-2 font-semibold"
-          data-testid="question-class-primary-action"
-        >
-          <Link href="/teacher-curriculum">
-            <BookOpenCheck className="h-5 w-5" />
-            {t("createInquiryQuestionClass")}
-          </Link>
-        </Button>
-        <Button
-          type="button"
-          size="lg"
-          variant="outline"
-          className="h-11 gap-2 font-semibold"
-          aria-controls="quick-question-class-form"
-          aria-expanded={quickCreateOpen}
-          onClick={() => setQuickCreateOpen((open) => !open)}
-        >
-          <Plus className="h-5 w-5" />
-          {quickCreateOpen
-            ? t("closeQuickQuestionClass")
-            : t("createQuickQuestionClass")}
-          <ChevronDown
-            className={`h-4 w-4 transition-transform ${quickCreateOpen ? "rotate-180" : ""}`}
-          />
-        </Button>
-      </div>
-
-      {quickCreateOpen && (
-        <div id="quick-question-class-form">
-          <TeacherSessionCreateCard
-            form={sessForm}
-            setForm={setSessForm}
-            isSaving={isSaving}
-            subjectOptions={subjectOptions}
-            targetClasses={targetClasses}
-            students={students}
-            onCreate={handleCreate}
-          />
-        </div>
-      )}
+    <section id="quick-question-class-form" aria-labelledby="question-class-view-title">
+      <TeacherSessionCreateCard
+        form={sessForm}
+        setForm={setSessForm}
+        isSaving={isSaving}
+        subjectOptions={subjectOptions}
+        targetClasses={targetClasses}
+        students={students}
+        onCreate={handleCreate}
+        showHeader={false}
+        labelledBy="question-class-view-title"
+      />
     </section>
   );
 }

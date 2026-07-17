@@ -8,6 +8,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ko from "../../messages/ko.json";
 import { TeacherQuestionClassActions } from "@/app/(teacher)/teacher-sessions/TeacherQuestionClassActions";
+import { QuestionClassWorkspaceNav } from "@/app/(teacher)/teacher-sessions/QuestionClassWorkspaceNav";
 import { TeacherSessionMonthList } from "@/app/(teacher)/teacher-sessions/TeacherSessionMonthList";
 import { TeacherSessionRow } from "@/app/(teacher)/teacher-sessions/TeacherSessionRow";
 import type {
@@ -17,6 +18,11 @@ import type {
 import { appQueryKeys } from "@/lib/app-queries";
 
 const toastSpy = vi.hoisted(() => vi.fn());
+const routerReplaceSpy = vi.hoisted(() => vi.fn());
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: routerReplaceSpy }),
+}));
 
 vi.mock("@/components/ui/use-toast", () => ({
   useToast: () => ({ toast: toastSpy }),
@@ -123,6 +129,7 @@ function renderActions(queryClient = new QueryClient()) {
 
 beforeEach(() => {
   toastSpy.mockReset();
+  routerReplaceSpy.mockReset();
   vi.stubGlobal("fetch", vi.fn());
   Object.defineProperty(Element.prototype, "scrollIntoView", {
     configurable: true,
@@ -136,20 +143,26 @@ afterEach(() => {
 });
 
 describe("질문수업 상단 행동", () => {
-  it("간단 만들기 양식을 기본으로 닫고 단추로 펼친다", () => {
+  it("세 작업공간을 모두 표시하고 현재 화면을 알린다", () => {
+    renderWithProviders(<QuestionClassWorkspaceNav activeView="inquiry" />);
+
+    expect(screen.getByRole("link", { name: ko.sessions.listViewTitle })).toHaveAttribute(
+      "href",
+      "/teacher-sessions",
+    );
+    expect(screen.getByRole("link", { name: ko.sessions.createInquiryQuestionClass })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: ko.sessions.createQuickQuestionClass })).toHaveAttribute(
+      "href",
+      "/teacher-sessions?view=quick",
+    );
+  });
+
+  it("간단 만들기 양식을 별도 화면 본문으로 바로 표시한다", () => {
     renderActions();
 
-    expect(screen.getByRole("link", { name: ko.sessions.createInquiryQuestionClass })).toHaveAttribute(
-      "href",
-      "/teacher-curriculum",
-    );
-    expect(screen.queryByTestId("quick-create-form")).not.toBeInTheDocument();
-
-    const toggle = screen.getByRole("button", { name: ko.sessions.createQuickQuestionClass });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(toggle);
-
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("quick-create-form")).toBeInTheDocument();
   });
 
@@ -160,7 +173,6 @@ describe("질문수업 상단 행동", () => {
       .mockResolvedValueOnce(new Response("{}", { status: 201 }));
     renderActions();
 
-    fireEvent.click(screen.getByRole("button", { name: ko.sessions.createQuickQuestionClass }));
     fireEvent.click(screen.getByRole("button", { name: "시험 자료 채우기" }));
     fireEvent.click(screen.getByRole("button", { name: "간단 수업 저장" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
@@ -175,7 +187,7 @@ describe("질문수업 상단 행동", () => {
     expect(screen.getByRole("textbox", { name: "주제" })).toHaveValue("별의 움직임");
   });
 
-  it("유효한 성공에서만 중복 없는 캐시 갱신, 재조회, 닫기와 강조를 수행한다", async () => {
+  it("유효한 성공에서만 캐시를 갱신하고 새 수업이 선택된 목록으로 이동한다", async () => {
     const created = makeSession({
       id: "created-session",
       date: "2026-07-20",
@@ -197,11 +209,12 @@ describe("질문수업 상단 행동", () => {
       .mockResolvedValue(undefined);
     const { onHighlight } = renderActions(queryClient);
 
-    fireEvent.click(screen.getByRole("button", { name: ko.sessions.createQuickQuestionClass }));
     fireEvent.click(screen.getByRole("button", { name: "시험 자료 채우기" }));
     fireEvent.click(screen.getByRole("button", { name: "간단 수업 저장" }));
 
-    await waitFor(() => expect(screen.queryByTestId("quick-create-form")).not.toBeInTheDocument());
+    await waitFor(() => expect(routerReplaceSpy).toHaveBeenCalledWith(
+      "/teacher-sessions?session=created-session",
+    ));
     const cached = queryClient.getQueryData<QuestionSession[]>(appQueryKeys.teacherSessions) ?? [];
     expect(cached.filter((session) => session.id === created.id)).toHaveLength(1);
     expect(cached.find((session) => session.id === created.id)?.topic).toBe("별의 움직임");
