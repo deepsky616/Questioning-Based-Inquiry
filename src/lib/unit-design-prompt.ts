@@ -215,7 +215,7 @@ ${inquiryQuestions}
 - guides는 모든 탐구 질문에 대해 원문과 같은 index, meaning, 서로 다른 핵심 낱말 2~5개와 쉬운 뜻, thinkingStart를 빠짐없이 만드세요.
 
 아래 JSON만 출력:
-{"learningGuides":{"coreIdea":{"explanation":"...","lifeConnection":"...","keywords":[{"term":"...","meaning":"..."}]},"coreSentences":[{"index":0,"explanation":"..."}],"essentialQuestions":[{"index":0,"thinkingFocus":"...","perspectives":["...","..."]}]},"guides":[{"index":0,"meaning":"...","keywords":[],"thinkingStart":"..."}]}`;
+{"learningGuides":{"coreIdea":{"explanation":"...","lifeConnection":"...","keywords":[{"term":"핵심 낱말 1","meaning":"첫 번째 핵심 낱말의 쉬운 뜻"},{"term":"핵심 낱말 2","meaning":"두 번째 핵심 낱말의 쉬운 뜻"},{"term":"핵심 낱말 3","meaning":"세 번째 핵심 낱말의 쉬운 뜻"}]},"coreSentences":[{"index":0,"explanation":"..."}],"essentialQuestions":[{"index":0,"thinkingFocus":"...","perspectives":["...","..."]}]},"guides":[{"index":0,"meaning":"...","keywords":[{"term":"질문 낱말 1","meaning":"첫 번째 질문 낱말의 쉬운 뜻"},{"term":"질문 낱말 2","meaning":"두 번째 질문 낱말의 쉬운 뜻"}],"thinkingStart":"..."}]}`;
   }
 
   return `당신은 수업 설계 전문가입니다.

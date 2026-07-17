@@ -809,6 +809,36 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     expect(prompt).toContain("정답이나 결론을 제시하지 마세요");
   });
 
+  it("learning_guides 제이슨 예시도 핵심 낱말 개수와 쉬운 뜻 규칙을 지킨다", () => {
+    const prompt = buildPrompt({
+      ...PROMPT_BASE,
+      step: "learning_guides",
+      selectedKeywords: ["광합성", "에너지 전환"],
+      coreSentences: VALID_DESIGN.coreSentences,
+      essentialQuestions: VALID_DESIGN.essentialQuestions,
+      inquiryQuestions: VALID_DESIGN.inquiryQuestions,
+    });
+    const exampleStart = prompt.indexOf('{"learningGuides"');
+    expect(exampleStart).toBeGreaterThanOrEqual(0);
+
+    const example = JSON.parse(prompt.slice(exampleStart)) as {
+      learningGuides: {
+        coreIdea: { keywords: Array<{ term: string; meaning: string }> };
+      };
+      guides: Array<{ keywords: Array<{ term: string; meaning: string }> }>;
+    };
+    const coreIdeaKeywords = example.learningGuides.coreIdea.keywords;
+    expect(coreIdeaKeywords.length).toBeGreaterThanOrEqual(3);
+    expect(coreIdeaKeywords.length).toBeLessThanOrEqual(5);
+    expect(coreIdeaKeywords.every(({ term, meaning }) => term.trim() && meaning.trim())).toBe(true);
+    expect(example.guides.length).toBeGreaterThan(0);
+    for (const guide of example.guides) {
+      expect(guide.keywords.length).toBeGreaterThanOrEqual(2);
+      expect(guide.keywords.length).toBeLessThanOrEqual(5);
+      expect(guide.keywords.every(({ term, meaning }) => term.trim() && meaning.trim())).toBe(true);
+    }
+  });
+
   it("student_guides 단계는 질문 원문과 학년 수준을 포함하고 원문 변경을 금지한다", () => {
     const prompt = buildPrompt({
       ...PROMPT_BASE,
