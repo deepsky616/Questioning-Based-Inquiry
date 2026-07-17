@@ -1,5 +1,6 @@
 import type { Achievement } from "@/lib/achievement-selection";
 import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
+import type { StudentLearningGuides } from "@/lib/student-learning-guide";
 
 // teacher-curriculum 페이지와 하위 컴포넌트가 공유하는 타입·헬퍼
 
@@ -20,6 +21,7 @@ export interface SavedInquiryDesign {
   coreIdea?: string;
   coreSentences?: string[];
   essentialQuestions?: string[];
+  learningGuides?: StudentLearningGuides;
   inquiryQuestions: InquiryQuestion[];
   isActive?: boolean;
   defaultQuestionPublic?: boolean;

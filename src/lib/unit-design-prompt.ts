@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const unitDesignGenerateSchema = z.object({
-  step: z.enum(["keywords", "sentences", "questions", "inquiry", "student_guides", "recommend_achievements", "recommend_by_unit"]),
+  step: z.enum(["keywords", "sentences", "questions", "inquiry", "student_guides", "learning_guides", "recommend_achievements", "recommend_by_unit"]),
   subject: z.string(),
   gradeRange: z.string(),
   area: z.string(),
@@ -186,6 +186,38 @@ ${questions}
 ]}`;
   }
 
+  if (data.step === "learning_guides") {
+    const inquiryQuestions = (data.inquiryQuestions ?? [])
+      .map((question, index) => `${index}. [${question.type}] ${question.content}`)
+      .join("\n");
+    return `당신은 학생의 이해와 탐구를 돕는 수업 설계 전문가입니다.
+아래 원문을 바꾸지 않고 ${gradeLabel} 학생을 위한 짧은 이해 자료를 만드세요.
+
+[교과] ${data.subject}  [영역] ${data.area}  [학년군] ${gradeLabel}
+[핵심 아이디어]
+${data.coreIdea}
+[핵심 문장]
+${data.coreSentences.map((item, index) => `${index}. ${item}`).join("\n")}
+[핵심 질문]
+${data.essentialQuestions.map((item, index) => `${index}. ${item}`).join("\n")}
+[탐구 질문]
+${inquiryQuestions}
+
+작성 규칙:
+- 모든 원문을 바꾸지 마세요.
+- 정답이나 결론을 제시하지 마세요.
+- coreIdea.explanation은 핵심 아이디어를 학생 눈높이 1~2문장으로 풀어 쓰세요.
+- coreIdea.lifeConnection은 생활 속 익숙한 사례 하나만 제시하세요.
+- coreIdea.keywords는 꼭 필요한 낱말만 0~3개 고르고 쉬운 뜻을 붙이세요.
+- coreSentences는 어려운 문장에만 쉬운 표현을 만들고 원래 index를 유지하세요.
+- essentialQuestions의 thinkingFocus는 생각의 범위를 한 문장으로 안내하세요.
+- essentialQuestions의 perspectives는 원인, 변화, 관계처럼 짧은 관점만 2~3개 제시하세요.
+- guides는 탐구 질문 원문과 같은 index를 사용하고 답 대신 생각을 시작할 단서만 제시하세요.
+
+아래 JSON만 출력:
+{"learningGuides":{"coreIdea":{"explanation":"...","lifeConnection":"...","keywords":[{"term":"...","meaning":"..."}]},"coreSentences":[{"index":0,"explanation":"..."}],"essentialQuestions":[{"index":0,"thinkingFocus":"...","perspectives":["...","..."]}]},"guides":[{"index":0,"meaning":"...","keywords":[],"thinkingStart":"..."}]}`;
+  }
+
   return `당신은 수업 설계 전문가입니다.
 아래 교육과정 분석, 성취기준, 핵심어, 핵심 문장, 핵심 질문을 종합해 탐구 질문을 세 유형으로 생성하세요.
 
@@ -204,13 +236,17 @@ ${data.essentialQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 - controversial (논쟁적): 판단·의견·가치·적용 → 정확히 2개
 
 각 탐구 질문은 핵심 질문에 가까워지는 '징검다리' 역할을 해야 합니다.
+학생용 이해 자료도 함께 생성하세요.
+- learningGuides.coreIdea: 쉽게 풀어보기, 생활 속 연결, 핵심 낱말 0~3개
+- learningGuides.coreSentences: 어려운 핵심 문장만 쉬운 표현으로 작성하고 원래 index 유지
+- learningGuides.essentialQuestions: 생각할 범위와 짧은 관점 2~3개, 정답이나 결론을 제시하지 않음
 각 질문의 studentGuide는 학생이 질문을 이해하도록 돕되 정답이나 결론을 미리 알려주지 않음.
 - meaning: 질문이 묻는 것을 ${gradeLabel} 눈높이 한 문장으로 설명
 - keywords: 꼭 필요한 핵심 낱말 0~3개와 쉬운 뜻
 - thinkingStart: 답 대신 처음 살펴볼 자료, 관점, 비교 대상을 제안
 
 아래 JSON만 출력:
-{"inquiryQuestions": [
+{"learningGuides":{"coreIdea":{"explanation":"쉽게 풀어보기...","lifeConnection":"생활 속 연결...","keywords":[]},"coreSentences":[{"index":0,"explanation":"..."}],"essentialQuestions":[{"index":0,"thinkingFocus":"...","perspectives":["원인","변화"]}]},"inquiryQuestions": [
   {"type":"factual","content":"...","studentGuide":{"meaning":"...","keywords":[{"term":"...","meaning":"..."}],"thinkingStart":"..."}},
   {"type":"factual","content":"...","studentGuide":{"meaning":"...","keywords":[],"thinkingStart":"..."}},
   {"type":"factual","content":"...","studentGuide":{"meaning":"...","keywords":[],"thinkingStart":"..."}},

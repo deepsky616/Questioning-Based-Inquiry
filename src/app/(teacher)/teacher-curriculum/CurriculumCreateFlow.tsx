@@ -11,6 +11,7 @@ import { CurriculumSelectableTextStep } from "./CurriculumSelectableTextStep";
 import { CurriculumStepProgress, type CurriculumStep } from "./CurriculumStepProgress";
 import { Step1CurriculumExplorer } from "./Step1CurriculumExplorer";
 import type { CurriculumArea, InquiryQuestion } from "./types";
+import type { StudentLearningGuides } from "@/lib/student-learning-guide";
 
 type LastDesignAction = { type: "saved" | "deployed"; at: string };
 
@@ -75,6 +76,8 @@ interface CurriculumCreateFlowProps {
   handleGoStep5: () => void;
   loadingStudentGuides: boolean;
   handleGenerateStudentGuides: () => void;
+  learningGuides?: StudentLearningGuides;
+  setLearningGuides: (value: StudentLearningGuides) => void;
   inquiryQuestions: InquiryQuestion[];
   selectedInquiryCount: number;
   dragInquiryIndex: number | null;
@@ -174,6 +177,8 @@ export function CurriculumCreateFlow({
   handleGoStep5,
   loadingStudentGuides,
   handleGenerateStudentGuides,
+  learningGuides,
+  setLearningGuides,
   inquiryQuestions,
   selectedInquiryCount,
   dragInquiryIndex,
@@ -315,6 +320,9 @@ export function CurriculumCreateFlow({
       <CurriculumInquiryStep
         visible={step >= 5}
         inquiryQuestions={inquiryQuestions}
+        coreSentences={selectedCoreSentences}
+        essentialQuestions={selectedEssentialQuestions}
+        learningGuides={learningGuides}
         selectedInquiryCount={selectedInquiryCount}
         dragInquiryIndex={dragInquiryIndex}
         inquiryAddType={inquiryAddType}
@@ -358,6 +366,7 @@ export function CurriculumCreateFlow({
         onSaveAndCreateSession={handleSaveAndCreateSession}
         onSaveOnly={handleSave}
         onGenerateGuides={handleGenerateStudentGuides}
+        onLearningGuidesChange={setLearningGuides}
       />
     </>
   );

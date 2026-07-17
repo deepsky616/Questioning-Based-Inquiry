@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { studentCanAccessSession } from "@/lib/session-access";
+import { normalizeStudentLearningGuides } from "@/lib/student-learning-guide";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -55,10 +56,11 @@ export async function GET(_req: Request, { params }: Params) {
       core_sentences: unknown;
       essential_questions: unknown;
       inquiry_questions: unknown;
+      learning_guides: unknown;
     }[]
   >`
     SELECT title, subject, grade_range, grade, area, core_idea,
-           core_sentences, essential_questions, inquiry_questions
+           core_sentences, essential_questions, inquiry_questions, learning_guides
     FROM unit_designs
     WHERE id = ${qs.unitDesignId} AND teacher_id = ${qs.teacherId}
     LIMIT 1
@@ -79,6 +81,7 @@ export async function GET(_req: Request, { params }: Params) {
       coreIdea: d.core_idea,
       coreSentences: asArray(d.core_sentences) as string[],
       essentialQuestions: asArray(d.essential_questions) as string[],
+      learningGuides: normalizeStudentLearningGuides(d.learning_guides),
       inquiryQuestions: asArray(d.inquiry_questions) as { type: string; content: string }[],
     },
   });

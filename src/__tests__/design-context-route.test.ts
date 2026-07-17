@@ -35,6 +35,11 @@ const DESIGN_ROW = {
   core_idea: "핵심 아이디어",
   core_sentences: ["문장1"],
   essential_questions: ["질문1"],
+  learning_guides: {
+    coreIdea: { explanation: "핵심 아이디어 쉬운 설명", lifeConnection: "생활 속 사례", keywords: [] },
+    coreSentences: [],
+    essentialQuestions: [],
+  },
   inquiry_questions: [{ type: "factual", content: "탐구1" }],
 };
 
@@ -61,6 +66,7 @@ describe("GET design-context 권한", () => {
     expect(res.status).toBe(200);
     expect(body.context?.title).toBe("광합성");
     expect(body.context?.sessionDate).toBe("2026-05-01");
+    expect(body.context?.learningGuides.coreIdea.explanation).toBe("핵심 아이디어 쉬운 설명");
   });
 
   it("소유가 아닌 교사는 403", async () => {

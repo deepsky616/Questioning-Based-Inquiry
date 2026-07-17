@@ -7,6 +7,7 @@ import DatePicker from "@/components/shared/DatePicker";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
 import { StudentInquiryGuideEditor } from "@/components/shared/StudentInquiryGuideEditor";
+import { StudentLearningGuideEditor } from "@/components/shared/StudentLearningGuideEditor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { formatDateTime } from "@/lib/datetime";
 import type { SessionTargetClass, SessionTargetStudent } from "@/lib/session-targeting";
 import type { CurriculumArea, InquiryQuestion } from "./types";
+import type { StudentLearningGuides } from "@/lib/student-learning-guide";
 
 type LastDesignAction = { type: "saved" | "deployed"; at: string };
 
@@ -26,6 +28,9 @@ const TYPE_COLOR: Record<string, string> = {
 interface CurriculumInquiryStepProps {
   visible: boolean;
   inquiryQuestions: InquiryQuestion[];
+  coreSentences: string[];
+  essentialQuestions: string[];
+  learningGuides?: StudentLearningGuides;
   selectedInquiryCount: number;
   dragInquiryIndex: number | null;
   inquiryAddType: InquiryQuestion["type"];
@@ -66,11 +71,15 @@ interface CurriculumInquiryStepProps {
   onSaveAndCreateSession: () => void;
   onSaveOnly: () => void;
   onGenerateGuides: () => void;
+  onLearningGuidesChange: (value: StudentLearningGuides) => void;
 }
 
 export function CurriculumInquiryStep({
   visible,
   inquiryQuestions,
+  coreSentences,
+  essentialQuestions,
+  learningGuides,
   selectedInquiryCount,
   dragInquiryIndex,
   inquiryAddType,
@@ -106,12 +115,13 @@ export function CurriculumInquiryStep({
   onSaveAndCreateSession,
   onSaveOnly,
   onGenerateGuides,
+  onLearningGuidesChange,
 }: CurriculumInquiryStepProps) {
   const t = useTranslations("curriculum");
   const tc = useTranslations("common");
   const tCls = useTranslations("classification");
   const typeLabel = (type: string) => `${tCls(`${type}.label`)}`;
-  const hasStudentGuides = inquiryQuestions.some((question) => question.studentGuide);
+  const hasStudentGuides = Boolean(learningGuides) || inquiryQuestions.some((question) => question.studentGuide);
 
   if (!visible) return null;
 
@@ -139,6 +149,12 @@ export function CurriculumInquiryStep({
               : t(hasStudentGuides ? "studentGuideRegenerate" : "studentGuideGenerate")}
           </Button>
         </div>
+        <StudentLearningGuideEditor
+          coreSentences={coreSentences}
+          essentialQuestions={essentialQuestions}
+          guides={learningGuides}
+          onChange={onLearningGuidesChange}
+        />
         <div className="space-y-2">
           {inquiryQuestions.map((question, index) => (
             <div

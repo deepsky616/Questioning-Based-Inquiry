@@ -459,6 +459,7 @@ model UnitDesign {
   coreSentences      Json            @map("core_sentences")      // string[]
   essentialQuestions Json            @map("essential_questions") // string[]
   inquiryQuestions   Json            @map("inquiry_questions")   // [{type, content}][]
+  learningGuides     Json?           @map("learning_guides")     // optional student-facing explanations
 
   // 수업세션 기본 공개 설정(저장 탭 수정 시 기본값으로 반영)
   isActive               Boolean     @default(true) @map("is_active")

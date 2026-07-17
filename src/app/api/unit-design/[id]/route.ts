@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isValidSessionDateString } from "@/lib/sessions";
 import { z } from "zod";
+import { studentLearningGuidesSchema } from "@/lib/student-learning-guide-schema";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -40,6 +41,7 @@ const updateSchema = z.object({
   coreSentences: z.array(z.string()).optional(),
   essentialQuestions: z.array(z.string()).optional(),
   inquiryQuestions: z.array(inquiryQuestionSchema).optional(),
+  learningGuides: studentLearningGuidesSchema.nullable().optional(),
   grade: z.string().nullable().optional(),
   sessionDate: sessionDateSchema.nullable().optional(),
   isActive: z.boolean().optional(),
@@ -87,6 +89,7 @@ export async function PATCH(req: Request, { params }: Params) {
     if (data.coreSentences !== undefined) add("core_sentences", JSON.stringify(data.coreSentences), "::jsonb");
     if (data.essentialQuestions !== undefined) add("essential_questions", JSON.stringify(data.essentialQuestions), "::jsonb");
     if (data.inquiryQuestions !== undefined) add("inquiry_questions", JSON.stringify(data.inquiryQuestions), "::jsonb");
+    if (data.learningGuides !== undefined) add("learning_guides", data.learningGuides ? JSON.stringify(data.learningGuides) : null, "::jsonb");
     if (data.grade !== undefined) add("grade", data.grade);
     if (data.sessionDate !== undefined) add("session_date", data.sessionDate);
     if (data.isActive !== undefined) add("is_active", data.isActive);

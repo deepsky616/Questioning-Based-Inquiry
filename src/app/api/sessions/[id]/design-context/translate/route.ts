@@ -8,6 +8,7 @@ import { contentHash, translateTexts } from "@/lib/translate";
 import { logger } from "@/lib/logger";
 import { studentCanAccessSession } from "@/lib/session-access";
 import { normalizeStudentInquiryGuide, type StudentInquiryGuide } from "@/lib/student-inquiry-guide";
+import { normalizeStudentLearningGuides, type StudentLearningGuides } from "@/lib/student-learning-guide";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -28,6 +29,7 @@ interface DesignReferenceContext {
   coreIdea: string;
   coreSentences: string[];
   essentialQuestions: string[];
+  learningGuides?: StudentLearningGuides;
   inquiryQuestions: InquiryQuestion[];
 }
 
@@ -61,10 +63,36 @@ function buildEntries(context: DesignReferenceContext): [string, string][] {
     ["area", context.area],
     ["coreIdea", context.coreIdea],
   ];
+  const learningGuides = context.learningGuides;
+  const coreIdeaEntries: [string, string][] = learningGuides?.coreIdea ? [
+    ["learningGuides.coreIdea.explanation", learningGuides.coreIdea.explanation],
+    ["learningGuides.coreIdea.lifeConnection", learningGuides.coreIdea.lifeConnection],
+    ...learningGuides.coreIdea.keywords.flatMap((keyword, index): [string, string][] => [
+      [`learningGuides.coreIdea.keywords.${index}.term`, keyword.term],
+      [`learningGuides.coreIdea.keywords.${index}.meaning`, keyword.meaning],
+    ]),
+  ] : [];
   return [
     ...base,
-    ...context.coreSentences.map((value, index) => [`coreSentences.${index}`, value] as [string, string]),
-    ...context.essentialQuestions.map((value, index) => [`essentialQuestions.${index}`, value] as [string, string]),
+    ...coreIdeaEntries,
+    ...context.coreSentences.flatMap((value, index): [string, string][] => {
+      const guide = learningGuides?.coreSentences.find((item) => item.index === index);
+      return [
+        [`coreSentences.${index}`, value],
+        ...(guide ? [[`learningGuides.coreSentences.${index}.explanation`, guide.explanation] as [string, string]] : []),
+      ];
+    }),
+    ...context.essentialQuestions.flatMap((value, index): [string, string][] => {
+      const guide = learningGuides?.essentialQuestions.find((item) => item.index === index);
+      return [
+        [`essentialQuestions.${index}`, value],
+        ...(guide?.thinkingFocus ? [[`learningGuides.essentialQuestions.${index}.thinkingFocus`, guide.thinkingFocus] as [string, string]] : []),
+        ...(guide?.perspectives.map((perspective, perspectiveIndex) => [
+          `learningGuides.essentialQuestions.${index}.perspectives.${perspectiveIndex}`,
+          perspective,
+        ] as [string, string]) ?? []),
+      ];
+    }),
     ...context.inquiryQuestions.flatMap((value, index): [string, string][] => {
       const guide = value.studentGuide;
       return [
@@ -89,6 +117,30 @@ function applyTranslations(context: DesignReferenceContext, fields: Record<strin
     coreIdea: fields.coreIdea ?? context.coreIdea,
     coreSentences: context.coreSentences.map((value, index) => fields[`coreSentences.${index}`] ?? value),
     essentialQuestions: context.essentialQuestions.map((value, index) => fields[`essentialQuestions.${index}`] ?? value),
+    ...(context.learningGuides ? {
+      learningGuides: {
+        ...(context.learningGuides.coreIdea ? {
+          coreIdea: {
+            explanation: fields["learningGuides.coreIdea.explanation"] ?? context.learningGuides.coreIdea.explanation,
+            lifeConnection: fields["learningGuides.coreIdea.lifeConnection"] ?? context.learningGuides.coreIdea.lifeConnection,
+            keywords: context.learningGuides.coreIdea.keywords.map((keyword, index) => ({
+              term: fields[`learningGuides.coreIdea.keywords.${index}.term`] ?? keyword.term,
+              meaning: fields[`learningGuides.coreIdea.keywords.${index}.meaning`] ?? keyword.meaning,
+            })),
+          },
+        } : {}),
+        coreSentences: context.learningGuides.coreSentences.map((guide) => ({
+          ...guide,
+          explanation: fields[`learningGuides.coreSentences.${guide.index}.explanation`] ?? guide.explanation,
+        })),
+        essentialQuestions: context.learningGuides.essentialQuestions.map((guide) => ({
+          ...guide,
+          thinkingFocus: fields[`learningGuides.essentialQuestions.${guide.index}.thinkingFocus`] ?? guide.thinkingFocus,
+          perspectives: guide.perspectives.map((perspective, perspectiveIndex) =>
+            fields[`learningGuides.essentialQuestions.${guide.index}.perspectives.${perspectiveIndex}`] ?? perspective),
+        })),
+      },
+    } : {}),
     inquiryQuestions: context.inquiryQuestions.map((value, index) => ({
       ...value,
       content: fields[`inquiryQuestions.${index}`] ?? value.content,
@@ -164,10 +216,11 @@ export async function POST(req: Request, { params }: Params) {
       core_sentences: unknown;
       essential_questions: unknown;
       inquiry_questions: unknown;
+      learning_guides: unknown;
     }[]
   >`
     SELECT id, title, subject, grade_range, grade, area, core_idea,
-           core_sentences, essential_questions, inquiry_questions
+           core_sentences, essential_questions, inquiry_questions, learning_guides
     FROM unit_designs
     WHERE id = ${qs.unitDesignId} AND teacher_id = ${qs.teacherId}
     LIMIT 1
@@ -186,6 +239,7 @@ export async function POST(req: Request, { params }: Params) {
     coreIdea: design.core_idea,
     coreSentences: asStringArray(design.core_sentences),
     essentialQuestions: asStringArray(design.essential_questions),
+    learningGuides: normalizeStudentLearningGuides(design.learning_guides),
     inquiryQuestions: asInquiryQuestions(design.inquiry_questions),
   };
   const entries = buildEntries(context);

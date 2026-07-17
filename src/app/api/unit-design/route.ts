@@ -4,6 +4,8 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isValidSessionDateString } from "@/lib/sessions";
+import { normalizeStudentLearningGuides } from "@/lib/student-learning-guide";
+import { studentLearningGuidesSchema } from "@/lib/student-learning-guide-schema";
 
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
 
@@ -41,6 +43,7 @@ const saveSchema = z.object({
   coreSentences: z.array(z.string()),
   essentialQuestions: z.array(z.string()),
   inquiryQuestions: z.array(inquiryQuestionSchema),
+  learningGuides: studentLearningGuidesSchema.optional(),
   isActive: z.boolean().optional().default(true),
   defaultQuestionPublic: z.boolean().optional().default(true),
   likesVisibleToPeers: z.boolean().optional().default(true),
@@ -67,6 +70,7 @@ export async function GET(req: Request) {
       core_sentences: unknown;
       essential_questions: unknown;
       inquiry_questions: unknown;
+      learning_guides: unknown;
       is_active: boolean;
       default_question_public: boolean;
       likes_visible_to_peers: boolean;
@@ -80,7 +84,7 @@ export async function GET(req: Request) {
     }[]
   >`
     SELECT id, title, subject, grade_range, grade, session_date, area,
-           core_idea, core_sentences, essential_questions, inquiry_questions,
+           core_idea, core_sentences, essential_questions, inquiry_questions, learning_guides,
            is_active, default_question_public, likes_visible_to_peers, comments_visible_to_peers,
            target_class_value, target_student_ids,
            (SELECT count(*) FROM question_sessions qs WHERE qs.unit_design_id = unit_designs.id) AS session_count,
@@ -100,6 +104,7 @@ export async function GET(req: Request) {
       coreSentences: asArray(d.core_sentences) as string[],
       essentialQuestions: asArray(d.essential_questions) as string[],
       inquiryQuestions: asArray(d.inquiry_questions),
+      learningGuides: normalizeStudentLearningGuides(d.learning_guides),
       isActive: d.is_active,
       defaultQuestionPublic: d.default_question_public,
       likesVisibleToPeers: d.likes_visible_to_peers,
@@ -129,13 +134,13 @@ export async function POST(req: Request) {
     const inserted = await prisma.$queryRawUnsafe<{ id: string; created_at: Date; updated_at: Date }[]>(
       `INSERT INTO unit_designs
          (id, teacher_id, curriculum_area_id, title, subject, grade_range, area,
-          core_idea, selected_keywords, core_sentences, essential_questions, inquiry_questions,
+          core_idea, selected_keywords, core_sentences, essential_questions, inquiry_questions, learning_guides,
           grade, session_date, is_active, default_question_public, likes_visible_to_peers,
           comments_visible_to_peers, target_class_value, target_student_ids, created_at, updated_at)
        VALUES
          (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
-          $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb,
-          $12, $13, $14, $15, $16, $17, $18, $19::jsonb, now(), now())
+          $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb,
+          $13, $14, $15, $16, $17, $18, $19, $20::jsonb, now(), now())
        RETURNING id, created_at, updated_at`,
       teacherId,
       data.curriculumAreaId ?? null,
@@ -148,6 +153,7 @@ export async function POST(req: Request) {
       JSON.stringify(data.coreSentences),
       JSON.stringify(data.essentialQuestions),
       JSON.stringify(data.inquiryQuestions),
+      data.learningGuides ? JSON.stringify(data.learningGuides) : null,
       data.grade ?? null,
       data.sessionDate ?? null,
       data.isActive,
@@ -174,6 +180,7 @@ export async function POST(req: Request) {
             sessionDate: data.sessionDate ?? null,
             area: data.area,
             inquiryQuestions: data.inquiryQuestions,
+            learningGuides: data.learningGuides,
             sessionCount: 0,
             lastDeployedAt: null,
             createdAt: insertedDesign?.created_at,

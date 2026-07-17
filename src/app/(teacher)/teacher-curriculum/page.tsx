@@ -52,7 +52,6 @@ import {
   type SavedInquiryDesign,
 } from "./types";
 import { useStudentInquiryGuides } from "./useStudentInquiryGuides";
-
 // ── 타입 ──────────────────────────────────────────────────────────────
 type LastDesignAction = { type: "saved" | "deployed"; at: string };
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
@@ -360,8 +359,15 @@ export default function CurriculumPage() {
       setLoadingQuestions(false);
     }
   };
+  const { learningGuides, setLearningGuides, loadingStudentGuides, handleGenerateStudentGuides, applyGeneratedLearningGuides, clearLearningGuides } = useStudentInquiryGuides({
+    questions: inquiryQuestions, coreIdea: selectedCoreIdeaLines.join("\n"), coreSentences: selectedCoreSentences, essentialQuestions: selectedEssentialQuestions,
+    setQuestions: setInquiryQuestions, generate: callGenerate,
+    onSuccess: () => toast({ description: t("studentGuideGenerated") }),
+    onError: () => toast({ variant: "destructive", description: t("studentGuideGenerateFailed") }),
+  });
 
   const handleGoStep5 = async () => {
+    clearLearningGuides();
     setLoadingInquiry(true);
     try {
       const data = await callGenerate("inquiry", {
@@ -369,6 +375,7 @@ export default function CurriculumPage() {
         essentialQuestions: selectedEssentialQuestions,
       });
       if (Array.isArray(data?.inquiryQuestions)) {
+        applyGeneratedLearningGuides(data.learningGuides);
         setInquiryQuestions(data.inquiryQuestions.map((question: InquiryQuestion) => {
           const studentGuide = normalizeStudentInquiryGuide(question.studentGuide);
           return {
@@ -383,14 +390,6 @@ export default function CurriculumPage() {
       setLoadingInquiry(false);
     }
   };
-
-  const { loadingStudentGuides, handleGenerateStudentGuides } = useStudentInquiryGuides({
-    questions: inquiryQuestions,
-    setQuestions: setInquiryQuestions,
-    generate: callGenerate,
-    onSuccess: () => toast({ description: t("studentGuideGenerated") }),
-    onError: () => toast({ variant: "destructive", description: t("studentGuideGenerateFailed") }),
-  });
 
   const toggleKeyword = (kw: string) => {
     setSelectedKeywords((prev) =>
@@ -422,6 +421,7 @@ export default function CurriculumPage() {
     selectedKeywords,
     coreSentences: selectedCoreSentences,
     essentialQuestions: selectedEssentialQuestions,
+    learningGuides,
     inquiryQuestions: selectedInquiryQuestions,
     isActive: sessionIsActive,
     defaultQuestionPublic,
@@ -669,7 +669,7 @@ export default function CurriculumPage() {
           selectedCoreSentenceIndices, setSelectedCoreSentenceIndices, setCoreSentences, loadingQuestions,
           handleGoStep4, selectedEssentialQuestions, essentialQuestions, selectedEssentialQuestionIndices,
           setSelectedEssentialQuestionIndices, setEssentialQuestions, loadingInquiry, handleGoStep5,
-          loadingStudentGuides, handleGenerateStudentGuides,
+          loadingStudentGuides, handleGenerateStudentGuides, learningGuides, setLearningGuides,
           inquiryQuestions, dragInquiryIndex, inquiryAddType, saveDate, saveGrade, saveTitle, students,
           targetClasses, targetClassValue, selectedStudentIds, sessionIsActive, defaultQuestionPublic,
           sessionLikesVisible, sessionCommentsVisible, isSaving, canSaveDesign, lastDesignAction,

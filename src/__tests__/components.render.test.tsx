@@ -93,6 +93,19 @@ describe("DesignReferenceView", () => {
           coreIdea: "식물은 빛으로 양분을 만든다",
           coreSentences: ["핵심 문장 하나"],
           essentialQuestions: ["핵심 질문 하나"],
+          learningGuides: {
+            coreIdea: {
+              explanation: "식물이 빛을 이용해 살아가는 큰 원리를 알아봐요.",
+              lifeConnection: "창가의 식물이 햇빛 쪽으로 자라는 모습을 떠올려 보세요.",
+              keywords: [{ term: "양분", meaning: "식물이 자라는 데 필요한 물질" }],
+            },
+            coreSentences: [{ index: 0, explanation: "식물이 빛으로 필요한 물질을 만들어요." }],
+            essentialQuestions: [{
+              index: 0,
+              thinkingFocus: "생물이 에너지를 얻는 여러 방법을 살펴봐요.",
+              perspectives: ["원인", "변화"],
+            }],
+          },
           inquiryQuestions: [{
             type: "factual",
             content: "잎은 왜 초록색일까?",
@@ -107,6 +120,12 @@ describe("DesignReferenceView", () => {
     );
     expect(screen.getByText(/광합성/)).toBeInTheDocument();
     expect(screen.getByText(/식물은 빛으로 양분을 만든다/)).toBeInTheDocument();
+    expect(screen.getByText("쉽게 풀어보기")).toBeInTheDocument();
+    expect(screen.getByText(/식물이 빛을 이용해 살아가는 큰 원리/)).toBeInTheDocument();
+    expect(screen.getByText("생활 속 연결")).toBeInTheDocument();
+    expect(screen.getByText("쉬운 문장으로 보기")).toBeInTheDocument();
+    expect(screen.getByText("이 질문에서 생각할 것")).toBeInTheDocument();
+    expect(screen.getByText("생각해 볼 관점")).toBeInTheDocument();
     expect(screen.getByText(/잎은 왜 초록색일까\?/)).toBeInTheDocument();
     expect(screen.getByText("질문이 묻는 것")).toBeInTheDocument();
     expect(screen.getByText(/잎이 초록색으로 보이는 까닭/)).toBeInTheDocument();

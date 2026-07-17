@@ -15,6 +15,7 @@ import { SessionVisibilitySettings } from "@/components/shared/SessionVisibility
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
 import { StudentInquiryGuideEditor } from "@/components/shared/StudentInquiryGuideEditor";
+import { StudentLearningGuideEditor } from "@/components/shared/StudentLearningGuideEditor";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -24,6 +25,12 @@ import { getSavedDesignTimeline, type SavedDesignTimelineKind } from "@/lib/save
 import { groupSessionDatesByMonth } from "@/lib/sessions";
 import { formatDateTime } from "@/lib/datetime";
 import { mergeGeneratedStudentGuides, normalizeStudentInquiryGuide } from "@/lib/student-inquiry-guide";
+import {
+  normalizeStudentLearningGuides,
+  remapStudentLearningGuides,
+  removeIndexedStudentLearningGuide,
+  type StudentLearningGuides,
+} from "@/lib/student-learning-guide";
 import { appQueryKeys } from "@/lib/app-queries";
 import {
   postQuestionClassFromDesign,
@@ -124,6 +131,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   const [editCoreSentences, setEditCoreSentences] = useState<string[]>([]);
   const [editEssentialQuestions, setEditEssentialQuestions] = useState<string[]>([]);
   const [editQuestions, setEditQuestions] = useState<InquiryQuestion[]>([]);
+  const [editLearningGuides, setEditLearningGuides] = useState<StudentLearningGuides | undefined>();
   const [savingEdit, setSavingEdit] = useState(false);
   const [generatingGuides, setGeneratingGuides] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -184,6 +192,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     setEditCoreIdea(design.coreIdea ?? "");
     setEditCoreSentences([...(design.coreSentences ?? [])]);
     setEditEssentialQuestions([...(design.essentialQuestions ?? [])]);
+    setEditLearningGuides(normalizeStudentLearningGuides(design.learningGuides));
     setEditQuestions(design.inquiryQuestions.map((q) => ({ ...q })));
   };
   const cancelEditDesign = () => {
@@ -192,6 +201,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     setEditCoreIdea("");
     setEditCoreSentences([]);
     setEditEssentialQuestions([]);
+    setEditLearningGuides(undefined);
     setEditQuestions([]);
   };
   // 핵심문장·핵심질문(문자열 리스트) 공통 편집 헬퍼
@@ -206,6 +216,14 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   ) => setter((prev) => prev.filter((_, i) => i !== index));
   const addTextItem = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
     setter((prev) => [...prev, ""]);
+  const removeLearningTextItem = (
+    kind: "coreSentences" | "essentialQuestions",
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    index: number,
+  ) => {
+    removeTextItem(setter, index);
+    setEditLearningGuides((previous) => removeIndexedStudentLearningGuide(previous, kind, index));
+  };
   const updateEditQuestion = (index: number, patch: Partial<InquiryQuestion>) => {
     setEditQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)));
   };
@@ -248,8 +266,10 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         };
       })
       .filter((q) => q.content);
-    const cleanedSentences = editCoreSentences.map((s) => s.trim()).filter(Boolean);
-    const cleanedEssential = editEssentialQuestions.map((s) => s.trim()).filter(Boolean);
+    const sentenceSourceIndexes = editCoreSentences.map((item, index) => item.trim() ? index : -1).filter((index) => index >= 0);
+    const essentialSourceIndexes = editEssentialQuestions.map((item, index) => item.trim() ? index : -1).filter((index) => index >= 0);
+    const cleanedSentences = sentenceSourceIndexes.map((index) => editCoreSentences[index].trim());
+    const cleanedEssential = essentialSourceIndexes.map((index) => editEssentialQuestions[index].trim());
     const res = await fetch(`/api/unit-design/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -265,6 +285,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         coreIdea: editCoreIdea.trim(),
         coreSentences: cleanedSentences,
         essentialQuestions: cleanedEssential,
+        learningGuides: remapStudentLearningGuides(editLearningGuides, sentenceSourceIndexes, essentialSourceIndexes),
         inquiryQuestions: cleaned,
       }),
     });
@@ -284,11 +305,14 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          step: "student_guides",
+          step: "learning_guides",
           subject: design.subject,
           gradeRange: design.gradeRange,
           area: design.area,
           unitName: editTitle.trim(),
+          coreIdea: editCoreIdea.trim(),
+          coreSentences: editCoreSentences,
+          essentialQuestions: editEssentialQuestions,
           inquiryQuestions: indexedQuestions.map(({ question }) => ({
             type: question.type,
             content: question.content.trim(),
@@ -296,16 +320,15 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !Array.isArray(data.guides)) throw new Error();
+      const nextLearningGuides = normalizeStudentLearningGuides(data.learningGuides);
+      if (!response.ok || (!Array.isArray(data.guides) && !nextLearningGuides)) throw new Error();
+      if (nextLearningGuides) setEditLearningGuides(nextLearningGuides);
 
-      const merged = mergeGeneratedStudentGuides(
-        indexedQuestions.map(({ question }) => question),
-        data.guides,
-      );
-      const byOriginalIndex = new Map(
-        indexedQuestions.map(({ originalIndex }, index) => [originalIndex, merged[index]]),
-      );
-      setEditQuestions((previous) => previous.map((question, index) => byOriginalIndex.get(index) ?? question));
+      if (Array.isArray(data.guides)) {
+        const merged = mergeGeneratedStudentGuides(indexedQuestions.map(({ question }) => question), data.guides);
+        const byOriginalIndex = new Map(indexedQuestions.map(({ originalIndex }, index) => [originalIndex, merged[index]]));
+        setEditQuestions((previous) => previous.map((question, index) => byOriginalIndex.get(index) ?? question));
+      }
       toast({ description: t("studentGuideGenerated") });
     } catch {
       toast({ variant: "destructive", description: t("studentGuideGenerateFailed") });
@@ -604,7 +627,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                             rows={2}
                             className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                           />
-                          <button type="button" onClick={() => removeTextItem(setEditCoreSentences, i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>✕</button>
+                          <button type="button" onClick={() => removeLearningTextItem("coreSentences", setEditCoreSentences, i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>✕</button>
                         </div>
                       ))}
                       <Button variant="outline" size="sm" onClick={() => addTextItem(setEditCoreSentences)}>＋ {t("addItem")}</Button>
@@ -621,15 +644,15 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                             rows={2}
                             className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
                           />
-                          <button type="button" onClick={() => removeTextItem(setEditEssentialQuestions, i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>✕</button>
+                          <button type="button" onClick={() => removeLearningTextItem("essentialQuestions", setEditEssentialQuestions, i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>✕</button>
                         </div>
                       ))}
                       <Button variant="outline" size="sm" onClick={() => addTextItem(setEditEssentialQuestions)}>＋ {t("addItem")}</Button>
                     </div>
 
-                    {/* 탐구 질문 */}
+                    <div className="space-y-3 border-t pt-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Label>{t("inquiryQuestionsLabel")}</Label>
+                      <Label>{t("studentGuideTitle")}</Label>
                       <Button
                         type="button"
                         variant="outline"
@@ -642,9 +665,19 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                           : <WandSparkles className="mr-2 h-4 w-4" aria-hidden="true" />}
                         {generatingGuides
                           ? t("studentGuideGenerating")
-                          : t(editQuestions.some((question) => question.studentGuide) ? "studentGuideRegenerate" : "studentGuideGenerate")}
+                          : t(editLearningGuides || editQuestions.some((question) => question.studentGuide) ? "studentGuideRegenerate" : "studentGuideGenerate")}
                       </Button>
                     </div>
+                    <StudentLearningGuideEditor
+                      coreSentences={editCoreSentences}
+                      essentialQuestions={editEssentialQuestions}
+                      guides={editLearningGuides}
+                      onChange={setEditLearningGuides}
+                    />
+                    </div>
+
+                    {/* 탐구 질문 */}
+                    <Label>{t("inquiryQuestionsLabel")}</Label>
                     <div className="space-y-2">
                       {editQuestions.map((q, i) => (
                         <div
@@ -775,6 +808,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                         coreIdea: d.coreIdea,
                         coreSentences: d.coreSentences,
                         essentialQuestions: d.essentialQuestions,
+                        learningGuides: d.learningGuides,
                         inquiryQuestions: d.inquiryQuestions,
                       }}
                     />
