@@ -58,6 +58,15 @@ const statsBody = {
   recentQuestions: [],
   recentComments: [],
   recentPoints: [],
+  questionGames: {
+    totals: { plays: 0, points: 0, goodQuestions: 0 },
+    modes: {
+      solo: { plays: 0, points: 0, goodQuestions: 0 },
+      ai: { plays: 0, points: 0, goodQuestions: 0 },
+      friend: { plays: 0, points: 0, goodQuestions: 0 },
+    },
+    recent: [],
+  },
 };
 
 function response(body: unknown, ok = true) {

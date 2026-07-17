@@ -114,6 +114,34 @@ describe("useRoom sendAction", () => {
     unmount();
   });
 
+  it("이미 처리된 명령 응답을 화면 안내 상태로 전달한다", async () => {
+    const joinedRoom = makeRoom();
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      const body = requestBody(init);
+      if (body?.action === "join") return jsonResponse({ room: joinedRoom });
+      if (!init?.method) return jsonResponse({ room: joinedRoom });
+      return jsonResponse({
+        room: joinedRoom,
+        result: { replayed: true },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom());
+
+    await act(async () => {
+      await result.current.joinRoom("1234");
+      await result.current.sendAction("start");
+    });
+
+    expect(result.current.actionNotice).toEqual({ kind: "replayed", id: 1 });
+    act(() => result.current.clearActionNotice());
+    expect(result.current.actionNotice).toBeNull();
+    unmount();
+  });
+
   it("기대 방이 있지만 현재 방이 없으면 superseded를 반환한다", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

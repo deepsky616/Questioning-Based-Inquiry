@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
+  CheckCircle2,
   Home,
   KeyRound,
   Loader2,
@@ -12,11 +13,13 @@ import {
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RoomTurnNotice } from "@/components/question-games/RoomTurnNotice";
 import type {
   BuiltInGame,
   GameRoom,
   RoomActionHandler,
 } from "@/lib/question-games-data";
+import { activeQuestionGamePlayerIds } from "@/lib/question-game-turn";
 import RoomCompatibilityNotice, {
   shouldShowRoomCompatibilityNotice,
 } from "@/app/(student)/student-question-play/games/RoomCompatibilityNotice";
@@ -66,6 +69,7 @@ export function QuestionGameRoomFlow({
   const {
     room,
     error,
+    actionNotice,
     actionLoading,
     isRestoring,
     connectionState,
@@ -74,9 +78,45 @@ export function QuestionGameRoomFlow({
     sendAction,
     leaveRoom,
     refreshRoom,
+    clearActionNotice,
   } = useRoom(game.id);
   const [view, setView] = useState<"choice" | "join">("choice");
   const [joinCode, setJoinCode] = useState("");
+  const [showRecoveryNotice, setShowRecoveryNotice] = useState(false);
+  const previousConnectionStateRef = useRef(connectionState);
+  const previousRoomIdentityRef = useRef<string | null>(null);
+  const roomIdentity = room ? `${room.code}:${room.createdAt}` : null;
+
+  useEffect(() => {
+    if (previousRoomIdentityRef.current !== roomIdentity) {
+      previousRoomIdentityRef.current = roomIdentity;
+      previousConnectionStateRef.current = connectionState;
+      setShowRecoveryNotice(false);
+      return;
+    }
+
+    const previous = previousConnectionStateRef.current;
+    previousConnectionStateRef.current = connectionState;
+    if (
+      room &&
+      connectionState === "connected" &&
+      (previous === "delayed" || previous === "offline")
+    ) {
+      setShowRecoveryNotice(true);
+    }
+  }, [connectionState, room, roomIdentity]);
+
+  useEffect(() => {
+    if (!showRecoveryNotice) return;
+    const timer = window.setTimeout(() => setShowRecoveryNotice(false), 4_000);
+    return () => window.clearTimeout(timer);
+  }, [showRecoveryNotice]);
+
+  useEffect(() => {
+    if (!actionNotice) return;
+    const timer = window.setTimeout(() => clearActionNotice?.(), 5_000);
+    return () => window.clearTimeout(timer);
+  }, [actionNotice, clearActionNotice]);
 
   async function handleLeaveRoom() {
     if (!(await leaveRoom())) return;
@@ -128,6 +168,44 @@ export function QuestionGameRoomFlow({
     </div>
   ) : null;
 
+  const recoveryNotice = room && showRecoveryNotice ? (
+    <div
+      aria-live="polite"
+      className="flex items-center gap-3 rounded-lg border border-sky-300 bg-sky-50 px-4 py-3 text-sky-950 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-100"
+      role="status"
+    >
+      <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <p className="text-sm">{t("roomConnectionRecovered")}</p>
+    </div>
+  ) : null;
+
+  const replayNotice = room && actionNotice?.kind === "replayed" ? (
+    <div
+      aria-live="polite"
+      className="flex items-center gap-3 rounded-lg border border-border bg-secondary px-4 py-3 text-secondary-foreground"
+      role="status"
+    >
+      <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <p className="text-sm">{t("roomActionAlreadyProcessed")}</p>
+    </div>
+  ) : null;
+
+  const activePlayerIds = room ? activeQuestionGamePlayerIds(room) : [];
+  const isMyTurn = activePlayerIds.includes(myId);
+  const roomNotices = room && (
+    connectionNotice || recoveryNotice || replayNotice || isMyTurn
+  ) ? (
+    <div className="mb-4 space-y-2">
+      {connectionNotice}
+      {recoveryNotice}
+      {replayNotice}
+      <RoomTurnNotice
+        active={isMyTurn}
+        turnKey={`${roomIdentity}:${room.playId ?? "waiting"}:${myId}`}
+      />
+    </div>
+  ) : null;
+
   if (isRestoring) {
     return (
       <div
@@ -145,7 +223,7 @@ export function QuestionGameRoomFlow({
     if (room.status === "waiting") {
       return (
         <>
-          {connectionNotice}
+          {roomNotices}
           {errorAlert}
           <RoomLobby
             game={game}
@@ -165,7 +243,7 @@ export function QuestionGameRoomFlow({
     if (RoomComponent) {
       return (
         <>
-          {connectionNotice}
+          {roomNotices}
           {errorAlert}
           <RoomComponent
             game={game}
@@ -181,7 +259,7 @@ export function QuestionGameRoomFlow({
 
     return (
       <>
-        {connectionNotice}
+        {roomNotices}
         {errorAlert}
         <div className="mx-auto max-w-lg border-y border-border py-10 text-center text-foreground">
           <p className="font-semibold">{t("notFound")}</p>

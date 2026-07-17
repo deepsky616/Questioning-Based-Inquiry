@@ -18,6 +18,7 @@ import {
   submitQuestionGameRoomCode,
   type QuestionGameBrowserSession,
 } from "./helpers/question-game-room";
+import { getMysteryItem } from "../src/lib/mystery-box-rules";
 
 test.describe.configure({ mode: "serial" });
 
@@ -52,6 +53,287 @@ async function submitLadderQuestion(
   });
   await expect(confirm).toBeVisible();
   await confirm.click();
+}
+
+function sessionForPlayer(
+  sessions: readonly QuestionGameBrowserSession[],
+  playerId: string,
+) {
+  const session = sessions.find(({ identity }) => identity.id === playerId);
+  if (!session) throw new Error("현재 차례 학생 화면을 찾을 수 없습니다");
+  return session;
+}
+
+async function startFriendGame(
+  host: QuestionGameBrowserSession,
+  code: string,
+  transport: ReturnType<typeof createSharedQuestionGameTransport>,
+) {
+  await host.page.getByRole("button", { name: /게임 시작/ }).click();
+  await expect.poll(() => transport.getRoom(code)?.status).toBe("playing");
+}
+
+async function expectFriendCompletion(
+  sessions: readonly QuestionGameBrowserSession[],
+  code: string,
+  transport: ReturnType<typeof createSharedQuestionGameTransport>,
+) {
+  await expect.poll(() => transport.getRoom(code)?.status).toBe("ended");
+  for (const session of sessions) {
+    await expect(
+      session.page.getByRole("heading", { name: "나의 질문학습 결과" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect.poll(
+      () => transport.awardedPointsFor(session.identity.id),
+    ).toBeGreaterThan(0);
+    await expect(
+      session.page.getByText("받은 포인트", { exact: true }).locator(".."),
+    ).toContainText(String(transport.awardedPointsFor(session.identity.id)));
+    await expectNoHorizontalPageOverflow(session.page);
+  }
+}
+
+async function completeRelay(
+  sessions: readonly QuestionGameBrowserSession[],
+  code: string,
+  transport: ReturnType<typeof createSharedQuestionGameTransport>,
+) {
+  const host = sessions[0];
+  await startFriendGame(host, code, transport);
+  await host.page.locator("#relay-topic").fill("별과 우주");
+  await host.page.locator("#relay-topic").press("Enter");
+  await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("question");
+
+  let questionCount = 0;
+  while (transport.getRoom(code)?.status !== "ended") {
+    const state = transport.getRoom(code)?.gameState as {
+      turnOrder?: string[];
+      currentTurnIdx?: number;
+      questions?: unknown[];
+    };
+    const playerId = state.turnOrder?.[state.currentTurnIdx ?? -1] ?? "";
+    const page = sessionForPlayer(sessions, playerId).page;
+    const input = page.locator("#relay-question-input");
+    await expect(input).toBeEnabled();
+    questionCount += 1;
+    await input.fill(`별과 우주는 ${questionCount}번째로 어떻게 이어질까요?`);
+    await input.press("Enter");
+    await expect.poll(
+      () => (transport.getRoom(code)?.gameState.questions as unknown[] | undefined)?.length ?? 0,
+    ).toBe(questionCount);
+  }
+}
+
+async function completeDice(
+  sessions: readonly QuestionGameBrowserSession[],
+  code: string,
+  transport: ReturnType<typeof createSharedQuestionGameTransport>,
+) {
+  await startFriendGame(sessions[0], code, transport);
+  let questionCount = 0;
+  while (transport.getRoom(code)?.status !== "ended") {
+    const state = transport.getRoom(code)?.gameState as {
+      phase?: string;
+      turnOrder?: string[];
+      currentTurnIdx?: number;
+      questions?: unknown[];
+    };
+    const playerId = state.turnOrder?.[state.currentTurnIdx ?? -1] ?? "";
+    const page = sessionForPlayer(sessions, playerId).page;
+    if (state.phase === "roll") {
+      const roll = page.getByRole("button", { name: "주사위 굴리기", exact: true });
+      await expect(roll).toBeEnabled();
+      await roll.click();
+      await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("question");
+      continue;
+    }
+    const input = page.locator("#dice-question-input");
+    await expect(input).toBeEnabled();
+    questionCount += 1;
+    await input.fill(`이 주제를 ${questionCount}번째로 어떻게 탐구할까요?`);
+    await input.press("Enter");
+    await expect.poll(
+      () => (transport.getRoom(code)?.gameState.questions as unknown[] | undefined)?.length ?? 0,
+    ).toBe(questionCount);
+  }
+}
+
+async function completeStoryDice(
+  sessions: readonly QuestionGameBrowserSession[],
+  code: string,
+  transport: ReturnType<typeof createSharedQuestionGameTransport>,
+) {
+  const host = sessions[0];
+  await startFriendGame(host, code, transport);
+  await host.page.getByRole("button", { name: "이야기 준비하기", exact: true }).click();
+  await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("roll");
+  await host.page.getByRole("button", { name: "이야기 주사위 굴리기", exact: true }).click();
+  await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("story");
+  await host.page.locator("#story-turn-input").fill("별을 찾아 우주로 떠나는 이야기를 만들었어요.");
+  await host.page.locator("#story-turn-input").press("Enter");
+
+  let pairCount = 0;
+  while (transport.getRoom(code)?.status !== "ended") {
+    const state = transport.getRoom(code)?.gameState as {
+      phase?: string;
+      taggerId?: string;
+      turnOrder?: string[];
+      currentTurnIdx?: number;
+      pairs?: unknown[];
+    };
+    const playerId = state.phase === "question"
+      ? state.turnOrder?.[state.currentTurnIdx ?? -1]
+      : state.taggerId;
+    const page = sessionForPlayer(sessions, playerId ?? "").page;
+    const input = page.locator("#story-turn-input");
+    await expect(input).toBeEnabled();
+    if (state.phase === "question") {
+      await input.fill(`이 이야기에서 ${pairCount + 1}번째로 가장 궁금한 점은 무엇일까요?`);
+      await input.press("Enter");
+      await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("answer");
+    } else {
+      await input.fill(`${pairCount + 1}번째 궁금증은 새로운 별을 찾는 과정과 이어집니다.`);
+      await input.press("Enter");
+      pairCount += 1;
+      await expect.poll(
+        () => (transport.getRoom(code)?.gameState.pairs as unknown[] | undefined)?.length ?? 0,
+      ).toBe(pairCount);
+    }
+  }
+}
+
+async function completeKaba(
+  sessions: readonly QuestionGameBrowserSession[],
+  code: string,
+  transport: ReturnType<typeof createSharedQuestionGameTransport>,
+) {
+  const host = sessions[0];
+  await startFriendGame(host, code, transport);
+  await host.page.getByRole("button", { name: "문장 준비하기", exact: true }).click();
+  await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("question");
+
+  let attemptCount = 0;
+  while (transport.getRoom(code)?.status !== "ended") {
+    const state = transport.getRoom(code)?.gameState as {
+      turnOrder?: string[];
+      currentTurnIdx?: number;
+      attempts?: unknown[];
+    };
+    const playerId = state.turnOrder?.[state.currentTurnIdx ?? -1] ?? "";
+    const input = sessionForPlayer(sessions, playerId).page.locator("#kaba-question-input");
+    await expect(input).toBeEnabled();
+    attemptCount += 1;
+    await input.fill(`이 문장의 뜻을 ${attemptCount}번째로 어떻게 물어볼까요?`);
+    await input.press("Enter");
+    await expect.poll(
+      () => (transport.getRoom(code)?.gameState.attempts as unknown[] | undefined)?.length ?? 0,
+    ).toBe(attemptCount);
+  }
+}
+
+async function completeMystery(
+  sessions: readonly QuestionGameBrowserSession[],
+  code: string,
+  transport: ReturnType<typeof createSharedQuestionGameTransport>,
+) {
+  const host = sessions[0];
+  await startFriendGame(host, code, transport);
+  await host.page.getByRole("button", { name: "미스터리 상자 시작", exact: true }).click();
+  await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("play");
+  const state = transport.getRoom(code)?.gameState as {
+    private?: { itemId?: string };
+    turnOrder?: string[];
+    currentTurnIdx?: number;
+  };
+  const item = state.private?.itemId ? getMysteryItem(state.private.itemId) : null;
+  expect(item).not.toBeNull();
+  const playerId = state.turnOrder?.[state.currentTurnIdx ?? -1] ?? "";
+  const page = sessionForPlayer(sessions, playerId).page;
+  await page.locator("#room-mystery-guess").fill(item!.names.ko);
+  await page.getByRole("button", { name: "추측 보내기", exact: true }).click();
+}
+
+async function completeMemory(
+  sessions: readonly QuestionGameBrowserSession[],
+  code: string,
+  transport: ReturnType<typeof createSharedQuestionGameTransport>,
+) {
+  const host = sessions[0];
+  const friend = sessions[1];
+  await startFriendGame(host, code, transport);
+  await host.page.getByRole("button", { name: /쉬움/ }).click();
+  await host.page.getByRole("button", { name: /주사위 굴리기/ }).click();
+  await expect(friend.page.getByRole("button", { name: /주사위 굴리기/ })).toBeEnabled();
+  await friend.page.getByRole("button", { name: /주사위 굴리기/ }).click();
+  await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("play");
+
+  while (transport.getRoom(code)?.status !== "ended") {
+    const state = transport.getRoom(code)?.gameState as {
+      turnOrder?: string[];
+      currentTurnIdx?: number;
+      qCards?: Array<{ id: string; pairId: string }>;
+      aCards?: Array<{ id: string; pairId: string }>;
+      takenIds?: string[];
+    };
+    const playerId = state.turnOrder?.[state.currentTurnIdx ?? -1] ?? "";
+    const page = sessionForPlayer(sessions, playerId).page;
+    const taken = new Set(state.takenIds ?? []);
+    const questionIndex = state.qCards?.findIndex(({ id }) => !taken.has(id)) ?? -1;
+    const questionCard = state.qCards?.[questionIndex];
+    const answerIndex = state.aCards?.findIndex(
+      ({ id, pairId }) => !taken.has(id) && pairId === questionCard?.pairId,
+    ) ?? -1;
+    expect(questionIndex).toBeGreaterThanOrEqual(0);
+    expect(answerIndex).toBeGreaterThanOrEqual(0);
+    await page.getByRole("button", { name: `질문 카드 ${questionIndex + 1}` }).click();
+    await expect.poll(
+      () => (transport.getRoom(code)?.gameState.revealedIds as unknown[] | undefined)?.length ?? 0,
+    ).toBe(1);
+    await page.getByRole("button", { name: `대답 카드 ${answerIndex + 1}` }).click();
+    await expect.poll(
+      () => (transport.getRoom(code)?.gameState.takenIds as unknown[] | undefined)?.length ?? 0,
+    ).toBe(taken.size + 2);
+  }
+}
+
+const FULL_COMPLETION_CASES = [
+  { id: "relay", title: "질문 릴레이", complete: completeRelay },
+  { id: "dice", title: "질문 주사위", complete: completeDice },
+  { id: "story-dice", title: "이야기 주사위", complete: completeStoryDice },
+  { id: "kaba", title: "까바놀이", complete: completeKaba },
+  { id: "mystery-box", title: "미스터리 박스", complete: completeMystery },
+  { id: "memory", title: "질문-대답 짝 찾기", complete: completeMemory },
+] as const;
+
+for (const completionCase of FULL_COMPLETION_CASES) {
+  test(`${completionCase.title}를 두 학생이 끝내고 각자 포인트를 받는다`, async ({ browser }) => {
+    test.slow();
+    const fixture = createQuestionGameBrowserFixture(`complete-${completionCase.id}`);
+    const transport = createSharedQuestionGameTransport();
+    const sessions: QuestionGameBrowserSession[] = [];
+
+    try {
+      const host = await openStudentRoom(
+        browser,
+        fixture.students[0],
+        completionCase.id,
+        transport,
+      );
+      const friend = await joinStudentRoom(
+        browser,
+        fixture.students[1],
+        completionCase.id,
+        host.code,
+        transport,
+      );
+      sessions.push(host, friend);
+      await completionCase.complete(sessions, host.code, transport);
+      await expectFriendCompletion(sessions, host.code, transport);
+    } finally {
+      await closeQuestionGameSessions(sessions);
+      await transport.dispose();
+    }
+  });
 }
 
 test("두 명 전에는 시작할 수 없고 두 명이면 시작한다", async ({ browser }) => {
@@ -411,6 +693,35 @@ test("사다리 실제 경로를 따라 세 라운드 뒤 자동 종료한다", 
     await expect(host.page.getByRole("heading", { name: "나의 질문학습 결과" })).toBeVisible();
     await expect(friend.page.getByRole("heading", { name: "나의 질문학습 결과" })).toBeVisible();
     await expect(friend.page.getByText("친구와 함께", { exact: true })).toBeVisible();
+    await expect.poll(() => transport.awardedPointsFor(host.identity.id)).toBeGreaterThan(0);
+    await expect.poll(() => transport.awardedPointsFor(friend.identity.id)).toBeGreaterThan(0);
+    await expect(
+      host.page.getByText("받은 포인트", { exact: true }).locator(".."),
+    ).toContainText(String(transport.awardedPointsFor(host.identity.id)));
+    await expect(
+      friend.page.getByText("받은 포인트", { exact: true }).locator(".."),
+    ).toContainText(String(transport.awardedPointsFor(friend.identity.id)));
+    const pointsBeforeRetry = transport.awardedPointsFor(host.identity.id);
+    const endedRoom = transport.getRoom(host.code)!;
+    const retryStatus = await host.page.evaluate(async (identity) => {
+      const response = await fetch("/api/points/award", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(identity),
+      });
+      return response.status;
+    }, {
+      gameId: endedRoom.gameId,
+      roomCode: endedRoom.code,
+      roomCreatedAt: endedRoom.createdAt,
+      playId: endedRoom.playId,
+    });
+    expect(retryStatus).toBe(200);
+    expect(transport.awardedPointsFor(host.identity.id)).toBe(pointsBeforeRetry);
+    expect(
+      transport.awardRequestsFor(host.identity.id) +
+      transport.awardRequestsFor(friend.identity.id),
+    ).toBeGreaterThanOrEqual(2);
     await expectNoHorizontalPageOverflow(host.page);
     await expectNoHorizontalPageOverflow(friend.page);
     await expect.poll(() => transport.getRoom(host.code)?.status).toBe("ended");

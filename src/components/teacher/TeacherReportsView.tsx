@@ -8,6 +8,8 @@ import { ReportPrintDoc, type PrintReportItem } from "@/components/reports/Repor
 import { ReportPrintControls } from "@/components/teacher/ReportPrintControls";
 import { useTranslations } from "next-intl";
 import { visibleReportRefetchInterval } from "@/lib/query-refresh";
+import { QuestionGameLearningHistory } from "@/components/question-games/QuestionGameLearningHistory";
+import type { QuestionGameLearningHistory as QuestionGameHistory } from "@/lib/question-game-history";
 
 interface ClassItem { grade: string; className: string; studentCount: number }
 interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
@@ -18,6 +20,7 @@ interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitl
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession" | "perStudent"> {
   student: { id?: string; name: string; grade?: string | null; className?: string | null; studentNumber?: string | null; school?: string | null };
   sessions?: SessionMeta[];
+  questionGames: QuestionGameHistory;
 }
 
 // 학급 세션 분석: 기존 세션 분석(전체 학생) 엔드포인트 재사용
@@ -472,25 +475,28 @@ export function TeacherReportsView() {
 
       {/* 학생별 보기 */}
       {!loading && view === "student" && studentReport && (
-        <ReportView
-          scope="student"
-          title={t("studentReportTitle", { name: studentReport.student.name })}
-          subtitle={currentStudent?.studentNumber ? t("studentReportSubtitle", { number: currentStudent.studentNumber }) : undefined}
-          totals={studentReport.totals}
-          weekly={studentReport.weekly}
-          monthly={studentReport.monthly}
-          classification={studentReport.classification}
-          sessions={studentReport.sessions}
-          analyzeSession={analyzeStudentSessionFor(studentId, t("analysisFailed"))}
-          analysisCacheKey={`teacher-student:${studentId}`}
-          onSaveAnalysis={(id, result) => saveSessionAnalysis({ sessionId: id, scope: "student", studentId, result }, t("analysisFailed"))}
-          bulkAnalyze={report ? bulkAnalyzeClass(report.klass.grade, report.klass.className, t("analysisFailed")) : undefined}
-          bulkSessions={report?.sessions}
-          onBulkComplete={refreshStudentReport}
-          showPrintButton={false}
-          participationLabel={t("participationStudent")}
-          receptionLabel={t("receptionStudent")}
-        />
+        <div className="space-y-5">
+          <QuestionGameLearningHistory audience="teacher" history={studentReport.questionGames} />
+          <ReportView
+            scope="student"
+            title={t("studentReportTitle", { name: studentReport.student.name })}
+            subtitle={currentStudent?.studentNumber ? t("studentReportSubtitle", { number: currentStudent.studentNumber }) : undefined}
+            totals={studentReport.totals}
+            weekly={studentReport.weekly}
+            monthly={studentReport.monthly}
+            classification={studentReport.classification}
+            sessions={studentReport.sessions}
+            analyzeSession={analyzeStudentSessionFor(studentId, t("analysisFailed"))}
+            analysisCacheKey={`teacher-student:${studentId}`}
+            onSaveAnalysis={(id, result) => saveSessionAnalysis({ sessionId: id, scope: "student", studentId, result }, t("analysisFailed"))}
+            bulkAnalyze={report ? bulkAnalyzeClass(report.klass.grade, report.klass.className, t("analysisFailed")) : undefined}
+            bulkSessions={report?.sessions}
+            onBulkComplete={refreshStudentReport}
+            showPrintButton={false}
+            participationLabel={t("participationStudent")}
+            receptionLabel={t("receptionStudent")}
+          />
+        </div>
       )}
 
       {/* 인쇄 전용 문서(화면엔 숨김, print-doc-mode 인쇄 시에만 출력) */}

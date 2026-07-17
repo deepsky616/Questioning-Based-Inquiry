@@ -6,10 +6,13 @@ import { useTranslations } from "next-intl";
 import { ReportView, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 import { formatClock } from "@/lib/datetime";
 import { visibleReportRefetchInterval } from "@/lib/query-refresh";
+import { QuestionGameLearningHistory } from "@/components/question-games/QuestionGameLearningHistory";
+import type { QuestionGameLearningHistory as QuestionGameHistory } from "@/lib/question-game-history";
 
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
   student: { name: string; grade?: string | null; className?: string | null; studentNumber?: string | null };
   sessions?: SessionMeta[];
+  questionGames: QuestionGameHistory;
 }
 
 async function analyzeStudentSession(sessionId: string, failMsg: string): Promise<SessionAnalysisResult | null> {
@@ -70,6 +73,7 @@ export function StudentReportView() {
           {isFetching ? t("refreshingReport") : t("refreshReport")}
         </button>
       </div>
+      <QuestionGameLearningHistory audience="student" history={data.questionGames} />
       <ReportView
         scope="student"
         title={t("studentReportTitle", { name: s.name })}

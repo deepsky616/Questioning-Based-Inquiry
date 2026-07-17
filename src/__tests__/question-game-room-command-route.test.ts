@@ -1142,7 +1142,10 @@ describe("등록된 놀이의 옛 방 전환", () => {
     }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ room });
+    await expect(response.json()).resolves.toEqual({
+      room,
+      result: { replayed: true },
+    });
     expect(mocks.restartQuestionGameRoom).toHaveBeenCalledWith(room);
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
@@ -1164,7 +1167,10 @@ describe("등록된 놀이의 옛 방 전환", () => {
     const response = await patch(commandBody({ action: "restart" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ room: latest });
+    await expect(response.json()).resolves.toEqual({
+      room: latest,
+      result: { replayed: true },
+    });
     expect(mocks.restartQuestionGameRoom).toHaveBeenCalledTimes(2);
     expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
   });

@@ -19,6 +19,9 @@ import {
   getQuestionGameRule,
   isBuiltInQuestionGameId,
 } from "../../src/lib/question-game-rules";
+import { buildQuestionGameScoreEvidence } from "../../src/lib/question-game-score-evidence";
+import { BASE_POINTS, SYSTEM_BONUS } from "../../src/lib/points-policy";
+import type { GameAwardResult } from "../../src/lib/game-award-result";
 import type {
   GameRoom,
   RoomCommandResult,
@@ -26,7 +29,7 @@ import type {
 } from "../../src/lib/question-games-data";
 import { createBrowserQuestionGameRunStore } from "./question-game-run";
 
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const SESSION_COOKIE = "authjs.session-token";
 const SESSION_MAX_AGE_SECONDS = 60 * 60;
 const ROOM_PATH = /^\/api\/question-games\/rooms(?:\/([0-9]{4}))?\/?$/;
@@ -76,6 +79,8 @@ export interface SharedQuestionGameTransport {
   ) => Promise<void>;
   getRoom: (code: string) => GameRoom | null;
   roomCodeForHost: (hostId: string) => string | null;
+  awardedPointsFor: (studentId: string) => number;
+  awardRequestsFor: (studentId: string) => number;
   dispose: () => Promise<void>;
 }
 
@@ -234,7 +239,11 @@ function deterministicMemoryPairs(count: number) {
   }));
 }
 
-async function installAuxiliaryRoutes(context: BrowserContext) {
+async function installAuxiliaryRoutes(
+  context: BrowserContext,
+  identity: QuestionGameBrowserIdentity,
+  award: (identity: QuestionGameBrowserIdentity, body: Record<string, unknown>) => TransportResponse,
+) {
   await context.route("**/api/notifications**", async (route) => {
     await fulfill(route, {
       status: 200,
@@ -283,16 +292,17 @@ async function installAuxiliaryRoutes(context: BrowserContext) {
     });
   });
   await context.route("**/api/points/award", async (route) => {
-    await fulfill(route, {
-      status: 409,
-      body: { error: "브라우저 시험에서는 점수를 저장하지 않습니다" },
-    });
+    await fulfill(route, award(identity, requestBody(route)));
   });
 }
 
 export function createSharedQuestionGameTransport(): SharedQuestionGameTransport {
   const rooms = new Map<string, GameRoom>();
   const runs = createBrowserQuestionGameRunStore();
+  const identities = new Map<string, QuestionGameBrowserIdentity>();
+  const awardResults = new Map<string, GameAwardResult>();
+  const awardedPoints = new Map<string, number>();
+  const awardRequests = new Map<string, number>();
   let nextCode = 1000;
   let nextUuid = 1;
   let clock = 1_900_000_000_000;
@@ -322,6 +332,82 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
     };
     rooms.set(saved.code, saved);
     return saved;
+  };
+
+  const awardKey = (room: GameRoom) =>
+    `${room.gameId}:${room.code}:${room.createdAt}:${room.playId ?? "legacy"}`;
+
+  const buildBrowserAwardResult = (room: GameRoom): GameAwardResult => {
+    const studentIds = new Set(
+      (room.pointParticipants ?? room.players)
+        .map(({ id }) => identities.get(id))
+        .filter((identity): identity is QuestionGameBrowserIdentity =>
+          identity?.role === "STUDENT"
+        )
+        .map(({ id }) => id),
+    );
+    const contributions = buildQuestionGameScoreEvidence(room, studentIds);
+    const awards = contributions.flatMap((contribution) => [
+      {
+        studentId: contribution.studentId,
+        bonusType: SYSTEM_BONUS.PARTICIPATION,
+        points: BASE_POINTS.PARTICIPATION,
+        reason: "게임 참여",
+      },
+      ...(contribution.validQuestions > 0 ? [{
+        studentId: contribution.studentId,
+        bonusType: SYSTEM_BONUS.VALID_QUESTIONS,
+        points: contribution.validQuestions * BASE_POINTS.PER_VALID_QUESTION,
+        reason: `유효 질문 ${contribution.validQuestions}개`,
+      }] : []),
+      {
+        studentId: contribution.studentId,
+        bonusType: SYSTEM_BONUS.COMPLETION,
+        points: BASE_POINTS.COMPLETION,
+        reason: "게임 완료",
+      },
+      ...(contribution.isWinner ? [{
+        studentId: contribution.studentId,
+        bonusType: SYSTEM_BONUS.WINNER,
+        points: BASE_POINTS.WINNER_BONUS,
+        reason: "우승",
+      }] : []),
+    ]);
+    return { awards, summary: "브라우저 시험 지급 결과" };
+  };
+
+  const awardRoom = (
+    identity: QuestionGameBrowserIdentity,
+    body: Record<string, unknown>,
+  ): TransportResponse => {
+    awardRequests.set(identity.id, (awardRequests.get(identity.id) ?? 0) + 1);
+    const code = typeof body.roomCode === "string" ? body.roomCode : "";
+    const room = rooms.get(code);
+    if (
+      !room ||
+      room.status !== "ended" ||
+      room.createdAt !== body.roomCreatedAt ||
+      room.playId !== body.playId ||
+      !room.players.some(({ id }) => id === identity.id)
+    ) {
+      return { status: 409, body: { error: "완료한 방을 확인할 수 없습니다" } };
+    }
+    const key = awardKey(room);
+    const previous = awardResults.get(key);
+    const result = previous ?? buildBrowserAwardResult(room);
+    if (!previous) {
+      awardResults.set(key, result);
+      for (const item of result.awards) {
+        awardedPoints.set(
+          item.studentId,
+          (awardedPoints.get(item.studentId) ?? 0) + item.points,
+        );
+      }
+    }
+    return {
+      status: 200,
+      body: { ...result, alreadyAwarded: previous !== undefined },
+    };
   };
 
   const createRoom = (
@@ -451,10 +537,11 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
     }
     if (action === "leave") return leaveRoom(room, identity);
     if (action === "publish-award-result") {
-      return {
-        status: 409,
-        body: { error: "브라우저 시험에서는 점수를 공개하지 않습니다" },
-      };
+      const result = awardResults.get(awardKey(room));
+      if (!result || body.playId !== room.playId) {
+        return { status: 409, body: { error: "지급 결과를 확인할 수 없습니다" } };
+      }
+      return resultResponse(save({ ...room, awardResult: result }));
     }
     if (action === "restart") {
       if (room.hostId !== identity.id) {
@@ -578,7 +665,8 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
 
   return {
     async install(context, identity) {
-      await installAuxiliaryRoutes(context);
+      identities.set(identity.id, identity);
+      await installAuxiliaryRoutes(context, identity, awardRoom);
       await context.route("**/api/question-games/runs**", async (route) => {
         const request = route.request();
         const url = new URL(request.url());
@@ -601,11 +689,21 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
     roomCodeForHost(hostId) {
       return [...rooms.values()].find((room) => room.hostId === hostId)?.code ?? null;
     },
+    awardedPointsFor(studentId) {
+      return awardedPoints.get(studentId) ?? 0;
+    },
+    awardRequestsFor(studentId) {
+      return awardRequests.get(studentId) ?? 0;
+    },
     async dispose() {
       disposed = true;
       await serial;
       rooms.clear();
       runs.clear();
+      identities.clear();
+      awardResults.clear();
+      awardedPoints.clear();
+      awardRequests.clear();
     },
   };
 }

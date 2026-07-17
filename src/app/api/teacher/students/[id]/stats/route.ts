@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
 import { normalizePointReasonForDisplay } from "@/lib/point-reason-label";
+import { countDistinctQuestionGamePlays } from "@/lib/question-game-history";
+import { loadQuestionGameLearningHistory } from "@/lib/question-game-history-service";
 import {
   isStudentInTeacherScope,
   loadTeacherStudentScope,
@@ -104,8 +106,8 @@ export async function GET(
     select: { relatedQuestionId: true },
   });
   const goodQuestions = new Set(approvedQ.map((p) => p.relatedQuestionId)).size;
-  // 질문놀이 참여 횟수: 멀티(PARTICIPATION) + 솔로/AI(ACTIVITY_SOLO·ACTIVITY_AI) 1판당 1건
-  const gamePlays = await prisma.pointLog.count({
+  // 같은 친구 방의 참여와 하루 상한 표지는 하나의 실행으로 묶는다.
+  const gamePlayLogs = await prisma.pointLog.findMany({
     where: {
       studentId,
       status: "APPROVED",
@@ -116,11 +118,20 @@ export async function GET(
         { gameId: "ACTIVITY_AI" },
       ],
     },
+    select: {
+      id: true,
+      bonusType: true,
+      gameId: true,
+      roomCode: true,
+      gameRunId: true,
+    },
   });
+  const gamePlays = countDistinctQuestionGamePlays(gamePlayLogs);
   // 질문 분류 분포(분류1 닫힌/열린, 분류2 사실/개념/논쟁)
   const classification = summarizeQuestionTypes(
     questions.map((q) => ({ closure: q.closure ?? "", cognitive: q.cognitive ?? "" })),
   );
+  const questionGames = await loadQuestionGameLearningHistory(studentId);
 
   return NextResponse.json({
     student: {
@@ -138,6 +149,7 @@ export async function GET(
       gamePlays,
     },
     classification,
+    questionGames,
     events,
     recentQuestions: questions.slice(0, 10),
     recentComments: comments.slice(0, 10),

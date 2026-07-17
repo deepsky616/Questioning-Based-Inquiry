@@ -112,6 +112,7 @@ function removeRoomMarker(gameId: string) {
 interface UseRoomResult {
   room: GameRoom | null;
   error: string | null;
+  actionNotice: RoomActionNotice | null;
   actionLoading: boolean;
   isRestoring: boolean;
   connectionState: RoomConnectionState;
@@ -121,6 +122,12 @@ interface UseRoomResult {
   leaveRoom: () => Promise<boolean>;
   setActiveCode: (code: string | null) => void;
   refreshRoom: () => void;
+  clearActionNotice: () => void;
+}
+
+export interface RoomActionNotice {
+  kind: "replayed";
+  id: number;
 }
 
 export type RoomConnectionState =
@@ -132,6 +139,7 @@ export type RoomConnectionState =
 export function useRoom(gameId?: string): UseRoomResult {
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<RoomActionNotice | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [connectionState, setConnectionState] =
@@ -146,6 +154,11 @@ export function useRoom(gameId?: string): UseRoomResult {
   const pendingActionCountRef = useRef(0);
   const pollFailureCountRef = useRef(0);
   const refreshRoomRef = useRef<() => void>(() => {});
+  const actionNoticeIdRef = useRef(0);
+
+  const clearActionNotice = useCallback(() => {
+    setActionNotice(null);
+  }, []);
 
   const advanceRoomGeneration = useCallback(() => {
     roomGenerationRef.current += 1;
@@ -181,6 +194,7 @@ export function useRoom(gameId?: string): UseRoomResult {
     roomRef.current = null;
     setActiveCodeState(null);
     setRoom(null);
+    setActionNotice(null);
     pollFailureCountRef.current = 0;
     setConnectionState("connecting");
     clearRoomMarker();
@@ -192,6 +206,7 @@ export function useRoom(gameId?: string): UseRoomResult {
     roomRef.current = nextRoom;
     setActiveCodeState(nextRoom.code);
     setRoom(nextRoom);
+    setActionNotice(null);
     pollFailureCountRef.current = 0;
     setConnectionState("connected");
     if (gameId) writeRoomMarker(gameId, nextRoom);
@@ -598,6 +613,7 @@ export function useRoom(gameId?: string): UseRoomResult {
       const generation = roomGenerationRef.current;
       beginAction();
       setError(null);
+      setActionNotice(null);
       try {
         const isLegacyMemoryRoll =
           action === "memory-roll" && currentRoom.gameState.stateVersion !== 2;
@@ -697,6 +713,13 @@ export function useRoom(gameId?: string): UseRoomResult {
           };
         }
         const result = readRoomCommandResult(data.result);
+        if (result?.replayed === true) {
+          actionNoticeIdRef.current += 1;
+          setActionNotice({
+            kind: "replayed",
+            id: actionNoticeIdRef.current,
+          });
+        }
         return {
           ok: true,
           room: outcome.room ?? data.room,
@@ -812,6 +835,7 @@ export function useRoom(gameId?: string): UseRoomResult {
   return {
     room,
     error,
+    actionNotice,
     actionLoading,
     isRestoring,
     connectionState,
@@ -821,5 +845,6 @@ export function useRoom(gameId?: string): UseRoomResult {
     leaveRoom,
     setActiveCode,
     refreshRoom,
+    clearActionNotice,
   };
 }

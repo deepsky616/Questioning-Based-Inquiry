@@ -169,6 +169,16 @@ function commandSuccess(
   });
 }
 
+function replayedCommandSuccess(
+  room: GameRoom,
+  result: unknown,
+) {
+  return commandSuccess(room, {
+    ...(readRoomCommandResult(result) ?? {}),
+    replayed: true,
+  });
+}
+
 function isCompletedVersion2Room(room: GameRoom) {
   return isCompletedVersion2QuestionGameRoom(room);
 }
@@ -299,7 +309,7 @@ async function handleQuestionGameCommand({
     );
   }
   if (result.kind === "replayed") {
-    return commandSuccess(result.room, result.result);
+    return replayedCommandSuccess(result.room, result.result);
   }
   if (result.kind === "resolution-required") {
     const request = findMysteryAiAnswerRequest(result, userId);
@@ -337,7 +347,7 @@ async function handleQuestionGameCommand({
       );
     }
     if (result.kind === "replayed") {
-      return commandSuccess(result.room, result.result);
+      return replayedCommandSuccess(result.room, result.result);
     }
   }
   if (result.kind !== "changed") return questionGameFailure(result, userId);
@@ -355,7 +365,7 @@ async function handleQuestionGameCommand({
   try {
     const replay = applyCommand(saved.room, mysteryAnswerResolution);
     if (replay.kind === "replayed") {
-      return commandSuccess(replay.room, replay.result);
+      return replayedCommandSuccess(replay.room, replay.result);
     }
   } catch {
     return NextResponse.json(
@@ -493,7 +503,7 @@ async function restartManagedRoom(
     ? restartQuestionGameRoom(room, { pointAwardSettled: true })
     : restartQuestionGameRoom(room);
   if (result.kind === "replayed") {
-    return commandSuccess(result.room, result.result);
+    return replayedCommandSuccess(result.room, result.result);
   }
   if (result.kind !== "changed") return questionGameFailure(result, userId);
   if (!isValidExpectedVersion(body.expectedVersion)) {
@@ -517,7 +527,7 @@ async function restartManagedRoom(
     ? restartQuestionGameRoom(saved.room, { pointAwardSettled: true })
     : restartQuestionGameRoom(saved.room);
   return replay.kind === "replayed"
-    ? commandSuccess(replay.room, replay.result)
+    ? replayedCommandSuccess(replay.room, replay.result)
     : roomConflict(saved.room);
 }
 

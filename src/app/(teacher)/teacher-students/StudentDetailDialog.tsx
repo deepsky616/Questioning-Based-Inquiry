@@ -20,6 +20,8 @@ import Link from "next/link";
 import { buildTeacherClassLabel } from "@/lib/teacher";
 import type { Student } from "./types";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
+import { QuestionGameLearningHistory } from "@/components/question-games/QuestionGameLearningHistory";
+import type { QuestionGameLearningHistory as QuestionGameHistory } from "@/lib/question-game-history";
 
 interface RawEvent { type: "question" | "comment" | "point"; createdAt: string; weight: number }
 interface PointLogItem { id: string; createdAt: string; points: number; gameId: string; bonusType: string; reason: string }
@@ -44,6 +46,7 @@ interface StudentStats {
   recentQuestions: QuestionItem[];
   recentComments: CommentItem[];
   recentPoints: PointLogItem[];
+  questionGames: QuestionGameHistory;
 }
 
 
@@ -426,6 +429,10 @@ export function StudentDetailDialog({
             <p className="text-2xl font-black text-teal-600">{stats?.student.gamePlays ?? "-"}</p>
           </div>
         </div>
+
+        {stats && (
+          <QuestionGameLearningHistory audience="teacher" history={stats.questionGames} />
+        )}
 
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-950/30">
           <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-200">{t("sessionProgressTitle")}</p>

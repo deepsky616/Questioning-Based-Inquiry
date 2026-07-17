@@ -143,4 +143,117 @@ describe("질문놀이 방 복원 화면", () => {
     screen.getByRole("button", { name: "지금 다시 확인" }).click();
     expect(refreshRoom).toHaveBeenCalledOnce();
   });
+
+  it("연결이 돌아오면 최신 차례로 맞춘 사실을 알린다", async () => {
+    const activeRoom = {
+      code: "1234",
+      gameId: "relay",
+      hostId: "student-1",
+      status: "waiting" as const,
+      players: [{
+        id: "student-1",
+        name: "학생",
+        isHost: true,
+        joinedAt: 1,
+      }],
+      topic: "",
+      chain: [],
+      turnIndex: 0,
+      gameState: {},
+      version: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const shared = {
+      room: activeRoom,
+      error: null,
+      actionNotice: null,
+      actionLoading: false,
+      isRestoring: false,
+      createRoom: vi.fn(),
+      joinRoom: vi.fn(),
+      sendAction: vi.fn(),
+      leaveRoom: vi.fn(),
+      setActiveCode: vi.fn(),
+      refreshRoom: vi.fn(),
+      clearActionNotice: vi.fn(),
+    };
+    roomHook.useRoom.mockReturnValue({
+      ...shared,
+      connectionState: "delayed",
+    });
+    const view = render(
+      <QuestionGameRoomFlow
+        game={game}
+        myId="student-1"
+        allowJoin
+        onExit={vi.fn()}
+      />,
+    );
+
+    roomHook.useRoom.mockReturnValue({
+      ...shared,
+      connectionState: "connected",
+    });
+    view.rerender(
+      <QuestionGameRoomFlow
+        game={game}
+        myId="student-1"
+        allowJoin
+        onExit={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText("방 연결이 복구되어 최신 차례로 맞췄어요."))
+      .toBeInTheDocument();
+  });
+
+  it("같은 요청이 이미 처리된 경우 저장된 결과를 쓰고 있음을 알린다", () => {
+    roomHook.useRoom.mockReturnValue({
+      room: {
+        code: "1234",
+        gameId: "relay",
+        hostId: "student-1",
+        status: "waiting",
+        players: [{
+          id: "student-1",
+          name: "학생",
+          isHost: true,
+          joinedAt: 1,
+        }],
+        topic: "",
+        chain: [],
+        turnIndex: 0,
+        gameState: {},
+        version: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      error: null,
+      actionNotice: { kind: "replayed", id: 1 },
+      actionLoading: false,
+      isRestoring: false,
+      connectionState: "connected",
+      createRoom: vi.fn(),
+      joinRoom: vi.fn(),
+      sendAction: vi.fn(),
+      leaveRoom: vi.fn(),
+      setActiveCode: vi.fn(),
+      refreshRoom: vi.fn(),
+      clearActionNotice: vi.fn(),
+    });
+
+    render(
+      <QuestionGameRoomFlow
+        game={game}
+        myId="student-1"
+        allowJoin
+        onExit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(
+      "이미 처리된 활동이에요. 저장된 최신 결과를 보여 줍니다.",
+    )).toBeInTheDocument();
+  });
 });

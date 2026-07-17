@@ -3,6 +3,9 @@ import { NextRequest } from "next/server";
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/student-report", () => ({ buildStudentReport: vi.fn() }));
+vi.mock("@/lib/question-game-history-service", () => ({
+  loadQuestionGameLearningHistory: vi.fn(),
+}));
 vi.mock("@/lib/db", () => ({
   prisma: {
     user: {
@@ -16,11 +19,13 @@ import { GET } from "@/app/api/reports/student/route";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildStudentReport } from "@/lib/student-report";
+import { loadQuestionGameLearningHistory } from "@/lib/question-game-history-service";
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockUserFindFirst = prisma.user.findFirst as ReturnType<typeof vi.fn>;
 const mockBuildStudentReport = buildStudentReport as ReturnType<typeof vi.fn>;
+const mockGameHistory = loadQuestionGameLearningHistory as ReturnType<typeof vi.fn>;
 
 type TeacherRecord = {
   role: "TEACHER";
@@ -81,6 +86,15 @@ beforeEach(() => {
     student: { id: "student-1", name: "학생" },
     sessions: [],
   });
+  mockGameHistory.mockResolvedValue({
+    totals: { plays: 2, points: 12, goodQuestions: 3 },
+    modes: {
+      solo: { plays: 1, points: 4, goodQuestions: 1 },
+      ai: { plays: 0, points: 0, goodQuestions: 0 },
+      friend: { plays: 1, points: 8, goodQuestions: 2 },
+    },
+    recent: [],
+  });
 });
 
 describe("단일 학생 보고서 접근 경계", () => {
@@ -120,9 +134,12 @@ describe("단일 학생 보고서 접근 경계", () => {
 
   it("같은 학교 담당 학급 학생은 보고서를 조회한다", async () => {
     const response = await GET(reportRequest());
+    const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(mockBuildStudentReport).toHaveBeenCalledOnce();
     expect(mockBuildStudentReport).toHaveBeenCalledWith("student-1");
+    expect(mockGameHistory).toHaveBeenCalledWith("student-1");
+    expect(body.questionGames.totals).toEqual({ plays: 2, points: 12, goodQuestions: 3 });
   });
 });
