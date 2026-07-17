@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { validateStudentGuideBundle } from "@/lib/student-guide-completeness";
+import {
+  buildStudentGuideRepairPrompt,
+  validateStudentGuideBundle,
+} from "@/lib/student-guide-completeness";
 
 const expected = { coreSentenceCount: 2, essentialQuestionCount: 1, inquiryQuestionCount: 2 };
 const complete = {
@@ -43,11 +46,30 @@ describe("학생용 설명 묶음 완전성", () => {
     ["핵심 아이디어 낱말 부족", { ...complete, learningGuides: { ...complete.learningGuides, coreIdea: { ...complete.learningGuides.coreIdea, keywords: complete.learningGuides.coreIdea.keywords.slice(0, 2) } } }],
     ["빈 낱말 뜻", { ...complete, learningGuides: { ...complete.learningGuides, coreIdea: { ...complete.learningGuides.coreIdea, keywords: complete.learningGuides.coreIdea.keywords.map((item, index) => index === 0 ? { ...item, meaning: "" } : item) } } }],
     ["중복 낱말", { ...complete, learningGuides: { ...complete.learningGuides, coreIdea: { ...complete.learningGuides.coreIdea, keywords: complete.learningGuides.coreIdea.keywords.map((item, index) => index === 1 ? { ...item, term: "생태계" } : item) } } }],
+    ["핵심 아이디어 낱말 6개", { ...complete, learningGuides: { ...complete.learningGuides, coreIdea: { ...complete.learningGuides.coreIdea, keywords: [...complete.learningGuides.coreIdea.keywords, { term: "서식지", meaning: "생물이 살아가는 곳" }, { term: "분해자", meaning: "죽은 생물을 분해하는 생물" }, { term: "생산자", meaning: "스스로 양분을 만드는 생물" }] } } }],
     ["문장 설명 누락", { ...complete, learningGuides: { ...complete.learningGuides, coreSentences: complete.learningGuides.coreSentences.slice(0, 1) } }],
     ["탐구 질문 낱말 부족", { ...complete, guides: complete.guides.map((guide, index) => index === 0 ? { ...guide, keywords: guide.keywords.slice(0, 1) } : guide) }],
+    ["탐구 질문 낱말 6개", { ...complete, guides: complete.guides.map((guide, index) => index === 0 ? { ...guide, keywords: [...guide.keywords, { term: "추가 낱말 셋", meaning: "셋째 쉬운 뜻" }, { term: "추가 낱말 넷", meaning: "넷째 쉬운 뜻" }, { term: "추가 낱말 다섯", meaning: "다섯째 쉬운 뜻" }, { term: "추가 낱말 여섯", meaning: "여섯째 쉬운 뜻" }] } : guide) }],
   ])("%s을 거부한다", (_name, value) => {
     const result = validateStudentGuideBundle(value, expected);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.issues.length).toBeGreaterThan(0);
+  });
+
+  it("보완 요청에 원래 요청과 문제와 12000자로 자른 이전 응답을 넣는다", () => {
+    const originalPrompt = "학생용 설명을 만들어 주세요.";
+    const issues = ["핵심 낱말이 부족합니다.", "질문 설명이 빠졌습니다."];
+    const includedResponse = "가".repeat(12000);
+    const prompt = buildStudentGuideRepairPrompt(
+      originalPrompt,
+      `${includedResponse}잘림`,
+      issues,
+    );
+
+    expect(prompt).toContain(originalPrompt);
+    expect(prompt).toContain("- 핵심 낱말이 부족합니다.");
+    expect(prompt).toContain("- 질문 설명이 빠졌습니다.");
+    expect(prompt).toContain(includedResponse);
+    expect(prompt).not.toContain("잘림");
   });
 });

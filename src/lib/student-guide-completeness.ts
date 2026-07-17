@@ -26,6 +26,9 @@ export type StudentGuideValidationResult =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+const hasTooManyRawKeywords = (value: unknown, maximum: number) =>
+  isRecord(value) && Array.isArray(value.keywords) && value.keywords.length > maximum;
+
 const hasUniqueTermsWithMeanings = (
   keywords: Array<{ term: string; meaning: string }>,
   minimum: number,
@@ -51,8 +54,15 @@ export function validateStudentGuideBundle(
 
   const learningGuides = normalizeStudentLearningGuides(value.learningGuides);
   const coreIdea = learningGuides?.coreIdea;
+  const rawCoreIdea = isRecord(value.learningGuides)
+    ? value.learningGuides.coreIdea
+    : undefined;
   if (!coreIdea?.explanation || !coreIdea.lifeConnection) issues.push("핵심 아이디어 설명이 빠졌습니다.");
-  if (!coreIdea || !hasUniqueTermsWithMeanings(coreIdea.keywords, 3, 5)) {
+  if (
+    !coreIdea
+    || hasTooManyRawKeywords(rawCoreIdea, 5)
+    || !hasUniqueTermsWithMeanings(coreIdea.keywords, 3, 5)
+  ) {
     issues.push("핵심 아이디어 핵심 낱말은 서로 다른 3~5개이며 뜻이 있어야 합니다.");
   }
   if (!learningGuides || !hasExactIndexes(learningGuides.coreSentences, expected.coreSentenceCount)) {
@@ -68,6 +78,7 @@ export function validateStudentGuideBundle(
     !item.thinkingFocus.trim() || item.perspectives.length < 2 || item.perspectives.length > 3
   )) issues.push("핵심 질문마다 생각할 범위와 관점 2~3개가 필요합니다.");
 
+  const rawGuides = Array.isArray(value.guides) ? value.guides : [];
   const guides = Array.isArray(value.guides)
     ? value.guides.flatMap((candidate) => {
         if (!isRecord(candidate) || !Number.isInteger(candidate.index)) return [];
@@ -78,11 +89,14 @@ export function validateStudentGuideBundle(
   if (!hasExactIndexes(guides, expected.inquiryQuestionCount)) {
     issues.push("모든 탐구 질문의 학생용 설명과 번호가 필요합니다.");
   }
-  if (guides.some((guide) =>
-    !guide.meaning.trim()
-    || !guide.thinkingStart.trim()
-    || !hasUniqueTermsWithMeanings(guide.keywords, 2, 5)
-  )) issues.push("탐구 질문마다 뜻, 생각 단서, 서로 다른 핵심 낱말 2~5개가 필요합니다.");
+  if (
+    rawGuides.some((candidate) => hasTooManyRawKeywords(candidate, 5))
+    || guides.some((guide) =>
+      !guide.meaning.trim()
+      || !guide.thinkingStart.trim()
+      || !hasUniqueTermsWithMeanings(guide.keywords, 2, 5)
+    )
+  ) issues.push("탐구 질문마다 뜻, 생각 단서, 서로 다른 핵심 낱말 2~5개가 필요합니다.");
 
   if (issues.length > 0 || !learningGuides || !coreIdea) return { ok: false, issues };
   return { ok: true, value: { learningGuides: { ...learningGuides, coreIdea }, guides } };
