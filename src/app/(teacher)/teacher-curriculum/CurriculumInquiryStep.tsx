@@ -1,11 +1,12 @@
 "use client";
 
-import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Save } from "lucide-react";
+import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Loader2, Save, WandSparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import DatePicker from "@/components/shared/DatePicker";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
+import { StudentInquiryGuideEditor } from "@/components/shared/StudentInquiryGuideEditor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ interface CurriculumInquiryStepProps {
   sessionLikesVisible: boolean;
   sessionCommentsVisible: boolean;
   isSaving: boolean;
+  isGeneratingGuides: boolean;
   canSaveDesign: boolean;
   lastDesignAction: LastDesignAction | null;
   onSetDragInquiryIndex: (index: number | null) => void;
@@ -63,6 +65,7 @@ interface CurriculumInquiryStepProps {
   }) => void;
   onSaveAndCreateSession: () => void;
   onSaveOnly: () => void;
+  onGenerateGuides: () => void;
 }
 
 export function CurriculumInquiryStep({
@@ -84,6 +87,7 @@ export function CurriculumInquiryStep({
   sessionLikesVisible,
   sessionCommentsVisible,
   isSaving,
+  isGeneratingGuides,
   canSaveDesign,
   lastDesignAction,
   onSetDragInquiryIndex,
@@ -101,11 +105,13 @@ export function CurriculumInquiryStep({
   onVisibilitySettingsChange,
   onSaveAndCreateSession,
   onSaveOnly,
+  onGenerateGuides,
 }: CurriculumInquiryStepProps) {
   const t = useTranslations("curriculum");
   const tc = useTranslations("common");
   const tCls = useTranslations("classification");
   const typeLabel = (type: string) => `${tCls(`${type}.label`)}`;
+  const hasStudentGuides = inquiryQuestions.some((question) => question.studentGuide);
 
   if (!visible) return null;
 
@@ -116,7 +122,23 @@ export function CurriculumInquiryStep({
         <CardDescription>{t("step5Desc")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-xs text-muted-foreground">{t("selectedCount", { count: selectedInquiryCount })}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">{t("selectedCount", { count: selectedInquiryCount })}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onGenerateGuides}
+            disabled={isGeneratingGuides || selectedInquiryCount === 0}
+          >
+            {isGeneratingGuides
+              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              : <WandSparkles className="mr-2 h-4 w-4" aria-hidden="true" />}
+            {isGeneratingGuides
+              ? t("studentGuideGenerating")
+              : t(hasStudentGuides ? "studentGuideRegenerate" : "studentGuideGenerate")}
+          </Button>
+        </div>
         <div className="space-y-2">
           {inquiryQuestions.map((question, index) => (
             <div
@@ -125,54 +147,62 @@ export function CurriculumInquiryStep({
               onDragStart={() => onSetDragInquiryIndex(index)}
               onDragOver={(event) => event.preventDefault()}
               onDrop={() => onDropInquiry(index)}
-              className={`flex flex-col gap-2 rounded-lg border px-3 py-2.5 sm:flex-row sm:items-start ${TYPE_COLOR[question.type] ?? "bg-card"}`}
+              className={`rounded-lg border px-3 py-2.5 ${TYPE_COLOR[question.type] ?? "bg-card"}`}
             >
-              <div className="flex shrink-0 items-center justify-between sm:mt-1 sm:flex-col">
-                <GripVertical className="hidden h-4 w-4 cursor-grab text-muted-foreground sm:block" />
-                <div className="flex sm:flex-col">
-                  <button
-                    type="button"
-                    onClick={() => onMoveInquiry(index, -1)}
-                    disabled={index === 0}
-                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                    aria-label={t("moveUp")}
-                  >
-                    <ChevronUp className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onMoveInquiry(index, 1)}
-                    disabled={index === inquiryQuestions.length - 1}
-                    className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                    aria-label={t("moveDown")}
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                <div className="flex shrink-0 items-center justify-between sm:mt-1 sm:flex-col">
+                  <GripVertical className="hidden h-4 w-4 cursor-grab text-muted-foreground sm:block" />
+                  <div className="flex sm:flex-col">
+                    <button
+                      type="button"
+                      onClick={() => onMoveInquiry(index, -1)}
+                      disabled={index === 0}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      aria-label={t("moveUp")}
+                    >
+                      <ChevronUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onMoveInquiry(index, 1)}
+                      disabled={index === inquiryQuestions.length - 1}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      aria-label={t("moveDown")}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
+                <select
+                  value={question.type}
+                  onChange={(event) => onUpdateInquiry(index, { type: event.target.value as InquiryQuestion["type"] })}
+                  className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground sm:w-auto sm:shrink-0"
+                >
+                  <option value="factual">{typeLabel("factual")}</option>
+                  <option value="conceptual">{typeLabel("conceptual")}</option>
+                  <option value="controversial">{typeLabel("controversial")}</option>
+                </select>
+                <textarea
+                  className="w-full flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  rows={2}
+                  value={question.content}
+                  onChange={(event) => onUpdateInquiry(index, { content: event.target.value })}
+                />
+                  <button
+                    type="button"
+                    onClick={() => onRemoveInquiry(index)}
+                    className="self-end text-sm text-red-500 hover:text-red-700 sm:mt-1 sm:shrink-0 sm:self-auto"
+                    aria-label={tc("delete")}
+                  >
+                    ✕
+                  </button>
               </div>
-              <select
-                value={question.type}
-                onChange={(event) => onUpdateInquiry(index, { type: event.target.value as InquiryQuestion["type"] })}
-                className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground sm:w-auto sm:shrink-0"
-              >
-                <option value="factual">{typeLabel("factual")}</option>
-                <option value="conceptual">{typeLabel("conceptual")}</option>
-                <option value="controversial">{typeLabel("controversial")}</option>
-              </select>
-              <textarea
-                className="w-full flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-                rows={2}
-                value={question.content}
-                onChange={(event) => onUpdateInquiry(index, { content: event.target.value })}
-              />
-              <button
-                type="button"
-                onClick={() => onRemoveInquiry(index)}
-                className="self-end text-sm text-red-500 hover:text-red-700 sm:mt-1 sm:shrink-0 sm:self-auto"
-                aria-label={tc("delete")}
-              >
-                ✕
-              </button>
+              <div className="mt-2">
+                <StudentInquiryGuideEditor
+                  guide={question.studentGuide}
+                  onChange={(studentGuide) => onUpdateInquiry(index, { studentGuide })}
+                />
+              </div>
             </div>
           ))}
           <div className="flex items-center gap-2">

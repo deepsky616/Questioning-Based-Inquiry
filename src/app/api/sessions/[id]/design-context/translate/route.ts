@@ -7,12 +7,14 @@ import { getRequestLocale, DEFAULT_LOCALE } from "@/lib/locale";
 import { contentHash, translateTexts } from "@/lib/translate";
 import { logger } from "@/lib/logger";
 import { studentCanAccessSession } from "@/lib/session-access";
+import { normalizeStudentInquiryGuide, type StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 
 type Params = { params: Promise<{ id: string }> };
 
 interface InquiryQuestion {
   type: string;
   content: string;
+  studentGuide?: StudentInquiryGuide;
 }
 
 interface DesignReferenceContext {
@@ -34,14 +36,22 @@ function asStringArray(value: unknown): string[] {
 }
 
 function asInquiryQuestions(value: unknown): InquiryQuestion[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is InquiryQuestion =>
-        typeof item === "object" &&
-        item !== null &&
-        typeof (item as { type?: unknown }).type === "string" &&
-        typeof (item as { content?: unknown }).content === "string",
-      )
-    : [];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (
+      typeof item !== "object" ||
+      item === null ||
+      typeof (item as { type?: unknown }).type !== "string" ||
+      typeof (item as { content?: unknown }).content !== "string"
+    ) return [];
+    const question = item as { type: string; content: string; studentGuide?: unknown };
+    const studentGuide = normalizeStudentInquiryGuide(question.studentGuide);
+    return [{
+      type: question.type,
+      content: question.content,
+      ...(studentGuide ? { studentGuide } : {}),
+    }];
+  });
 }
 
 function buildEntries(context: DesignReferenceContext): [string, string][] {
@@ -55,7 +65,18 @@ function buildEntries(context: DesignReferenceContext): [string, string][] {
     ...base,
     ...context.coreSentences.map((value, index) => [`coreSentences.${index}`, value] as [string, string]),
     ...context.essentialQuestions.map((value, index) => [`essentialQuestions.${index}`, value] as [string, string]),
-    ...context.inquiryQuestions.map((value, index) => [`inquiryQuestions.${index}`, value.content] as [string, string]),
+    ...context.inquiryQuestions.flatMap((value, index): [string, string][] => {
+      const guide = value.studentGuide;
+      return [
+        [`inquiryQuestions.${index}`, value.content],
+        ...(guide?.meaning ? [[`inquiryQuestions.${index}.guide.meaning`, guide.meaning] as [string, string]] : []),
+        ...(guide?.keywords.flatMap((keyword, keywordIndex): [string, string][] => [
+          [`inquiryQuestions.${index}.guide.keywords.${keywordIndex}.term`, keyword.term],
+          [`inquiryQuestions.${index}.guide.keywords.${keywordIndex}.meaning`, keyword.meaning],
+        ]) ?? []),
+        ...(guide?.thinkingStart ? [[`inquiryQuestions.${index}.guide.thinkingStart`, guide.thinkingStart] as [string, string]] : []),
+      ];
+    }),
   ].filter(([, value]) => value.trim());
 }
 
@@ -71,6 +92,16 @@ function applyTranslations(context: DesignReferenceContext, fields: Record<strin
     inquiryQuestions: context.inquiryQuestions.map((value, index) => ({
       ...value,
       content: fields[`inquiryQuestions.${index}`] ?? value.content,
+      ...(value.studentGuide ? {
+        studentGuide: {
+          meaning: fields[`inquiryQuestions.${index}.guide.meaning`] ?? value.studentGuide.meaning,
+          keywords: value.studentGuide.keywords.map((keyword, keywordIndex) => ({
+            term: fields[`inquiryQuestions.${index}.guide.keywords.${keywordIndex}.term`] ?? keyword.term,
+            meaning: fields[`inquiryQuestions.${index}.guide.keywords.${keywordIndex}.meaning`] ?? keyword.meaning,
+          })),
+          thinkingStart: fields[`inquiryQuestions.${index}.guide.thinkingStart`] ?? value.studentGuide.thinkingStart,
+        },
+      } : {}),
     })),
   };
 }

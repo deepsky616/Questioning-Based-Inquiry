@@ -287,7 +287,15 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
     title: "광합성과 에너지",
     subject: "과학",
     inquiry_questions: [
-      { type: "factual", content: "광합성이 일어나는 장소는 어디인가?" },
+      {
+        type: "factual",
+        content: "광합성이 일어나는 장소는 어디인가?",
+        studentGuide: {
+          meaning: "광합성이 일어나는 식물의 기관을 찾는 질문이에요.",
+          keywords: [],
+          thinkingStart: "잎과 줄기의 역할을 살펴보세요.",
+        },
+      },
       { type: "conceptual", content: "광합성과 호흡은 어떻게 다른가?" },
     ],
   };
@@ -367,6 +375,37 @@ describe("POST /api/unit-design/[id]/session — 저장된 탐구질문 세션 �
         likesVisibleToPeers: true,
         commentsVisibleToPeers: true,
       },
+    });
+  });
+
+  it("수업에 배포할 때 요청의 안내가 아니라 저장된 학생용 안내를 복사한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockQueryRaw.mockResolvedValue([SAVED_DESIGN]);
+    mockSessionCreate.mockImplementation(async ({ data }) => ({ id: "qs-guide", ...data }));
+
+    const [req, ctx] = makeDesignSessionRequest("ud-1", {
+      date: "2026-05-10",
+      sharedQuestions: [{
+        type: "factual",
+        content: "광합성이 일어나는 장소는 어디인가?",
+        studentGuide: {
+          meaning: "요청에서 바꾼 설명",
+          keywords: [],
+          thinkingStart: "요청에서 바꾼 문장",
+        },
+      }],
+    });
+
+    const res = await createSessionFromDesign(req, ctx);
+
+    expect(res.status).toBe(201);
+    expect(mockSessionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        sharedQuestions: [{
+          ...SAVED_DESIGN.inquiry_questions[0],
+          publishedAt: expect.any(String),
+        }],
+      }),
     });
   });
 
@@ -509,7 +548,7 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
       .mockResolvedValueOnce(null);
 
     setAiResponse(
-      '{"inquiryQuestions": [{"type": "factual", "content": "광합성이 일어나는 장소는?"}, {"type": "conceptual", "content": "광합성과 호흡의 차이는?"}]}'
+      '{"inquiryQuestions": [{"type": "factual", "content": "광합성이 일어나는 장소는?", "studentGuide": {"meaning": "광합성이 일어나는 곳을 확인하는 질문이에요.", "keywords": [{"term": "광합성", "meaning": "빛으로 양분을 만드는 과정"}], "thinkingStart": "식물의 기관을 떠올려 보세요."}}, {"type": "conceptual", "content": "광합성과 호흡의 차이는?"}]}'
     );
 
     const res = await generatePOST(
@@ -523,6 +562,27 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     const body = await res.json();
     expect(body.inquiryQuestions).toHaveLength(2);
     expect(body.inquiryQuestions[0].type).toBe("factual");
+    expect(body.inquiryQuestions[0].studentGuide.meaning).toContain("확인하는 질문");
+  });
+
+  it("student_guides 단계: 기존 질문 원문을 바꾸지 않는 학생용 안내 초안을 반환한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockFindUnique
+      .mockResolvedValueOnce({ value: "test-api-key" })
+      .mockResolvedValueOnce(null);
+    setAiResponse(
+      '{"guides": [{"index": 0, "meaning": "광합성 장소를 확인하는 질문이에요.", "keywords": [], "thinkingStart": "식물의 기관을 살펴보세요."}]}'
+    );
+
+    const res = await generatePOST(makeRequest({
+      ...GENERATE_BASE,
+      step: "student_guides",
+      inquiryQuestions: [{ type: "factual", content: "광합성은 어디에서 일어날까?" }],
+    }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.guides[0]).toEqual(expect.objectContaining({ index: 0 }));
   });
 
   it("AI 응답에서 JSON을 파싱할 수 없으면 502를 반환한다", async () => {
@@ -593,6 +653,20 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     expect(inquiryPrompt).toContain("factual (사실적): 사실·정보 확인·기억 → 3~4개");
     expect(inquiryPrompt).toContain("conceptual (개념적): 추론·비교·분석·해석 → 3~4개");
     expect(inquiryPrompt).toContain("controversial (논쟁적): 판단·의견·가치·적용 → 정확히 2개");
+    expect(inquiryPrompt).toContain('"studentGuide"');
+    expect(inquiryPrompt).toContain("정답이나 결론을 미리 알려주지 않음");
+  });
+
+  it("student_guides 단계는 질문 원문과 학년 수준을 포함하고 원문 변경을 금지한다", () => {
+    const prompt = buildPrompt({
+      ...PROMPT_BASE,
+      step: "student_guides",
+      inquiryQuestions: [{ type: "controversial", content: "학교에서 인공지능 사용을 제한해야 할까?" }],
+    });
+
+    expect(prompt).toContain("학교에서 인공지능 사용을 제한해야 할까?");
+    expect(prompt).toContain("질문 원문을 바꾸거나 다시 쓰지 마세요");
+    expect(prompt).toContain("정답이나 특정 입장을 제시하지 마세요");
   });
 
   it("recommend_by_unit 단계는 단원명과 제공 목록(번호)만 포함하고 선택 규칙을 명시한다", () => {

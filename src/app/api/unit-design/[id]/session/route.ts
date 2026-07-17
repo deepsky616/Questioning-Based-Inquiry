@@ -12,9 +12,19 @@ import { isValidSessionDateString } from "@/lib/sessions";
 
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
 
+const studentGuideSchema = z.object({
+  meaning: z.string().max(500),
+  keywords: z.array(z.object({
+    term: z.string().max(80),
+    meaning: z.string().max(240),
+  })).max(5),
+  thinkingStart: z.string().max(500),
+});
+
 const inquiryQuestionSchema = z.object({
   type: z.string(),
   content: z.string().min(1),
+  studentGuide: studentGuideSchema.optional(),
 }).passthrough();
 
 const createSessionSchema = z.object({
@@ -84,7 +94,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       const savedQuestions = Array.isArray(design.inquiry_questions)
         ? design.inquiry_questions.filter(
-            (question): question is { type: string; content: string } =>
+            (question): question is Record<string, unknown> & { type: string; content: string } =>
               typeof question === "object" &&
               question !== null &&
               typeof (question as { type?: unknown }).type === "string" &&
@@ -92,17 +102,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               Boolean((question as { content: string }).content.trim()),
           )
         : [];
-      const savedKeys = new Set(savedQuestions.map(questionKey));
+      const savedByKey = new Map(savedQuestions.map((question) => [questionKey(question), question]));
       const publishedAt = new Date().toISOString();
-      const selectedQuestions = data.sharedQuestions.map((question) => ({
-        ...question,
-        type: question.type,
-        content: question.content.trim(),
-        publishedAt,
-      }));
-      if (selectedQuestions.some((question) => !savedKeys.has(questionKey(question)))) {
+      if (data.sharedQuestions.some((question) => !savedByKey.has(questionKey(question)))) {
         return { kind: "invalid-questions" } as const;
       }
+      const selectedQuestions = data.sharedQuestions.map((question) => {
+        const saved = savedByKey.get(questionKey(question))!;
+        return {
+          ...saved,
+          type: saved.type,
+          content: saved.content.trim(),
+          publishedAt,
+        };
+      });
 
       const newSession = await tx.questionSession.create({
         data: {

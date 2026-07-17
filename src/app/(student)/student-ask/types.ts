@@ -1,6 +1,9 @@
+import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
+
 export interface SharedQuestion {
   type: string;
   content: string;
+  studentGuide?: StudentInquiryGuide;
 }
 
 export interface QuestionSession {
@@ -27,7 +30,7 @@ export interface DesignContext {
   coreIdea: string;
   coreSentences: string[];
   essentialQuestions: string[];
-  inquiryQuestions: { type: string; content: string }[];
+  inquiryQuestions: { type: string; content: string; studentGuide?: StudentInquiryGuide }[];
 }
 
 export interface ClassificationResult {

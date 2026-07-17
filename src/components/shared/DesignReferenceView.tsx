@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { splitCoreIdeaLines } from "@/lib/content-selection";
+import { StudentInquiryQuestionReference } from "@/components/shared/StudentInquiryQuestionReference";
+import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 
 export interface DesignReference {
   id?: string;
@@ -15,7 +17,7 @@ export interface DesignReference {
   coreIdea?: string;
   coreSentences?: string[];
   essentialQuestions?: string[];
-  inquiryQuestions?: { type: string; content: string }[];
+  inquiryQuestions?: { type: string; content: string; studentGuide?: StudentInquiryGuide }[];
 }
 
 /**
@@ -113,12 +115,9 @@ export function DesignReferenceView({
           <section>
             <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("inquiryQuestions")}</p>
             <p className="text-[11px] leading-snug text-muted-foreground">{t("inquiryQuestionsDesc")}</p>
-            <ul className="mt-0.5 space-y-1 text-foreground">
+            <ul className="mt-2 space-y-2 text-foreground">
               {inquiry.map((q, i) => (
-                <li key={i}>
-                  <span className="mr-1 font-medium text-indigo-600 dark:text-indigo-400">[{typeLabel(q.type)}]</span>
-                  {q.content}
-                </li>
+                <StudentInquiryQuestionReference key={i} question={q} typeLabel={typeLabel(q.type)} />
               ))}
             </ul>
           </section>

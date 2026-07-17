@@ -93,13 +93,25 @@ describe("DesignReferenceView", () => {
           coreIdea: "식물은 빛으로 양분을 만든다",
           coreSentences: ["핵심 문장 하나"],
           essentialQuestions: ["핵심 질문 하나"],
-          inquiryQuestions: [{ type: "factual", content: "잎은 왜 초록색일까?" }],
+          inquiryQuestions: [{
+            type: "factual",
+            content: "잎은 왜 초록색일까?",
+            studentGuide: {
+              meaning: "잎이 초록색으로 보이는 까닭을 확인하는 질문이에요.",
+              keywords: [{ term: "엽록소", meaning: "빛을 받아들이는 초록색 물질" }],
+              thinkingStart: "잎의 색과 빛의 관계를 먼저 살펴보세요.",
+            },
+          }],
         }}
       />,
     );
     expect(screen.getByText(/광합성/)).toBeInTheDocument();
     expect(screen.getByText(/식물은 빛으로 양분을 만든다/)).toBeInTheDocument();
     expect(screen.getByText(/잎은 왜 초록색일까\?/)).toBeInTheDocument();
+    expect(screen.getByText("질문이 묻는 것")).toBeInTheDocument();
+    expect(screen.getByText(/잎이 초록색으로 보이는 까닭/)).toBeInTheDocument();
+    expect(screen.getByText(/엽록소/)).toBeInTheDocument();
+    expect(screen.getByText("생각 시작하기")).toBeInTheDocument();
     expect(screen.getByText(/핵심 문장 하나/)).toBeInTheDocument();
   });
 });

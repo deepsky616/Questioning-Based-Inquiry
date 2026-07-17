@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const unitDesignGenerateSchema = z.object({
-  step: z.enum(["keywords", "sentences", "questions", "inquiry", "recommend_achievements", "recommend_by_unit"]),
+  step: z.enum(["keywords", "sentences", "questions", "inquiry", "student_guides", "recommend_achievements", "recommend_by_unit"]),
   subject: z.string(),
   gradeRange: z.string(),
   area: z.string(),
@@ -18,6 +18,10 @@ export const unitDesignGenerateSchema = z.object({
   selectedContentItems: z.array(z.string()).optional().default([]),
   achievementExplanations: z.record(z.string()).optional().default({}),
   achievementConsiderations: z.array(z.string()).optional().default([]),
+  inquiryQuestions: z.array(z.object({
+    type: z.enum(["factual", "conceptual", "controversial"]),
+    content: z.string().trim().min(1),
+  })).optional(),
 });
 
 export function buildPrompt(data: z.infer<typeof unitDesignGenerateSchema>): string {
@@ -157,6 +161,31 @@ ${data.coreSentences.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 {"questions": ["핵심 질문1", "핵심 질문2"]}`;
   }
 
+  if (data.step === "student_guides") {
+    const questions = (data.inquiryQuestions ?? [])
+      .map((question, index) => `${index}. [${question.type}] ${question.content}`)
+      .join("\n");
+    return `당신은 학생의 탐구를 돕는 수업 설계 전문가입니다.
+아래 탐구 질문마다 ${gradeLabel} 학생이 질문을 이해하고 스스로 생각을 시작하도록 짧은 안내를 만드세요.
+
+[교과] ${data.subject}  [영역] ${data.area}  [학년군] ${gradeLabel}
+[탐구 질문 원문]
+${questions}
+
+작성 규칙:
+- 질문 원문을 바꾸거나 다시 쓰지 마세요.
+- 정답이나 특정 입장을 제시하지 마세요.
+- meaning은 질문이 무엇을 묻는지 학생 눈높이 한 문장으로 설명하세요.
+- keywords는 꼭 알아야 하는 낱말만 0~3개 고르고, 뜻을 쉽게 설명하세요.
+- thinkingStart는 답이 아니라 처음 살펴볼 자료, 관점, 비교 대상을 한 문장으로 제안하세요.
+- 질문마다 원래 순서와 같은 index를 사용하세요.
+
+아래 JSON만 출력:
+{"guides":[
+  {"index":0,"meaning":"...","keywords":[{"term":"...","meaning":"..."}],"thinkingStart":"..."}
+]}`;
+  }
+
   return `당신은 수업 설계 전문가입니다.
 아래 교육과정 분석, 성취기준, 핵심어, 핵심 문장, 핵심 질문을 종합해 탐구 질문을 세 유형으로 생성하세요.
 
@@ -175,16 +204,20 @@ ${data.essentialQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
 - controversial (논쟁적): 판단·의견·가치·적용 → 정확히 2개
 
 각 탐구 질문은 핵심 질문에 가까워지는 '징검다리' 역할을 해야 합니다.
+각 질문의 studentGuide는 학생이 질문을 이해하도록 돕되 정답이나 결론을 미리 알려주지 않음.
+- meaning: 질문이 묻는 것을 ${gradeLabel} 눈높이 한 문장으로 설명
+- keywords: 꼭 필요한 핵심 낱말 0~3개와 쉬운 뜻
+- thinkingStart: 답 대신 처음 살펴볼 자료, 관점, 비교 대상을 제안
 
 아래 JSON만 출력:
 {"inquiryQuestions": [
-  {"type": "factual", "content": "..."},
-  {"type": "factual", "content": "..."},
-  {"type": "factual", "content": "..."},
-  {"type": "conceptual", "content": "..."},
-  {"type": "conceptual", "content": "..."},
-  {"type": "conceptual", "content": "..."},
-  {"type": "controversial", "content": "..."},
-  {"type": "controversial", "content": "..."}
+  {"type":"factual","content":"...","studentGuide":{"meaning":"...","keywords":[{"term":"...","meaning":"..."}],"thinkingStart":"..."}},
+  {"type":"factual","content":"...","studentGuide":{"meaning":"...","keywords":[],"thinkingStart":"..."}},
+  {"type":"factual","content":"...","studentGuide":{"meaning":"...","keywords":[],"thinkingStart":"..."}},
+  {"type":"conceptual","content":"...","studentGuide":{"meaning":"...","keywords":[],"thinkingStart":"..."}},
+  {"type":"conceptual","content":"...","studentGuide":{"meaning":"...","keywords":[],"thinkingStart":"..."}},
+  {"type":"conceptual","content":"...","studentGuide":{"meaning":"...","keywords":[],"thinkingStart":"..."}},
+  {"type":"controversial","content":"...","studentGuide":{"meaning":"...","keywords":[],"thinkingStart":"..."}},
+  {"type":"controversial","content":"...","studentGuide":{"meaning":"...","keywords":[],"thinkingStart":"..."}}
 ]}`;
 }

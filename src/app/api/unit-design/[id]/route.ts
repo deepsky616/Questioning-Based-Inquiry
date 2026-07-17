@@ -8,6 +8,15 @@ type Params = { params: Promise<{ id: string }> };
 
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
 
+const studentGuideSchema = z.object({
+  meaning: z.string().max(500),
+  keywords: z.array(z.object({
+    term: z.string().max(80),
+    meaning: z.string().max(240),
+  })).max(5),
+  thinkingStart: z.string().max(500),
+});
+
 const inquiryQuestionSchema = z.object({
   type: z.string(),
   content: z.string(),
@@ -17,6 +26,7 @@ const inquiryQuestionSchema = z.object({
   priority: z.number().optional(),
   lessonPhase: z.string().optional(),
   rationale: z.string().optional(),
+  studentGuide: studentGuideSchema.optional(),
 }).passthrough();
 
 // 부분 업데이트: 보낸 필드만 갱신(나머지 필드 보존). 호출자가 전체 객체를 갖고 있지 않아도 안전.

@@ -69,7 +69,15 @@ beforeEach(() => {
     core_idea: "도형은 길이와 넓이로 설명할 수 있다",
     core_sentences: ["둘레는 도형의 가장자리 길이입니다."],
     essential_questions: ["넓이는 어떻게 비교할 수 있을까요?"],
-    inquiry_questions: [{ type: "factual", content: "직사각형의 둘레는 어떻게 구하나요?" }],
+    inquiry_questions: [{
+      type: "factual",
+      content: "직사각형의 둘레는 어떻게 구하나요?",
+      studentGuide: {
+        meaning: "직사각형 가장자리 길이를 구하는 방법을 확인하는 질문이에요.",
+        keywords: [{ term: "둘레", meaning: "도형 가장자리의 전체 길이" }],
+        thinkingStart: "네 변의 길이를 먼저 살펴보세요.",
+      },
+    }],
   }]);
   mFind.mockResolvedValue(null);
   mUpsert.mockResolvedValue({});
@@ -82,6 +90,10 @@ beforeEach(() => {
     "Perimeter is the length around a figure.",
     "How can we compare area?",
     "How do you find the perimeter of a rectangle?",
+    "This asks how to find the length around a rectangle.",
+    "Perimeter",
+    "The total length around a shape",
+    "Look at the lengths of all four sides first.",
   ]);
 });
 
@@ -94,6 +106,11 @@ describe("POST design-context translate", () => {
     expect(data.context.title).toBe("Perimeter and Area of Plane Figures");
     expect(data.context.coreSentences[0]).toBe("Perimeter is the length around a figure.");
     expect(data.context.inquiryQuestions[0].content).toBe("How do you find the perimeter of a rectangle?");
+    expect(data.context.inquiryQuestions[0].studentGuide).toEqual({
+      meaning: "This asks how to find the length around a rectangle.",
+      keywords: [{ term: "Perimeter", meaning: "The total length around a shape" }],
+      thinkingStart: "Look at the lengths of all four sides first.",
+    });
     expect(mTranslate).toHaveBeenCalledWith(
       [
         "평면도형의 둘레와 넓이",
@@ -103,6 +120,10 @@ describe("POST design-context translate", () => {
         "둘레는 도형의 가장자리 길이입니다.",
         "넓이는 어떻게 비교할 수 있을까요?",
         "직사각형의 둘레는 어떻게 구하나요?",
+        "직사각형 가장자리 길이를 구하는 방법을 확인하는 질문이에요.",
+        "둘레",
+        "도형 가장자리의 전체 길이",
+        "네 변의 길이를 먼저 살펴보세요.",
       ],
       "en",
       "st1",

@@ -41,6 +41,7 @@ import {
   type PendingQuestionClassDesign,
 } from "@/lib/question-class-creation";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
+import { normalizeStudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import {
   KNOWLEDGE_ITEM_LIMIT,
   PROCESS_ITEM_LIMIT,
@@ -50,10 +51,10 @@ import {
   type InquiryQuestion,
   type SavedInquiryDesign,
 } from "./types";
+import { useStudentInquiryGuides } from "./useStudentInquiryGuides";
 
 // ── 타입 ──────────────────────────────────────────────────────────────
 type LastDesignAction = { type: "saved" | "deployed"; at: string };
-
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
 export default function CurriculumPage() {
   const tPages = useTranslations("pages");
@@ -102,8 +103,6 @@ export default function CurriculumPage() {
   const [selectedKnowledge, setSelectedKnowledge] = useState<string[]>([]);
   const [selectedProcess, setSelectedProcess] = useState<string[]>([]);
   const [selectedValue, setSelectedValue] = useState<string[]>([]);
-
-
   // Step 2 — 핵심어
   const [recommendedKeywords, setRecommendedKeywords] = useState<string[]>([]);
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
@@ -254,7 +253,14 @@ export default function CurriculumPage() {
   );
   // 5단계 탐구질문은 리스트 자체가 저장/세션 대상(내용이 빈 것은 제외)
   const selectedInquiryQuestions = inquiryQuestions
-    .map((q) => ({ type: q.type, content: q.content.trim() }))
+    .map((q) => {
+      const studentGuide = normalizeStudentInquiryGuide(q.studentGuide);
+      return {
+        type: q.type,
+        content: q.content.trim(),
+        ...(studentGuide ? { studentGuide } : {}),
+      };
+    })
     .filter((q) => q.content);
 
   const getFilteredAchievementGroups = () => {
@@ -362,14 +368,29 @@ export default function CurriculumPage() {
         coreSentences: selectedCoreSentences,
         essentialQuestions: selectedEssentialQuestions,
       });
-      if (data?.inquiryQuestions) {
-        setInquiryQuestions(data.inquiryQuestions);
+      if (Array.isArray(data?.inquiryQuestions)) {
+        setInquiryQuestions(data.inquiryQuestions.map((question: InquiryQuestion) => {
+          const studentGuide = normalizeStudentInquiryGuide(question.studentGuide);
+          return {
+            type: question.type,
+            content: question.content,
+            ...(studentGuide ? { studentGuide } : {}),
+          };
+        }));
         setStep(5);
       }
     } finally {
       setLoadingInquiry(false);
     }
   };
+
+  const { loadingStudentGuides, handleGenerateStudentGuides } = useStudentInquiryGuides({
+    questions: inquiryQuestions,
+    setQuestions: setInquiryQuestions,
+    generate: callGenerate,
+    onSuccess: () => toast({ description: t("studentGuideGenerated") }),
+    onError: () => toast({ variant: "destructive", description: t("studentGuideGenerateFailed") }),
+  });
 
   const toggleKeyword = (kw: string) => {
     setSelectedKeywords((prev) =>
@@ -648,6 +669,7 @@ export default function CurriculumPage() {
           selectedCoreSentenceIndices, setSelectedCoreSentenceIndices, setCoreSentences, loadingQuestions,
           handleGoStep4, selectedEssentialQuestions, essentialQuestions, selectedEssentialQuestionIndices,
           setSelectedEssentialQuestionIndices, setEssentialQuestions, loadingInquiry, handleGoStep5,
+          loadingStudentGuides, handleGenerateStudentGuides,
           inquiryQuestions, dragInquiryIndex, inquiryAddType, saveDate, saveGrade, saveTitle, students,
           targetClasses, targetClassValue, selectedStudentIds, sessionIsActive, defaultQuestionPublic,
           sessionLikesVisible, sessionCommentsVisible, isSaving, canSaveDesign, lastDesignAction,

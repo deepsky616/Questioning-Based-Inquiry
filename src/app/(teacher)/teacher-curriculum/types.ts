@@ -1,10 +1,12 @@
 import type { Achievement } from "@/lib/achievement-selection";
+import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 
 // teacher-curriculum 페이지와 하위 컴포넌트가 공유하는 타입·헬퍼
 
 export interface InquiryQuestion {
   type: "factual" | "conceptual" | "controversial";
   content: string;
+  studentGuide?: StudentInquiryGuide;
 }
 
 export interface SavedInquiryDesign {

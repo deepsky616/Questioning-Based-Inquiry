@@ -7,6 +7,15 @@ import { isValidSessionDateString } from "@/lib/sessions";
 
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
 
+const studentGuideSchema = z.object({
+  meaning: z.string().max(500),
+  keywords: z.array(z.object({
+    term: z.string().max(80),
+    meaning: z.string().max(240),
+  })).max(5),
+  thinkingStart: z.string().max(500),
+});
+
 const inquiryQuestionSchema = z.object({
   type: z.string(),
   content: z.string(),
@@ -16,6 +25,7 @@ const inquiryQuestionSchema = z.object({
   priority: z.number().optional(),
   lessonPhase: z.string().optional(),
   rationale: z.string().optional(),
+  studentGuide: studentGuideSchema.optional(),
 }).passthrough();
 
 const saveSchema = z.object({

@@ -73,6 +73,8 @@ interface CurriculumCreateFlowProps {
   setEssentialQuestions: Dispatch<SetStateAction<string[]>>;
   loadingInquiry: boolean;
   handleGoStep5: () => void;
+  loadingStudentGuides: boolean;
+  handleGenerateStudentGuides: () => void;
   inquiryQuestions: InquiryQuestion[];
   selectedInquiryCount: number;
   dragInquiryIndex: number | null;
@@ -170,6 +172,8 @@ export function CurriculumCreateFlow({
   setEssentialQuestions,
   loadingInquiry,
   handleGoStep5,
+  loadingStudentGuides,
+  handleGenerateStudentGuides,
   inquiryQuestions,
   selectedInquiryCount,
   dragInquiryIndex,
@@ -327,6 +331,7 @@ export function CurriculumCreateFlow({
         sessionLikesVisible={sessionLikesVisible}
         sessionCommentsVisible={sessionCommentsVisible}
         isSaving={isSaving}
+        isGeneratingGuides={loadingStudentGuides}
         canSaveDesign={canSaveDesign}
         lastDesignAction={lastDesignAction}
         onSetDragInquiryIndex={setDragInquiryIndex}
@@ -352,6 +357,7 @@ export function CurriculumCreateFlow({
         }}
         onSaveAndCreateSession={handleSaveAndCreateSession}
         onSaveOnly={handleSave}
+        onGenerateGuides={handleGenerateStudentGuides}
       />
     </>
   );

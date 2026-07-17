@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
+import { StudentInquiryQuestionReference } from "@/components/shared/StudentInquiryQuestionReference";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import type { DesignContext, QuestionSession } from "./types";
@@ -60,14 +61,13 @@ export function StudentAskReferencePanel({
         <div className="rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4 space-y-2">
           <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">{t("teacherInquiryQuestions")}</p>
           <p className="text-xs text-indigo-500 mb-2">{t("inquiryHint")}</p>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {sharedQuestions.map((question, index) => (
-              <li key={index} className="flex items-start gap-2 text-sm text-indigo-800 dark:text-indigo-100">
-                <span className="shrink-0 mt-0.5 text-xs font-medium text-indigo-500">
-                  [{typeLabel(question.type)}]
-                </span>
-                <span>{question.content}</span>
-              </li>
+              <StudentInquiryQuestionReference
+                key={index}
+                question={question}
+                typeLabel={typeLabel(question.type)}
+              />
             ))}
           </ul>
         </div>

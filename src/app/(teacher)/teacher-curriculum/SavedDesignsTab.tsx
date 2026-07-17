@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Pencil, Save, Trash2, X } from "lucide-react";
+import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Loader2, Pencil, Save, Trash2, WandSparkles, X } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import DatePicker from "@/components/shared/DatePicker";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { DesignReferenceView } from "@/components/shared/DesignReferenceView";
+import { StudentInquiryGuideEditor } from "@/components/shared/StudentInquiryGuideEditor";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { CollapseChevron } from "@/components/shared/SectionToggle";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -22,6 +23,7 @@ import { filterSortSavedDesigns } from "@/lib/saved-designs";
 import { getSavedDesignTimeline, type SavedDesignTimelineKind } from "@/lib/saved-design-timeline";
 import { groupSessionDatesByMonth } from "@/lib/sessions";
 import { formatDateTime } from "@/lib/datetime";
+import { mergeGeneratedStudentGuides, normalizeStudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import { appQueryKeys } from "@/lib/app-queries";
 import {
   postQuestionClassFromDesign,
@@ -123,6 +125,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   const [editEssentialQuestions, setEditEssentialQuestions] = useState<string[]>([]);
   const [editQuestions, setEditQuestions] = useState<InquiryQuestion[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [generatingGuides, setGeneratingGuides] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [addType, setAddType] = useState<InquiryQuestion["type"]>("factual");
 
@@ -236,7 +239,14 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   // 편집 내용을 설계에 PATCH(제목·수업날짜·공개설정·참고자료 전부)
   const patchEditDesign = async (id: string) => {
     const cleaned = editQuestions
-      .map((q) => ({ type: q.type, content: q.content.trim() }))
+      .map((q) => {
+        const studentGuide = normalizeStudentInquiryGuide(q.studentGuide);
+        return {
+          type: q.type,
+          content: q.content.trim(),
+          ...(studentGuide ? { studentGuide } : {}),
+        };
+      })
       .filter((q) => q.content);
     const cleanedSentences = editCoreSentences.map((s) => s.trim()).filter(Boolean);
     const cleanedEssential = editEssentialQuestions.map((s) => s.trim()).filter(Boolean);
@@ -260,6 +270,48 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     });
     const result = await res.json().catch(() => ({}));
     return { ok: res.ok, cleaned, updatedAt: typeof result.updatedAt === "string" ? result.updatedAt : undefined };
+  };
+
+  const generateEditStudentGuides = async (design: SavedInquiryDesign) => {
+    const indexedQuestions = editQuestions
+      .map((question, originalIndex) => ({ question, originalIndex }))
+      .filter(({ question }) => question.content.trim());
+    if (indexedQuestions.length === 0 || generatingGuides) return;
+
+    setGeneratingGuides(true);
+    try {
+      const response = await fetch("/api/unit-design/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          step: "student_guides",
+          subject: design.subject,
+          gradeRange: design.gradeRange,
+          area: design.area,
+          unitName: editTitle.trim(),
+          inquiryQuestions: indexedQuestions.map(({ question }) => ({
+            type: question.type,
+            content: question.content.trim(),
+          })),
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !Array.isArray(data.guides)) throw new Error();
+
+      const merged = mergeGeneratedStudentGuides(
+        indexedQuestions.map(({ question }) => question),
+        data.guides,
+      );
+      const byOriginalIndex = new Map(
+        indexedQuestions.map(({ originalIndex }, index) => [originalIndex, merged[index]]),
+      );
+      setEditQuestions((previous) => previous.map((question, index) => byOriginalIndex.get(index) ?? question));
+      toast({ description: t("studentGuideGenerated") });
+    } catch {
+      toast({ variant: "destructive", description: t("studentGuideGenerateFailed") });
+    } finally {
+      setGeneratingGuides(false);
+    }
   };
 
   // 저장만(설계 업데이트 — 라이브 참고자료에 즉시 반영)
@@ -576,7 +628,23 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                     </div>
 
                     {/* 탐구 질문 */}
-                    <Label>{t("inquiryQuestionsLabel")}</Label>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Label>{t("inquiryQuestionsLabel")}</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => generateEditStudentGuides(d)}
+                        disabled={generatingGuides || !editQuestions.some((question) => question.content.trim())}
+                      >
+                        {generatingGuides
+                          ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                          : <WandSparkles className="mr-2 h-4 w-4" aria-hidden="true" />}
+                        {generatingGuides
+                          ? t("studentGuideGenerating")
+                          : t(editQuestions.some((question) => question.studentGuide) ? "studentGuideRegenerate" : "studentGuideGenerate")}
+                      </Button>
+                    </div>
                     <div className="space-y-2">
                       {editQuestions.map((q, i) => (
                         <div
@@ -585,55 +653,63 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                           onDragStart={() => setDragIndex(i)}
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={() => handleEditDrop(i)}
-                          className="flex items-start gap-2"
+                          className="rounded-md border border-border bg-muted/20 p-3"
                         >
-                          <div className="mt-1 flex shrink-0 flex-col items-center">
-                            <GripVertical className="hidden h-4 w-4 cursor-grab text-muted-foreground sm:block" />
-                            <div className="flex sm:flex-col">
-                              <button
-                                type="button"
-                                onClick={() => moveEditQuestion(i, -1)}
-                                disabled={i === 0}
-                                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                aria-label={t("moveUp")}
-                              >
-                                <ChevronUp className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moveEditQuestion(i, 1)}
-                                disabled={i === editQuestions.length - 1}
-                                className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                aria-label={t("moveDown")}
-                              >
-                                <ChevronDown className="h-4 w-4" />
-                              </button>
+                          <div className="flex items-start gap-2">
+                            <div className="mt-1 flex shrink-0 flex-col items-center">
+                              <GripVertical className="hidden h-4 w-4 cursor-grab text-muted-foreground sm:block" />
+                              <div className="flex sm:flex-col">
+                                <button
+                                  type="button"
+                                  onClick={() => moveEditQuestion(i, -1)}
+                                  disabled={i === 0}
+                                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                  aria-label={t("moveUp")}
+                                >
+                                  <ChevronUp className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveEditQuestion(i, 1)}
+                                  disabled={i === editQuestions.length - 1}
+                                  className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                                  aria-label={t("moveDown")}
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
+                            <select
+                              value={q.type}
+                              onChange={(e) => updateEditQuestion(i, { type: e.target.value as InquiryQuestion["type"] })}
+                              className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                            >
+                              <option value="factual">{typeLabel("factual")}</option>
+                              <option value="conceptual">{typeLabel("conceptual")}</option>
+                              <option value="controversial">{typeLabel("controversial")}</option>
+                            </select>
+                            <textarea
+                              value={q.content}
+                              onChange={(e) => updateEditQuestion(i, { content: e.target.value })}
+                              rows={2}
+                              className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+                              placeholder={t("topicPlaceholder")}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeEditQuestion(i)}
+                              className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700"
+                              aria-label={tc("delete")}
+                            >
+                              ✕
+                            </button>
                           </div>
-                          <select
-                            value={q.type}
-                            onChange={(e) => updateEditQuestion(i, { type: e.target.value as InquiryQuestion["type"] })}
-                            className="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-                          >
-                            <option value="factual">{typeLabel("factual")}</option>
-                            <option value="conceptual">{typeLabel("conceptual")}</option>
-                            <option value="controversial">{typeLabel("controversial")}</option>
-                          </select>
-                          <textarea
-                            value={q.content}
-                            onChange={(e) => updateEditQuestion(i, { content: e.target.value })}
-                            rows={2}
-                            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-                            placeholder={t("topicPlaceholder")}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeEditQuestion(i)}
-                            className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700"
-                            aria-label={tc("delete")}
-                          >
-                            ✕
-                          </button>
+                          <div className="mt-2">
+                            <StudentInquiryGuideEditor
+                              guide={q.studentGuide}
+                              onChange={(studentGuide) => updateEditQuestion(i, { studentGuide })}
+                            />
+                          </div>
                         </div>
                       ))}
                       <div className="flex items-center gap-2">
