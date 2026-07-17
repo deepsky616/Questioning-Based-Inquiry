@@ -36,6 +36,7 @@ import { DELETE } from "@/app/api/unit-design/[id]/route";
 import { POST as createSessionFromDesign } from "@/app/api/unit-design/[id]/session/route";
 import { POST as generatePOST } from "@/app/api/unit-design/generate/route";
 import { buildPrompt } from "@/lib/unit-design-prompt";
+import { __resetRateLimit } from "@/lib/rate-limit";
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
@@ -80,6 +81,7 @@ function makeDesignSessionRequest(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  __resetRateLimit();
   aiState.apiKey = "test-api-key";
   mockUserFindUnique.mockResolvedValue({
     role: "TEACHER",
@@ -163,6 +165,35 @@ const VALID_DESIGN = {
   essentialQuestions: ["생물은 어떻게 에너지를 얻고 활용하는가?"],
   learningGuides: LEARNING_GUIDES,
   inquiryQuestions: [{ type: "factual" as const, content: "광합성이 일어나는 장소는 어디인가?" }],
+};
+
+const COMPLETE_GENERATED_GUIDES = {
+  learningGuides: {
+    coreIdea: {
+      explanation: "핵심 아이디어를 쉽게 풀어요.",
+      lifeConnection: "학교 화단을 떠올려요.",
+      keywords: [
+        { term: "생태계", meaning: "생물과 환경이 관계를 맺는 체계" },
+        { term: "광합성", meaning: "식물이 빛으로 양분을 만드는 과정" },
+        { term: "먹이 사슬", meaning: "먹고 먹히는 관계의 연결" },
+      ],
+    },
+    coreSentences: [{ index: 0, explanation: "핵심 문장을 쉽게 풀어요." }],
+    essentialQuestions: [{
+      index: 0,
+      thinkingFocus: "관계와 변화를 살펴봐요.",
+      perspectives: ["관계", "변화"],
+    }],
+  },
+  guides: [{
+    index: 0,
+    meaning: "질문이 묻는 뜻을 쉽게 풀어요.",
+    keywords: [
+      { term: "생산자", meaning: "스스로 양분을 만드는 생물" },
+      { term: "에너지", meaning: "생물이 살아가는 데 필요한 힘" },
+    ],
+    thinkingStart: "식물이 양분을 만드는 과정을 살펴봐요.",
+  }],
 };
 
 describe("POST /api/unit-design — 탐구 질문 저장", () => {
@@ -566,9 +597,8 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
       .mockResolvedValueOnce(null);
 
     setAiResponse(JSON.stringify({
-      learningGuides: LEARNING_GUIDES,
       inquiryQuestions: [
-        { type: "factual", content: "광합성이 일어나는 장소는?", studentGuide: { meaning: "광합성이 일어나는 곳을 확인하는 질문이에요.", keywords: [{ term: "광합성", meaning: "빛으로 양분을 만드는 과정" }], thinkingStart: "식물의 기관을 떠올려 보세요." } },
+        { type: "factual", content: "광합성이 일어나는 장소는?" },
         { type: "conceptual", content: "광합성과 호흡의 차이는?" },
       ],
     }));
@@ -584,8 +614,8 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     const body = await res.json();
     expect(body.inquiryQuestions).toHaveLength(2);
     expect(body.inquiryQuestions[0].type).toBe("factual");
-    expect(body.inquiryQuestions[0].studentGuide.meaning).toContain("확인하는 질문");
-    expect(body.learningGuides.coreIdea.explanation).toContain("큰 원리");
+    expect(body.inquiryQuestions[0]).not.toHaveProperty("studentGuide");
+    expect(body).not.toHaveProperty("learningGuides");
   });
 
   it("learning_guides 단계: 기존 단원 내용을 바꾸지 않는 학생용 설명을 반환한다", async () => {
@@ -593,7 +623,7 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     mockFindUnique
       .mockResolvedValueOnce({ value: "test-api-key" })
       .mockResolvedValueOnce(null);
-    setAiResponse(JSON.stringify({ learningGuides: LEARNING_GUIDES, guides: [] }));
+    setAiResponse(JSON.stringify(COMPLETE_GENERATED_GUIDES));
 
     const res = await generatePOST(makeRequest({
       ...GENERATE_BASE,
@@ -605,7 +635,62 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
 
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.learningGuides.coreIdea.lifeConnection).toContain("화분");
+    expect(body.learningGuides.coreIdea.lifeConnection).toContain("화단");
+  });
+
+  it("학생용 설명 첫 응답이 불완전하면 한 번 보완해 완전한 결과만 반환한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockGenerateContent
+      .mockResolvedValueOnce({ text: JSON.stringify({
+        learningGuides: {
+          coreIdea: { explanation: "쉽게", lifeConnection: "생활", keywords: [] },
+          coreSentences: [],
+          essentialQuestions: [],
+        },
+        guides: [],
+      }) })
+      .mockResolvedValueOnce({ text: JSON.stringify(COMPLETE_GENERATED_GUIDES) });
+
+    const res = await generatePOST(makeRequest({
+      ...VALID_DESIGN,
+      step: "learning_guides",
+    }));
+
+    expect(res.status).toBe(200);
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    await expect(res.json()).resolves.toEqual(COMPLETE_GENERATED_GUIDES);
+  });
+
+  it("학생용 설명 첫 응답이 올바른 제이슨이 아니어도 한 번 보완한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockGenerateContent
+      .mockResolvedValueOnce({ text: "올바른 제이슨이 아닌 응답" })
+      .mockResolvedValueOnce({ text: JSON.stringify(COMPLETE_GENERATED_GUIDES) });
+
+    const res = await generatePOST(makeRequest({
+      ...VALID_DESIGN,
+      step: "learning_guides",
+    }));
+
+    expect(res.status).toBe(200);
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    await expect(res.json()).resolves.toEqual(COMPLETE_GENERATED_GUIDES);
+  });
+
+  it("보완 결과도 불완전하면 부분 결과를 반환하지 않는다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockGenerateContent.mockResolvedValue({
+      text: JSON.stringify({ learningGuides: {}, guides: [] }),
+    });
+
+    const res = await generatePOST(makeRequest({
+      ...VALID_DESIGN,
+      step: "learning_guides",
+    }));
+
+    expect(res.status).toBe(502);
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining("완전") });
   });
 
   it("student_guides 단계: 기존 질문 원문을 바꾸지 않는 학생용 안내 초안을 반환한다", async () => {
@@ -696,10 +781,9 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     expect(inquiryPrompt).toContain("factual (사실적): 사실·정보 확인·기억 → 3~4개");
     expect(inquiryPrompt).toContain("conceptual (개념적): 추론·비교·분석·해석 → 3~4개");
     expect(inquiryPrompt).toContain("controversial (논쟁적): 판단·의견·가치·적용 → 정확히 2개");
-    expect(inquiryPrompt).toContain('"studentGuide"');
-    expect(inquiryPrompt).toContain('"learningGuides"');
-    expect(inquiryPrompt).toContain("생활 속 연결");
-    expect(inquiryPrompt).toContain("정답이나 결론을 미리 알려주지 않음");
+    expect(inquiryPrompt).toContain('"inquiryQuestions"');
+    expect(inquiryPrompt).not.toContain('"studentGuide"');
+    expect(inquiryPrompt).not.toContain('"learningGuides"');
   });
 
   it("learning_guides 단계는 원문 유지와 정답·결론 제시 금지를 명시한다", () => {
@@ -716,7 +800,11 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     expect(prompt).toContain(VALID_DESIGN.coreSentences[0]);
     expect(prompt).toContain(VALID_DESIGN.essentialQuestions[0]);
     expect(prompt).toContain("[선택한 핵심어] 광합성, 에너지 전환");
-    expect(prompt).toContain("핵심 낱말을 3~5개");
+    expect(prompt).toContain("서로 다른 핵심 낱말을 3~5개");
+    expect(prompt).toContain("모든 원문에 대해 쉬운 표현을 하나씩");
+    expect(prompt).toContain("모든 원문에 대해 thinkingFocus 한 문장");
+    expect(prompt).toContain("모든 탐구 질문에 대해 원문과 같은 index");
+    expect(prompt).toContain("서로 다른 핵심 낱말 2~5개");
     expect(prompt).toContain("원문을 바꾸지 마세요");
     expect(prompt).toContain("정답이나 결론을 제시하지 마세요");
   });
