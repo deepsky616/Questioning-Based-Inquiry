@@ -43,6 +43,8 @@ npm run dev
 
 ```env
 DATABASE_URL="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres?pgbouncer=true&connection_limit=1"
+# migrate 명령용 직접 연결(세션 모드, 5432) — transaction 풀러(6543)로는 migrate가 실패
+DIRECT_URL="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
 NEXTAUTH_SECRET="your-secret-key"
 NEXTAUTH_URL="http://localhost:3000"
 TEACHER_REGISTRATION_CODE="replace-with-at-least-12-random-characters"

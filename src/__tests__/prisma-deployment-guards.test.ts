@@ -53,9 +53,18 @@ describe("Prisma deployment guards", () => {
   });
 
   it("uses an existing DATABASE_URL without requiring a local env file", () => {
+    // 배포 환경 변수(process.env)를 .env.local보다 먼저 사용해야 한다
     expect(prismaEnvRunner).toMatch(
-      /let databaseUrl = process\.env\.DATABASE_URL\?\.trim\(\);[\s\S]*if \(!databaseUrl && existsSync/,
+      /const fromProcess = process\.env\[name\]\?\.trim\(\);[\s\S]*if \(fromProcess\) return fromProcess;/,
     );
+    expect(prismaEnvRunner).toContain('resolveEnv("DATABASE_URL")');
+  });
+
+  it("passes a session-mode DIRECT_URL so migrate commands survive the transaction pooler", () => {
+    // transaction 풀러(6543)는 prepared statement 미지원 → migrate는 DIRECT_URL 필요
+    expect(prismaEnvRunner).toContain('resolveEnv("DIRECT_URL")');
+    expect(prismaEnvRunner).toContain("DIRECT_URL: directUrl");
+    expect(readFileSync("prisma/schema.prisma", "utf8")).toContain('directUrl = env("DIRECT_URL")');
   });
 
   it("limits Prisma diff runtime so Vercel builds cannot hang indefinitely", () => {

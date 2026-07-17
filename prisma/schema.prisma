@@ -5,6 +5,9 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // migrate 계열 명령용 직접 연결(세션 모드) — transaction 풀러(6543)는
+  // prepared statement를 지원하지 않아 schema engine이 실패한다.
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
