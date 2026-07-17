@@ -12,6 +12,7 @@ export interface SessionTargetRecord {
 export interface SessionAccessRecord extends SessionTargetRecord {
   teacherId: string;
   teacher: {
+    role: string;
     school: string | null;
     teacherClasses: Array<{ grade: string; className: string }>;
   };
@@ -34,6 +35,7 @@ export function studentCanAccessSession(
     !student.school ||
     !student.grade ||
     !student.className ||
+    session.teacher.role !== "TEACHER" ||
     session.teacher.school !== student.school
   ) {
     return false;
@@ -64,6 +66,7 @@ export function sessionWhereForStudent(
 
   return {
     teacher: {
+      role: "TEACHER",
       school: student.school,
       OR: [
         {

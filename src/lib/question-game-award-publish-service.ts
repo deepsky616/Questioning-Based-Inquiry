@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import {
+  createNoEligibleStudentAwardResult,
   restorePublishableAwardResult,
   type GameAwardResult,
 } from "@/lib/game-award-result";
@@ -23,14 +24,29 @@ export async function loadVerifiedGameAwardResult(
   identity: VerifiedGameAwardIdentity,
   allowedStudentIds: ReadonlySet<string>,
 ): Promise<GameAwardResult | null> {
+  const awardKey = buildRoomAwardKey(
+    identity.roomCode,
+    identity.roomCreatedAt,
+    identity.playId,
+  );
+  const settlement = await prisma.gameRoomSettlement.findUnique({
+    where: {
+      gameId_awardKey: {
+        gameId: identity.gameId,
+        awardKey,
+      },
+    },
+    select: { outcome: true },
+  });
+  if (settlement?.outcome === "NO_ELIGIBLE_STUDENTS") {
+    return createNoEligibleStudentAwardResult();
+  }
+  if (settlement?.outcome !== "AWARDED") return null;
+
   const logs = await prisma.pointLog.findMany({
     where: {
       gameId: identity.gameId,
-      roomCode: buildRoomAwardKey(
-        identity.roomCode,
-        identity.roomCreatedAt,
-        identity.playId,
-      ),
+      roomCode: awardKey,
       status: "APPROVED",
     },
     orderBy: [

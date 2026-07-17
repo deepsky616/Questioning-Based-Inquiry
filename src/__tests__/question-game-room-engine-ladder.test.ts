@@ -1009,7 +1009,9 @@ describe("질문 사다리 방 판정기", () => {
         ]),
       });
 
-      const restarted = restartQuestionGameRoom(left.room);
+      const restarted = restartQuestionGameRoom(left.room, {
+        pointAwardSettled: true,
+      });
       expect(restarted.kind).toBe("changed");
       if (restarted.kind !== "changed") throw new Error("다시 시작 결과가 필요합니다");
       const started = applyQuestionGameRoomCommand({

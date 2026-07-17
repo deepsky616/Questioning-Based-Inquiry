@@ -24,22 +24,33 @@ import {
 import { readRelayPublicState } from "@/lib/question-game-room-engines/turn-games";
 import { assignLadderTopics, generateLadderGrid } from "@/lib/question-ladder";
 
-const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  loadGameRoom: vi.fn(),
-  saveGameRoom: vi.fn(),
-  deleteGameRoom: vi.fn(),
-  createGameRoom: vi.fn(),
-  consumeCreateLimit: vi.fn(),
-  cleanupIfDue: vi.fn(),
-  checkRateLimit: vi.fn((): Response | null => null),
-  recordMemoryRoll: vi.fn(),
-  settleMemoryRollingRoom: vi.fn((room: GameRoom) => room),
-  loadVerifiedGameAwardResult: vi.fn(),
-  deleteGameRoomPresence: vi.fn(),
-  generateMysteryAiAnswer: vi.fn(),
-  ensureQuestionGameRoomPoints: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  const tx = {
+    $queryRaw: vi.fn(),
+    user: { findUnique: vi.fn() },
+    gameRoom: {},
+    gameRoomCreateAttempt: {},
+  };
+  return {
+    tx,
+    transaction: vi.fn(),
+    auth: vi.fn(),
+    loadGameRoom: vi.fn(),
+    saveGameRoom: vi.fn(),
+    deleteGameRoom: vi.fn(),
+    createGameRoom: vi.fn(),
+    consumeCreateLimit: vi.fn(),
+    cleanupIfDue: vi.fn(),
+    checkRateLimit: vi.fn((): Response | null => null),
+    recordMemoryRoll: vi.fn(),
+    settleMemoryRollingRoom: vi.fn((room: GameRoom) => room),
+    loadVerifiedGameAwardResult: vi.fn(),
+    deleteGameRoomPresence: vi.fn(),
+    generateMysteryAiAnswer: vi.fn(),
+    ensureQuestionGameRoomPoints: vi.fn(),
+    settlementFindUnique: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/api-rate-limit", () => ({ checkRateLimit: mocks.checkRateLimit }));
@@ -51,6 +62,7 @@ vi.mock("@/lib/game-room-cleanup-service", () => ({
 }));
 vi.mock("@/lib/game-room-store", () => ({
   loadGameRoom: mocks.loadGameRoom,
+  loadLockedGameRoom: mocks.loadGameRoom,
   saveGameRoom: mocks.saveGameRoom,
   deleteGameRoom: mocks.deleteGameRoom,
   deleteGameRoomPresence: mocks.deleteGameRoomPresence,
@@ -80,6 +92,12 @@ vi.mock("@/lib/question-game-award-publish-service", () => ({
 }));
 vi.mock("@/lib/point-award-service", () => ({
   ensureQuestionGameRoomPoints: mocks.ensureQuestionGameRoomPoints,
+}));
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    $transaction: mocks.transaction,
+    gameRoomSettlement: { findUnique: mocks.settlementFindUnique },
+  },
 }));
 import { POST } from "@/app/api/question-games/rooms/route";
 import { GET, PATCH } from "@/app/api/question-games/rooms/[code]/route";
@@ -142,6 +160,17 @@ function create(body: Record<string, unknown>) {
 }
 
 beforeEach(() => {
+  mocks.transaction.mockReset().mockImplementation(
+    (callback: (client: typeof mocks.tx) => unknown) => callback(mocks.tx),
+  );
+  mocks.tx.$queryRaw.mockReset().mockResolvedValue([{ lock: "" }]);
+  mocks.tx.user.findUnique.mockReset().mockImplementation(
+    async ({ where }: { where: { id: string } }) => ({
+      id: where.id,
+      name: where.id === "user-1" ? "학생" : where.id,
+      role: "STUDENT",
+    }),
+  );
   mocks.auth.mockReset().mockResolvedValue({
     user: { id: "user-1", name: "학생" },
   });
@@ -155,6 +184,7 @@ beforeEach(() => {
   mocks.deleteGameRoomPresence.mockReset().mockResolvedValue(undefined);
   mocks.generateMysteryAiAnswer.mockReset();
   mocks.ensureQuestionGameRoomPoints.mockReset().mockResolvedValue(null);
+  mocks.settlementFindUnique.mockReset().mockResolvedValue({ outcome: "AWARDED" });
   mocks.consumeCreateLimit.mockReset().mockResolvedValue(true);
   mocks.cleanupIfDue.mockReset().mockResolvedValue(null);
   mocks.settleMemoryRollingRoom
@@ -460,7 +490,7 @@ describe("공개 방 응답", () => {
     expect(body.room.gameState).toEqual({ phase: "play" });
     expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
       gameState: { phase: "play", private: { answer: "사과" } },
-    }));
+    }), mocks.tx);
   });
 
   it("충돌 응답에서 비공개 상태를 제거한다", async () => {

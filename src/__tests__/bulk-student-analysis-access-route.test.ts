@@ -34,6 +34,7 @@ const mAnalysisFind = prisma.sessionAnalysis.findMany as unknown as ReturnType<t
 const mRunAnalysis = runStudentSessionAnalysis as unknown as ReturnType<typeof vi.fn>;
 
 type TeacherRecord = {
+  role: "TEACHER";
   school: string | null;
   teacherClasses: Array<{ grade: string; className: string }>;
 };
@@ -57,6 +58,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
   teacherRecord = {
+    role: "TEACHER",
     school: "한빛초",
     teacherClasses: [{ grade: "5", className: "1" }],
   };
@@ -74,6 +76,7 @@ beforeEach(() => {
 describe("묶음 학생 분석 접근 경계", () => {
   it("학교가 없는 교사는 학생 조회와 분석 전에 거부한다", async () => {
     teacherRecord = {
+      role: "TEACHER",
       school: null,
       teacherClasses: [{ grade: "5", className: "1" }],
     };
@@ -94,7 +97,7 @@ describe("묶음 학생 분석 접근 경계", () => {
   });
 
   it("담당 학급이 없는 교사는 같은 학교의 요청 학급을 분석할 수 있다", async () => {
-    teacherRecord = { school: "한빛초", teacherClasses: [] };
+    teacherRecord = { role: "TEACHER", school: "한빛초", teacherClasses: [] };
     mOwnedClassFind.mockResolvedValue(null);
 
     const response = await POST(request("6", "2"));

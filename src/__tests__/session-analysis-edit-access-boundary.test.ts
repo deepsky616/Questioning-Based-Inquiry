@@ -28,6 +28,7 @@ const ownedSession = {
   targetStudentId: null,
   targetStudentIds: [],
   teacher: {
+    role: "TEACHER",
     school: "우리학교",
     teacherClasses: [{ grade: "5", className: "1" }],
   },

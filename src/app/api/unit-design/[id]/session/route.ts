@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { teacherCanUseSessionTarget } from "@/lib/session-access";
+import {
+  lockSessionWriteLifecycles,
+  normalizeSessionTarget,
+  revalidateSessionTargetAfterLifecycleLocks,
+} from "@/lib/session-write-access";
 import { isValidSessionDateString } from "@/lib/sessions";
 
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
@@ -45,104 +49,107 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const teacherId = (session.user as { id: string }).id;
     const body = await req.json();
     const data = createSessionSchema.parse(body);
-
-    const rows = await prisma.$queryRaw<
-      {
-        id: string;
-        teacher_id: string;
-        title: string;
-        subject: string;
-        inquiry_questions: unknown;
-      }[]
-    >`
-      SELECT id, teacher_id, title, subject, inquiry_questions
-      FROM unit_designs
-      WHERE id = ${id}
-      LIMIT 1
-    `;
-
-    const design = rows[0];
-    if (!design || design.teacher_id !== teacherId) {
-      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
-    }
-
-    const canUseTarget = await teacherCanUseSessionTarget(teacherId, {
+    const target = normalizeSessionTarget({
       targetType: data.targetType,
       targetGrade: data.targetGrade ?? null,
       targetClassName: data.targetClassName ?? null,
       targetStudentId: data.targetStudentId ?? null,
       targetStudentIds: data.targetStudentIds,
     });
-    if (!canUseTarget) {
+    const result = await prisma.$transaction(async (tx) => {
+      await lockSessionWriteLifecycles(tx, teacherId, target);
+      if (!(await revalidateSessionTargetAfterLifecycleLocks(tx, teacherId, target))) {
+        return { kind: "target-forbidden" } as const;
+      }
+
+      const rows = await tx.$queryRaw<
+        {
+          id: string;
+          teacher_id: string;
+          title: string;
+          subject: string;
+          inquiry_questions: unknown;
+        }[]
+      >`
+        SELECT id, teacher_id, title, subject, inquiry_questions
+        FROM unit_designs
+        WHERE id = ${id}
+        ORDER BY id
+        FOR SHARE
+      `;
+      const design = rows[0];
+      if (!design || design.teacher_id !== teacherId) {
+        return { kind: "forbidden" } as const;
+      }
+
+      const savedQuestions = Array.isArray(design.inquiry_questions)
+        ? design.inquiry_questions.filter(
+            (question): question is { type: string; content: string } =>
+              typeof question === "object" &&
+              question !== null &&
+              typeof (question as { type?: unknown }).type === "string" &&
+              typeof (question as { content?: unknown }).content === "string" &&
+              Boolean((question as { content: string }).content.trim()),
+          )
+        : [];
+      const savedKeys = new Set(savedQuestions.map(questionKey));
+      const publishedAt = new Date().toISOString();
+      const selectedQuestions = data.sharedQuestions.map((question) => ({
+        ...question,
+        type: question.type,
+        content: question.content.trim(),
+        publishedAt,
+      }));
+      if (selectedQuestions.some((question) => !savedKeys.has(questionKey(question)))) {
+        return { kind: "invalid-questions" } as const;
+      }
+
+      const newSession = await tx.questionSession.create({
+        data: {
+          date: data.date,
+          subject: design.subject,
+          topic: data.topic?.trim() || design.title,
+          teacherId,
+          unitDesignId: design.id,
+          sharedQuestions: selectedQuestions,
+          ...target,
+          defaultQuestionPublic: data.defaultQuestionPublic,
+          isActive: data.isActive,
+          likesVisibleToPeers: data.likesVisibleToPeers,
+          commentsVisibleToPeers: data.commentsVisibleToPeers,
+        },
+      });
+
+      for (const question of selectedQuestions) {
+        await tx.question.create({
+          data: {
+            content: question.content,
+            closure: "open",
+            cognitive: "conceptual",
+            source: "TEACHER_SHARED",
+            inquiryType: question.type,
+            isPublic: true,
+            authorId: teacherId,
+            sessionId: newSession.id,
+          },
+        });
+      }
+      return { kind: "created", session: newSession } as const;
+    });
+
+    if (result.kind === "forbidden") {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+    }
+    if (result.kind === "target-forbidden") {
       return NextResponse.json({ error: "수업 대상을 선택할 권한이 없습니다" }, { status: 403 });
     }
-
-    const savedQuestions = Array.isArray(design.inquiry_questions)
-      ? design.inquiry_questions.filter(
-          (question): question is { type: string; content: string } =>
-            typeof question === "object" &&
-            question !== null &&
-            typeof (question as { type?: unknown }).type === "string" &&
-            typeof (question as { content?: unknown }).content === "string" &&
-            Boolean((question as { content: string }).content.trim()),
-        )
-      : [];
-
-    const savedKeys = new Set(savedQuestions.map(questionKey));
-    const publishedAt = new Date().toISOString();
-    const selectedQuestions = data.sharedQuestions.map((question) => ({
-      ...question,
-      type: question.type,
-      content: question.content.trim(),
-      publishedAt,
-    }));
-
-    if (selectedQuestions.some((question) => !savedKeys.has(questionKey(question)))) {
+    if (result.kind === "invalid-questions") {
       return NextResponse.json(
         { error: "저장된 탐구질문 중에서만 선택할 수 있습니다" },
         { status: 400 },
       );
     }
-
-    const newSession = await prisma.questionSession.create({
-      data: {
-        date: data.date,
-        subject: design.subject,
-        topic: data.topic?.trim() || design.title,
-        teacherId,
-        unitDesignId: design.id,
-        sharedQuestions: selectedQuestions,
-        targetType: data.targetType,
-        targetGrade: data.targetType === "CLASS" || data.targetType === "CUSTOM" ? data.targetGrade ?? null : null,
-        targetClassName: data.targetType === "CLASS" || data.targetType === "CUSTOM" ? data.targetClassName ?? null : null,
-        targetStudentId: data.targetType === "STUDENT" ? data.targetStudentId ?? null : null,
-        targetStudentIds: ["CLASS", "STUDENT", "CUSTOM"].includes(data.targetType) ? data.targetStudentIds : [],
-        defaultQuestionPublic: data.defaultQuestionPublic,
-        isActive: data.isActive,
-        likesVisibleToPeers: data.likesVisibleToPeers,
-        commentsVisibleToPeers: data.commentsVisibleToPeers,
-      },
-    });
-
-    // 배포 질문을 TEACHER_SHARED Question으로 생성 → 학생이 좋아요·댓글로 참여 가능(수업 탐구 질문)
-    await Promise.all(
-      selectedQuestions.map((q) =>
-        prisma.question.create({
-          data: {
-            content: q.content,
-            closure: "open",
-            cognitive: "conceptual",
-            source: "TEACHER_SHARED",
-            inquiryType: q.type,
-            isPublic: true,
-            authorId: teacherId,
-            sessionId: newSession.id,
-          },
-        }),
-      ),
-    );
-
-    return NextResponse.json(newSession, { status: 201 });
+    return NextResponse.json(result.session, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });

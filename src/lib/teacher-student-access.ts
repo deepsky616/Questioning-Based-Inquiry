@@ -19,13 +19,68 @@ export async function loadTeacherStudentScope(
   const teacher = await prisma.user.findUnique({
     where: { id: teacherId },
     select: {
+      role: true,
       school: true,
       teacherClasses: { select: { grade: true, className: true } },
     },
   });
 
-  if (!teacher?.school) return null;
+  if (teacher?.role !== "TEACHER" || !teacher.school) return null;
   return { school: teacher.school, classes: teacher.teacherClasses };
+}
+
+export async function lockAndLoadTeacherStudentScope(
+  tx: Pick<Prisma.TransactionClient, "$queryRaw" | "user">,
+  teacherId: string,
+): Promise<TeacherStudentScope | null> {
+  const lockedTeacher = await tx.$queryRaw<Array<{ id: string }>>(
+    Prisma.sql`
+      SELECT "id"
+      FROM "users"
+      WHERE "id" = ${teacherId}
+      ORDER BY "id"
+      FOR UPDATE
+    `,
+  );
+  if (lockedTeacher.length === 0) return null;
+
+  await tx.$queryRaw<Array<{ id: string }>>(
+    Prisma.sql`
+      SELECT "id"
+      FROM "teacher_classes"
+      WHERE "teacher_id" = ${teacherId}
+      ORDER BY "id"
+      FOR UPDATE
+    `,
+  );
+
+  const teacher = await tx.user.findUnique({
+    where: { id: teacherId },
+    select: {
+      role: true,
+      school: true,
+      teacherClasses: { select: { grade: true, className: true } },
+    },
+  });
+  if (teacher?.role !== "TEACHER" || !teacher.school) return null;
+  return { school: teacher.school, classes: teacher.teacherClasses };
+}
+
+export async function lockStudentRows(
+  tx: Pick<Prisma.TransactionClient, "$queryRaw">,
+  studentIds: string[],
+): Promise<Array<{ id: string }>> {
+  const sortedIds = Array.from(new Set(studentIds)).sort();
+  if (sortedIds.length === 0) return [];
+  return tx.$queryRaw<Array<{ id: string }>>(
+    Prisma.sql`
+      SELECT "id"
+      FROM "users"
+      WHERE "id" IN (${Prisma.join(sortedIds)})
+      ORDER BY "id"
+      FOR UPDATE
+    `,
+  );
 }
 
 export function isClassInTeacherScope(

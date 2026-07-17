@@ -175,6 +175,7 @@ describe("POST /api/translate", () => {
         targetStudentId: null,
         targetStudentIds: [],
         teacher: {
+          role: "TEACHER",
           school: "s",
           teacherClasses: [{ grade: "5", className: "1" }],
         },
@@ -210,6 +211,7 @@ describe("POST /api/translate", () => {
         targetStudentId: null,
         targetStudentIds: [],
         teacher: {
+          role: "TEACHER",
           school: "other-school",
           teacherClasses: [{ grade: "5", className: "1" }],
         },

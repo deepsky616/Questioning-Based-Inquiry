@@ -17,6 +17,7 @@ import {
   relayQuestionGameRoomEngine,
   storyDiceQuestionGameRoomEngine,
 } from "@/lib/question-game-room-engines/turn-games";
+import { isCompletedVersion2QuestionGameRoom } from "@/lib/question-game-room-award-ledger";
 
 const RECENT_COMMAND_LIMIT = 64;
 const UUID_V4_PATTERN =
@@ -84,6 +85,11 @@ export interface QuestionGameRoomLeaveContext {
   now?: number;
   random?: () => number;
   randomUUID?: () => string;
+  pointAwardSettled?: boolean;
+}
+
+export interface QuestionGameRoomRestartContext {
+  pointAwardSettled?: boolean;
 }
 
 export interface QuestionGameRoomEngine {
@@ -257,6 +263,7 @@ function changedRoomWithCommand(
   room: GameRoom,
   candidate: GameRoom,
   commandId: string,
+  now: number,
   result?: RoomCommandResult,
 ): QuestionGameRoomResult {
   const nextState = parseEngineState(candidate.gameState);
@@ -276,7 +283,7 @@ function changedRoomWithCommand(
         commandId,
       ),
     },
-  }, nextState);
+  }, nextState, now);
   const nextStateBytes = serializedBytes(nextRoom.gameState);
   const nextRoomBytes = serializedBytes(nextRoom);
   if (
@@ -302,6 +309,7 @@ function withCompletionParticipants(
   previousRoom: GameRoom,
   nextRoom: GameRoom,
   nextState: EngineStateBase | null,
+  completionTime: number,
 ): GameRoom {
   const previousState = parseEngineState(previousRoom.gameState);
   const completedNow =
@@ -316,9 +324,20 @@ function withCompletionParticipants(
   return completedNow
     ? {
         ...nextRoom,
+        pointCompletedAt: isNonNegativeInteger(completionTime)
+          ? completionTime
+          : nextRoom.updatedAt,
         pointParticipants: structuredClone(nextRoom.players),
       }
-    : nextRoom;
+    : previousRoom.pointCompletedAt !== undefined
+      ? { ...nextRoom, pointCompletedAt: previousRoom.pointCompletedAt }
+      : (() => {
+          const {
+            pointCompletedAt: _pointCompletedAt,
+            ...roomWithoutCompletionTime
+          } = nextRoom;
+          return roomWithoutCompletionTime;
+        })();
 }
 
 function applyQuestionGameRoomCommandWithResolvedEngine(
@@ -445,6 +464,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
         playId: checkedRandomUUID(),
         pointAwardKeyVersion: 2,
         pointEvidenceVersion: 2,
+        pointCompletedAt: undefined,
       };
       initialState = engine.createInitialState({
         room: structuredClone(startRoom),
@@ -474,6 +494,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
       room,
       { ...startRoom, gameState: structuredClone(initialState) },
       body.commandId,
+      now,
     );
   }
 
@@ -528,6 +549,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
     room,
     engineResult.room,
     body.commandId,
+    now,
     engineResult.result,
   );
 }
@@ -573,6 +595,17 @@ function leaveQuestionGameRoomWithResolvedEngine(
   }
 
   const remainingPlayers = room.players.filter(({ id }) => id !== userId);
+  if (
+    remainingPlayers.length === 0 &&
+    isCompletedVersion2QuestionGameRoom(room) &&
+    input.pointAwardSettled !== true
+  ) {
+    return unchanged(
+      "conflict",
+      room,
+      "포인트 지급을 확인한 뒤 방을 나갈 수 있습니다",
+    );
+  }
   const nextHostId = remainingPlayers.some(({ id }) => id === room.hostId)
     ? room.hostId
     : (remainingPlayers[0]?.id ?? "");
@@ -722,12 +755,25 @@ function leaveQuestionGameRoomWithResolvedEngine(
     players: structuredClone(players),
     status: shouldEnd ? "ended" : hookRoom.status,
     gameState: finalState,
-  }, nextState);
+  }, nextState, input.now ?? room.updatedAt);
 
   return { kind: "changed", room: nextRoom };
 }
 
-export function restartQuestionGameRoom(room: GameRoom): QuestionGameRoomResult {
+export function restartQuestionGameRoom(
+  room: GameRoom,
+  context: QuestionGameRoomRestartContext = {},
+): QuestionGameRoomResult {
+  if (
+    isCompletedVersion2QuestionGameRoom(room) &&
+    context.pointAwardSettled !== true
+  ) {
+    return unchanged(
+      "conflict",
+      room,
+      "포인트 지급을 확인한 뒤 다시 시작할 수 있습니다",
+    );
+  }
   const alreadyRestarted =
     room.status === "waiting" &&
     room.topic === "" &&
@@ -737,6 +783,7 @@ export function restartQuestionGameRoom(room: GameRoom): QuestionGameRoomResult 
     room.playId === undefined &&
     room.pointAwardKeyVersion === undefined &&
     room.pointEvidenceVersion === undefined &&
+    room.pointCompletedAt === undefined &&
     room.pointParticipants === undefined &&
     room.awardResult === undefined;
   if (alreadyRestarted) {
@@ -747,6 +794,7 @@ export function restartQuestionGameRoom(room: GameRoom): QuestionGameRoomResult 
     playId: _playId,
     pointAwardKeyVersion: _pointAwardKeyVersion,
     pointEvidenceVersion: _pointEvidenceVersion,
+    pointCompletedAt: _pointCompletedAt,
     pointParticipants: _pointParticipants,
     awardResult: _awardResult,
     ...roomWithoutExecution

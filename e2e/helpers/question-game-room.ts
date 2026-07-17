@@ -420,6 +420,7 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
       now: now(),
       random,
       randomUUID,
+      pointAwardSettled: true,
     });
     if (result.kind === "replayed") {
       return { status: 200, body: { room: null } };
@@ -465,7 +466,7 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
           body: { error: "기대 버전이 다릅니다", room: publicRoom(room) },
         };
       }
-      const result = restartQuestionGameRoom(room);
+      const result = restartQuestionGameRoom(room, { pointAwardSettled: true });
       return result.kind === "changed"
         ? resultResponse(save(result.room), result.result)
         : result.kind === "replayed"

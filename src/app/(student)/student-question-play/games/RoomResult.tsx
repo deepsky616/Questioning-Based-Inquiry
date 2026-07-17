@@ -11,6 +11,7 @@ import {
 import { RefreshCw, Share2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useLocale } from "next-intl";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, playerColorById } from "./roomShared";
 import { GameResultReview } from "./GameResultReview";
@@ -52,6 +53,7 @@ function readAwardResult(value: unknown): GameAwardResult | null {
     "awards",
     "bestQuestion",
     "summary",
+    "settlement",
     "alreadyAwarded",
   ]);
   if (Object.keys(value).some((key) => !allowedKeys.has(key))) return null;
@@ -95,6 +97,7 @@ export default function RoomResult({
   actionLoading, onAction, onLeave, onRestart, restartLabel, waitingLabel,
 }: Props) {
   const locale = useLocale();
+  const queryClient = useQueryClient();
   const { data: session, status: sessionStatus } = useSession();
   const text = getQuestionGameText(locale);
   const isHost = room.hostId === myId;
@@ -247,6 +250,9 @@ export default function RoomResult({
       if (!response.ok || !result) {
         throw new Error(text.awardRequestFailed);
       }
+      if (result.awards.some(({ points }) => points > 0)) {
+        void queryClient.invalidateQueries({ queryKey: ["points-card"] });
+      }
       if (
         !mountedRef.current ||
         currentLifetimeRef.current !== requestLifetimeKey
@@ -275,7 +281,7 @@ export default function RoomResult({
         );
       }
     }
-  }, [canRecoverAward, game.id, publishAward, room.code, room.createdAt, room.playId, text.awardFailed, text.awardRequestFailed]);
+  }, [canRecoverAward, game.id, publishAward, queryClient, room.code, room.createdAt, room.playId, text.awardFailed, text.awardRequestFailed]);
 
   // 완료된 실행의 포인트 지급 상태를 참가자 화면마다 한 번 확인한다.
   useEffect(() => {

@@ -6,12 +6,19 @@
  *
  * 모든 단계에서 실패 시 구체적인 에러 메시지를 던집니다.
  */
+export class JsonExtractionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "JsonExtractionError";
+  }
+}
+
 function extractBalancedJson(raw: string, open: "{" | "[", close: "}" | "]", label: string): unknown {
-  if (!raw) throw new Error("AI 응답이 비어있습니다");
+  if (!raw) throw new JsonExtractionError("AI 응답이 비어있습니다");
   let text = raw.replace(/^```(?:json|JSON)?\s*/m, "").replace(/```\s*$/m, "").trim();
 
   const start = text.indexOf(open);
-  if (start < 0) throw new Error(`${label}를 찾을 수 없습니다`);
+  if (start < 0) throw new JsonExtractionError(`${label}를 찾을 수 없습니다`);
 
   let depth = 0;
   let inStr = false;
@@ -29,14 +36,14 @@ function extractBalancedJson(raw: string, open: "{" | "[", close: "}" | "]", lab
       if (depth === 0) { end = i; break; }
     }
   }
-  if (end < 0) throw new Error(`${label}가 닫히지 않았습니다`);
+  if (end < 0) throw new JsonExtractionError(`${label}가 닫히지 않았습니다`);
 
   const sliced = text.slice(start, end + 1);
   try {
     return JSON.parse(sliced);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    throw new Error(`JSON 파싱 실패: ${msg}`);
+    throw new JsonExtractionError(`JSON 파싱 실패: ${msg}`);
   }
 }
 

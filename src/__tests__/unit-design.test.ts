@@ -17,6 +17,7 @@ vi.mock("@/lib/db", () => ({
     $queryRaw: vi.fn(),
     $queryRawUnsafe: vi.fn(),
     $executeRawUnsafe: vi.fn(),
+    $transaction: vi.fn(),
     systemConfig: { findUnique: vi.fn() },
     questionSession: { create: vi.fn() },
     question: { create: vi.fn() },
@@ -40,6 +41,7 @@ const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
 const mockQueryRawUnsafe = prisma.$queryRawUnsafe as ReturnType<typeof vi.fn>;
 const mockExecRaw = prisma.$executeRawUnsafe as ReturnType<typeof vi.fn>;
+const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockSessionCreate = prisma.questionSession.create as ReturnType<typeof vi.fn>;
 const mockFindUnique = prisma.systemConfig.findUnique as ReturnType<typeof vi.fn>;
@@ -80,9 +82,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   aiState.apiKey = "test-api-key";
   mockUserFindUnique.mockResolvedValue({
+    role: "TEACHER",
     school: "한빛초",
     teacherClasses: [{ grade: "5", className: "1" }],
   });
+  mockTransaction.mockImplementation(async (callback) => callback(prisma));
 });
 
 // ─── GET /api/unit-design ─────────────────────────────────────────────────────

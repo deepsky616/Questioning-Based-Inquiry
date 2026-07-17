@@ -20,6 +20,7 @@ export async function GET(_req: Request, { params }: Params) {
       targetType: true, targetGrade: true, targetClassName: true, targetStudentId: true, targetStudentIds: true,
       teacher: {
         select: {
+          role: true,
           school: true,
           teacherClasses: { select: { grade: true, className: true } },
         },

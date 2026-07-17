@@ -146,30 +146,47 @@ export function usePointReview({ classFilter }: { classFilter?: PointReviewClass
     if (targetIds.length === 0) return;
     setBusy(true);
     try {
-      await fetch("/api/teacher/points/decide", {
+      const res = await fetch("/api/teacher/points/decide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: targetIds, decision }),
       });
-      setMessage(decision === "APPROVE" ? t("resultApproved", { count: targetIds.length }) : t("resultRejected", { count: targetIds.length }));
+      const data = await res.json().catch(() => ({})) as { count?: unknown; error?: unknown };
+      const count = typeof data.count === "number" && Number.isInteger(data.count) && data.count > 0
+        ? data.count
+        : 0;
+      if (!res.ok || count === 0) {
+        setMessage(typeof data.error === "string" ? data.error : t("networkError"));
+        return;
+      }
+      setMessage(decision === "APPROVE" ? t("resultApproved", { count }) : t("resultRejected", { count }));
       loadPending();
       queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.pendingPoints });
       queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.flagged });
-    } catch {} finally { setBusy(false); }
+    } catch { setMessage(t("networkError")); } finally { setBusy(false); }
   }
 
   async function decideWithOverride(logId: string, points: number) {
     setBusy(true);
     try {
-      await fetch("/api/teacher/points/decide", {
+      const res = await fetch("/api/teacher/points/decide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: [logId], decision: "APPROVE", overridePoints: points }),
       });
-      setMessage(t("overrideApproved", { points }));
+      const data = await res.json().catch(() => ({})) as { count?: unknown; error?: unknown };
+      const count = typeof data.count === "number" && Number.isInteger(data.count) && data.count > 0
+        ? data.count
+        : 0;
+      if (!res.ok || count === 0) {
+        setMessage(typeof data.error === "string" ? data.error : t("networkError"));
+        return;
+      }
+      setMessage(`${t("overrideApproved", { points })} · ${t("resultApproved", { count })}`);
       loadPending();
       queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.pendingPoints });
-    } catch {} finally { setBusy(false); }
+      queryClient.invalidateQueries({ queryKey: teacherAlertQueryKeys.flagged });
+    } catch { setMessage(t("networkError")); } finally { setBusy(false); }
   }
 
   const classFilteredSessions = useMemo(

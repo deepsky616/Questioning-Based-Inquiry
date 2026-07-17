@@ -29,6 +29,7 @@ const individualSession = (targetStudentId: string) => ({
   targetStudentId,
   targetStudentIds: [targetStudentId],
   teacher: {
+    role: "TEACHER",
     school: "한빛초",
     teacherClasses: [{ grade: "5", className: "1" }],
   },

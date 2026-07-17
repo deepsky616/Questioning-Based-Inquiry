@@ -48,6 +48,7 @@ export async function getPublishedQuestions(sessionId: string, userId: string) {
         targetStudentIds: true,
         teacher: {
           select: {
+            role: true,
             school: true,
             teacherClasses: { select: { grade: true, className: true } },
           },

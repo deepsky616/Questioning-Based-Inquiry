@@ -419,6 +419,9 @@ function AskContent() {
         queryKey: appQueryKeys.studentQuestionSummary(user.id),
       });
       void queryClient.invalidateQueries({ queryKey: appNotificationQueryKeys.student });
+      if (typeof saved?.awardedPoints === "number" && saved.awardedPoints > 0) {
+        void queryClient.invalidateQueries({ queryKey: ["points-card"] });
+      }
       if (
         selectedSessionIdRef.current !== savedSessionId ||
         !isAnalysisCurrent(contentRef.current, selectedSessionIdRef.current, savedAnalysis)

@@ -34,6 +34,7 @@ model User {
   unitDesigns         UnitDesign[]         @relation("UnitDesigns")
   questionLikes       QuestionLike[]       @relation("UserLikes")
   pointLogs           PointLog[]           @relation("StudentPointLogs")
+  activityAwardClaims ActivityAwardClaim[] @relation("StudentActivityAwardClaims")
   awardedLogs         PointLog[]           @relation("AwardedByTeacher")
   gameRoomCreateAttempts GameRoomCreateAttempt[] @relation("GameRoomCreateAttempts")
   ownedGameRuns       GameRun[]            @relation("GameRunOwner")
@@ -62,6 +63,7 @@ model PointLog {
   sessionId   String?  @map("session_id_ref")
   relatedQuestionId String? @map("related_question_id")
   relatedCommentId  String? @map("related_comment_id")
+  activityDedupeKey String? @map("activity_dedupe_key")
   aiAnalysis  String?  @map("ai_analysis")
   awardedById String?  @map("awarded_by_id")
   awardedBy   User?    @relation("AwardedByTeacher", fields: [awardedById], references: [id])
@@ -74,6 +76,7 @@ model PointLog {
   @@unique([studentId, gameId, roomCode, bonusType], name: "uniq_point_award")
   @@unique([relatedQuestionId, bonusType], name: "uniq_point_per_question")
   @@unique([relatedCommentId, bonusType], name: "uniq_point_per_comment")
+  @@unique([studentId, bonusType, activityDedupeKey], name: "uniq_activity_content_award", map: "uniq_activity_content_award")
   @@unique([studentId, gameRunId, bonusType], name: "uniq_point_per_game_run")
   @@index([studentId, createdAt])
   @@index([gameId, createdAt])
@@ -81,6 +84,20 @@ model PointLog {
   @@index([status])
   @@index([sessionId])
   @@map("point_logs")
+}
+
+model ActivityAwardClaim {
+  studentId          String   @map("student_id")
+  student            User     @relation("StudentActivityAwardClaims", fields: [studentId], references: [id], onDelete: Cascade)
+  bonusType          String   @map("bonus_type")
+  activityDedupeKey  String   @map("activity_dedupe_key")
+  scopeId            String   @map("scope_id")
+  pointLogId         String   @map("point_log_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@id([studentId, bonusType, activityDedupeKey], map: "activity_award_claims_pkey")
+  @@unique([pointLogId], map: "uniq_activity_award_claim_point_log")
+  @@map("activity_award_claims")
 }
 
 model AppNotification {
@@ -158,6 +175,7 @@ model Question {
   id             String  @id @default(cuid())
   content        String  @map("content")
   normalizedContent String @default("") @map("normalized_content")
+  dedupeKey      String? @map("dedupe_key")
   closure        String  @map("closure")
   cognitive      String  @map("cognitive")
   closureScore   Float?  @map("closure_score")
@@ -180,11 +198,10 @@ model Question {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@index([sessionId, authorId, normalizedContent])
+  @@unique([sessionId, authorId, dedupeKey], name: "uniq_student_question_content", map: "uniq_student_question_content")
   @@index([authorId, createdAt])
   @@index([sessionId, source])
   @@index([sessionId, createdAt])
-  @@index([normalizedContent])
   @@map("questions")
 }
 
@@ -192,6 +209,7 @@ model Comment {
   id         String   @id @default(cuid())
   content    String   @map("content")
   normalizedContent String @default("") @map("normalized_content")
+  dedupeKey  String? @map("dedupe_key")
   authorId   String   @map("author_id")
   author     User     @relation("CommentAuthor", fields: [authorId], references: [id])
   questionId String   @map("question_id")
@@ -200,9 +218,8 @@ model Comment {
   flagReason String?  @map("flag_reason")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  @@index([questionId, authorId, normalizedContent])
+  @@unique([questionId, authorId, dedupeKey], name: "uniq_student_comment_content", map: "uniq_student_comment_content")
   @@index([authorId, createdAt])
-  @@index([normalizedContent])
   @@map("comments")
 }
 
@@ -246,6 +263,19 @@ model GameRoomCreateAttempt {
 
   @@index([userId, createdAt])
   @@map("game_room_create_attempts")
+}
+
+model GameRoomSettlement {
+  gameId       String   @map("game_id")
+  awardKey     String   @map("award_key")
+  roomCode     String?  @map("room_code")
+  roomCreatedAt BigInt? @map("room_created_at")
+  playId       String?  @map("play_id")
+  outcome      String   @map("outcome")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@id([gameId, awardKey], map: "game_room_settlements_pkey")
+  @@map("game_room_settlements")
 }
 
 model GameRun {

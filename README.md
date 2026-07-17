@@ -23,8 +23,8 @@ npm install
 # Generate Prisma client
 npx prisma generate
 
-# Push database schema
-npx prisma db push
+# Apply versioned migrations, including database functions and triggers
+npm run db:migrate:deploy
 
 # Check required deployment tables/enums
 npm run db:check
@@ -60,9 +60,52 @@ RESEND_FROM_EMAIL="Question Lab <noreply@your-domain.com>"
 1. Create a Supabase Free project.
 2. Copy the pooled Postgres connection string from Supabase Database settings.
 3. Set it as `DATABASE_URL`.
-4. Run `npx prisma generate` and `npx prisma db push`.
-5. Run `npm run db:security:apply` after the initial push and after adding tables.
+4. Run `npx prisma generate` and `npm run db:migrate:deploy`.
+5. Run `npm run db:security:apply` after the migrations and after adding database objects.
 6. Run `npm run db:check` and `npm run db:security:check` before deployment.
+
+Do not use `prisma db push` for an application environment. The versioned migrations
+create required database functions, triggers, claims, and security rules that schema
+push cannot reproduce.
+
+### Point-integrity migration rollout
+
+The point-integrity migration and the application release that depends on it must be
+cut over together. Stop point-bearing writes and drain requests from the previous app
+version, run `npm run db:migrate:deploy`, deploy the matching app version, run
+`npm run db:security:apply` and the database checks, and only then resume writes. This
+prevents an older app process from deleting award ledgers while the new immutable
+claim rules are being installed.
+
+The migration rejects every existing pending AI activity review and teacher-adjusted
+review because older rows do not contain a verifiable source snapshot. Rejected rows
+receive a `MIGRATED_REJECTED_` bonus-type prefix so the original per-question or
+per-comment unique slot is available for a fresh analysis; approved ledger rows are
+not changed. After writes resume, teachers must run the session analysis again to
+create reviewable candidates from the current question and comment text.
+
+Before backfilling question-game settlement receipts, the migration cross-checks
+each active completed version-2 room against its participant accounts, saved award
+result, and approved point logs. It does not mark partial histories as awarded.
+Ephemeral completed rooms that still reference an already-deleted account are
+removed while their surviving audit logs remain unchanged.
+
+If `npm run db:migrate:deploy` fails while applying
+`20260716211000_close_point_integrity_races`, keep point-bearing writes stopped.
+Check `npm run db:migrate:status` and the database logs, then verify that the
+transaction rolled back and none of that migration's new columns, indexes,
+functions, triggers, or `activity_award_claims` table remain. Only after that
+verification, mark the failed attempt as rolled back and retry the versioned
+migration:
+
+```bash
+node scripts/run-prisma-with-env.mjs migrate resolve --rolled-back 20260716211000_close_point_integrity_races
+npm run db:migrate:deploy
+```
+
+Do not run the migration SQL directly and do not use `prisma db push`. If any
+partial object remains or rollback cannot be proven, do not resolve the failed
+migration; keep writes stopped and repair or restore the database first.
 
 ### Supabase Data API security
 

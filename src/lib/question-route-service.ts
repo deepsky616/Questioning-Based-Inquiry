@@ -5,12 +5,14 @@ import { prisma } from "@/lib/db";
 import { buildQuestionCreateData, buildQuestionWhereClause, resolveIsPublicFilter, QUESTION_LIST_MAX } from "@/lib/questions";
 import { isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { sendQuestionNotificationEmail } from "@/lib/email";
-import { normalizeContent, ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
+import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
+import { normalizeContentForPersistence } from "@/lib/content-normalize-db";
 import {
   loadTeacherStudentScope,
   studentWhereForTeacherScope,
 } from "@/lib/teacher-student-access";
 import {
+  lockCurrentSessionAccessScope,
   sessionWhereForStudent,
   studentCanAccessSession,
 } from "@/lib/session-access";
@@ -90,6 +92,7 @@ async function applyQuestionAccessScope(
           targetStudentIds: true,
           teacher: {
             select: {
+              role: true,
               school: true,
               teacherClasses: { select: { grade: true, className: true } },
             },
@@ -412,6 +415,7 @@ export async function getStudentSessionQuestion(
         targetStudentIds: true,
         teacher: {
           select: {
+            role: true,
             school: true,
             teacherClasses: { select: { grade: true, className: true } },
           },
@@ -664,6 +668,13 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
   const body = await req.json();
   const data = createQuestionSchema.parse(body);
   const userId = requireUserId(sessionUser);
+  const viewer = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, school: true, grade: true, className: true },
+  });
+  if (!viewer || (viewer.role !== "TEACHER" && viewer.role !== "STUDENT")) {
+    throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
+  }
 
   const selectedSession = data.sessionId
     ? await prisma.questionSession.findUnique({
@@ -679,6 +690,7 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
           targetStudentIds: true,
           teacher: {
             select: {
+              role: true,
               school: true,
               teacherClasses: { select: { grade: true, className: true } },
             },
@@ -687,7 +699,7 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
       })
     : null;
 
-  const userRole = sessionUser.role ?? undefined;
+  const userRole = viewer.role;
   if (data.sessionId && !selectedSession) {
     throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
   }
@@ -698,11 +710,7 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
     throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
   }
   if (selectedSession && userRole === "STUDENT") {
-    const student = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, role: true, school: true, grade: true, className: true },
-    });
-    if (!student || !studentCanAccessSession(selectedSession, student)) {
+    if (!studentCanAccessSession(selectedSession, viewer)) {
       throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
     }
   }
@@ -710,7 +718,10 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
     throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
   }
 
-  const normalized = normalizeContent(data.content);
+  const normalized = await normalizeContentForPersistence(data.content);
+  if (normalized.length === 0) {
+    throw new QuestionRouteError("질문에 글자를 입력해 주세요", 400);
+  }
   if (userRole === "STUDENT" && data.sessionId && normalized.length > 0) {
     const existing = await prisma.question.findFirst({
       where: {
@@ -725,63 +736,99 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
     }
   }
 
-  const createData: Prisma.QuestionUncheckedCreateInput = {
-    ...buildQuestionCreateData(data, userId, {
-      defaultIsPublic: selectedSession?.defaultQuestionPublic ?? false,
-    }),
-    normalizedContent: normalized,
-    flagged: data.flagged ?? false,
-    flagReason: data.flagReason || null,
-  };
-
-  const question = await prisma.question.create({
-    data: createData,
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          className: true,
-        },
+  const questionInclude = {
+    author: {
+      select: {
+        id: true,
+        name: true,
+        className: true,
       },
-      session: {
-        include: {
-          teacher: {
-            select: {
-              email: true,
-              name: true,
-            },
+    },
+    session: {
+      include: {
+        teacher: {
+          select: {
+            email: true,
+            name: true,
           },
         },
       },
     },
-  });
+  } satisfies Prisma.QuestionInclude;
 
-  if (userRole === "STUDENT" && question.sessionId && question.source !== "TEACHER_SHARED") {
-    try {
-      await prisma.$transaction([
-        prisma.pointLog.create({
-          data: {
-            studentId: userId,
-            gameId: "ACTIVITY",
-            bonusType: "QUESTION_WRITE",
-            points: ACTIVITY_BASE_POINTS.QUESTION_WRITE,
-            reason: "질문수업 질문 작성",
-            status: "APPROVED",
-            sessionId: question.sessionId,
-            relatedQuestionId: question.id,
-          },
-        }),
-        prisma.user.update({
-          where: { id: userId },
-          data: { totalPoints: { increment: ACTIVITY_BASE_POINTS.QUESTION_WRITE } },
-        }),
-      ]);
-    } catch (e) {
-      if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") {
-        logger.error("Question point award failed:", e);
+  const result = await prisma.$transaction(async (tx) => {
+    const currentAccess = await lockCurrentSessionAccessScope(tx, {
+      viewerId: userId,
+      sessionId: data.sessionId ?? null,
+    });
+    const currentViewer = currentAccess?.viewer;
+    const currentSession = currentAccess?.session;
+    if (
+      !currentViewer ||
+      (currentViewer.role !== "TEACHER" && currentViewer.role !== "STUDENT") ||
+      (data.sessionId && !currentSession)
+    ) {
+      throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
+    }
+
+    if (currentSession) {
+      if (currentViewer.role === "TEACHER") {
+        if (
+          currentSession.teacherId !== userId ||
+          currentSession.teacher.role !== "TEACHER"
+        ) {
+          throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
+        }
+      } else if (
+        !currentSession.isActive ||
+        !studentCanAccessSession(currentSession, currentViewer)
+      ) {
+        throw new QuestionRouteError("질문수업에 접근할 수 없습니다", 403);
       }
     }
+
+    const createData: Prisma.QuestionUncheckedCreateInput = {
+      ...buildQuestionCreateData(data, userId, {
+        defaultIsPublic: currentSession?.defaultQuestionPublic ?? false,
+      }),
+      normalizedContent: normalized,
+      flagged: data.flagged ?? false,
+      flagReason: data.flagReason || null,
+    };
+    const question = await tx.question.create({ data: createData, include: questionInclude });
+    const shouldAward =
+      currentViewer.role === "STUDENT" &&
+      Boolean(question.sessionId) &&
+      question.source !== "TEACHER_SHARED";
+    if (!shouldAward) {
+      return { question, awardedPoints: 0, viewerRole: currentViewer.role };
+    }
+
+    await tx.pointLog.create({
+      data: {
+        studentId: userId,
+        gameId: "ACTIVITY",
+        bonusType: "QUESTION_WRITE",
+        points: ACTIVITY_BASE_POINTS.QUESTION_WRITE,
+        reason: "질문수업 질문 작성",
+        status: "APPROVED",
+        sessionId: question.sessionId,
+        relatedQuestionId: question.id,
+      },
+    });
+    await tx.user.update({
+      where: { id: userId },
+      data: { totalPoints: { increment: ACTIVITY_BASE_POINTS.QUESTION_WRITE } },
+    });
+    return {
+      question,
+      awardedPoints: ACTIVITY_BASE_POINTS.QUESTION_WRITE,
+      viewerRole: currentViewer.role,
+    };
+  });
+  const { question, awardedPoints, viewerRole } = result;
+
+  if (viewerRole === "STUDENT" && question.sessionId && question.source !== "TEACHER_SHARED") {
 
     try {
       await prisma.appNotification.updateMany({
@@ -812,5 +859,5 @@ export async function createQuestionForUser(req: Request, sessionUser: QuestionR
     }
   }
 
-  return question;
+  return { ...question, awardedPoints };
 }

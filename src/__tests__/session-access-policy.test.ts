@@ -42,6 +42,28 @@ describe("질문수업 대상 순수 정책", () => {
       targetType: { in: ["CLASS", "STUDENT", "CUSTOM"] },
       targetStudentIds: { array_contains: "student-1" },
     });
+    expect(where?.teacher).toEqual(expect.objectContaining({ role: "TEACHER" }));
+  });
+
+  it("수업 소유자가 현재 교사가 아니면 학생 접근을 허용하지 않는다", () => {
+    expect(studentCanAccessSession(
+      {
+        teacherId: "teacher-1",
+        targetType: "ALL",
+        targetGrade: null,
+        targetClassName: null,
+        targetStudentId: null,
+        targetStudentIds: [],
+        teacher: { role: "STUDENT", school: "한빛초", teacherClasses: [] },
+      },
+      {
+        id: "student-1",
+        role: "STUDENT",
+        school: "한빛초",
+        grade: "5",
+        className: "1",
+      },
+    )).toBe(false);
   });
 
   it("학년과 반이 비어 있는 학생은 학교 전체 수업도 직접 열 수 없다", () => {
@@ -53,7 +75,7 @@ describe("질문수업 대상 순수 정책", () => {
         targetClassName: null,
         targetStudentId: null,
         targetStudentIds: [],
-        teacher: { school: "한빛초", teacherClasses: [] },
+        teacher: { role: "TEACHER", school: "한빛초", teacherClasses: [] },
       },
       {
         id: "student-1",

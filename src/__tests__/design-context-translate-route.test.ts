@@ -54,6 +54,7 @@ beforeEach(() => {
     targetStudentId: null,
     targetStudentIds: [],
     teacher: {
+      role: "TEACHER",
       school: "테스트학교",
       teacherClasses: [{ grade: "5", className: "1" }],
     },

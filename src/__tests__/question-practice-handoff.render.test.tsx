@@ -8,9 +8,10 @@ import { QuestionPracticeView } from "@/components/shared/QuestionPracticeView";
 import type { PracticeSelection } from "@/lib/practice-selection";
 import ko from "../../messages/ko.json";
 
-const { push, customBankState } = vi.hoisted(() => ({
+const { push, customBankState, invalidateQueries } = vi.hoisted(() => ({
   push: vi.fn(),
   customBankState: { current: undefined as undefined | { quiz: unknown[]; transform: unknown[]; create: unknown[] } },
+  invalidateQueries: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -19,6 +20,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: customBankState.current }),
+  useQueryClient: () => ({ invalidateQueries }),
 }));
 
 function practiceElement(
@@ -99,6 +101,7 @@ function deferredGenerateResponse<T extends Record<string, unknown>>(data: T, ok
 
 beforeEach(() => {
   push.mockReset();
+  invalidateQueries.mockReset().mockResolvedValue(undefined);
   customBankState.current = undefined;
   sessionStorage.clear();
   vi.spyOn(Math, "random").mockReturnValue(0);
@@ -122,6 +125,104 @@ afterEach(() => {
 });
 
 describe("연습 질문 전달", () => {
+  it("분류 연습에서 포인트가 실제 지급되면 포인트 카드를 새로 읽는다", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ correct: true, awarded: 1 }),
+    }));
+    renderPractice("student", "student-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "닫힌 질문" }));
+
+    await waitFor(() => {
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["points-card"] });
+    });
+  });
+
+  it("분류 연습 제출이 실패하면 답을 확정하지 않고 같은 선택을 다시 보낼 수 있다", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({ error: "포인트 기록에 실패했습니다" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ correct: true, awarded: 1 }),
+      }));
+    renderPractice("student", "student-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "닫힌 질문" }));
+
+    expect(await screen.findByText("포인트 기록에 실패했습니다")).toBeInTheDocument();
+    expect(screen.getByText("0/0 맞힘")).toBeInTheDocument();
+    expect(screen.queryByText(/정답이에요/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "닫힌 질문" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "닫힌 질문" }));
+
+    expect(await screen.findByText(/정답이에요/)).toBeInTheDocument();
+    expect(screen.getByText("1/1 맞힘")).toBeInTheDocument();
+    expect(screen.queryByText("포인트 기록에 실패했습니다")).not.toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("바꾸기 연습에서 포인트가 실제 지급되면 포인트 카드를 새로 읽는다", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        achieved: true,
+        awarded: 3,
+        classification: { closure: "open", cognitive: "conceptual" },
+      }),
+    }));
+    renderPractice("student", "student-1", {
+      tab: "transform",
+      quizMode: "cognitive",
+      focus: null,
+    });
+    fireEvent.change(screen.getByPlaceholderText("바꾼 질문을 써 보세요"), {
+      target: { value: "환경을 지키면 우리 생활은 어떻게 달라질까요?" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 확인받기" }));
+
+    await waitFor(() => {
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["points-card"] });
+    });
+  });
+
+  it("실시간 문제 확인 시간이 지나면 답을 지우거나 판정 요청을 보내지 않는다", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        source: "우리나라의 수도는 어디인가요?",
+        target: "open",
+        hint: "가정한 상황을 넣어 보세요.",
+        example: "수도가 달랐다면 생활은 어떻게 바뀌었을까요?",
+        generationProof: "expired-proof",
+        generationProofExpiresAt: "2000-01-01T00:00:00.000Z",
+      }),
+    }));
+    renderPractice("student", "student-1", {
+      tab: "transform",
+      quizMode: "cognitive",
+      focus: null,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /AI 새 문제/ }));
+    expect(await screen.findByText("우리나라의 수도는 어디인가요?")).toBeInTheDocument();
+    const input = screen.getByPlaceholderText("바꾼 질문을 써 보세요");
+    fireEvent.change(input, {
+      target: { value: "수도가 달랐다면 우리 생활은 어떻게 바뀌었을까요?" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 확인받기" }));
+
+    expect(await screen.findByText("이 문제의 확인 시간이 지났어요. 답은 그대로 두고 AI 새 문제를 받은 뒤 다시 작성해 주세요.")).toBeInTheDocument();
+    expect(input).toHaveValue("수도가 달랐다면 우리 생활은 어떻게 바뀌었을까요?");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("추천 선택으로 들어오면 해당 유형 문항만 출제한다", () => {
     renderPractice("student", "student-1", {
       tab: "quiz",
@@ -138,7 +239,11 @@ describe("연습 질문 전달", () => {
     expect(screen.queryByText("논쟁적 질문 집중")).not.toBeInTheDocument();
   });
 
-  it("커스텀 문항이 도착해도 추천과 다른 유형은 집중 묶음에 섞지 않는다", () => {
+  it("커스텀 문항이 도착해도 추천과 다른 유형은 집중 묶음에 섞지 않는다", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ correct: true, awarded: 0 }),
+    }));
     customBankState.current = {
       quiz: [
         {
@@ -167,7 +272,7 @@ describe("연습 질문 전달", () => {
     vi.mocked(Math.random).mockReturnValue(0.999);
 
     fireEvent.click(screen.getByRole("button", { name: "논쟁적 질문" }));
-    fireEvent.click(screen.getByRole("button", { name: "다음 문제" }));
+    fireEvent.click(await screen.findByRole("button", { name: "다음 문제" }));
 
     expect(screen.getByText("학교 텃밭과 운동장 중 무엇을 더 넓혀야 할까요?")).toBeInTheDocument();
     expect(screen.queryByText("우리 학교 운동장은 몇 개인가요?")).not.toBeInTheDocument();
@@ -186,7 +291,7 @@ describe("연습 질문 전달", () => {
       focus: "conceptual",
     });
     fireEvent.click(screen.getByRole("button", { name: "개념적 질문" }));
-    expect(screen.getByText(/정답이에요/)).toBeInTheDocument();
+    expect(screen.queryByText(/정답이에요/)).not.toBeInTheDocument();
 
     view.rerender(
       practiceElement("student", "student-1", {
@@ -431,7 +536,7 @@ describe("연습 질문 전달", () => {
     );
     renderPractice("student", "student-1");
     fireEvent.click(screen.getByRole("button", { name: "닫힌 질문" }));
-    expect(screen.getByText(/정답이에요/)).toBeInTheDocument();
+    expect(screen.queryByText(/정답이에요/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "2. 질문 바꾸기" }));
     fireEvent.click(screen.getByRole("tab", { name: "1. 분류 연습" }));
@@ -477,6 +582,7 @@ describe("연습 질문 전달", () => {
     teacher.unmount();
     renderPractice("student", "student-1");
     fireEvent.click(screen.getByRole("button", { name: "닫힌 질문" }));
+    await screen.findByText(/정답이에요/);
     expect(screen.queryByRole("button", { name: "이 질문으로 질문하기" })).not.toBeInTheDocument();
   });
 

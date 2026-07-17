@@ -86,4 +86,19 @@ describe("질문놀이 방 생성 제한", () => {
       where: { userId: "user-2" },
     });
   });
+
+  it("이미 열린 거래를 받으면 별도 거래를 만들지 않고 같은 거래에 기록한다", async () => {
+    const { consumeGameRoomCreateLimit } = await import(
+      "@/lib/game-room-create-rate-limit"
+    );
+
+    await expect(
+      consumeGameRoomCreateLimit("user-1", mocks.tx as never),
+    ).resolves.toBe(true);
+
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.tx.gameRoomCreateAttempt.create).toHaveBeenCalledWith({
+      data: { userId: "user-1", createdAt: NOW },
+    });
+  });
 });

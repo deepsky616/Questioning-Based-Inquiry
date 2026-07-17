@@ -20,6 +20,7 @@ const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
 
 const TEACHER_SCOPE = {
   teacher: {
+    role: "TEACHER",
     school: "테스트학교",
     teacherClasses: [{ grade: "4", className: "2" }],
   },

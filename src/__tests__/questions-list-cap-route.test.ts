@@ -32,7 +32,11 @@ const listReq = (query = "") => new Request(`http://localhost/api/questions${que
 beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
-  mUserFind.mockResolvedValue({ school: "테스트초", teacherClasses: [] });
+  mUserFind.mockResolvedValue({
+    role: "TEACHER",
+    school: "테스트초",
+    teacherClasses: [],
+  });
   mFindMany.mockResolvedValue([]);
   mCount.mockResolvedValue(0);
   mGroupBy.mockResolvedValue([]);

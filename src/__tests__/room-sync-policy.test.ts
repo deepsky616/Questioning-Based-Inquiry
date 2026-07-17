@@ -49,7 +49,7 @@ describe("room sync policy", () => {
   });
 
   it("uses a dedicated room model instead of overloading SystemConfig", () => {
-    expect(roomStoreSource).toContain("prisma.gameRoom");
+    expect(roomStoreSource).toContain("client.gameRoom");
     expect(roomStoreSource).not.toContain("systemConfig");
   });
 

@@ -87,6 +87,7 @@ export async function POST(req: Request) {
           targetStudentIds: true,
           teacher: {
             select: {
+              role: true,
               school: true,
               teacherClasses: { select: { grade: true, className: true } },
             },

@@ -683,20 +683,20 @@ async function awardVerifiedQuestionGameRun(
     });
     earnedToday = aggregate._sum.points ?? 0;
     awarded = Math.max(0, Math.min(requested, dailyLimit - earnedToday));
+    await tx.pointLog.create({
+      data: {
+        studentId: actor.id,
+        gameId: modeKey,
+        gameRunId: run.id,
+        roomCode: `run:${run.id}`,
+        bonusType: `${modeKey}_${run.gameId}`,
+        points: awarded,
+        reason: "서버 확인 질문놀이 완료",
+        status: "APPROVED",
+        createdAt: completedAt,
+      },
+    });
     if (awarded > 0) {
-      await tx.pointLog.create({
-        data: {
-          studentId: actor.id,
-          gameId: modeKey,
-          gameRunId: run.id,
-          roomCode: `run:${run.id}`,
-          bonusType: `${modeKey}_${run.gameId}`,
-          points: awarded,
-          reason: "서버 확인 질문놀이 완료",
-          status: "APPROVED",
-          createdAt: completedAt,
-        },
-      });
       await tx.user.update({
         where: { id: actor.id },
         data: { totalPoints: { increment: awarded } },

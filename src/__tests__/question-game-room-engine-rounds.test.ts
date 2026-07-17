@@ -447,12 +447,26 @@ describe("공유 라운드 공통 경계", () => {
       expect(room.players.map(({ id }) => id)).toEqual(["guest-1"]);
       expect(room.gameState).toEqual(completedState);
 
-      const lastLeave = leaveQuestionGameRoom({ room, userId: "guest-1" });
+      const lastLeave = leaveQuestionGameRoom({
+        room,
+        userId: "guest-1",
+        pointAwardSettled: true,
+      });
       room = changed(lastLeave);
       expect(room.players).toEqual([]);
       expect(room.gameState).toEqual(completedState);
     },
   );
+
+  it("승인 장부 확인 없는 완료 방은 마지막 참가자 이탈로 실행 근거를 없애지 않는다", () => {
+    let room = completedRoom("dice");
+    room = changed(leaveQuestionGameRoom({ room, userId: "host" }));
+
+    expect(leaveQuestionGameRoom({ room, userId: "guest-1" })).toMatchObject({
+      kind: "conflict",
+      room,
+    });
+  });
 
   it("완료 라운드가 하나 이상일 때만 방장이 조기 종료할 수 있다", () => {
     let room = setRelayTopic();

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   restartQuestionGameRoom: vi.fn(),
   hasQuestionGameRoomEngine: vi.fn(() => false),
   ensureQuestionGameRoomPoints: vi.fn(),
+  settlementFindUnique: vi.fn(),
   loggerWarn: vi.fn(),
 }));
 
@@ -47,6 +48,11 @@ vi.mock("@/lib/question-game-award-publish-service", () => ({
 }));
 vi.mock("@/lib/point-award-service", () => ({
   ensureQuestionGameRoomPoints: mocks.ensureQuestionGameRoomPoints,
+}));
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    gameRoomSettlement: { findUnique: mocks.settlementFindUnique },
+  },
 }));
 vi.mock("@/lib/question-game-room-engine", () => ({
   applyQuestionGameRoomCommand: mocks.applyQuestionGameRoomCommand,
@@ -190,6 +196,7 @@ beforeEach(() => {
   mocks.restartQuestionGameRoom.mockReset();
   mocks.hasQuestionGameRoomEngine.mockReset().mockReturnValue(false);
   mocks.ensureQuestionGameRoomPoints.mockReset().mockResolvedValue(null);
+  mocks.settlementFindUnique.mockReset().mockResolvedValue(null);
   mocks.loggerWarn.mockReset();
 });
 
@@ -1109,6 +1116,155 @@ describe("등록된 놀이의 옛 방 전환", () => {
     expect(mocks.restartQuestionGameRoom).toHaveBeenCalledTimes(2);
     expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
   });
+
+  it("미지급 버전 2 완료 방은 다시 시작으로 실행 근거를 지우지 않는다", async () => {
+    const room = makeV2Room({
+      status: "ended",
+      pointParticipants: structuredClone(makeV2Room().players),
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [],
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.hasQuestionGameRoomEngine.mockReturnValue(true);
+    mocks.ensureQuestionGameRoomPoints.mockRejectedValue(new Error("정산 실패"));
+
+    const response = await patch(commandBody({ action: "restart" }));
+
+    expect(response.status).toBe(409);
+    expect(mocks.ensureQuestionGameRoomPoints).toHaveBeenCalledWith(room);
+    expect(mocks.restartQuestionGameRoom).not.toHaveBeenCalled();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("지급 함수가 결과를 반환해도 정산 영수증이 없으면 다시 시작하지 않는다", async () => {
+    const room = makeV2Room({
+      status: "ended",
+      pointParticipants: structuredClone(makeV2Room().players),
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [],
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.hasQuestionGameRoomEngine.mockReturnValue(true);
+    mocks.ensureQuestionGameRoomPoints.mockResolvedValue({
+      awards: [{
+        studentId: "user-1",
+        bonusType: "PARTICIPATION",
+        points: 1,
+        reason: "게임 참여",
+      }],
+    });
+
+    const response = await patch(commandBody({ action: "restart" }));
+
+    expect(response.status).toBe(409);
+    expect(mocks.settlementFindUnique).toHaveBeenCalledTimes(2);
+    expect(mocks.restartQuestionGameRoom).not.toHaveBeenCalled();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("지급 대상 없음 정산 영수증이 있으면 완료 방을 다시 시작할 수 있다", async () => {
+    const room = makeV2Room({
+      status: "ended",
+      pointParticipants: structuredClone(makeV2Room().players),
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [],
+      },
+    });
+    const restarted = makeRoom();
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.hasQuestionGameRoomEngine.mockReturnValue(true);
+    mocks.settlementFindUnique.mockResolvedValue({
+      outcome: "NO_ELIGIBLE_STUDENTS",
+    });
+    mocks.restartQuestionGameRoom.mockReturnValue({ kind: "changed", room: restarted });
+    mocks.saveGameRoom.mockResolvedValue({
+      kind: "saved",
+      room: { ...restarted, version: 2 },
+    });
+
+    const response = await patch(commandBody({ action: "restart" }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.ensureQuestionGameRoomPoints).not.toHaveBeenCalled();
+    expect(mocks.restartQuestionGameRoom).toHaveBeenCalledWith(room, {
+      pointAwardSettled: true,
+    });
+  });
+
+  it("잘못된 버전의 완료 방 다시 시작은 자동 정산을 호출하기 전에 거절한다", async () => {
+    const room = makeV2Room({
+      status: "ended",
+      pointParticipants: structuredClone(makeV2Room().players),
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [],
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.hasQuestionGameRoomEngine.mockReturnValue(true);
+
+    const response = await patch(commandBody({
+      action: "restart",
+      expectedVersion: "wrong",
+    }));
+
+    expect(response.status).toBe(400);
+    expect(mocks.settlementFindUnique).not.toHaveBeenCalled();
+    expect(mocks.ensureQuestionGameRoomPoints).not.toHaveBeenCalled();
+  });
+
+  it("버전 2 완료 방은 실행 지급 키 승인 장부 확인 뒤 다시 시작한다", async () => {
+    const room = makeV2Room({
+      status: "ended",
+      pointParticipants: structuredClone(makeV2Room().players),
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [],
+      },
+    });
+    const restarted = makeRoom();
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.hasQuestionGameRoomEngine.mockReturnValue(true);
+    mocks.ensureQuestionGameRoomPoints.mockRejectedValue(new Error("재정산 불가"));
+    mocks.settlementFindUnique.mockResolvedValue({ outcome: "AWARDED" });
+    mocks.restartQuestionGameRoom.mockReturnValue({ kind: "changed", room: restarted });
+    mocks.saveGameRoom.mockResolvedValue({
+      kind: "saved",
+      room: { ...restarted, version: 2 },
+    });
+
+    const response = await patch(commandBody({ action: "restart" }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.settlementFindUnique).toHaveBeenCalledWith({
+      where: {
+        gameId_awardKey: {
+          gameId: "dice",
+          awardKey: "room:1234:10:00000000-0000-4000-8000-000000000002",
+        },
+      },
+      select: { outcome: true },
+    });
+    expect(mocks.ensureQuestionGameRoomPoints).not.toHaveBeenCalled();
+    expect(mocks.restartQuestionGameRoom).toHaveBeenCalledWith(room, {
+      pointAwardSettled: true,
+    });
+  });
 });
 
 describe("옛 진행 방 안내 판별", () => {
@@ -1278,6 +1434,130 @@ describe("버전 2 나가기", () => {
       expect.objectContaining({ players: [] }),
     );
     expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("미지급 완료 방의 마지막 참가자 이탈은 방을 삭제하지 않는다", async () => {
+    const room = makeV2Room({
+      status: "ended",
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      ],
+      pointParticipants: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+        { id: "user-2", name: "친구", isHost: false, joinedAt: 2 },
+      ],
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [],
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.ensureQuestionGameRoomPoints.mockRejectedValue(new Error("정산 실패"));
+
+    const response = await patch({
+      action: "leave",
+      expectedCreatedAt: room.createdAt,
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.leaveQuestionGameRoom).not.toHaveBeenCalled();
+    expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("지급 함수만 성공하고 정산 영수증이 없으면 마지막 참가자도 방을 삭제하지 않는다", async () => {
+    const room = makeV2Room({
+      status: "ended",
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      ],
+      pointParticipants: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+        { id: "user-2", name: "친구", isHost: false, joinedAt: 2 },
+      ],
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [],
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.ensureQuestionGameRoomPoints.mockResolvedValue({ awards: [] });
+
+    const response = await patch({
+      action: "leave",
+      expectedCreatedAt: room.createdAt,
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.settlementFindUnique).toHaveBeenCalledTimes(2);
+    expect(mocks.leaveQuestionGameRoom).not.toHaveBeenCalled();
+    expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("지급 대상 없음 정산 영수증이면 마지막 참가자 이탈로 방을 삭제한다", async () => {
+    const room = makeV2Room({
+      status: "ended",
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      ],
+      pointParticipants: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      ],
+      gameState: {
+        stateVersion: 2,
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [],
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.settlementFindUnique.mockResolvedValue({
+      outcome: "NO_ELIGIBLE_STUDENTS",
+    });
+    mocks.deleteGameRoom.mockResolvedValue({ kind: "deleted", room: null });
+
+    const response = await patch({
+      action: "leave",
+      expectedCreatedAt: room.createdAt,
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ room: null, deleted: true });
+    expect(mocks.ensureQuestionGameRoomPoints).not.toHaveBeenCalled();
+    expect(mocks.deleteGameRoom).toHaveBeenCalledOnce();
+  });
+
+  it("상태 버전이 빠지고 점수 버전 표지만 남은 완료 방의 마지막 이탈도 보존한다", async () => {
+    const room = makeV2Room({
+      status: "ended",
+      players: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+      ],
+      pointParticipants: [
+        { id: "user-1", name: "학생", isHost: true, joinedAt: 1 },
+        { id: "user-2", name: "친구", isHost: false, joinedAt: 2 },
+      ],
+      gameState: {
+        phase: "done",
+        endReason: "completed",
+        recentCommandIds: [],
+      },
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.deleteGameRoom.mockResolvedValue({ kind: "deleted", room: null });
+
+    const response = await patch({
+      action: "leave",
+      expectedCreatedAt: room.createdAt,
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.ensureQuestionGameRoomPoints).not.toHaveBeenCalled();
+    expect(mocks.leaveQuestionGameRoom).not.toHaveBeenCalled();
+    expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
   });
 
   it("생성 시각 없는 버전 2 이탈은 방을 바꾸지 않고 400이다", async () => {

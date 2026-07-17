@@ -33,6 +33,7 @@ const sessionAccessSelect = {
   targetStudentIds: true,
   teacher: {
     select: {
+      role: true,
       school: true,
       teacherClasses: { select: { grade: true, className: true } },
     },
@@ -55,6 +56,7 @@ function canViewSession(
     targetStudentId: string | null;
     targetStudentIds: unknown;
     teacher: {
+      role: string;
       school: string | null;
       teacherClasses: Array<{ grade: string; className: string }>;
     };

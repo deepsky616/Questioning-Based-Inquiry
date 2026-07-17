@@ -43,6 +43,7 @@ beforeEach(() => {
     user: { id: "teacher-1", role: "TEACHER", email: null, name: "교사" },
   });
   mockTeacher.mockResolvedValue({
+    role: "TEACHER",
     school: "한빛초",
     teacherClasses: [{ grade: "5", className: "1" }],
   });
@@ -70,7 +71,11 @@ describe("학생 묶음 생성 접근 경계", () => {
   });
 
   it("담당 학급이 없는 교사는 같은 학교 학급에 학생을 만들 수 있다", async () => {
-    mockTeacher.mockResolvedValue({ school: "한빛초", teacherClasses: [] });
+    mockTeacher.mockResolvedValue({
+      role: "TEACHER",
+      school: "한빛초",
+      teacherClasses: [],
+    });
 
     const response = await POST(request("한빛초", "6", "2"));
 

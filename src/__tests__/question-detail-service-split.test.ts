@@ -13,11 +13,13 @@ describe("question detail route service split", () => {
     expect(serviceSource).toContain("canDeleteQuestionForUser");
     expect(serviceSource).toContain("getStudentQuestionEditBlockReason");
     expect(serviceSource).toContain("getStudentQuestionDeleteBlockReason");
+    expect(serviceSource).toContain("updateQuestionWithGuard");
+    expect(serviceSource).toContain("deleteQuestionWithGuard");
 
     expect(routeSource).toContain("canEditQuestionForUser");
     expect(routeSource).toContain("canDeleteQuestionForUser");
-    expect(routeSource).toContain("getStudentQuestionEditBlockReason");
-    expect(routeSource).toContain("getStudentQuestionDeleteBlockReason");
+    expect(routeSource).toContain("updateQuestionWithGuard");
+    expect(routeSource).toContain("deleteQuestionWithGuard");
     expect(routeSource.split("\n").length).toBeLessThan(225);
   });
 });

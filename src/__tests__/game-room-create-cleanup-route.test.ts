@@ -1,15 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
-  createGameRoom: vi.fn(),
-  consumeCreateLimit: vi.fn(),
-  cleanupIfDue: vi.fn(),
-  loggerWarn: vi.fn(),
-  loggerError: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  const tx = {
+    $queryRaw: vi.fn(),
+    user: { findUnique: vi.fn() },
+    gameRoom: {},
+    gameRoomCreateAttempt: {},
+  };
+  return {
+    tx,
+    transaction: vi.fn(),
+    auth: vi.fn(),
+    createGameRoom: vi.fn(),
+    consumeCreateLimit: vi.fn(),
+    cleanupIfDue: vi.fn(),
+    loggerWarn: vi.fn(),
+    loggerError: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/db", () => ({
+  prisma: { $transaction: mocks.transaction },
+}));
 vi.mock("@/lib/game-room-store", () => ({ createGameRoom: mocks.createGameRoom }));
 vi.mock("@/lib/game-room-create-rate-limit", () => ({
   consumeGameRoomCreateLimit: mocks.consumeCreateLimit,
@@ -32,6 +45,15 @@ function createRoom() {
 }
 
 beforeEach(() => {
+  mocks.transaction.mockReset().mockImplementation(
+    (callback: (client: typeof mocks.tx) => unknown) => callback(mocks.tx),
+  );
+  mocks.tx.$queryRaw.mockReset().mockResolvedValue([{ lock: "" }]);
+  mocks.tx.user.findUnique.mockReset().mockResolvedValue({
+    id: "user-1",
+    name: "학생",
+    role: "STUDENT",
+  });
   mocks.auth.mockReset().mockResolvedValue({ user: { id: "user-1", name: "학생" } });
   mocks.createGameRoom.mockReset().mockResolvedValue({
     code: "1234",
@@ -60,16 +82,16 @@ describe("질문놀이 방 생성 보호", () => {
     const response = await createRoom();
 
     expect(response.status).toBe(429);
-    expect(mocks.consumeCreateLimit).toHaveBeenCalledWith("user-1");
+    expect(mocks.consumeCreateLimit).toHaveBeenCalledWith("user-1", mocks.tx);
     expect(mocks.cleanupIfDue).not.toHaveBeenCalled();
     expect(mocks.createGameRoom).not.toHaveBeenCalled();
   });
 
-  it("허용된 생성 요청은 기회 정리를 시도한 뒤 방을 만든다", async () => {
+  it("허용된 생성 요청은 방을 만든 뒤 기회 정리도 시도한다", async () => {
     const response = await createRoom();
 
     expect(response.status).toBe(200);
-    expect(mocks.consumeCreateLimit).toHaveBeenCalledWith("user-1");
+    expect(mocks.consumeCreateLimit).toHaveBeenCalledWith("user-1", mocks.tx);
     expect(mocks.cleanupIfDue).toHaveBeenCalledOnce();
     expect(mocks.createGameRoom).toHaveBeenCalledOnce();
   });

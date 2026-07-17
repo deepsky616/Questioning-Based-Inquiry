@@ -3,6 +3,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { summarizeQuestionTypes } from "@/lib/stats-calc";
 import { normalizePointReasonForDisplay } from "@/lib/point-reason-label";
+import {
+  isStudentInTeacherScope,
+  loadTeacherStudentScope,
+} from "@/lib/teacher-student-access";
 
 interface RawEvent { type: "question" | "comment" | "point"; createdAt: string; weight: number; meta?: Record<string, unknown> }
 type Params = { params: Promise<{ id: string }> };
@@ -20,31 +24,24 @@ export async function GET(
   const studentId = id;
 
   // 교사 권한 검증: 자기 학교/학급 학생인지 확인
-  const [teacher, student] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: (session.user as { id: string }).id },
-      select: { school: true, teacherClasses: { select: { grade: true, className: true } } },
-    }),
-    prisma.user.findUnique({
-      where: { id: studentId },
-      select: {
-        id: true, name: true, grade: true, className: true, studentNumber: true,
-        school: true, totalPoints: true, role: true, createdAt: true,
-      },
-    }),
-  ]);
+  const teacherScope = await loadTeacherStudentScope((session.user as { id: string }).id);
+  if (!teacherScope) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
+
+  const student = await prisma.user.findUnique({
+    where: { id: studentId },
+    select: {
+      id: true, name: true, grade: true, className: true, studentNumber: true,
+      school: true, totalPoints: true, role: true, createdAt: true,
+    },
+  });
 
   if (!student || student.role !== "STUDENT") {
     return NextResponse.json({ error: "학생을 찾을 수 없습니다" }, { status: 404 });
   }
-  if (!teacher || teacher.school !== student.school) {
+  if (!isStudentInTeacherScope(teacherScope, student)) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
-  }
-  if (teacher.teacherClasses.length > 0) {
-    const inClass = teacher.teacherClasses.some(
-      (c) => c.grade === student.grade && c.className === student.className
-    );
-    if (!inClass) return NextResponse.json({ error: "담당 학생이 아닙니다" }, { status: 403 });
   }
 
   const [questions, comments, pointLogs] = await Promise.all([
@@ -65,7 +62,7 @@ export async function GET(
       orderBy: { createdAt: "desc" },
     }),
     prisma.pointLog.findMany({
-      where: { studentId },
+      where: { studentId, status: "APPROVED" },
       select: { id: true, createdAt: true, points: true, gameId: true, bonusType: true, reason: true },
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -95,7 +92,15 @@ export async function GET(
   const commentsReceived = questions.reduce((sum, q) => sum + q._count.comments, 0);
   // 좋은 질문 수 = 교사가 승인한 보너스가 달린 서로 다른 질문 수
   const approvedQ = await prisma.pointLog.findMany({
-    where: { studentId, status: "APPROVED", relatedQuestionId: { not: null } },
+    where: {
+      studentId,
+      status: "APPROVED",
+      points: { gt: 0 },
+      bonusType: {
+        in: ["AI_TOPIC_FIT_QUESTION", "AI_DEEP_QUESTION", "TEACHER_ADJUSTED"],
+      },
+      relatedQuestionId: { not: null },
+    },
     select: { relatedQuestionId: true },
   });
   const goodQuestions = new Set(approvedQ.map((p) => p.relatedQuestionId)).size;
@@ -103,7 +108,13 @@ export async function GET(
   const gamePlays = await prisma.pointLog.count({
     where: {
       studentId,
-      OR: [{ bonusType: "PARTICIPATION" }, { gameId: "ACTIVITY_SOLO" }, { gameId: "ACTIVITY_AI" }],
+      status: "APPROVED",
+      OR: [
+        { bonusType: "PARTICIPATION" },
+        { bonusType: "FRIEND_DAILY_LIMIT" },
+        { gameId: "ACTIVITY_SOLO" },
+        { gameId: "ACTIVITY_AI" },
+      ],
     },
   });
   // 질문 분류 분포(분류1 닫힌/열린, 분류2 사실/개념/논쟁)

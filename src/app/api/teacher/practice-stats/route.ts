@@ -11,6 +11,10 @@ import {
   type PracticeAttemptInput,
   type PracticeCustomItemType,
 } from "@/lib/practice-diagnostics";
+import {
+  loadTeacherStudentScope,
+  studentWhereForTeacherScope,
+} from "@/lib/teacher-student-access";
 
 // 담당 학급 학생들의 질문 연습 현황(오늘/최근 7일 포인트, 모드별 성공 횟수).
 // 연습 지급이 PointLog(gameId=PRACTICE)에 남으므로 추가 수집 없이 집계만 한다.
@@ -40,26 +44,21 @@ export async function GET() {
 
   try {
     const emptySummary = buildPracticeDiagnostic([]);
-    const teacher = await prisma.user.findUnique({
-      where: { id: teacherId },
-      select: {
-        school: true,
-        teacherClasses: { select: { grade: true, className: true } },
-      },
-    });
-    if (!teacher?.school) {
-      return NextResponse.json({ summary: emptySummary, students: [] });
+    const teacherScope = await loadTeacherStudentScope(teacherId);
+    if (!teacherScope) {
+      const currentTeacher = await prisma.user.findUnique({
+        where: { id: teacherId },
+        select: { role: true, school: true },
+      });
+      if (currentTeacher?.role === "TEACHER" && !currentTeacher.school) {
+        return NextResponse.json({ summary: emptySummary, students: [] });
+      }
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     // 담당 학급이 있으면 해당 학년·반만, 없으면 같은 학교 학생 전체 (기존 학생 목록과 동일 규칙)
     const students = await prisma.user.findMany({
-      where: {
-        role: "STUDENT",
-        school: teacher.school,
-        ...(teacher.teacherClasses.length > 0
-          ? { OR: teacher.teacherClasses.map((c) => ({ grade: c.grade, className: c.className })) }
-          : {}),
-      },
+      where: studentWhereForTeacherScope(teacherScope),
       select: { id: true, name: true, grade: true, className: true, studentNumber: true },
     });
     if (students.length === 0) {
@@ -120,6 +119,7 @@ export async function GET() {
       where: {
         gameId: PRACTICE_GAME_ID,
         studentId: { in: studentIds },
+        status: "APPROVED",
         createdAt: { gte: new Date(Math.min(weekStart.getTime(), Date.now() - WEEK_MS)) },
       },
       select: { studentId: true, bonusType: true, points: true, createdAt: true },

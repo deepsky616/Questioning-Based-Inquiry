@@ -31,7 +31,11 @@ const request = (query = "") => new Request(`http://localhost/api/questions${que
 beforeEach(() => {
   vi.clearAllMocks();
   mAuth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
-  mUserFind.mockResolvedValue({ school: "한빛초", teacherClasses: [] });
+  mUserFind.mockResolvedValue({
+    role: "TEACHER",
+    school: "한빛초",
+    teacherClasses: [],
+  });
   mQuestionFindMany.mockResolvedValue([]);
   mQuestionCount.mockResolvedValue(0);
   mQuestionGroupBy.mockResolvedValue([]);
@@ -50,6 +54,7 @@ describe("질문 조회 권한 경계", () => {
 
   it("담당 학급 교사의 질문 목록은 학교와 학년 반을 함께 제한한다", async () => {
     mUserFind.mockResolvedValue({
+      role: "TEACHER",
       school: "한빛초",
       teacherClasses: [{ grade: "5", className: "1" }],
     });
@@ -69,7 +74,11 @@ describe("질문 조회 권한 경계", () => {
   });
 
   it("교사 자료나 학교가 없으면 질문 조회를 기본 거부한다", async () => {
-    mUserFind.mockResolvedValue({ school: null, teacherClasses: [] });
+    mUserFind.mockResolvedValue({
+      role: "TEACHER",
+      school: null,
+      teacherClasses: [],
+    });
 
     const response = await GET(request());
 
@@ -95,6 +104,7 @@ describe("질문 조회 권한 경계", () => {
     const where = mQuestionFindMany.mock.calls[0][0].where;
     const sessionScope = {
       teacher: {
+        role: "TEACHER",
         school: "한빛초",
         OR: [
           { teacherClasses: { some: { grade: "5", className: "1" } } },

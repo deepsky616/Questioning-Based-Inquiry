@@ -9,6 +9,8 @@ vi.mock("@/lib/db", () => ({
     },
     unitDesign: { findFirst: vi.fn() },
     user: { findUnique: vi.fn(), findMany: vi.fn() },
+    $queryRaw: vi.fn(),
+    $transaction: vi.fn(),
   },
 }));
 
@@ -22,6 +24,8 @@ const mockUpdate = prisma.questionSession.update as ReturnType<typeof vi.fn>;
 const mockUnitDesignFindFirst = prisma.unitDesign.findFirst as ReturnType<typeof vi.fn>;
 const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
+const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
+const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 
 const TEACHER_SESSION = { user: { id: "teacher-1", role: "TEACHER" } };
 
@@ -51,6 +55,7 @@ beforeEach(() => {
   });
   mockUnitDesignFindFirst.mockResolvedValue({ id: "unit-design-1" });
   mockUserFindUnique.mockResolvedValue({
+    role: "TEACHER",
     school: "테스트학교",
     teacherClasses: [{ grade: "5", className: "1" }],
   });
@@ -59,6 +64,26 @@ beforeEach(() => {
     { id: "student-2", role: "STUDENT", school: "테스트학교", grade: "5", className: "1" },
   ]);
   mockUpdate.mockImplementation(async ({ data }) => ({ id: "session-1", ...data }));
+  mockQueryRaw.mockImplementation(async (query: unknown) => {
+    const sql = Array.isArray(query)
+      ? query.join("?")
+      : (query as { strings?: readonly string[]; sql?: string })?.strings?.join("?") ??
+        (query as { sql?: string })?.sql ??
+        "";
+    if (sql.includes("pg_advisory_xact_lock")) return [{ lock: "" }];
+    if (sql.includes('FROM "question_sessions"')) {
+      return [{ id: "session-1", teacherId: "teacher-1" }];
+    }
+    if (sql.includes('FROM "users"')) {
+      return [{ id: "student-1" }, { id: "student-2" }];
+    }
+    if (sql.includes('FROM "teacher_classes"')) return [];
+    if (sql.includes('FROM "unit_designs"')) {
+      return [{ id: "unit-design-1", teacherId: "teacher-1" }];
+    }
+    return [];
+  });
+  mockTransaction.mockImplementation(async (callback) => callback(prisma));
 });
 
 describe("PATCH /api/sessions/[id] — 단원설계 배포", () => {

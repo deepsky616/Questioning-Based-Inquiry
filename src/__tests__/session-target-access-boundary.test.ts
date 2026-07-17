@@ -54,12 +54,14 @@ const mockQuestionFindMany = prisma.question.findMany as ReturnType<typeof vi.fn
 const mockCommentFindMany = prisma.comment.findMany as ReturnType<typeof vi.fn>;
 const mockLikeFindMany = prisma.questionLike.findMany as ReturnType<typeof vi.fn>;
 const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
+const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 
 const teacherSession = {
   user: { id: "teacher-1", role: "TEACHER", school: "한빛초" },
 };
 
 const teacherScope = {
+  role: "TEACHER",
   school: "한빛초",
   teacherClasses: [{ grade: "5", className: "1" }],
 };
@@ -171,6 +173,7 @@ beforeEach(() => {
   mockQuestionFindMany.mockResolvedValue([]);
   mockCommentFindMany.mockResolvedValue([]);
   mockLikeFindMany.mockResolvedValue([]);
+  mockTransaction.mockImplementation(async (callback) => callback(prisma));
 });
 
 describe("질문수업 대상 저장 경계", () => {

@@ -15,6 +15,7 @@ export interface GameAwardResult {
   awards: GameAward[];
   bestQuestion?: GameAwardBestQuestion;
   summary?: string;
+  settlement?: "NO_ELIGIBLE_STUDENTS";
 }
 
 interface GameAwardResultSnapshot {
@@ -33,6 +34,14 @@ const SNAPSHOT_TYPE = "game-room-award-result";
 const SNAPSHOT_VERSION = 1;
 const MAX_AWARDS = 256;
 const MAX_TEXT_LENGTH = 4_000;
+
+export function createNoEligibleStudentAwardResult(): GameAwardResult {
+  return {
+    awards: [],
+    settlement: "NO_ELIGIBLE_STUDENTS",
+    summary: "점수를 지급할 학생 참가자가 없습니다.",
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -101,16 +110,22 @@ function readSnapshot(value: unknown): GameAwardResultSnapshot | null {
 export function isGameAwardResult(value: unknown): value is GameAwardResult {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ["awards"], ["bestQuestion", "summary"]) ||
+    !hasExactKeys(value, ["awards"], ["bestQuestion", "summary", "settlement"]) ||
     !Array.isArray(value.awards) ||
-    value.awards.length === 0 ||
     value.awards.length > MAX_AWARDS ||
     !value.awards.every(isGameAward) ||
     (value.bestQuestion !== undefined && !isBestQuestion(value.bestQuestion)) ||
-    (value.summary !== undefined && !isSummary(value.summary))
+    (value.summary !== undefined && !isSummary(value.summary)) ||
+    (value.settlement !== undefined && value.settlement !== "NO_ELIGIBLE_STUDENTS")
   ) {
     return false;
   }
+
+  if (value.awards.length === 0) {
+    return value.settlement === "NO_ELIGIBLE_STUDENTS" &&
+      value.bestQuestion === undefined;
+  }
+  if (value.settlement !== undefined) return false;
 
   const awardKeys = value.awards.map(
     ({ studentId, bonusType }) => `${studentId}\u0000${bonusType}`,
@@ -140,6 +155,7 @@ export function gameAwardResultsMatch(
   if (!first || !second || first.awards.length !== second.awards.length) {
     return false;
   }
+  if (first.settlement !== second.settlement) return false;
   if (first.summary !== second.summary) return false;
 
   const firstBest = first.bestQuestion;

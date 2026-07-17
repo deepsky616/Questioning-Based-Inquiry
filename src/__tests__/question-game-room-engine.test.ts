@@ -695,6 +695,7 @@ describe("질문놀이 방 판정기", () => {
       expect(completed.kind).toBe("changed");
       expect(completed.room.pointParticipants).toEqual(completionPlayers);
       expect(completed.room.pointParticipants).not.toBe(candidate.players);
+      expect(completed.room.pointCompletedAt).toBe(300);
 
       const afterCompletedLeave = leaveQuestionGameRoom({
         room: completed.room,
@@ -703,6 +704,7 @@ describe("질문놀이 방 판정기", () => {
       expect(afterCompletedLeave.room.players.map(({ id }) => id)).toEqual(["a"]);
       expect(afterCompletedLeave.room.pointParticipants?.map(({ id }) => id))
         .toEqual(["a", "b"]);
+      expect(afterCompletedLeave.room.pointCompletedAt).toBe(300);
     });
 
     it("일반 변경 명령의 상태와 방 출력 상한 초과는 결과 없이 invalid다", () => {
@@ -984,7 +986,7 @@ describe("질문놀이 방 판정기", () => {
       });
 
       const result = leaveQuestionGameRoomWithEngine(
-        { room, userId: "c" },
+        { room, userId: "c", now: 400 },
         engine,
       );
 
@@ -994,6 +996,7 @@ describe("질문놀이 방 판정기", () => {
         makePlayer("b"),
       ]);
       expect(result.room.pointParticipants).not.toBe(result.room.players);
+      expect(result.room.pointCompletedAt).toBe(400);
     });
 
     it("이탈 훅 뒤에도 한 명 방의 참가자와 방장 및 부족 종료를 다시 고정한다", () => {
@@ -1094,6 +1097,22 @@ describe("질문놀이 방 판정기", () => {
   });
 
   describe("다시 시작", () => {
+    it("승인 장부 확인 없는 버전 2 완료 방은 실행 근거를 초기화하지 않는다", () => {
+      const room = makeRoom({
+        status: "ended",
+        playId: "00000000-0000-4000-8000-000000000010",
+        pointAwardKeyVersion: 2,
+        pointEvidenceVersion: 2,
+        pointParticipants: structuredClone(makeRoom().players),
+        gameState: makeState({ phase: "done", endReason: "completed" }),
+      });
+
+      expect(restartQuestionGameRoom(room)).toMatchObject({
+        kind: "conflict",
+        room,
+      });
+    });
+
     it("코드와 참가자를 유지하며 빈 대기 방으로 되돌리고 저장 값은 올리지 않는다", () => {
       const room = makeRoom({
         status: "ended",
@@ -1109,11 +1128,12 @@ describe("질문놀이 방 판정기", () => {
             reason: "게임 완료",
           }],
         },
+        pointCompletedAt: 300,
         pointParticipants: structuredClone(makeRoom().players),
       });
       const before = structuredClone(room);
 
-      const result = restartQuestionGameRoom(room);
+      const result = restartQuestionGameRoom(room, { pointAwardSettled: true });
 
       expect(result.kind).toBe("changed");
       expect(result.room).not.toBe(room);

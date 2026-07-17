@@ -44,6 +44,7 @@ beforeEach(() => {
     targetStudentId: null,
     targetStudentIds: [],
     teacher: {
+      role: "TEACHER",
       school: "한빛초",
       teacherClasses: [{ grade: "5", className: "1" }],
     },
@@ -84,6 +85,7 @@ describe("학생 수업별 기존 질문 보기", () => {
       targetStudentId: "student-other",
       targetStudentIds: ["student-other"],
       teacher: {
+        role: "TEACHER",
         school: "한빛초",
         teacherClasses: [{ grade: "5", className: "1" }],
       },

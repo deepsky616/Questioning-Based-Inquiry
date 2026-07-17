@@ -8,7 +8,7 @@
 //  - 분류는 정답 맞히기가 아니라 근거를 생각하는 활동 → 모든 문항에 해설 제공
 //  - 닫힌→열린, 사실적→개념적→논쟁적 전환·생성 연습 → AI 분류로 즉시 피드백
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,6 +84,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   const t = useTranslations("practice");
   const tCls = useTranslations("classification");
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<PracticeTab>(initialSelection?.tab ?? "quiz");
 
   const typeLabel = (target: TransformTarget) =>
@@ -152,34 +153,53 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
 
   const quizCorrectValue = quizMode === "closure" ? quizItem.closure : quizItem.cognitive;
   const [quizAward, setQuizAward] = useState<AwardInfo | null>(null);
+  const [isQuizChecking, setIsQuizChecking] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
   const quizRequestRef = useRef(0);
   const invalidateQuiz = useCallback(() => {
     quizRequestRef.current += 1;
     setQuizAward(null);
+    setIsQuizChecking(false);
+    setQuizError(null);
   }, []);
   const nextQuiz = () => {
     invalidateQuiz();
     setQuizDeck((d) => drawFromDeck(focusedQuizBank, d.remaining, d.item.id));
     setQuizAnswer(null);
   };
-  const answerQuiz = (value: string) => {
-    if (quizAnswer) return;
+  const answerQuiz = async (value: string) => {
+    if (quizAnswer || isQuizChecking) return;
     const requestId = ++quizRequestRef.current;
-    setQuizAnswer(value);
-    const correct = value === quizCorrectValue;
-    setQuizStats((s) => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
+    setIsQuizChecking(true);
+    setQuizError(null);
     // 오답도 항상 전송 — 서버가 재검증해 정답이면 지급하고, 시도(정답·오답)를
     // 기록해 문항별 정답률 통계의 재료로 쓴다
-    fetch("/api/points/practice", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "quiz", itemId: quizItem.id, quizType: quizMode, answer: value }),
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (quizRequestRef.current === requestId && data?.correct) setQuizAward(data);
-      })
-      .catch(() => {});
+    try {
+      const response = await fetch("/api/points/practice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "quiz", itemId: quizItem.id, quizType: quizMode, answer: value }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || t("quizSubmitError"));
+      if (quizRequestRef.current !== requestId) return;
+      const correct = data.correct === true;
+      setQuizAnswer(value);
+      setQuizStats((stats) => ({
+        correct: stats.correct + (correct ? 1 : 0),
+        total: stats.total + 1,
+      }));
+      if (typeof data.awarded === "number" && data.awarded > 0) {
+        void queryClient.invalidateQueries({ queryKey: ["points-card"] });
+      }
+      if (correct) setQuizAward(data);
+    } catch (error) {
+      if (quizRequestRef.current === requestId) {
+        setQuizError(error instanceof Error ? error.message : t("quizSubmitError"));
+      }
+    } finally {
+      if (quizRequestRef.current === requestId) setIsQuizChecking(false);
+    }
   };
 
   // ── 모드 2·3 공용: AI 판정 + 포인트 ──
@@ -213,7 +233,14 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   // ── 모드 2: 질문 바꾸기 ──
   const [transformDeck, setTransformDeck] = useState(() => drawFromDeck(PRACTICE_TRANSFORM_BANK, []));
   // AI가 실시간 출제한 문제(있으면 은행 문항 대신 사용, 실패 시 은행이 폴백)
-  const [aiTransform, setAiTransform] = useState<{ source: string; target: TransformTarget; hint: string; example: string } | null>(null);
+  const [aiTransform, setAiTransform] = useState<{
+    source: string;
+    target: TransformTarget;
+    hint: string;
+    example: string;
+    generationProof: string;
+    generationProofExpiresAt: string;
+  } | null>(null);
   const transformItem = aiTransform ?? localizePracticeTransformItem(transformDeck.item, locale);
   const [showHint, setShowHint] = useState(false);
   const nextTransform = () => {
@@ -226,7 +253,12 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
 
   // ── 모드 3: 질문 만들기 ──
   const [createDeck, setCreateDeck] = useState(() => drawFromDeck(PRACTICE_CREATE_TOPICS, []));
-  const [aiTopic, setAiTopic] = useState<{ title: string; passage: string } | null>(null);
+  const [aiTopic, setAiTopic] = useState<{
+    title: string;
+    passage: string;
+    generationProof: string;
+    generationProofExpiresAt: string;
+  } | null>(null);
   const createTopic = aiTopic ?? localizePracticeCreateTopic(createDeck.item, locale);
   const [createTarget, setCreateTarget] = useState<TransformTarget>("conceptual");
   const nextCreateTopic = () => {
@@ -317,6 +349,13 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   const runCheck = async () => {
     const content = input.trim();
     if (!content || isChecking) return;
+    const proofExpiresAt = tab === "transform"
+      ? aiTransform?.generationProofExpiresAt
+      : aiTopic?.generationProofExpiresAt;
+    if (proofExpiresAt && Date.parse(proofExpiresAt) <= Date.now() + 5_000) {
+      setCheckError(t("generationExpired"));
+      return;
+    }
     const requestId = ++checkRequestRef.current;
     setIsChecking(true);
     setCheckError(null);
@@ -325,10 +364,22 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
     const payload =
       tab === "transform"
         ? aiTransform
-          ? { mode: "transform-ai", source: aiTransform.source, target: aiTransform.target, content }
+          ? {
+              mode: "transform-ai",
+              source: aiTransform.source,
+              target: aiTransform.target,
+              content,
+              generationProof: aiTransform.generationProof,
+            }
           : { mode: "transform", itemId: transformDeck.item.id, content }
         : aiTopic
-          ? { mode: "create-ai", passage: aiTopic.passage, target: createTarget, content }
+          ? {
+              mode: "create-ai",
+              passage: aiTopic.passage,
+              target: createTarget,
+              content,
+              generationProof: aiTopic.generationProof,
+            }
           : { mode: "create", topicId: createDeck.item.id, target: createTarget, content };
     try {
       const res = await fetch("/api/points/practice", {
@@ -337,8 +388,14 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
         body: JSON.stringify(payload),
       });
       const data = await res.json();
+      if (!res.ok) {
+        if (checkRequestRef.current !== requestId) return;
+        throw new Error(data.error || t("aiError"));
+      }
+      if (typeof data?.awarded === "number" && data.awarded > 0) {
+        void queryClient.invalidateQueries({ queryKey: ["points-card"] });
+      }
       if (checkRequestRef.current !== requestId) return;
-      if (!res.ok) throw new Error(data.error || t("aiError"));
       setCheckResult(data);
     } catch (err) {
       if (checkRequestRef.current !== requestId) return;
@@ -526,8 +583,8 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
                   <Button
                     key={choice}
                     variant="outline"
-                    disabled={decided}
-                    onClick={() => answerQuiz(choice)}
+                    disabled={decided || isQuizChecking}
+                    onClick={() => void answerQuiz(choice)}
                     className={`h-11 flex-1 min-w-[130px] ${
                       decided && isCorrect ? "border-green-400 bg-green-50 text-green-700 disabled:opacity-100 dark:bg-green-950/40 dark:text-green-300"
                       : decided && isPicked ? "border-red-300 bg-red-50 text-red-600 disabled:opacity-100 dark:bg-red-950/40 dark:text-red-300"
@@ -539,6 +596,8 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
                 );
               })}
             </div>
+
+            {quizError && <p className="text-sm text-red-600">{quizError}</p>}
 
             {quizAnswer && (
               <div className={`rounded-lg border p-4 space-y-1.5 ${quizAnswer === quizCorrectValue ? "border-green-300 bg-green-50 dark:border-green-900 dark:bg-green-950/30" : "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"}`}>

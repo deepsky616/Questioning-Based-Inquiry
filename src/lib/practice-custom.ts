@@ -46,6 +46,7 @@ export type PracticeCustomItemInput = z.infer<typeof practiceCustomItemSchema>;
 /** DB 행(문자열 컬럼) — Prisma 타입 의존 없이 필요한 필드만 */
 export interface PracticeCustomRow {
   id: string;
+  teacherId: string;
   mode: string;
   content: string | null;
   closure: string | null;
@@ -100,10 +101,14 @@ export function rowsToBank(rows: PracticeCustomRow[]): MergedCustomBank {
 export async function findCustomItemsForUser(user: {
   id: string;
   role?: string;
-}): Promise<PracticeCustomRow[]> {
+}, filter: { id?: string; mode?: keyof MergedCustomBank } = {}): Promise<PracticeCustomRow[]> {
+  const itemFilter = {
+    ...(filter.id ? { id: filter.id } : {}),
+    ...(filter.mode ? { mode: filter.mode } : {}),
+  };
   if (user.role === "TEACHER" || user.role === "ADMIN") {
     return prisma.practiceCustomItem.findMany({
-      where: { teacherId: user.id, isActive: true },
+      where: { teacherId: user.id, isActive: true, ...itemFilter },
       orderBy: { createdAt: "asc" },
     });
   }
@@ -130,7 +135,11 @@ export async function findCustomItemsForUser(user: {
   if (teachers.length === 0) return [];
 
   return prisma.practiceCustomItem.findMany({
-    where: { teacherId: { in: teachers.map((t) => t.id) }, isActive: true },
+    where: {
+      teacherId: { in: teachers.map((t) => t.id) },
+      isActive: true,
+      ...itemFilter,
+    },
     orderBy: { createdAt: "asc" },
   });
 }

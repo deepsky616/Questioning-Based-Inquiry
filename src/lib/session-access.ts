@@ -17,6 +17,115 @@ export {
   type SessionTargetRecord,
 } from "@/lib/session-access-policy";
 
+const lockedSessionAccessSelect = {
+  teacherId: true,
+  isActive: true,
+  defaultQuestionPublic: true,
+  targetType: true,
+  targetGrade: true,
+  targetClassName: true,
+  targetStudentId: true,
+  targetStudentIds: true,
+  teacher: {
+    select: {
+      role: true,
+      school: true,
+      teacherClasses: { select: { grade: true, className: true } },
+    },
+  },
+} satisfies Prisma.QuestionSessionSelect;
+
+/**
+ * 지급 거래가 기다리는 동안 학생 소속이나 수업 대상이 바뀌는 일을 막고,
+ * 잠금 뒤의 현재 자료로 접근 권한을 다시 판정할 수 있게 한다.
+ */
+export async function lockCurrentSessionAccessScope(
+  tx: Prisma.TransactionClient,
+  params: {
+    viewerId: string;
+    sessionId: string | null;
+    additionalUserIds?: string[];
+  },
+) {
+  let teacherId: string | null = null;
+  if (params.sessionId) {
+    const lockedSessions = await tx.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT "id"
+        FROM "question_sessions"
+        WHERE "id" = ${params.sessionId}
+        FOR SHARE
+      `,
+    );
+    if (lockedSessions.length === 0) return null;
+
+    const sessionIdentity = await tx.questionSession.findUnique({
+      where: { id: params.sessionId },
+      select: { teacherId: true },
+    });
+    if (!sessionIdentity) return null;
+    teacherId = sessionIdentity.teacherId;
+  }
+
+  if (teacherId) {
+    await tx.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT "id"
+        FROM "users"
+        WHERE "id" = ${teacherId}
+        FOR UPDATE
+      `,
+    );
+    await tx.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT "id"
+        FROM "teacher_classes"
+        WHERE "teacher_id" = ${teacherId}
+        ORDER BY "id"
+        FOR SHARE
+      `,
+    );
+  }
+
+  const remainingUserIds = Array.from(new Set([
+    params.viewerId,
+    ...(params.additionalUserIds ?? []),
+  ].filter((id) => id !== teacherId))).sort();
+  if (remainingUserIds.length > 0) {
+    await tx.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT "id"
+        FROM "users"
+        WHERE "id" IN (${Prisma.join(remainingUserIds)})
+        ORDER BY "id"
+        FOR UPDATE
+      `,
+    );
+  }
+
+  const [viewer, currentSession] = await Promise.all([
+    tx.user.findUnique({
+      where: { id: params.viewerId },
+      select: {
+        id: true,
+        role: true,
+        school: true,
+        grade: true,
+        className: true,
+        teacherClasses: { select: { grade: true, className: true } },
+      },
+    }),
+    params.sessionId
+      ? tx.questionSession.findUnique({
+          where: { id: params.sessionId },
+          select: lockedSessionAccessSelect,
+        })
+      : Promise.resolve(null),
+  ]);
+
+  return { viewer, session: currentSession };
+}
+
 function stringIds(value: unknown): string[] {
   return Array.isArray(value)
     ? [...new Set(value.filter((item): item is string => typeof item === "string" && item.length > 0))]

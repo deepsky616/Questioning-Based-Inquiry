@@ -2316,6 +2316,43 @@ describe("질문 주사위 서버 실행 경로", () => {
     expect(pointLogs.filter((log) => log.gameRunId === "run-1")).toHaveLength(1);
     expect(pointLogs.find((log) => log.gameRunId === "run-1")?.points).toBe(2);
   });
+
+  it("혼자 모드 일일 상한을 채운 학생의 완료 판도 영 점 표식으로 남긴다", async () => {
+    pointLogs.push({
+      studentId: "student-1",
+      gameId: "ACTIVITY_SOLO",
+      gameRunId: "old-run",
+      bonusType: "ACTIVITY_SOLO_dice",
+      points: 30,
+      reason: "이전 실행",
+      status: "APPROVED",
+      createdAt: new Date(),
+    });
+    await createDice();
+    let version = 1;
+    let finalResponse: Response | undefined;
+    for (let questionIndex = 0; questionIndex < 3; questionIndex += 1) {
+      await rollDice(questionIndex * 2, version);
+      version += 1;
+      finalResponse = await submitDiceQuestion(questionIndex * 2 + 1, version);
+      version += 1;
+    }
+
+    if (!finalResponse) throw new Error("missing final response");
+    expect(finalResponse.status).toBe(200);
+    await expect(finalResponse.json()).resolves.toMatchObject({
+      result: { awarded: 0, dailyRemaining: 0, cappedByLimit: true },
+    });
+    expect(users.get("student-1")?.totalPoints).toBe(0);
+    expect(pointLogs.filter((log) => log.gameRunId === "run-1")).toHaveLength(1);
+    expect(pointLogs.find((log) => log.gameRunId === "run-1")).toMatchObject({
+      studentId: "student-1",
+      gameId: "ACTIVITY_SOLO",
+      bonusType: "ACTIVITY_SOLO_dice",
+      points: 0,
+      status: "APPROVED",
+    });
+  });
 });
 
 describe("질문 사다리 서버 실행 경로", () => {

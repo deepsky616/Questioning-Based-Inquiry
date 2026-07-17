@@ -4,6 +4,7 @@ import type { GameRoom, RoomStatus } from "@/lib/question-games-data";
 const mocks = vi.hoisted(() => {
   const tx = {
     gameRoomPresence: { findFirst: vi.fn() },
+    gameRoomSettlement: { findUnique: vi.fn() },
   };
   return {
     tx,
@@ -13,7 +14,9 @@ const mocks = vi.hoisted(() => {
     transaction: vi.fn(),
     loadLockedGameRoom: vi.fn(),
     deleteGameRoom: vi.fn(),
+    ensureQuestionGameRoomPoints: vi.fn(),
     loggerInfo: vi.fn(),
+    loggerWarn: vi.fn(),
   };
 });
 
@@ -29,8 +32,11 @@ vi.mock("@/lib/game-room-store", () => ({
   deleteGameRoom: mocks.deleteGameRoom,
   loadLockedGameRoom: mocks.loadLockedGameRoom,
 }));
+vi.mock("@/lib/point-award-service", () => ({
+  ensureQuestionGameRoomPoints: mocks.ensureQuestionGameRoomPoints,
+}));
 vi.mock("@/lib/logger", () => ({
-  logger: { info: mocks.loggerInfo },
+  logger: { info: mocks.loggerInfo, warn: mocks.loggerWarn },
 }));
 
 import {
@@ -68,17 +74,45 @@ function roomRecord({
   return { code, data: room };
 }
 
+function completedVersion2RoomRecord(code = "4444", createdAt = 4_000) {
+  const playId = "00000000-0000-4000-8000-000000000004";
+  const room: GameRoom = {
+    ...roomRecord({ code, status: "ended", createdAt, version: 8 }).data,
+    players: [
+      { id: "host", name: "방장", isHost: true, joinedAt: createdAt },
+      { id: "student", name: "학생", isHost: false, joinedAt: createdAt },
+    ],
+    playId,
+    pointAwardKeyVersion: 2,
+    pointEvidenceVersion: 2,
+    pointParticipants: [
+      { id: "host", name: "방장", isHost: true, joinedAt: createdAt },
+      { id: "student", name: "학생", isHost: false, joinedAt: createdAt },
+    ],
+    gameState: {
+      stateVersion: 2,
+      phase: "done",
+      endReason: "completed",
+      recentCommandIds: [],
+    },
+  };
+  return { code, data: room };
+}
+
 beforeEach(() => {
   mocks.findRooms.mockReset().mockResolvedValue([]);
   mocks.findPresences.mockReset().mockResolvedValue([]);
   mocks.deleteCreateAttempts.mockReset().mockResolvedValue({ count: 0 });
   mocks.loadLockedGameRoom.mockReset();
   mocks.tx.gameRoomPresence.findFirst.mockReset().mockResolvedValue(null);
+  mocks.tx.gameRoomSettlement.findUnique.mockReset().mockResolvedValue(null);
   mocks.transaction.mockReset().mockImplementation(
     (callback: (client: unknown) => unknown) => callback(mocks.tx),
   );
   mocks.deleteGameRoom.mockReset().mockResolvedValue({ kind: "deleted", room: null });
+  mocks.ensureQuestionGameRoomPoints.mockReset().mockResolvedValue(null);
   mocks.loggerInfo.mockReset();
+  mocks.loggerWarn.mockReset();
 });
 
 describe("cleanupExpiredGameRooms", () => {
@@ -254,6 +288,142 @@ describe("cleanupExpiredGameRooms", () => {
     });
 
     expect(mocks.deleteGameRoom).toHaveBeenCalledOnce();
+  });
+
+  it("미지급 완료 방은 자동 정산을 재시도해도 승인 장부가 없으면 보존한다", async () => {
+    const record = completedVersion2RoomRecord();
+    mocks.findRooms.mockResolvedValue([record]);
+    mocks.loadLockedGameRoom.mockResolvedValue(record.data);
+
+    await expect(cleanupExpiredGameRooms({ now: NOW })).resolves.toEqual({
+      deletedCount: 0,
+      errorCount: 0,
+    });
+
+    expect(mocks.ensureQuestionGameRoomPoints).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "4444",
+        pointCompletedAt: 4_000,
+      }),
+    );
+    expect(mocks.tx.gameRoomSettlement.findUnique).toHaveBeenCalledWith({
+      where: {
+        gameId_awardKey: {
+          gameId: "dice",
+          awardKey: "room:4444:4000:00000000-0000-4000-8000-000000000004",
+        },
+      },
+      select: { outcome: true },
+    });
+    expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("정산 호출이 실패하고 잠근 뒤에도 영수증이 없으면 오류와 경고를 남긴다", async () => {
+    const record = completedVersion2RoomRecord();
+    mocks.findRooms.mockResolvedValue([record]);
+    mocks.loadLockedGameRoom.mockResolvedValue(record.data);
+    mocks.ensureQuestionGameRoomPoints.mockRejectedValue(
+      new Error("정산 저장소 오류"),
+    );
+
+    await expect(cleanupExpiredGameRooms({ now: NOW })).resolves.toEqual({
+      deletedCount: 0,
+      errorCount: 1,
+    });
+
+    expect(mocks.tx.gameRoomSettlement.findUnique).toHaveBeenCalledOnce();
+    expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
+    expect(mocks.loggerWarn).toHaveBeenCalledWith(
+      "질문놀이 방 정산 오류",
+      { roomCode: "4444", errorCount: 1 },
+    );
+  });
+
+  it("지급 함수가 결과를 반환해도 정산 영수증이 없으면 완료 방을 보존한다", async () => {
+    const record = completedVersion2RoomRecord();
+    mocks.findRooms.mockResolvedValue([record]);
+    mocks.loadLockedGameRoom.mockResolvedValue(record.data);
+    mocks.ensureQuestionGameRoomPoints.mockResolvedValue({ awards: [] });
+
+    await expect(cleanupExpiredGameRooms({ now: NOW })).resolves.toEqual({
+      deletedCount: 0,
+      errorCount: 0,
+    });
+
+    expect(mocks.tx.gameRoomSettlement.findUnique).toHaveBeenCalledOnce();
+    expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("완료 방은 실행 지급 키의 승인 장부를 확인한 뒤에만 삭제한다", async () => {
+    const record = completedVersion2RoomRecord();
+    mocks.findRooms.mockResolvedValue([record]);
+    mocks.loadLockedGameRoom.mockResolvedValue(record.data);
+    mocks.ensureQuestionGameRoomPoints.mockRejectedValue(
+      new Error("다른 요청이 정산을 마치는 중"),
+    );
+    mocks.tx.gameRoomSettlement.findUnique.mockResolvedValue({ outcome: "AWARDED" });
+
+    await expect(cleanupExpiredGameRooms({ now: NOW })).resolves.toEqual({
+      deletedCount: 1,
+      errorCount: 0,
+    });
+
+    expect(mocks.deleteGameRoom).toHaveBeenCalledOnce();
+    expect(mocks.loggerWarn).not.toHaveBeenCalled();
+  });
+
+  it("지급 대상 없음 정산 영수증이 있는 완료 방도 삭제한다", async () => {
+    const record = completedVersion2RoomRecord();
+    mocks.findRooms.mockResolvedValue([record]);
+    mocks.loadLockedGameRoom.mockResolvedValue(record.data);
+    mocks.tx.gameRoomSettlement.findUnique.mockResolvedValue({
+      outcome: "NO_ELIGIBLE_STUDENTS",
+    });
+
+    await expect(cleanupExpiredGameRooms({ now: NOW })).resolves.toEqual({
+      deletedCount: 1,
+      errorCount: 0,
+    });
+
+    expect(mocks.deleteGameRoom).toHaveBeenCalledOnce();
+  });
+
+  it("지급 버전 값이 손상된 버전 2 완료 방도 근거 복구 전에는 보존한다", async () => {
+    const record = completedVersion2RoomRecord();
+    delete record.data.playId;
+    delete record.data.pointAwardKeyVersion;
+    delete record.data.pointEvidenceVersion;
+    mocks.findRooms.mockResolvedValue([record]);
+    mocks.loadLockedGameRoom.mockResolvedValue(record.data);
+    mocks.ensureQuestionGameRoomPoints.mockRejectedValue(
+      new Error("손상된 정산 표지"),
+    );
+
+    await expect(cleanupExpiredGameRooms({ now: NOW })).resolves.toEqual({
+      deletedCount: 0,
+      errorCount: 0,
+    });
+
+    expect(mocks.ensureQuestionGameRoomPoints).not.toHaveBeenCalled();
+    expect(mocks.tx.gameRoomSettlement.findUnique).not.toHaveBeenCalled();
+    expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
+    expect(mocks.loggerWarn).not.toHaveBeenCalled();
+  });
+
+  it("상태 버전이 빠지고 다른 버전 표지만 남은 완료 방도 자동 삭제하지 않는다", async () => {
+    const record = completedVersion2RoomRecord();
+    delete record.data.gameState.stateVersion;
+    mocks.findRooms.mockResolvedValue([record]);
+    mocks.loadLockedGameRoom.mockResolvedValue(record.data);
+
+    await expect(cleanupExpiredGameRooms({ now: NOW })).resolves.toEqual({
+      deletedCount: 0,
+      errorCount: 0,
+    });
+
+    expect(mocks.ensureQuestionGameRoomPoints).not.toHaveBeenCalled();
+    expect(mocks.tx.gameRoomSettlement.findUnique).not.toHaveBeenCalled();
+    expect(mocks.deleteGameRoom).not.toHaveBeenCalled();
   });
 });
 

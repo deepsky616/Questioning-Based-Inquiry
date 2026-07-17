@@ -23,6 +23,13 @@ vi.mock("@/lib/db", () => ({
     question: {
       findMany: vi.fn(),
     },
+    comment: {
+      findMany: vi.fn(),
+    },
+    pointLog: {
+      updateMany: vi.fn(),
+    },
+    $queryRaw: vi.fn(),
     $transaction: vi.fn(),
   },
 }));
@@ -39,6 +46,11 @@ const mockDeleteSession = prisma.questionSession.delete as ReturnType<typeof vi.
 const mockArchiveNotifications = prisma.appNotification.updateMany as ReturnType<typeof vi.fn>;
 const mockDeleteNotifications = prisma.appNotification.deleteMany as ReturnType<typeof vi.fn>;
 const mockDeleteAnalysis = prisma.sessionAnalysis.deleteMany as ReturnType<typeof vi.fn>;
+const mockRejectPendingPoints = prisma.pointLog.updateMany as ReturnType<typeof vi.fn>;
+const mockFindQuestions = prisma.question.findMany as ReturnType<typeof vi.fn>;
+const mockFindComments = prisma.comment.findMany as ReturnType<typeof vi.fn>;
+const mockFindUser = prisma.user.findUnique as ReturnType<typeof vi.fn>;
+const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
 const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 
 const teacher = { user: { id: "teacher-1", role: "TEACHER" } };
@@ -61,6 +73,28 @@ beforeEach(() => {
   mockDeleteNotifications.mockResolvedValue({ count: 1 });
   mockArchiveNotifications.mockResolvedValue({ count: 1 });
   mockDeleteAnalysis.mockResolvedValue({ count: 1 });
+  mockFindQuestions.mockResolvedValue([]);
+  mockFindComments.mockResolvedValue([]);
+  mockFindUser.mockResolvedValue({
+    role: "TEACHER",
+    school: "한빛초",
+    teacherClasses: [],
+  });
+  mockRejectPendingPoints.mockResolvedValue({ count: 0 });
+  mockQueryRaw.mockImplementation(async (query: unknown) => {
+    const sql = Array.isArray(query)
+      ? query.join("?")
+      : (query as { strings?: readonly string[]; sql?: string })?.strings?.join("?") ??
+        (query as { sql?: string })?.sql ??
+        "";
+    if (sql.includes("pg_advisory_xact_lock")) return [{ lock: "" }];
+    if (sql.includes('FROM "users"')) return [{ id: "teacher-1" }];
+    if (sql.includes('FROM "teacher_classes"')) return [];
+    if (sql.includes('FROM "question_sessions"')) {
+      return [{ id: "session-1", teacherId: "teacher-1" }];
+    }
+    return [];
+  });
   mockTransaction.mockImplementation(async (callback) => callback(prisma));
 });
 
@@ -115,7 +149,41 @@ describe("수업 요청 알림 수명", () => {
       where: { sessionId: "session-1", type: "SESSION_REMINDER" },
     });
     expect(mockDeleteAnalysis).toHaveBeenCalledWith({ where: { sessionId: "session-1" } });
+    expect(mockRejectPendingPoints).toHaveBeenCalledWith({
+      where: {
+        status: "PENDING",
+        bonusType: { in: expect.arrayContaining(["AI_DEEP_QUESTION", "AI_APT_ANSWER"]) },
+        sessionId: { in: ["session-1"] },
+      },
+      data: { status: "REJECTED", decidedAt: expect.any(Date) },
+    });
+    expect(mockRejectPendingPoints).toHaveBeenCalledWith({
+      where: { sessionId: "session-1" },
+      data: { sessionId: null },
+    });
+    const rejectCall = mockRejectPendingPoints.mock.invocationCallOrder[0];
+    const detachCall = mockRejectPendingPoints.mock.invocationCallOrder[1];
+    expect(rejectCall).toBeLessThan(detachCall);
+    expect(detachCall).toBeLessThan(mockDeleteSession.mock.invocationCallOrder[0]);
+    expect(mockRejectPendingPoints).toHaveBeenCalledBefore(mockDeleteSession);
     expect(mockDeleteSession).toHaveBeenCalledWith({ where: { id: "session-1" } });
     expect(mockTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("행 잠금 사이에 새 질문이 들어오면 역순으로 잠금하지 않고 다시 시도하게 한다", async () => {
+    mockFindQuestions
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: "late-question" }]);
+
+    const response = await DELETE(
+      new Request("http://localhost/api/sessions/session-1", { method: "DELETE" }),
+      context,
+    );
+
+    expect(response.status).toBe(409);
+    expect(mockRejectPendingPoints).not.toHaveBeenCalled();
+    expect(mockDeleteNotifications).not.toHaveBeenCalled();
+    expect(mockDeleteAnalysis).not.toHaveBeenCalled();
+    expect(mockDeleteSession).not.toHaveBeenCalled();
   });
 });

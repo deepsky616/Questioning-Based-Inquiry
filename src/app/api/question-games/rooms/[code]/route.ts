@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { lockAccountLifecycles } from "@/lib/account-lifecycle-lock";
 import { checkRateLimit } from "@/lib/api-rate-limit";
+import { prisma } from "@/lib/db";
 import {
   isValidQuestionForm,
   normalizeQuestionActivity,
@@ -21,6 +23,7 @@ import {
   deleteGameRoomPresence,
   isStaleRoomAction,
   loadGameRoom,
+  loadLockedGameRoom,
   saveGameRoom,
 } from "@/lib/game-room-store";
 import {
@@ -54,6 +57,11 @@ import {
 } from "@/lib/mystery-box-ai-answer";
 import type { MysteryAnswerResolution } from "@/lib/mystery-box-rules";
 import { ensureQuestionGameRoomPoints } from "@/lib/point-award-service";
+import {
+  hasSettledQuestionGameRoomAward,
+  isCompletedVersion2QuestionGameRoomCandidate,
+  isCompletedVersion2QuestionGameRoom,
+} from "@/lib/question-game-room-award-ledger";
 import { logger } from "@/lib/logger";
 
 type Params = { params: Promise<{ code: string }> };
@@ -162,12 +170,31 @@ function commandSuccess(
 }
 
 function isCompletedVersion2Room(room: GameRoom) {
-  return room.status === "ended" &&
-    room.pointAwardKeyVersion === 2 &&
-    room.pointEvidenceVersion === 2 &&
-    room.gameState.stateVersion === 2 &&
-    room.gameState.phase === "done" &&
-    room.gameState.endReason === "completed";
+  return isCompletedVersion2QuestionGameRoom(room);
+}
+
+function roomSettlementPending(room: GameRoom) {
+  return NextResponse.json(
+    {
+      error: "포인트 지급을 마친 뒤 방을 정리할 수 있습니다. 잠시 후 다시 시도해 주세요.",
+      room: toPublicGameRoom(room),
+    },
+    { status: 409 },
+  );
+}
+
+async function ensureCompletedRoomAwardSettled(room: GameRoom) {
+  if (!isCompletedVersion2QuestionGameRoomCandidate(room)) return true;
+  if (!isCompletedVersion2Room(room)) return false;
+  try {
+    const { prisma } = await import("@/lib/db");
+    if (await hasSettledQuestionGameRoomAward(prisma, room)) return true;
+    await ensureQuestionGameRoomPoints(room);
+    return await hasSettledQuestionGameRoomAward(prisma, room);
+  } catch {
+    logger.warn("질문놀이 포인트 자동 지급을 마치지 못했습니다");
+    return false;
+  }
 }
 
 async function ensureCompletedRoomPoints(room: GameRoom): Promise<GameRoom> {
@@ -446,8 +473,25 @@ async function restartManagedRoom(
   ) {
     return invalidRequest("방 생성 시각이 올바르지 않습니다");
   }
+  if (
+    isCompletedVersion2Room(room) &&
+    !isValidExpectedVersion(body.expectedVersion)
+  ) {
+    return invalidRequest("올바른 expectedVersion이 필요합니다");
+  }
+  if (
+    isCompletedVersion2Room(room) &&
+    isStaleRoomAction(room, body.expectedVersion)
+  ) {
+    return roomConflict(room);
+  }
 
-  const result = restartQuestionGameRoom(room);
+  const pointAwardSettled = await ensureCompletedRoomAwardSettled(room);
+  if (!pointAwardSettled) return roomSettlementPending(room);
+
+  const result = isCompletedVersion2Room(room)
+    ? restartQuestionGameRoom(room, { pointAwardSettled: true })
+    : restartQuestionGameRoom(room);
   if (result.kind === "replayed") {
     return commandSuccess(result.room, result.result);
   }
@@ -467,7 +511,11 @@ async function restartManagedRoom(
   if (!isRoomMember(saved.room, userId)) return roomForbidden();
   if (saved.room.createdAt !== room.createdAt) return roomConflict(saved.room);
 
-  const replay = restartQuestionGameRoom(saved.room);
+  const replayPointAwardSettled = await ensureCompletedRoomAwardSettled(saved.room);
+  if (!replayPointAwardSettled) return roomSettlementPending(saved.room);
+  const replay = isCompletedVersion2Room(saved.room)
+    ? restartQuestionGameRoom(saved.room, { pointAwardSettled: true })
+    : restartQuestionGameRoom(saved.room);
   return replay.kind === "replayed"
     ? commandSuccess(replay.room, replay.result)
     : roomConflict(saved.room);
@@ -520,61 +568,77 @@ async function handleMemoryRoll(
 }
 
 async function joinRoom(
-  initialRoom: GameRoom,
+  code: string,
   userId: string,
-  userName: string,
 ) {
-  let room = initialRoom;
-  const expectedCreatedAt = initialRoom.createdAt;
-  if (!isBuiltInQuestionGameId(room.gameId)) {
-    return NextResponse.json(
-      { error: "지원하지 않는 질문놀이입니다" },
-      { status: 400 },
-    );
-  }
-  const { max } = getQuestionGameRule(room.gameId).multiplayer;
-  const player: RoomPlayer = {
-    id: userId,
-    name: userName,
-    isHost: false,
-    joinedAt: Date.now(),
-  };
+  return prisma.$transaction(async (tx) => {
+    await lockAccountLifecycles(tx, [userId]);
+    let room = await loadLockedGameRoom(code, tx);
+    if (!room) return roomMissing();
+    const expectedCreatedAt = room.createdAt;
+    const currentUser = await tx.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, role: true },
+    });
+    if (
+      !currentUser ||
+      (currentUser.role !== "STUDENT" && currentUser.role !== "TEACHER")
+    ) {
+      return NextResponse.json(
+        { error: "현재 계정으로는 방에 참가할 수 없습니다" },
+        { status: 403 },
+      );
+    }
+    if (!isBuiltInQuestionGameId(room.gameId)) {
+      return NextResponse.json(
+        { error: "지원하지 않는 질문놀이입니다" },
+        { status: 400 },
+      );
+    }
+    const { max } = getQuestionGameRule(room.gameId).multiplayer;
+    const player: RoomPlayer = {
+      id: userId,
+      name: currentUser.name,
+      isHost: false,
+      joinedAt: Date.now(),
+    };
 
-  for (let attempt = 0; attempt < MEMBERSHIP_WRITE_ATTEMPTS; attempt++) {
+    for (let attempt = 0; attempt < MEMBERSHIP_WRITE_ATTEMPTS; attempt++) {
+      if (room.players.some((item) => item.id === userId)) {
+        return NextResponse.json({ room: toPublicGameRoom(room) });
+      }
+      if (room.status !== "waiting") {
+        return NextResponse.json(
+          { error: "이미 시작된 방이에요" },
+          { status: 400 },
+        );
+      }
+      if (room.players.length >= max) {
+        return NextResponse.json(
+          { error: `방이 가득 찼어요 (최대 ${max}명)` },
+          { status: 400 },
+        );
+      }
+
+      const result = await saveGameRoom({
+        ...room,
+        players: [...room.players, player],
+      }, tx);
+      if (result.kind === "saved") {
+        return NextResponse.json({ room: toPublicGameRoom(result.room) });
+      }
+      if (result.kind === "missing") return roomMissing();
+      if (result.room.createdAt !== expectedCreatedAt) {
+        return roomConflictForMember(result.room, userId);
+      }
+      room = result.room;
+    }
+
     if (room.players.some((item) => item.id === userId)) {
       return NextResponse.json({ room: toPublicGameRoom(room) });
     }
-    if (room.status !== "waiting") {
-      return NextResponse.json(
-        { error: "이미 시작된 방이에요" },
-        { status: 400 },
-      );
-    }
-    if (room.players.length >= max) {
-      return NextResponse.json(
-        { error: `방이 가득 찼어요 (최대 ${max}명)` },
-        { status: 400 },
-      );
-    }
-
-    const result = await saveGameRoom({
-      ...room,
-      players: [...room.players, player],
-    });
-    if (result.kind === "saved") {
-      return NextResponse.json({ room: toPublicGameRoom(result.room) });
-    }
-    if (result.kind === "missing") return roomMissing();
-    if (result.room.createdAt !== expectedCreatedAt) {
-      return roomConflictForMember(result.room, userId);
-    }
-    room = result.room;
-  }
-
-  if (room.players.some((item) => item.id === userId)) {
-    return NextResponse.json({ room: toPublicGameRoom(room) });
-  }
-  return roomConflictWithoutRoom();
+    return roomConflictWithoutRoom();
+  });
 }
 
 async function clearMemberPresence(room: GameRoom, userId: string) {
@@ -613,6 +677,9 @@ async function leaveRoom(initialRoom: GameRoom, userId: string) {
         );
 
       if (players.length === 0) {
+        if (!await ensureCompletedRoomAwardSettled(room)) {
+          return roomSettlementPending(room);
+        }
         const result = await deleteGameRoom(room);
         if (result.kind === "deleted" || result.kind === "missing") {
           return roomDeleted();
@@ -668,6 +735,16 @@ async function leaveVersion2Room(initialRoom: GameRoom, userId: string) {
   const expectedCreatedAt = initialRoom.createdAt;
 
   for (let attempt = 0; attempt < MEMBERSHIP_WRITE_ATTEMPTS; attempt++) {
+    const requiresLastParticipantSettlement =
+      isCompletedVersion2QuestionGameRoomCandidate(room) &&
+      room.players.length === 1 &&
+      room.players[0]?.id === userId;
+    if (
+      requiresLastParticipantSettlement &&
+      !await ensureCompletedRoomAwardSettled(room)
+    ) {
+      return roomSettlementPending(room);
+    }
     let result: QuestionGameRoomResult;
     try {
       result = leaveQuestionGameRoom({
@@ -676,6 +753,9 @@ async function leaveVersion2Room(initialRoom: GameRoom, userId: string) {
         now: Date.now(),
         random: Math.random,
         randomUUID: () => globalThis.crypto.randomUUID(),
+        ...(requiresLastParticipantSettlement
+          ? { pointAwardSettled: true }
+          : {}),
       });
     } catch {
       return NextResponse.json(
@@ -797,12 +877,13 @@ export async function PATCH(
     : checkRateLimit(`game-room-write:${userId}`, 120);
   if (limited) return limited;
 
+  if (action === "join") return joinRoom(code, userId);
+
   let room = await loadGameRoom(code);
   if (!room) {
     return action === "leave" ? roomDeleted() : roomMissing();
   }
 
-  if (action === "join") return joinRoom(room, userId, userName);
   const isMember = isRoomMember(room, userId);
   if (action === "leave" && !isMember) {
     await clearMemberPresence(room, userId);

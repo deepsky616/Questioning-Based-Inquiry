@@ -82,12 +82,15 @@ export function CommentThread({
         body: JSON.stringify({ content: text.trim() }),
       });
       if (!res.ok) throw new Error();
-      const created: ThreadComment = await res.json();
+      const created: ThreadComment & { awardedPoints?: number } = await res.json();
       setComments((prev) => {
         const next = [...prev, created];
         onCountChange?.(next.length);
         return next;
       });
+      if ((created.awardedPoints ?? 0) > 0) {
+        void queryClient.invalidateQueries({ queryKey: ["points-card"] });
+      }
       setText("");
     } catch {
       // 무시

@@ -52,6 +52,7 @@ export async function PATCH(req: NextRequest) {
       targetStudentIds: true,
       teacher: {
         select: {
+          role: true,
           school: true,
           teacherClasses: { select: { grade: true, className: true } },
         },

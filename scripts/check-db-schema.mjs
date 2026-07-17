@@ -27,6 +27,8 @@ const REQUIRED_TABLES = [
   "comments",
   "question_likes",
   "point_logs",
+  "activity_award_claims",
+  "game_room_settlements",
   "app_notifications",
   "game_rooms",
   "game_room_presences",
@@ -51,7 +53,23 @@ const REQUIRED_TEXT_COLUMNS = [
 ];
 
 const REQUIRED_COLUMNS = [
+  ["questions", "dedupe_key", "text"],
+  ["comments", "dedupe_key", "text"],
+  ["point_logs", "activity_dedupe_key", "text"],
   ["point_logs", "game_run_id", "text"],
+  ["activity_award_claims", "student_id", "text"],
+  ["activity_award_claims", "bonus_type", "text"],
+  ["activity_award_claims", "activity_dedupe_key", "text"],
+  ["activity_award_claims", "scope_id", "text"],
+  ["activity_award_claims", "point_log_id", "text"],
+  ["activity_award_claims", "created_at", "timestamp without time zone"],
+  ["game_room_settlements", "game_id", "text"],
+  ["game_room_settlements", "award_key", "text"],
+  ["game_room_settlements", "room_code", "text"],
+  ["game_room_settlements", "room_created_at", "bigint"],
+  ["game_room_settlements", "play_id", "text"],
+  ["game_room_settlements", "outcome", "text"],
+  ["game_room_settlements", "created_at", "timestamp without time zone"],
   ["game_runs", "owner_id", "text"],
   ["game_runs", "state", "jsonb"],
   ["game_runs", "expires_at", "timestamp without time zone"],
@@ -62,10 +80,46 @@ const REQUIRED_COLUMNS = [
 
 export const REQUIRED_INDEXES = [
   {
+    name: "uniq_student_question_content",
+    tableName: "questions",
+    isUnique: true,
+    columns: ["session_id", "author_id", "dedupe_key"],
+  },
+  {
+    name: "uniq_student_comment_content",
+    tableName: "comments",
+    isUnique: true,
+    columns: ["question_id", "author_id", "dedupe_key"],
+  },
+  {
+    name: "uniq_activity_content_award",
+    tableName: "point_logs",
+    isUnique: true,
+    columns: ["student_id", "bonus_type", "activity_dedupe_key"],
+  },
+  {
+    name: "activity_award_claims_pkey",
+    tableName: "activity_award_claims",
+    isUnique: true,
+    columns: ["student_id", "bonus_type", "activity_dedupe_key"],
+  },
+  {
+    name: "uniq_activity_award_claim_point_log",
+    tableName: "activity_award_claims",
+    isUnique: true,
+    columns: ["point_log_id"],
+  },
+  {
     name: "uniq_game_run_creation_request",
     tableName: "game_runs",
     isUnique: true,
     columns: ["owner_id", "creation_request_id"],
+  },
+  {
+    name: "game_room_settlements_pkey",
+    tableName: "game_room_settlements",
+    isUnique: true,
+    columns: ["game_id", "award_key"],
   },
   {
     name: "uniq_game_activity_request",
@@ -107,6 +161,14 @@ export const REQUIRED_INDEXES = [
 
 export const REQUIRED_FOREIGN_KEYS = [
   {
+    name: "activity_award_claims_student_id_fkey",
+    sourceTable: "activity_award_claims",
+    sourceColumns: ["student_id"],
+    targetTable: "users",
+    targetColumns: ["id"],
+    onDelete: "CASCADE",
+  },
+  {
     name: "game_runs_owner_id_fkey",
     sourceTable: "game_runs",
     sourceColumns: ["owner_id"],
@@ -140,7 +202,65 @@ export const REQUIRED_FOREIGN_KEYS = [
   },
 ];
 
-const REQUIRED_RLS_TABLES = ["game_runs", "game_activities"];
+export const REQUIRED_FUNCTIONS = [
+  { name: "normalize_activity_content" },
+  { name: "set_student_content_dedupe_key" },
+  { name: "protect_point_question_content" },
+  { name: "protect_point_comment_content" },
+  { name: "enforce_question_write_contract" },
+  { name: "enforce_comment_write_contract" },
+];
+
+export const REQUIRED_TRIGGERS = [
+  {
+    name: "set_question_dedupe_key_before_write",
+    tableName: "questions",
+    functionName: "set_student_content_dedupe_key",
+  },
+  {
+    name: "set_comment_dedupe_key_before_write",
+    tableName: "comments",
+    functionName: "set_student_content_dedupe_key",
+  },
+  {
+    name: "protect_point_question_content_before_update",
+    tableName: "questions",
+    functionName: "protect_point_question_content",
+  },
+  {
+    name: "protect_point_comment_content_before_update",
+    tableName: "comments",
+    functionName: "protect_point_comment_content",
+  },
+  {
+    name: "enforce_question_write_contract_before_write",
+    tableName: "point_logs",
+    functionName: "enforce_question_write_contract",
+  },
+  {
+    name: "enforce_comment_write_contract_before_write",
+    tableName: "point_logs",
+    functionName: "enforce_comment_write_contract",
+  },
+];
+
+export const REQUIRED_CHECK_CONSTRAINTS = [
+  {
+    name: "activity_award_claims_bonus_type_check",
+    tableName: "activity_award_claims",
+  },
+  {
+    name: "game_room_settlements_outcome_check",
+    tableName: "game_room_settlements",
+  },
+];
+
+const REQUIRED_RLS_TABLES = [
+  "game_runs",
+  "game_activities",
+  "activity_award_claims",
+  "game_room_settlements",
+];
 
 function sameColumns(actual, expected) {
   return Array.isArray(actual)
@@ -168,6 +288,14 @@ export function foreignKeyDefinitionMatches(actual, expected) {
     && actual.targetTable === expected.targetTable
     && sameColumns(actual.targetColumns, expected.targetColumns)
     && actual.onDelete === expected.onDelete;
+}
+
+export function triggerDefinitionMatches(actual, expected) {
+  return Boolean(actual)
+    && actual.isInternal === false
+    && actual.isEnabled === true
+    && actual.tableName === expected.tableName
+    && actual.functionName === expected.functionName;
 }
 
 export function rlsTableAccessibleByCurrentRole(state) {
@@ -298,6 +426,52 @@ async function readRlsTableState(prisma, tableName) {
   return rows[0] ?? null;
 }
 
+async function functionExists(prisma, functionName) {
+  const rows = await prisma.$queryRaw`
+    SELECT routines.oid
+    FROM pg_proc routines
+    JOIN pg_namespace namespaces ON namespaces.oid = routines.pronamespace
+    WHERE namespaces.nspname = current_schema()
+      AND routines.prokind = 'f'
+      AND routines.proname = ${functionName}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+async function readTriggerDefinition(prisma, triggerName) {
+  const rows = await prisma.$queryRaw`
+    SELECT table_relations.relname AS "tableName",
+           routines.proname AS "functionName",
+           triggers.tgisinternal AS "isInternal",
+           triggers.tgenabled <> 'D' AS "isEnabled"
+    FROM pg_trigger triggers
+    JOIN pg_class table_relations ON table_relations.oid = triggers.tgrelid
+    JOIN pg_namespace namespaces ON namespaces.oid = table_relations.relnamespace
+    JOIN pg_proc routines ON routines.oid = triggers.tgfoid
+    WHERE namespaces.nspname = current_schema()
+      AND triggers.tgname = ${triggerName}
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+}
+
+async function checkConstraintExists(prisma, constraintName, tableName) {
+  const rows = await prisma.$queryRaw`
+    SELECT constraints.oid
+    FROM pg_constraint constraints
+    JOIN pg_class table_relations ON table_relations.oid = constraints.conrelid
+    JOIN pg_namespace namespaces ON namespaces.oid = table_relations.relnamespace
+    WHERE namespaces.nspname = current_schema()
+      AND constraints.contype = 'c'
+      AND constraints.convalidated = true
+      AND constraints.conname = ${constraintName}
+      AND table_relations.relname = ${tableName}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
 async function main() {
   loadLocalEnv();
   if (!process.env.DATABASE_URL) {
@@ -339,6 +513,24 @@ async function main() {
       }
     }
 
+    const missingFunctions = [];
+    for (const expected of REQUIRED_FUNCTIONS) {
+      if (!(await functionExists(prisma, expected.name))) missingFunctions.push(expected.name);
+    }
+
+    const invalidTriggers = [];
+    for (const expected of REQUIRED_TRIGGERS) {
+      const actual = await readTriggerDefinition(prisma, expected.name);
+      if (!triggerDefinitionMatches(actual, expected)) invalidTriggers.push(expected.name);
+    }
+
+    const invalidCheckConstraints = [];
+    for (const expected of REQUIRED_CHECK_CONSTRAINTS) {
+      if (!(await checkConstraintExists(prisma, expected.name, expected.tableName))) {
+        invalidCheckConstraints.push(expected.name);
+      }
+    }
+
     const tablesWithoutRls = [];
     const inaccessibleRlsTables = [];
     for (const table of REQUIRED_RLS_TABLES) {
@@ -353,6 +545,9 @@ async function main() {
       || invalidColumns.length > 0
       || invalidIndexes.length > 0
       || invalidForeignKeys.length > 0
+      || missingFunctions.length > 0
+      || invalidTriggers.length > 0
+      || invalidCheckConstraints.length > 0
       || tablesWithoutRls.length > 0
       || inaccessibleRlsTables.length > 0
     ) {
@@ -369,6 +564,15 @@ async function main() {
       }
       if (invalidForeignKeys.length > 0) {
         console.error(`Missing or invalid foreign keys: ${invalidForeignKeys.join(", ")}`);
+      }
+      if (missingFunctions.length > 0) {
+        console.error(`Missing functions: ${missingFunctions.join(", ")}`);
+      }
+      if (invalidTriggers.length > 0) {
+        console.error(`Missing, disabled, or invalid triggers: ${invalidTriggers.join(", ")}`);
+      }
+      if (invalidCheckConstraints.length > 0) {
+        console.error(`Missing or invalid check constraints: ${invalidCheckConstraints.join(", ")}`);
       }
       if (tablesWithoutRls.length > 0) {
         console.error(`Tables without row level security: ${tablesWithoutRls.join(", ")}`);

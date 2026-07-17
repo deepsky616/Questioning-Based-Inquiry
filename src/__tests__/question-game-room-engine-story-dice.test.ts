@@ -191,7 +191,11 @@ describe("이야기 주사위 방 판정기", () => {
     expect(room.players.map(({ id }) => id)).toEqual(["guest-1"]);
     expect(room.gameState).toEqual(completedState);
 
-    const lastLeave = leaveQuestionGameRoom({ room, userId: "guest-1" });
+    const lastLeave = leaveQuestionGameRoom({
+      room,
+      userId: "guest-1",
+      pointAwardSettled: true,
+    });
     room = changed(lastLeave);
     expect(room.players).toEqual([]);
     expect(room.gameState).toEqual(completedState);

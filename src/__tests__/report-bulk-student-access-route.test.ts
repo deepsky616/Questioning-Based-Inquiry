@@ -43,6 +43,7 @@ beforeEach(() => {
     },
   });
   mockTeacher.mockResolvedValue({
+    role: "TEACHER",
     school: "한빛초",
     teacherClasses: [],
   });
@@ -60,6 +61,7 @@ beforeEach(() => {
 describe("묶음 학생 보고서 접근 경계", () => {
   it("학교가 없는 교사는 담당 학급 값을 보내도 학생 조회 전에 403으로 거부한다", async () => {
     mockTeacher.mockResolvedValue({
+      role: "TEACHER",
       school: null,
       teacherClasses: [{ grade: "5", className: "1" }],
     });

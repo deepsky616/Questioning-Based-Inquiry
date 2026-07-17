@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { BASE_POINTS } from "@/lib/points-policy";
+import { BASE_POINTS, pointBonusSpec } from "@/lib/points-policy";
+import {
+  loadTeacherStudentScope,
+  studentWhereForTeacherScope,
+} from "@/lib/teacher-student-access";
 
 interface StudentPlay { id: string; name: string; studentNumber: string | null; plays: number; completions: number; points: number; goodQuestions: number }
 interface StudentLite { id: string; name: string; studentNumber: string | null }
@@ -24,26 +28,13 @@ export async function GET() {
   }
   const teacherId = (session.user as { id: string }).id;
 
-  const teacher = await prisma.user.findUnique({
-    where: { id: teacherId },
-    select: {
-      school: true,
-      teacherClasses: { select: { grade: true, className: true } },
-    },
-  });
-  if (!teacher?.school) {
+  const teacherScope = await loadTeacherStudentScope(teacherId);
+  if (!teacherScope) {
     return NextResponse.json({ error: "담당 학교 정보가 없습니다" }, { status: 403 });
   }
-  const classes = teacher.teacherClasses;
 
   const students = await prisma.user.findMany({
-    where: {
-      role: "STUDENT",
-      school: teacher.school,
-      ...(classes.length > 0
-        ? { OR: classes.map((c) => ({ grade: c.grade, className: c.className })) }
-        : {}),
-    },
+    where: studentWhereForTeacherScope(teacherScope),
     select: { id: true, name: true, studentNumber: true },
   });
   const studentMap = new Map(students.map((s) => [s.id, s]));
@@ -51,7 +42,7 @@ export async function GET() {
   if (ids.length === 0) return NextResponse.json({ byGame: {} });
 
   const logs = await prisma.pointLog.findMany({
-    where: { studentId: { in: ids }, status: { not: "REJECTED" } },
+    where: { studentId: { in: ids }, status: "APPROVED" },
     select: { gameId: true, studentId: true, bonusType: true, points: true, createdAt: true },
   });
 
@@ -62,7 +53,12 @@ export async function GET() {
   const perStudentValidPoints: Record<string, Map<string, number>> = {};
 
   for (const log of logs) {
-    const g = log.gameId;
+    const bonusSpec = pointBonusSpec(log.bonusType);
+    const isVerifiedRun = bonusSpec.kind === "game" && (
+      (log.gameId === "ACTIVITY_SOLO" && bonusSpec.mode === "solo") ||
+      (log.gameId === "ACTIVITY_AI" && bonusSpec.mode === "ai")
+    );
+    const g = isVerifiedRun ? bonusSpec.gameId : log.gameId;
     if (!g) continue;
     if (!byGame[g]) { byGame[g] = { participants: 0, plays: 0, completions: 0, goodQuestions: 0, lastPlayedAt: null, students: [], nonParticipants: [] }; }
     if (!perStudent[g]) perStudent[g] = new Map();
@@ -73,8 +69,15 @@ export async function GET() {
     let row = perStudent[g].get(log.studentId);
     if (!row) { row = { id: meta.id, name: meta.name, studentNumber: meta.studentNumber, plays: 0, completions: 0, points: 0, goodQuestions: 0 }; perStudent[g].set(log.studentId, row); }
     row.points += log.points;
-    if (log.bonusType === "PARTICIPATION") { row.plays += 1; byGame[g].plays += 1; }
-    if (log.bonusType === "COMPLETION") { row.completions += 1; byGame[g].completions += 1; }
+    const isCappedFriendRun = log.bonusType === "FRIEND_DAILY_LIMIT";
+    if (log.bonusType === "PARTICIPATION" || isVerifiedRun || isCappedFriendRun) {
+      row.plays += 1;
+      byGame[g].plays += 1;
+    }
+    if (log.bonusType === "COMPLETION" || isVerifiedRun || isCappedFriendRun) {
+      row.completions += 1;
+      byGame[g].completions += 1;
+    }
     if (log.bonusType === "VALID_QUESTIONS") {
       perStudentValidPoints[g].set(log.studentId, (perStudentValidPoints[g].get(log.studentId) ?? 0) + log.points);
     }

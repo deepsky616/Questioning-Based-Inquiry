@@ -181,6 +181,7 @@ export interface GameRoom {
   playId?: string;
   pointAwardKeyVersion?: 1 | 2;
   pointEvidenceVersion?: 1 | 2;
+  pointCompletedAt?: number;
   pointParticipants?: RoomPlayer[];
   awardResult?: GameAwardResult;
 }
@@ -295,6 +296,8 @@ export function isGameRoom(value: unknown): value is GameRoom {
     (value.pointEvidenceVersion === undefined ||
       value.pointEvidenceVersion === 1 ||
       value.pointEvidenceVersion === 2) &&
+    (value.pointCompletedAt === undefined ||
+      isNonNegativeInteger(value.pointCompletedAt)) &&
     (value.pointParticipants === undefined ||
       isPointParticipantSnapshot(
         value.pointParticipants,
@@ -320,7 +323,18 @@ export function pointStudentParticipantsForRoom(
 
 export function parseGameRoom(value: unknown): GameRoom | null {
   if (!isRecord(value)) return null;
-  const normalized = value.version == null ? { ...value, version: 1 } : value;
+  const withVersion = value.version == null ? { ...value, version: 1 } : value;
+  const gameState = isRecord(withVersion.gameState) ? withVersion.gameState : null;
+  const shouldFreezeLegacyCompletionTime =
+    withVersion.pointCompletedAt === undefined &&
+    withVersion.status === "ended" &&
+    gameState?.stateVersion === 2 &&
+    gameState.phase === "done" &&
+    gameState.endReason === "completed" &&
+    isNonNegativeInteger(withVersion.updatedAt);
+  const normalized = shouldFreezeLegacyCompletionTime
+    ? { ...withVersion, pointCompletedAt: withVersion.updatedAt }
+    : withVersion;
   return isGameRoom(normalized) ? normalized : null;
 }
 

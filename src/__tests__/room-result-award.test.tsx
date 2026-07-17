@@ -10,6 +10,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import { QueryClient } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import RoomResult from "@/app/(student)/student-question-play/games/RoomResult";
@@ -114,6 +115,7 @@ function deferred<T>() {
 
 let fetchMock: ReturnType<typeof vi.fn>;
 let onAction: ReturnType<typeof vi.fn<RoomActionHandler>>;
+let queryClient: QueryClient;
 
 function renderResult(
   room = makeRoom(),
@@ -141,10 +143,14 @@ function renderResult(
       onAction={onAction}
       onLeave={onLeave}
     />,
+    { queryClient },
   );
 }
 
 beforeEach(() => {
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   auth.session = {
     data: {
       user: { id: "teacher", name: "교사", role: "TEACHER" },
@@ -168,6 +174,17 @@ afterEach(() => {
 });
 
 describe("verified room result awards", () => {
+  it("친구방 포인트가 실제 지급되면 포인트 카드를 새로 읽는다", async () => {
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue(jsonResponse(AWARD));
+
+    renderResult();
+
+    await waitFor(() => {
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["points-card"] });
+    });
+  });
+
   it("sends only execution identifiers and publishes without a client result", async () => {
     renderResult();
 

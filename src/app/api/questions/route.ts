@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { logger } from "@/lib/logger";
 import { auth } from "@/lib/auth";
 import {
@@ -60,6 +61,12 @@ export async function POST(req: Request) {
     }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json(
+        { error: "이미 같은 질문을 작성했어요. 다른 관점으로 바꿔보세요!", code: "DUPLICATE" },
+        { status: 409 },
+      );
     }
     logger.error("Create question error:", error);
     return NextResponse.json({ error: "서버 오류가 발생했습니다" }, { status: 500 });

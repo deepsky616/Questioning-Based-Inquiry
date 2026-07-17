@@ -14,6 +14,7 @@ vi.mock("@/lib/db", () => ({
       subject: "과학",
       inquiry_questions: [{ type: "factual", content: "광합성이란?" }],
     }]),
+    $transaction: vi.fn(),
   },
 }));
 
@@ -25,6 +26,7 @@ import { POST as createSessionFromDesign } from "@/app/api/unit-design/[id]/sess
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockSessionCreate = prisma.questionSession.create as ReturnType<typeof vi.fn>;
 const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
+const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 
 const TEACHER_SESSION = {
   user: { id: "teacher-1", role: "TEACHER", name: "교사" },
@@ -44,7 +46,12 @@ const makeCtx = (id: string) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockSessionCreate.mockResolvedValue({ id: "qs-1" });
-  mockUserFindUnique.mockResolvedValue({ school: "테스트학교", teacherClasses: [] });
+  mockUserFindUnique.mockResolvedValue({
+    role: "TEACHER",
+    school: "테스트학교",
+    teacherClasses: [],
+  });
+  mockTransaction.mockImplementation(async (callback) => callback(prisma));
 });
 
 // ─── POST /api/sessions ───────────────────────────────────────────────────────

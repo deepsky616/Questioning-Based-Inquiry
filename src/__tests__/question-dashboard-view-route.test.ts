@@ -112,6 +112,7 @@ describe("학생 대시보드 질문 요약", () => {
     const recentCall = mFindMany.mock.calls.find(([args]) => args.take === 5)?.[0];
     const sessionScope = {
       teacher: {
+        role: "TEACHER",
         school: "테스트초",
         OR: [
           { teacherClasses: { some: { grade: "5", className: "1" } } },

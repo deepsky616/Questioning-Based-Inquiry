@@ -144,6 +144,30 @@ describe("award and publish route service split", () => {
     })).toBe(false);
   });
 
+  it("지급 대상 없음 영수증 결과만 빈 점수 목록을 허용한다", () => {
+    const noEligible = {
+      awards: [],
+      settlement: "NO_ELIGIBLE_STUDENTS",
+      summary: "점수를 지급할 학생 참가자가 없습니다.",
+    };
+
+    expect(isGameAwardResult(noEligible)).toBe(true);
+    expect(isGameAwardResult({ awards: [] })).toBe(false);
+    expect(isGameAwardResult({
+      ...noEligible,
+      settlement: "AWARDED",
+    })).toBe(false);
+    expect(isGameAwardResult({
+      ...noEligible,
+      awards: [{
+        studentId: "student-1",
+        bonusType: "COMPLETION",
+        points: 5,
+        reason: "게임 완료",
+      }],
+    })).toBe(false);
+  });
+
   it("validates the public result at the room top level", () => {
     const room = {
       code: "1234",

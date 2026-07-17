@@ -6,10 +6,9 @@
  */
 export function normalizeContent(s: string): string {
   return s
-    .trim()
-    .replace(/\s+/g, "")
-    .replace(/[.,!?~…·、，。　 ]/g, "")
-    .toLowerCase();
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{Nd}]+/gu, "");
 }
 
 // 자동 부여 기본 점수 (수업세션 질문/답변)

@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { AiBusyError, AiKeyMissingError, AiQuotaError, generateJsonWithMetadata } from "@/lib/ai";
 import { getRequestLocale } from "@/lib/locale";
+import { issuePracticeGenerationProof } from "@/lib/practice-generation-proof";
+import { JsonExtractionError } from "@/lib/json-extract";
 
 // 질문 연습용 AI 실시간 출제 (바꾸기·만들기 모드 전용).
 // 분류 퀴즈는 정답·해설의 신뢰성이 필요해 검수된 문항 은행만 사용하고,
@@ -98,6 +101,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
   }
   const userId = (session.user as { id: string }).id;
+  const currentUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  if (!currentUser) {
+    return NextResponse.json({ error: "계정을 확인할 수 없습니다" }, { status: 401 });
+  }
+  if (!["STUDENT", "TEACHER", "ADMIN"].includes(currentUser.role)) {
+    return NextResponse.json({ error: "연습을 이용할 권한이 없습니다" }, { status: 403 });
+  }
   const locale = getRequestLocale(req);
 
   const { success } = rateLimit(`practice-gen:${userId}`, { limit: 10, windowMs: 60_000 });
@@ -123,7 +136,19 @@ export async function POST(req: Request) {
         temperature: 0.9, // 매번 다른 문제가 나오도록 다양성 우선
       });
       const item = transformResponseSchema.parse(generated.data);
-      return NextResponse.json({ ...item, target });
+      const proof = issuePracticeGenerationProof({
+        userId,
+        mode: "transform",
+        target,
+        content: item.source,
+      });
+      return NextResponse.json({
+        ...item,
+        target,
+        generationProof: proof.proof,
+        generationId: proof.generationId,
+        generationProofExpiresAt: proof.expiresAt.toISOString(),
+      });
     }
 
     const generated = await generateJsonWithMetadata<unknown>({
@@ -134,9 +159,19 @@ export async function POST(req: Request) {
       temperature: 0.9,
     });
     const topic = createResponseSchema.parse(generated.data);
-    return NextResponse.json(topic);
+    const proof = issuePracticeGenerationProof({
+      userId,
+      mode: "create",
+      content: topic.passage,
+    });
+    return NextResponse.json({
+      ...topic,
+      generationProof: proof.proof,
+      generationId: proof.generationId,
+      generationProofExpiresAt: proof.expiresAt.toISOString(),
+    });
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    if (error instanceof z.ZodError || error instanceof JsonExtractionError) {
       // 요청 형식 오류와 AI 응답 형식 오류 모두 — 클라이언트는 은행 문항으로 폴백
       return NextResponse.json({ error: "AI 출제 형식이 올바르지 않습니다" }, { status: 502 });
     }

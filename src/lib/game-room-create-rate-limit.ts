@@ -1,10 +1,18 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 
 const CREATE_LIMIT = 10;
 const CREATE_WINDOW_MS = 60_000;
 
-export async function consumeGameRoomCreateLimit(userId: string) {
-  return prisma.$transaction(async (tx) => {
+type GameRoomCreateLimitClient = Pick<
+  Prisma.TransactionClient,
+  "$queryRaw" | "gameRoomCreateAttempt"
+>;
+
+async function consumeGameRoomCreateLimitInTransaction(
+  tx: GameRoomCreateLimitClient,
+  userId: string,
+) {
     const lockKey = `game-room-create:${userId}`;
     const rows = await tx.$queryRaw<Array<{ lock: string; now: Date }>>`
       WITH "locked" AS MATERIALIZED (
@@ -35,5 +43,14 @@ export async function consumeGameRoomCreateLimit(userId: string) {
       data: { userId, createdAt: now },
     });
     return true;
-  });
+}
+
+export async function consumeGameRoomCreateLimit(
+  userId: string,
+  tx?: GameRoomCreateLimitClient,
+) {
+  if (tx) return consumeGameRoomCreateLimitInTransaction(tx, userId);
+  return prisma.$transaction((client) =>
+    consumeGameRoomCreateLimitInTransaction(client, userId)
+  );
 }

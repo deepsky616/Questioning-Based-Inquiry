@@ -14,6 +14,7 @@ vi.mock("@/lib/db", () => ({
       create: vi.fn(),
     },
     $queryRaw: vi.fn(),
+    $transaction: vi.fn(),
   },
 }));
 
@@ -26,6 +27,7 @@ const mockUserFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockUserFindMany = prisma.user.findMany as ReturnType<typeof vi.fn>;
 const mockSessionCreate = prisma.questionSession.create as ReturnType<typeof vi.fn>;
 const mockQueryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
+const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -33,6 +35,8 @@ beforeEach(() => {
     user: { id: "teacher-1", role: "TEACHER" },
   });
   mockUserFindUnique.mockResolvedValue({
+    id: "teacher-1",
+    role: "TEACHER",
     school: "한빛초",
     teacherClasses: [{ grade: "5", className: "1" }],
   });
@@ -55,6 +59,7 @@ beforeEach(() => {
     },
   ]);
   mockSessionCreate.mockResolvedValue({ id: "session-new" });
+  mockTransaction.mockImplementation(async (callback) => callback(prisma));
 });
 
 describe("탐구설계 질문수업 대상 저장 경계", () => {

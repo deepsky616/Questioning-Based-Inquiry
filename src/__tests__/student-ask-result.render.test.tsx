@@ -314,7 +314,7 @@ describe("학생 질문 분석 결과", () => {
         return Promise.resolve({ ok: true, json: async () => result } as Response);
       }
       if (url === "/api/questions" && init?.method === "POST") {
-        return Promise.resolve({ ok: true, json: async () => ({ id: "saved-1" }) } as Response);
+        return Promise.resolve({ ok: true, json: async () => ({ id: "saved-1", awardedPoints: 2 }) } as Response);
       }
       return Promise.resolve({ ok: true, json: async () => ({ configured: true }) } as Response);
     }));
@@ -340,6 +340,7 @@ describe("학생 질문 분석 결과", () => {
     expect(queryClientState.cancelQueries.mock.invocationCallOrder[0]).toBeLessThan(
       queryClientState.setQueryData.mock.invocationCallOrder[0],
     );
+    expect(queryClientState.invalidateQueries).toHaveBeenCalledWith({ queryKey: ["points-card"] });
   });
 
   it.each([

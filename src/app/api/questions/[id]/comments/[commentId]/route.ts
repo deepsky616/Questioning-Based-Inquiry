@@ -2,9 +2,18 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canModerateQuestion, canViewQuestion } from "@/lib/content-visibility";
-import { normalizeContent } from "@/lib/content-normalize";
+import { normalizeContentForPersistence } from "@/lib/content-normalize-db";
 import { checkProfanity } from "@/lib/profanity";
 import { cleanupCommentTranslations } from "@/lib/translation-cleanup";
+import {
+  lockCommentMutationTargets,
+  rejectPendingActivityBonuses,
+} from "@/lib/pending-activity-bonus-cleanup";
+import {
+  revalidateStudentOwnedMutationAfterLocks,
+  revalidateTeacherQuestionManagementAfterLocks,
+} from "@/lib/question-detail-service";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 const patchSchema = z.object({
@@ -13,6 +22,9 @@ const patchSchema = z.object({
 });
 
 type Params = { params: Promise<{ id: string; commentId: string }> };
+
+const AWARDED_COMMENT_LOCK_MESSAGE =
+  "포인트를 받은 답변은 수정하거나 삭제할 수 없습니다. 선생님께 요청해 주세요.";
 
 const questionAccessSelect = {
   isPublic: true,
@@ -28,6 +40,7 @@ const questionAccessSelect = {
       targetStudentIds: true,
       teacher: {
         select: {
+          role: true,
           school: true,
           teacherClasses: { select: { grade: true, className: true } },
         },
@@ -107,9 +120,13 @@ export async function PATCH(
       return NextResponse.json({ error: "본인 댓글만 수정할 수 있습니다" }, { status: 403 });
     }
     const content = data.content.trim();
+    const normalizedContent = await normalizeContentForPersistence(content);
+    if (viewer?.role === "STUDENT" && normalizedContent.length === 0) {
+      return NextResponse.json({ error: "답변에 글자를 입력해 주세요" }, { status: 400 });
+    }
     const profanity = checkProfanity(content);
     updateData.content = content;
-    updateData.normalizedContent = normalizeContent(content);
+    updateData.normalizedContent = normalizedContent;
     updateData.flagged = profanity.flagged;
     updateData.flagReason = profanity.flagged ? profanity.reason : null;
   }
@@ -117,17 +134,92 @@ export async function PATCH(
     return NextResponse.json({ error: "변경할 내용이 없습니다" }, { status: 400 });
   }
 
-  const comment = await prisma.comment.update({
-    where: { id: commentId },
-    data: updateData,
-    include: { author: { select: { id: true, name: true } } },
+  const updateComment = () => prisma.$transaction(async (tx) => {
+    const locked = await lockCommentMutationTargets(tx, [commentId], [id]);
+    const lockedQuestion = locked.questions.find((question) => question.id === id);
+    const lockedComment = locked.comments.find((comment) => comment.id === commentId);
+    if (
+      !lockedQuestion ||
+      !lockedComment ||
+      lockedComment.questionId !== id
+    ) {
+      return { status: "MISSING" } as const;
+    }
+
+    if (
+      role === "TEACHER" &&
+      !(await revalidateTeacherQuestionManagementAfterLocks(tx, userId, {
+        authorId: lockedQuestion.authorId,
+        sessionId: lockedQuestion.sessionId,
+      }))
+    ) {
+      return { status: "FORBIDDEN" } as const;
+    }
+
+    if (
+      role === "STUDENT" &&
+      !(await revalidateStudentOwnedMutationAfterLocks(
+        tx,
+        userId,
+        lockedComment.authorId,
+        lockedQuestion.sessionId,
+      ))
+    ) {
+      return { status: "FORBIDDEN" } as const;
+    }
+
+    if (data.content !== undefined && lockedComment.authorId !== userId) {
+      return { status: "FORBIDDEN" } as const;
+    }
+
+    if (data.content !== undefined && role === "STUDENT") {
+      const isPointEligibleAnswer = lockedQuestion.authorId !== userId &&
+        (existing.question.author?.role === "STUDENT" || existing.question.author?.role === "TEACHER");
+      if (isPointEligibleAnswer) return { status: "LOCKED" } as const;
+
+      const awardedPointCount = await tx.pointLog.count({
+        where: {
+          relatedCommentId: commentId,
+          status: { in: ["PENDING", "APPROVED"] },
+        },
+      });
+      if (awardedPointCount > 0) return { status: "LOCKED" } as const;
+    }
+
+    const comment = await tx.comment.update({
+      where: { id: commentId },
+      data: updateData,
+      include: { author: { select: { id: true, name: true } } },
+    });
+    return { status: "UPDATED", comment } as const;
   });
+  let updateResult: Awaited<ReturnType<typeof updateComment>>;
+  try {
+    updateResult = await updateComment();
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json(
+        { error: "이미 같은 답변을 작성했어요. 다른 표현으로 바꿔보세요!", code: "DUPLICATE" },
+        { status: 409 },
+      );
+    }
+    throw error;
+  }
+  if (updateResult.status === "MISSING") {
+    return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
+  }
+  if (updateResult.status === "LOCKED") {
+    return NextResponse.json({ error: AWARDED_COMMENT_LOCK_MESSAGE }, { status: 403 });
+  }
+  if (updateResult.status === "FORBIDDEN") {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
 
   if (data.content !== undefined) {
     await cleanupCommentTranslations([commentId]);
   }
 
-  return NextResponse.json(comment);
+  return NextResponse.json(updateResult.comment);
 }
 
 /** 댓글 삭제 (작성자 본인 또는 교사). */
@@ -170,7 +262,69 @@ export async function DELETE(
     return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
   }
 
-  await prisma.comment.delete({ where: { id: commentId } });
+  const deleteResult = await prisma.$transaction(async (tx) => {
+    const locked = await lockCommentMutationTargets(tx, [commentId], [id]);
+    const lockedQuestion = locked.questions.find((question) => question.id === id);
+    const lockedComment = locked.comments.find((item) => item.id === commentId);
+    if (
+      !lockedQuestion ||
+      !lockedComment ||
+      lockedComment.questionId !== id
+    ) {
+      return "MISSING" as const;
+    }
+
+    if (
+      role === "TEACHER" &&
+      !(await revalidateTeacherQuestionManagementAfterLocks(tx, userId, {
+        authorId: lockedQuestion.authorId,
+        sessionId: lockedQuestion.sessionId,
+      }))
+    ) {
+      return "FORBIDDEN" as const;
+    }
+
+    if (
+      role === "STUDENT" &&
+      !(await revalidateStudentOwnedMutationAfterLocks(
+        tx,
+        userId,
+        lockedComment.authorId,
+        lockedQuestion.sessionId,
+      ))
+    ) {
+      return "FORBIDDEN" as const;
+    }
+
+    if (role === "STUDENT" && lockedComment.authorId !== userId) {
+      return "FORBIDDEN" as const;
+    }
+
+    if (role === "STUDENT") {
+      const protectedPointCount = await tx.pointLog.count({
+        where: {
+          relatedCommentId: commentId,
+          status: { in: ["PENDING", "APPROVED"] },
+        },
+      });
+      if (protectedPointCount > 0) return "AWARDED" as const;
+    }
+
+    await rejectPendingActivityBonuses(tx, { commentIds: [lockedComment.id] });
+    await tx.comment.delete({ where: { id: commentId } });
+    return "DELETED" as const;
+  });
+
+  if (deleteResult === "MISSING") {
+    return NextResponse.json({ error: "댓글을 찾을 수 없습니다" }, { status: 404 });
+  }
+  if (deleteResult === "AWARDED") {
+    return NextResponse.json({ error: AWARDED_COMMENT_LOCK_MESSAGE }, { status: 403 });
+  }
+  if (deleteResult === "FORBIDDEN") {
+    return NextResponse.json({ error: "삭제 권한이 없습니다" }, { status: 403 });
+  }
+
   await cleanupCommentTranslations([commentId]);
   return NextResponse.json({ ok: true });
 }

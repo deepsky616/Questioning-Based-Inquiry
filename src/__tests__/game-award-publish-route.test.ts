@@ -88,6 +88,11 @@ const REORDERED_AWARD: GameAwardResult = {
     },
   ],
 };
+const NO_ELIGIBLE_AWARD: GameAwardResult = {
+  awards: [],
+  settlement: "NO_ELIGIBLE_STUDENTS",
+  summary: "점수를 지급할 학생 참가자가 없습니다.",
+};
 
 function makeRoom(overrides: Partial<GameRoom> = {}): GameRoom {
   return {
@@ -198,6 +203,20 @@ describe("verified game award publication route", () => {
     );
   });
 
+  it("publishes a no-eligible-students settlement without point awards", async () => {
+    mocks.loadVerifiedGameAwardResult.mockResolvedValue(NO_ELIGIBLE_AWARD);
+
+    const response = await patch(requestBody());
+
+    expect(response.status).toBe(200);
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
+      awardResult: NO_ELIGIBLE_AWARD,
+    }));
+    await expect(response.json()).resolves.toMatchObject({
+      room: { awardResult: NO_ELIGIBLE_AWARD },
+    });
+  });
+
   it.each([
     ["result", AWARD],
     ["awardResult", AWARD],
@@ -294,6 +313,19 @@ describe("verified game award publication route", () => {
 
   it("replays an already published matching result without another write", async () => {
     mocks.loadGameRoom.mockResolvedValue(makeRoom({ awardResult: AWARD }));
+
+    const response = await patch(requestBody());
+
+    expect(response.status).toBe(200);
+    expect(mocks.loadVerifiedGameAwardResult).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("replays an already published no-eligible-students settlement without another write", async () => {
+    mocks.loadGameRoom.mockResolvedValue(makeRoom({
+      awardResult: NO_ELIGIBLE_AWARD,
+    }));
+    mocks.loadVerifiedGameAwardResult.mockResolvedValue(NO_ELIGIBLE_AWARD);
 
     const response = await patch(requestBody());
 

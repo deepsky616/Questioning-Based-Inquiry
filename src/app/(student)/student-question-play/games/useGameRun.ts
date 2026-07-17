@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { LadderGrid } from "@/lib/question-ladder";
 import {
   getMysteryItem,
@@ -1642,6 +1643,7 @@ function isExpectedMysteryAiAdvance(
 }
 
 export function useGameRun() {
+  const queryClient = useQueryClient();
   const mountedRef = useRef(false);
   const generationRef = useRef(0);
   const inFlightRef = useRef(false);
@@ -1673,6 +1675,12 @@ export function useGameRun() {
       generationRef.current += 1;
     };
   }, []);
+
+  useEffect(() => {
+    if ((result?.awarded ?? 0) > 0) {
+      void queryClient.invalidateQueries({ queryKey: ["points-card"] });
+    }
+  }, [queryClient, result]);
 
   const begin = useCallback((kind: Exclude<PendingKind, null>) => {
     if (inFlightRef.current) return false;

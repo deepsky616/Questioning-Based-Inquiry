@@ -67,6 +67,7 @@ const assignedQuestion = {
     targetStudentId: null,
     targetStudentIds: [],
     teacher: {
+      role: "TEACHER",
       school: "한빛초",
       teacherClasses: [{ grade: "5", className: "1" }],
     },

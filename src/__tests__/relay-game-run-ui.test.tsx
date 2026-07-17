@@ -9,6 +9,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient } from "@tanstack/react-query";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import RelayGame from "@/app/(student)/student-question-play/games/RelayGame";
 import { BUILT_IN_GAMES } from "@/lib/question-games-data";
@@ -82,7 +83,7 @@ function responseWithOptionalResult(run: unknown, result: unknown) {
   return result === undefined ? { run } : { run, result };
 }
 
-function renderRelay(mode: "solo" | "ai" = "solo") {
+function renderRelay(mode: "solo" | "ai" = "solo", queryClient?: QueryClient) {
   return render(
     <RelayGame
       game={game}
@@ -92,6 +93,7 @@ function renderRelay(mode: "solo" | "ai" = "solo") {
         players: mode === "ai" ? ["민준", "AI"] : ["민준"],
       }}
     />,
+    { queryClient },
   );
 }
 
@@ -572,6 +574,8 @@ describe("이어 말하기 서버 실행 화면", () => {
   });
 
   it("마지막 질문 자동 정산 결과를 받으면 별도 완료 요청 없이 결과 화면으로 간다", async () => {
+    const queryClient = new QueryClient();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
     let version = 1;
     let questionCount = 0;
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
@@ -590,7 +594,7 @@ describe("이어 말하기 서버 실행 화면", () => {
       }
       return jsonResponse({ error: "별도 완료 요청은 없어야 합니다" }, 500);
     });
-    renderRelay();
+    renderRelay("solo", queryClient);
     chooseTopicAndStart();
     await screen.findByPlaceholderText(/첫 번째 질문/);
 
@@ -600,6 +604,7 @@ describe("이어 말하기 서버 실행 화면", () => {
 
     expect(await screen.findByText("릴레이 완성!")).toBeVisible();
     expect(screen.getByText("+5점 적립!")).toBeVisible();
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["points-card"] });
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/complete")))
       .toHaveLength(0);
   });

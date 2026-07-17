@@ -23,6 +23,7 @@ const mockUserFindFirst = prisma.user.findFirst as ReturnType<typeof vi.fn>;
 const mockBuildStudentReport = buildStudentReport as ReturnType<typeof vi.fn>;
 
 type TeacherRecord = {
+  role: "TEACHER";
   school: string | null;
   teacherClasses: Array<{ grade: string; className: string }>;
 };
@@ -54,6 +55,7 @@ beforeEach(() => {
     },
   });
   teacherRecord = {
+    role: "TEACHER",
     school: "한빛초",
     teacherClasses: [{ grade: "5", className: "1" }],
   };
@@ -104,6 +106,7 @@ describe("단일 학생 보고서 접근 경계", () => {
 
   it("학교가 없는 교사는 집계 전에 403으로 거부한다", async () => {
     teacherRecord = {
+      role: "TEACHER",
       school: null,
       teacherClasses: [{ grade: "5", className: "1" }],
     };

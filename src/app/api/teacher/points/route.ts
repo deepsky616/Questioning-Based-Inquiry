@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import {
   isStudentInTeacherScope,
+  lockAndLoadTeacherStudentScope,
+  lockStudentRows,
   loadTeacherStudentScope,
   studentWhereForTeacherScope,
 } from "@/lib/teacher-student-access";
@@ -17,7 +19,7 @@ export async function GET() {
   const teacherId = (session.user as { id: string }).id;
 
   const scope = await loadTeacherStudentScope(teacherId);
-  if (!scope) return NextResponse.json({ students: [] });
+  if (!scope) return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
 
   const students = await prisma.user.findMany({
     where: studentWhereForTeacherScope(scope),
@@ -67,11 +69,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
 
-  const adjusted = points < 0 ? Math.max(points, -student.totalPoints) : points;
-
+  let result:
+    | { state: "UPDATED"; adjusted: number }
+    | { state: "NOT_FOUND" }
+    | { state: "FORBIDDEN" };
   try {
-    await prisma.$transaction([
-      prisma.pointLog.create({
+    result = await prisma.$transaction(async (tx) => {
+      const currentScope = await lockAndLoadTeacherStudentScope(tx, teacherId);
+      if (!currentScope) return { state: "FORBIDDEN" as const };
+
+      const locked = await lockStudentRows(tx, [studentId]);
+      if (locked.length === 0) return { state: "NOT_FOUND" as const };
+
+      const currentStudent = await tx.user.findUnique({
+        where: { id: studentId },
+        select: {
+          role: true,
+          school: true,
+          grade: true,
+          className: true,
+          totalPoints: true,
+        },
+      });
+      if (!currentStudent || currentStudent.role !== "STUDENT") {
+        return { state: "NOT_FOUND" as const };
+      }
+      if (!isStudentInTeacherScope(currentScope, currentStudent)) {
+        return { state: "FORBIDDEN" as const };
+      }
+
+      const revocable = points < 0
+        ? Math.min(Math.abs(points), Math.max(0, currentStudent.totalPoints))
+        : 0;
+      const adjusted = points < 0
+        ? (revocable === 0 ? 0 : -revocable)
+        : points;
+      await tx.pointLog.create({
         data: {
           studentId, gameId: "MANUAL", roomCode: null,
           bonusType: points >= 0 ? "TEACHER_GRANT" : "TEACHER_REVOKE",
@@ -79,15 +112,22 @@ export async function POST(req: NextRequest) {
           reason: reason || (points >= 0 ? "교사 수동 지급" : "교사 회수"),
           awardedById: teacherId,
         } as Prisma.PointLogUncheckedCreateInput,
-      }),
-      prisma.user.update({
+      });
+      await tx.user.update({
         where: { id: studentId },
         data: { totalPoints: { increment: adjusted } },
-      }),
-    ]);
+      });
+      return { state: "UPDATED" as const, adjusted };
+    });
   } catch {
     return NextResponse.json({ error: "처리 실패" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, adjusted });
+  if (result.state === "NOT_FOUND") {
+    return NextResponse.json({ error: "학생을 찾을 수 없습니다" }, { status: 404 });
+  }
+  if (result.state === "FORBIDDEN") {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
+  return NextResponse.json({ ok: true, adjusted: result.adjusted });
 }

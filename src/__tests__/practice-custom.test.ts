@@ -6,6 +6,7 @@ import { practiceCustomItemSchema, rowsToBank, type PracticeCustomRow } from "@/
 
 const baseRow: PracticeCustomRow = {
   id: "r1",
+  teacherId: "teacher-1",
   mode: "quiz",
   content: null,
   closure: null,

@@ -2,12 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
+  findSettlement: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   prisma: {
     pointLog: {
       findMany: mocks.findMany,
+    },
+    gameRoomSettlement: {
+      findUnique: mocks.findSettlement,
     },
   },
 }));
@@ -29,6 +33,7 @@ const ALLOWED_STUDENT_IDS = new Set(["student-1"]);
 describe("verified question game award publishing", () => {
   beforeEach(() => {
     mocks.findMany.mockReset();
+    mocks.findSettlement.mockReset().mockResolvedValue({ outcome: "AWARDED" });
   });
 
   it("restores only approved logs for the exact game execution key", async () => {
@@ -95,6 +100,44 @@ describe("verified question game award publishing", () => {
         aiAnalysis: true,
       },
     });
+    expect(mocks.findSettlement).toHaveBeenCalledWith({
+      where: {
+        gameId_awardKey: {
+          gameId: "dice",
+          awardKey: "room:1234:100:11111111-1111-4111-8111-111111111111",
+        },
+      },
+      select: { outcome: true },
+    });
+    expect(mocks.findSettlement.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.findMany.mock.invocationCallOrder[0]);
+  });
+
+  it.each([null, { outcome: "UNKNOWN" }])(
+    "does not publish logs without a recognized settlement receipt: %j",
+    async (settlement) => {
+      mocks.findSettlement.mockResolvedValue(settlement);
+
+      await expect(
+        loadVerifiedGameAwardResult(IDENTITY, ALLOWED_STUDENT_IDS),
+      ).resolves.toBeNull();
+      expect(mocks.findMany).not.toHaveBeenCalled();
+    },
+  );
+
+  it("publishes the no-eligible-students settlement without reading point logs", async () => {
+    mocks.findSettlement.mockResolvedValue({
+      outcome: "NO_ELIGIBLE_STUDENTS",
+    });
+
+    await expect(
+      loadVerifiedGameAwardResult(IDENTITY, ALLOWED_STUDENT_IDS),
+    ).resolves.toEqual({
+      awards: [],
+      settlement: "NO_ELIGIBLE_STUDENTS",
+      summary: "점수를 지급할 학생 참가자가 없습니다.",
+    });
+    expect(mocks.findMany).not.toHaveBeenCalled();
   });
 
   it("returns null when the execution has no valid approved result", async () => {

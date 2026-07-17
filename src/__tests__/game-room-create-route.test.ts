@@ -5,13 +5,24 @@ import {
 } from "@/lib/question-game-rules";
 
 const mocks = vi.hoisted(() => ({
+  tx: {
+    $queryRaw: vi.fn(),
+    user: { findUnique: vi.fn() },
+  },
   auth: vi.fn(),
+  transaction: vi.fn(),
   createGameRoom: vi.fn(),
   consumeCreateLimit: vi.fn(),
   cleanupIfDue: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/db", () => ({
+  prisma: { $transaction: mocks.transaction },
+}));
+vi.mock("@/lib/logger", () => ({
+  logger: { error: vi.fn(), warn: vi.fn() },
+}));
 vi.mock("@/lib/game-room-store", () => ({
   createGameRoom: mocks.createGameRoom,
 }));
@@ -35,6 +46,15 @@ function createRoom(gameId: string) {
 }
 
 beforeEach(() => {
+  mocks.transaction.mockReset().mockImplementation(
+    (callback: (tx: typeof mocks.tx) => unknown) => callback(mocks.tx),
+  );
+  mocks.tx.$queryRaw.mockReset().mockResolvedValue([{ lock: "" }]);
+  mocks.tx.user.findUnique.mockReset().mockResolvedValue({
+    id: "user-1",
+    name: "학생",
+    role: "STUDENT",
+  });
   mocks.auth.mockReset().mockResolvedValue({
     user: { id: "user-1", name: "학생" },
   });
@@ -77,6 +97,6 @@ describe("친구 방 생성 놀이 식별값", () => {
       gameId,
       hostId: "user-1",
       hostName: "학생",
-    });
+    }, mocks.tx);
   });
 });

@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameRoom } from "@/lib/question-games-data";
 
@@ -8,6 +7,7 @@ const prismaMock = vi.hoisted(() => ({
     updateMany: vi.fn(),
     deleteMany: vi.fn(),
     create: vi.fn(),
+    createMany: vi.fn(),
   },
   $executeRaw: vi.fn(),
 }));
@@ -43,6 +43,7 @@ beforeEach(() => {
   prismaMock.gameRoom.updateMany.mockReset();
   prismaMock.gameRoom.deleteMany.mockReset();
   prismaMock.gameRoom.create.mockReset();
+  prismaMock.gameRoom.createMany.mockReset();
   prismaMock.$executeRaw.mockReset();
 });
 
@@ -283,8 +284,37 @@ describe("deleteGameRoom", () => {
 });
 
 describe("createGameRoom", () => {
+  it("전달받은 거래 저장소에 방을 삽입한다", async () => {
+    const transactionCreate = vi.fn();
+    const transactionCreateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const transactionClient = {
+      gameRoom: {
+        create: transactionCreate,
+        createMany: transactionCreateMany,
+      },
+    };
+
+    await createGameRoom({
+      gameId: "question-chain",
+      hostId: "host",
+      hostName: "현재 방장",
+    }, transactionClient as never);
+
+    expect(transactionCreateMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({
+        data: expect.objectContaining({
+          hostId: "host",
+          players: [expect.objectContaining({ name: "현재 방장" })],
+        }),
+      })],
+      skipDuplicates: true,
+    });
+    expect(transactionCreate).not.toHaveBeenCalled();
+    expect(prismaMock.gameRoom.create).not.toHaveBeenCalled();
+  });
+
   it("새 대기 방은 점수 버전을 넣지 않는다", async () => {
-    prismaMock.gameRoom.create.mockResolvedValue({});
+    prismaMock.gameRoom.createMany.mockResolvedValue({ count: 1 });
 
     const room = await createGameRoom({
       gameId: "question-chain",
@@ -294,27 +324,24 @@ describe("createGameRoom", () => {
 
     expect(room).not.toHaveProperty("pointAwardKeyVersion");
     expect(room).not.toHaveProperty("pointEvidenceVersion");
-    expect(prismaMock.gameRoom.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(prismaMock.gameRoom.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({
         data: expect.not.objectContaining({
           pointAwardKeyVersion: expect.anything(),
           pointEvidenceVersion: expect.anything(),
         }),
-      }),
+      })],
+      skipDuplicates: true,
     });
   });
 
-  it("P2002 코드 겹침이면 다음 후보로 생성한다", async () => {
-    const collision = new Prisma.PrismaClientKnownRequestError("dup", {
-      code: "P2002",
-      clientVersion: "5",
-    });
+  it("코드 겹침을 거래 오류로 만들지 않고 다음 후보로 생성한다", async () => {
     vi.spyOn(Math, "random")
       .mockReturnValueOnce(0)
       .mockReturnValueOnce(0.111);
-    prismaMock.gameRoom.create
-      .mockRejectedValueOnce(collision)
-      .mockResolvedValueOnce({});
+    prismaMock.gameRoom.createMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
 
     const room = await createGameRoom({
       gameId: "question-chain",
@@ -323,13 +350,13 @@ describe("createGameRoom", () => {
     });
 
     expect(room?.code).toBe("1999");
-    expect(prismaMock.gameRoom.create).toHaveBeenCalledTimes(2);
+    expect(prismaMock.gameRoom.createMany).toHaveBeenCalledTimes(2);
     expect(prismaMock.gameRoom.findUnique).not.toHaveBeenCalled();
   });
 
-  it("P2002가 아닌 생성 오류는 숨기지 않는다", async () => {
+  it("생성 오류는 숨기지 않는다", async () => {
     const error = new Error("database unavailable");
-    prismaMock.gameRoom.create.mockRejectedValue(error);
+    prismaMock.gameRoom.createMany.mockRejectedValue(error);
 
     await expect(
       createGameRoom({
@@ -340,12 +367,8 @@ describe("createGameRoom", () => {
     ).rejects.toBe(error);
   });
 
-  it("P2002 코드 겹침이 열두 번이면 null을 반환한다", async () => {
-    const collision = new Prisma.PrismaClientKnownRequestError("dup", {
-      code: "P2002",
-      clientVersion: "5",
-    });
-    prismaMock.gameRoom.create.mockRejectedValue(collision);
+  it("코드 겹침이 열두 번이면 null을 반환한다", async () => {
+    prismaMock.gameRoom.createMany.mockResolvedValue({ count: 0 });
 
     await expect(
       createGameRoom({
@@ -354,6 +377,6 @@ describe("createGameRoom", () => {
         hostName: "방장",
       }),
     ).resolves.toBeNull();
-    expect(prismaMock.gameRoom.create).toHaveBeenCalledTimes(12);
+    expect(prismaMock.gameRoom.createMany).toHaveBeenCalledTimes(12);
   });
 });

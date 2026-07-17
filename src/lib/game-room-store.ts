@@ -103,6 +103,10 @@ export async function saveGameRoom(
     : { kind: "missing", room: null };
 }
 
+/**
+ * 낮은 수준의 수명 일치 삭제입니다. 완료된 버전 2 방은 호출 전에
+ * 정산 영수증을 확인한 보호 경로를 반드시 거쳐야 합니다.
+ */
 export async function deleteGameRoom(
   room: Pick<GameRoom, "code" | "version" | "createdAt">,
   client: GameRoomStoreClient = prisma,
@@ -146,7 +150,7 @@ export async function createGameRoom({
   gameId: string;
   hostId: string;
   hostName: string;
-}): Promise<GameRoom | null> {
+}, client: GameRoomStoreClient = prisma): Promise<GameRoom | null> {
   for (let attempt = 0; attempt < 12; attempt++) {
     const code = gen4();
     const now = Date.now();
@@ -171,23 +175,14 @@ export async function createGameRoom({
       updatedAt: now,
     };
 
-    try {
-      await prisma.gameRoom.create({
-        data: {
-          code,
-          data: room as unknown as Prisma.InputJsonValue,
-        },
-      });
-      return room;
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        continue;
-      }
-      throw error;
-    }
+    const inserted = await client.gameRoom.createMany({
+      data: [{
+        code,
+        data: room as unknown as Prisma.InputJsonValue,
+      }],
+      skipDuplicates: true,
+    });
+    if (inserted.count === 1) return room;
   }
 
   return null;

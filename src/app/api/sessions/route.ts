@@ -3,8 +3,12 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { requireTeacherSession } from "@/lib/session-helpers";
 import { isValidSessionDateString } from "@/lib/sessions";
-import { teacherCanUseSessionTarget } from "@/lib/session-access";
 import { sessionTargetsStudent } from "@/lib/session-targeting";
+import {
+  lockSessionWriteLifecycles,
+  normalizeSessionTarget,
+  revalidateSessionTargetAfterLifecycleLocks,
+} from "@/lib/session-write-access";
 import { z } from "zod";
 
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
@@ -187,37 +191,38 @@ export async function POST(req: Request) {
     const { date, subject, topic, targetType, targetGrade, targetClassName, targetStudentId, targetStudentIds, defaultQuestionPublic, likesVisibleToPeers, commentsVisibleToPeers, isActive } =
       createSchema.parse(body);
 
-    const canUseTarget = await teacherCanUseSessionTarget(authResult.user.id, {
+    const target = normalizeSessionTarget({
       targetType,
       targetGrade: targetGrade ?? null,
       targetClassName: targetClassName ?? null,
       targetStudentId: targetStudentId ?? null,
       targetStudentIds,
     });
-    if (!canUseTarget) {
+    const result = await prisma.$transaction(async (tx) => {
+      await lockSessionWriteLifecycles(tx, authResult.user.id, target);
+      if (!(await revalidateSessionTargetAfterLifecycleLocks(tx, authResult.user.id, target))) {
+        return { kind: "forbidden" } as const;
+      }
+
+      const newSession = await tx.questionSession.create({
+        data: {
+          date,
+          subject,
+          topic,
+          teacherId: authResult.user.id,
+          ...target,
+          defaultQuestionPublic,
+          likesVisibleToPeers,
+          commentsVisibleToPeers,
+          isActive,
+        },
+      });
+      return { kind: "created", session: newSession } as const;
+    });
+    if (result.kind === "forbidden") {
       return NextResponse.json({ error: "질문수업 대상을 지정할 권한이 없습니다" }, { status: 403 });
     }
-
-    const newSession = await prisma.questionSession.create({
-      data: {
-        date,
-        subject,
-        topic,
-        teacherId: authResult.user.id,
-        targetType,
-        targetGrade: targetType === "CLASS" || targetType === "CUSTOM" ? targetGrade ?? null : null,
-        targetClassName: targetType === "CLASS" || targetType === "CUSTOM" ? targetClassName ?? null : null,
-        targetStudentId: targetType === "STUDENT" ? targetStudentId ?? null : null,
-        targetStudentIds: targetType === "CUSTOM" || targetType === "STUDENT" || targetType === "CLASS"
-          ? targetStudentIds
-          : [],
-        defaultQuestionPublic,
-        likesVisibleToPeers,
-        commentsVisibleToPeers,
-        isActive,
-      },
-    });
-    return NextResponse.json(newSession, { status: 201 });
+    return NextResponse.json(result.session, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "입력 형식이 올바르지 않습니다" }, { status: 400 });

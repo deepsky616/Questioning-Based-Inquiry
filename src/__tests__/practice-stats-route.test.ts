@@ -43,6 +43,7 @@ beforeEach(() => {
   vi.useRealTimers();
   mAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
   mTeacher.mockResolvedValue({
+    role: "TEACHER",
     school: "테스트초",
     teacherClasses: [{ grade: "4", className: "1" }],
   });
@@ -62,6 +63,21 @@ describe("학생 연습 현황 API", () => {
 
     mAuth.mockResolvedValue({ user: { id: "s1", role: "STUDENT" } });
     expect((await GET()).status).toBe(403);
+  });
+
+  it("로그인 후 교사 역할이 회수되면 현재 자료 범위를 거부한다", async () => {
+    mTeacher.mockResolvedValue({
+      role: "STUDENT",
+      school: "테스트초",
+      teacherClasses: [{ grade: "4", className: "1" }],
+    });
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect(mStudents).not.toHaveBeenCalled();
+    expect(mAttempts).not.toHaveBeenCalled();
+    expect(mLogs).not.toHaveBeenCalled();
   });
 
   it("오늘과 주간 포인트, 성공 횟수, 최근 진단을 함께 집계한다", async () => {
@@ -88,6 +104,14 @@ describe("학생 연습 현황 API", () => {
       diagnosticAttempts: 1,
       capped: false,
     });
+  });
+
+  it("확정된 연습 포인트만 통계에 포함한다", async () => {
+    await GET();
+
+    expect(mLogs).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ status: "APPROVED" }),
+    }));
   });
 
   it("연습 기록이 없는 학생도 영으로 포함하고 번호순으로 정렬한다", async () => {
@@ -207,7 +231,7 @@ describe("학생 연습 현황 API", () => {
   });
 
   it("학교가 없어도 같은 빈 성공 응답 모양을 유지한다", async () => {
-    mTeacher.mockResolvedValue({ school: null, teacherClasses: [] });
+    mTeacher.mockResolvedValue({ role: "TEACHER", school: null, teacherClasses: [] });
 
     const response = await GET();
     const data = await response.json();

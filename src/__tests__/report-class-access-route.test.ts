@@ -40,6 +40,7 @@ const mockSessions = prisma.questionSession.findMany as ReturnType<typeof vi.fn>
 const mockAnalyses = prisma.sessionAnalysis.findMany as ReturnType<typeof vi.fn>;
 
 type TeacherRecord = {
+  role: "TEACHER";
   school: string | null;
   teacherClasses: Array<{ grade: string; className: string }>;
 };
@@ -72,6 +73,7 @@ beforeEach(() => {
     },
   });
   teacherRecord = {
+    role: "TEACHER",
     school: "한빛초",
     teacherClasses: [{ grade: "5", className: "1" }],
   };
@@ -102,6 +104,7 @@ describe("학급 보고서 접근 경계", () => {
 
   it("학교가 없는 교사는 학생 조회 전에 403으로 거부한다", async () => {
     teacherRecord = {
+      role: "TEACHER",
       school: null,
       teacherClasses: [{ grade: "5", className: "1" }],
     };
@@ -113,7 +116,7 @@ describe("학급 보고서 접근 경계", () => {
   });
 
   it("담당 학급이 없으면 같은 학교 학생의 학년 반 목록과 학생 수를 반환한다", async () => {
-    teacherRecord = { school: "한빛초", teacherClasses: [] };
+    teacherRecord = { role: "TEACHER", school: "한빛초", teacherClasses: [] };
     mockClassGroups.mockResolvedValue([
       { grade: "6", className: "2", _count: { _all: 2 } },
       { grade: "5", className: "1", _count: { _all: 3 } },
