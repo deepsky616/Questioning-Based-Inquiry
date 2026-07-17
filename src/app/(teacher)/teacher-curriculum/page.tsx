@@ -249,18 +249,6 @@ export default function CurriculumPage() {
     essentialQuestions,
     selectedEssentialQuestionIndices
   );
-  // 5단계 탐구질문은 리스트 자체가 저장/세션 대상(내용이 빈 것은 제외)
-  const selectedInquiryQuestions = inquiryQuestions
-    .map((q) => {
-      const studentGuide = normalizeStudentInquiryGuide(q.studentGuide);
-      return {
-        type: q.type,
-        content: q.content.trim(),
-        ...(studentGuide ? { studentGuide } : {}),
-      };
-    })
-    .filter((q) => q.content);
-
   const getFilteredAchievementGroups = () => {
     const groups = curriculumData?.achievementGroups ?? [];
     if (groups.length === 0) return [];
@@ -358,15 +346,29 @@ export default function CurriculumPage() {
       setLoadingQuestions(false);
     }
   };
-  const { learningGuides, setLearningGuides, loadingStudentGuides, handleGenerateStudentGuides, applyGeneratedLearningGuides, clearLearningGuides } = useStudentInquiryGuides({
+  const { learningGuides, setLearningGuides, loadingStudentGuides, handleGenerateStudentGuides, hasFreshStudentGuides, clearStudentGuides } = useStudentInquiryGuides({
     questions: inquiryQuestions, coreIdea: selectedCoreIdeaLines.join("\n"), coreSentences: selectedCoreSentences, essentialQuestions: selectedEssentialQuestions,
     setQuestions: setInquiryQuestions, generate: callGenerate,
     onSuccess: () => toast({ description: t("studentGuideGenerated") }),
     onError: () => toast({ variant: "destructive", description: t("studentGuideGenerateFailed") }),
   });
 
+  // 5단계 탐구질문은 리스트 자체가 저장/세션 대상(내용이 빈 것은 제외)
+  const selectedInquiryQuestions = inquiryQuestions
+    .map((question) => {
+      const studentGuide = hasFreshStudentGuides
+        ? normalizeStudentInquiryGuide(question.studentGuide)
+        : undefined;
+      return {
+        type: question.type,
+        content: question.content.trim(),
+        ...(studentGuide ? { studentGuide } : {}),
+      };
+    })
+    .filter((question) => question.content);
+
   const handleGoStep5 = async () => {
-    clearLearningGuides();
+    clearStudentGuides();
     setLoadingInquiry(true);
     try {
       const data = await callGenerate("inquiry", {
@@ -374,15 +376,10 @@ export default function CurriculumPage() {
         essentialQuestions: selectedEssentialQuestions,
       });
       if (Array.isArray(data?.inquiryQuestions)) {
-        applyGeneratedLearningGuides(data.learningGuides);
-        setInquiryQuestions(data.inquiryQuestions.map((question: InquiryQuestion) => {
-          const studentGuide = normalizeStudentInquiryGuide(question.studentGuide);
-          return {
-            type: question.type,
-            content: question.content,
-            ...(studentGuide ? { studentGuide } : {}),
-          };
-        }));
+        setInquiryQuestions(data.inquiryQuestions.map((question: InquiryQuestion) => ({
+          type: question.type,
+          content: question.content,
+        })));
         setStep(5);
       }
     } finally {
@@ -420,7 +417,7 @@ export default function CurriculumPage() {
     selectedKeywords,
     coreSentences: selectedCoreSentences,
     essentialQuestions: selectedEssentialQuestions,
-    learningGuides,
+    learningGuides: hasFreshStudentGuides ? learningGuides : undefined,
     inquiryQuestions: selectedInquiryQuestions,
     isActive: sessionIsActive,
     defaultQuestionPublic,

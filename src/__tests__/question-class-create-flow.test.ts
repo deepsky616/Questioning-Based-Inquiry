@@ -187,6 +187,33 @@ describe("탐구질문 수업 만들기 요청 흐름", () => {
   });
 });
 
+describe("학생용 설명 최신 상태 저장", () => {
+  it("다섯째 단계 진입 때 이전 설명을 지우고 탐구 응답의 설명은 적용하지 않는다", () => {
+    const handleGoStep5 = curriculumPage.slice(
+      curriculumPage.indexOf("const handleGoStep5 = async"),
+      curriculumPage.indexOf("const toggleKeyword"),
+    );
+
+    expect(handleGoStep5).toContain("clearStudentGuides()");
+    expect(handleGoStep5).not.toContain("applyGeneratedLearningGuides");
+    expect(handleGoStep5).not.toContain("question.studentGuide");
+  });
+
+  it("현재 원문과 맞는 학생용 설명만 저장 자료에 포함한다", () => {
+    const selectedQuestions = curriculumPage.slice(
+      curriculumPage.indexOf("const selectedInquiryQuestions"),
+      curriculumPage.indexOf("const handleGoStep5"),
+    );
+    const buildPayload = curriculumPage.slice(
+      curriculumPage.indexOf("const buildDesignPayload"),
+      curriculumPage.indexOf("const saveDesign"),
+    );
+
+    expect(selectedQuestions).toContain("const studentGuide = hasFreshStudentGuides");
+    expect(buildPayload).toContain("learningGuides: hasFreshStudentGuides ? learningGuides : undefined");
+  });
+});
+
 describe("저장 설계에서 새 수업 만들기", () => {
   it("유효한 수업 식별값이 있을 때만 성공 후속 처리를 실행한다", async () => {
     const refreshDesigns = vi.fn();
