@@ -431,7 +431,7 @@ export function StudentDetailDialog({
         </div>
 
         {stats && (
-          <QuestionGameLearningHistory audience="teacher" history={stats.questionGames} />
+          <QuestionGameLearningHistory audience="teacher" history={stats.questionGames} studentId={student.id} />
         )}
 
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-950/30">

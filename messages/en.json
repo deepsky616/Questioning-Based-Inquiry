@@ -1609,7 +1609,16 @@
     "selectClasses": "Select classes to share with",
     "selectStudents": "Select students to share with",
     "gradeClass": "Grade {grade} Class {className}",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "settlementTitle": "Point award status",
+    "settlementEmpty": "There are no recently completed friend question games.",
+    "settlementHealthy": "Point awards are confirmed for all {count} recently ended rooms.",
+    "settlementNeedsCheck": "{count} need checking",
+    "settlementRepair": "Check missing awards",
+    "settlementRepairing": "Checking...",
+    "settlementRoom": "Room {code}",
+    "settlementRepairDone": "Point award status was checked again.",
+    "settlementRepairFailed": "Point award status could not be checked."
   },
   "myQuestions": {
     "deleteConfirm": "Delete this question? This cannot be undone.",

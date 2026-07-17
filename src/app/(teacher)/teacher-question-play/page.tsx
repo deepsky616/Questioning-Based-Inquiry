@@ -27,6 +27,11 @@ import {
   sumQuestionGameModes,
   type QuestionGameModeStats,
 } from "@/lib/question-game-learning-summary";
+import { QuestionGameSettlementHealthPanel } from "@/components/question-games/QuestionGameSettlementHealthPanel";
+import {
+  isQuestionGameSettlementHealth,
+  type QuestionGameSettlementHealth,
+} from "@/lib/question-game-settlement-health";
 
 type VisType = "all" | "classes" | "students" | "hidden";
 
@@ -77,6 +82,8 @@ export default function TeacherQuestionPlayPage() {
   // 참여 통계
   const [statsByGame, setStatsByGame] = useState<Record<string, GameStat>>({});
   const [statsDialogGame, setStatsDialogGame] = useState<AnyGame | null>(null);
+  const [settlementHealth, setSettlementHealth] = useState<QuestionGameSettlementHealth | null>(null);
+  const [settlementRepairing, setSettlementRepairing] = useState(false);
 
   // 가시성 편집 다이얼로그
   const [visDialogGame, setVisDialogGame] = useState<AnyGame | null>(null);
@@ -88,17 +95,41 @@ export default function TeacherQuestionPlayPage() {
     Promise.all([
       fetch("/api/teacher/question-games").then((r) => r.json()),
       fetch("/api/teacher/question-games/stats").then((r) => r.json()),
+      fetch("/api/teacher/question-games/settlements")
+        .then((r) => r.ok ? r.json() : null)
+        .catch(() => null),
     ])
-      .then(([gamesData, statsData]) => {
+      .then(([gamesData, statsData, settlementData]) => {
         setGames(gamesData.games ?? []);
         setVisibilityMap(gamesData.visibilityMap ?? {});
         setStatsByGame(statsData.byGame ?? {});
+        if (isQuestionGameSettlementHealth(settlementData)) {
+          setSettlementHealth(settlementData);
+        }
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function repairSettlements() {
+    setSettlementRepairing(true);
+    try {
+      const response = await fetch("/api/teacher/question-games/settlements", {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error();
+      const data: unknown = await response.json();
+      if (!isQuestionGameSettlementHealth(data)) throw new Error();
+      setSettlementHealth(data);
+      toast({ variant: "success", description: t("settlementRepairDone") });
+    } catch {
+      toast({ variant: "destructive", description: t("settlementRepairFailed") });
+    } finally {
+      setSettlementRepairing(false);
+    }
+  }
 
   // 가시성 저장
   async function saveVisibility() {
@@ -184,6 +215,12 @@ export default function TeacherQuestionPlayPage() {
           {t("subtitle")}
         </p>
       </div>
+
+      <QuestionGameSettlementHealthPanel
+        health={settlementHealth}
+        repairing={settlementRepairing}
+        onRepair={() => { void repairSettlements(); }}
+      />
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-3 gap-4">

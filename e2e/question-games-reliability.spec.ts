@@ -336,6 +336,103 @@ for (const completionCase of FULL_COMPLETION_CASES) {
   });
 }
 
+for (const resilienceCase of QUESTION_GAME_PREPARATION_CASES) {
+  test(`${resilienceCase.title}는 새로 고침 뒤 복원되고 방장 이탈 뒤 멈추지 않는다`, async ({ browser }) => {
+    test.slow();
+    const fixture = createQuestionGameBrowserFixture(`resilience-${resilienceCase.id}`);
+    const transport = createSharedQuestionGameTransport();
+    const sessions: QuestionGameBrowserSession[] = [];
+
+    try {
+      const host = await openStudentRoom(
+        browser,
+        fixture.students[0],
+        resilienceCase.id,
+        transport,
+      );
+      const friend = await joinStudentRoom(
+        browser,
+        fixture.students[1],
+        resilienceCase.id,
+        host.code,
+        transport,
+      );
+      sessions.push(host, friend);
+      await startFriendGame(host, host.code, transport);
+
+      await friend.page.reload();
+      await expect(friend.page).toHaveURL(
+        new RegExp(`/student-question-play/${resilienceCase.id}$`),
+      );
+      await expect(
+        friend.page.getByRole("button", { name: /나가기/ }).first(),
+      ).toBeVisible({ timeout: 15_000 });
+      expect(transport.getRoom(host.code)?.players.map(({ id }) => id))
+        .toContain(friend.identity.id);
+
+      const room = transport.getRoom(host.code)!;
+      const leaveStatus = await host.page.evaluate(async ({
+        code,
+        createdAt,
+      }) => {
+        const response = await fetch(`/api/question-games/rooms/${code}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "leave", expectedCreatedAt: createdAt }),
+        });
+        return response.status;
+      }, { code: room.code, createdAt: room.createdAt });
+      expect(leaveStatus).toBe(200);
+      await expect.poll(() => transport.getRoom(host.code)?.status).toBe("ended");
+      await expect(
+        friend.page.getByRole("button", { name: /나가기/ }).first(),
+      ).toBeVisible({ timeout: 15_000 });
+      await expectNoHorizontalPageOverflow(friend.page);
+    } finally {
+      await closeQuestionGameSessions(sessions);
+      await transport.dispose();
+    }
+  });
+}
+
+test("같은 학생이 여러 창으로 참가해도 참가자와 포인트 대상을 늘리지 않는다", async ({ browser }) => {
+  const fixture = createQuestionGameBrowserFixture("duplicate-window");
+  const transport = createSharedQuestionGameTransport();
+  const sessions: QuestionGameBrowserSession[] = [];
+
+  try {
+    const host = await openStudentRoom(
+      browser,
+      fixture.students[0],
+      "relay",
+      transport,
+    );
+    const friend = await joinStudentRoom(
+      browser,
+      fixture.students[1],
+      "relay",
+      host.code,
+      transport,
+    );
+    const duplicate = await joinStudentRoom(
+      browser,
+      fixture.students[1],
+      "relay",
+      host.code,
+      transport,
+    );
+    sessions.push(host, friend, duplicate);
+
+    expect(transport.getRoom(host.code)?.players).toHaveLength(2);
+    await expect(
+      duplicate.page.getByRole("heading", { name: /참가자 2/ }),
+    ).toBeVisible();
+  } finally {
+    await closeQuestionGameSessions(sessions);
+    await transport.dispose();
+  }
+});
+
 test("두 명 전에는 시작할 수 없고 두 명이면 시작한다", async ({ browser }) => {
   const fixture = createQuestionGameBrowserFixture("minimum");
   const transport = createSharedQuestionGameTransport();

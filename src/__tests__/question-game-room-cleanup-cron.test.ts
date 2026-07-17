@@ -2,11 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   cleanup: vi.fn(),
+  repair: vi.fn(),
   loggerError: vi.fn(),
 }));
 
 vi.mock("@/lib/game-room-cleanup-service", () => ({
   cleanupExpiredGameRooms: mocks.cleanup,
+}));
+vi.mock("@/lib/question-game-settlement-repair", () => ({
+  inspectQuestionGameSettlements: mocks.repair,
 }));
 vi.mock("@/lib/logger", () => ({
   logger: { error: mocks.loggerError },
@@ -22,6 +26,11 @@ function request(authorization?: string) {
 beforeEach(() => {
   process.env.CRON_SECRET = "cron-secret";
   mocks.cleanup.mockReset().mockResolvedValue({ deletedCount: 3, errorCount: 1 });
+  mocks.repair.mockReset().mockResolvedValue({
+    checkedAt: "2026-07-17T02:00:00.000Z",
+    summary: { checked: 4, settled: 3, recovered: 1, pending: 0, failed: 0 },
+    items: [],
+  });
   mocks.loggerError.mockReset();
 });
 
@@ -34,7 +43,18 @@ describe("질문놀이 방 예약 정리", () => {
     const response = await request("Bearer cron-secret");
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ deletedCount: 3, errorCount: 1 });
+    await expect(response.json()).resolves.toEqual({
+      deletedCount: 3,
+      errorCount: 1,
+      settlementRepair: {
+        checked: 4,
+        settled: 3,
+        recovered: 1,
+        pending: 0,
+        failed: 0,
+      },
+    });
+    expect(mocks.repair).toHaveBeenCalledWith({ repair: true, take: 100 });
     expect(mocks.cleanup).toHaveBeenCalledOnce();
   });
 
@@ -44,6 +64,7 @@ describe("질문놀이 방 예약 정리", () => {
       const response = await request(authorization);
 
       expect(response.status).toBe(401);
+      expect(mocks.repair).not.toHaveBeenCalled();
       expect(mocks.cleanup).not.toHaveBeenCalled();
     },
   );
@@ -54,6 +75,7 @@ describe("질문놀이 방 예약 정리", () => {
     const response = await request("Bearer cron-secret");
 
     expect(response.status).toBe(503);
+    expect(mocks.repair).not.toHaveBeenCalled();
     expect(mocks.cleanup).not.toHaveBeenCalled();
     expect(mocks.loggerError).toHaveBeenCalledWith("질문놀이 방 정리 예약 오류", {
       errorCount: 1,

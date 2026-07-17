@@ -16,6 +16,7 @@ interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitl
   klass: { grade: string; className: string; studentCount: number };
   perStudent: PerStudentRow[];
   sessions?: SessionMeta[];
+  questionGames: QuestionGameHistory;
 }
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession" | "perStudent"> {
   student: { id?: string; name: string; grade?: string | null; className?: string | null; studentNumber?: string | null; school?: string | null };
@@ -454,29 +455,32 @@ export function TeacherReportsView() {
 
       {/* 학급별 보기 */}
       {!loading && view === "class" && report && (
-        <ReportView
-          scope="class"
-          title={t("classReportTitle", { grade: report.klass.grade, className: report.klass.className })}
-          subtitle={t("classReportSubtitle", { count: report.klass.studentCount })}
-          totals={report.totals}
-          weekly={report.weekly}
-          monthly={report.monthly}
-          classification={report.classification}
-          perStudent={report.perStudent}
-          sessions={report.sessions}
-          analyzeSession={(id) => analyzeClassSession(id, t("analysisFailed"))}
-          analysisCacheKey={`class:${selected}`}
-          onSaveAnalysis={(id, result) => saveSessionAnalysis({ sessionId: id, scope: "class", result }, t("analysisFailed"))}
-          showPrintButton={false}
-          participationLabel={t("participationClass")}
-          receptionLabel={t("receptionClass")}
-        />
+        <div className="space-y-5">
+          <QuestionGameLearningHistory audience="class" history={report.questionGames} />
+          <ReportView
+            scope="class"
+            title={t("classReportTitle", { grade: report.klass.grade, className: report.klass.className })}
+            subtitle={t("classReportSubtitle", { count: report.klass.studentCount })}
+            totals={report.totals}
+            weekly={report.weekly}
+            monthly={report.monthly}
+            classification={report.classification}
+            perStudent={report.perStudent}
+            sessions={report.sessions}
+            analyzeSession={(id) => analyzeClassSession(id, t("analysisFailed"))}
+            analysisCacheKey={`class:${selected}`}
+            onSaveAnalysis={(id, result) => saveSessionAnalysis({ sessionId: id, scope: "class", result }, t("analysisFailed"))}
+            showPrintButton={false}
+            participationLabel={t("participationClass")}
+            receptionLabel={t("receptionClass")}
+          />
+        </div>
       )}
 
       {/* 학생별 보기 */}
       {!loading && view === "student" && studentReport && (
         <div className="space-y-5">
-          <QuestionGameLearningHistory audience="teacher" history={studentReport.questionGames} />
+          <QuestionGameLearningHistory audience="teacher" history={studentReport.questionGames} studentId={studentId} />
           <ReportView
             scope="student"
             title={t("studentReportTitle", { name: studentReport.student.name })}

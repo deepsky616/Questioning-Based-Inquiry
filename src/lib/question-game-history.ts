@@ -25,6 +25,12 @@ export interface QuestionGameLearningHistory {
     goodQuestions: number;
   }>;
   recent: QuestionGameHistoryItem[];
+  nextCursor?: string | null;
+}
+
+export interface QuestionGameHistoryPage {
+  items: QuestionGameHistoryItem[];
+  nextCursor: string | null;
 }
 
 interface HistoryRun {

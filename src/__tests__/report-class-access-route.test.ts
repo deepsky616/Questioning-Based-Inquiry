@@ -21,10 +21,14 @@ vi.mock("@/lib/db", () => ({
     sessionAnalysis: { findMany: vi.fn() },
   },
 }));
+vi.mock("@/lib/question-game-history-service", () => ({
+  loadQuestionGameClassSummary: vi.fn(),
+}));
 
 import { GET } from "@/app/api/reports/class/route";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { loadQuestionGameClassSummary } from "@/lib/question-game-history-service";
 
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockTeacher = prisma.user.findUnique as ReturnType<typeof vi.fn>;
@@ -38,6 +42,7 @@ const mockLikes = prisma.questionLike.findMany as ReturnType<typeof vi.fn>;
 const mockComments = prisma.comment.findMany as ReturnType<typeof vi.fn>;
 const mockSessions = prisma.questionSession.findMany as ReturnType<typeof vi.fn>;
 const mockAnalyses = prisma.sessionAnalysis.findMany as ReturnType<typeof vi.fn>;
+const mockGameSummary = loadQuestionGameClassSummary as ReturnType<typeof vi.fn>;
 
 type TeacherRecord = {
   role: "TEACHER";
@@ -90,6 +95,15 @@ beforeEach(() => {
   mockComments.mockResolvedValue([]);
   mockSessions.mockResolvedValue([]);
   mockAnalyses.mockResolvedValue([]);
+  mockGameSummary.mockResolvedValue({
+    totals: { plays: 0, points: 0, goodQuestions: 0 },
+    modes: {
+      solo: { plays: 0, points: 0, goodQuestions: 0 },
+      ai: { plays: 0, points: 0, goodQuestions: 0 },
+      friend: { plays: 0, points: 0, goodQuestions: 0 },
+    },
+    recent: [],
+  });
 });
 
 describe("학급 보고서 접근 경계", () => {
@@ -159,6 +173,7 @@ describe("학급 보고서 접근 경계", () => {
       },
       select: { id: true, name: true, studentNumber: true },
     });
+    expect(mockGameSummary).toHaveBeenCalledWith(["student-1"]);
   });
 
   it("다른 교사 질문수업의 전체 분석은 학급 보고서에 붙이지 않는다", async () => {
