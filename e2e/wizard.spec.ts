@@ -77,19 +77,28 @@ const GENERATE_FIXTURES: Record<string, unknown> = {
       {
         index: 0,
         meaning: "식물이 양분을 만들 때 필요한 조건을 찾는 질문이에요.",
-        keywords: [{ term: "광합성", meaning: "식물이 빛으로 양분을 만드는 과정" }],
+        keywords: [
+          { term: "광합성", meaning: "식물이 빛으로 양분을 만드는 과정" },
+          { term: "양분", meaning: "생물이 자라고 살아가는 데 필요한 물질" },
+        ],
         thinkingStart: "식물이 자랄 때 필요한 것을 떠올려 보세요.",
       },
       {
         index: 1,
         meaning: "두 먹이 관계의 공통점과 차이점을 찾는 질문이에요.",
-        keywords: [{ term: "먹이 그물", meaning: "여러 먹이 사슬이 얽힌 관계" }],
+        keywords: [
+          { term: "먹이 그물", meaning: "여러 먹이 사슬이 얽힌 관계" },
+          { term: "먹이 사슬", meaning: "먹고 먹히는 관계가 이어진 모습" },
+        ],
         thinkingStart: "한 생물이 여러 생물과 이어지는 모습을 살펴보세요.",
       },
       {
         index: 2,
         meaning: "개발과 생태계 보전 사이에서 판단 근거를 찾는 질문이에요.",
-        keywords: [{ term: "생태계 보전", meaning: "생물과 환경의 관계를 지키는 일" }],
+        keywords: [
+          { term: "생태계 보전", meaning: "생물과 환경의 관계를 지키는 일" },
+          { term: "개발", meaning: "생활에 필요한 시설이나 공간을 만드는 일" },
+        ],
         thinkingStart: "개발의 도움과 생태계에 주는 영향을 나누어 살펴보세요.",
       },
     ],
@@ -174,17 +183,25 @@ test.describe("탐구질문 마법사 5단계", () => {
     await expect(page.getByText("생태계는 어떻게 균형을 유지할까?")).toBeVisible();
     await page.getByRole("button", { name: /다음 단계: 탐구 질문/ }).click();
 
-    // ── 5단계: 탐구 질문 + 저장 폼 ──
+    // ── 5단계 편집 상태: 탐구 질문만 표시 ──
     await expect(page.getByText("먹이 사슬과 먹이 그물은 어떻게 다를까?")).toBeVisible();
+    await expect(page.getByRole("button", { name: "학생용 설명 만들기" })).toHaveCount(0);
+    await expect(page.getByText("저장 정보", { exact: true })).toHaveCount(0);
 
-    // 학생용 설명 자동 생성 → 핵심 낱말 자동 입력 + 네 설명 영역 색 구분
-    await page.getByRole("button", { name: "학생용 설명 만들기" }).click();
-    await expect(page.getByLabel("핵심 아이디어 핵심 낱말"))
-      .toHaveValue(/생태계: 생물과 환경이 서로 관계를 맺는 체계/);
+    // 완료 뒤 같은 5단계 안에서 학생 배포 자료 확인 상태로 전환
+    await page.getByRole("button", { name: "탐구 질문 만들기 완료" }).click();
+    await expect(page.getByRole("heading", { name: "학생 배포 자료 확인" })).toBeVisible();
+    await expect(page.locator('[data-student-guide-section="unit-title"]')).toBeVisible();
     await expect(page.locator('[data-student-guide-section="core-idea"]')).toHaveClass(/bg-amber-50\/70/);
     await expect(page.locator('[data-student-guide-section="core-sentence"]')).toHaveClass(/bg-sky-50\/70/);
     await expect(page.locator('[data-student-guide-section="essential-question"]')).toHaveClass(/bg-violet-50\/70/);
     await expect(page.locator('[data-student-guide-section="inquiry-question"]')).toHaveClass(/bg-emerald-50\/70/);
+
+    // 학생용 설명 자동 생성 → 핵심 낱말과 모든 원문 설명 자동 입력
+    await page.getByRole("button", { name: "학생용 설명 만들기" }).click();
+    await expect(page.getByLabel("핵심 아이디어 핵심 낱말"))
+      .toHaveValue(/생태계: 생물과 환경이 서로 관계를 맺는 체계/);
+    await expect(page.getByText("식물이 양분을 만들 때 필요한 조건을 찾는 질문이에요.")).toBeVisible();
 
     // 저장 폼: 학년 선택 + 단원명 입력 (날짜는 오늘 기본값)
     await page
