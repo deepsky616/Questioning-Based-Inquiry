@@ -354,6 +354,7 @@ export default function CurriculumPage() {
     setQuestions: setInquiryQuestions, generate: callGenerate,
     onSuccess: () => toast({ description: t("studentGuideGenerated") }),
     onError: () => toast({ variant: "destructive", description: t("studentGuideGenerateFailed") }),
+    onSourceChanged: () => toast({ description: t("studentGuideSourceChangedDuringGeneration") }),
   });
 
   // 5단계 탐구질문은 리스트 자체가 저장/세션 대상(내용이 빈 것은 제외)

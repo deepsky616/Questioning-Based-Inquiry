@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
-import { mergeGeneratedStudentGuides } from "@/lib/student-inquiry-guide";
 import { validateStudentGuideBundle } from "@/lib/student-guide-completeness";
 import { buildStudentGuideSourceSignature } from "@/lib/student-guide-source";
 import type { StudentLearningGuides } from "@/lib/student-learning-guide";
@@ -17,6 +16,7 @@ interface UseStudentInquiryGuidesOptions {
   generate: (step: string, extra: Record<string, unknown>) => Promise<unknown>;
   onSuccess: () => void;
   onError: () => void;
+  onSourceChanged?: () => void;
 }
 
 export function useStudentInquiryGuides({
@@ -28,6 +28,7 @@ export function useStudentInquiryGuides({
   generate,
   onSuccess,
   onError,
+  onSourceChanged,
 }: UseStudentInquiryGuidesOptions) {
   const sourceSignature = buildStudentGuideSourceSignature({
     coreIdea,
@@ -38,6 +39,10 @@ export function useStudentInquiryGuides({
   const [loadingStudentGuides, setLoadingStudentGuides] = useState(false);
   const [learningGuides, setLearningGuides] = useState<StudentLearningGuides | undefined>();
   const [generatedSourceSignature, setGeneratedSourceSignature] = useState<string | null>(null);
+  const latestSourceSignatureRef = useRef(sourceSignature);
+  useEffect(() => {
+    latestSourceSignatureRef.current = sourceSignature;
+  }, [sourceSignature]);
   const inquiryQuestions = questions.filter((question) => question.content.trim());
   const currentBundle = validateStudentGuideBundle({
     learningGuides,
@@ -64,6 +69,7 @@ export function useStudentInquiryGuides({
   }, [currentBundle.ok, generatedSourceSignature, sourceSignature]);
 
   const handleGenerateStudentGuides = async () => {
+    const requestSourceSignature = sourceSignature;
     const indexedQuestions = questions
       .map((question, originalIndex) => ({ question, originalIndex }))
       .filter(({ question }) => question.content.trim());
@@ -89,15 +95,23 @@ export function useStudentInquiryGuides({
         onError();
         return;
       }
+      if (latestSourceSignatureRef.current !== requestSourceSignature) {
+        onSourceChanged?.();
+        return;
+      }
 
       setLearningGuides(checked.value.learningGuides);
-      const merged = mergeGeneratedStudentGuides(
-        indexedQuestions.map(({ question }) => question),
-        checked.value.guides,
-      );
-      const byOriginalIndex = new Map(indexedQuestions.map(({ originalIndex }, index) => [originalIndex, merged[index]]));
-      setQuestions((previous) => previous.map((question, index) => byOriginalIndex.get(index) ?? question));
-      setGeneratedSourceSignature(sourceSignature);
+      const guideByOriginalIndex = new Map(indexedQuestions.map(({ originalIndex }, index) => [
+        originalIndex,
+        checked.value.guides[index],
+      ]));
+      setQuestions((previous) => previous.map((question, index) => {
+        const guide = guideByOriginalIndex.get(index);
+        if (!guide) return question;
+        const { index: _index, ...studentGuide } = guide;
+        return { ...question, studentGuide };
+      }));
+      setGeneratedSourceSignature(requestSourceSignature);
       onSuccess();
     } catch {
       onError();

@@ -48,6 +48,7 @@ interface CurriculumInquiryStepProps {
   sessionLikesVisible: boolean;
   sessionCommentsVisible: boolean;
   isSaving: boolean;
+  isGeneratingInquiryQuestions: boolean;
   isGeneratingGuides: boolean;
   canSaveDesign: boolean;
   lastDesignAction: LastDesignAction | null;
@@ -103,6 +104,7 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
     sessionLikesVisible,
     sessionCommentsVisible,
     isSaving,
+    isGeneratingInquiryQuestions,
     isGeneratingGuides,
     canSaveDesign,
     lastDesignAction,
@@ -129,8 +131,8 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!visible) setIsReviewing(false);
-  }, [visible]);
+    if (!visible || isGeneratingInquiryQuestions) setIsReviewing(false);
+  }, [isGeneratingInquiryQuestions, visible]);
 
   if (!visible) return null;
 

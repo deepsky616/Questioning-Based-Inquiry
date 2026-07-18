@@ -352,6 +352,7 @@ export function CurriculumCreateFlow({
         sessionLikesVisible={sessionLikesVisible}
         sessionCommentsVisible={sessionCommentsVisible}
         isSaving={isSaving}
+        isGeneratingInquiryQuestions={loadingInquiry}
         isGeneratingGuides={loadingStudentGuides}
         canSaveDesign={canSaveDesign}
         lastDesignAction={lastDesignAction}

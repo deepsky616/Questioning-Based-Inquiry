@@ -891,6 +891,7 @@
     "studentGuideThinkingPlaceholder": "Give a first clue or viewpoint without revealing the answer.",
     "studentGuideGenerated": "Student guides created. Review and refine them before saving.",
     "studentGuideGenerateFailed": "Student guides could not be created. Please try again.",
+    "studentGuideSourceChangedDuringGeneration": "The source changed while the guides were being created, so the result was not applied. Create them again from the current content.",
     "coreIdeaGuideTitle": "Student guide for the core idea",
     "studentGuideCoreIdeaSectionTitle": "Core idea",
     "studentGuideCoreIdeaSectionDesc": "Explain the lesson's big idea with simple language and a familiar example.",

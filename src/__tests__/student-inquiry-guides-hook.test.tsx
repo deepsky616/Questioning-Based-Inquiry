@@ -189,4 +189,52 @@ describe("학생용 설명 생성 훅 최신 상태", () => {
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledTimes(1);
   });
+
+  it("생성 중 질문이 바뀌면 이전 원문과 설명을 적용하지 않는다", async () => {
+    let resolveGeneration!: (value: unknown) => void;
+    const generate = vi.fn(() => new Promise<unknown>((resolve) => {
+      resolveGeneration = resolve;
+    }));
+    const onSuccess = vi.fn();
+    const onError = vi.fn();
+    const onSourceChanged = vi.fn();
+    const { result } = renderHook(() => {
+      const [currentQuestions, setCurrentQuestions] = useState<InquiryQuestion[]>(questions);
+      const guides = useStudentInquiryGuides({
+        questions: currentQuestions,
+        coreIdea: "생물은 환경과 관계를 맺는다.",
+        coreSentences: ["생물은 서로 연결된다."],
+        essentialQuestions: ["생태계는 어떻게 유지될까?"],
+        setQuestions: setCurrentQuestions,
+        generate,
+        onSuccess,
+        onError,
+        onSourceChanged,
+      });
+      return { ...guides, currentQuestions, setCurrentQuestions };
+    });
+
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.handleGenerateStudentGuides();
+    });
+    act(() => result.current.setCurrentQuestions([{
+      type: "conceptual",
+      content: "생산자는 생태계에서 어떤 관계를 만들까?",
+    }]));
+    await act(async () => {
+      resolveGeneration(generatedBundle);
+      await pending;
+    });
+
+    expect(result.current.currentQuestions).toEqual([{
+      type: "conceptual",
+      content: "생산자는 생태계에서 어떤 관계를 만들까?",
+    }]);
+    expect(result.current.learningGuides).toBeUndefined();
+    expect(result.current.hasFreshStudentGuides).toBe(false);
+    expect(onSourceChanged).toHaveBeenCalledTimes(1);
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
 });
