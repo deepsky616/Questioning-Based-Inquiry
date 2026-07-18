@@ -76,6 +76,8 @@ interface CurriculumCreateFlowProps {
   handleGoStep5: () => void;
   loadingStudentGuides: boolean;
   handleGenerateStudentGuides: () => void;
+  canRestoreStudentGuides: boolean;
+  restorePreviousStudentGuides: () => void;
   learningGuides?: StudentLearningGuides;
   hasCurrentStudentGuides: boolean;
   hasFreshStudentGuides: boolean;
@@ -181,6 +183,8 @@ export function CurriculumCreateFlow({
   handleGoStep5,
   loadingStudentGuides,
   handleGenerateStudentGuides,
+  canRestoreStudentGuides,
+  restorePreviousStudentGuides,
   learningGuides,
   hasCurrentStudentGuides,
   hasFreshStudentGuides,
@@ -354,6 +358,7 @@ export function CurriculumCreateFlow({
         isSaving={isSaving}
         isGeneratingInquiryQuestions={loadingInquiry}
         isGeneratingGuides={loadingStudentGuides}
+        canRestoreStudentGuides={canRestoreStudentGuides}
         canSaveDesign={canSaveDesign}
         lastDesignAction={lastDesignAction}
         onSetDragInquiryIndex={setDragInquiryIndex}
@@ -380,6 +385,7 @@ export function CurriculumCreateFlow({
         onSaveAndCreateSession={handleSaveAndCreateSession}
         onSaveOnly={handleSave}
         onGenerateGuides={handleGenerateStudentGuides}
+        onRestoreGuides={restorePreviousStudentGuides}
         onLearningGuidesChange={setLearningGuides}
       />
     </>

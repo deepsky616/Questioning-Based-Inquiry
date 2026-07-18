@@ -5,11 +5,13 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { validateStudentGuideBundle } from "@/lib/student-guide-completeness";
 import { buildStudentGuideSourceSignature } from "@/lib/student-guide-source";
 import type { StudentLearningGuides } from "@/lib/student-learning-guide";
+import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import type { InquiryQuestion } from "./types";
 
 interface UseStudentInquiryGuidesOptions {
   questions: InquiryQuestion[];
   coreIdea: string;
+  selectedKeywords: string[];
   coreSentences: string[];
   essentialQuestions: string[];
   setQuestions: Dispatch<SetStateAction<InquiryQuestion[]>>;
@@ -19,9 +21,16 @@ interface UseStudentInquiryGuidesOptions {
   onSourceChanged?: () => void;
 }
 
+interface StudentGuideSnapshot {
+  sourceSignature: string;
+  learningGuides?: StudentLearningGuides;
+  inquiryGuides: Array<StudentInquiryGuide | undefined>;
+}
+
 export function useStudentInquiryGuides({
   questions,
   coreIdea,
+  selectedKeywords,
   coreSentences,
   essentialQuestions,
   setQuestions,
@@ -32,6 +41,7 @@ export function useStudentInquiryGuides({
 }: UseStudentInquiryGuidesOptions) {
   const sourceSignature = buildStudentGuideSourceSignature({
     coreIdea,
+    selectedKeywords,
     coreSentences,
     essentialQuestions,
     inquiryQuestions: questions,
@@ -39,10 +49,15 @@ export function useStudentInquiryGuides({
   const [loadingStudentGuides, setLoadingStudentGuides] = useState(false);
   const [learningGuides, setLearningGuides] = useState<StudentLearningGuides | undefined>();
   const [generatedSourceSignature, setGeneratedSourceSignature] = useState<string | null>(null);
+  const [previousStudentGuides, setPreviousStudentGuides] = useState<StudentGuideSnapshot | null>(null);
   const latestSourceSignatureRef = useRef(sourceSignature);
+  const latestLearningGuidesRef = useRef(learningGuides);
+  const latestQuestionsRef = useRef(questions);
   useEffect(() => {
     latestSourceSignatureRef.current = sourceSignature;
-  }, [sourceSignature]);
+    latestLearningGuidesRef.current = learningGuides;
+    latestQuestionsRef.current = questions;
+  }, [learningGuides, questions, sourceSignature]);
   const inquiryQuestions = questions.filter((question) => question.content.trim());
   const currentBundle = validateStudentGuideBundle({
     learningGuides,
@@ -100,6 +115,15 @@ export function useStudentInquiryGuides({
         return;
       }
 
+      if (hasCurrentStudentGuides) {
+        setPreviousStudentGuides({
+          sourceSignature: requestSourceSignature,
+          learningGuides: latestLearningGuidesRef.current,
+          inquiryGuides: latestQuestionsRef.current.map((question) => question.studentGuide),
+        });
+      } else {
+        setPreviousStudentGuides(null);
+      }
       setLearningGuides(checked.value.learningGuides);
       const guideByOriginalIndex = new Map(indexedQuestions.map(({ originalIndex }, index) => [
         originalIndex,
@@ -124,6 +148,24 @@ export function useStudentInquiryGuides({
     setLearningGuides(undefined);
     setQuestions((previous) => previous.map(({ studentGuide: _studentGuide, ...question }) => question));
     setGeneratedSourceSignature(null);
+    setPreviousStudentGuides(null);
+  };
+
+  const canRestoreStudentGuides = previousStudentGuides?.sourceSignature === sourceSignature;
+  const restorePreviousStudentGuides = () => {
+    if (!previousStudentGuides || previousStudentGuides.sourceSignature !== sourceSignature) {
+      setPreviousStudentGuides(null);
+      return;
+    }
+    setLearningGuides(previousStudentGuides.learningGuides);
+    setQuestions((previous) => previous.map((question, index) => {
+      const studentGuide = previousStudentGuides.inquiryGuides[index];
+      if (studentGuide) return { ...question, studentGuide };
+      const { studentGuide: _studentGuide, ...withoutStudentGuide } = question;
+      return withoutStudentGuide;
+    }));
+    setGeneratedSourceSignature(previousStudentGuides.sourceSignature);
+    setPreviousStudentGuides(null);
   };
 
   return {
@@ -135,6 +177,8 @@ export function useStudentInquiryGuides({
     hasFreshStudentGuides,
     hasIncompleteStudentGuides,
     hasStaleStudentGuides,
+    canRestoreStudentGuides,
+    restorePreviousStudentGuides,
     clearStudentGuides,
   };
 }

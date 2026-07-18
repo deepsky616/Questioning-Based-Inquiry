@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import { CurriculumInquiryStep } from "@/app/(teacher)/teacher-curriculum/CurriculumInquiryStep";
+import { ConfirmProvider } from "@/components/shared/confirm-dialog";
 
 const baseProps: ComponentProps<typeof CurriculumInquiryStep> = {
   visible: true,
@@ -56,6 +57,7 @@ const baseProps: ComponentProps<typeof CurriculumInquiryStep> = {
   isSaving: false,
   isGeneratingInquiryQuestions: false,
   isGeneratingGuides: false,
+  canRestoreStudentGuides: false,
   canSaveDesign: false,
   lastDesignAction: null,
   onSetDragInquiryIndex: vi.fn(),
@@ -74,6 +76,7 @@ const baseProps: ComponentProps<typeof CurriculumInquiryStep> = {
   onSaveAndCreateSession: vi.fn(),
   onSaveOnly: vi.fn(),
   onGenerateGuides: vi.fn(),
+  onRestoreGuides: vi.fn(),
   onLearningGuidesChange: vi.fn(),
 };
 
@@ -86,12 +89,14 @@ function InquiryStepHarness({
 }) {
   const [title, setTitle] = useState(initialTitle);
   return (
-    <CurriculumInquiryStep
-      {...baseProps}
-      saveTitle={title}
-      isGeneratingInquiryQuestions={isGeneratingInquiryQuestions}
-      onSaveTitleChange={setTitle}
-    />
+    <ConfirmProvider>
+      <CurriculumInquiryStep
+        {...baseProps}
+        saveTitle={title}
+        isGeneratingInquiryQuestions={isGeneratingInquiryQuestions}
+        onSaveTitleChange={setTitle}
+      />
+    </ConfirmProvider>
   );
 }
 

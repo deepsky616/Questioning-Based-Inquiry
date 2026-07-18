@@ -2,6 +2,7 @@ import type { InquiryQuestion } from "@/app/(teacher)/teacher-curriculum/types";
 
 export interface StudentGuideSourceInput {
   coreIdea: string;
+  selectedKeywords: string[];
   coreSentences: string[];
   essentialQuestions: string[];
   inquiryQuestions: Pick<InquiryQuestion, "type" | "content">[];
@@ -19,6 +20,7 @@ export function withSelectedCoreIdea<T extends object>(
 export function buildStudentGuideSourceSignature(input: StudentGuideSourceInput): string {
   return JSON.stringify({
     coreIdea: clean(input.coreIdea),
+    selectedKeywords: input.selectedKeywords.map(clean).filter(Boolean),
     coreSentences: input.coreSentences.map(clean),
     essentialQuestions: input.essentialQuestions.map(clean),
     inquiryQuestions: input.inquiryQuestions

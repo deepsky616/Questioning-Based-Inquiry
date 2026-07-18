@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Loader2, Search, WandSparkles } from "lucide-react";
+import { ArrowLeft, Loader2, RotateCcw, Search, WandSparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { StudentInquiryGuideEditor } from "@/components/shared/StudentInquiryGuideEditor";
@@ -28,7 +28,9 @@ interface InquiryDistributionReviewProps {
   hasIncompleteStudentGuides: boolean;
   hasStaleStudentGuides: boolean;
   isGeneratingGuides: boolean;
+  canRestoreStudentGuides: boolean;
   onGenerateGuides: () => void;
+  onRestoreGuides: () => void;
   onLearningGuidesChange: (value: StudentLearningGuides) => void;
   onInquiryGuideChange: (index: number, guide: StudentInquiryGuide) => void;
   onBackToEdit: () => void;
@@ -46,7 +48,9 @@ export function InquiryDistributionReview({
   hasIncompleteStudentGuides,
   hasStaleStudentGuides,
   isGeneratingGuides,
+  canRestoreStudentGuides,
   onGenerateGuides,
+  onRestoreGuides,
   onLearningGuidesChange,
   onInquiryGuideChange,
   onBackToEdit,
@@ -64,20 +68,28 @@ export function InquiryDistributionReview({
           <ArrowLeft className="mr-1.5 h-4 w-4" aria-hidden="true" />
           {t("backToInquiryEdit")}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onGenerateGuides}
-          disabled={isGeneratingGuides || inquiryCount === 0}
-        >
-          {isGeneratingGuides
-            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-            : <WandSparkles className="mr-2 h-4 w-4" aria-hidden="true" />}
-          {isGeneratingGuides
-            ? t("studentGuideGenerating")
-            : t(hasAnyGuideState ? "studentGuideRegenerate" : "studentGuideGenerate")}
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {canRestoreStudentGuides && (
+            <Button type="button" variant="ghost" size="sm" onClick={onRestoreGuides} disabled={isGeneratingGuides}>
+              <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              {t("studentGuideRestorePrevious")}
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onGenerateGuides}
+            disabled={isGeneratingGuides || inquiryCount === 0}
+          >
+            {isGeneratingGuides
+              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              : <WandSparkles className="mr-2 h-4 w-4" aria-hidden="true" />}
+            {isGeneratingGuides
+              ? t("studentGuideGenerating")
+              : t(hasAnyGuideState ? "studentGuideRegenerate" : "studentGuideGenerate")}
+          </Button>
+        </div>
       </div>
 
       {hasStaleStudentGuides && (

@@ -56,6 +56,7 @@ describe("학생용 설명 생성 훅 최신 상태", () => {
         const guides = useStudentInquiryGuides({
           questions: currentQuestions,
           coreIdea: "생물은 환경과 관계를 맺는다.",
+          selectedKeywords: ["생물", "환경"],
           coreSentences: ["생물은 서로 연결된다."],
           essentialQuestions: ["생태계는 어떻게 유지될까?"],
           setQuestions: setCurrentQuestions,
@@ -112,6 +113,7 @@ describe("학생용 설명 생성 훅 최신 상태", () => {
       const guides = useStudentInquiryGuides({
         questions: currentQuestions,
         coreIdea: "생물은 환경과 관계를 맺는다.",
+        selectedKeywords: ["생물", "환경"],
         coreSentences: ["생물은 서로 연결된다."],
         essentialQuestions: ["생태계는 어떻게 유지될까?"],
         setQuestions: setCurrentQuestions,
@@ -168,6 +170,7 @@ describe("학생용 설명 생성 훅 최신 상태", () => {
     const { result } = renderHook(() => useStudentInquiryGuides({
       questions,
       coreIdea: "생물은 환경과 관계를 맺는다.",
+      selectedKeywords: ["생물", "환경"],
       coreSentences: ["생물은 서로 연결된다."],
       essentialQuestions: ["생태계는 어떻게 유지될까?"],
       setQuestions,
@@ -203,6 +206,7 @@ describe("학생용 설명 생성 훅 최신 상태", () => {
       const guides = useStudentInquiryGuides({
         questions: currentQuestions,
         coreIdea: "생물은 환경과 관계를 맺는다.",
+        selectedKeywords: ["생물", "환경"],
         coreSentences: ["생물은 서로 연결된다."],
         essentialQuestions: ["생태계는 어떻게 유지될까?"],
         setQuestions: setCurrentQuestions,
@@ -236,5 +240,196 @@ describe("학생용 설명 생성 훅 최신 상태", () => {
     expect(onSourceChanged).toHaveBeenCalledTimes(1);
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("선택한 핵심 낱말이 바뀌면 기존 설명을 오래된 상태로 둔다", async () => {
+    const generate = vi.fn(async () => generatedBundle);
+    const { result, rerender } = renderHook(
+      ({ selectedKeywords }: { selectedKeywords: string[] }) => {
+        const [currentQuestions, setCurrentQuestions] = useState<InquiryQuestion[]>(questions);
+        return useStudentInquiryGuides({
+          questions: currentQuestions,
+          coreIdea: "생물은 환경과 관계를 맺는다.",
+          selectedKeywords,
+          coreSentences: ["생물은 서로 연결된다."],
+          essentialQuestions: ["생태계는 어떻게 유지될까?"],
+          setQuestions: setCurrentQuestions,
+          generate,
+          onSuccess: vi.fn(),
+          onError: vi.fn(),
+        });
+      },
+      { initialProps: { selectedKeywords: ["생물", "환경"] } },
+    );
+
+    await act(async () => {
+      await result.current.handleGenerateStudentGuides();
+    });
+    expect(result.current.hasFreshStudentGuides).toBe(true);
+
+    rerender({ selectedKeywords: ["생물", "관계"] });
+
+    await waitFor(() => expect(result.current.hasStaleStudentGuides).toBe(true));
+    expect(result.current.hasFreshStudentGuides).toBe(false);
+  });
+
+  it("다시 만든 뒤 교사가 수정했던 직전 설명을 한 번 복원한다", async () => {
+    const regeneratedBundle = {
+      ...generatedBundle,
+      learningGuides: {
+        ...generatedBundle.learningGuides,
+        coreIdea: {
+          ...generatedBundle.learningGuides.coreIdea,
+          explanation: "새로 만든 핵심 생각 설명",
+        },
+      },
+      guides: [{
+        ...generatedBundle.guides[0],
+        meaning: "새로 만든 탐구 질문 설명",
+      }],
+    };
+    const generate = vi.fn()
+      .mockResolvedValueOnce(generatedBundle)
+      .mockResolvedValueOnce(regeneratedBundle);
+    const { result } = renderHook(() => {
+      const [currentQuestions, setCurrentQuestions] = useState<InquiryQuestion[]>(questions);
+      const guides = useStudentInquiryGuides({
+        questions: currentQuestions,
+        coreIdea: "생물은 환경과 관계를 맺는다.",
+        selectedKeywords: ["생물", "환경"],
+        coreSentences: ["생물은 서로 연결된다."],
+        essentialQuestions: ["생태계는 어떻게 유지될까?"],
+        setQuestions: setCurrentQuestions,
+        generate,
+        onSuccess: vi.fn(),
+        onError: vi.fn(),
+      });
+      return { ...guides, currentQuestions, setCurrentQuestions };
+    });
+
+    await act(async () => {
+      await result.current.handleGenerateStudentGuides();
+    });
+    act(() => {
+      result.current.setLearningGuides({
+        ...generatedBundle.learningGuides,
+        coreIdea: {
+          ...generatedBundle.learningGuides.coreIdea,
+          explanation: "교사가 다듬은 핵심 생각 설명",
+        },
+      });
+      result.current.setCurrentQuestions((previous) => previous.map((question) => ({
+        ...question,
+        studentGuide: {
+          ...generatedInquiryGuide,
+          meaning: "교사가 다듬은 탐구 질문 설명",
+        },
+      })));
+    });
+
+    await act(async () => {
+      await result.current.handleGenerateStudentGuides();
+    });
+
+    expect(result.current.learningGuides?.coreIdea?.explanation).toBe("새로 만든 핵심 생각 설명");
+    expect(result.current.currentQuestions[0].studentGuide?.meaning).toBe("새로 만든 탐구 질문 설명");
+    expect(result.current.canRestoreStudentGuides).toBe(true);
+
+    act(() => result.current.restorePreviousStudentGuides());
+
+    expect(result.current.learningGuides?.coreIdea?.explanation).toBe("교사가 다듬은 핵심 생각 설명");
+    expect(result.current.currentQuestions[0].studentGuide?.meaning).toBe("교사가 다듬은 탐구 질문 설명");
+    expect(result.current.canRestoreStudentGuides).toBe(false);
+  });
+
+  it("직전 설명의 원문이 바뀌면 복원할 수 없게 한다", async () => {
+    const generate = vi.fn(async () => generatedBundle);
+    const { result, rerender } = renderHook(
+      ({ selectedKeywords }: { selectedKeywords: string[] }) => {
+        const [currentQuestions, setCurrentQuestions] = useState<InquiryQuestion[]>(questions);
+        const guides = useStudentInquiryGuides({
+          questions: currentQuestions,
+          coreIdea: "생물은 환경과 관계를 맺는다.",
+          selectedKeywords,
+          coreSentences: ["생물은 서로 연결된다."],
+          essentialQuestions: ["생태계는 어떻게 유지될까?"],
+          setQuestions: setCurrentQuestions,
+          generate,
+          onSuccess: vi.fn(),
+          onError: vi.fn(),
+        });
+        return guides;
+      },
+      { initialProps: { selectedKeywords: ["생물", "환경"] } },
+    );
+
+    await act(async () => {
+      await result.current.handleGenerateStudentGuides();
+    });
+    await act(async () => {
+      await result.current.handleGenerateStudentGuides();
+    });
+    expect(result.current.canRestoreStudentGuides).toBe(true);
+
+    rerender({ selectedKeywords: ["생물", "관계"] });
+
+    await waitFor(() => expect(result.current.canRestoreStudentGuides).toBe(false));
+  });
+
+  it("다시 만드는 동안 교사가 수정한 설명도 직전 설명으로 복원한다", async () => {
+    let resolveRegeneration!: (value: unknown) => void;
+    const generate = vi.fn()
+      .mockResolvedValueOnce(generatedBundle)
+      .mockImplementationOnce(() => new Promise<unknown>((resolve) => {
+        resolveRegeneration = resolve;
+      }));
+    const { result } = renderHook(() => {
+      const [currentQuestions, setCurrentQuestions] = useState<InquiryQuestion[]>(questions);
+      const guides = useStudentInquiryGuides({
+        questions: currentQuestions,
+        coreIdea: "생물은 환경과 관계를 맺는다.",
+        selectedKeywords: ["생물", "환경"],
+        coreSentences: ["생물은 서로 연결된다."],
+        essentialQuestions: ["생태계는 어떻게 유지될까?"],
+        setQuestions: setCurrentQuestions,
+        generate,
+        onSuccess: vi.fn(),
+        onError: vi.fn(),
+      });
+      return { ...guides, currentQuestions, setCurrentQuestions };
+    });
+
+    await act(async () => {
+      await result.current.handleGenerateStudentGuides();
+    });
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.handleGenerateStudentGuides();
+    });
+    act(() => {
+      result.current.setLearningGuides({
+        ...generatedBundle.learningGuides,
+        coreIdea: {
+          ...generatedBundle.learningGuides.coreIdea,
+          explanation: "생성 중 교사가 수정한 설명",
+        },
+      });
+      result.current.setCurrentQuestions((previous) => previous.map((question) => ({
+        ...question,
+        studentGuide: {
+          ...generatedInquiryGuide,
+          meaning: "생성 중 교사가 수정한 질문 설명",
+        },
+      })));
+    });
+    await act(async () => {
+      resolveRegeneration(generatedBundle);
+      await pending;
+    });
+
+    act(() => result.current.restorePreviousStudentGuides());
+
+    expect(result.current.learningGuides?.coreIdea?.explanation).toBe("생성 중 교사가 수정한 설명");
+    expect(result.current.currentQuestions[0].studentGuide?.meaning).toBe("생성 중 교사가 수정한 질문 설명");
   });
 });

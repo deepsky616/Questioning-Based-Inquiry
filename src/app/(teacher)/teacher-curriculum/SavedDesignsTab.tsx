@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Loader2, Pencil, Save, Trash2, WandSparkles, X } from "lucide-react";
+import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Loader2, Pencil, RotateCcw, Save, Trash2, WandSparkles, X } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,9 @@ import { filterSortSavedDesigns } from "@/lib/saved-designs";
 import { getSavedDesignTimeline, type SavedDesignTimelineKind } from "@/lib/saved-design-timeline";
 import { groupSessionDatesByMonth } from "@/lib/sessions";
 import { formatDateTime } from "@/lib/datetime";
-import { mergeGeneratedStudentGuides, normalizeStudentInquiryGuide } from "@/lib/student-inquiry-guide";
+import { normalizeStudentInquiryGuide, type StudentInquiryGuide } from "@/lib/student-inquiry-guide";
+import { validateStudentGuideBundle } from "@/lib/student-guide-completeness";
+import { buildStudentGuideSourceSignature } from "@/lib/student-guide-source";
 import {
   normalizeStudentLearningGuides,
   remapStudentLearningGuides,
@@ -50,6 +52,12 @@ interface SavedDesignsTabProps {
   onChanged: () => void | Promise<unknown>;
   students: SessionTargetStudent[];
   targetClasses: SessionTargetClass[];
+}
+
+interface EditStudentGuideSnapshot {
+  sourceSignature: string;
+  learningGuides?: StudentLearningGuides;
+  inquiryGuides: Array<StudentInquiryGuide | undefined>;
 }
 
 /**
@@ -132,10 +140,50 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   const [editEssentialQuestions, setEditEssentialQuestions] = useState<string[]>([]);
   const [editQuestions, setEditQuestions] = useState<InquiryQuestion[]>([]);
   const [editLearningGuides, setEditLearningGuides] = useState<StudentLearningGuides | undefined>();
+  const [generatedEditGuideSourceSignature, setGeneratedEditGuideSourceSignature] = useState<string | null>(null);
+  const [previousEditStudentGuides, setPreviousEditStudentGuides] = useState<EditStudentGuideSnapshot | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [generatingGuides, setGeneratingGuides] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [addType, setAddType] = useState<InquiryQuestion["type"]>("factual");
+
+  const editingDesign = savedList.find((design) => design.id === editingDesignId);
+  const editGuideSourceSignature = buildStudentGuideSourceSignature({
+    coreIdea: editCoreIdea,
+    selectedKeywords: editingDesign?.selectedKeywords ?? [],
+    coreSentences: editCoreSentences,
+    essentialQuestions: editEssentialQuestions,
+    inquiryQuestions: editQuestions,
+  });
+  const latestEditGuideSourceSignatureRef = useRef(editGuideSourceSignature);
+  const latestEditLearningGuidesRef = useRef(editLearningGuides);
+  const latestEditQuestionsRef = useRef(editQuestions);
+  useEffect(() => {
+    latestEditGuideSourceSignatureRef.current = editGuideSourceSignature;
+    latestEditLearningGuidesRef.current = editLearningGuides;
+    latestEditQuestionsRef.current = editQuestions;
+  }, [editGuideSourceSignature, editLearningGuides, editQuestions]);
+  const editInquiryQuestions = editQuestions.filter((question) => question.content.trim());
+  const editGuideBundle = validateStudentGuideBundle({
+    learningGuides: editLearningGuides,
+    guides: editInquiryQuestions.flatMap((question, index) => question.studentGuide
+      ? [{ ...question.studentGuide, index }]
+      : []),
+  }, {
+    coreSentenceCount: editCoreSentences.length,
+    essentialQuestionCount: editEssentialQuestions.length,
+    inquiryQuestionCount: editInquiryQuestions.length,
+  });
+  const hasEditStudentGuides = Boolean(editLearningGuides)
+    || editQuestions.some((question) => question.studentGuide);
+  const hasCurrentEditStudentGuides = hasEditStudentGuides
+    && generatedEditGuideSourceSignature === editGuideSourceSignature;
+  const hasFreshEditStudentGuides = hasCurrentEditStudentGuides && editGuideBundle.ok;
+  const hasIncompleteEditStudentGuides = hasCurrentEditStudentGuides && !editGuideBundle.ok;
+  const hasStaleEditStudentGuides = hasEditStudentGuides
+    && generatedEditGuideSourceSignature !== null
+    && generatedEditGuideSourceSignature !== editGuideSourceSignature;
+  const canRestoreEditStudentGuides = previousEditStudentGuides?.sourceSignature === editGuideSourceSignature;
 
   // 조회(필터) 옵션 + 필터/정렬 적용
   const uniq = (vals: (string | null | undefined)[]) =>
@@ -192,8 +240,19 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     setEditCoreIdea(design.coreIdea ?? "");
     setEditCoreSentences([...(design.coreSentences ?? [])]);
     setEditEssentialQuestions([...(design.essentialQuestions ?? [])]);
-    setEditLearningGuides(normalizeStudentLearningGuides(design.learningGuides));
-    setEditQuestions(design.inquiryQuestions.map((q) => ({ ...q })));
+    const nextLearningGuides = normalizeStudentLearningGuides(design.learningGuides);
+    const nextQuestions = design.inquiryQuestions.map((q) => ({ ...q }));
+    setEditLearningGuides(nextLearningGuides);
+    setEditQuestions(nextQuestions);
+    const hasGuides = Boolean(nextLearningGuides) || nextQuestions.some((question) => question.studentGuide);
+    setGeneratedEditGuideSourceSignature(hasGuides ? buildStudentGuideSourceSignature({
+      coreIdea: design.coreIdea ?? "",
+      selectedKeywords: design.selectedKeywords ?? [],
+      coreSentences: design.coreSentences ?? [],
+      essentialQuestions: design.essentialQuestions ?? [],
+      inquiryQuestions: nextQuestions,
+    }) : null);
+    setPreviousEditStudentGuides(null);
   };
   const cancelEditDesign = () => {
     setEditingDesignId(null);
@@ -202,6 +261,8 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     setEditCoreSentences([]);
     setEditEssentialQuestions([]);
     setEditLearningGuides(undefined);
+    setGeneratedEditGuideSourceSignature(null);
+    setPreviousEditStudentGuides(null);
     setEditQuestions([]);
   };
   // 핵심문장·핵심질문(문자열 리스트) 공통 편집 헬퍼
@@ -258,11 +319,13 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   const patchEditDesign = async (id: string) => {
     const cleaned = editQuestions
       .map((q) => {
-        const studentGuide = normalizeStudentInquiryGuide(q.studentGuide);
+        const studentGuide = hasFreshEditStudentGuides
+          ? normalizeStudentInquiryGuide(q.studentGuide)
+          : undefined;
         return {
           type: q.type,
           content: q.content.trim(),
-          ...(studentGuide ? { studentGuide } : {}),
+          ...(hasFreshEditStudentGuides && studentGuide ? { studentGuide } : {}),
         };
       })
       .filter((q) => q.content);
@@ -285,7 +348,9 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         coreIdea: editCoreIdea.trim(),
         coreSentences: cleanedSentences,
         essentialQuestions: cleanedEssential,
-        learningGuides: remapStudentLearningGuides(editLearningGuides, sentenceSourceIndexes, essentialSourceIndexes),
+        learningGuides: hasFreshEditStudentGuides
+          ? remapStudentLearningGuides(editLearningGuides, sentenceSourceIndexes, essentialSourceIndexes)
+          : null,
         inquiryQuestions: cleaned,
       }),
     });
@@ -298,7 +363,16 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
       .map((question, originalIndex) => ({ question, originalIndex }))
       .filter(({ question }) => question.content.trim());
     if (indexedQuestions.length === 0 || generatingGuides) return;
+    if (hasCurrentEditStudentGuides) {
+      const approved = await confirm({
+        title: t("studentGuideRegenerateConfirmTitle"),
+        description: t("studentGuideRegenerateConfirmDesc"),
+        confirmText: t("studentGuideRegenerateConfirmAction"),
+      });
+      if (!approved) return;
+    }
 
+    const requestSourceSignature = editGuideSourceSignature;
     setGeneratingGuides(true);
     try {
       const response = await fetch("/api/unit-design/generate", {
@@ -311,6 +385,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
           area: design.area,
           unitName: editTitle.trim(),
           coreIdea: editCoreIdea.trim(),
+          selectedKeywords: design.selectedKeywords ?? [],
           coreSentences: editCoreSentences,
           essentialQuestions: editEssentialQuestions,
           inquiryQuestions: indexedQuestions.map(({ question }) => ({
@@ -320,15 +395,36 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         }),
       });
       const data = await response.json().catch(() => ({}));
-      const nextLearningGuides = normalizeStudentLearningGuides(data.learningGuides);
-      if (!response.ok || (!Array.isArray(data.guides) && !nextLearningGuides)) throw new Error();
-      if (nextLearningGuides) setEditLearningGuides(nextLearningGuides);
-
-      if (Array.isArray(data.guides)) {
-        const merged = mergeGeneratedStudentGuides(indexedQuestions.map(({ question }) => question), data.guides);
-        const byOriginalIndex = new Map(indexedQuestions.map(({ originalIndex }, index) => [originalIndex, merged[index]]));
-        setEditQuestions((previous) => previous.map((question, index) => byOriginalIndex.get(index) ?? question));
+      const expected = {
+        coreSentenceCount: editCoreSentences.length,
+        essentialQuestionCount: editEssentialQuestions.length,
+        inquiryQuestionCount: indexedQuestions.length,
+      };
+      const checked = validateStudentGuideBundle(data, expected);
+      if (!response.ok || !checked.ok) throw new Error();
+      if (latestEditGuideSourceSignatureRef.current !== requestSourceSignature) {
+        toast({ description: t("studentGuideSourceChangedDuringGeneration") });
+        return;
       }
+      if (hasCurrentEditStudentGuides) {
+        setPreviousEditStudentGuides({
+          sourceSignature: requestSourceSignature,
+          learningGuides: latestEditLearningGuidesRef.current,
+          inquiryGuides: latestEditQuestionsRef.current.map((question) => question.studentGuide),
+        });
+      } else {
+        setPreviousEditStudentGuides(null);
+      }
+      setEditLearningGuides(checked.value.learningGuides);
+      const byOriginalIndex = new Map(indexedQuestions.map(({ originalIndex }, index) => {
+        const { index: _index, ...studentGuide } = checked.value.guides[index];
+        return [originalIndex, studentGuide] as const;
+      }));
+      setEditQuestions((previous) => previous.map((question, index) => {
+        const studentGuide = byOriginalIndex.get(index);
+        return studentGuide ? { ...question, studentGuide } : question;
+      }));
+      setGeneratedEditGuideSourceSignature(requestSourceSignature);
       toast({ description: t("studentGuideGenerated") });
     } catch {
       toast({ variant: "destructive", description: t("studentGuideGenerateFailed") });
@@ -337,9 +433,35 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     }
   };
 
+  const confirmEditStudentGuideOmission = async () => {
+    if (!(hasIncompleteEditStudentGuides || hasStaleEditStudentGuides)) return true;
+    return confirm({
+      title: t("studentGuideSaveWithoutTitle"),
+      description: t("studentGuideSaveWithoutDesc"),
+      confirmText: t("studentGuideSaveWithoutAction"),
+    });
+  };
+
+  const restorePreviousEditStudentGuides = () => {
+    if (!previousEditStudentGuides || previousEditStudentGuides.sourceSignature !== editGuideSourceSignature) {
+      setPreviousEditStudentGuides(null);
+      return;
+    }
+    setEditLearningGuides(previousEditStudentGuides.learningGuides);
+    setEditQuestions((previous) => previous.map((question, index) => {
+      const studentGuide = previousEditStudentGuides.inquiryGuides[index];
+      if (studentGuide) return { ...question, studentGuide };
+      const { studentGuide: _studentGuide, ...withoutStudentGuide } = question;
+      return withoutStudentGuide;
+    }));
+    setGeneratedEditGuideSourceSignature(previousEditStudentGuides.sourceSignature);
+    setPreviousEditStudentGuides(null);
+  };
+
   // 저장만(설계 업데이트 — 라이브 참고자료에 즉시 반영)
   const saveEditDesign = async (id: string) => {
     if (!editTitle.trim() || savingEdit) return;
+    if (!(await confirmEditStudentGuideOmission())) return;
     setSavingEdit(true);
     try {
       const { ok, updatedAt } = await patchEditDesign(id);
@@ -357,6 +479,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   // 수정한 설계를 저장하고 그 설정으로 새 질문수업을 만든다.
   const createQuestionClassFromDesign = async (id: string) => {
     if (!editTitle.trim() || !editDate || savingEdit) return;
+    if (!(await confirmEditStudentGuideOmission())) return;
     setSavingEdit(true);
     try {
       const target = buildClassStudentTargetPayload({
@@ -653,25 +776,46 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                     <div className="space-y-3 border-t pt-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <Label>{t("studentGuideTitle")}</Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => generateEditStudentGuides(d)}
-                        disabled={generatingGuides || !editQuestions.some((question) => question.content.trim())}
-                      >
-                        {generatingGuides
-                          ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                          : <WandSparkles className="mr-2 h-4 w-4" aria-hidden="true" />}
-                        {generatingGuides
-                          ? t("studentGuideGenerating")
-                          : t(editLearningGuides || editQuestions.some((question) => question.studentGuide) ? "studentGuideRegenerate" : "studentGuideGenerate")}
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {canRestoreEditStudentGuides && (
+                          <Button type="button" variant="ghost" size="sm" onClick={restorePreviousEditStudentGuides} disabled={generatingGuides}>
+                            <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" />
+                            {t("studentGuideRestorePrevious")}
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => generateEditStudentGuides(d)}
+                          disabled={generatingGuides || !editQuestions.some((question) => question.content.trim())}
+                        >
+                          {generatingGuides
+                            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                            : <WandSparkles className="mr-2 h-4 w-4" aria-hidden="true" />}
+                          {generatingGuides
+                            ? t("studentGuideGenerating")
+                            : t(editLearningGuides || editQuestions.some((question) => question.studentGuide) ? "studentGuideRegenerate" : "studentGuideGenerate")}
+                        </Button>
+                      </div>
                     </div>
+                    {hasStaleEditStudentGuides && (
+                      <p role="status" className="rounded-lg border border-amber-300/80 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100">
+                        {t("studentGuideStale")}
+                      </p>
+                    )}
+                    {hasIncompleteEditStudentGuides && (
+                      <p role="status" className="rounded-lg border border-rose-300/80 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-900 dark:border-rose-700/70 dark:bg-rose-950/30 dark:text-rose-100">
+                        {t("studentGuideIncomplete")}
+                      </p>
+                    )}
                     <StudentLearningGuideEditor
+                      coreIdea={editCoreIdea}
                       coreSentences={editCoreSentences}
                       essentialQuestions={editEssentialQuestions}
                       guides={editLearningGuides}
+                      showEditors={hasCurrentEditStudentGuides}
+                      emptyMessage={t(hasStaleEditStudentGuides ? "studentGuideStale" : "studentGuideEmpty")}
                       onChange={setEditLearningGuides}
                     />
                     </div>
@@ -737,12 +881,18 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                               ✕
                             </button>
                           </div>
-                          <div className="mt-2">
-                            <StudentInquiryGuideEditor
-                              guide={q.studentGuide}
-                              onChange={(studentGuide) => updateEditQuestion(i, { studentGuide })}
-                            />
-                          </div>
+                          {hasCurrentEditStudentGuides && q.studentGuide ? (
+                            <div className="mt-2">
+                              <StudentInquiryGuideEditor
+                                guide={q.studentGuide}
+                                onChange={(studentGuide) => updateEditQuestion(i, { studentGuide })}
+                              />
+                            </div>
+                          ) : hasEditStudentGuides ? (
+                            <p className="mt-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                              {t(hasStaleEditStudentGuides ? "studentGuideStale" : "studentGuideIncomplete")}
+                            </p>
+                          ) : null}
                         </div>
                       ))}
                       <div className="flex items-center gap-2">
@@ -762,7 +912,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <Button
                         onClick={() => saveEditDesign(d.id)}
-                        disabled={savingEdit || !editTitle.trim()}
+                        disabled={savingEdit || generatingGuides || !editTitle.trim()}
                         variant="gradient"
                         className="h-11 flex-1 text-base font-semibold"
                       >
@@ -772,7 +922,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                       <Button
                         variant={newQuestionClassNeeded ? "default" : "secondary"}
                         onClick={() => createQuestionClassFromDesign(d.id)}
-                        disabled={savingEdit || !editTitle.trim() || !editDate}
+                        disabled={savingEdit || generatingGuides || !editTitle.trim() || !editDate}
                         className={`h-11 flex-1 text-base font-semibold ${
                           newQuestionClassNeeded ? "bg-orange-600 text-white hover:bg-orange-700" : ""
                         }`}

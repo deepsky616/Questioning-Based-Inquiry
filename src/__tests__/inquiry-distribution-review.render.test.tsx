@@ -50,7 +50,9 @@ const baseProps = {
   hasIncompleteStudentGuides: false,
   hasStaleStudentGuides: false,
   isGeneratingGuides: false,
+  canRestoreStudentGuides: false,
   onGenerateGuides: vi.fn(),
+  onRestoreGuides: vi.fn(),
   onLearningGuidesChange: vi.fn(),
   onInquiryGuideChange: vi.fn(),
   onBackToEdit: vi.fn(),
@@ -122,5 +124,20 @@ describe("학생 배포 자료 확인", () => {
     expect(screen.getByRole("status")).toHaveTextContent("비어 있거나 핵심 낱말 수가 부족");
     expect(screen.getByLabelText("핵심 아이디어 쉽게 풀어보기")).toBeInTheDocument();
     expect(screen.getByLabelText("질문이 묻는 것")).toBeInTheDocument();
+  });
+
+  it("다시 만든 직전 설명을 한 번 되돌릴 수 있다", () => {
+    const onRestoreGuides = vi.fn();
+    render(
+      <InquiryDistributionReview
+        {...baseProps}
+        canRestoreStudentGuides
+        onRestoreGuides={onRestoreGuides}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이전 설명 되돌리기" }));
+
+    expect(onRestoreGuides).toHaveBeenCalledTimes(1);
   });
 });

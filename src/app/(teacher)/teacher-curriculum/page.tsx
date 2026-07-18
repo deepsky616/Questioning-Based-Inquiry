@@ -49,12 +49,11 @@ import {
   todayStr,
   type CurriculumArea,
   type InquiryQuestion,
+  type LastDesignAction,
   type SavedInquiryDesign,
 } from "./types";
 import { useStudentInquiryGuides } from "./useStudentInquiryGuides";
 import { InquiryQuestionClassWorkspaceHeader } from "./InquiryQuestionClassWorkspaceHeader";
-// ── 타입 ──────────────────────────────────────────────────────────────
-type LastDesignAction = { type: "saved" | "deployed"; at: string };
 // ── 컴포넌트 ──────────────────────────────────────────────────────────
 export default function CurriculumPage() {
   const t = useTranslations("curriculum");
@@ -349,14 +348,14 @@ export default function CurriculumPage() {
   };
   const { learningGuides, setLearningGuides, loadingStudentGuides, handleGenerateStudentGuides,
     hasCurrentStudentGuides, hasFreshStudentGuides, hasIncompleteStudentGuides,
-    hasStaleStudentGuides, clearStudentGuides } = useStudentInquiryGuides({
-    questions: inquiryQuestions, coreIdea: selectedCoreIdeaLines.join("\n"), coreSentences: selectedCoreSentences, essentialQuestions: selectedEssentialQuestions,
+    hasStaleStudentGuides, canRestoreStudentGuides, restorePreviousStudentGuides,
+    clearStudentGuides } = useStudentInquiryGuides({
+    questions: inquiryQuestions, coreIdea: selectedCoreIdeaLines.join("\n"), selectedKeywords, coreSentences: selectedCoreSentences, essentialQuestions: selectedEssentialQuestions,
     setQuestions: setInquiryQuestions, generate: callGenerate,
     onSuccess: () => toast({ description: t("studentGuideGenerated") }),
     onError: () => toast({ variant: "destructive", description: t("studentGuideGenerateFailed") }),
     onSourceChanged: () => toast({ description: t("studentGuideSourceChangedDuringGeneration") }),
   });
-
   // 5단계 탐구질문은 리스트 자체가 저장/세션 대상(내용이 빈 것은 제외)
   const selectedInquiryQuestions = inquiryQuestions
     .map((question) => {
@@ -668,7 +667,8 @@ export default function CurriculumPage() {
           selectedCoreSentenceIndices, setSelectedCoreSentenceIndices, setCoreSentences, loadingQuestions,
           handleGoStep4, selectedEssentialQuestions, essentialQuestions, selectedEssentialQuestionIndices,
           setSelectedEssentialQuestionIndices, setEssentialQuestions, loadingInquiry, handleGoStep5,
-          loadingStudentGuides, handleGenerateStudentGuides, learningGuides, hasCurrentStudentGuides,
+          loadingStudentGuides, handleGenerateStudentGuides,
+          canRestoreStudentGuides, restorePreviousStudentGuides, learningGuides, hasCurrentStudentGuides,
           hasFreshStudentGuides, hasIncompleteStudentGuides, hasStaleStudentGuides, setLearningGuides,
           inquiryQuestions, dragInquiryIndex, inquiryAddType, saveDate, saveGrade, saveTitle, students,
           targetClasses, targetClassValue, selectedStudentIds, sessionIsActive, defaultQuestionPublic,

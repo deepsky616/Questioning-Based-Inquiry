@@ -216,6 +216,36 @@ describe("학생용 설명 최신 상태 저장", () => {
     expect(selectedQuestions).toContain("const studentGuide = hasFreshStudentGuides");
     expect(buildPayload).toContain("learningGuides: hasFreshStudentGuides ? learningGuides : undefined");
   });
+
+  it("불완전하거나 오래된 설명을 제외하고 저장하기 전에 두 저장 흐름 모두 확인한다", () => {
+    const omissionGate = inquiryStep.slice(
+      inquiryStep.indexOf("const confirmStudentGuideOmission"),
+      inquiryStep.indexOf("return ("),
+    );
+
+    expect(omissionGate).toContain("hasIncompleteStudentGuides || hasStaleStudentGuides");
+    expect(omissionGate).toContain('confirmText: t("studentGuideSaveWithoutAction")');
+    expect(omissionGate).toContain("if (!(await confirmStudentGuideOmission())) return");
+    expect(inquiryStep).toContain("requestSave(onSaveOnly)");
+    expect(inquiryStep).toContain("requestSave(onSaveAndCreateSession)");
+    expect(curriculumPage).not.toContain("useConfirm");
+  });
+
+  it("현재 설명이 있으면 다시 만들기 전에 교사에게 교체 여부를 확인한다", () => {
+    const requestGeneration = inquiryStep.slice(
+      inquiryStep.indexOf("const requestStudentGuideGeneration"),
+      inquiryStep.indexOf("const confirmStudentGuideOmission"),
+    );
+
+    expect(requestGeneration).toContain("if (hasCurrentStudentGuides)");
+    expect(requestGeneration).toContain('title: t("studentGuideRegenerateConfirmTitle")');
+    expect(requestGeneration).toContain("await onGenerateGuides()");
+  });
+
+  it("학생용 설명을 만드는 동안 저장과 수업 만들기를 잠근다", () => {
+    expect(inquiryStep.match(/disabled=\{isSaving \|\| isGeneratingGuides \|\| !canSaveDesign\}/g))
+      .toHaveLength(2);
+  });
 });
 
 describe("저장 설계에서 새 수업 만들기", () => {

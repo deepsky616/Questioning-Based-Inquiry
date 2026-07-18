@@ -10,6 +10,8 @@ export interface InquiryQuestion {
   studentGuide?: StudentInquiryGuide;
 }
 
+export type LastDesignAction = { type: "saved" | "deployed"; at: string };
+
 export interface SavedInquiryDesign {
   id: string;
   title: string;
@@ -19,6 +21,7 @@ export interface SavedInquiryDesign {
   sessionDate?: string | null;
   area: string;
   coreIdea?: string;
+  selectedKeywords?: string[];
   coreSentences?: string[];
   essentialQuestions?: string[];
   learningGuides?: StudentLearningGuides;

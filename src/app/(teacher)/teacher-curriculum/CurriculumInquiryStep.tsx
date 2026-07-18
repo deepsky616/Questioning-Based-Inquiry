@@ -5,6 +5,7 @@ import { BookOpenCheck, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import DatePicker from "@/components/shared/DatePicker";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import { SessionTargetSelector } from "@/components/shared/SessionTargetSelector";
 import { SessionVisibilitySettings } from "@/components/shared/SessionVisibilitySettings";
 import { Button } from "@/components/ui/button";
@@ -17,9 +18,7 @@ import type { StudentLearningGuides } from "@/lib/student-learning-guide";
 import type { SessionTargetClass, SessionTargetStudent } from "@/lib/session-targeting";
 import { InquiryDistributionReview } from "./InquiryDistributionReview";
 import { InquiryQuestionEditor } from "./InquiryQuestionEditor";
-import type { CurriculumArea, InquiryQuestion } from "./types";
-
-type LastDesignAction = { type: "saved" | "deployed"; at: string };
+import type { CurriculumArea, InquiryQuestion, LastDesignAction } from "./types";
 
 interface CurriculumInquiryStepProps {
   visible: boolean;
@@ -50,6 +49,7 @@ interface CurriculumInquiryStepProps {
   isSaving: boolean;
   isGeneratingInquiryQuestions: boolean;
   isGeneratingGuides: boolean;
+  canRestoreStudentGuides: boolean;
   canSaveDesign: boolean;
   lastDesignAction: LastDesignAction | null;
   onSetDragInquiryIndex: (index: number | null) => void;
@@ -70,9 +70,10 @@ interface CurriculumInquiryStepProps {
     likesVisibleToPeers: boolean;
     commentsVisibleToPeers: boolean;
   }) => void;
-  onSaveAndCreateSession: () => void;
-  onSaveOnly: () => void;
-  onGenerateGuides: () => void;
+  onSaveAndCreateSession: () => void | Promise<void>;
+  onSaveOnly: () => void | Promise<void>;
+  onGenerateGuides: () => void | Promise<void>;
+  onRestoreGuides: () => void;
   onLearningGuidesChange: (value: StudentLearningGuides) => void;
 }
 
@@ -106,6 +107,7 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
     isSaving,
     isGeneratingInquiryQuestions,
     isGeneratingGuides,
+    canRestoreStudentGuides,
     canSaveDesign,
     lastDesignAction,
     onSetDragInquiryIndex,
@@ -124,9 +126,11 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
     onSaveAndCreateSession,
     onSaveOnly,
     onGenerateGuides,
+    onRestoreGuides,
     onLearningGuidesChange,
   } = props;
   const t = useTranslations("curriculum");
+  const confirm = useConfirm();
   const [isReviewing, setIsReviewing] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -144,6 +148,29 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
     const scrollToCard = () => cardRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(scrollToCard);
     else scrollToCard();
+  };
+  const requestStudentGuideGeneration = async () => {
+    if (hasCurrentStudentGuides) {
+      const approved = await confirm({
+        title: t("studentGuideRegenerateConfirmTitle"),
+        description: t("studentGuideRegenerateConfirmDesc"),
+        confirmText: t("studentGuideRegenerateConfirmAction"),
+      });
+      if (!approved) return;
+    }
+    await onGenerateGuides();
+  };
+  const confirmStudentGuideOmission = async () => {
+    if (!(hasIncompleteStudentGuides || hasStaleStudentGuides)) return true;
+    return confirm({
+      title: t("studentGuideSaveWithoutTitle"),
+      description: t("studentGuideSaveWithoutDesc"),
+      confirmText: t("studentGuideSaveWithoutAction"),
+    });
+  };
+  const requestSave = async (save: () => void | Promise<void>) => {
+    if (!(await confirmStudentGuideOmission())) return;
+    await save();
   };
 
   return (
@@ -186,7 +213,9 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
               hasIncompleteStudentGuides={hasIncompleteStudentGuides}
               hasStaleStudentGuides={hasStaleStudentGuides}
               isGeneratingGuides={isGeneratingGuides}
-              onGenerateGuides={onGenerateGuides}
+              canRestoreStudentGuides={canRestoreStudentGuides}
+              onGenerateGuides={requestStudentGuideGeneration}
+              onRestoreGuides={onRestoreGuides}
               onLearningGuidesChange={onLearningGuidesChange}
               onInquiryGuideChange={updateInquiryGuide}
               onBackToEdit={() => setIsReviewing(false)}
@@ -254,8 +283,8 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
 
               <div className="flex flex-wrap items-center gap-2 border-t pt-4">
                 <Button
-                  onClick={onSaveAndCreateSession}
-                  disabled={isSaving || !canSaveDesign}
+                  onClick={() => requestSave(onSaveAndCreateSession)}
+                  disabled={isSaving || isGeneratingGuides || !canSaveDesign}
                   variant="gradient"
                   className="h-11 flex-1 text-base font-semibold"
                 >
@@ -264,8 +293,8 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={onSaveOnly}
-                  disabled={isSaving || !canSaveDesign}
+                  onClick={() => requestSave(onSaveOnly)}
+                  disabled={isSaving || isGeneratingGuides || !canSaveDesign}
                   className="h-11 flex-1 text-base"
                 >
                   <Save className="h-5 w-5" aria-hidden="true" />
