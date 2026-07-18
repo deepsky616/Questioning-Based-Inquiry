@@ -52,14 +52,20 @@ function PerspectiveEditor({
 }
 
 export function StudentLearningGuideEditor({
+  coreIdea: coreIdeaSource = "",
   coreSentences,
   essentialQuestions,
   guides,
+  showEditors = true,
+  emptyMessage = "",
   onChange,
 }: {
+  coreIdea?: string;
   coreSentences: string[];
   essentialQuestions: string[];
   guides?: StudentLearningGuides;
+  showEditors?: boolean;
+  emptyMessage?: string;
   onChange: (guides: StudentLearningGuides) => void;
 }) {
   const t = useTranslations("curriculum");
@@ -89,7 +95,16 @@ export function StudentLearningGuideEditor({
             </p>
           </div>
         </div>
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {coreIdeaSource.trim() && (
+          <p
+            data-student-guide-source="core-idea"
+            className="mt-3 rounded-lg border border-amber-200/70 bg-background/85 px-3 py-3 text-sm font-medium leading-6 text-foreground dark:border-amber-800/50"
+          >
+            {coreIdeaSource}
+          </p>
+        )}
+        {showEditors ? (
+        <div className="mt-4 grid gap-3 border-t border-amber-200/70 pt-4 dark:border-amber-800/50 lg:grid-cols-2">
           <div className="space-y-1 lg:col-span-2">
             <Label htmlFor={`${fieldId}-core-explanation`}>{t("coreIdeaExplanationLabel")}</Label>
             <textarea
@@ -128,6 +143,11 @@ export function StudentLearningGuideEditor({
             </p>
           </div>
         </div>
+        ) : (
+          <p className="mt-3 rounded-lg border border-dashed border-amber-300/70 bg-background/60 px-3 py-3 text-xs text-muted-foreground dark:border-amber-700/60">
+            {emptyMessage}
+          </p>
+        )}
       </section>
 
       {coreSentences.length > 0 && (
@@ -152,11 +172,12 @@ export function StudentLearningGuideEditor({
             {coreSentences.map((sentence, index) => {
               const guide = current.coreSentences.find((item) => item.index === index) ?? { index, explanation: "" };
               return (
-                <details key={`sentence-${index}`} className="rounded-lg border border-sky-200/70 bg-background/85 px-3 py-2.5 dark:border-sky-800/50">
-                  <summary className="cursor-pointer text-xs font-semibold text-foreground">
-                    {t("coreSentenceGuideTitle", { n: index + 1 })} · <span className="font-normal text-muted-foreground">{sentence}</span>
-                  </summary>
-                  <div className="mt-2 space-y-1">
+                <article key={`sentence-${index}`} className="rounded-lg border border-sky-200/70 bg-background/85 px-3 py-3 dark:border-sky-800/50">
+                  <p data-student-guide-source="core-sentence" className="text-sm font-medium leading-6 text-foreground">
+                    {sentence}
+                  </p>
+                  {showEditors ? (
+                  <div className="mt-3 space-y-1 border-t border-sky-200/70 pt-3 dark:border-sky-800/50">
                     <Label htmlFor={`${fieldId}-sentence-${index}`}>{t("coreSentenceEasyLabel", { n: index + 1 })}</Label>
                     <textarea
                       id={`${fieldId}-sentence-${index}`}
@@ -169,7 +190,12 @@ export function StudentLearningGuideEditor({
                       })}
                     />
                   </div>
-                </details>
+                  ) : (
+                    <p className="mt-3 rounded-lg border border-dashed border-sky-300/70 bg-background/60 px-3 py-3 text-xs text-muted-foreground dark:border-sky-700/60">
+                      {emptyMessage}
+                    </p>
+                  )}
+                </article>
               );
             })}
           </div>
@@ -202,11 +228,12 @@ export function StudentLearningGuideEditor({
                 perspectives: [],
               };
               return (
-                <details key={`question-${index}`} className="rounded-lg border border-violet-200/70 bg-background/85 px-3 py-2.5 dark:border-violet-800/50">
-                  <summary className="cursor-pointer text-xs font-semibold text-foreground">
-                    {t("essentialQuestionGuideTitle", { n: index + 1 })} · <span className="font-normal text-muted-foreground">{question}</span>
-                  </summary>
-                  <div className="mt-2 grid gap-3 lg:grid-cols-2">
+                <article key={`question-${index}`} className="rounded-lg border border-violet-200/70 bg-background/85 px-3 py-3 dark:border-violet-800/50">
+                  <p data-student-guide-source="essential-question" className="text-sm font-medium leading-6 text-foreground">
+                    {question}
+                  </p>
+                  {showEditors ? (
+                  <div className="mt-3 grid gap-3 border-t border-violet-200/70 pt-3 dark:border-violet-800/50 lg:grid-cols-2">
                     <div className="space-y-1">
                       <Label htmlFor={`${fieldId}-question-${index}`}>{t("essentialQuestionFocusLabel", { n: index + 1 })}</Label>
                       <textarea
@@ -230,7 +257,12 @@ export function StudentLearningGuideEditor({
                       })}
                     />
                   </div>
-                </details>
+                  ) : (
+                    <p className="mt-3 rounded-lg border border-dashed border-violet-300/70 bg-background/60 px-3 py-3 text-xs text-muted-foreground dark:border-violet-700/60">
+                      {emptyMessage}
+                    </p>
+                  )}
+                </article>
               );
             })}
           </div>

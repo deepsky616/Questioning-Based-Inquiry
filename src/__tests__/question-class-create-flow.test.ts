@@ -18,6 +18,10 @@ const inquiryStep = readFileSync(
   "src/app/(teacher)/teacher-curriculum/CurriculumInquiryStep.tsx",
   "utf8",
 );
+const inquiryDistributionReview = readFileSync(
+  "src/app/(teacher)/teacher-curriculum/InquiryDistributionReview.tsx",
+  "utf8",
+);
 const savedDesignsTab = readFileSync(
   "src/app/(teacher)/teacher-curriculum/SavedDesignsTab.tsx",
   "utf8",
@@ -38,9 +42,9 @@ const savedDesign: SavedInquiryDesign = {
 
 describe("탐구질문 수업 만들기 요청 흐름", () => {
   it("탐구 질문 학생용 설명을 앞선 세 설명과 구분되는 초록 영역으로 묶는다", () => {
-    expect(inquiryStep).toContain('data-student-guide-section="inquiry-question"');
-    expect(inquiryStep).toContain("border-emerald-200/80");
-    expect(inquiryStep).toContain("bg-emerald-50/70");
+    expect(inquiryDistributionReview).toContain('data-student-guide-section="inquiry-question"');
+    expect(inquiryDistributionReview).toContain("border-emerald-200/80");
+    expect(inquiryDistributionReview).toContain("bg-emerald-50/70");
   });
 
   it("설계 저장과 수업 생성이 모두 성공한 경우에만 성공 후속 처리를 실행한다", async () => {

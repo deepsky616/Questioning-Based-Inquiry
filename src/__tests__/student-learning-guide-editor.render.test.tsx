@@ -11,9 +11,12 @@ describe("학생용 단원 이해 자료 편집", () => {
     const onChange = vi.fn();
     render(
       <StudentLearningGuideEditor
+        coreIdea="식물은 빛을 이용해 양분을 만든다."
         coreSentences={["식물은 빛 에너지를 양분으로 바꾼다."]}
         essentialQuestions={["생물은 어떻게 에너지를 얻을까?"]}
         guides={undefined}
+        showEditors
+        emptyMessage="학생용 설명을 만들어 주세요."
         onChange={onChange}
       />,
     );
@@ -46,9 +49,12 @@ describe("학생용 단원 이해 자료 편집", () => {
   it("핵심 아이디어, 핵심 문장, 핵심 질문을 서로 다른 색 영역으로 나누고 핵심 낱말 자동 입력을 안내한다", () => {
     const { container } = render(
       <StudentLearningGuideEditor
+        coreIdea="식물은 빛을 이용해 양분을 만든다."
         coreSentences={["식물은 빛 에너지를 양분으로 바꾼다."]}
         essentialQuestions={["생물은 어떻게 에너지를 얻을까?"]}
         guides={undefined}
+        showEditors
+        emptyMessage="학생용 설명을 만들어 주세요."
         onChange={vi.fn()}
       />,
     );
@@ -62,5 +68,26 @@ describe("학생용 단원 이해 자료 편집", () => {
     expect(screen.getByPlaceholderText("예: 광합성: 식물이 빛을 이용해 양분을 만드는 과정"))
       .toBeInTheDocument();
     expect(screen.getByText(/설명 만들기를 누르면.*3~5개.*자동/)).toBeInTheDocument();
+  });
+
+  it("설명이 없으면 원문만 읽기 전용으로 보여주고 입력 자리는 안내한다", () => {
+    const { container } = render(
+      <StudentLearningGuideEditor
+        coreIdea="식물은 빛을 이용해 양분을 만든다."
+        coreSentences={["식물은 빛 에너지를 양분으로 바꾼다."]}
+        essentialQuestions={["생물은 어떻게 에너지를 얻을까?"]}
+        guides={undefined}
+        showEditors={false}
+        emptyMessage="학생용 설명을 만들어 주세요."
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(container.querySelector('[data-student-guide-source="core-idea"]'))
+      .toHaveTextContent("식물은 빛을 이용해 양분을 만든다.");
+    expect(screen.getByText("식물은 빛 에너지를 양분으로 바꾼다.")).toBeInTheDocument();
+    expect(screen.getByText("생물은 어떻게 에너지를 얻을까?")).toBeInTheDocument();
+    expect(screen.queryByLabelText("핵심 아이디어 쉽게 풀어보기")).not.toBeInTheDocument();
+    expect(screen.getAllByText("학생용 설명을 만들어 주세요.").length).toBeGreaterThanOrEqual(3);
   });
 });

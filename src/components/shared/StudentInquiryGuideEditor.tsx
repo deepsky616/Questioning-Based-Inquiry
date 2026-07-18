@@ -14,9 +14,11 @@ import {
 
 export function StudentInquiryGuideEditor({
   guide,
+  defaultOpen = false,
   onChange,
 }: {
   guide?: StudentInquiryGuide;
+  defaultOpen?: boolean;
   onChange: (guide: StudentInquiryGuide) => void;
 }) {
   const t = useTranslations("curriculum");
@@ -30,7 +32,7 @@ export function StudentInquiryGuideEditor({
   }, [formattedKeywords]);
 
   return (
-    <details className="group border-t border-current/15 pt-2">
+    <details open={defaultOpen} className="group border-t border-current/15 pt-2">
       <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-semibold text-foreground">
         <BookOpenText className="h-4 w-4" aria-hidden="true" />
         {t("studentGuideTitle")}

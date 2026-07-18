@@ -347,7 +347,7 @@ export default function CurriculumPage() {
       setLoadingQuestions(false);
     }
   };
-  const { learningGuides, setLearningGuides, loadingStudentGuides, handleGenerateStudentGuides, hasFreshStudentGuides, clearStudentGuides } = useStudentInquiryGuides({
+  const { learningGuides, setLearningGuides, loadingStudentGuides, handleGenerateStudentGuides, hasFreshStudentGuides, hasStaleStudentGuides, clearStudentGuides } = useStudentInquiryGuides({
     questions: inquiryQuestions, coreIdea: selectedCoreIdeaLines.join("\n"), coreSentences: selectedCoreSentences, essentialQuestions: selectedEssentialQuestions,
     setQuestions: setInquiryQuestions, generate: callGenerate,
     onSuccess: () => toast({ description: t("studentGuideGenerated") }),
@@ -665,7 +665,8 @@ export default function CurriculumPage() {
           selectedCoreSentenceIndices, setSelectedCoreSentenceIndices, setCoreSentences, loadingQuestions,
           handleGoStep4, selectedEssentialQuestions, essentialQuestions, selectedEssentialQuestionIndices,
           setSelectedEssentialQuestionIndices, setEssentialQuestions, loadingInquiry, handleGoStep5,
-          loadingStudentGuides, handleGenerateStudentGuides, learningGuides, setLearningGuides,
+          loadingStudentGuides, handleGenerateStudentGuides, learningGuides, hasFreshStudentGuides,
+          hasStaleStudentGuides, setLearningGuides,
           inquiryQuestions, dragInquiryIndex, inquiryAddType, saveDate, saveGrade, saveTitle, students,
           targetClasses, targetClassValue, selectedStudentIds, sessionIsActive, defaultQuestionPublic,
           sessionLikesVisible, sessionCommentsVisible, isSaving, canSaveDesign, lastDesignAction,
