@@ -77,7 +77,9 @@ interface CurriculumCreateFlowProps {
   loadingStudentGuides: boolean;
   handleGenerateStudentGuides: () => void;
   learningGuides?: StudentLearningGuides;
+  hasCurrentStudentGuides: boolean;
   hasFreshStudentGuides: boolean;
+  hasIncompleteStudentGuides: boolean;
   hasStaleStudentGuides: boolean;
   setLearningGuides: (value: StudentLearningGuides) => void;
   inquiryQuestions: InquiryQuestion[];
@@ -180,7 +182,9 @@ export function CurriculumCreateFlow({
   loadingStudentGuides,
   handleGenerateStudentGuides,
   learningGuides,
+  hasCurrentStudentGuides,
   hasFreshStudentGuides,
+  hasIncompleteStudentGuides,
   hasStaleStudentGuides,
   setLearningGuides,
   inquiryQuestions,
@@ -328,7 +332,9 @@ export function CurriculumCreateFlow({
         coreSentences={selectedCoreSentences}
         essentialQuestions={selectedEssentialQuestions}
         learningGuides={learningGuides}
+        hasCurrentStudentGuides={hasCurrentStudentGuides}
         hasFreshStudentGuides={hasFreshStudentGuides}
+        hasIncompleteStudentGuides={hasIncompleteStudentGuides}
         hasStaleStudentGuides={hasStaleStudentGuides}
         selectedInquiryCount={selectedInquiryCount}
         dragInquiryIndex={dragInquiryIndex}

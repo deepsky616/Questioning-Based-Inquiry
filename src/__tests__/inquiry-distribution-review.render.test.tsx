@@ -45,7 +45,9 @@ const baseProps = {
   essentialQuestions: ["생태계는 어떻게 유지될까?"],
   inquiryQuestions,
   learningGuides,
+  hasCurrentStudentGuides: true,
   hasFreshStudentGuides: true,
+  hasIncompleteStudentGuides: false,
   hasStaleStudentGuides: false,
   isGeneratingGuides: false,
   onGenerateGuides: vi.fn(),
@@ -95,7 +97,9 @@ describe("학생 배포 자료 확인", () => {
     render(
       <InquiryDistributionReview
         {...baseProps}
+        hasCurrentStudentGuides={false}
         hasFreshStudentGuides={false}
+        hasIncompleteStudentGuides={false}
         hasStaleStudentGuides
       />,
     );
@@ -104,5 +108,19 @@ describe("학생 배포 자료 확인", () => {
     expect(screen.getByRole("button", { name: "학생용 설명 다시 만들기" })).toBeInTheDocument();
     expect(screen.queryByLabelText("핵심 아이디어 쉽게 풀어보기")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("질문이 묻는 것")).not.toBeInTheDocument();
+  });
+
+  it("설명을 잠깐 비워도 편집기를 유지하고 불완전 상태를 안내한다", () => {
+    render(
+      <InquiryDistributionReview
+        {...baseProps}
+        hasFreshStudentGuides={false}
+        hasIncompleteStudentGuides
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("비어 있거나 핵심 낱말 수가 부족");
+    expect(screen.getByLabelText("핵심 아이디어 쉽게 풀어보기")).toBeInTheDocument();
+    expect(screen.getByLabelText("질문이 묻는 것")).toBeInTheDocument();
   });
 });

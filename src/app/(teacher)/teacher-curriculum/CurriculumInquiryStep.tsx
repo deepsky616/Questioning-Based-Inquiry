@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookOpenCheck, Save } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -28,7 +28,9 @@ interface CurriculumInquiryStepProps {
   coreSentences: string[];
   essentialQuestions: string[];
   learningGuides?: StudentLearningGuides;
+  hasCurrentStudentGuides: boolean;
   hasFreshStudentGuides: boolean;
+  hasIncompleteStudentGuides: boolean;
   hasStaleStudentGuides: boolean;
   selectedInquiryCount: number;
   dragInquiryIndex: number | null;
@@ -81,7 +83,9 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
     coreSentences,
     essentialQuestions,
     learningGuides,
+    hasCurrentStudentGuides,
     hasFreshStudentGuides,
+    hasIncompleteStudentGuides,
     hasStaleStudentGuides,
     selectedInquiryCount,
     dragInquiryIndex,
@@ -122,6 +126,7 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
   } = props;
   const t = useTranslations("curriculum");
   const [isReviewing, setIsReviewing] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!visible) setIsReviewing(false);
@@ -132,9 +137,15 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
   const updateInquiryGuide = (index: number, guide: StudentInquiryGuide) => {
     onUpdateInquiry(index, { studentGuide: guide });
   };
+  const showReview = () => {
+    setIsReviewing(true);
+    const scrollToCard = () => cardRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(scrollToCard);
+    else scrollToCard();
+  };
 
   return (
-    <Card>
+    <Card ref={cardRef}>
       <CardHeader>
         <CardTitle className="text-base">
           {t(isReviewing ? "studentDistributionReviewTitle" : "step5Title")}
@@ -157,7 +168,7 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
             onRemove={onRemoveInquiry}
             onAddTypeChange={onInquiryAddTypeChange}
             onAdd={onAddInquiry}
-            onComplete={() => setIsReviewing(true)}
+            onComplete={showReview}
           />
         ) : (
           <>
@@ -168,7 +179,9 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
               essentialQuestions={essentialQuestions}
               inquiryQuestions={inquiryQuestions}
               learningGuides={learningGuides}
+              hasCurrentStudentGuides={hasCurrentStudentGuides}
               hasFreshStudentGuides={hasFreshStudentGuides}
+              hasIncompleteStudentGuides={hasIncompleteStudentGuides}
               hasStaleStudentGuides={hasStaleStudentGuides}
               isGeneratingGuides={isGeneratingGuides}
               onGenerateGuides={onGenerateGuides}

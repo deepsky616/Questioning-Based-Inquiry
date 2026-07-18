@@ -866,6 +866,7 @@
     "unitTitlePending": "Enter the unit title when creating the question class",
     "studentGuideEmpty": "Create student guides to add an easy explanation directly below this content.",
     "studentGuideStale": "The source content changed, so the student guides need to be recreated.",
+    "studentGuideIncomplete": "Some student guide fields are empty or have too few key words. You can keep editing, but the guides will not be saved until complete.",
     "saveInfo": "Save info",
     "date": "Date",
     "grade": "Grade",

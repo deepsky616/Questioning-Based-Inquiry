@@ -23,7 +23,9 @@ interface InquiryDistributionReviewProps {
   essentialQuestions: string[];
   inquiryQuestions: InquiryQuestion[];
   learningGuides?: StudentLearningGuides;
+  hasCurrentStudentGuides: boolean;
   hasFreshStudentGuides: boolean;
+  hasIncompleteStudentGuides: boolean;
   hasStaleStudentGuides: boolean;
   isGeneratingGuides: boolean;
   onGenerateGuides: () => void;
@@ -39,7 +41,9 @@ export function InquiryDistributionReview({
   essentialQuestions,
   inquiryQuestions,
   learningGuides,
+  hasCurrentStudentGuides,
   hasFreshStudentGuides,
+  hasIncompleteStudentGuides,
   hasStaleStudentGuides,
   isGeneratingGuides,
   onGenerateGuides,
@@ -50,7 +54,7 @@ export function InquiryDistributionReview({
   const t = useTranslations("curriculum");
   const tCls = useTranslations("classification");
   const emptyMessage = t(hasStaleStudentGuides ? "studentGuideStale" : "studentGuideEmpty");
-  const hasAnyGuideState = hasFreshStudentGuides || hasStaleStudentGuides;
+  const hasAnyGuideState = hasCurrentStudentGuides || hasStaleStudentGuides;
   const inquiryCount = inquiryQuestions.filter((question) => question.content.trim()).length;
 
   return (
@@ -82,6 +86,12 @@ export function InquiryDistributionReview({
         </p>
       )}
 
+      {hasIncompleteStudentGuides && (
+        <p role="status" className="rounded-lg border border-rose-300/80 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-900 dark:border-rose-700/70 dark:bg-rose-950/30 dark:text-rose-100">
+          {t("studentGuideIncomplete")}
+        </p>
+      )}
+
       <section
         data-student-guide-section="unit-title"
         className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-900/50"
@@ -97,7 +107,7 @@ export function InquiryDistributionReview({
         coreSentences={coreSentences}
         essentialQuestions={essentialQuestions}
         guides={learningGuides}
-        showEditors={hasFreshStudentGuides}
+        showEditors={hasCurrentStudentGuides}
         emptyMessage={emptyMessage}
         onChange={onLearningGuidesChange}
       />
@@ -133,7 +143,7 @@ export function InquiryDistributionReview({
                     {question.content}
                   </p>
                 </div>
-                {hasFreshStudentGuides && question.studentGuide ? (
+                {hasCurrentStudentGuides && question.studentGuide ? (
                   <div className="mt-3 border-t border-emerald-200/70 pt-3 dark:border-emerald-800/50">
                     <StudentInquiryGuideEditor
                       guide={question.studentGuide}

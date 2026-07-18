@@ -76,6 +76,21 @@ describe("학생용 설명 생성 훅 최신 상태", () => {
     });
 
     expect(result.current.hasFreshStudentGuides).toBe(true);
+    expect(result.current.hasCurrentStudentGuides).toBe(true);
+    expect(result.current.hasIncompleteStudentGuides).toBe(false);
+    expect(result.current.hasStaleStudentGuides).toBe(false);
+
+    act(() => result.current.setLearningGuides({
+      ...generatedBundle.learningGuides,
+      coreIdea: {
+        ...generatedBundle.learningGuides.coreIdea,
+        explanation: "",
+      },
+    }));
+
+    expect(result.current.hasFreshStudentGuides).toBe(false);
+    expect(result.current.hasCurrentStudentGuides).toBe(true);
+    expect(result.current.hasIncompleteStudentGuides).toBe(true);
     expect(result.current.hasStaleStudentGuides).toBe(false);
 
     rerender({ questions: [{ type: "factual", content: "바뀐 질문" }] });
@@ -125,7 +140,9 @@ describe("학생용 설명 생성 훅 최신 상태", () => {
     })));
 
     expect(result.current.hasFreshStudentGuides).toBe(false);
-    expect(result.current.hasStaleStudentGuides).toBe(true);
+    expect(result.current.hasCurrentStudentGuides).toBe(true);
+    expect(result.current.hasIncompleteStudentGuides).toBe(true);
+    expect(result.current.hasStaleStudentGuides).toBe(false);
 
     act(() => result.current.setCurrentQuestions((previous) => previous.map((question) => ({
       ...question,

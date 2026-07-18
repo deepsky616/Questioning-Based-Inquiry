@@ -50,8 +50,12 @@ export function useStudentInquiryGuides({
     inquiryQuestionCount: inquiryQuestions.length,
   });
   const hasStudentGuides = Boolean(learningGuides) || questions.some((question) => question.studentGuide);
-  const hasFreshStudentGuides = currentBundle.ok && generatedSourceSignature === sourceSignature;
-  const hasStaleStudentGuides = hasStudentGuides && !hasFreshStudentGuides;
+  const hasCurrentStudentGuides = hasStudentGuides && generatedSourceSignature === sourceSignature;
+  const hasFreshStudentGuides = currentBundle.ok && hasCurrentStudentGuides;
+  const hasIncompleteStudentGuides = hasCurrentStudentGuides && !currentBundle.ok;
+  const hasStaleStudentGuides = hasStudentGuides
+    && generatedSourceSignature !== null
+    && generatedSourceSignature !== sourceSignature;
 
   useEffect(() => {
     if (generatedSourceSignature === null && currentBundle.ok) {
@@ -113,7 +117,9 @@ export function useStudentInquiryGuides({
     setLearningGuides,
     loadingStudentGuides,
     handleGenerateStudentGuides,
+    hasCurrentStudentGuides,
     hasFreshStudentGuides,
+    hasIncompleteStudentGuides,
     hasStaleStudentGuides,
     clearStudentGuides,
   };

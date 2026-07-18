@@ -20,7 +20,9 @@ const baseProps: ComponentProps<typeof CurriculumInquiryStep> = {
   coreSentences: ["생물은 서로 연결된다."],
   essentialQuestions: ["생태계는 어떻게 유지될까?"],
   learningGuides: undefined,
+  hasCurrentStudentGuides: false,
   hasFreshStudentGuides: false,
+  hasIncompleteStudentGuides: false,
   hasStaleStudentGuides: false,
   selectedInquiryCount: 3,
   dragInquiryIndex: null,
@@ -112,14 +114,14 @@ describe("다섯째 단계 질문 편집과 배포 자료 확인", () => {
     fireEvent.click(screen.getByRole("button", { name: "탐구 질문 만들기 완료" }));
 
     expect(container.querySelector('[data-student-guide-section="unit-title"]'))
-      .toHaveClass("border-slate-200", "bg-slate-50/80");
+      .toHaveClass("border-slate-200", "bg-slate-50/80", "dark:border-slate-700", "dark:bg-slate-900/50");
     expect(container.querySelector('[data-student-guide-section="core-idea"]'))
-      .toHaveClass("border-amber-200/80", "bg-amber-50/70");
+      .toHaveClass("border-amber-200/80", "bg-amber-50/70", "dark:border-amber-800/60", "dark:bg-amber-950/20");
     expect(container.querySelector('[data-student-guide-section="core-sentence"]'))
-      .toHaveClass("border-sky-200/80", "bg-sky-50/70");
+      .toHaveClass("border-sky-200/80", "bg-sky-50/70", "dark:border-sky-800/60", "dark:bg-sky-950/20");
     expect(container.querySelector('[data-student-guide-section="essential-question"]'))
-      .toHaveClass("border-violet-200/80", "bg-violet-50/70");
+      .toHaveClass("border-violet-200/80", "bg-violet-50/70", "dark:border-violet-800/60", "dark:bg-violet-950/20");
     expect(container.querySelector('[data-student-guide-section="inquiry-question"]'))
-      .toHaveClass("border-emerald-200/80", "bg-emerald-50/70");
+      .toHaveClass("border-emerald-200/80", "bg-emerald-50/70", "dark:border-emerald-800/60", "dark:bg-emerald-950/20");
   });
 });
