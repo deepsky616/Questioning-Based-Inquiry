@@ -347,17 +347,9 @@ export default function CurriculumPage() {
       setLoadingQuestions(false);
     }
   };
-  const {
-    learningGuides,
-    setLearningGuides,
-    loadingStudentGuides,
-    handleGenerateStudentGuides,
-    hasCurrentStudentGuides,
-    hasFreshStudentGuides,
-    hasIncompleteStudentGuides,
-    hasStaleStudentGuides,
-    clearStudentGuides,
-  } = useStudentInquiryGuides({
+  const { learningGuides, setLearningGuides, loadingStudentGuides, handleGenerateStudentGuides,
+    hasCurrentStudentGuides, hasFreshStudentGuides, hasIncompleteStudentGuides,
+    hasStaleStudentGuides, clearStudentGuides } = useStudentInquiryGuides({
     questions: inquiryQuestions, coreIdea: selectedCoreIdeaLines.join("\n"), coreSentences: selectedCoreSentences, essentialQuestions: selectedEssentialQuestions,
     setQuestions: setInquiryQuestions, generate: callGenerate,
     onSuccess: () => toast({ description: t("studentGuideGenerated") }),
