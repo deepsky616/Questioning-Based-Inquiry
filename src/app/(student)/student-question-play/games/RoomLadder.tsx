@@ -8,7 +8,7 @@ import {
   LoaderCircle,
   Route,
 } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -186,6 +186,7 @@ export default function RoomLadder({
 }: Props) {
   const rawLocale = useLocale();
   const locale = resolveQuestionGameLocale(rawLocale);
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const state = readLadderState(room.gameState);
   const execution = roomExecution(room);
@@ -316,12 +317,10 @@ export default function RoomLadder({
     const topics = topicInputs.map((topic) => topic.trim());
     const errors = topics.map((topic) => {
       if (!topic) {
-        return locale === "en" ? "Enter a topic." : "주제를 입력해 주세요.";
+        return t("enterATopic");
       }
       if (topic.length > QUESTION_GAME_LIMITS.topic) {
-        return locale === "en"
-          ? `Use ${QUESTION_GAME_LIMITS.topic} characters or fewer.`
-          : `${QUESTION_GAME_LIMITS.topic}자 이내로 입력해 주세요.`;
+        return t("useTopicCharactersOrFewer", { topic: QUESTION_GAME_LIMITS.topic });
       }
       return null;
     });
@@ -336,9 +335,7 @@ export default function RoomLadder({
       room.playId,
     );
     if (!confirmed && lifetimeRef.current === lifetime) {
-      setPrepareError(locale === "en"
-        ? "Could not prepare the ladder. Try again."
-        : "사다리를 준비하지 못했어요. 다시 시도해 주세요.");
+      setPrepareError(t("couldNotPrepareTheLadder"));
     }
   }
 
@@ -349,7 +346,7 @@ export default function RoomLadder({
         <RoomHeader
           game={game}
           room={room}
-          subtitle={locale === "en" ? "Checking shared ladder" : "공유 사다리 확인 중"}
+          subtitle={t("checkingSharedLadder")}
           onLeave={onLeave}
           disabled={requestPending}
         />
@@ -359,14 +356,10 @@ export default function RoomLadder({
             className="mx-auto h-10 w-10 text-amber-700 dark:text-amber-300"
           />
           <p className="mt-3 font-black text-foreground">
-            {locale === "en"
-              ? "The shared ladder could not be loaded safely."
-              : "공유 사다리를 안전하게 불러오지 못했어요."}
+            {t("theSharedLadderCouldNot")}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            {locale === "en"
-              ? "Wait for the room to refresh or leave and join again."
-              : "방이 새로 고쳐질 때까지 기다리거나 나간 뒤 다시 참가해 주세요."}
+            {t("waitForTheRoomTo")}
           </p>
         </section>
       </div>
@@ -379,7 +372,7 @@ export default function RoomLadder({
         <RoomHeader
           game={game}
           room={room}
-          subtitle={locale === "en" ? "Preparing ladder topics" : "사다리 주제 준비"}
+          subtitle={t("preparingLadderTopics")}
           onLeave={onLeave}
           disabled={requestPending}
         />
@@ -390,9 +383,7 @@ export default function RoomLadder({
                 {text.ladderSetupTitle}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {locale === "en"
-                  ? `Enter one topic for each of the ${room.players.length} players.`
-                  : `참가자 ${room.players.length}명에게 나눌 주제를 하나씩 입력해 주세요.`}
+                {t("enterOneTopicForEach", { length: room.players.length })}
               </p>
             </div>
             <div className="space-y-4">
@@ -444,7 +435,7 @@ export default function RoomLadder({
               ) : (
                 <Route className="mr-2 h-5 w-5" aria-hidden="true" />
               )}
-              {locale === "en" ? "Prepare ladder" : "사다리 준비"}
+              {t("prepareLadder")}
             </Button>
           </section>
         ) : (
@@ -454,12 +445,10 @@ export default function RoomLadder({
               className="mx-auto h-10 w-10 text-violet-700 dark:text-violet-300"
             />
             <p className="mt-3 font-black text-foreground">
-              {locale === "en"
-                ? "The host is preparing the ladder topics."
-                : "방장이 사다리 주제를 준비하고 있어요."}
+              {t("theHostIsPreparingThe")}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {locale === "en" ? "Please wait a moment." : "잠시만 기다려 주세요."}
+              {t("pleaseWaitAMoment")}
             </p>
           </section>
         )}
@@ -484,8 +473,8 @@ export default function RoomLadder({
           game={game}
           room={room}
           myId={myId}
-          scoreLabel={locale === "en" ? "questions" : "질문"}
-          scoreUnit={locale === "en" ? "" : "개"}
+          scoreLabel={t("questions2")}
+          scoreUnit={t("text")}
           scores={[...resultPlayers].map(([playerId, name]) => ({
             playerId,
             name,
@@ -530,9 +519,7 @@ export default function RoomLadder({
         />
         <section className="border-y border-border bg-card px-4 py-6 text-center text-card-foreground">
           <p className="font-black text-foreground">
-            {locale === "en"
-              ? "Your ladder assignment could not be loaded safely."
-              : "내 사다리 배정을 안전하게 불러오지 못했어요."}
+            {t("yourLadderAssignmentCouldNot")}
           </p>
         </section>
       </div>
@@ -586,7 +573,7 @@ export default function RoomLadder({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-muted-foreground">
-              {locale === "en" ? "Your assigned topic" : "내 배정 주제"}
+              {t("yourAssignedTopic")}
             </p>
             <h2 className="mt-1 break-words text-xl font-black text-foreground">
               {myAssignment.topic}
@@ -606,12 +593,12 @@ export default function RoomLadder({
       />
 
       <section
-        aria-label={locale === "en" ? "Current round submissions" : "현재 라운드 제출 현황"}
+        aria-label={t("currentRoundSubmissions")}
         className="border-y border-border bg-card px-4 py-4 text-card-foreground sm:px-6"
       >
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-black text-foreground">
-            {locale === "en" ? "Current round submissions" : "현재 라운드 제출 현황"}
+            {t("currentRoundSubmissions")}
           </h2>
           <span className="text-sm font-bold text-muted-foreground">
             {submittedCount} / {state.roundTargetPlayerIds.length}
@@ -628,12 +615,12 @@ export default function RoomLadder({
               >
                 {submitted ? (
                   <CheckCircle2
-                    aria-label={locale === "en" ? "Submitted" : "제출 완료"}
+                    aria-label={t("submitted")}
                     className="h-5 w-5 text-emerald-700 dark:text-emerald-300"
                   />
                 ) : (
                   <Clock3
-                    aria-label={locale === "en" ? "Waiting" : "제출 대기"}
+                    aria-label={t("waiting")}
                     className="h-5 w-5 text-amber-700 dark:text-amber-300"
                   />
                 )}
@@ -654,16 +641,12 @@ export default function RoomLadder({
           <div className="flex items-center gap-2 font-black">
             <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
             <h2>
-              {locale === "en"
-                ? "Your current-round question is submitted"
-                : "현재 라운드 내 질문 제출 완료"}
+              {t("yourCurrentRoundQuestionIs")}
             </h2>
           </div>
           <p className="mt-3 break-words text-sm leading-6">{myQuestion.question}</p>
           <p className="mt-2 text-sm font-semibold">
-            {locale === "en"
-              ? "You can follow the other students' submission status above."
-              : "위에서 다른 학생의 제출 현황을 확인할 수 있어요."}
+            {t("youCanFollowTheOther")}
           </p>
         </section>
       ) : (
@@ -691,12 +674,13 @@ function LadderInsufficientResult({
   onLeave: () => void;
   disabled: boolean;
 }) {
+  const t = useTranslations("gamePlay");
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <RoomHeader
         game={game}
         room={room}
-        subtitle={locale === "en" ? "Ladder ended" : "질문 사다리 종료"}
+        subtitle={t("ladderEnded")}
         onLeave={onLeave}
         disabled={disabled}
       />
@@ -706,14 +690,10 @@ function LadderInsufficientResult({
           className="mx-auto h-12 w-12 text-amber-700 dark:text-amber-300"
         />
         <h1 className="mt-3 text-xl font-black text-foreground">
-          {locale === "en"
-            ? "The ladder ended because there were not enough players."
-            : "참가자가 부족해 질문 사다리를 마쳤어요."}
+          {t("theLadderEndedBecauseThere")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {locale === "en"
-            ? "Leave the room when you are ready."
-            : "확인한 뒤 방을 나가 주세요."}
+          {t("leaveTheRoomWhenYou")}
         </p>
       </section>
     </div>
@@ -727,6 +707,7 @@ function LadderResultDetails({
   state: LadderRoomState;
   locale: "ko" | "en";
 }) {
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
 
   const orderedQuestions = [...state.questions].sort(
@@ -761,7 +742,7 @@ function LadderResultDetails({
 
         <section className="mt-6">
           <h2 className="font-black text-foreground">
-            {locale === "en" ? "Questions per student" : "학생별 질문 수"}
+            {t("questionsPerStudent")}
           </h2>
           <ul className="mt-3 divide-y divide-border border-y border-border">
             {[...playerResults.entries()].map(([playerId, result]) => (
@@ -773,7 +754,7 @@ function LadderResultDetails({
                   {result.playerName}
                 </span>
                 <span className="shrink-0 font-black text-violet-700 dark:text-violet-300">
-                  {locale === "en" ? `${result.count} questions` : `질문 ${result.count}개`}
+                  {t("countQuestions", { count: result.count })}
                 </span>
               </li>
             ))}
@@ -782,7 +763,7 @@ function LadderResultDetails({
 
         <section className="mt-6">
           <h2 className="font-black text-foreground">
-            {locale === "en" ? "Questions by round" : "라운드별 질문 기록"}
+            {t("questionsByRound")}
           </h2>
           <div className="mt-3 space-y-5">
             {Array.from({ length: state.maxRounds }, (_, index) => index + 1)
@@ -793,7 +774,7 @@ function LadderResultDetails({
                 return (
                   <section className="border-t border-border pt-3" key={round}>
                     <h3 className="text-sm font-black text-foreground">
-                      {locale === "en" ? `Round ${round}` : `${round}라운드`}
+                      {t("roundRound", { round: round })}
                     </h3>
                     <ol className="mt-2 divide-y divide-border">
                       {roundQuestions.map((question) => (

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Dices, Flag, LogOut, Send } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -82,6 +82,7 @@ export default function RoomDice({
   onLeave,
 }: Props) {
   const locale = resolveQuestionGameLocale(useLocale());
+  const t = useTranslations("gamePlay");
   const text = getRoomTurnGameText(locale);
   const state = readDicePublicState(room.gameState);
   const valid = state !== null && roomMatchesState(game, room, state, myId);
@@ -153,7 +154,7 @@ export default function RoomDice({
           game={game}
           room={room}
           myId={myId}
-          scoreLabel={locale === "en" ? "Questions" : "질문 수"}
+          scoreLabel={t("questions")}
           scoreUnit=""
           scores={scores}
           questions={state.questions}
@@ -232,7 +233,7 @@ export default function RoomDice({
         <p className="text-sm text-muted-foreground">{isMyTurn ? text.currentTurn(currentPlayerName) : text.waitingTurn(currentPlayerName)}</p>
       </section>
 
-      <section className="space-y-4 border-b border-border pb-5" aria-label={locale === "en" ? "Current turn" : "현재 차례"}>
+      <section className="space-y-4 border-b border-border pb-5" aria-label={t("currentTurn")}>
         {state.phase === "roll" && isMyTurn && (
           <Button type="button" onClick={roll} disabled={requestPending} className="w-full sm:w-auto">
             <Dices className="mr-2 h-4 w-4" aria-hidden="true" />

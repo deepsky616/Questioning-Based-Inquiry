@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useGameRun } from "./useGameRun";
 import { GameLearningSummary } from "./GameLearningSummary";
@@ -19,6 +19,7 @@ interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig
 
 export default function RelayGame({ game, onBack, config }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const presetTopics = getRelayTopics(locale);
   const { mode, players } = config;
@@ -65,7 +66,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
     !awaitingAiTurn;
   const backBlocked = runBusy || awaitingCompletion || questionNeedsConfirmation;
   // 친구 모드에서의 현재 플레이어
-  const currentFriendPlayer = players[playerIdx] ?? "나";
+  const currentFriendPlayer = players[playerIdx] ?? text.me;
   const playerColor = useCallback((name: string) => {
     const i = players.indexOf(name);
     return i >= 0
@@ -268,7 +269,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             <input
               type="text"
               maxLength={QUESTION_GAME_LIMITS.topic}
-              aria-label={locale === "en" ? "Enter a custom topic" : "직접 주제 입력"}
+              aria-label={t("enterACustomTopic")}
               className="w-full bg-background text-foreground border-2 border-input rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors"
               style={{ borderColor: customTopic ? game.accentColor : "hsl(var(--input))" }}
               onFocus={(e) => { e.target.style.borderColor = game.accentColor; setTopic(""); }}
@@ -342,23 +343,19 @@ export default function RelayGame({ game, onBack, config }: Props) {
           >
             <p className="font-bold">
               {runResult.preview
-                ? (locale === "en" ? "Preview completed without points." : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                ? (t("previewCompletedWithoutPoints"))
                 : runResult.awarded > 0
-                  ? (locale === "en" ? `+${runResult.awarded} points earned!` : `+${runResult.awarded}점 적립!`)
-                  : (locale === "en" ? "The daily point limit has been reached." : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+                  ? (t("awardedPointsEarned", { awarded: runResult.awarded }))
+                  : (t("theDailyPointLimitHas"))}
             </p>
             {!runResult.preview && runResult.dailyRemaining > 0 && (
               <p className="mt-1 text-xs">
-                {locale === "en"
-                  ? `${runResult.dailyRemaining} points are still available today.`
-                  : `오늘 ${runResult.dailyRemaining}점 더 받을 수 있어요.`}
+                {t("dailyremainingPointsAreStillAvailable", { dailyRemaining: runResult.dailyRemaining })}
               </p>
             )}
             {!runResult.preview && runResult.awarded > 0 && runResult.cappedByLimit && (
               <p className="mt-1 text-xs font-medium">
-                {locale === "en"
-                  ? "The daily limit was applied."
-                  : "일일 상한이 적용되었어요."}
+                {t("theDailyLimitWasApplied")}
               </p>
             )}
           </div>
@@ -478,7 +475,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
         role="log"
         aria-live="polite"
         aria-relevant="additions text"
-        aria-label={locale === "en" ? "Question relay chain" : "질문 릴레이 사슬"}
+        aria-label={t("questionRelayChain")}
         aria-busy={aiLoading}
         className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-4 max-h-72 overflow-y-auto space-y-2"
       >
@@ -560,7 +557,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
               variant="outline"
               onClick={returnToNewRun}
             >
-              {locale === "en" ? "Start a new run" : "새 실행으로 돌아가기"}
+              {t("startANewRun")}
             </Button>
           </div>
         ) : awaitingCompletion ? (
@@ -568,9 +565,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             <p role="status" className="text-sm text-muted-foreground text-center">
               {runPending === "complete"
                 ? text.analyzingPoints
-                : (locale === "en"
-                  ? "Your questions are saved. Finish the run to receive points."
-                  : "질문은 저장되었어요. 포인트 지급을 마무리해 주세요.")}
+                : (t("yourQuestionsAreSavedFinish"))}
             </p>
             <Button
               className="w-full font-bold rounded-xl"
@@ -586,9 +581,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             <p role="status" className="text-sm text-muted-foreground text-center">
               {aiLoading
                 ? text.aiMakingQuestion
-                : (locale === "en"
-                  ? "The AI turn is waiting to be recorded."
-                  : "인공지능 질문 차례를 이어 가 주세요.")}
+                : (t("theAiTurnIsWaiting"))}
             </p>
             <Button
               className="w-full font-bold rounded-xl"
@@ -598,7 +591,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             >
               {aiLoading
                 ? text.loading
-                : (locale === "en" ? "Retry AI turn" : "인공지능 차례 다시 시도")}
+                : (t("retryAiTurn2"))}
             </Button>
           </div>
         ) : (
@@ -606,7 +599,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             <textarea
               ref={inputRef}
               maxLength={QUESTION_GAME_LIMITS.question}
-              aria-label={locale === "en" ? "Enter the next question" : "이어 갈 질문 입력"}
+              aria-label={t("enterTheNextQuestion")}
               className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none h-24 transition-colors"
               style={{ borderColor: "hsl(var(--input))" }}
               onFocus={(e) => {
@@ -650,7 +643,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
               {runPending === "action"
                 ? text.sending
                 : questionNeedsConfirmation
-                  ? (locale === "en" ? "Check saved question again" : "질문 저장 다시 확인")
+                  ? (t("checkSavedQuestionAgain"))
                 : isAI ? text.relaySubmitAi : text.relaySubmit}
           </Button>
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Flag, LogOut, Play, Send } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -87,6 +87,7 @@ export default function RoomKaba({
   onLeave,
 }: Props) {
   const locale = resolveQuestionGameLocale(useLocale());
+  const t = useTranslations("gamePlay");
   const text = getRoomTurnGameText(locale);
   const state = readKabaPublicState(room.gameState);
   const valid = state !== null && roomMatchesState(game, room, state, myId);
@@ -164,7 +165,7 @@ export default function RoomKaba({
           game={game}
           room={room}
           myId={myId}
-          scoreLabel={locale === "en" ? "Correct" : "맞힌 수"}
+          scoreLabel={t("correct")}
           scoreUnit=""
           scores={scores}
           questions={questions}

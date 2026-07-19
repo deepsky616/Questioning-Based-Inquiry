@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
 import { useGameRun, type GameRunSnapshot } from "./useGameRun";
@@ -26,6 +26,7 @@ interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig
 
 export default function DiceGame({ game, onBack, config }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const diceTypes = getQuestionDiceTypes(locale);
   const { mode, players } = config;
@@ -231,16 +232,14 @@ export default function DiceGame({ game, onBack, config }: Props) {
           >
             <p className="font-bold">
               {runResult.preview
-                ? (locale === "en" ? "Preview completed without points." : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                ? (t("previewCompletedWithoutPoints"))
                 : runResult.awarded > 0
-                  ? (locale === "en" ? `+${runResult.awarded} points earned!` : `+${runResult.awarded}점 적립!`)
-                  : (locale === "en" ? "The daily point limit has been reached." : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+                  ? (t("awardedPointsEarned", { awarded: runResult.awarded }))
+                  : (t("theDailyPointLimitHas"))}
             </p>
             {!runResult.preview && runResult.dailyRemaining > 0 && (
               <p className="mt-1 text-xs">
-                {locale === "en"
-                  ? `${runResult.dailyRemaining} points are still available today.`
-                  : `오늘 ${runResult.dailyRemaining}점 더 받을 수 있어요.`}
+                {t("dailyremainingPointsAreStillAvailable", { dailyRemaining: runResult.dailyRemaining })}
               </p>
             )}
           </div>
@@ -302,7 +301,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
             {runConflict}
           </div>
           <Button type="button" variant="outline" className="w-full" onClick={handleBack}>
-            {locale === "en" ? "Return to game selection" : "놀이 선택으로 돌아가기"}
+            {t("returnToGameSelection")}
           </Button>
         </div>
       )}
@@ -359,7 +358,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
           <div className="text-center w-full">
             <div className="inline-block rounded-full px-5 py-2 text-white font-black text-lg mb-2"
               style={{ background: typeInfo.color }}>
-              {currentFace}번 — {typeInfo.type}
+              {t("diceFaceType", { face: currentFace, type: typeInfo.type })}
             </div>
             <p className="text-muted-foreground text-sm">{typeInfo.desc}</p>
           </div>
@@ -395,7 +394,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
                   disabled={runBusy || runConflict !== null}
                   onClick={() => void retryAiQuestion()}
                 >
-                  {locale === "en" ? "Retry AI question" : "인공지능 질문 다시 만들기"}
+                  {t("retryAiQuestion")}
                 </Button>
               </>
             )}
@@ -425,7 +424,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
 
           <textarea
             maxLength={QUESTION_GAME_LIMITS.question}
-            aria-label={locale === "en" ? "Enter a dice question" : "주사위 질문 입력"}
+            aria-label={t("enterADiceQuestion")}
             className="w-full bg-background text-foreground border-2 border-input rounded-xl p-3 text-sm resize-none focus:outline-none focus:border-indigo-400 h-28"
             placeholder={text.dicePlaceholder(typeInfo.type)}
             value={question}
@@ -445,7 +444,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
             {runPending === "action"
               ? text.sending
               : questionNeedsConfirmation
-                ? (locale === "en" ? "Check saved question again" : "질문 저장 다시 확인")
+                ? (t("checkSavedQuestionAgain"))
                 : aiLoading ? text.diceFeedbackLoading : text.submit}
           </Button>
         </div>

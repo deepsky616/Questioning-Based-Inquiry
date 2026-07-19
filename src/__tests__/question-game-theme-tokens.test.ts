@@ -188,7 +188,7 @@ describe("question game theme tokens", () => {
   it.each([
     ["GameHeader.tsx", "{subtitle}"],
     ["roomShared.tsx", "subtitle ??"],
-    ["RoomLobby.tsx", 'locale === "en" ? "Lobby with friends"'],
+    ["RoomLobby.tsx", 't("lobbyWithFriends")'],
     ["LadderGame.tsx", "{text.ladderSubtitle}"],
     ["KabaGame.tsx", "{kabaText.subtitle}"],
     ["MysteryBoxGame.tsx", "text.mysteryAiSubtitle"],
@@ -266,7 +266,7 @@ describe("question game theme tokens", () => {
       [kaba, "span", "{kabaText.correctCount(correctCount)}"],
       [lobby, "span", "{room.players.length}"],
       [review, "span", "{i + 1}."],
-      [mystery, "div", "{remaining}"],
+      [mystery, "div", 't("remainingLeft"'],
     ]) {
       const tag = openingTagNear(source, tagName, marker);
       expect(tag).toMatch(/\btext-foreground\b/);
@@ -276,11 +276,11 @@ describe("question game theme tokens", () => {
 
   it("keeps both lobby waiting messages readable without fading the text", () => {
     const source = readGameSource("RoomLobby.tsx");
-    const emptySeat = openingTagNear(source, "span", "Waiting for friends...");
+    const emptySeat = openingTagNear(source, "span", 't("waitingForFriends")');
     const waitingGuest = openingTagNear(
       source,
       "div",
-      "Waiting for the host to start...",
+      't("waitingForTheHostTo")',
     );
 
     expect(emptySeat).toMatch(/\btext-secondary-foreground\b/);

@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import {
+  KABA_VERDICT_GOOD,
+  KABA_VERDICT_RETRY,
+  parseKabaFeedbackText,
+  type KabaVerdict,
+} from "./kaba-feedback";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
 import { getKabaText, getQuestionGameText } from "@/lib/question-game-i18n";
@@ -11,13 +17,14 @@ import type { GameStartConfig } from "../[gameId]/page";
 import { useGameRun } from "./useGameRun";
 import { GameLearningSummary } from "./GameLearningSummary";
 
-interface AIFeedback { verdict: "잘했어요" | "다시해봐요"; reason: string; cheer: string }
+interface AIFeedback { verdict: KabaVerdict; reason: string; cheer: string }
 interface RoundEntry { original: string; student: string; isCorrect: boolean; playerName: string; feedback?: AIFeedback }
 
 interface Props { game: BuiltInGame; onBack: () => void; config: GameStartConfig }
 
 export default function KabaGame({ game, onBack, config }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const kabaText = getKabaText(locale);
   const { mode, players } = config;
@@ -74,25 +81,14 @@ export default function KabaGame({ game, onBack, config }: Props) {
   const backBlocked = runBusy || unconfirmedQuestion !== null;
 
   const parseAIFeedback = useCallback((text: string): AIFeedback | null => {
-    const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-    let verdict: "잘했어요" | "다시해봐요" | null = null;
-    let reason = "";
-    let cheer = "";
-    for (const line of lines) {
-      if (line.startsWith("판정:")) {
-        if (line.includes("잘했어요")) verdict = "잘했어요";
-        else if (line.includes("다시해봐요")) verdict = "다시해봐요";
-      }
-      if (line.startsWith("이유:")) reason = line.replace("이유:", "").trim();
-      if (line.startsWith("격려:")) cheer = line.replace("격려:", "").trim();
-    }
-    if (!verdict) return null;
+    const parsed = parseKabaFeedbackText(text);
+    if (!parsed) return null;
     return {
-      verdict,
-      reason: reason || (locale === "en" ? "Checked!" : "확인했어요!"),
-      cheer: cheer || (locale === "en" ? "Keep going!" : "잘하고 있어요! 👍"),
+      verdict: parsed.verdict,
+      reason: parsed.reason || (t("checked")),
+      cheer: parsed.cheer || (t("keepGoing")),
     };
-  }, [locale]);
+  }, [t]);
 
   async function submit() {
     const trimmed = (unconfirmedQuestion ?? input).trim();
@@ -116,13 +112,11 @@ export default function KabaGame({ game, onBack, config }: Props) {
       });
       if (requestId !== aiRequestRef.current) return;
       const parsed = res?.text ? parseAIFeedback(res.text) : null;
-      const verdict = correct ? "잘했어요" as const : "다시해봐요" as const;
+      const verdict = correct ? KABA_VERDICT_GOOD : KABA_VERDICT_RETRY;
       const serverFeedback: AIFeedback = {
         verdict,
-        reason: locale === "en"
-          ? (correct ? "It has a question form." : "Rewrite it as a question.")
-          : (correct ? "질문 형태로 바꿨어요." : "질문 형태로 다시 바꿔 보세요."),
-        cheer: locale === "en" ? "Keep going!" : "계속 도전해 보세요!",
+        reason: correct ? t("hasQuestionForm") : t("rewriteAsQuestion"),
+        cheer: t("keepGoing2"),
       };
       const fb = parsed?.verdict === verdict ? parsed : serverFeedback;
       setFeedback(fb);
@@ -228,10 +222,10 @@ export default function KabaGame({ game, onBack, config }: Props) {
             }`}>
               <p className="font-bold">
                 {runResult.preview
-                  ? (locale === "en" ? "Preview completed without points." : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                  ? (t("previewCompletedWithoutPoints"))
                   : runResult.awarded > 0
-                    ? (locale === "en" ? `+${runResult.awarded} points earned!` : `+${runResult.awarded}점 적립!`)
-                    : (locale === "en" ? "The daily point limit has been reached." : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+                    ? (t("awardedPointsEarned", { awarded: runResult.awarded }))
+                    : (t("theDailyPointLimitHas"))}
               </p>
             </div>
           )}
@@ -342,7 +336,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
                   style={{ background: game.gradientCss }}
                   onClick={() => void retryStart()}
                 >
-                  {locale === "en" ? "Try starting again" : "다시 시작하기"}
+                  {t("tryStartingAgain")}
                 </Button>
               )}
             </div>
@@ -379,7 +373,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
                 {runBusy
                   ? text.loading
                   : unconfirmedQuestion
-                    ? (locale === "en" ? "Check saved answer again" : "저장된 답 다시 확인")
+                    ? (t("checkSavedAnswerAgain"))
                     : isAI ? kabaText.checkAi : kabaText.check}
               </Button>
             </>
@@ -405,13 +399,13 @@ export default function KabaGame({ game, onBack, config }: Props) {
               {/* AI 피드백 */}
               {isAI && feedback && (
                 <div className="rounded-2xl bg-secondary border-2 border-border p-5 text-center space-y-2">
-                  <div className="text-5xl">{feedback.verdict === "잘했어요" ? "🎉" : "🤔"}</div>
+                  <div className="text-5xl">{feedback.verdict === KABA_VERDICT_GOOD ? "🎉" : "🤔"}</div>
                   <p className={`text-2xl font-black ${
-                    feedback.verdict === "잘했어요"
+                    feedback.verdict === KABA_VERDICT_GOOD
                       ? "text-green-900 dark:text-green-200"
                       : "text-orange-800 dark:text-orange-200"
                   }`}>
-                    {feedback.verdict === "잘했어요" ? kabaText.good : kabaText.tryAgain}
+                    {feedback.verdict === KABA_VERDICT_GOOD ? kabaText.good : kabaText.tryAgain}
                   </p>
                   <p className="text-secondary-foreground text-sm">{feedback.reason}</p>
                   <p className="text-foreground text-sm font-medium px-4 py-2">

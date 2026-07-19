@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, History, LoaderCircle } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { formatDateOnly } from "@/lib/datetime";
 import {
   BUILT_IN_GAMES,
@@ -25,28 +25,25 @@ const PAGE_SIZE = 8;
 
 export function QuestionGameLearningHistory({ audience, history, studentId }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const isEnglish = locale === "en";
   const games = useMemo(() => new Map(
     localizeQuestionGames(BUILT_IN_GAMES, locale).map((game) => [game.id, game]),
   ), [locale]);
-  const modeLabels: Record<QuestionGameHistoryMode, string> = isEnglish
-    ? { solo: "Solo", ai: "With AI", friend: "With friends" }
-    : { solo: "혼자 하기", ai: "인공지능과 함께", friend: "친구와 함께" };
-  const title = isEnglish
-    ? audience === "student"
-      ? "My question-game learning history"
-      : audience === "class"
-        ? "Class question-game summary"
-        : "Question-game learning history"
-    : audience === "student"
-      ? "나의 질문놀이 학습 이력"
-      : audience === "class"
-        ? "학급 질문놀이 요약"
-        : "질문놀이 학습 이력";
+  const modeLabels: Record<QuestionGameHistoryMode, string> = {
+    solo: t("modeSolo"),
+    ai: t("modeAi"),
+    friend: t("modeFriend"),
+  };
+  const title = audience === "student"
+    ? t("historyTitleStudent")
+    : audience === "class"
+      ? t("historyTitleClass")
+      : t("historyTitle");
   const measures = [
-    { label: isEnglish ? "Completed games" : "완료한 놀이", value: history.totals.plays },
-    { label: isEnglish ? "Good questions" : "좋은 질문", value: history.totals.goodQuestions },
-    { label: isEnglish ? "Points earned" : "받은 포인트", value: history.totals.points },
+    { label: t("completedGames"), value: history.totals.plays },
+    { label: t("goodQuestions"), value: history.totals.goodQuestions },
+    { label: t("pointsEarned"), value: history.totals.points },
   ];
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<"all" | QuestionGameHistoryMode>("all");
@@ -73,7 +70,7 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
       if (!response.ok || !("items" in data) || !Array.isArray(data.items)) {
         throw new Error("error" in data && data.error
           ? data.error
-          : isEnglish ? "Could not load history." : "이력을 불러오지 못했습니다.");
+          : t("couldNotLoadHistory"));
       }
       if (requestId !== requestIdRef.current) return;
       setItems((current) => cursor ? [...current, ...data.items] : data.items);
@@ -82,7 +79,7 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
       if (requestId !== requestIdRef.current) return;
       setLoadError(error instanceof Error
         ? error.message
-        : isEnglish ? "Could not load history." : "이력을 불러오지 못했습니다.");
+        : t("couldNotLoadHistory"));
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
@@ -102,7 +99,7 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
     if (rows.length === 0) {
       return (
         <p className="mt-2 text-sm text-muted-foreground">
-          {isEnglish ? "No completed question games found." : "조건에 맞는 완료 기록이 없어요."}
+          {t("noCompletedQuestionGamesFound")}
         </p>
       );
     }
@@ -120,9 +117,7 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
                 </p>
               </div>
               <p className="shrink-0 text-right text-xs font-semibold text-foreground">
-                {isEnglish
-                  ? `${item.goodQuestions} good questions · ${item.points} pts`
-                  : `좋은 질문 ${item.goodQuestions}개 · ${item.points}점`}
+                {t("goodquestionsGoodQuestionsPointsPts", { goodQuestions: item.goodQuestions, points: item.points })}
               </p>
             </li>
           );
@@ -152,7 +147,7 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
       <div className="mt-3 grid grid-cols-1 gap-1.5 text-xs sm:grid-cols-3">
         {(["solo", "ai", "friend"] as const).map((itemMode) => (
           <p className="min-w-0 rounded-md bg-muted px-2 py-1.5 text-center font-semibold text-foreground" key={itemMode}>
-            {modeLabels[itemMode]} {history.modes[itemMode].plays}{isEnglish ? "" : "회"}
+            {modeLabels[itemMode]} {history.modes[itemMode].plays}{t("text2")}
           </p>
         ))}
       </div>
@@ -162,11 +157,11 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
           {!expanded && (
             <div className="mt-4">
               <h3 className="text-xs font-bold text-foreground">
-                {isEnglish ? "Recent completed games" : "최근 완료한 놀이"}
+                {t("recentCompletedGames")}
               </h3>
               {history.recent.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {isEnglish ? "No completed question games yet." : "아직 완료한 질문놀이가 없어요."}
+                  {t("noCompletedQuestionGamesYet")}
                 </p>
               ) : renderItems(history.recent)}
             </div>
@@ -180,15 +175,15 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
           >
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             {expanded
-              ? isEnglish ? "Hide full history" : "이력 접기"
-              : isEnglish ? "View full history" : "전체 이력 보기"}
+              ? t("hideFullHistory")
+              : t("viewFullHistory")}
           </button>
 
           {expanded && (
             <div className="mt-4 border-t border-border pt-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="text-xs font-bold text-foreground">
-                  {isEnglish ? "Play mode" : "놀이 방식"}
+                  {t("playMode")}
                   <select
                     className="mt-1 block min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground"
                     value={mode}
@@ -198,14 +193,14 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
                       setNextCursor(null);
                     }}
                   >
-                    <option value="all">{isEnglish ? "All modes" : "전체 방식"}</option>
+                    <option value="all">{t("allModes")}</option>
                     {(["solo", "ai", "friend"] as const).map((itemMode) => (
                       <option value={itemMode} key={itemMode}>{modeLabels[itemMode]}</option>
                     ))}
                   </select>
                 </label>
                 <label className="text-xs font-bold text-foreground">
-                  {isEnglish ? "Question game" : "질문놀이"}
+                  {t("questionGame")}
                   <select
                     className="mt-1 block min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground"
                     value={gameId}
@@ -215,7 +210,7 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
                       setNextCursor(null);
                     }}
                   >
-                    <option value="all">{isEnglish ? "All games" : "전체 놀이"}</option>
+                    <option value="all">{t("allGames")}</option>
                     {[...games.values()].map((game) => (
                       <option value={game.id} key={game.id}>{game.title}</option>
                     ))}
@@ -226,7 +221,7 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
               {loading && items.length === 0 ? (
                 <p role="status" className="mt-4 inline-flex items-center gap-2 text-sm text-muted-foreground">
                   <LoaderCircle className="h-4 w-4 animate-spin" />
-                  {isEnglish ? "Loading history..." : "이력을 불러오는 중입니다..."}
+                  {t("loadingHistory")}
                 </p>
               ) : renderItems(items)}
               {loadError && <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-300">{loadError}</p>}
@@ -238,8 +233,8 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
                   onClick={() => void loadPage(nextCursor)}
                 >
                   {loading
-                    ? isEnglish ? "Loading..." : "불러오는 중..."
-                    : isEnglish ? "Load more" : "더 보기"}
+                    ? t("loading")
+                    : t("loadMore")}
                 </button>
               )}
             </div>

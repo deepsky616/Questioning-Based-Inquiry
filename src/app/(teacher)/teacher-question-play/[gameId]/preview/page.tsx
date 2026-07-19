@@ -35,6 +35,7 @@ export default function TeacherGamePreview({ params }: { params: Promise<{ gameI
   const router = useRouter();
   const t = useTranslations("gamePreview");
   const locale = useLocale();
+  const tg = useTranslations("gamePlay");
 
   const game = BUILT_IN_GAMES.find((g) => g.id === gameId);
   const localizedGame = game ? localizeBuiltInGame(game, locale) : null;

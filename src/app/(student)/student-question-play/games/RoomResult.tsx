@@ -10,7 +10,7 @@ import {
 } from "react";
 import { RefreshCw, Share2 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { usePointBonusLabel } from "@/components/shared/use-point-label";
@@ -104,6 +104,7 @@ export default function RoomResult({
   actionLoading, onAction, onLeave, onRestart, restartLabel, waitingLabel,
 }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const { label: bonusLabel } = usePointBonusLabel();
   const queryClient = useQueryClient();
   const { data: session, status: sessionStatus } = useSession();
@@ -469,7 +470,7 @@ export default function RoomResult({
                         {s.name}{s.playerId === myId && <span className="text-xs text-secondary-foreground ml-1">({text.me})</span>}
                       </span>
                       <span className="font-black text-base text-foreground">
-                        +{pts}{locale === "en" ? " pts" : "점"}
+                        +{pts}{t("pts")}
                       </span>
                     </div>
                     {highlightedBonuses.length > 0 && (

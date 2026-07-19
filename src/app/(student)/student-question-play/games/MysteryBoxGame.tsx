@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { MYSTERY_PRESENTATION } from "./mystery-box-presentation";
 import { Button } from "@/components/ui/button";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
 import { QUESTION_GAME_LIMITS } from "@/lib/question-game-rules";
@@ -25,26 +26,10 @@ interface Props {
 const AI_NAME = "🤖 AI";
 const AI_THINK_MS = 1_000;
 
-const MYSTERY_PRESENTATION: Record<
-  string,
-  { emoji: string; category: { ko: string; en: string } }
-> = {
-  apple: { emoji: "🍎", category: { ko: "과일", en: "fruit" } },
-  puppy: { emoji: "🐶", category: { ko: "동물", en: "animal" } },
-  book: { emoji: "📚", category: { ko: "물건", en: "object" } },
-  car: { emoji: "🚗", category: { ko: "탈것", en: "vehicle" } },
-  butterfly: { emoji: "🦋", category: { ko: "동물", en: "animal" } },
-  piano: { emoji: "🎹", category: { ko: "악기", en: "instrument" } },
-  sun: { emoji: "☀️", category: { ko: "우주", en: "space" } },
-  strawberry: { emoji: "🍓", category: { ko: "과일", en: "fruit" } },
-  rocket: { emoji: "🚀", category: { ko: "탈것", en: "vehicle" } },
-  sunflower: { emoji: "🌻", category: { ko: "식물", en: "plant" } },
-  snowman: { emoji: "⛄", category: { ko: "만든 것", en: "made object" } },
-  dragon: { emoji: "🐉", category: { ko: "상상 속 생물", en: "imaginary creature" } },
-};
 
 export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const mysteryLocale = locale === "en" ? "en" : "ko";
   const text = getQuestionGameText(locale);
   const isAI = config.mode === "ai";
@@ -215,17 +200,13 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             <div className="text-7xl" aria-hidden="true">📦</div>
             <h2 className="mt-3 text-xl font-black text-foreground">
               {isAI
-                ? (locale === "en" ? "Solve it before AI" : "인공지능보다 먼저 맞혀 보세요")
-                : (locale === "en" ? "Find the hidden object" : "상자 속 물건을 찾아보세요")}
+                ? (t("solveItBeforeAi"))
+                : (t("findTheHiddenObject"))}
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {isAI
-                ? (locale === "en"
-                    ? "You and AI alternate. A question or a guess counts as one activity."
-                    : "질문과 추측을 합쳐 인공지능과 한 번씩 번갈아 진행해요.")
-                : (locale === "en"
-                    ? "Ask yes-or-no questions or make a guess within 20 activities."
-                    : "예 또는 아니오로 답할 수 있는 질문과 추측을 합쳐 20회 안에 맞혀요.")}
+                ? (t("youAndAiAlternateA"))
+                : (t("askYesOrNoQuestions"))}
             </p>
           </div>
           {isAI && (
@@ -258,7 +239,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
       <div className="mx-auto max-w-lg space-y-5">
         <GameHeader
           game={game}
-          subtitle={locale === "en" ? "Preparing the box" : "상자를 준비하고 있어요"}
+          subtitle={t("preparingTheBox")}
           onBack={handleBack}
           backDisabled={requestBlocked}
         />
@@ -267,7 +248,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             <>
               <div className="animate-bounce text-7xl" aria-hidden="true">📦</div>
               <p role="status" className="text-sm font-bold text-muted-foreground">
-                {locale === "en" ? "Choosing a hidden object..." : "비밀 물건을 고르고 있어요..."}
+                {t("choosingAHiddenObject")}
               </p>
             </>
           ) : (
@@ -276,12 +257,10 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                 role="alert"
                 className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-950 dark:border-red-700 dark:bg-red-950 dark:text-red-100"
               >
-                {error ?? (locale === "en"
-                  ? "Could not prepare the mystery box."
-                  : "미스터리 박스를 준비하지 못했습니다.")}
+                {error ?? (t("couldNotPrepareTheMystery"))}
               </div>
               <Button type="button" className="w-full font-bold" onClick={() => void startGame()}>
-                {locale === "en" ? "Try again" : "다시 시작하기"}
+                {t("tryAgain")}
               </Button>
             </>
           )}
@@ -298,12 +277,10 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
           role="alert"
           className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950 dark:border-red-700 dark:bg-red-950 dark:text-red-100"
         >
-          {locale === "en"
-            ? "Could not read the mystery box game."
-            : "미스터리 박스 실행을 읽지 못했습니다."}
+          {t("couldNotReadTheMystery")}
         </div>
         <Button type="button" className="w-full font-bold" onClick={restart}>
-          {locale === "en" ? "Start over" : "새로 시작하기"}
+          {t("startOver")}
         </Button>
       </div>
     );
@@ -320,7 +297,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
           {conflict}
         </div>
         <Button type="button" className="w-full font-bold" onClick={restart}>
-          {locale === "en" ? "Start a new game" : "새 실행 시작하기"}
+          {t("startANewGame")}
         </Button>
       </div>
     );
@@ -337,15 +314,15 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
       run.mysteryWinner === "STUDENT";
     const aiSolved = run.mysteryEndReason === "SOLVED" && run.mysteryWinner === "AI";
     const title = studentSolved
-      ? (locale === "en" ? "You found it!" : "정답을 맞혔어요!")
+      ? (t("youFoundIt"))
       : aiSolved
-        ? (locale === "en" ? "AI found it first" : "인공지능이 먼저 맞혔어요")
-        : (locale === "en" ? "All 20 activities are complete" : "20회 활동을 모두 마쳤어요");
+        ? (t("aiFoundItFirst"))
+        : (t("all20ActivitiesAreComplete"));
     return (
       <div className="mx-auto max-w-lg space-y-5">
         <GameHeader
           game={game}
-          subtitle={locale === "en" ? "Mystery solved" : "미스터리 박스 완료"}
+          subtitle={t("mysterySolved")}
           onBack={handleBack}
           backDisabled={requestBlocked}
         />
@@ -356,7 +333,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             </div>
             <h2 className="mt-3 text-2xl font-black text-foreground">{title}</h2>
             <p className="mt-3 text-3xl font-black text-foreground">
-              {answerItem?.names[mysteryLocale] ?? (locale === "en" ? "Unknown" : "확인할 수 없음")}
+              {answerItem?.names[mysteryLocale] ?? (t("unknown"))}
             </p>
             {presentation && (
               <p className="mt-1 text-sm font-semibold text-muted-foreground">
@@ -367,11 +344,11 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
           <div className="grid grid-cols-2 gap-2 text-center">
             <StatBox
-              label={locale === "en" ? "Total activities" : "전체 활동"}
+              label={t("totalActivities")}
               value={run.questionCount}
             />
             <StatBox
-              label={locale === "en" ? "Your questions" : "내 질문"}
+              label={t("yourQuestions")}
               value={run.mysteryStudentQuestionCount ?? 0}
             />
           </div>
@@ -411,8 +388,8 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const remaining = Math.max(0, run.targetCount - run.questionCount);
   const aiTurn = run.mysteryNextStep === "AI_TURN";
   const subtitle = aiTurn
-    ? (locale === "en" ? "AI's turn" : "인공지능 차례")
-    : (locale === "en" ? `${studentName}'s turn` : `${studentName} 차례`);
+    ? (t("aiSTurn"))
+    : (t("studentnameSTurn", { studentName: studentName }));
   const canRetry = Boolean(unconfirmedMysteryAction || aiTurn);
 
   return (
@@ -436,8 +413,8 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
               onClick={() => void retryMysteryAction()}
             >
               {unconfirmedMysteryAction
-                ? (locale === "en" ? "Check this activity again" : "이 활동 다시 확인하기")
-                : (locale === "en" ? "Retry AI turn" : "인공지능 차례 다시 시도하기")}
+                ? (t("checkThisActivityAgain"))
+                : (t("retryAiTurn"))}
             </Button>
           )}
         </div>
@@ -447,17 +424,17 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
         <div className="flex items-center gap-5">
           <div
             className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-pink-300 bg-pink-50 text-6xl dark:border-pink-700 dark:bg-pink-950"
-            aria-label={locale === "en" ? "Hidden object" : "비밀 물건"}
+            aria-label={t("hiddenObject")}
           >
             📦
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3 text-sm text-foreground">
               <span className="font-black text-foreground">
-                {locale === "en" ? "Activity progress" : "활동 진행"}
+                {t("activityProgress")}
               </span>
               <span className="font-bold text-muted-foreground">
-                {locale === "en" ? `${remaining} left` : `${remaining}회 남음`}
+                {t("remainingLeft", { remaining: remaining })}
               </span>
             </div>
             <div className="mt-2 h-3 overflow-hidden rounded-full bg-muted">
@@ -467,9 +444,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
               />
             </div>
             <p className="mt-3 text-xs font-semibold text-muted-foreground">
-              {locale === "en"
-                ? `Your valid questions: ${run.mysteryStudentQuestionCount ?? 0}`
-                : `내가 작성한 유효 질문 ${run.mysteryStudentQuestionCount ?? 0}개`}
+              {t("yourValidQuestionsMysterystudentquestion", { mysteryStudentQuestionCount: run.mysteryStudentQuestionCount ?? 0 })}
             </p>
           </div>
         </div>
@@ -483,8 +458,8 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
             )}
             <p role="status" className="text-sm font-bold">
               {pending === "ai"
-                ? (locale === "en" ? "AI is thinking..." : "인공지능이 생각하고 있어요...")
-                : (locale === "en" ? "AI's turn is ready." : "인공지능 차례를 준비했어요.")}
+                ? (t("aiIsThinking"))
+                : (t("aiSTurnIsReady"))}
             </p>
           </div>
         </section>
@@ -493,7 +468,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
           {!isGuessing ? (
             <form className="space-y-3" onSubmit={handleQuestionSubmit}>
               <label htmlFor="mystery-question" className="block text-sm font-black text-foreground">
-                {locale === "en" ? "Ask a yes-or-no question" : "예 또는 아니오 질문하기"}
+                {t("askAYesOrNo")}
               </label>
               <textarea
                 id="mystery-question"
@@ -506,9 +481,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                 }}
                 rows={3}
                 className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder={locale === "en"
-                  ? "Example: Is it something people made?"
-                  : "예: 사람이 만든 것인가요?"}
+                placeholder={t("exampleIsItSomethingPeople")}
               />
               <div className="flex gap-2">
                 <Button
@@ -517,8 +490,8 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                   disabled={inputBlocked || !question.trim()}
                 >
                   {pending === "action"
-                    ? (locale === "en" ? "Checking..." : "확인 중...")
-                    : (locale === "en" ? "Ask" : "질문하기")}
+                    ? (t("checking"))
+                    : (t("ask"))}
                 </Button>
                 <Button
                   type="button"
@@ -527,14 +500,14 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                   disabled={inputBlocked}
                   onClick={() => setIsGuessing(true)}
                 >
-                  {locale === "en" ? "Make a guess" : "정답 추측"}
+                  {t("makeAGuess")}
                 </Button>
               </div>
             </form>
           ) : (
             <form className="space-y-3" onSubmit={handleGuessSubmit}>
               <label htmlFor="mystery-guess" className="block text-sm font-black text-foreground">
-                {locale === "en" ? "What is inside the box?" : "상자 속 물건은 무엇인가요?"}
+                {t("whatIsInsideTheBox")}
               </label>
               <input
                 id="mystery-guess"
@@ -546,7 +519,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                   if (error && !unconfirmedMysteryAction) clearError();
                 }}
                 className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder={locale === "en" ? "Write the object's name" : "물건 이름을 입력하세요"}
+                placeholder={t("writeTheObjectSName")}
                 autoFocus
               />
               <div className="flex gap-2">
@@ -556,8 +529,8 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                   disabled={inputBlocked || !guess.trim()}
                 >
                   {pending === "action"
-                    ? (locale === "en" ? "Checking..." : "확인 중...")
-                    : (locale === "en" ? "Submit guess" : "정답 제출")}
+                    ? (t("checking"))
+                    : (t("submitGuess"))}
                 </Button>
                 <Button
                   type="button"
@@ -566,7 +539,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                   disabled={inputBlocked}
                   onClick={() => setIsGuessing(false)}
                 >
-                  {locale === "en" ? "Keep asking" : "질문 계속하기"}
+                  {t("keepAsking")}
                 </Button>
               </div>
             </form>
@@ -604,6 +577,7 @@ function PointResult({
   };
   locale: string;
 }) {
+  const t = useTranslations("gamePlay");
   const positive = result.awarded > 0;
   return (
     <div
@@ -615,29 +589,19 @@ function PointResult({
     >
       <p className="font-bold">
         {result.preview
-          ? (locale === "en"
-              ? "Preview completed without points."
-              : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+          ? (t("previewCompletedWithoutPoints"))
           : positive
-            ? (locale === "en"
-                ? `+${result.awarded} points earned!`
-                : `+${result.awarded}점 적립!`)
-            : (locale === "en"
-                ? "The daily point limit has been reached."
-                : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+            ? (t("awardedPointsEarned", { awarded: result.awarded }))
+            : (t("theDailyPointLimitHas"))}
       </p>
       {!result.preview && result.cappedByLimit && (
         <p className="mt-1 text-xs">
-          {locale === "en"
-            ? "The award was limited by today's point cap."
-            : "오늘 포인트 상한에 맞춰 일부만 적립됐어요."}
+          {t("theAwardWasLimitedBy")}
         </p>
       )}
       {!result.preview && result.dailyRemaining > 0 && (
         <p className="mt-1 text-xs">
-          {locale === "en"
-            ? `${result.dailyRemaining} points are still available today.`
-            : `오늘 ${result.dailyRemaining}점 더 받을 수 있어요.`}
+          {t("dailyremainingPointsAreStillAvailable", { dailyRemaining: result.dailyRemaining })}
         </p>
       )}
     </div>
@@ -653,15 +617,16 @@ function MysteryHistory({
   studentName: string;
   locale: string;
 }) {
+  const t = useTranslations("gamePlay");
   if (entries.length === 0) return null;
   return (
     <section className="rounded-lg border border-border bg-card p-5 text-card-foreground shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-black text-foreground">
-          {locale === "en" ? "Activity history" : "활동 기록"}
+          {t("activityHistory")}
         </h2>
         <span className="text-xs font-semibold text-muted-foreground">
-          {locale === "en" ? `${entries.length} activities` : `${entries.length}개`}
+          {t("lengthActivities", { length: entries.length })}
         </span>
       </div>
       <ol className="mt-3 max-h-96 divide-y divide-border overflow-y-auto border-y border-border">
@@ -669,11 +634,11 @@ function MysteryHistory({
           const actor = entry.actor === "AI" ? AI_NAME : studentName;
           const detail = entry.kind === "QUESTION"
             ? entry.answer === "yes"
-              ? (locale === "en" ? "Yes" : "예")
-              : (locale === "en" ? "No" : "아니오")
+              ? (t("yes"))
+              : (t("no"))
             : entry.correct
-              ? (locale === "en" ? "Correct guess" : "정답")
-              : (locale === "en" ? "Not the answer" : "정답이 아님");
+              ? (t("correctGuess"))
+              : (t("notTheAnswer"));
           return (
             <li key={entry.sequence} className="py-3 text-sm">
               <div className="flex items-start gap-2">
@@ -683,8 +648,8 @@ function MysteryHistory({
                 <div className="min-w-0 flex-1">
                   <p className="break-words font-bold text-foreground">
                     {actor} · {entry.kind === "QUESTION"
-                      ? (locale === "en" ? "Question" : "질문")
-                      : (locale === "en" ? "Guess" : "추측")}
+                      ? (t("question"))
+                      : (t("guess"))}
                   </p>
                   <p className="mt-1 break-words text-foreground">{entry.text}</p>
                   <p className={`mt-1 font-bold ${

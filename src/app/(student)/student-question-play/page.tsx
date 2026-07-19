@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 export default function StudentQuestionPlayPage() {
   const t = useTranslations("playLanding");
   const locale = useLocale();
+  const tg = useTranslations("gamePlay");
   const [games, setGames] = useState<AnyGame[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState<AnyGame | null>(null);

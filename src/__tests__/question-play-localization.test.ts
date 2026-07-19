@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import koMessages from "../../messages/ko.json";
+import enMessages from "../../messages/en.json";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import type { ComponentType, PropsWithChildren } from "react";
@@ -55,7 +57,7 @@ function renderLobby(locale: "ko" | "en", playerCount: number) {
   return renderToStaticMarkup(
     createElement(
       TestIntlProvider,
-      { locale, messages: {} },
+      { locale, messages: { gamePlay: (locale === "en" ? enMessages : koMessages).gamePlay } },
       createElement(RoomLobby, {
         game,
         room,

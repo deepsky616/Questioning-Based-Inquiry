@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Dices, HelpCircle, LoaderCircle, MessageCircle } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { RoomHeader, WaitingBanner } from "./roomShared";
 import RoomResult from "./RoomResult";
@@ -82,6 +82,7 @@ export default function RoomMemory({
   onLeave,
 }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const state = readMemoryState(room.gameState);
   const isHost = room.hostId === myId;
@@ -392,8 +393,8 @@ export default function RoomMemory({
         game={game}
         room={room}
         myId={myId}
-        scoreLabel={locale === "en" ? "Pairs collected" : "모은 짝"}
-        scoreUnit={locale === "en" ? " pairs" : "쌍"}
+        scoreLabel={t("pairsCollected")}
+        scoreUnit={t("pairs")}
         scores={scores}
         questions={[]}
         actionLoading={actionLoading}
@@ -451,9 +452,7 @@ export default function RoomMemory({
             </div>
           ) : (
             <WaitingBanner
-              text={locale === "en"
-                ? "The host is choosing the difficulty."
-                : "방장이 난이도를 고르는 중"}
+              text={t("theHostIsChoosingThe")}
             />
           )}
         </section>
@@ -469,14 +468,14 @@ export default function RoomMemory({
         <RoomHeader
           game={game}
           room={room}
-          subtitle={locale === "en" ? "Rolling for turn order" : "주사위로 차례 정하는 중"}
+          subtitle={t("rollingForTurnOrder")}
           onLeave={onLeave}
           disabled={rolling || actionLoading}
         />
         <section className="space-y-5 border-y border-border bg-card px-1 py-5 text-card-foreground sm:px-5">
           <div className="flex items-center justify-between gap-3">
             <p className="font-black">
-              {locale === "en" ? "Dice results" : "주사위 결과"}
+              {t("diceResults")}
             </p>
             <p className="text-sm font-semibold text-muted-foreground">
               {rolledCount}/{room.players.length}
@@ -485,7 +484,7 @@ export default function RoomMemory({
 
           {myRoll !== undefined ? (
             <div className="border-y border-violet-300 bg-violet-50 py-5 text-center text-violet-950 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-50">
-              <p className="text-sm font-semibold">{locale === "en" ? "My die" : "내 주사위"}</p>
+              <p className="text-sm font-semibold">{t("myDie")}</p>
               <p className="mt-1 text-5xl font-black">{myRoll}</p>
             </div>
           ) : (
@@ -529,12 +528,12 @@ export default function RoomMemory({
   const inputLocked = !isMyTurn || waitingForMiss || requestPending;
   const remainingCards = state.qCards.length + state.aCards.length - state.takenIds.length;
   const status = waitingForMiss
-    ? (locale === "en" ? "Returning cards face down" : "카드를 다시 덮는 중")
+    ? (t("returningCardsFaceDown"))
     : requestPending
-      ? (locale === "en" ? "Sending move" : "요청 처리 중")
+      ? (t("sendingMove"))
       : isMyTurn
-        ? (locale === "en" ? "Your turn" : "내 차례")
-        : (locale === "en" ? "Waiting for your turn" : "내 차례를 기다리는 중");
+        ? (t("yourTurn"))
+        : (t("waitingForYourTurn"));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -557,9 +556,7 @@ export default function RoomMemory({
             </p>
           </div>
           <p className="rounded-lg bg-muted px-3 py-2 text-sm font-black text-foreground">
-            {locale === "en"
-              ? `Attempts ${state.attempts}/${state.maxAttempts}`
-              : `시도 ${state.attempts}/${state.maxAttempts}`}
+            {t("attemptsAttemptsMaxattempts", { attempts: state.attempts, maxAttempts: state.maxAttempts })}
           </p>
         </div>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
@@ -619,6 +616,7 @@ function MemoryCardSection({
   pendingCardId: string | null;
   onFlip: (card: MemoryCard) => Promise<void>;
 }) {
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const title = kind === "q" ? text.questionCard : text.answerCard;
   const pairById = new Map(state.pairs.map((pair) => [pair.id, pair]));
@@ -640,13 +638,9 @@ function MemoryCardSection({
           const revealed = state.revealedIds.includes(card.id);
           const taken = state.takenIds.includes(card.id);
           const visible = revealed || taken;
-          const kindLabel = locale === "en"
-            ? (kind === "q" ? "Question card" : "Answer card")
-            : (kind === "q" ? "질문 카드" : "대답 카드");
+          const kindLabel = kind === "q" ? t("questionCardLabel") : t("answerCardLabel");
           const accessibleLabel = taken
-            ? (locale === "en"
-              ? `Collected ${kindLabel.toLowerCase()}: ${content}`
-              : `획득한 ${kindLabel}: ${content}`)
+            ? t("collectedCard", { kindLabel, content })
             : visible
               ? `${kindLabel}: ${content}`
               : `${kindLabel} ${index + 1}`;

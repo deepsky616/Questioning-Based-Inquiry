@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -58,6 +58,7 @@ function firstNonEmptyLine(value: string | undefined): string {
 
 export default function LadderGame({ game, onBack, config }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const isAI = config.mode === "ai";
   const columnCount = isAI ? AI_COLUMN_COUNT : SOLO_COLUMN_COUNT;
@@ -350,7 +351,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
             {runConflict}
           </div>
           <Button className="w-full" onClick={handleBack} type="button" variant="outline">
-            {locale === "en" ? "Return to game selection" : "놀이 선택으로 돌아가기"}
+            {t("returnToGameSelection")}
           </Button>
         </div>
       )}
@@ -534,16 +535,14 @@ export default function LadderGame({ game, onBack, config }: Props) {
             >
               <p className="font-bold">
                 {runResult.preview
-                  ? (locale === "en" ? "Preview completed without points." : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                  ? (t("previewCompletedWithoutPoints"))
                   : runResult.awarded > 0
-                    ? (locale === "en" ? `+${runResult.awarded} points earned!` : `+${runResult.awarded}점 적립!`)
-                    : (locale === "en" ? "The daily point limit has been reached." : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+                    ? (t("awardedPointsEarned", { awarded: runResult.awarded }))
+                    : (t("theDailyPointLimitHas"))}
               </p>
               {!runResult.preview && runResult.dailyRemaining > 0 && (
                 <p className="mt-1 text-xs">
-                  {locale === "en"
-                    ? `${runResult.dailyRemaining} points are still available today.`
-                    : `오늘 ${runResult.dailyRemaining}점 더 받을 수 있어요.`}
+                  {t("dailyremainingPointsAreStillAvailable", { dailyRemaining: runResult.dailyRemaining })}
                 </p>
               )}
             </div>

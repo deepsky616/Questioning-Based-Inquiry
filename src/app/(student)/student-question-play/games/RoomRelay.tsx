@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Flag, LogOut, Play, Send } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -101,6 +101,7 @@ export default function RoomRelay({
   onLeave,
 }: Props) {
   const locale = resolveQuestionGameLocale(useLocale());
+  const t = useTranslations("gamePlay");
   const text = getRoomTurnGameText(locale);
   const state = readRelayPublicState(room.gameState);
   const valid = state !== null && roomMatchesState(game, room, state, myId);
@@ -183,7 +184,7 @@ export default function RoomRelay({
           game={game}
           room={room}
           myId={myId}
-          scoreLabel={locale === "en" ? "Questions" : "질문 수"}
+          scoreLabel={t("questions")}
           scoreUnit=""
           scores={scores}
           questions={state.questions}

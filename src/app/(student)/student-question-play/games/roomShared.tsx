@@ -1,7 +1,7 @@
 "use client";
 
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
 
 export const PLAYER_COLORS = [
@@ -30,6 +30,7 @@ export function RoomHeader({
   disabled?: boolean;
 }) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   return (
     <div className="flex items-center gap-3">
@@ -47,7 +48,7 @@ export function RoomHeader({
           <span className="text-3xl">{game.emoji}</span>
           <div>
             <p className="font-black">{game.title}</p>
-            <p className="text-white text-xs">{subtitle ?? (locale === "en" ? `Room ${room.code}` : `방 ${room.code}`)}</p>
+            <p className="text-white text-xs">{subtitle ?? (t("roomCode2", { code: room.code }))}</p>
           </div>
         </div>
         <div className="text-white text-right">

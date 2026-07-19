@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { GameHeader } from "./GameHeader";
 import {
@@ -34,6 +34,7 @@ function countCompletedPairs(chain: ChainItem[]): number {
 
 export default function StoryDiceGame({ game, onBack, config }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const { mode, players } = config;
   const isAI = mode === "ai";
@@ -188,9 +189,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     const trimmed = (unconfirmedQuestion ?? input).trim();
     if (!trimmed || !run || runBusy || runConflict) return;
     if (!isQuestionFormForLocale(trimmed, locale)) {
-      setLocalError(locale === "en"
-        ? "Write the sentence as a question."
-        : "질문하는 문장으로 작성해 주세요.");
+      setLocalError(t("writeTheSentenceAsA"));
       return;
     }
     clearRunError();
@@ -262,16 +261,14 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
             }`}>
               <p className="font-bold">
                 {runResult.preview
-                  ? (locale === "en" ? "Preview completed without points." : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                  ? (t("previewCompletedWithoutPoints"))
                   : runResult.awarded > 0
-                    ? (locale === "en" ? `+${runResult.awarded} points earned!` : `+${runResult.awarded}점 적립!`)
-                    : (locale === "en" ? "The daily point limit has been reached." : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+                    ? (t("awardedPointsEarned", { awarded: runResult.awarded }))
+                    : (t("theDailyPointLimitHas"))}
               </p>
               {!runResult.preview && runResult.dailyRemaining > 0 && (
                 <p className="mt-1 text-xs">
-                  {locale === "en"
-                    ? `${runResult.dailyRemaining} points are still available today.`
-                    : `오늘 ${runResult.dailyRemaining}점 더 받을 수 있어요.`}
+                  {t("dailyremainingPointsAreStillAvailable", { dailyRemaining: runResult.dailyRemaining })}
                 </p>
               )}
             </div>
@@ -326,10 +323,10 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
           ) : (
             <>
               <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200">
-                {runError ?? (locale === "en" ? "Could not prepare the story dice." : "이야기 주사위를 준비하지 못했습니다.")}
+                {runError ?? (t("couldNotPrepareTheStory"))}
               </div>
               <Button type="button" variant="outline" className="w-full font-bold" onClick={() => void retryStart()}>
-                {locale === "en" ? "Try again" : "다시 시작하기"}
+                {t("tryAgain")}
               </Button>
             </>
           )}
@@ -456,7 +453,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
             {runPending === "action"
               ? text.loading
               : unconfirmedQuestion
-                ? (locale === "en" ? "Retry save" : "다시 저장하기")
+                ? (t("retrySave"))
                 : text.storyStart}
           </Button>
         </div>
@@ -515,7 +512,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
                 {runPending === "action"
                   ? text.loading
                   : unconfirmedQuestion
-                    ? (locale === "en" ? "Retry save" : "다시 저장하기")
+                    ? (t("retrySave"))
                     : nextAction === "question"
                       ? text.storySubmitQuestion
                       : text.storySubmitAnswer}
@@ -534,7 +531,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
                   disabled={runBusy || Boolean(runConflict)}
                   onClick={retryAIQuestion}
                 >
-                  {locale === "en" ? "Retry AI question" : "인공지능 질문 다시 만들기"}
+                  {t("retryAiQuestion")}
                 </Button>
               )}
             </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BookOpen, Dices, Flag, LogOut, Play, Send } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -92,6 +92,7 @@ export default function RoomStoryDice({
   onLeave,
 }: Props) {
   const locale = resolveQuestionGameLocale(useLocale());
+  const t = useTranslations("gamePlay");
   const text = getRoomTurnGameText(locale);
   const state = readStoryDicePublicState(room.gameState);
   const valid = state !== null && roomMatchesState(game, room, state, myId);
@@ -189,7 +190,7 @@ export default function RoomStoryDice({
           game={game}
           room={room}
           myId={myId}
-          scoreLabel={locale === "en" ? "Turns" : "참여 수"}
+          scoreLabel={t("turns")}
           scoreUnit=""
           scores={scores}
           questions={state.pairs}

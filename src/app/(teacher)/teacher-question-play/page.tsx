@@ -69,6 +69,7 @@ export default function TeacherQuestionPlayPage() {
   const t = useTranslations("qPlay");
   const tc = useTranslations("common");
   const locale = useLocale();
+  const tg = useTranslations("gamePlay");
   const { toast } = useToast();
   const [games, setGames] = useState<AnyGame[]>([]);
   const [visibilityMap, setVisibilityMap] = useState<Record<string, GameVisibility>>({});

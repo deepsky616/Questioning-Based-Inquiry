@@ -23,6 +23,7 @@ export function QuestionGameSettlementHealthPanel({
 }: Props) {
   const t = useTranslations("qPlay");
   const locale = useLocale();
+  const tg = useTranslations("gamePlay");
   if (!health) return null;
 
   const games = new Map(

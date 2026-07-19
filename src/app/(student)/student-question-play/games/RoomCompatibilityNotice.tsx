@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { hasQuestionGameRoomEngine } from "@/lib/question-game-room-engine";
 import type {
@@ -37,6 +37,7 @@ export default function RoomCompatibilityNotice({
   onLeave,
 }: RoomCompatibilityNoticeProps) {
   const isEnglish = useLocale() === "en";
+  const t = useTranslations("gamePlay");
   const isHost = room.hostId === myId;
 
   return (
@@ -57,12 +58,10 @@ export default function RoomCompatibilityNotice({
             id="room-compatibility-title"
             className="text-lg font-black text-amber-950 dark:text-amber-50"
           >
-            {isEnglish ? "Restart with the new rules" : "새 규칙으로 다시 시작"}
+            {t("restartWithTheNewRules")}
           </h2>
           <p className="text-sm leading-6 text-amber-800 dark:text-amber-200">
-            {isEnglish
-              ? "This room was started with an earlier rule set."
-              : "이 방은 이전 규칙으로 시작되었습니다."}
+            {t("thisRoomWasStartedWith")}
           </p>
         </div>
 
@@ -79,14 +78,12 @@ export default function RoomCompatibilityNotice({
               aria-hidden="true"
             />
             {actionLoading
-              ? (isEnglish ? "Restarting..." : "다시 시작하는 중...")
-              : (isEnglish ? "Restart with new rules" : "새 규칙으로 다시 시작")}
+              ? (t("restarting"))
+              : (t("restartWithNewRules"))}
           </Button>
         ) : (
           <p className="rounded-xl border border-border bg-card text-card-foreground px-4 py-3 text-sm font-medium">
-            {isEnglish
-              ? "Waiting for the host to restart with the new rules."
-              : "방장이 새 규칙으로 다시 시작하기를 기다리는 중입니다."}
+            {t("waitingForTheHostTo2")}
           </p>
         )}
       </section>

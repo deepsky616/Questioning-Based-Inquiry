@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { GameHeader } from "./GameHeader";
 import { GameResultReview } from "./GameResultReview";
@@ -49,6 +49,7 @@ function cardText(card: MemoryRunCard, locale: string) {
 
 export default function MemoryGame({ game, onBack, config }: Props) {
   const locale = useLocale();
+  const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const isAI = config.mode === "ai";
   const studentName = config.players[0]?.trim() || text.me;
@@ -234,7 +235,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
                     {config.cards}{locale === "en" ? ` ${text.card}` : text.card}
                   </p>
                   <p className="text-xs font-semibold text-muted-foreground">
-                    {locale === "en" ? `${maximum} attempts` : `최대 ${maximum}회`}
+                    {t("maximumAttempts", { maximum: maximum })}
                   </p>
                 </button>
               );
@@ -268,16 +269,14 @@ export default function MemoryGame({ game, onBack, config }: Props) {
                 role="alert"
                 className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-700 dark:bg-red-950 dark:text-red-100"
               >
-                {error ?? (locale === "en"
-                  ? "Could not prepare the cards."
-                  : "카드를 준비하지 못했습니다.")}
+                {error ?? (t("couldNotPrepareTheCards"))}
               </div>
               <Button
                 type="button"
                 className="w-full font-bold"
                 onClick={() => void startGame(selectedDifficulty)}
               >
-                {locale === "en" ? "Try again" : "다시 시작하기"}
+                {t("tryAgain")}
               </Button>
             </>
           )}
@@ -291,10 +290,10 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       <div className="mx-auto max-w-lg space-y-5">
         <GameHeader game={game} subtitle={text.memoryGeneratingCards} onBack={handleBack} />
         <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-900">
-          {locale === "en" ? "Could not read the game." : "카드 짝 찾기 실행을 읽지 못했습니다."}
+          {t("couldNotReadTheGame")}
         </div>
         <Button type="button" className="w-full" onClick={restart}>
-          {locale === "en" ? "Start over" : "새로 시작하기"}
+          {t("startOver")}
         </Button>
       </div>
     );
@@ -308,7 +307,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
           {conflict}
         </div>
         <Button type="button" className="w-full font-bold" onClick={restart}>
-          {locale === "en" ? "Start a new game" : "새 실행 시작하기"}
+          {t("startANewGame")}
         </Button>
       </div>
     );
@@ -323,7 +322,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       <div className="mx-auto max-w-lg space-y-5">
         <GameHeader
           game={game}
-          subtitle={locale === "en" ? "Complete!" : "완성!"}
+          subtitle={t("complete")}
           onBack={handleBack}
           backDisabled={requestBlocked}
         />
@@ -350,29 +349,19 @@ export default function MemoryGame({ game, onBack, config }: Props) {
             >
               <p className="font-bold">
                 {result.preview
-                  ? (locale === "en"
-                      ? "Preview completed without points."
-                      : "미리보기로 완료되어 포인트는 지급되지 않아요.")
+                  ? (t("previewCompletedWithoutPoints"))
                   : result.awarded > 0
-                    ? (locale === "en"
-                        ? `+${result.awarded} points earned!`
-                        : `+${result.awarded}점 적립!`)
-                    : (locale === "en"
-                        ? "The daily point limit has been reached."
-                        : "오늘 받을 수 있는 질문놀이 포인트를 모두 받았어요.")}
+                    ? (t("awardedPointsEarned", { awarded: result.awarded }))
+                    : (t("theDailyPointLimitHas"))}
               </p>
               {!result.preview && result.cappedByLimit && (
                 <p className="mt-1 text-xs">
-                  {locale === "en"
-                    ? "The award was limited by today's point cap."
-                    : "오늘 포인트 상한에 맞춰 일부만 적립됐어요."}
+                  {t("theAwardWasLimitedBy")}
                 </p>
               )}
               {!result.preview && result.dailyRemaining > 0 && (
                 <p className="mt-1 text-xs">
-                  {locale === "en"
-                    ? `${result.dailyRemaining} points are still available today.`
-                    : `오늘 ${result.dailyRemaining}점 더 받을 수 있어요.`}
+                  {t("dailyremainingPointsAreStillAvailable", { dailyRemaining: result.dailyRemaining })}
                 </p>
               )}
             </div>
@@ -416,9 +405,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     ? AI_NAME
     : studentName;
   const subtitle = `${text.turnOf(currentName)} · ${text.remainingCards(remainingCards)} · ${
-    locale === "en"
-      ? `Attempts ${run.questionCount}/${run.targetCount}`
-      : `시도 ${run.questionCount}/${run.targetCount}`
+    t("attemptsQuestioncountTargetcount", { questionCount: run.questionCount, targetCount: run.targetCount })
   }`;
   const canRetry = Boolean(
     unconfirmedMemoryAction ||
@@ -448,7 +435,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
               disabled={pending !== null}
               onClick={retryMemoryAction}
             >
-              {locale === "en" ? "Retry this turn" : "이 차례 다시 확인하기"}
+              {t("retryThisTurn")}
             </Button>
           )}
         </div>
@@ -482,14 +469,13 @@ export default function MemoryGame({ game, onBack, config }: Props) {
 
       {run.memoryNextStep === "RESOLVE_MISS" && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-center text-sm font-bold text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
-          {locale === "en"
-            ? "The cards do not match. They will turn back over shortly."
-            : "짝이 달라요. 잠시 확인한 뒤 카드를 다시 덮습니다."}
+          {t("theCardsDoNotMatch")}
         </div>
       )}
 
       <MemoryCardSection
         title={text.questionCard}
+        kind="q"
         cards={questionCards}
         columns={columns}
         locale={locale}
@@ -498,6 +484,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       />
       <MemoryCardSection
         title={text.answerCard}
+        kind="a"
         cards={answerCards}
         columns={columns}
         locale={locale}
@@ -517,6 +504,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
 
 function MemoryCardSection({
   title,
+  kind,
   cards,
   columns,
   locale,
@@ -524,14 +512,15 @@ function MemoryCardSection({
   onCard,
 }: {
   title: string;
+  kind: "q" | "a";
   cards: MemoryRunCard[];
   columns: number;
   locale: string;
   disabled: boolean;
   onCard: (card: MemoryRunCard) => void;
 }) {
-  const type = cards[0]?.type ?? (title.includes("대답") ? "a" : "q");
-  const question = type === "q";
+  const t = useTranslations("gamePlay");
+  const question = kind === "q";
   return (
     <div className="rounded-lg border border-border bg-card p-3 text-card-foreground shadow-sm">
       <p className={`mb-2 text-xs font-black ${
@@ -549,9 +538,7 @@ function MemoryCardSection({
           const visible = card.state !== "HIDDEN";
           const taken = card.state === "TAKEN";
           const content = cardText(card, locale);
-          const hiddenLabel = locale === "en"
-            ? `${question ? "Question" : "Answer"} card ${index + 1}`
-            : `${question ? "질문" : "대답"} 카드 ${index + 1}`;
+          const hiddenLabel = question ? t("hiddenQuestionCard", { index: index + 1 }) : t("hiddenAnswerCard", { index: index + 1 });
           return (
             <button
               key={card.id}
