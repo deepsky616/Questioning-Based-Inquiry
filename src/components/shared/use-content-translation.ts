@@ -6,7 +6,17 @@ import { useLocale, useTranslations } from "next-intl";
 import { useToast } from "@/components/ui/use-toast";
 
 export interface TranslatableItem {
-  type: "QUESTION" | "COMMENT" | "SESSION_SUBJECT" | "SESSION_TOPIC";
+  // GAME_INSTRUCTION의 id는 "게임id:안내줄인덱스" 복합 키 (서버 /api/translate와 동일 계약)
+  type:
+    | "QUESTION"
+    | "COMMENT"
+    | "SESSION_SUBJECT"
+    | "SESSION_TOPIC"
+    | "GAME_TITLE"
+    | "GAME_DESCRIPTION"
+    | "GAME_PLAYER_COUNT"
+    | "GAME_DURATION"
+    | "GAME_INSTRUCTION";
   id: string;
 }
 

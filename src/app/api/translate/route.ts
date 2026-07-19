@@ -9,18 +9,93 @@ import { contentHash, translateTexts } from "@/lib/translate";
 import { canViewQuestion, isCommentVisibleToViewer } from "@/lib/content-visibility";
 import { logger } from "@/lib/logger";
 import { studentCanAccessSession } from "@/lib/session-access";
+import { isGameVisibleToStudent, type CustomGame } from "@/lib/question-games-data";
+import { loadQuestionGameSettingsForTeachers } from "@/lib/question-game-settings-store";
+
+// GAME_INSTRUCTION의 id는 "게임id:안내줄인덱스" 복합 키다.
+const GAME_TYPES = [
+  "GAME_TITLE",
+  "GAME_DESCRIPTION",
+  "GAME_PLAYER_COUNT",
+  "GAME_DURATION",
+  "GAME_INSTRUCTION",
+] as const;
 
 const bodySchema = z.object({
   items: z
     .array(
       z.object({
-        type: z.enum(["QUESTION", "COMMENT", "SESSION_SUBJECT", "SESSION_TOPIC"]),
+        type: z.enum(["QUESTION", "COMMENT", "SESSION_SUBJECT", "SESSION_TOPIC", ...GAME_TYPES]),
         id: z.string().min(1),
       }),
     )
     .min(1)
     .max(40),
 });
+
+function gameIdOf(item: { type: string; id: string }): string {
+  return item.type === "GAME_INSTRUCTION" ? item.id.split(":")[0] : item.id;
+}
+
+// 교사가 만든 놀이 중 뷰어가 볼 수 있는 것만 반환한다.
+// 학생: 담당 선생님(같은 학교의 담당 학급 교사 또는 학급 미지정 교사)의 게임 중
+//       공개 설정이 허용하는 것. 교사: 본인 게임.
+async function loadViewableCustomGames(
+  viewer: {
+    id: string;
+    role: string | null;
+    school: string | null;
+    grade: string | null;
+    className: string | null;
+  } | null,
+  gameIds: string[],
+): Promise<Map<string, CustomGame>> {
+  const result = new Map<string, CustomGame>();
+  if (!viewer || gameIds.length === 0) return result;
+
+  if (viewer.role === "TEACHER") {
+    const rows = await prisma.questionGameCustom.findMany({
+      where: { id: { in: gameIds }, teacherId: viewer.id },
+      select: { id: true, title: true, description: true, playerCount: true, duration: true, instructions: true },
+    });
+    for (const row of rows) {
+      result.set(row.id, {
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        playerCount: row.playerCount,
+        duration: row.duration,
+        instructions: Array.isArray(row.instructions) ? row.instructions.map(String) : [],
+      } as CustomGame);
+    }
+    return result;
+  }
+
+  if (viewer.role !== "STUDENT" || !viewer.school || !viewer.grade || !viewer.className) {
+    return result;
+  }
+  const teachers = await prisma.user.findMany({
+    where: {
+      role: "TEACHER",
+      school: viewer.school,
+      OR: [
+        { teacherClasses: { some: { grade: viewer.grade, className: viewer.className } } },
+        { teacherClasses: { none: {} } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (teachers.length === 0) return result;
+  const { customGames, visibilityMap } = await loadQuestionGameSettingsForTeachers(
+    teachers.map((t) => t.id),
+  );
+  for (const game of customGames) {
+    if (!gameIds.includes(game.id)) continue;
+    const visibility = visibilityMap[game.id] ?? { type: "all" as const };
+    if (isGameVisibleToStudent(visibility, viewer)) result.set(game.id, game);
+  }
+  return result;
+}
 
 const keyOf = (type: string, id: string) => `${type}:${id}`;
 
@@ -94,6 +169,13 @@ export async function POST(req: Request) {
   const sessionIds = items
     .filter((i) => i.type === "SESSION_SUBJECT" || i.type === "SESSION_TOPIC")
     .map((i) => i.id);
+  const gameIds = [
+    ...new Set(
+      items
+        .filter((i) => (GAME_TYPES as readonly string[]).includes(i.type))
+        .map((i) => gameIdOf(i)),
+    ),
+  ];
 
   const authorSelect = { role: true, school: true, grade: true, className: true } as const;
   const [viewer, questions, comments, sessions] = await Promise.all([
@@ -170,21 +252,28 @@ export async function POST(req: Request) {
     originals.set(keyOf("SESSION_SUBJECT", session.id), session.subject);
     if (session.topic.trim()) originals.set(keyOf("SESSION_TOPIC", session.id), session.topic);
   }
+  const viewableGames = await loadViewableCustomGames(viewer, gameIds);
+  for (const [gameId, game] of viewableGames) {
+    originals.set(keyOf("GAME_TITLE", gameId), game.title);
+    if (game.description.trim()) originals.set(keyOf("GAME_DESCRIPTION", gameId), game.description);
+    if (game.playerCount.trim()) originals.set(keyOf("GAME_PLAYER_COUNT", gameId), game.playerCount);
+    if (game.duration.trim()) originals.set(keyOf("GAME_DURATION", gameId), game.duration);
+    game.instructions.forEach((step, index) => {
+      if (step.trim()) originals.set(keyOf("GAME_INSTRUCTION", `${gameId}:${index}`), step);
+    });
+  }
 
-  // 캐시 조회
+  // 캐시 조회 — 요청된 (type, id) 쌍 전체를 한 번에 본다
   const cached = await prisma.translation.findMany({
     where: {
       targetLocale,
-      OR: [
-        ...(qIds.length ? [{ sourceType: "QUESTION", sourceId: { in: qIds } }] : []),
-        ...(cIds.length ? [{ sourceType: "COMMENT", sourceId: { in: cIds } }] : []),
-      ],
+      OR: items.map((i) => ({ sourceType: i.type, sourceId: i.id })),
     },
   });
   const cacheByKey = new Map(cached.map((t) => [keyOf(t.sourceType, t.sourceId), t]));
 
   const out: Record<string, string> = {};
-  const misses: { type: "QUESTION" | "COMMENT" | "SESSION_SUBJECT" | "SESSION_TOPIC"; id: string; text: string; hash: string }[] = [];
+  const misses: { type: (typeof items)[number]["type"]; id: string; text: string; hash: string }[] = [];
 
   for (const item of items) {
     const k = keyOf(item.type, item.id);
