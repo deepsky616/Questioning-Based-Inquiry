@@ -24,7 +24,6 @@ export function StudentMonthlyDateSelect({
   ariaLabel: string;
   className?: string;
 }) {
-  const tCommon = useTranslations("common");
   const dateMonthGroups = groupSessionDatesByMonth(dates);
 
   return (
@@ -74,6 +73,7 @@ export function StudentMonthlySessionLookup<T extends LookupSession>({
     noMatchingSession: string;
   };
 }) {
+  const tCommon = useTranslations("common");
   const sessionMonthGroups = groupSessionsByMonth(sessions);
   const sessionText = useSessionMetaTranslation(sessions);
 
