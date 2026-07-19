@@ -13,6 +13,7 @@ import { useTranslations } from "next-intl";
 
 function RegisterContent() {
   const t = useTranslations("auth");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,7 +48,7 @@ function RegisterContent() {
       return;
     }
     const classError = validateTeacherClasses(teacherClasses);
-    if (classError) { setError(classError); return; }
+    if (classError) { setError(tCommon(classError)); return; }
     const passwordError = validatePasswordPolicy(password);
     if (passwordError) {
       setError(passwordError);
@@ -153,7 +154,7 @@ function RegisterContent() {
                     )}
                     {tc.grade && tc.className && (
                       <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-                        {buildTeacherClassLabel(tc.grade, tc.className)}
+                        {buildTeacherClassLabel(tCommon, tc.grade, tc.className)}
                       </span>
                     )}
                   </div>

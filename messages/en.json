@@ -43,7 +43,13 @@
     "questionWord": "question",
     "home": "Home",
     "retry": "Try again",
-    "redirecting": "Redirecting..."
+    "redirecting": "Redirecting...",
+    "gradeClassLabel": "Grade {grade} Class {className}",
+    "itemCount": "{count}",
+    "classesRequired": "Add at least one grade and class",
+    "gradeRequired": "Enter the grade",
+    "classRequired": "Enter the class",
+    "duplicateClass": "Duplicate grade and class"
   },
   "classification": {
     "category1": "Type 1",
@@ -307,7 +313,8 @@
     "searchPlaceholder": "Search topic or subject",
     "upcomingSessionsLabel": "Today & upcoming",
     "pastSessionsLabel": "Past classes",
-    "helperTipFormula": "Controversial questions are easy to build with endings like 'Should we ~?', 'Is ~ fair?', or 'Which value matters more?'."
+    "helperTipFormula": "Controversial questions are easy to build with endings like 'Should we ~?', 'Is ~ fair?', or 'Which value matters more?'.",
+    "sessionCount": "{count}"
   },
   "comment": {
     "loading": "Loading comments...",
@@ -1157,7 +1164,12 @@
     "inquiryEditNote": "🧩 Inquiry lessons let you edit only the date·topic (subject is fixed).",
     "areaLabel": "Area",
     "unitLabel": "Unit",
-    "searchPlaceholder": "Search topic or subject"
+    "searchPlaceholder": "Search topic or subject",
+    "targetClass": "Grade {grade} Class {className}",
+    "targetStudentNamed": "Student {name}",
+    "targetStudentSingle": "Individual student",
+    "targetClassPartial": "Part of Grade {grade} Class {className}",
+    "targetAllClasses": "All my classes"
   },
   "settings": {
     "apiKeyRequired": "Please enter an API key (10+ characters)",
@@ -1772,7 +1784,9 @@
     "gradeClass": "Grade {grade} Class {className}",
     "selectAll": "Select all",
     "numberName": "No. {n} {name}",
-    "noStudents": "No students"
+    "noStudents": "No students",
+    "allClassesCount": "All my classes ({selected}/{total})",
+    "classCount": "Grade {grade} Class {className} ({selected}/{total})"
   },
   "qstats": {
     "sortLabel": "Sort",

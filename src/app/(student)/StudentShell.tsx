@@ -26,6 +26,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
   const user = getSessionUser(session);
   const router = useRouter();
   const t = useTranslations("nav");
+  const tCommon = useTranslations("common");
   const pages = STUDENT_PAGES.map((p) => ({ href: p.href, label: t(p.key) }));
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export function StudentShell({ children }: { children: React.ReactNode }) {
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse">로딩 중...</div>
+        <div className="animate-pulse">{tCommon("loading")}</div>
       </div>
     );
   }

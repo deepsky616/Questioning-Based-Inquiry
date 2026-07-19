@@ -26,6 +26,7 @@ interface TeacherClass {
 /** 학생 일괄 등록 폼 (교사 학생관리 '일괄 등록' 탭). 자체적으로 담당 학급 정보를 로드한다. */
 export function StudentBulkRegisterCard() {
   const t = useTranslations("settings");
+  const tCommon = useTranslations("common");
   const tAcc = useTranslations("account");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -184,7 +185,7 @@ export function StudentBulkRegisterCard() {
                   {mode === "auto" && (
                     <div className="space-y-2">
                       <Label>{t("gradeClassLabel")}</Label>
-                      <Input value={buildTeacherClassLabel(bulkGrade, bulkClass)} disabled />
+                      <Input value={buildTeacherClassLabel(tCommon, bulkGrade, bulkClass)} disabled />
                     </div>
                   )}
 
@@ -205,7 +206,7 @@ export function StudentBulkRegisterCard() {
                         <SelectContent>
                           {teacherClasses.map((c) => (
                             <SelectItem key={`${c.grade}-${c.className}`} value={`${c.grade}-${c.className}`}>
-                              {buildTeacherClassLabel(c.grade, c.className)}
+                              {buildTeacherClassLabel(tCommon, c.grade, c.className)}
                             </SelectItem>
                           ))}
                         </SelectContent>

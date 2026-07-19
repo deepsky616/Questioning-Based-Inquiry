@@ -192,7 +192,7 @@ export default function TeacherSettingsPage() {
                     key={`${c.grade}-${c.className}`}
                     className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-950/40 px-3 py-1 text-sm font-medium text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-200"
                   >
-                    {buildTeacherClassLabel(c.grade, c.className)}
+                    {buildTeacherClassLabel(tc, c.grade, c.className)}
                   </span>
                 ))}
               </div>

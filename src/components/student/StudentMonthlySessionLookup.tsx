@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   groupSessionDatesByMonth,
   groupSessionsByMonth,
@@ -23,6 +24,7 @@ export function StudentMonthlyDateSelect({
   ariaLabel: string;
   className?: string;
 }) {
+  const tCommon = useTranslations("common");
   const dateMonthGroups = groupSessionDatesByMonth(dates);
 
   return (
@@ -92,7 +94,7 @@ export function StudentMonthlySessionLookup<T extends LookupSession>({
     >
       <option value="all">{labels.allSessions}</option>
       {sessionMonthGroups.map((group) => (
-        <optgroup key={group.key} label={`${group.label} (${group.sessions.length}개)`}>
+        <optgroup key={group.key} label={`${group.label} (${tCommon("itemCount", { count: group.sessions.length })})`}>
           {group.sessions.map((session) => {
             const completed = completedSessionIds?.has(session.id) ?? false;
             const suffixes = [

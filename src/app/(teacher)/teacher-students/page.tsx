@@ -63,6 +63,7 @@ type StudentSort = "class" | "progressAsc";
 export default function StudentsPage() {
   const tPages = useTranslations("pages");
   const t = useTranslations("students");
+  const tCommon = useTranslations("common");
   const tSet = useTranslations("settings");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -174,7 +175,7 @@ export default function StudentsPage() {
   });
 
   const grouped = sortedFiltered.reduce<Record<string, Student[]>>((acc, s) => {
-    const key = buildTeacherClassLabel(s.grade, s.className);
+    const key = buildTeacherClassLabel(tCommon, s.grade, s.className);
     if (!acc[key]) acc[key] = [];
     acc[key].push(s);
     return acc;
@@ -366,7 +367,7 @@ export default function StudentsPage() {
                     ? "bg-indigo-600 text-white border-indigo-600"
                     : "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100"
                 }`}>
-                {buildTeacherClassLabel(tc.grade, tc.className)}
+                {buildTeacherClassLabel(tCommon, tc.grade, tc.className)}
               </button>
             );
           })}

@@ -43,7 +43,13 @@
     "questionWord": "질문",
     "home": "처음으로",
     "retry": "다시 시도",
-    "redirecting": "이동 중..."
+    "redirecting": "이동 중...",
+    "gradeClassLabel": "{grade}학년 {className}반",
+    "itemCount": "{count}개",
+    "classesRequired": "담당 학년·반을 1개 이상 추가해 주세요",
+    "gradeRequired": "학년을 입력해 주세요",
+    "classRequired": "반을 입력해 주세요",
+    "duplicateClass": "중복된 학년·반이 있습니다"
   },
   "classification": {
     "category1": "분류1",
@@ -307,7 +313,8 @@
     "searchPlaceholder": "주제·교과 검색",
     "upcomingSessionsLabel": "오늘·예정",
     "pastSessionsLabel": "지난 수업",
-    "helperTipFormula": "논쟁이 되는 질문은 '~해야 할까?', '~은 정당한가?', '어떤 가치가 더 중요할까?'로 끝맺으면 쉽게 만들 수 있어요."
+    "helperTipFormula": "논쟁이 되는 질문은 '~해야 할까?', '~은 정당한가?', '어떤 가치가 더 중요할까?'로 끝맺으면 쉽게 만들 수 있어요.",
+    "sessionCount": "{count}개"
   },
   "comment": {
     "loading": "댓글 불러오는 중...",
@@ -1157,7 +1164,12 @@
     "inquiryEditNote": "🧩 탐구질문 수업은 날짜·주제만 수정할 수 있어요(교과 고정).",
     "areaLabel": "영역",
     "unitLabel": "단원",
-    "searchPlaceholder": "주제·교과 검색"
+    "searchPlaceholder": "주제·교과 검색",
+    "targetClass": "{grade}학년 {className}반",
+    "targetStudentNamed": "학생 {name}",
+    "targetStudentSingle": "개별 학생",
+    "targetClassPartial": "{grade}학년 {className}반 일부",
+    "targetAllClasses": "전체 담당 학급"
   },
   "settings": {
     "apiKeyRequired": "API 키를 입력해 주세요 (10자 이상)",
@@ -1772,7 +1784,9 @@
     "gradeClass": "{grade}학년 {className}반",
     "selectAll": "전체 선택",
     "numberName": "{n}번 {name}",
-    "noStudents": "학생이 없습니다"
+    "noStudents": "학생이 없습니다",
+    "allClassesCount": "전체 담당 학급({selected}/{total})",
+    "classCount": "{grade}학년 {className}반({selected}/{total})"
   },
   "qstats": {
     "sortLabel": "정렬",

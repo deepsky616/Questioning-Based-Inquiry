@@ -173,7 +173,7 @@ export function StudentAskSessionSelector({
             <option value="">{t("noMatchingSession")}</option>
           ) : (
             sessionMonthGroups.map((group) => (
-              <optgroup key={group.key} label={`${group.label} (${group.sessions.length}개)`}>
+              <optgroup key={group.key} label={`${group.label} (${t("sessionCount", { count: group.sessions.length })})`}>
                 {group.sessions.map((session) => (
                   <option key={session.id} value={session.id}>
                     {sessionText.label(session)}
@@ -265,7 +265,7 @@ export function StudentAskSessionSelector({
                     <section key={group.key} className="student-ask-month-section space-y-2">
                       <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 py-2 text-xs font-semibold text-muted-foreground backdrop-blur">
                         <span>{t("upcomingSessionsLabel")} · {group.label}</span>
-                        <span>{group.sessions.length}개</span>
+                        <span>{t("sessionCount", { count: group.sessions.length })}</span>
                       </div>
                       <div className="student-ask-month-grid grid gap-2 sm:grid-cols-2">
                         {group.sessions.map(renderSessionCard)}
@@ -297,7 +297,7 @@ export function StudentAskSessionSelector({
                             <CollapseChevron open={open} />
                             {t("pastSessionsLabel")} · {group.label}
                           </span>
-                          <span>{group.sessions.length}개</span>
+                          <span>{t("sessionCount", { count: group.sessions.length })}</span>
                         </button>
                         {open && (
                           <div className="student-ask-month-grid grid gap-2 sm:grid-cols-2">

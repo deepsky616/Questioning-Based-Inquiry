@@ -142,13 +142,23 @@ export function buildClassStudentTargetPayload(params: {
   };
 }
 
-export function buildClassSelectionLabel(params: {
-  targetClassValue: string;
-  selectedStudentIds: string[];
-  students: SessionTargetStudent[];
-}) {
+type TranslateFn = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
+
+// t는 targetSelector 네임스페이스 번역 함수 (allClassesCount·classCount)
+export function buildClassSelectionLabel(
+  t: TranslateFn,
+  params: {
+    targetClassValue: string;
+    selectedStudentIds: string[];
+    students: SessionTargetStudent[];
+  },
+) {
   if (params.targetClassValue === "all") {
-    return `전체 담당 학급(${params.students.length}/${params.students.length})`;
+    const total = params.students.length;
+    return t("allClassesCount", { selected: total, total });
   }
   const [, grade, className] = params.targetClassValue.split(":");
   const classStudents = params.students.filter(
@@ -157,25 +167,36 @@ export function buildClassSelectionLabel(params: {
   const selectedCount = params.selectedStudentIds.filter((id) =>
     classStudents.some((student) => student.id === id),
   ).length;
-  return `${grade}학년 ${className}반(${selectedCount}/${classStudents.length})`;
+  return t("classCount", {
+    grade,
+    className,
+    selected: selectedCount,
+    total: classStudents.length,
+  });
 }
 
-export function buildTargetLabel(params: {
-  targetType?: string | null;
-  targetGrade?: string | null;
-  targetClassName?: string | null;
-  targetStudentName?: string | null;
-}) {
+// t는 sessions 네임스페이스 번역 함수 (targetClass·targetStudent*·targetAllClasses)
+export function buildTargetLabel(
+  t: TranslateFn,
+  params: {
+    targetType?: string | null;
+    targetGrade?: string | null;
+    targetClassName?: string | null;
+    targetStudentName?: string | null;
+  },
+) {
   if (params.targetType === "CLASS" && params.targetGrade && params.targetClassName) {
-    return `${params.targetGrade}학년 ${params.targetClassName}반`;
+    return t("targetClass", { grade: params.targetGrade, className: params.targetClassName });
   }
   if (params.targetType === "STUDENT") {
-    return params.targetStudentName ? `학생 ${params.targetStudentName}` : "개별 학생";
+    return params.targetStudentName
+      ? t("targetStudentNamed", { name: params.targetStudentName })
+      : t("targetStudentSingle");
   }
   if (params.targetType === "CUSTOM" && params.targetGrade && params.targetClassName) {
-    return `${params.targetGrade}학년 ${params.targetClassName}반 일부`;
+    return t("targetClassPartial", { grade: params.targetGrade, className: params.targetClassName });
   }
-  return "전체 담당 학급";
+  return t("targetAllClasses");
 }
 
 interface SessionTarget {

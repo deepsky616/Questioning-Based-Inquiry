@@ -84,7 +84,7 @@ export function SessionTargetSelector({
         </SelectContent>
       </Select>
       <p className="text-xs text-muted-foreground">
-        {buildClassSelectionLabel({ targetClassValue, selectedStudentIds, students })}
+        {buildClassSelectionLabel(t, { targetClassValue, selectedStudentIds, students })}
       </p>
 
       {targetClassValue !== "all" && (

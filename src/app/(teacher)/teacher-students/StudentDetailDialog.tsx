@@ -182,6 +182,7 @@ function BarChart({
 
 export function StudentSessionProgress({ student }: { student: Student }) {
   const t = useTranslations("students");
+  const tCommon = useTranslations("common");
   const progress = student.sessionProgress;
   if (!progress || progress.total === 0) {
     return <span className="text-xs text-muted-foreground">{t("sessionProgressEmpty")}</span>;
@@ -212,6 +213,7 @@ export function StudentDetailDialog({
   student, onClose, onChanged,
 }: { student: Student; onClose: () => void; onChanged: () => void }) {
   const t = useTranslations("students");
+  const tCommon = useTranslations("common");
   const tc = useTranslations("common");
   const tCls = useTranslations("classification");
   const tWithdrawal = useTranslations("accountWithdrawal");
@@ -341,7 +343,7 @@ export function StudentDetailDialog({
           <DialogTitle className="flex items-center gap-2">
             <span>{student.name}</span>
             <span className="text-sm font-normal text-muted-foreground">
-              {buildTeacherClassLabel(student.grade, student.className)} · {t("numberSuffix", { n: student.studentNumber })}
+              {buildTeacherClassLabel(tCommon, student.grade, student.className)} · {t("numberSuffix", { n: student.studentNumber })}
             </span>
           </DialogTitle>
           <DialogDescription className="sr-only">

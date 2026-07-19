@@ -1,18 +1,37 @@
+/** 국제화용 번역 함수 — next-intl useTranslations 반환값과 호환 */
+export type TranslateFn = (
+  key: string,
+  values?: Record<string, string | number>,
+) => string;
+
+export type TeacherClassValidationKey =
+  | "classesRequired"
+  | "gradeRequired"
+  | "classRequired"
+  | "duplicateClass";
+
+// 완성 문장이 아닌 common 네임스페이스의 메시지 키를 반환한다 —
+// 호출부가 t(키)로 현재 로케일에 맞게 표시한다.
 export function validateTeacherClasses(
   classes: Array<{ grade: string; className: string }>
-): string | null {
-  if (classes.length === 0) return "담당 학년·반을 1개 이상 추가해 주세요";
+): TeacherClassValidationKey | null {
+  if (classes.length === 0) return "classesRequired";
   for (const c of classes) {
-    if (!c.grade.trim()) return "학년을 입력해 주세요";
-    if (!c.className.trim()) return "반을 입력해 주세요";
+    if (!c.grade.trim()) return "gradeRequired";
+    if (!c.className.trim()) return "classRequired";
   }
   const keys = classes.map((c) => `${c.grade.trim()}-${c.className.trim()}`);
-  if (new Set(keys).size !== keys.length) return "중복된 학년·반이 있습니다";
+  if (new Set(keys).size !== keys.length) return "duplicateClass";
   return null;
 }
 
-export function buildTeacherClassLabel(grade: string, className: string): string {
-  return `${grade}학년 ${className}반`;
+// t는 common 네임스페이스 번역 함수 (common.gradeClassLabel)
+export function buildTeacherClassLabel(
+  t: TranslateFn,
+  grade: string,
+  className: string,
+): string {
+  return t("gradeClassLabel", { grade, className });
 }
 
 export function parseTeacherClassKey(

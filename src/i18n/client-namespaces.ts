@@ -19,6 +19,7 @@ export const ROOT_CLIENT_NAMESPACES = [
 
 export const AUTH_CLIENT_NAMESPACES = [
   "auth",
+  "common", // 회원가입의 담당 학급 검증 메시지·학년반 라벨
 ] as const;
 
 export const STUDENT_CLIENT_NAMESPACES = [

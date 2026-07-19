@@ -181,7 +181,7 @@ export function TeacherSessionRow({
                   : t("badgeQuickQuestionClass")}
               </span>
               <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                {buildTargetLabel({
+                {buildTargetLabel(t, {
                   targetType: session.targetType,
                   targetGrade: session.targetGrade,
                   targetClassName: session.targetClassName,
