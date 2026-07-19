@@ -1,7 +1,7 @@
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { sendTeacherPasswordResetEmail } from "@/lib/email";
+import { isEmailEnabled, sendTeacherPasswordResetEmail } from "@/lib/email";
 import {
   buildPasswordResetUrl,
   createPasswordResetToken,
@@ -33,6 +33,13 @@ export async function POST(req: Request) {
     const emailLimited = checkRateLimit(`forgot-password:email:${normalizedEmail}`, 3);
     if (emailLimited) return emailLimited;
 
+    if (!isEmailEnabled()) {
+      logger.error(
+        "[forgot-password] email delivery is disabled: GMAIL_USER and GMAIL_APP_PASSWORD are required",
+      );
+      return NextResponse.json({ message: GENERIC_MESSAGE });
+    }
+
     const teacher = await prisma.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true, email: true, name: true, role: true },
@@ -48,19 +55,16 @@ export async function POST(req: Request) {
     const tokenHash = hashPasswordResetToken(token);
     const expiresAt = getPasswordResetExpiry();
 
-    await prisma.$transaction([
-      prisma.passwordResetToken.updateMany({
-        where: { userId: teacher.id, usedAt: null },
-        data: { usedAt: new Date() },
-      }),
-      prisma.passwordResetToken.create({
-        data: {
-          tokenHash,
-          userId: teacher.id,
-          expiresAt,
-        },
-      }),
-    ]);
+    // 기존 링크는 새 메일이 실제로 접수된 뒤에만 무효화한다. 전송 장애가
+    // 기존의 유효한 복구 수단까지 없애지 않도록 새 토큰을 먼저 따로 만든다.
+    const resetToken = await prisma.passwordResetToken.create({
+      data: {
+        tokenHash,
+        userId: teacher.id,
+        // SMTP가 메일을 접수하기 전에는 링크가 사용되지 않도록 만료 상태로 둔다.
+        expiresAt: new Date(0),
+      },
+    });
 
     const origin = process.env.NEXTAUTH_URL ?? new URL(req.url).origin;
     const resetUrl = buildPasswordResetUrl(origin, token);
@@ -71,9 +75,40 @@ export async function POST(req: Request) {
     });
 
     logger.info("[forgot-password] emailResult:", emailResult);
-    if (!emailResult.ok) {
-      logger.error("Password reset email error:", emailResult.error);
+    const emailDelivered = emailResult.ok && !emailResult.skipped;
+    if (!emailDelivered) {
+      const reason = emailResult.ok
+        ? ("reason" in emailResult ? emailResult.reason : "Email delivery was skipped")
+        : emailResult.error;
+      logger.error("Password reset email delivery failed:", reason);
+
+      try {
+        await prisma.passwordResetToken.delete({ where: { id: resetToken.id } });
+      } catch (cleanupError) {
+        logger.error("Password reset token cleanup error:", cleanupError);
+      }
+
+      return NextResponse.json({ message: GENERIC_MESSAGE });
     }
+
+    // 전송에 성공한 현재 토큰만 활성화한다. 아직 전송 중인 다른 요청의 만료
+    // 상태 토큰은 건드리지 않아 동시 요청끼리 서로 교착되거나 삭제하지 않는다.
+    const activatedAt = new Date();
+    await prisma.$transaction([
+      prisma.passwordResetToken.updateMany({
+        where: {
+          userId: teacher.id,
+          usedAt: null,
+          expiresAt: { gt: activatedAt },
+          id: { not: resetToken.id },
+        },
+        data: { usedAt: activatedAt },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: resetToken.id },
+        data: { expiresAt, usedAt: null },
+      }),
+    ]);
 
     return NextResponse.json({ message: GENERIC_MESSAGE });
   } catch (error) {

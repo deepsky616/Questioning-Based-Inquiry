@@ -3,11 +3,17 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/db", () => ({
   prisma: {
     user: { findUnique: vi.fn() },
-    passwordResetToken: { updateMany: vi.fn(), create: vi.fn() },
+    passwordResetToken: {
+      updateMany: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+      update: vi.fn(),
+    },
     $transaction: vi.fn().mockResolvedValue([]),
   },
 }));
 vi.mock("@/lib/email", () => ({
+  isEmailEnabled: vi.fn().mockReturnValue(true),
   sendTeacherPasswordResetEmail: vi.fn().mockResolvedValue({ ok: true }),
 }));
 vi.mock("@/lib/api-rate-limit", async (importOriginal) => {
@@ -16,11 +22,17 @@ vi.mock("@/lib/api-rate-limit", async (importOriginal) => {
 });
 
 import { prisma } from "@/lib/db";
-import { sendTeacherPasswordResetEmail } from "@/lib/email";
+import { isEmailEnabled, sendTeacherPasswordResetEmail } from "@/lib/email";
 import { checkRateLimit } from "@/lib/api-rate-limit";
 import { POST } from "@/app/api/auth/forgot-password/route";
 
 const mockFindUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
+const mockCreateToken = prisma.passwordResetToken.create as ReturnType<typeof vi.fn>;
+const mockDeleteToken = prisma.passwordResetToken.delete as ReturnType<typeof vi.fn>;
+const mockUpdateToken = prisma.passwordResetToken.update as ReturnType<typeof vi.fn>;
+const mockUpdateManyTokens = prisma.passwordResetToken.updateMany as ReturnType<typeof vi.fn>;
+const mockTransaction = prisma.$transaction as ReturnType<typeof vi.fn>;
+const mockIsEmailEnabled = isEmailEnabled as ReturnType<typeof vi.fn>;
 const mockSendEmail = sendTeacherPasswordResetEmail as ReturnType<typeof vi.fn>;
 const mockRateLimit = checkRateLimit as ReturnType<typeof vi.fn>;
 
@@ -35,7 +47,13 @@ function makeReq(email: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRateLimit.mockReturnValue(null);
+  mockIsEmailEnabled.mockReturnValue(true);
   mockSendEmail.mockResolvedValue({ ok: true });
+  mockCreateToken.mockResolvedValue({ id: "reset-token-1" });
+  mockDeleteToken.mockResolvedValue({ id: "reset-token-1" });
+  mockUpdateToken.mockResolvedValue({ id: "reset-token-1" });
+  mockUpdateManyTokens.mockResolvedValue({ count: 1 });
+  mockTransaction.mockResolvedValue([]);
 });
 
 describe("POST forgot-password 계정 열거 방지", () => {
@@ -73,5 +91,66 @@ describe("POST forgot-password 계정 열거 방지", () => {
     const res = await POST(makeReq("t@a.com"));
     expect(res.status).toBe(429);
     expect(mockFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("이메일 설정이 없으면 토큰을 만들거나 계정을 조회하지 않는다", async () => {
+    mockIsEmailEnabled.mockReturnValue(false);
+
+    const res = await POST(makeReq("teacher@example.com"));
+
+    expect(res.status).toBe(200);
+    expect(mockFindUnique).not.toHaveBeenCalled();
+    expect(mockCreateToken).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it("전송 실패 시 새 토큰만 삭제하고 기존 토큰을 유지한다", async () => {
+    mockFindUnique.mockResolvedValue({
+      id: "t1",
+      email: "teacher@example.com",
+      name: "교사",
+      role: "TEACHER",
+    });
+    mockSendEmail.mockResolvedValue({ ok: false, error: "SMTP authentication failed" });
+
+    const res = await POST(makeReq("teacher@example.com"));
+
+    expect(res.status).toBe(200);
+    expect(mockCreateToken).toHaveBeenCalledOnce();
+    expect(mockDeleteToken).toHaveBeenCalledWith({ where: { id: "reset-token-1" } });
+    expect(mockUpdateManyTokens).not.toHaveBeenCalled();
+  });
+
+  it("실제 전송 성공 뒤에 기존 토큰을 무효화한다", async () => {
+    mockFindUnique.mockResolvedValue({
+      id: "t1",
+      email: "teacher@example.com",
+      name: "교사",
+      role: "TEACHER",
+    });
+
+    const res = await POST(makeReq("teacher@example.com"));
+
+    expect(res.status).toBe(200);
+    expect(mockTransaction).toHaveBeenCalledOnce();
+    expect(mockSendEmail.mock.invocationCallOrder[0]).toBeLessThan(
+      mockTransaction.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("새 토큰은 전송 성공 전까지 만료 상태로 두고 성공 뒤 활성화한다", async () => {
+    mockFindUnique.mockResolvedValue({
+      id: "t1",
+      email: "teacher@example.com",
+      name: "교사",
+      role: "TEACHER",
+    });
+
+    await POST(makeReq("teacher@example.com"));
+
+    expect(mockCreateToken.mock.calls[0][0].data.expiresAt.getTime()).toBe(0);
+    expect(mockUpdateToken.mock.calls[0][0].data.expiresAt.getTime()).toBeGreaterThan(
+      Date.now(),
+    );
   });
 });

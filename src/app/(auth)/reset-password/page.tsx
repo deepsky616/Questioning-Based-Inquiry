@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { useTranslations } from "next-intl";
+import { validatePasswordPolicy } from "@/lib/password-policy";
 
 function ResetPasswordContent() {
   const t = useTranslations("auth");
@@ -25,8 +26,9 @@ function ResetPasswordContent() {
       setError(t("invalidResetLink"));
       return;
     }
-    if (password.length < 6) {
-      setError(t("passwordTooShort"));
+    const policyError = validatePasswordPolicy(password);
+    if (policyError) {
+      setError(policyError);
       return;
     }
     if (password !== confirmPassword) {
@@ -69,15 +71,15 @@ function ResetPasswordContent() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>}
-          {message && <div className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-sm p-3 rounded-md">{message}</div>}
+          {error && <div role="alert" className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>}
+          {message && <div role="status" className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-sm p-3 rounded-md">{message}</div>}
           <div className="space-y-2">
             <Label htmlFor="password">{t("newPassword")}</Label>
             <Input
               id="password"
               name="password"
               type="password"
-              placeholder={t("min6")}
+              placeholder={t("passwordHint")}
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -91,7 +93,7 @@ function ResetPasswordContent() {
               id="confirmPassword"
               name="confirmPassword"
               type="password"
-              placeholder={t("min6")}
+              placeholder={t("passwordHint")}
               value={confirmPassword}
               onChange={(e) => {
                 setConfirmPassword(e.target.value);
@@ -99,6 +101,7 @@ function ResetPasswordContent() {
               }}
             />
           </div>
+          <p className="text-xs text-muted-foreground">{t("passwordRule")}</p>
           <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting || Boolean(message)}>
             {isSubmitting ? t("changing") : t("changePassword")}
           </Button>

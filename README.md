@@ -47,15 +47,15 @@ DATABASE_URL="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pool
 DIRECT_URL="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
 NEXTAUTH_SECRET="your-secret-key"
 NEXTAUTH_URL="http://localhost:3000"
-TEACHER_REGISTRATION_CODE="replace-with-at-least-12-random-characters"
 GOOGLE_API_KEY="your-gemini-api-key"
-RESEND_API_KEY="re_your_api_key"
-RESEND_FROM_EMAIL="Question Lab <noreply@your-domain.com>"
+GMAIL_USER="your_gmail@gmail.com"
+GMAIL_APP_PASSWORD="xxxx xxxx xxxx xxxx"
 ```
 
-`RESEND_API_KEY` and `RESEND_FROM_EMAIL` are optional in development. If either value is missing, the app skips email sending and keeps the main request successful.
-
-`TEACHER_REGISTRATION_CODE` must be at least 12 characters. Public teacher registration is denied when it is missing, and student accounts are created by an authenticated teacher from student management.
+`GMAIL_USER` and `GMAIL_APP_PASSWORD` must both be present and belong to the same
+Google account. Use a Google app password, not the account password. Email is optional
+for local development, but password reset email is unavailable when either value is
+missing or invalid.
 
 ### Supabase Free setup
 
@@ -147,9 +147,10 @@ PII is not sent (`sendDefaultPii: false`) and tracing is off to stay in the free
 
 ### Resend Free setup
 
-1. Create a Resend API key.
-2. Verify one sending domain in Resend.
-3. Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL`.
+1. Enable two-step verification for the sending Google account.
+2. Create a Google app password for mail.
+3. Set the account address as `GMAIL_USER` and the app password as
+   `GMAIL_APP_PASSWORD`.
 
 The app sends email only from server routes:
 
@@ -167,8 +168,12 @@ The app sends email only from server routes:
    - `NEXTAUTH_SECRET`: Generate with `openssl rand -base64 32`
    - `NEXTAUTH_URL`: Your Vercel deployment URL
    - `GOOGLE_API_KEY`: Your Gemini API key
-   - `RESEND_API_KEY`: Resend API key
-   - `RESEND_FROM_EMAIL`: Verified sender, e.g. `Question Lab <noreply@your-domain.com>`
+   - `GMAIL_USER`: Sending Google account address
+   - `GMAIL_APP_PASSWORD`: App password created for the same account
+
+After changing either email variable, redeploy the production deployment and complete
+one password reset using a registered teacher account. A successful request must log an
+email result with `ok: true` and the message must arrive in the inbox or spam folder.
 
 ## Project Structure
 
