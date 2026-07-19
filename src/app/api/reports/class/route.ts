@@ -8,7 +8,6 @@ import {
   isClassInTeacherScope,
   loadTeacherStudentScope,
 } from "@/lib/teacher-student-access";
-import { loadQuestionGameClassSummary } from "@/lib/question-game-history-service";
 
 // 학급 활동 리포트(교사용)
 //  - grade/className 미지정: 교사의 담당 학급 목록 반환(선택용)
@@ -92,13 +91,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "해당 학급에 학생이 없습니다" }, { status: 404 });
   }
 
-  const [questions, likesGiven, comments, likesReceived, commentsReceived, questionGames] = await Promise.all([
+  const [questions, likesGiven, comments, likesReceived, commentsReceived] = await Promise.all([
     prisma.question.findMany({ where: { authorId: { in: ids } }, select: { createdAt: true, closure: true, cognitive: true, authorId: true } }),
     prisma.questionLike.findMany({ where: { userId: { in: ids } }, select: { createdAt: true, userId: true } }),
     prisma.comment.findMany({ where: { authorId: { in: ids } }, select: { createdAt: true, authorId: true } }),
     prisma.questionLike.findMany({ where: { question: { authorId: { in: ids } } }, select: { createdAt: true } }),
     prisma.comment.findMany({ where: { question: { authorId: { in: ids } } }, select: { createdAt: true } }),
-    loadQuestionGameClassSummary(ids),
   ]);
 
   const report = buildActivityReport({ questions, likesGiven, comments, likesReceived, commentsReceived });
@@ -180,7 +178,6 @@ export async function GET(req: NextRequest) {
     klass: { grade, className, studentCount: students.length, school },
     perStudent,
     sessions: sessionsWithAnalysis,
-    questionGames,
     ...report,
   });
 }

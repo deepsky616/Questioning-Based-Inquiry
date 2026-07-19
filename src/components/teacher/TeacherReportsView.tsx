@@ -8,20 +8,16 @@ import { ReportPrintDoc, type PrintReportItem } from "@/components/reports/Repor
 import { ReportPrintControls } from "@/components/teacher/ReportPrintControls";
 import { useTranslations } from "next-intl";
 import { visibleReportRefetchInterval } from "@/lib/query-refresh";
-import { QuestionGameLearningHistory } from "@/components/question-games/QuestionGameLearningHistory";
-import type { QuestionGameLearningHistory as QuestionGameHistory } from "@/lib/question-game-history";
 
 interface ClassItem { grade: string; className: string; studentCount: number }
 interface ClassReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
   klass: { grade: string; className: string; studentCount: number };
   perStudent: PerStudentRow[];
   sessions?: SessionMeta[];
-  questionGames: QuestionGameHistory;
 }
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession" | "perStudent"> {
   student: { id?: string; name: string; grade?: string | null; className?: string | null; studentNumber?: string | null; school?: string | null };
   sessions?: SessionMeta[];
-  questionGames: QuestionGameHistory;
 }
 
 // 학급 세션 분석: 기존 세션 분석(전체 학생) 엔드포인트 재사용
@@ -456,7 +452,6 @@ export function TeacherReportsView() {
       {/* 학급별 보기 */}
       {!loading && view === "class" && report && (
         <div className="space-y-5">
-          <QuestionGameLearningHistory audience="class" history={report.questionGames} />
           <ReportView
             scope="class"
             title={t("classReportTitle", { grade: report.klass.grade, className: report.klass.className })}
@@ -480,7 +475,6 @@ export function TeacherReportsView() {
       {/* 학생별 보기 */}
       {!loading && view === "student" && studentReport && (
         <div className="space-y-5">
-          <QuestionGameLearningHistory audience="teacher" history={studentReport.questionGames} studentId={studentId} />
           <ReportView
             scope="student"
             title={t("studentReportTitle", { name: studentReport.student.name })}

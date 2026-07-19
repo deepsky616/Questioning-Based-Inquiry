@@ -173,7 +173,7 @@ describe("학급 보고서 접근 경계", () => {
       },
       select: { id: true, name: true, studentNumber: true },
     });
-    expect(mockGameSummary).toHaveBeenCalledWith(["student-1"]);
+    expect(mockGameSummary).not.toHaveBeenCalled();
   });
 
   it("다른 교사 질문수업의 전체 분석은 학급 보고서에 붙이지 않는다", async () => {

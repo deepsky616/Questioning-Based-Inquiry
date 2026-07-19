@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildStudentReport } from "@/lib/student-report";
-import { loadQuestionGameLearningHistory } from "@/lib/question-game-history-service";
 import {
   isStudentInTeacherScope,
   loadTeacherStudentScope,
@@ -36,13 +35,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const [report, questionGames] = await Promise.all([
-    buildStudentReport(targetId),
-    loadQuestionGameLearningHistory(targetId),
-  ]);
+  const report = await buildStudentReport(targetId);
   if (!report) {
     return NextResponse.json({ error: "학생을 찾을 수 없습니다" }, { status: 404 });
   }
 
-  return NextResponse.json({ ...report, questionGames });
+  return NextResponse.json(report);
 }

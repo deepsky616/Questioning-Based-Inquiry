@@ -11,13 +11,17 @@ vi.mock("@/lib/teacher-student-access", () => ({
 }));
 vi.mock("@/lib/question-game-history-service", () => ({
   loadQuestionGameHistoryPage: vi.fn(),
+  loadQuestionGameLearningHistory: vi.fn(),
   isQuestionGameHistoryCursor: vi.fn(() => true),
 }));
 
 import { GET } from "@/app/api/reports/question-games/route";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { loadQuestionGameHistoryPage } from "@/lib/question-game-history-service";
+import {
+  loadQuestionGameHistoryPage,
+  loadQuestionGameLearningHistory,
+} from "@/lib/question-game-history-service";
 import {
   isStudentInTeacherScope,
   loadTeacherStudentScope,
@@ -26,15 +30,40 @@ import {
 const mockAuth = auth as ReturnType<typeof vi.fn>;
 const mockStudent = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 const mockLoad = loadQuestionGameHistoryPage as ReturnType<typeof vi.fn>;
+const mockLoadSummary = loadQuestionGameLearningHistory as ReturnType<typeof vi.fn>;
 const mockScope = loadTeacherStudentScope as ReturnType<typeof vi.fn>;
 const mockInScope = isStudentInTeacherScope as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockLoad.mockResolvedValue({ items: [], nextCursor: null });
+  mockLoadSummary.mockResolvedValue({
+    totals: { plays: 2, points: 12, goodQuestions: 3 },
+    modes: {
+      solo: { plays: 1, points: 4, goodQuestions: 1 },
+      ai: { plays: 0, points: 0, goodQuestions: 0 },
+      friend: { plays: 1, points: 8, goodQuestions: 2 },
+    },
+    recent: [],
+    nextCursor: null,
+  });
 });
 
 describe("질문놀이 상세 이력 경로", () => {
+  it("학생 질문놀이 화면에 필요한 전체 학습 요약을 반환한다", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
+
+    const response = await GET(new NextRequest(
+      "http://localhost/api/reports/question-games?summary=1",
+    ));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockLoadSummary).toHaveBeenCalledWith("student-1");
+    expect(mockLoad).not.toHaveBeenCalled();
+    expect(body.totals).toEqual({ plays: 2, points: 12, goodQuestions: 3 });
+  });
+
   it("학생은 본인의 필터된 다음 이력만 조회한다", async () => {
     mockAuth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
 

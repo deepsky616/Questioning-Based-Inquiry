@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import {
   isQuestionGameHistoryCursor,
   loadQuestionGameHistoryPage,
+  loadQuestionGameLearningHistory,
 } from "@/lib/question-game-history-service";
 import { isBuiltInQuestionGameId } from "@/lib/question-game-rules";
 import type { QuestionGameHistoryMode } from "@/lib/question-game-history";
@@ -49,6 +50,10 @@ export async function GET(request: NextRequest) {
     if (!isStudentInTeacherScope(scope, student)) {
       return NextResponse.json({ error: "학생 이력 조회 권한이 없습니다" }, { status: 403 });
     }
+  }
+
+  if (params.get("summary") === "1") {
+    return NextResponse.json(await loadQuestionGameLearningHistory(studentId));
   }
 
   const modeValue = params.get("mode")?.trim() || undefined;

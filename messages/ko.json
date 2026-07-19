@@ -1691,7 +1691,10 @@
     "settlementRepairing": "확인 중...",
     "settlementRoom": "방 {code}",
     "settlementRepairDone": "포인트 지급 상태를 다시 확인했습니다.",
-    "settlementRepairFailed": "포인트 지급 상태를 확인하지 못했습니다."
+    "settlementRepairFailed": "포인트 지급 상태를 확인하지 못했습니다.",
+    "learningOverviewRegion": "학급 질문놀이 학습 현황",
+    "learningOverviewDesc": "학급을 선택하면 완료한 놀이와 좋은 질문, 받은 포인트를 모아 볼 수 있어요.",
+    "learningClassLabel": "학급 선택"
   },
   "myQuestions": {
     "deleteConfirm": "이 질문을 삭제할까요? 삭제하면 되돌릴 수 없어요.",
@@ -2150,8 +2153,8 @@
     "nextExpandThinking": "왜 또는 어떻게를 넣어 생각을 넓히는 질문도 만들어 보세요.",
     "nextChangePerspective": "같은 주제를 다른 관점에서 한 번 더 질문해 보세요.",
     "diceFaceType": "{face}번 — {type}",
-    "historyTitleStudent": "나의 질문놀이 학습 이력",
-    "historyTitleClass": "학급 질문놀이 요약",
+    "historyTitleStudent": "나의 질문놀이 학습 기록",
+    "historyTitleClass": "학급 질문놀이 학습 현황",
     "historyTitle": "질문놀이 학습 이력",
     "hasQuestionForm": "질문 형태로 바꿨어요.",
     "rewriteAsQuestion": "질문 형태로 다시 바꿔 보세요."

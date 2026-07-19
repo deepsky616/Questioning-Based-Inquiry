@@ -32,6 +32,7 @@ import {
   isQuestionGameSettlementHealth,
   type QuestionGameSettlementHealth,
 } from "@/lib/question-game-settlement-health";
+import { TeacherQuestionGameLearningOverview } from "@/components/question-games/TeacherQuestionGameLearningOverview";
 
 type VisType = "all" | "classes" | "students" | "hidden";
 
@@ -221,6 +222,12 @@ export default function TeacherQuestionPlayPage() {
         health={settlementHealth}
         repairing={settlementRepairing}
         onRepair={() => { void repairSettlements(); }}
+      />
+
+      <TeacherQuestionGameLearningOverview
+        classes={teacherClasses}
+        students={students}
+        statsByGame={statsByGame}
       />
 
       {/* 통계 카드 */}

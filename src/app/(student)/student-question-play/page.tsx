@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { AnyGame, localizeQuestionGames } from "@/lib/question-games-data";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { StudentQuestionGameLearningHistory } from "@/components/question-games/StudentQuestionGameLearningHistory";
 
 export default function StudentQuestionPlayPage() {
   const t = useTranslations("playLanding");
@@ -57,6 +58,10 @@ export default function StudentQuestionPlayPage() {
             </span>
           </div>
         </div>
+      </div>
+
+      <div className="mb-10">
+        <StudentQuestionGameLearningHistory />
       </div>
 
       {isLoading && (

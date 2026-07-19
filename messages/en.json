@@ -1691,7 +1691,10 @@
     "settlementRepairing": "Checking...",
     "settlementRoom": "Room {code}",
     "settlementRepairDone": "Point award status was checked again.",
-    "settlementRepairFailed": "Point award status could not be checked."
+    "settlementRepairFailed": "Point award status could not be checked.",
+    "learningOverviewRegion": "Class question-game learning overview",
+    "learningOverviewDesc": "Select a class to review completed games, good questions, and points earned.",
+    "learningClassLabel": "Select class"
   },
   "myQuestions": {
     "deleteConfirm": "Delete this question? This cannot be undone.",
@@ -2150,8 +2153,8 @@
     "nextExpandThinking": "Try a why or how question that expands your thinking.",
     "nextChangePerspective": "Ask about the same topic once more from a different point of view.",
     "diceFaceType": "No. {face} — {type}",
-    "historyTitleStudent": "My question-game learning history",
-    "historyTitleClass": "Class question-game summary",
+    "historyTitleStudent": "My question-game learning record",
+    "historyTitleClass": "Class question-game learning overview",
     "historyTitle": "Question-game learning history",
     "hasQuestionForm": "It has a question form.",
     "rewriteAsQuestion": "Rewrite it as a question."

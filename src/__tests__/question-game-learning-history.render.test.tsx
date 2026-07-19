@@ -32,7 +32,7 @@ describe("질문놀이 학습 이력 화면", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "나의 질문놀이 학습 이력" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "나의 질문놀이 학습 기록" })).toBeVisible();
     expect(screen.getByText("완료한 놀이").nextSibling).toHaveTextContent("3");
     expect(screen.getByText("혼자 하기 1회")).toBeVisible();
     expect(screen.getByText("인공지능과 함께 1회")).toBeVisible();
@@ -122,7 +122,7 @@ describe("질문놀이 학습 이력 화면", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "학급 질문놀이 요약" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "학급 질문놀이 학습 현황" })).toBeVisible();
     expect(screen.queryByText("최근 완료한 놀이")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "전체 이력 보기" })).not.toBeInTheDocument();
   });

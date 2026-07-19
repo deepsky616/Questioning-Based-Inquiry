@@ -139,7 +139,7 @@ describe("단일 학생 보고서 접근 경계", () => {
     expect(response.status).toBe(200);
     expect(mockBuildStudentReport).toHaveBeenCalledOnce();
     expect(mockBuildStudentReport).toHaveBeenCalledWith("student-1");
-    expect(mockGameHistory).toHaveBeenCalledWith("student-1");
-    expect(body.questionGames.totals).toEqual({ plays: 2, points: 12, goodQuestions: 3 });
+    expect(mockGameHistory).not.toHaveBeenCalled();
+    expect(body).not.toHaveProperty("questionGames");
   });
 });
