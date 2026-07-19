@@ -77,7 +77,8 @@
     }
   },
   "auth": {
-    "tagline": "Inquiry-based learning through questions",
+    "tagline": "A classroom where we learn together through questions",
+    "taglineDescription": "A learning space where teachers and students ask, explore, and grow together",
     "studentLogin": "Student Login",
     "teacherLogin": "Teacher Login",
     "studentSignup": "Student Sign up",

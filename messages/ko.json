@@ -77,7 +77,8 @@
     }
   },
   "auth": {
-    "tagline": "질문기반 탐구수업 웹앱",
+    "tagline": "질문으로 함께 배우는 교실",
+    "taglineDescription": "교사와 학생이 질문하고 탐구하며 함께 성장하는 배움 공간",
     "studentLogin": "학생 로그인",
     "teacherLogin": "교사 로그인",
     "studentSignup": "학생 회원가입",

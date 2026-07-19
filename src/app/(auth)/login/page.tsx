@@ -302,9 +302,12 @@ function LoginContent() {
 
   return (
     <Card className="w-full max-w-md">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl text-center">Question Lab</CardTitle>
-        <CardDescription className="text-center">{t("tagline")}</CardDescription>
+      <CardHeader className="space-y-2 text-center">
+        <p className="text-sm font-semibold tracking-wide text-primary">Question Lab</p>
+        <CardTitle className="text-2xl leading-tight">{t("tagline")}</CardTitle>
+        <CardDescription className="text-pretty leading-relaxed">
+          {t("taglineDescription")}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs value={loginType} onValueChange={(value) => setLoginType(value as "student" | "teacher")}>
