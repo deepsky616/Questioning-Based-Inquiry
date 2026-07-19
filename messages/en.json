@@ -969,6 +969,7 @@
     "savedFilterAllAreas": "All areas",
     "savedFilterAllUnits": "All units",
     "savedFilterEmpty": "No saved inquiry designs match the filters.",
+    "deleteConfirm": "Delete this inquiry design?",
     "deleteConfirmLinked": "This will remove student reference materials from {count} question classes created from this design. Delete anyway?"
   },
   "students": {

@@ -969,6 +969,7 @@
     "savedFilterAllAreas": "전체 영역",
     "savedFilterAllUnits": "전체 단원",
     "savedFilterEmpty": "조건에 맞는 탐구질문이 없어요.",
+    "deleteConfirm": "이 탐구 설계를 삭제할까요?",
     "deleteConfirmLinked": "이 설계로 만든 질문수업 {count}개의 학생 참고 자료가 사라집니다. 정말 삭제할까요?"
   },
   "students": {
