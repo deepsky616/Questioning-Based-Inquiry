@@ -90,7 +90,7 @@ async function loadViewableCustomGames(
     teachers.map((t) => t.id),
   );
   for (const game of customGames) {
-    if (!gameIds.includes(game.id)) continue;
+    if (game.isBuiltIn || !gameIds.includes(game.id)) continue;
     const visibility = visibilityMap[game.id] ?? { type: "all" as const };
     if (isGameVisibleToStudent(visibility, viewer)) result.set(game.id, game);
   }

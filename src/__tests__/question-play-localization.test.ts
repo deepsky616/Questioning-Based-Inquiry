@@ -29,7 +29,7 @@ const studentGamePage = readFileSync("src/app/(student)/student-question-play/[g
 const teacherGamePage = readFileSync("src/app/(teacher)/teacher-question-play/page.tsx", "utf8");
 const teacherPreviewPage = readFileSync("src/app/(teacher)/teacher-question-play/[gameId]/preview/page.tsx", "utf8");
 const TestIntlProvider = NextIntlClientProvider as ComponentType<
-  PropsWithChildren<{ locale: string; messages: Record<string, never> }>
+  PropsWithChildren<{ locale: string; messages: Record<string, unknown> }>
 >;
 
 function renderLobby(locale: "ko" | "en", playerCount: number) {
