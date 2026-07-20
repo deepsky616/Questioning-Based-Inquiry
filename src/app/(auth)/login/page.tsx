@@ -354,12 +354,6 @@ export default function LoginPage() {
               className="object-contain"
               priority
             />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent p-5 text-white">
-              <p className="text-sm font-medium opacity-90">Question Lab</p>
-              <h1 className="mt-1 text-2xl font-bold leading-tight sm:text-3xl">
-                {t("heroTitle")}
-              </h1>
-            </div>
           </div>
         </section>
 

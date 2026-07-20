@@ -35,6 +35,10 @@ describe("로그인 화면 소개 문구", () => {
     expect(
       screen.getByText("교사와 학생이 질문하고 탐구하며 함께 성장하는 배움 공간"),
     ).toBeInTheDocument();
+    expect(screen.getAllByText("Question Lab")).toHaveLength(1);
+    expect(
+      screen.queryByRole("heading", { name: "질문에서 시작해 탐구로 이어지는 수업" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("질문기반 탐구수업 웹앱")).not.toBeInTheDocument();
   });
 });
