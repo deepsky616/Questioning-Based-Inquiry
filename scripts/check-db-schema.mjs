@@ -80,6 +80,12 @@ const REQUIRED_COLUMNS = [
 
 export const REQUIRED_INDEXES = [
   {
+    name: "uniq_student_identity",
+    tableName: "users",
+    isUnique: true,
+    columns: ["school", "grade", "class_name", "student_number"],
+  },
+  {
     name: "uniq_student_question_content",
     tableName: "questions",
     isUnique: true,

@@ -50,6 +50,7 @@ model User {
   @@index([role, school, grade, className])
   @@index([role, totalPoints])
   @@index([role, school, totalPoints])
+  @@unique([school, grade, className, studentNumber], name: "studentIdentity", map: "uniq_student_identity")
   @@map("users")
 }
 

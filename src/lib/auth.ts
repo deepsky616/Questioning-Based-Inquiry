@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { buildLoginIdentity, isLoginAttemptAllowed } from "@/lib/login-guard";
 import { authCallbacks, authPages, authSession } from "@/lib/auth-shared";
+import { normalizeStudentIdentity } from "@/lib/student-registration";
 import type { UserRole } from "@/types/user";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -29,14 +30,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         let user;
 
         if (credentials.loginType === "student") {
-          const school = credentials.school as string;
-          const grade = credentials.grade as string;
-          const className = credentials.className as string;
-          const studentNumber = credentials.studentNumber as string;
-          if (!school || !grade || !className || !studentNumber) return null;
-          user = await prisma.user.findFirst({
-            where: { role: "STUDENT", school, grade, className, studentNumber },
+          const rawIdentity = [
+            credentials.school,
+            credentials.grade,
+            credentials.className,
+            credentials.studentNumber,
+          ];
+          if (rawIdentity.some((value) => typeof value !== "string" || !value.trim())) {
+            return null;
+          }
+          const identity = normalizeStudentIdentity({
+            school: credentials.school as string,
+            grade: credentials.grade as string,
+            className: credentials.className as string,
+            studentNumber: credentials.studentNumber as string,
           });
+          user = await prisma.user.findUnique({
+            where: { studentIdentity: identity },
+          });
+          if (user?.role !== "STUDENT") return null;
         } else {
           const email = credentials.email as string | undefined;
           if (!email) return null;

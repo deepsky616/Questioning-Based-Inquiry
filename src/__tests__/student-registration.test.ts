@@ -33,6 +33,22 @@ describe("buildStudentCreateData", () => {
     );
     expect(data).not.toHaveProperty("email");
   });
+
+  it("학생과 학급 식별값의 앞뒤 공백을 제거한다", () => {
+    const data = buildStudentCreateData(
+      { studentNumber: " 3 ", name: " 박민준 " },
+      { school: " 서울초 ", grade: " 3 ", className: " 2 " },
+      hashedPw
+    );
+
+    expect(data).toMatchObject({
+      name: "박민준",
+      school: "서울초",
+      grade: "3",
+      className: "2",
+      studentNumber: "3",
+    });
+  });
 });
 
 describe("partitionStudents", () => {
@@ -65,6 +81,30 @@ describe("partitionStudents", () => {
     const students: StudentInput[] = [{ studentNumber: "1", name: "홍길동" }];
     const existingNumbers = new Set<string>(["1"]);
     const result: BulkPartition = partitionStudents(students, classInfo, existingNumbers);
+    expect(result.toCreate).toHaveLength(0);
+    expect(result.skippedCount).toBe(1);
+  });
+
+  it("한 요청 안의 같은 번호는 공백을 정리한 뒤 한 번만 생성한다", () => {
+    const students: StudentInput[] = [
+      { studentNumber: " 7 ", name: "첫 학생" },
+      { studentNumber: "7", name: "중복 학생" },
+    ];
+
+    const result = partitionStudents(students, classInfo, new Set());
+
+    expect(result.toCreate).toHaveLength(1);
+    expect(result.toCreate[0]).toMatchObject({ studentNumber: "7", name: "첫 학생" });
+    expect(result.skippedCount).toBe(1);
+  });
+
+  it("기존 번호에도 공백 정규화를 적용해 중복 생성을 막는다", () => {
+    const result = partitionStudents(
+      [{ studentNumber: "7", name: "학생" }],
+      classInfo,
+      new Set([" 7 "])
+    );
+
     expect(result.toCreate).toHaveLength(0);
     expect(result.skippedCount).toBe(1);
   });

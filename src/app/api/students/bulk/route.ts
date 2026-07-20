@@ -4,7 +4,11 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { sendBulkStudentSummaryEmail } from "@/lib/email";
-import { partitionStudents, buildStudentCreateData } from "@/lib/student-registration";
+import {
+  STUDENT_REGISTRATION_LIMITS,
+  partitionStudents,
+  buildStudentCreateData,
+} from "@/lib/student-registration";
 import { formatErrorBody } from "@/lib/api-error";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import {
@@ -13,18 +17,19 @@ import {
 } from "@/lib/teacher-student-access";
 
 const bulkSchema = z.object({
-  school: z.string().min(1),
-  grade: z.string().min(1),
-  className: z.string().min(1),
+  school: z.string().trim().min(1).max(STUDENT_REGISTRATION_LIMITS.school),
+  grade: z.string().trim().min(1).max(STUDENT_REGISTRATION_LIMITS.grade),
+  className: z.string().trim().min(1).max(STUDENT_REGISTRATION_LIMITS.className),
   defaultPassword: z.string().min(1),
   students: z
     .array(
       z.object({
-        studentNumber: z.string().min(1),
-        name: z.string().min(1),
+        studentNumber: z.string().trim().min(1).max(STUDENT_REGISTRATION_LIMITS.studentNumber),
+        name: z.string().trim().min(1).max(STUDENT_REGISTRATION_LIMITS.name),
       })
     )
-    .min(1),
+    .min(1)
+    .max(STUDENT_REGISTRATION_LIMITS.batchSize),
 });
 
 export async function POST(req: Request) {
@@ -65,10 +70,10 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(defaultPassword, 12);
     const errors: string[] = [];
     let created = 0;
+    let skipped = skippedCount;
 
     if (toCreate.length > 0) {
       try {
-        // 생성 대상을 트랜잭션으로 한 번에 처리
         const createData = toCreate.map((s) =>
           buildStudentCreateData(
             { studentNumber: s.studentNumber, name: s.name },
@@ -76,16 +81,18 @@ export async function POST(req: Request) {
             hashedPassword
           )
         );
-        await prisma.$transaction(
-          createData.map((data) => prisma.user.create({ data }))
-        );
-        created = createData.length;
+        const inserted = await prisma.user.createMany({
+          data: createData,
+          skipDuplicates: true,
+        });
+        created = inserted.count;
+        skipped += createData.length - inserted.count;
       } catch {
         errors.push("일부 학생 등록에 실패했습니다");
       }
     }
 
-    const results = { created, skipped: skippedCount, errors };
+    const results = { created, skipped, errors };
 
     const teacherEmail = session.user.email;
     if (teacherEmail) {

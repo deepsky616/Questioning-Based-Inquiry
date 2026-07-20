@@ -30,19 +30,54 @@ export interface BulkResultInput {
   errors: string[];
 }
 
+export const STUDENT_REGISTRATION_LIMITS = {
+  batchSize: 100,
+  school: 100,
+  grade: 20,
+  className: 30,
+  studentNumber: 20,
+  name: 50,
+} as const;
+
+export function normalizeStudentInput(student: StudentInput): StudentInput {
+  return {
+    studentNumber: student.studentNumber.trim(),
+    name: student.name.trim(),
+  };
+}
+
+export function normalizeClassInfo(classInfo: ClassInfo): ClassInfo {
+  return {
+    school: classInfo.school.trim(),
+    grade: classInfo.grade.trim(),
+    className: classInfo.className.trim(),
+  };
+}
+
+export function normalizeStudentIdentity(
+  identity: ClassInfo & Pick<StudentInput, "studentNumber">,
+): ClassInfo & Pick<StudentInput, "studentNumber"> {
+  return {
+    ...normalizeClassInfo(identity),
+    studentNumber: identity.studentNumber.trim(),
+  };
+}
+
 export function buildStudentCreateData(
   student: StudentInput,
   classInfo: ClassInfo,
   hashedPassword: string
 ): StudentCreateData {
+  const normalizedStudent = normalizeStudentInput(student);
+  const normalizedClass = normalizeClassInfo(classInfo);
   return {
     password: hashedPassword,
-    name: student.name,
+    name: normalizedStudent.name,
     role: "STUDENT",
-    school: classInfo.school,
-    grade: classInfo.grade,
-    className: classInfo.className,
-    studentNumber: student.studentNumber,
+    school: normalizedClass.school,
+    grade: normalizedClass.grade,
+    className: normalizedClass.className,
+    studentNumber: normalizedStudent.studentNumber,
   };
 }
 
@@ -53,12 +88,17 @@ export function partitionStudents(
 ): BulkPartition {
   const toCreate: StudentCreateData[] = [];
   let skippedCount = 0;
+  const seenNumbers = new Set(
+    Array.from(existingStudentNumbers, (studentNumber) => studentNumber.trim()),
+  );
 
-  for (const s of students) {
-    if (existingStudentNumbers.has(s.studentNumber)) {
+  for (const student of students) {
+    const normalizedStudent = normalizeStudentInput(student);
+    if (seenNumbers.has(normalizedStudent.studentNumber)) {
       skippedCount++;
     } else {
-      toCreate.push(buildStudentCreateData(s, classInfo, ""));
+      seenNumbers.add(normalizedStudent.studentNumber);
+      toCreate.push(buildStudentCreateData(normalizedStudent, classInfo, ""));
     }
   }
 

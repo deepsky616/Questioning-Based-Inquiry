@@ -12,6 +12,7 @@ import { buildTeacherClassLabel, resolveClassInputMode } from "@/lib/teacher";
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { appQueryKeys } from "@/lib/app-queries";
+import { STUDENT_REGISTRATION_LIMITS } from "@/lib/student-registration";
 
 interface BulkStudent {
   studentNumber: string;
@@ -95,6 +96,13 @@ export function StudentBulkRegisterCard() {
       toast({ variant: "destructive", description: t("studentListRequired") });
       return;
     }
+    if (students.length > STUDENT_REGISTRATION_LIMITS.batchSize) {
+      toast({
+        variant: "destructive",
+        description: t("bulkTooMany", { max: STUDENT_REGISTRATION_LIMITS.batchSize }),
+      });
+      return;
+    }
 
     setIsBulkSaving(true);
     try {
@@ -148,10 +156,14 @@ export function StudentBulkRegisterCard() {
     );
   }
 
+  const parsedStudentCount = parseBulkText().length;
+
   return (
     <Card>
       <CardContent className="space-y-4 pt-6">
-            <p className="text-sm text-muted-foreground">{t("bulkDesc")}</p>
+            <p className="text-sm text-muted-foreground">
+              {t("bulkDesc", { max: STUDENT_REGISTRATION_LIMITS.batchSize })}
+            </p>
             {(() => {
               const mode = resolveClassInputMode(teacherClasses);
               return (
@@ -163,6 +175,7 @@ export function StudentBulkRegisterCard() {
                       id="bulkSchool"
                       placeholder={t("schoolPlaceholder")}
                       value={bulkSchool}
+                      maxLength={STUDENT_REGISTRATION_LIMITS.school}
                       disabled={mode !== "manual"}
                       onChange={(e) => setBulkSchool(e.target.value)}
                     />
@@ -173,11 +186,23 @@ export function StudentBulkRegisterCard() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label htmlFor="bulkGrade">{t("gradeLabel")}</Label>
-                        <Input id="bulkGrade" placeholder="3" value={bulkGrade} onChange={(e) => setBulkGrade(e.target.value)} />
+                        <Input
+                          id="bulkGrade"
+                          placeholder="3"
+                          value={bulkGrade}
+                          maxLength={STUDENT_REGISTRATION_LIMITS.grade}
+                          onChange={(e) => setBulkGrade(e.target.value)}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="bulkClass">{t("classLabel")}</Label>
-                        <Input id="bulkClass" placeholder="2" value={bulkClass} onChange={(e) => setBulkClass(e.target.value)} />
+                        <Input
+                          id="bulkClass"
+                          placeholder="2"
+                          value={bulkClass}
+                          maxLength={STUDENT_REGISTRATION_LIMITS.className}
+                          onChange={(e) => setBulkClass(e.target.value)}
+                        />
                       </div>
                     </div>
                   )}
@@ -248,17 +273,27 @@ export function StudentBulkRegisterCard() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
               {bulkText ? (
-                <span className="text-sm text-muted-foreground">{t("enteredCount", { count: parseBulkText().length })}</span>
+                <span
+                  className={parsedStudentCount > STUDENT_REGISTRATION_LIMITS.batchSize
+                    ? "text-sm font-medium text-destructive"
+                    : "text-sm text-muted-foreground"}
+                >
+                  {t("enteredCount", { count: parsedStudentCount })}
+                </span>
               ) : (
                 <span />
               )}
               <Button
                 onClick={handleBulkRegister}
-                disabled={isBulkSaving || parseBulkText().length === 0}
+                disabled={
+                  isBulkSaving
+                  || parsedStudentCount === 0
+                  || parsedStudentCount > STUDENT_REGISTRATION_LIMITS.batchSize
+                }
                 variant="gradient"
                 className="h-11 w-full text-base font-semibold sm:flex-1"
               >
-                {isBulkSaving ? t("registering") : t("bulkRegisterBtn", { count: parseBulkText().length })}
+                {isBulkSaving ? t("registering") : t("bulkRegisterBtn", { count: parsedStudentCount })}
               </Button>
             </div>
       </CardContent>
