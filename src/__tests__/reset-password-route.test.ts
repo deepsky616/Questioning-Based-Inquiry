@@ -24,14 +24,25 @@ import { prisma } from "@/lib/db";
 
 const findToken = prisma.passwordResetToken.findUnique as ReturnType<typeof vi.fn>;
 const transaction = prisma.$transaction as ReturnType<typeof vi.fn>;
-const claimToken = vi.fn(async () => ({ count: 1 }));
+
+type UpdateManyArgs = {
+  where: {
+    id?: string | { not: string };
+    userId?: string;
+    usedAt?: null;
+    expiresAt?: { gt: Date };
+  };
+  data: { usedAt: Date };
+};
+
+const claimToken = vi.fn(async (_args: UpdateManyArgs) => ({ count: 1 }));
 const updatePassword = vi.fn(async () => ({ id: "teacher-1" }));
-const invalidateOtherTokens = vi.fn(async () => ({ count: 0 }));
+const invalidateOtherTokens = vi.fn(async (_args: UpdateManyArgs) => ({ count: 0 }));
 
 const transactionClient = {
   passwordResetToken: {
-    updateMany: vi.fn(async (args: { where: { id?: string } }) => (
-      args.where.id ? claimToken(args) : invalidateOtherTokens(args)
+    updateMany: vi.fn(async (args: UpdateManyArgs) => (
+      typeof args.where.id === "string" ? claimToken(args) : invalidateOtherTokens(args)
     )),
   },
   user: { update: updatePassword },
@@ -79,6 +90,25 @@ describe("POST reset-password 비밀번호 정책", () => {
 
     expect(response.status).toBe(200);
     expect(transaction).toHaveBeenCalledOnce();
+    expect(claimToken).toHaveBeenCalledOnce();
+    expect(claimToken).toHaveBeenCalledWith({
+      where: {
+        id: "token-1",
+        userId: "teacher-1",
+        usedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      },
+      data: { usedAt: expect.any(Date) },
+    });
+    expect(invalidateOtherTokens).toHaveBeenCalledOnce();
+    expect(invalidateOtherTokens).toHaveBeenCalledWith({
+      where: {
+        userId: "teacher-1",
+        usedAt: null,
+        id: { not: "token-1" },
+      },
+      data: { usedAt: expect.any(Date) },
+    });
   });
 
   it("동시에 먼저 사용된 토큰은 트랜잭션 안에서 다시 선점하지 못한다", async () => {
@@ -90,5 +120,6 @@ describe("POST reset-password 비밀번호 정책", () => {
     expect(response.status).toBe(400);
     expect(body.error).toContain("유효하지 않거나 만료된 링크");
     expect(updatePassword).not.toHaveBeenCalled();
+    expect(invalidateOtherTokens).not.toHaveBeenCalled();
   });
 });
