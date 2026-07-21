@@ -2156,8 +2156,8 @@
     "historyTitleStudent": "My question-game learning record",
     "historyTitleClass": "Class question-game learning overview",
     "historyTitle": "Question-game learning history",
-    "hasQuestionForm": "It has a question form.",
-    "rewriteAsQuestion": "Rewrite it as a question."
+    "hasQuestionForm": "The question keeps the statement's meaning.",
+    "rewriteAsQuestion": "Keep the statement's subject and action or state, then rewrite it as a question."
   },
   "translate": {
     "translate": "Translate",

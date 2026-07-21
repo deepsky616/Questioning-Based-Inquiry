@@ -72,7 +72,7 @@ export async function generateMysteryAiAnswer(
     temperature: 0,
     maxOutputTokens: 32,
     thinkingBudget: 0,
-    timeoutMs: 8_000,
+    timeoutMs: 12_000,
     responseMimeType: "application/json",
     responseJsonSchema: MYSTERY_AI_RESPONSE_JSON_SCHEMA,
   });

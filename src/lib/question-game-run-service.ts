@@ -22,6 +22,7 @@ import {
   verifyQuestionGameAiProof,
 } from "@/lib/question-game-ai-proof";
 import { isQuestionFormForLocale } from "@/lib/question-game-i18n";
+import { isKabaQuestionRewrite } from "@/lib/question-game-kaba-rules";
 import {
   isQuestionGameRunRecord as isRecord,
   QUESTION_GAME_REQUEST_ID_PATTERN,
@@ -41,6 +42,7 @@ import {
 } from "@/lib/question-game-dice-definition";
 import {
   ensureKabaProgress,
+  kabaSentenceText,
   parseKabaState,
   type KabaRunState,
 } from "@/lib/question-game-kaba-definition";
@@ -3732,7 +3734,11 @@ async function submitKabaAttempt(
     if (!sentenceKey) {
       throw new QuestionGameRunError("까바놀이 문장 순서가 손상되었습니다", 409);
     }
-    const correct = isQuestionFormForLocale(question, locale);
+    const correct = isKabaQuestionRewrite(
+      kabaSentenceText(sentenceKey, locale),
+      question,
+      locale,
+    );
     const inputHash = kabaAttemptHash(sentenceKey, locale, question);
     const nextQuestionCount = state.questionCount + 1;
     const nextState: KabaRunState = {

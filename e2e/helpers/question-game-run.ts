@@ -3,6 +3,7 @@ import {
   getKabaSentences,
   isQuestionFormForLocale,
 } from "../../src/lib/question-game-i18n";
+import { isKabaQuestionRewrite } from "../../src/lib/question-game-kaba-rules";
 import {
   QUESTION_GAME_LIMITS,
   QUESTION_GAME_RULES,
@@ -1282,7 +1283,8 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       throw new BrowserRunError("지금은 문장을 제출할 차례가 아닙니다", 409);
     }
 
-    const correct = isQuestionFormForLocale(question, locale);
+    const sentence = run.kabaSentencePlan[run.questionCount];
+    const correct = isKabaQuestionRewrite(sentence, question, locale);
     run.questionHashes.push(questionHash);
     run.questionCount += 1;
     if (correct) run.correctCount += 1;

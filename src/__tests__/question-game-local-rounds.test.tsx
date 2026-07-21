@@ -1242,7 +1242,7 @@ describe("까바 지역 목표", () => {
     await submitKaba("서버가 틀렸다고 판정할 문장인가요?");
 
     expect(screen.getByText("다시해봐요")).toBeVisible();
-    expect(screen.getByText("질문 형태로 다시 바꿔 보세요.")).toBeVisible();
+    expect(screen.getByText("원문의 대상과 행동 또는 상태를 유지해 질문으로 바꿔 보세요.")).toBeVisible();
     expect(screen.queryByText("잘했어요", { selector: "p" })).not.toBeInTheDocument();
     expect(screen.queryByText("아주 좋은 질문입니다.")).not.toBeInTheDocument();
     expect(screen.queryByText("잘했어요.")).not.toBeInTheDocument();

@@ -23,6 +23,24 @@ const ids = Array.from(
   (_, index) => `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
 );
 
+const KABA_BROWSER_QUESTIONS = {
+  ko: [
+    "고양이가 자나요?", "개미가 걷나요?", "토끼가 뛰나요?", "꽃이 예쁜가요?", "사과가 빨간가요?",
+    "하늘이 파란가요?", "비가 오나요?", "새가 날아가나요?", "강아지가 짖나요?", "물고기가 헤엄치나요?",
+  ],
+  en: [
+    "Does the cat sleep?", "Does the ant walk?", "Does the rabbit jump?", "Is the flower pretty?", "Is the apple red?",
+    "Is the sky blue?", "Does it rain?", "Does the bird fly away?", "Does the dog bark?", "Does the fish swim?",
+  ],
+} as const;
+
+function kabaBrowserQuestion(sentence: string, locale: "ko" | "en") {
+  const index = getKabaSentences(locale).indexOf(sentence as never);
+  const question = KABA_BROWSER_QUESTIONS[locale][index];
+  if (!question) throw new Error("까바놀이 시험 질문이 필요합니다");
+  return question;
+}
+
 type PublicMemoryCard = {
   id: string;
   type: "q" | "a";
@@ -954,7 +972,7 @@ describe("브라우저 질문놀이 실행 전송기", () => {
       seenSentences.push(run.currentSentence);
       const correct = index < 6;
       const question = correct
-        ? `서버가 판정할 질문 ${index + 1}은 무엇인가요?`
+        ? kabaBrowserQuestion(run.currentSentence, "ko")
         : `질문이 아닌 답 ${index + 1}`;
       const body = {
         action: "kaba-submit-attempt",
@@ -1055,6 +1073,7 @@ describe("브라우저 질문놀이 실행 전송기", () => {
 
     let response = created;
     for (let index = 0; index < 10; index += 1) {
+      const run = response.body.run as { currentSentence: string };
       response = store.dispatch(studentA, {
         method: "POST",
         pathname: `/api/question-games/runs/${id}/actions`,
@@ -1064,7 +1083,7 @@ describe("브라우저 질문놀이 실행 전송기", () => {
           expectedVersion: index + 1,
           locale: "en",
           question: index < 7
-            ? `What is server question ${index + 1}?`
+            ? kabaBrowserQuestion(run.currentSentence, "en")
             : `Not a question ${index + 1}`,
         },
       });
@@ -1108,6 +1127,7 @@ describe("브라우저 질문놀이 실행 전송기", () => {
       const id = runId(created);
       let response = created;
       for (let index = 0; index < 10; index += 1) {
+        const run = response.body.run as { currentSentence: string };
         response = store.dispatch(studentA, {
           method: "POST",
           pathname: `/api/question-games/runs/${id}/actions`,
@@ -1116,7 +1136,7 @@ describe("브라우저 질문놀이 실행 전송기", () => {
             requestId: ids[actionStart + index],
             expectedVersion: index + 1,
             locale: "ko",
-            question: `상한 확인 질문 ${createIndex}-${index + 1}은 무엇인가요?`,
+            question: kabaBrowserQuestion(run.currentSentence, "ko"),
           },
         });
       }

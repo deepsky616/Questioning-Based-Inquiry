@@ -4,6 +4,7 @@ import {
   isQuestionFormForLocale,
   type LocalizedText,
 } from "@/lib/question-game-i18n";
+import { isKabaQuestionRewrite } from "@/lib/question-game-kaba-rules";
 import {
   QUESTION_GAME_LIMITS,
   QUESTION_GAME_RULES,
@@ -761,7 +762,11 @@ function isKabaAttempt(value: unknown): value is KabaAttemptRecord {
   }
   const expected = KABA_SENTENCE_MAP.get(value.sentenceKey);
   return expected?.ko === value.sentence.ko && expected.en === value.sentence.en &&
-    value.correct === isQuestionFormForLocale(value.question, value.locale);
+    value.correct === isKabaQuestionRewrite(
+      value.sentence[value.locale],
+      value.question,
+      value.locale,
+    );
 }
 
 function readScores(
@@ -1581,7 +1586,11 @@ function applyKabaCommand(context: QuestionGameRoomEngineContext): QuestionGameE
   }
   const prompt = state.sentencePlan[state.attempts.length];
   if (!prompt) return corrupt(context, "카바 문장 순서가 손상되었습니다");
-  const correct = isQuestionFormForLocale(question, context.body.locale);
+  const correct = isKabaQuestionRewrite(
+    prompt.text[context.body.locale],
+    question,
+    context.body.locale,
+  );
   const attempt: KabaAttemptRecord = {
     roundId: state.roundId,
     round: state.round,

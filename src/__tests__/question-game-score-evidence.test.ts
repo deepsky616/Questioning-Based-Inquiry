@@ -320,6 +320,14 @@ function makeUnsolvedMysteryRoom(): GameRoom {
 
 function makeKabaRoom(correct: Record<"host" | "s1", number> = { host: 1, s1: 2 }): GameRoom {
   const sentencePlan = getKabaSentencePairs().slice(0, 6);
+  const validQuestions = [
+    "고양이가 자나요?",
+    "개미가 걷나요?",
+    "토끼가 뛰나요?",
+    "꽃이 예쁜가요?",
+    "사과가 빨간가요?",
+    "하늘이 파란가요?",
+  ];
   const used = { host: 0, s1: 0 };
   const attempts = sentencePlan.map((sentence, index) => {
     const player = PLAYERS[index % PLAYERS.length];
@@ -333,7 +341,7 @@ function makeKabaRoom(correct: Record<"host" | "s1", number> = { host: 1, s1: 2 
       sentenceKey: sentence.key,
       sentence: sentence.text,
       locale: "ko",
-      question: isCorrect ? `${index + 1}번째 문장인가요?` : `${index + 1}번째 문장입니다`,
+      question: isCorrect ? validQuestions[index] : `${index + 1}번째 문장입니다`,
       correct: isCorrect,
     };
   });
@@ -455,7 +463,7 @@ describe("질문놀이 버전 2 점수 근거", () => {
     expect(mystery.find(({ studentId }) => studentId === "host")?.questions).toEqual([
       "먹을 수 있나요?",
     ]);
-    expect(kaba[0].questions).toEqual(["2번째 문장인가요?"]);
+    expect(kaba[0].questions).toEqual(["개미가 걷나요?"]);
   });
 
   it("담당 학생만 결과에 넣고 담당 학생의 영점수도 보존한다", () => {

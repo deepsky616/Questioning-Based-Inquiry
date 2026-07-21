@@ -19,6 +19,7 @@ import {
   type QuestionGameBrowserSession,
 } from "./helpers/question-game-room";
 import { getMysteryItem } from "../src/lib/mystery-box-rules";
+import { KABA_SENTENCES } from "../src/lib/question-game-i18n";
 
 test.describe.configure({ mode: "serial" });
 
@@ -31,6 +32,21 @@ const QUESTION_GAME_PREPARATION_CASES = [
   { id: "mystery-box", title: "미스터리 박스" },
   { id: "kaba", title: "까바놀이" },
 ] as const;
+
+const KABA_ROOM_QUESTIONS = [
+  "고양이가 자나요?", "개미가 걷나요?", "토끼가 뛰나요?", "꽃이 예쁜가요?", "사과가 빨간가요?",
+  "하늘이 파란가요?", "비가 오나요?", "새가 날아가나요?", "강아지가 짖나요?", "물고기가 헤엄치나요?",
+  "아이가 웃나요?", "나무가 흔들리나요?", "별이 빛나나요?", "바람이 부나요?", "눈이 내리나요?",
+  "나비가 날개를 펴나요?", "달이 밝은가요?", "파도가 치나요?", "벌이 꿀을 모으나요?", "원숭이가 나무에 오르나요?",
+  "햇빛이 따뜻한가요?", "구름이 하얀가요?", "고래가 바다에 사나요?", "개구리가 우나요?", "아기 새가 둥지에 있나요?",
+] as const;
+
+function kabaRoomQuestion(sentence: string) {
+  const index = KABA_SENTENCES.ko.findIndex((candidate) => candidate === sentence);
+  const question = KABA_ROOM_QUESTIONS[index];
+  if (!question) throw new Error("까바놀이 브라우저 시험 질문이 필요합니다");
+  return question;
+}
 
 test.beforeEach(({}, testInfo) => {
   test.skip(
@@ -217,17 +233,24 @@ async function completeKaba(
     const state = transport.getRoom(code)?.gameState as {
       turnOrder?: string[];
       currentTurnIdx?: number;
-      attempts?: unknown[];
+      attempts?: Array<{ correct?: boolean }>;
+      sentencePlan?: Array<{ text?: { ko?: string } }>;
     };
     const playerId = state.turnOrder?.[state.currentTurnIdx ?? -1] ?? "";
+    const sentence = state.sentencePlan?.[state.attempts?.length ?? 0]?.text?.ko ?? "";
     const input = sessionForPlayer(sessions, playerId).page.locator("#kaba-question-input");
     await expect(input).toBeEnabled();
     attemptCount += 1;
-    await input.fill(`이 문장의 뜻을 ${attemptCount}번째로 어떻게 물어볼까요?`);
+    await input.fill(kabaRoomQuestion(sentence));
     await input.press("Enter");
     await expect.poll(
       () => (transport.getRoom(code)?.gameState.attempts as unknown[] | undefined)?.length ?? 0,
     ).toBe(attemptCount);
+    expect(
+      (transport.getRoom(code)?.gameState as {
+        attempts?: Array<{ correct?: boolean }>;
+      }).attempts?.at(-1)?.correct,
+    ).toBe(true);
   }
 }
 

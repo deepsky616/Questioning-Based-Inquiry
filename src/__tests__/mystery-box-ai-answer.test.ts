@@ -82,7 +82,7 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
       temperature: 0,
       maxOutputTokens: 32,
       thinkingBudget: 0,
-      timeoutMs: 8_000,
+      timeoutMs: 12_000,
       responseMimeType: "application/json",
       responseJsonSchema: {
         type: "object",

@@ -154,6 +154,22 @@ const KABA_ACTION_IDS = Array.from(
   (_, index) => `00000000-0000-4000-8000-${String(201 + index).padStart(12, "0")}`,
 );
 const KABA_ALTERNATE_FINAL_ACTION_ID = "00000000-0000-4000-8000-000000000221";
+const KABA_VALID_QUESTIONS = {
+  ko: [
+    "고양이가 자나요?", "개미가 걷나요?", "토끼가 뛰나요?", "꽃이 예쁜가요?", "사과가 빨간가요?",
+    "하늘이 파란가요?", "비가 오나요?", "새가 날아가나요?", "강아지가 짖나요?", "물고기가 헤엄치나요?",
+    "아이가 웃나요?", "나무가 흔들리나요?", "별이 빛나나요?", "바람이 부나요?", "눈이 내리나요?",
+    "나비가 날개를 펴나요?", "달이 밝은가요?", "파도가 치나요?", "벌이 꿀을 모으나요?", "원숭이가 나무에 오르나요?",
+    "햇빛이 따뜻한가요?", "구름이 하얀가요?", "고래가 바다에 사나요?", "개구리가 우나요?", "아기 새가 둥지에 있나요?",
+  ],
+  en: [
+    "Does the cat sleep?", "Does the ant walk?", "Does the rabbit jump?", "Is the flower pretty?", "Is the apple red?",
+    "Is the sky blue?", "Does it rain?", "Does the bird fly away?", "Does the dog bark?", "Does the fish swim?",
+    "Does the child smile?", "Does the tree shake?", "Does the star shine?", "Does the wind blow?", "Does snow fall?",
+    "Does the butterfly open its wings?", "Is the moon bright?", "Does the wave crash?", "Does the bee collect nectar?", "Does the monkey climb a tree?",
+    "Is the sunlight warm?", "Are the clouds white?", "Does the whale live in the ocean?", "Does the frog croak?", "Is the baby bird in the nest?",
+  ],
+} as const;
 const STORY_ACTION_IDS = Array.from(
   { length: 8 },
   (_, index) => `00000000-0000-4000-8000-${String(301 + index).padStart(12, "0")}`,
@@ -634,17 +650,25 @@ async function playAiStoryDice() {
 
 async function submitKabaAttempt(
   index: number,
-  question = `${index + 1}번째 문장은 질문인가요?`,
+  question?: string,
   expectedVersion = index + 1,
   id = "run-1",
   locale: "ko" | "en" = "ko",
   extra: Record<string, unknown> = {},
 ) {
+  const state = runs.get(id)?.state as {
+    questionCount: number;
+    sentencePlan: string[];
+  } | undefined;
+  const sentenceKey = state?.sentencePlan[state.questionCount];
+  const sentenceIndex = sentenceKey ? Number(sentenceKey.slice(-2)) - 1 : -1;
+  const resolvedQuestion = question ?? KABA_VALID_QUESTIONS[locale][sentenceIndex];
+  if (!resolvedQuestion) throw new Error("missing kaba test question");
   return postAction({
     action: "kaba-submit-attempt",
     requestId: KABA_ACTION_IDS[index],
     expectedVersion,
-    question,
+    question: resolvedQuestion,
     locale,
     ...extra,
   }, id);
@@ -2728,6 +2752,16 @@ describe("까바놀이 서버 실행 경로", () => {
 
   it("서버가 질문 꼴을 판정하고 화면의 문장과 정답값을 무시하며 같은 요청을 한 번만 기록한다", async () => {
     await createKaba();
+    const state = runs.get("run-1")?.state as { sentencePlan: string[] };
+    const catIndex = state.sentencePlan.indexOf("kaba-01");
+    if (catIndex >= 0) {
+      [state.sentencePlan[0], state.sentencePlan[catIndex]] = [
+        state.sentencePlan[catIndex],
+        state.sentencePlan[0],
+      ];
+    } else {
+      state.sentencePlan[0] = "kaba-01";
+    }
     const correct = await submitKabaAttempt(
       0,
       "고양이가 자나요?",
@@ -2790,15 +2824,38 @@ describe("까바놀이 서버 실행 경로", () => {
     expect(stored).not.toContain("화면이 바꾼 문장");
   });
 
+  it("원문과 다른 내용을 질문 꼴로만 바꾼 시도는 정답으로 기록하지 않는다", async () => {
+    await createKaba();
+    const state = runs.get("run-1")?.state as { sentencePlan: string[] };
+    const frogIndex = state.sentencePlan.indexOf("kaba-24");
+    if (frogIndex >= 0) {
+      [state.sentencePlan[0], state.sentencePlan[frogIndex]] = [
+        state.sentencePlan[frogIndex],
+        state.sentencePlan[0],
+      ];
+    } else {
+      state.sentencePlan[0] = "kaba-24";
+    }
+
+    const response = await submitKabaAttempt(0, "개구리가 노나요?");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      correct: false,
+      run: { questionCount: 1, correctCount: 0 },
+    });
+  });
+
   it("혼자 모드 정답 열 개를 확인해 십이 점을 정산하고 재전송과 결과 조회 및 완료 요청으로 복구한다", async () => {
     await createKaba();
-    const questions = Array.from(
-      { length: 10 },
-      (_, index) => `${index + 1}번째 문장은 질문인가요?`,
-    );
+    const questions: string[] = [];
     let final: Response | undefined;
-    for (let index = 0; index < questions.length; index += 1) {
-      final = await submitKabaAttempt(index, questions[index]);
+    for (let index = 0; index < 10; index += 1) {
+      const state = runs.get("run-1")?.state as { questionCount: number; sentencePlan: string[] };
+      const sentenceIndex = Number(state.sentencePlan[state.questionCount].slice(-2)) - 1;
+      const question = KABA_VALID_QUESTIONS.ko[sentenceIndex];
+      questions.push(question);
+      final = await submitKabaAttempt(index, question);
       expect(final.status).toBe(200);
     }
     if (!final) throw new Error("missing final response");
@@ -2853,7 +2910,7 @@ describe("까바놀이 서버 실행 경로", () => {
     let final: Response | undefined;
     for (let index = 0; index < 10; index += 1) {
       const question = index < 7
-        ? `${index + 1}번째 문장은 질문인가요?`
+        ? undefined
         : `${index + 1}번째 문장은 평서문입니다`;
       final = await submitKabaAttempt(index, question);
     }
@@ -2908,12 +2965,16 @@ describe("까바놀이 서버 실행 경로", () => {
     }
 
     const responses = await Promise.all([
-      submitKabaAttempt(9, "첫 번째 마지막 문장은 질문인가요?"),
+      submitKabaAttempt(9),
       postAction({
         action: "kaba-submit-attempt",
         requestId: KABA_ALTERNATE_FINAL_ACTION_ID,
         expectedVersion: 10,
-        question: "두 번째 마지막 문장은 질문인가요?",
+        question: (() => {
+          const state = runs.get("run-1")?.state as { questionCount: number; sentencePlan: string[] };
+          const sentenceIndex = Number(state.sentencePlan[state.questionCount].slice(-2)) - 1;
+          return KABA_VALID_QUESTIONS.ko[sentenceIndex];
+        })(),
         locale: "ko",
       }),
     ]);

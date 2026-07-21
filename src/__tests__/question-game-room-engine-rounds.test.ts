@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseGameRoom, type GameRoom } from "@/lib/question-games-data";
+import { getKabaSentencePairs } from "@/lib/question-game-i18n";
 import {
   applyQuestionGameRoomCommand,
   leaveQuestionGameRoom,
@@ -367,7 +368,7 @@ describe("카바 판정기", () => {
 
     room = changed(run(room, "guest-1", "kaba-submit-question", 91, {
       locale: "ko",
-      question: "고양이가 자나요?",
+      question: "토끼가 뛰나요?",
     }, { randomUUID: () => uuid(24) }));
     state = readKabaPublicState(room.gameState)!;
     expect(state.attempts[1].correct).toBe(true);
@@ -377,6 +378,48 @@ describe("카바 판정기", () => {
       question: "고양이가 자나요?",
       correct: true,
     }).kind).toBe("invalid");
+  });
+
+  it("원문과 다른 내용을 질문 꼴로만 바꾼 시도는 오답으로 판정한다", () => {
+    const prepareFrogRoom = () => {
+      const room = preparedKaba(2);
+      const state = readKabaPublicState(room.gameState)!;
+      const frogSentence = getKabaSentencePairs().find(
+        ({ text }) => text.ko === "개구리가 울다",
+      );
+      expect(frogSentence).toBeDefined();
+      const frogIndex = state.sentencePlan.findIndex(
+        ({ text }) => text.ko === "개구리가 울다",
+      );
+      const sentencePlan = [...state.sentencePlan];
+      if (frogIndex >= 0) {
+        [sentencePlan[0], sentencePlan[frogIndex]] = [
+          sentencePlan[frogIndex],
+          sentencePlan[0],
+        ];
+      } else {
+        sentencePlan[0] = frogSentence!;
+      }
+      return { ...room, gameState: { ...state, sentencePlan } };
+    };
+
+    const unrelated = changed(run(
+      prepareFrogRoom(),
+      "host",
+      "kaba-submit-question",
+      93,
+      { locale: "ko", question: "개구리가 노나요?" },
+    ));
+    const matching = changed(run(
+      prepareFrogRoom(),
+      "host",
+      "kaba-submit-question",
+      94,
+      { locale: "ko", question: "개구리가 우나요?" },
+    ));
+
+    expect(readKabaPublicState(unrelated.gameState)?.attempts[0].correct).toBe(false);
+    expect(readKabaPublicState(matching.gameState)?.attempts[0].correct).toBe(true);
   });
 
   it("차례 위반과 예전 라운드를 막고 같은 명령은 재생한다", () => {

@@ -168,7 +168,7 @@ function withRecord(gameId: TurnGameId): GameRoom {
   }
   return run(room, "user-1", "kaba-submit-question", {
     locale: "ko",
-    question: "고양이가 자나요?",
+    question: "개미가 걷나요?",
   });
 }
 
@@ -190,7 +190,7 @@ function afterOneRound(gameId: TurnGameId): GameRoom {
   }
   return run(room, "user-2", "kaba-submit-question", {
     locale: "ko",
-    question: "개미가 걷나요?",
+    question: "토끼가 뛰나요?",
   });
 }
 
@@ -425,7 +425,7 @@ describe("권위 상태 표시와 입력 가림", () => {
     ["story-dice", "토끼는 왜 책을 찾았나요?", "친구와 함께 읽으려고 찾았어요.", "0 / 1명 제출"],
     ["dice", "달은 왜 밝게 보이나요?", "", "1 / 2명 제출"],
     ["relay", "우주는 왜 넓어 보이나요?", "", "1 / 2명 제출"],
-    ["kaba", "고양이가 자나요?", "맞음", "1 / 2명 제출"],
+    ["kaba", "개미가 걷나요?", "맞음", "1 / 2명 제출"],
   ] as const)("%s 서버 기록과 제출 진행을 함께 보여 준다", (gameId, first, second, progress) => {
     renderGame(gameId, withRecord(gameId), "user-2");
     expect(screen.getByText(first)).toBeInTheDocument();
