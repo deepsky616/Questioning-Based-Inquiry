@@ -65,10 +65,14 @@ describe("질문놀이 학습 이력 화면", () => {
     expect(screen.getByText(
       "질문 릴레이: 혼자 하기 완료 0회, 인공지능과 함께 완료 1회, 친구와 함께 완료 2회",
     ).closest("ul")).toHaveClass("sr-only");
-    expect(screen.getByText("7. 13. 시작 주: 완료 2회, 좋은 질문 4개").closest("ul"))
+    expect(screen.getByText("인정 질문·활동").nextSibling).toHaveTextContent("6");
+    expect(screen.getByText(
+      "놀이 규칙에 맞게 작성하거나 완료하여 점수에 반영된 질문과 활동이에요.",
+    )).toBeVisible();
+    expect(screen.getByText("7. 13. 시작 주: 완료 2회, 인정 질문·활동 4개").closest("ul"))
       .toHaveClass("sr-only");
     expect(screen.getByText("질문 릴레이")).toBeVisible();
-    expect(screen.getByText("좋은 질문 3개 · 17점")).toBeVisible();
+    expect(screen.getByText("인정 질문·활동 3개 · 17점")).toBeVisible();
   });
 
   it("상세 이력을 방식과 놀이로 걸러 보고 다음 기록을 이어 본다", async () => {

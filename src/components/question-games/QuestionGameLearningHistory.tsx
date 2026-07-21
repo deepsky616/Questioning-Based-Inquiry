@@ -155,6 +155,9 @@ export function QuestionGameLearningHistory({
           </div>
         ))}
       </dl>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">
+        {t("recognizedActivityHelp")}
+      </p>
 
       <QuestionGameLearningCharts
         audience={audience}

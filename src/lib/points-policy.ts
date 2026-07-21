@@ -119,7 +119,7 @@ export function pointBonusLabel(bonusType: string): { label: string; emoji: stri
     case "QUESTION_WRITE": return { label: "질문수업 질문 작성", emoji: "✏️" };
     case "COMMENT_WRITE": return { label: "친구 질문에 답변 작성", emoji: "💬" };
     case "PARTICIPATION": return { label: "게임 참여", emoji: "✋" };
-    case "VALID_QUESTIONS": return { label: "좋은 질문", emoji: "❓" };
+    case "VALID_QUESTIONS": return { label: "질문놀이 활동 인정", emoji: "❓" };
     case "COMPLETION": return { label: "게임 완료", emoji: "✅" };
     case "WINNER": return { label: "우승", emoji: "👑" };
     case "FRIEND_DAILY_LIMIT": return { label: "친구 놀이 하루 상한", emoji: "🎯" };
@@ -133,6 +133,7 @@ const DEFAULT_QUESTION_WRITE_REASONS = new Set([
   "수업세션 질문 작성",
   "질문수업 질문 작성",
 ]);
+const DEFAULT_VALID_QUESTION_REASON = /^(?:유효 질문|좋은 질문|인정 질문·활동)(?: [1-9][0-9]*개)?$/;
 
 export function shouldShowPointReason(
   reason: string,
@@ -142,7 +143,8 @@ export function shouldShowPointReason(
   return Boolean(reason) &&
     reason !== defaultLabel &&
     !reason.startsWith("instance:") &&
-    !(bonusType === "QUESTION_WRITE" && DEFAULT_QUESTION_WRITE_REASONS.has(reason));
+    !(bonusType === "QUESTION_WRITE" && DEFAULT_QUESTION_WRITE_REASONS.has(reason)) &&
+    !(bonusType === "VALID_QUESTIONS" && DEFAULT_VALID_QUESTION_REASON.test(reason));
 }
 
 // 포인트 이력 라벨을 번역키로 매핑하기 위한 명세(표시 시점 i18n용, 순수 함수).
