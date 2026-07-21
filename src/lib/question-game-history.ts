@@ -17,6 +17,12 @@ export interface QuestionGameHistoryItem {
   goodQuestions: number;
 }
 
+export interface QuestionGameWeeklyPoint {
+  weekStart: string;
+  plays: number;
+  goodQuestions: number;
+}
+
 export interface QuestionGameLearningHistory {
   totals: { plays: number; points: number; goodQuestions: number };
   modes: Record<QuestionGameHistoryMode, {
@@ -25,6 +31,7 @@ export interface QuestionGameLearningHistory {
     goodQuestions: number;
   }>;
   recent: QuestionGameHistoryItem[];
+  weekly?: QuestionGameWeeklyPoint[];
   nextCursor?: string | null;
 }
 

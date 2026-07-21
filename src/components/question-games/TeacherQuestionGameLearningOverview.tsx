@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { LoaderCircle, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { QuestionGameLearningHistory } from "@/components/question-games/QuestionGameLearningHistory";
-import {
-  sumQuestionGameModes,
-  type QuestionGameModeStats,
-} from "@/lib/question-game-learning-summary";
 import type { QuestionGameLearningHistory as LearningHistory } from "@/lib/question-game-history";
 
 interface TeacherClass {
@@ -22,7 +19,8 @@ interface TeacherStudent {
 
 interface StudentLearningStat {
   id: string;
-  modes: Record<"solo" | "ai" | "friend", QuestionGameModeStats>;
+  plays: number;
+  completions: number;
 }
 
 interface GameLearningStat {
@@ -35,53 +33,68 @@ interface Props {
   statsByGame: Record<string, GameLearningStat>;
 }
 
-const emptyHistory: LearningHistory = {
-  totals: { plays: 0, points: 0, goodQuestions: 0 },
-  modes: {
-    solo: { plays: 0, points: 0, goodQuestions: 0 },
-    ai: { plays: 0, points: 0, goodQuestions: 0 },
-    friend: { plays: 0, points: 0, goodQuestions: 0 },
-  },
-  recent: [],
-  nextCursor: null,
-};
-
 export function TeacherQuestionGameLearningOverview({ classes, students, statsByGame }: Props) {
   const t = useTranslations("qPlay");
+  const tc = useTranslations("common");
   const [selectedClass, setSelectedClass] = useState("");
+  const [history, setHistory] = useState<LearningHistory | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const available = classes.map(({ grade, className }) => `${grade}|${className}`);
     if (!available.includes(selectedClass)) setSelectedClass(available[0] ?? "");
   }, [classes, selectedClass]);
 
-  const history = useMemo<LearningHistory>(() => {
-    if (!selectedClass) return emptyHistory;
+  useEffect(() => {
+    if (!selectedClass) {
+      setHistory(null);
+      setLoading(false);
+      return;
+    }
+    const [grade, className] = selectedClass.split("|");
+    const controller = new AbortController();
+    setHistory(null);
+    setLoading(true);
+    setLoadError(false);
+    const params = new URLSearchParams({ summary: "1", grade, className });
+    fetch(`/api/reports/question-games?${params.toString()}`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const data: LearningHistory | { error?: string } = await response.json();
+        if (!response.ok || !("totals" in data) || !("modes" in data)) {
+          throw new Error("question game class summary failed");
+        }
+        setHistory(data);
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setLoadError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [reloadKey, selectedClass]);
+
+  const gameComparison = useMemo(() => {
+    if (!selectedClass) return [];
     const [grade, className] = selectedClass.split("|");
     const studentIds = new Set(
       students
         .filter((student) => student.grade === grade && student.className === className)
         .map((student) => student.id),
     );
-    const rows = Object.values(statsByGame)
-      .flatMap((stat) => stat.students)
-      .filter((student) => studentIds.has(student.id));
-    const modes = sumQuestionGameModes(rows);
-
-    return {
-      totals: {
-        plays: modes.solo.completions + modes.ai.completions + modes.friend.completions,
-        points: modes.solo.points + modes.ai.points + modes.friend.points,
-        goodQuestions: modes.solo.goodQuestions + modes.ai.goodQuestions + modes.friend.goodQuestions,
-      },
-      modes: {
-        solo: { plays: modes.solo.completions, points: modes.solo.points, goodQuestions: modes.solo.goodQuestions },
-        ai: { plays: modes.ai.completions, points: modes.ai.points, goodQuestions: modes.ai.goodQuestions },
-        friend: { plays: modes.friend.completions, points: modes.friend.points, goodQuestions: modes.friend.goodQuestions },
-      },
-      recent: [],
-      nextCursor: null,
-    };
+    return Object.entries(statsByGame).map(([gameId, stat]) => {
+      const rows = stat.students.filter((student) => studentIds.has(student.id));
+      return {
+        gameId,
+        plays: rows.reduce((sum, student) => sum + student.plays, 0),
+        completions: rows.reduce((sum, student) => sum + student.completions, 0),
+      };
+    });
   }, [selectedClass, statsByGame, students]);
 
   if (classes.length === 0) return null;
@@ -104,7 +117,32 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
           </select>
         </label>
       </div>
-      <QuestionGameLearningHistory audience="class" history={history} />
+      {loading && (
+        <div role="status" className="flex min-h-32 items-center justify-center border-y border-border text-sm text-muted-foreground">
+          <LoaderCircle className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+          {t("learningOverviewLoading")}
+        </div>
+      )}
+      {loadError && (
+        <div className="flex min-h-32 flex-col items-center justify-center gap-3 border-y border-border text-sm text-red-600 dark:text-red-300">
+          <p role="alert">{t("learningOverviewLoadError")}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((value) => value + 1)}
+            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-current px-3 font-bold"
+          >
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            {tc("retry")}
+          </button>
+        </div>
+      )}
+      {history && !loading && !loadError && (
+        <QuestionGameLearningHistory
+          audience="class"
+          history={history}
+          gameComparison={gameComparison}
+        />
+      )}
     </section>
   );
 }

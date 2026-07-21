@@ -6,6 +6,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import { StudentQuestionGameLearningHistory } from "@/components/question-games/StudentQuestionGameLearningHistory";
 
+class NoopResizeObserver {
+  observe() {}
+  disconnect() {}
+  unobserve() {}
+}
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  configurable: true,
+  value: NoopResizeObserver,
+});
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();

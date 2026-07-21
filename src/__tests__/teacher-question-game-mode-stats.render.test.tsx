@@ -7,6 +7,17 @@ import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-int
 import TeacherQuestionPlayPage from "@/app/(teacher)/teacher-question-play/page";
 import { BUILT_IN_GAMES } from "@/lib/question-games-data";
 
+class NoopResizeObserver {
+  observe() {}
+  disconnect() {}
+  unobserve() {}
+}
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  configurable: true,
+  value: NoopResizeObserver,
+});
+
 let teacherClasses = [
   { grade: "5", className: "1" },
   { grade: "5", className: "2" },
@@ -33,7 +44,19 @@ describe("교사 질문놀이 방식 비교", () => {
     const game = BUILT_IN_GAMES[0];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      const body = url.endsWith("/stats")
+      const body = url.includes("/api/reports/question-games?")
+        ? {
+            totals: { plays: 5, points: 42, goodQuestions: 8 },
+            modes: {
+              solo: { plays: 2, points: 12, goodQuestions: 3 },
+              ai: { plays: 1, points: 8, goodQuestions: 2 },
+              friend: { plays: 2, points: 22, goodQuestions: 3 },
+            },
+            weekly: [{ weekStart: "2026-07-13", plays: 5, goodQuestions: 8 }],
+            recent: [],
+            nextCursor: null,
+          }
+        : url.endsWith("/stats")
         ? {
             byGame: {
               [game.id]: {

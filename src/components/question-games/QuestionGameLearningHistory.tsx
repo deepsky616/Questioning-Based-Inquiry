@@ -14,16 +14,26 @@ import type {
   QuestionGameHistoryPage,
   QuestionGameLearningHistory as LearningHistory,
 } from "@/lib/question-game-history";
+import {
+  QuestionGameLearningCharts,
+  type QuestionGameCompletionComparison,
+} from "@/components/question-games/QuestionGameLearningCharts";
 
 interface Props {
   audience: "student" | "teacher" | "class";
   history: LearningHistory;
   studentId?: string;
+  gameComparison?: QuestionGameCompletionComparison[];
 }
 
 const PAGE_SIZE = 8;
 
-export function QuestionGameLearningHistory({ audience, history, studentId }: Props) {
+export function QuestionGameLearningHistory({
+  audience,
+  history,
+  studentId,
+  gameComparison,
+}: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
   const isEnglish = locale === "en";
@@ -143,6 +153,12 @@ export function QuestionGameLearningHistory({ audience, history, studentId }: Pr
           </div>
         ))}
       </dl>
+
+      <QuestionGameLearningCharts
+        audience={audience}
+        history={history}
+        gameComparison={gameComparison}
+      />
 
       <div className="mt-3 grid grid-cols-1 gap-1.5 text-xs sm:grid-cols-3">
         {(["solo", "ai", "friend"] as const).map((itemMode) => (

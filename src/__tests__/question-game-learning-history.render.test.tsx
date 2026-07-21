@@ -6,6 +6,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import { QuestionGameLearningHistory } from "@/components/question-games/QuestionGameLearningHistory";
 
+class NoopResizeObserver {
+  observe() {}
+  disconnect() {}
+  unobserve() {}
+}
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  configurable: true,
+  value: NoopResizeObserver,
+});
+
 afterEach(cleanup);
 
 describe("질문놀이 학습 이력 화면", () => {
@@ -20,6 +31,10 @@ describe("질문놀이 학습 이력 화면", () => {
             ai: { plays: 1, points: 7, goodQuestions: 2 },
             friend: { plays: 1, points: 17, goodQuestions: 3 },
           },
+          weekly: [
+            { weekStart: "2026-07-06", plays: 1, goodQuestions: 2 },
+            { weekStart: "2026-07-13", plays: 2, goodQuestions: 4 },
+          ],
           recent: [{
             id: "friend:room:1",
             gameId: "relay",
@@ -37,6 +52,10 @@ describe("질문놀이 학습 이력 화면", () => {
     expect(screen.getByText("혼자 하기 1회")).toBeVisible();
     expect(screen.getByText("인공지능과 함께 1회")).toBeVisible();
     expect(screen.getByText("친구와 함께 1회")).toBeVisible();
+    expect(screen.getByText("최근 6주 변화")).toBeVisible();
+    expect(screen.getByText("놀이 방식별 완료 횟수")).toBeVisible();
+    expect(screen.getByText("7. 13. 시작 주: 완료 2회, 좋은 질문 4개").closest("ul"))
+      .toHaveClass("sr-only");
     expect(screen.getByText("질문 릴레이")).toBeVisible();
     expect(screen.getByText("좋은 질문 3개 · 17점")).toBeVisible();
   });
@@ -117,12 +136,21 @@ describe("질문놀이 학습 이력 화면", () => {
             ai: { plays: 2, points: 14, goodQuestions: 5 },
             friend: { plays: 4, points: 30, goodQuestions: 12 },
           },
+          weekly: [{ weekStart: "2026-07-13", plays: 8, goodQuestions: 21 }],
           recent: [],
         }}
+        gameComparison={[
+          { gameId: "relay", plays: 5, completions: 4 },
+          { gameId: "dice", plays: 4, completions: 2 },
+        ]}
       />,
     );
 
     expect(screen.getByRole("heading", { name: "학급 질문놀이 학습 현황" })).toBeVisible();
+    expect(screen.getByText("최근 6주 변화")).toBeVisible();
+    expect(screen.getByText("놀이별 완료율")).toBeVisible();
+    expect(screen.getByText("질문 릴레이: 참여 5회 중 완료 4회, 완료율 80%").closest("ul"))
+      .toHaveClass("sr-only");
     expect(screen.queryByText("최근 완료한 놀이")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "전체 이력 보기" })).not.toBeInTheDocument();
   });

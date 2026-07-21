@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { formatDateOnly } from "@/lib/datetime";
@@ -30,6 +30,7 @@ export function QuestionGameSettlementHealthPanel({
     localizeQuestionGames(BUILT_IN_GAMES, locale).map((game) => [game.id, game]),
   );
   const issueCount = health.summary.pending + health.summary.failed;
+  if (issueCount === 0) return null;
   const issues = health.items.filter(
     ({ status }) => status === "pending" || status === "failed",
   );
@@ -40,21 +41,13 @@ export function QuestionGameSettlementHealthPanel({
       className="border-y border-border py-4"
     >
       <div className="flex flex-wrap items-center gap-3">
-        {issueCount > 0 ? (
-          <AlertTriangle className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
-        ) : (
-          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" aria-hidden="true" />
-        )}
+        <AlertTriangle className="h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <h2 id="question-game-settlement-health" className="text-sm font-bold text-foreground">
             {t("settlementTitle")}
           </h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {health.summary.checked === 0
-              ? t("settlementEmpty")
-              : issueCount === 0
-                ? t("settlementHealthy", { count: health.summary.checked })
-                : t("settlementNeedsCheck", { count: issueCount })}
+            {t("settlementNeedsCheck", { count: issueCount })}
           </p>
         </div>
         <Button

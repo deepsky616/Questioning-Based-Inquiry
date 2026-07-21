@@ -6,6 +6,7 @@ import type {
   QuestionGameHistoryMode,
   QuestionGameHistoryPage,
   QuestionGameLearningHistory,
+  QuestionGameWeeklyPoint,
 } from "@/lib/question-game-history";
 
 const DEFAULT_PAGE_SIZE = 8;
@@ -32,6 +33,12 @@ interface RawSummaryRow {
   goodQuestions: bigint | number;
 }
 
+interface RawWeeklyRow {
+  weekStart: string;
+  plays: bigint | number;
+  goodQuestions: bigint | number;
+}
+
 function emptyHistory(): QuestionGameLearningHistory {
   return {
     totals: { plays: 0, points: 0, goodQuestions: 0 },
@@ -41,6 +48,7 @@ function emptyHistory(): QuestionGameLearningHistory {
       friend: { plays: 0, points: 0, goodQuestions: 0 },
     },
     recent: [],
+    weekly: [],
     nextCursor: null,
   };
 }
@@ -179,6 +187,44 @@ async function loadSummary(studentIds: string[]) {
   return summaryFromRows(rows);
 }
 
+async function loadWeeklyTrend(studentIds: string[]): Promise<QuestionGameWeeklyPoint[]> {
+  if (studentIds.length === 0) return [];
+  const rows = await prisma.$queryRaw<RawWeeklyRow[]>(Prisma.sql`
+    WITH ${playRowsSql(studentIds)},
+    bounds AS (
+      SELECT DATE_TRUNC(
+        'week',
+        CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul'
+      )::date AS "currentWeek"
+    ),
+    weeks AS (
+      SELECT GENERATE_SERIES(
+        "currentWeek" - INTERVAL '5 weeks',
+        "currentWeek",
+        INTERVAL '1 week'
+      )::date AS "weekStart"
+      FROM bounds
+    )
+    SELECT
+      TO_CHAR(weeks."weekStart", 'YYYY-MM-DD') AS "weekStart",
+      COUNT(all_plays."id") AS "plays",
+      COALESCE(SUM(all_plays."goodQuestions"), 0) AS "goodQuestions"
+    FROM weeks
+    LEFT JOIN all_plays
+      ON DATE_TRUNC(
+        'week',
+        all_plays."completedAt" AT TIME ZONE 'Asia/Seoul'
+      )::date = weeks."weekStart"
+    GROUP BY weeks."weekStart"
+    ORDER BY weeks."weekStart" ASC
+  `);
+  return rows.map((row) => ({
+    weekStart: row.weekStart,
+    plays: safeNumber(row.plays),
+    goodQuestions: safeNumber(row.goodQuestions),
+  }));
+}
+
 function rowToHistoryItem(row: RawHistoryRow): QuestionGameHistoryItem {
   return {
     id: row.id,
@@ -242,15 +288,26 @@ export async function loadQuestionGameLearningHistory(
   studentId: string,
   recentLimit = DEFAULT_PAGE_SIZE,
 ): Promise<QuestionGameLearningHistory> {
-  const [summary, page] = await Promise.all([
+  const [summary, page, weekly] = await Promise.all([
     loadSummary([studentId]),
     loadQuestionGameHistoryPage({ studentId, limit: recentLimit }),
+    loadWeeklyTrend([studentId]),
   ]);
-  return { ...summary, recent: page.items, nextCursor: page.nextCursor };
+  return {
+    ...summary,
+    recent: page.items,
+    weekly,
+    nextCursor: page.nextCursor,
+  };
 }
 
 export async function loadQuestionGameClassSummary(
   studentIds: string[],
 ): Promise<QuestionGameLearningHistory> {
-  return loadSummary([...new Set(studentIds)]);
+  const uniqueIds = [...new Set(studentIds)];
+  const [summary, weekly] = await Promise.all([
+    loadSummary(uniqueIds),
+    loadWeeklyTrend(uniqueIds),
+  ]);
+  return { ...summary, weekly };
 }

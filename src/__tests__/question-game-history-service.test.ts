@@ -6,6 +6,7 @@ vi.mock("@/lib/db", () => ({
 
 import { prisma } from "@/lib/db";
 import {
+  loadQuestionGameClassSummary,
   loadQuestionGameHistoryPage,
   loadQuestionGameLearningHistory,
 } from "@/lib/question-game-history-service";
@@ -40,16 +41,51 @@ describe("질문놀이 학습 이력 조회", () => {
           points: BigInt(6),
           goodQuestions: BigInt(2),
         },
+      ])
+      .mockResolvedValueOnce([
+        {
+          weekStart: "2026-07-06",
+          plays: BigInt(1),
+          goodQuestions: BigInt(2),
+        },
+        {
+          weekStart: "2026-07-13",
+          plays: BigInt(2),
+          goodQuestions: BigInt(3),
+        },
       ]);
 
     const history = await loadQuestionGameLearningHistory("student-1", 1);
 
-    expect(queryRaw).toHaveBeenCalledTimes(2);
+    expect(queryRaw).toHaveBeenCalledTimes(3);
     expect(history.totals).toEqual({ plays: 3, points: 14, goodQuestions: 5 });
     expect(history.recent).toEqual([
       expect.objectContaining({ id: "run:run-2", points: 4, goodQuestions: 1 }),
     ]);
     expect(history.nextCursor).toEqual(expect.any(String));
+    expect(history.weekly).toEqual([
+      { weekStart: "2026-07-06", plays: 1, goodQuestions: 2 },
+      { weekStart: "2026-07-13", plays: 2, goodQuestions: 3 },
+    ]);
+  });
+
+  it("학급 학생들의 최근 주간 완료와 좋은 질문을 함께 집계한다", async () => {
+    queryRaw
+      .mockResolvedValueOnce([
+        { mode: "friend", plays: BigInt(3), points: BigInt(18), goodQuestions: BigInt(7) },
+      ])
+      .mockResolvedValueOnce([
+        { weekStart: "2026-07-13", plays: BigInt(3), goodQuestions: BigInt(7) },
+      ]);
+
+    const history = await loadQuestionGameClassSummary(["student-1", "student-2"]);
+
+    expect(queryRaw).toHaveBeenCalledTimes(2);
+    expect(history.totals).toEqual({ plays: 3, points: 18, goodQuestions: 7 });
+    expect(history.weekly).toEqual([
+      { weekStart: "2026-07-13", plays: 3, goodQuestions: 7 },
+    ]);
+    expect(history.recent).toEqual([]);
   });
 
   it("방식과 놀이 필터를 적용하고 커서로 다음 묶음을 반환한다", async () => {

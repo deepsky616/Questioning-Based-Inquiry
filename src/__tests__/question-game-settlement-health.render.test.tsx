@@ -7,7 +7,7 @@ import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-int
 import { QuestionGameSettlementHealthPanel } from "@/components/question-games/QuestionGameSettlementHealthPanel";
 
 describe("교사 질문놀이 포인트 지급 상태", () => {
-  it("모두 지급된 경우 핵심 상태만 한 줄로 보여 준다", () => {
+  it("모두 지급된 경우 관리 화면을 복잡하게 하지 않도록 숨긴다", () => {
     render(
       <QuestionGameSettlementHealthPanel
         health={{
@@ -20,8 +20,9 @@ describe("교사 질문놀이 포인트 지급 상태", () => {
       />,
     );
 
-    expect(screen.getByText("최근 종료 방 2개 모두 포인트 지급을 확인했어요."))
-      .toBeInTheDocument();
+    expect(screen.queryByText("포인트 지급 상태")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "누락 지급 다시 확인" }))
+      .not.toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 
