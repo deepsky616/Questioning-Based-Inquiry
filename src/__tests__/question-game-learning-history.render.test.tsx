@@ -177,6 +177,12 @@ describe("질문놀이 학습 이력 화면", () => {
     expect(within(modeSelector).getByRole("button", { name: "모두 비교" }))
       .toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("놀이별 참여 수치")).toBeVisible();
+    const participationChart = screen.getByRole("img", {
+      name: "질문놀이별 혼자, 인공지능, 친구와 함께 참여한 학생 비율 비교 그래프",
+    });
+    const comparisonLayout = participationChart.closest("figure")?.parentElement;
+    expect(comparisonLayout).not.toBeNull();
+    expect(comparisonLayout).toHaveClass("xl:grid-cols-2");
     expect(screen.getByText(
       "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 50%, 완료 3회",
     ).closest("ul")).toHaveClass("sr-only");
@@ -190,6 +196,7 @@ describe("질문놀이 학습 이력 화면", () => {
     })).toBeVisible();
     const participationTable = screen.getByText("놀이별 참여 수치").closest("table");
     expect(participationTable).not.toBeNull();
+    expect(comparisonLayout).toContainElement(participationTable);
     expect(within(participationTable!).getByRole("columnheader", { name: "친구와 함께" }))
       .toBeVisible();
     expect(within(participationTable!).queryByRole("columnheader", { name: "혼자 하기" }))
