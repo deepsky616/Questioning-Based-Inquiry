@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Prisma } from "@prisma/client";
 
 const dbMocks = vi.hoisted(() => ({
   queryRaw: vi.fn(),
@@ -38,16 +39,16 @@ describe("질문놀이 학습 이력 조회", () => {
           mode: "solo",
           plays: BigInt(2),
           participants: BigInt(1),
-          points: BigInt(8),
-          goodQuestions: BigInt(3),
+          points: new Prisma.Decimal(8),
+          goodQuestions: new Prisma.Decimal(3),
         },
         {
           gameId: "relay",
           mode: "friend",
           plays: BigInt(1),
           participants: BigInt(1),
-          points: BigInt(6),
-          goodQuestions: BigInt(2),
+          points: new Prisma.Decimal(6),
+          goodQuestions: new Prisma.Decimal(2),
         },
       ])
       .mockResolvedValueOnce([
@@ -65,7 +66,7 @@ describe("질문놀이 학습 이력 조회", () => {
           mode: "friend",
           completedAt: new Date("2026-07-17T01:00:00Z"),
           points: BigInt(6),
-          goodQuestions: BigInt(2),
+          goodQuestions: new Prisma.Decimal(2),
         },
       ])
       .mockResolvedValueOnce([
@@ -77,7 +78,7 @@ describe("질문놀이 학습 이력 조회", () => {
         {
           date: "2026-07-17",
           plays: BigInt(2),
-          goodQuestions: BigInt(3),
+          goodQuestions: new Prisma.Decimal(3),
         },
       ]);
 
@@ -126,12 +127,16 @@ describe("질문놀이 학습 이력 조회", () => {
           mode: "friend",
           plays: BigInt(3),
           participants: BigInt(2),
-          points: BigInt(18),
-          goodQuestions: BigInt(7),
+          points: new Prisma.Decimal(18),
+          goodQuestions: new Prisma.Decimal(7),
         },
       ])
       .mockResolvedValueOnce([
-        { date: "2026-07-17", plays: BigInt(3), goodQuestions: BigInt(7) },
+        {
+          date: "2026-07-17",
+          plays: BigInt(3),
+          goodQuestions: new Prisma.Decimal(7),
+        },
       ]);
 
     const history = await loadQuestionGameClassSummary(["student-1", "student-2"]);

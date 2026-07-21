@@ -75,9 +75,12 @@ export function QuestionGameLearningHistory({
     if (cursor) params.set("cursor", cursor);
     try {
       const response = await fetch(`/api/reports/question-games?${params.toString()}`);
-      const data: QuestionGameHistoryPage | { error?: string } = await response.json();
-      if (!response.ok || !("items" in data) || !Array.isArray(data.items)) {
-        throw new Error("error" in data && data.error
+      const data = await response.json().catch(() => null) as
+        | QuestionGameHistoryPage
+        | { error?: string }
+        | null;
+      if (!response.ok || !data || !("items" in data) || !Array.isArray(data.items)) {
+        throw new Error(data && "error" in data && data.error
           ? data.error
           : t("couldNotLoadHistory"));
       }

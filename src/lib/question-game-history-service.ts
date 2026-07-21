@@ -23,8 +23,8 @@ interface RawHistoryRow {
   gameId: string;
   mode: QuestionGameHistoryMode;
   completedAt: Date;
-  points: bigint | number;
-  goodQuestions: bigint | number;
+  points: bigint | number | Prisma.Decimal;
+  goodQuestions: bigint | number | Prisma.Decimal;
 }
 
 interface RawSummaryRow {
@@ -32,14 +32,14 @@ interface RawSummaryRow {
   mode: QuestionGameHistoryMode;
   plays: bigint | number;
   participants: bigint | number;
-  points: bigint | number;
-  goodQuestions: bigint | number;
+  points: bigint | number | Prisma.Decimal;
+  goodQuestions: bigint | number | Prisma.Decimal;
 }
 
 interface RawDailyRow {
   date: string;
-  plays: bigint | number;
-  goodQuestions: bigint | number;
+  plays: bigint | number | Prisma.Decimal;
+  goodQuestions: bigint | number | Prisma.Decimal;
 }
 
 type HistoryQueryClient = Pick<Prisma.TransactionClient, "$queryRaw">;
@@ -59,8 +59,8 @@ function emptyHistory(): QuestionGameLearningHistory {
   };
 }
 
-function safeNumber(value: bigint | number) {
-  const number = typeof value === "bigint" ? Number(value) : value;
+function safeNumber(value: bigint | number | Prisma.Decimal) {
+  const number = Number(value);
   return Number.isSafeInteger(number) && number >= 0 ? number : 0;
 }
 

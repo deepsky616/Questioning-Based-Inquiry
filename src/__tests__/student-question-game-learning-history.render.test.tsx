@@ -53,4 +53,13 @@ describe("학생 질문놀이 학습 기록", () => {
 
     expect(await screen.findByRole("heading", { name: "나의 질문놀이 학습 기록" })).toBeVisible();
   });
+
+  it("서버 응답이 비어 있어도 이해할 수 있는 오류를 보여 준다", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 500 })));
+
+    render(<StudentQuestionGameLearningHistory />);
+
+    expect(await screen.findByText("이력을 불러오지 못했습니다.")).toBeVisible();
+    expect(screen.queryByText(/Unexpected end of JSON input/)).not.toBeInTheDocument();
+  });
 });

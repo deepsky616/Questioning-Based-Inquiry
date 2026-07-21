@@ -22,9 +22,14 @@ export function StudentQuestionGameLearningHistory() {
       const response = await fetch("/api/reports/question-games?summary=1", {
         cache: "no-store",
       });
-      const data: LearningHistory | { error?: string } = await response.json();
-      if (!response.ok || !("totals" in data)) {
-        throw new Error("error" in data && data.error ? data.error : t("couldNotLoadHistory"));
+      const data = await response.json().catch(() => null) as
+        | LearningHistory
+        | { error?: string }
+        | null;
+      if (!response.ok || !data || !("totals" in data)) {
+        throw new Error(data && "error" in data && data.error
+          ? data.error
+          : t("couldNotLoadHistory"));
       }
       if (requestId === requestIdRef.current) setHistory(data);
     } catch (loadError) {

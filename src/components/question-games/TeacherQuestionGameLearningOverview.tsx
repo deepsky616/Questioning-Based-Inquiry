@@ -74,8 +74,11 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
       signal: controller.signal,
     })
       .then(async (response) => {
-        const data: LearningHistory | { error?: string } = await response.json();
-        if (!response.ok || !("totals" in data) || !("modes" in data)) {
+        const data = await response.json().catch(() => null) as
+          | LearningHistory
+          | { error?: string }
+          | null;
+        if (!response.ok || !data || !("totals" in data) || !("modes" in data)) {
           throw new Error("question game class summary failed");
         }
         setHistory(data);

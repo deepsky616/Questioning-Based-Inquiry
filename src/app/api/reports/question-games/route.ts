@@ -17,6 +17,18 @@ import {
 
 const HISTORY_MODES = new Set<QuestionGameHistoryMode>(["solo", "ai", "friend"]);
 
+async function questionGameHistoryResponse(load: () => Promise<unknown>) {
+  try {
+    return NextResponse.json(await load());
+  } catch (error) {
+    console.error("Question game history load failed", error);
+    return NextResponse.json(
+      { error: "질문놀이 학습 기록을 불러오지 못했습니다" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -58,8 +70,8 @@ export async function GET(request: NextRequest) {
       },
       select: { id: true },
     });
-    return NextResponse.json(
-      await loadQuestionGameClassSummary(students.map(({ id }) => id)),
+    return questionGameHistoryResponse(() =>
+      loadQuestionGameClassSummary(students.map(({ id }) => id))
     );
   }
 
@@ -86,7 +98,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (summaryRequested) {
-    return NextResponse.json(await loadQuestionGameLearningHistory(studentId));
+    return questionGameHistoryResponse(() => loadQuestionGameLearningHistory(studentId));
   }
 
   const modeValue = params.get("mode")?.trim() || undefined;
@@ -110,12 +122,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "올바르지 않은 이력 위치입니다" }, { status: 400 });
   }
 
-  const page = await loadQuestionGameHistoryPage({
+  return questionGameHistoryResponse(() => loadQuestionGameHistoryPage({
     studentId,
     ...(mode ? { mode } : {}),
     ...(gameId ? { gameId } : {}),
     limit,
     ...(cursor ? { cursor } : {}),
-  });
-  return NextResponse.json(page);
+  }));
 }

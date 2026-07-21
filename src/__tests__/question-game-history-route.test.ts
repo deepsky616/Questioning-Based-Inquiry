@@ -82,6 +82,25 @@ describe("질문놀이 상세 이력 경로", () => {
     expect(body.totals).toEqual({ plays: 2, points: 12, goodQuestions: 3 });
   });
 
+  it("학습 요약 조회가 실패해도 비어 있지 않은 오류 응답을 반환한다", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockAuth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
+    mockLoadSummary.mockRejectedValueOnce(new Error("database failed"));
+
+    const response = await GET(new NextRequest(
+      "http://localhost/api/reports/question-games?summary=1",
+    ));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: "질문놀이 학습 기록을 불러오지 못했습니다" });
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Question game history load failed",
+      expect.any(Error),
+    );
+    errorSpy.mockRestore();
+  });
+
   it("학생은 본인의 필터된 다음 이력만 조회한다", async () => {
     mockAuth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
 
