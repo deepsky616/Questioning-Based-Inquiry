@@ -9,6 +9,7 @@ import { toPublicGameRoom } from "@/lib/question-game-room-response";
 import {
   readMysteryPublicState,
   readMysteryState,
+  toPublicMysteryState,
   type MysteryRoomState,
 } from "@/lib/question-game-room-engines/mystery";
 
@@ -327,6 +328,42 @@ describe("미스터리 박스 방 판정기", () => {
       { commandIndex: 12, nextRoundId: commandId(93) },
     );
     expect(repeated).toMatchObject({ kind: "forbidden", room: asked });
+  });
+
+  it("인공지능을 사용할 수 없으면 임시 답변 출처와 질문 점수를 저장한다", () => {
+    const room = prepareRoom();
+    const nextRoundId = commandId(91);
+    const asked = changedRoom(applyMystery(
+      room,
+      "mystery-ask",
+      { locale: "ko", question: "무슨 소리가 나나요?" },
+      {
+        nextRoundId,
+        mysteryAnswerResolution: {
+          itemId: "apple",
+          playerId: "host",
+          locale: "ko",
+          question: "무슨 소리가 나나요?",
+          answer: "unknown",
+          source: "fallback",
+        },
+      },
+    ));
+    const state = asked.gameState as unknown as MysteryRoomState;
+
+    expect(state.history).toEqual([{
+      kind: "question",
+      playerId: "host",
+      playerName: "Host",
+      locale: "ko",
+      question: "무슨 소리가 나나요?",
+      answer: "unknown",
+      answerSource: "fallback",
+    }]);
+    expect(state.scores).toEqual({ host: 1, guest: 0 });
+    expect(toPublicMysteryState(state)).toMatchObject({
+      history: [{ answerSource: "fallback" }],
+    });
   });
 
   it.each([

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
   ArrowLeft,
   CheckCircle2,
   Home,
@@ -9,6 +10,7 @@ import {
   Loader2,
   RefreshCw,
   WifiOff,
+  X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -79,6 +81,7 @@ export function QuestionGameRoomFlow({
     leaveRoom,
     refreshRoom,
     clearActionNotice,
+    clearError,
   } = useRoom(game.id);
   const [view, setView] = useState<"choice" | "join">("choice");
   const [joinCode, setJoinCode] = useState("");
@@ -136,6 +139,27 @@ export function QuestionGameRoomFlow({
       className="rounded-lg border border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200 px-4 py-3 text-sm"
     >
       {error}
+    </div>
+  ) : null;
+
+  const activeErrorAlert = error ? (
+    <div
+      role="alert"
+      className="fixed bottom-4 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 items-start gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-red-950 shadow-lg dark:border-red-700 dark:bg-red-950 dark:text-red-100"
+    >
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <p className="min-w-0 flex-1 break-words text-sm font-semibold">{error}</p>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="h-7 w-7 shrink-0 text-current hover:bg-red-100 dark:hover:bg-red-900"
+        aria-label={t("dismissRoomError")}
+        title={t("dismissRoomError")}
+        onClick={clearError}
+      >
+        <X className="h-4 w-4" aria-hidden="true" />
+      </Button>
     </div>
   ) : null;
 
@@ -244,7 +268,6 @@ export function QuestionGameRoomFlow({
       return (
         <>
           {roomNotices}
-          {errorAlert}
           <RoomComponent
             game={game}
             room={room}
@@ -253,6 +276,7 @@ export function QuestionGameRoomFlow({
             onAction={sendAction}
             onLeave={() => { void handleLeaveRoom(); }}
           />
+          {activeErrorAlert}
         </>
       );
     }

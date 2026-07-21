@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTranslations } from "next-intl";
-import { BarChart3, ChevronDown, LogOut, Pencil, Trash2, Trophy, UserCircle, Users, Menu, X } from "lucide-react";
+import { BarChart3, ChevronDown, KeyRound, LogOut, Settings, Trash2, Trophy, UserCircle, Users, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -26,6 +26,7 @@ export function isNavPageActive(pathname: string, page: NavPage) {
 
 export interface AccountNavLinks {
   settingsHref: string;
+  settingsType?: "settings" | "password";
   withdrawalHref?: string;
   studentManagementHref?: string;
   rankingsHref?: string;
@@ -187,6 +188,9 @@ export function AppNav({
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const t = useTranslations("nav");
+  const isPasswordLink = accountLinks?.settingsType === "password";
+  const SettingsLinkIcon = isPasswordLink ? KeyRound : Settings;
+  const settingsLabel = isPasswordLink ? t("changePassword") : t("settings");
 
   const isActive = (page: NavPage) => isNavPageActive(pathname, page);
   const classInfo = [
@@ -243,8 +247,8 @@ export function AppNav({
                       onClick={() => setAccountOpen(false)}
                       className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
                     >
-                      <Pencil className="h-4 w-4 text-muted-foreground" />
-                      {t("personalInfo")}
+                      <SettingsLinkIcon className="h-4 w-4 text-muted-foreground" />
+                      {settingsLabel}
                     </Link>
                   )}
                   {accountLinks?.withdrawalHref && (
@@ -347,8 +351,8 @@ export function AppNav({
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-primary"
                 >
-                  <Pencil className="h-4 w-4" />
-                  {t("personalInfo")}
+                  <SettingsLinkIcon className="h-4 w-4" />
+                  {settingsLabel}
                 </Link>
                 {accountLinks.withdrawalHref && (
                   <Link

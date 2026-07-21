@@ -123,6 +123,7 @@ interface UseRoomResult {
   setActiveCode: (code: string | null) => void;
   refreshRoom: () => void;
   clearActionNotice: () => void;
+  clearError: () => void;
 }
 
 export interface RoomActionNotice {
@@ -158,6 +159,10 @@ export function useRoom(gameId?: string): UseRoomResult {
 
   const clearActionNotice = useCallback(() => {
     setActionNotice(null);
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
   }, []);
 
   const advanceRoomGeneration = useCallback(() => {
@@ -861,5 +866,6 @@ export function useRoom(gameId?: string): UseRoomResult {
     setActiveCode,
     refreshRoom,
     clearActionNotice,
+    clearError,
   };
 }

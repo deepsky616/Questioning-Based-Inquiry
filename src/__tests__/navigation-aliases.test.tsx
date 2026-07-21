@@ -139,6 +139,35 @@ describe("내비게이션 주소 별칭", () => {
     expectActive(screen.getByRole("link", { name: "질문수업" }));
   });
 
+  it("역할에 맞는 계정 설정 이름을 데스크톱과 모바일 메뉴에 표시한다", () => {
+    const { unmount } = renderWithMessages(
+      <AppNav
+        pages={pages}
+        userName="교사"
+        roleSuffix="선생님"
+        accountLinks={{ settingsHref: "/teacher-settings", settingsType: "settings" }}
+      />,
+    );
+
+    expect(screen.getAllByRole("link", { name: ko.nav.settings })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: ko.nav.openMenu }));
+    expect(screen.getAllByRole("link", { name: ko.nav.settings })).toHaveLength(2);
+    unmount();
+
+    renderWithMessages(
+      <AppNav
+        pages={pages}
+        userName="학생"
+        roleSuffix="학생"
+        accountLinks={{ settingsHref: "/student-settings", settingsType: "password" }}
+      />,
+    );
+
+    expect(screen.getAllByRole("link", { name: ko.nav.changePassword })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: ko.nav.openMenu }));
+    expect(screen.getAllByRole("link", { name: ko.nav.changePassword })).toHaveLength(2);
+  });
+
   it("별칭 화면을 대표 메뉴 순번으로 삼아 이전과 다음을 계산한다", () => {
     navigationState.pathname = "/teacher-curriculum/steps";
     renderWithMessages(<PageNav pages={pages} />);

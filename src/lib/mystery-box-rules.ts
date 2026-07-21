@@ -33,6 +33,7 @@ export interface MysteryAnswerResolution {
   locale: MysteryLocale;
   question: string;
   answer: MysteryAnswer;
+  source?: "ai" | "fallback";
 }
 
 export interface MysteryItem {

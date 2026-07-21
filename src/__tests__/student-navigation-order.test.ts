@@ -57,7 +57,10 @@ describe("student navigation order", () => {
   });
 
   it("학생 설정을 상단 계정 메뉴에서 접근할 수 있다", () => {
-    expect(readAppNavAccountLinks(layoutSource)).toMatchObject({ settingsHref: "/student-settings" });
+    expect(readAppNavAccountLinks(layoutSource)).toMatchObject({
+      settingsHref: "/student-settings",
+      settingsType: "password",
+    });
   });
 
   it("AppNav 밖에 있는 계정 경로는 무시한다", () => {

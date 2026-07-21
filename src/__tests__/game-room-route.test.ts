@@ -870,7 +870,7 @@ describe("미스터리 박스 실제 공개 응답", () => {
     expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
   });
 
-  it("미등록 질문의 에이아이 실패는 질문과 차례를 소비하거나 저장하지 않는다", async () => {
+  it("미등록 질문의 에이아이 실패는 임시 답변으로 질문과 점수 및 다음 차례를 저장한다", async () => {
     const question = "비가 오면 잘 자라나요?";
     const state = makeMysteryPlayState();
     const room = makeMysteryRoom(state);
@@ -878,6 +878,10 @@ describe("미스터리 박스 실제 공개 응답", () => {
     mocks.generateMysteryAiAnswer.mockRejectedValue(
       new Error(`raw apple ${question}`),
     );
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved" as const,
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
 
     const response = await patch({
       action: "mystery-ask",
@@ -890,11 +894,18 @@ describe("미스터리 박스 실제 공개 응답", () => {
       question,
     });
 
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      error: "답변을 준비하지 못했어요. 질문은 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.",
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.room.gameState).toMatchObject({
+      currentTurnIdx: 1,
+      scores: { "user-1": 1, "user-2": 0 },
+      history: [{
+        question,
+        answer: "unknown",
+        answerSource: "fallback",
+      }],
     });
-    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
     expect(state.history).toEqual([]);
     expect(state.scores).toEqual({ "user-1": 0, "user-2": 0 });
     expect(state.currentTurnIdx).toBe(0);

@@ -30,7 +30,7 @@ export type MysteryHistoryItem =
       locale: MysteryLocale;
       question: string;
       answer: MysteryAnswer;
-      answerSource?: "ai";
+      answerSource?: "ai" | "fallback";
     }
   | {
       kind: "guess";
@@ -160,7 +160,9 @@ function isMysteryHistoryItem(value: unknown): value is MysteryHistoryItem {
       (value.answer === "yes" ||
         value.answer === "no" ||
         value.answer === "unknown") &&
-      (value.answerSource === undefined || value.answerSource === "ai");
+      (value.answerSource === undefined ||
+        value.answerSource === "ai" ||
+        (value.answerSource === "fallback" && value.answer === "unknown"));
   }
   return value.kind === "guess" &&
     hasExactKeys(value, [
@@ -254,6 +256,9 @@ function hasValidHistorySemantics(state: MysteryRoomState): boolean {
   return state.history.every((historyItem) => {
     if (historyItem.kind === "question") {
       if (historyItem.answerSource === "ai") return true;
+      if (historyItem.answerSource === "fallback") {
+        return historyItem.answer === "unknown";
+      }
       return classifyMysteryQuestion(
         historyItem.question,
         item,
@@ -448,7 +453,7 @@ function projectMysteryHistoryItem(
         ...common,
         question: value.question,
         answer: value.answer,
-        ...(value.answerSource === "ai"
+        ...(value.answerSource === "ai" || value.answerSource === "fallback"
           ? { answerSource: value.answerSource }
           : {}),
       }
@@ -559,14 +564,17 @@ function isMysteryAnswerResolution(
       "locale",
       "question",
       "answer",
-    ]) &&
+    ], ["source"]) &&
     typeof value.itemId === "string" &&
     typeof value.playerId === "string" &&
     (value.locale === "ko" || value.locale === "en") &&
     typeof value.question === "string" &&
     (value.answer === "yes" ||
       value.answer === "no" ||
-      value.answer === "unknown");
+      value.answer === "unknown") &&
+    (value.source === undefined ||
+      value.source === "ai" ||
+      (value.source === "fallback" && value.answer === "unknown"));
 }
 
 function currentTurnPlayerId(state: MysteryRoomState): string | null {
@@ -773,7 +781,7 @@ function askMysteryQuestion(
   const ruleAnswer = classifyMysteryQuestion(question, item, locale);
   const resolution = context.mysteryAnswerResolution;
   let answer = ruleAnswer;
-  let answerSource: "ai" | undefined;
+  let answerSource: "ai" | "fallback" | undefined;
   if (ruleAnswer === "unknown") {
     if (!(
       isMysteryAnswerResolution(resolution) &&
@@ -795,7 +803,7 @@ function askMysteryQuestion(
       };
     }
     answer = resolution.answer;
-    answerSource = "ai";
+    answerSource = resolution.source ?? "ai";
   }
 
   return finishOrAdvanceMysteryActivity(

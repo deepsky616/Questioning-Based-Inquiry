@@ -542,6 +542,14 @@ function MysteryHistory({
                 <p className="mt-1 break-words text-foreground">
                   {item.kind === "question" ? item.question : item.guess}
                 </p>
+                {item.kind === "question" && item.answerSource === "fallback" && (
+                  <p
+                    className="mt-2 text-xs font-semibold leading-5 text-amber-800 dark:text-amber-200"
+                    role="status"
+                  >
+                    {t("mysteryFallbackSaved")}
+                  </p>
+                )}
               </div>
               <span className={item.kind === "question" && item.answer === "yes"
                 ? "rounded-lg bg-emerald-100 px-2 py-1 font-black text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100"

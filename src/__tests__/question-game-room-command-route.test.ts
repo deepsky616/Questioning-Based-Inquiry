@@ -845,10 +845,13 @@ describe("미스터리 박스 에이아이 해결 경계", () => {
     );
   });
 
-  it("에이아이 별도 호출 제한은 답을 만들거나 방을 저장하지 않는다", async () => {
+  it("에이아이 별도 호출 제한에도 임시 답변으로 질문을 저장한다", async () => {
     const room = makeV2Room({ gameId: "mystery-box" });
+    const candidate = makeV2Room({ gameId: "mystery-box", version: 2 });
     mocks.loadGameRoom.mockResolvedValue(room);
-    mocks.applyQuestionGameRoomCommand.mockReturnValue(resolutionRequired(room));
+    mocks.applyQuestionGameRoomCommand
+      .mockReturnValueOnce(resolutionRequired(room))
+      .mockReturnValueOnce({ kind: "changed", room: candidate });
     mocks.findMysteryAiAnswerRequest.mockReturnValue(request);
     mocks.checkRateLimit.mockImplementation((key: string) =>
       key === "game-room-mystery-ai:user-1"
@@ -858,35 +861,58 @@ describe("미스터리 박스 에이아이 해결 경계", () => {
           })
         : null,
     );
+    mocks.saveGameRoom.mockResolvedValue({ kind: "saved", room: candidate });
 
     const response = await patch(commandBody());
 
-    expect(response.status).toBe(429);
+    expect(response.status).toBe(200);
     expect(mocks.generateMysteryAiAnswer).not.toHaveBeenCalled();
-    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        mysteryAnswerResolution: {
+          ...request,
+          answer: "unknown",
+          source: "fallback",
+        },
+      }),
+    );
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(candidate);
   });
 
-  it("에이아이 오류는 내부 값 없이 재시도 가능한 503이며 저장하지 않는다", async () => {
+  it("에이아이 오류는 내부 값을 노출하지 않고 임시 답변으로 질문을 저장한다", async () => {
     const room = makeV2Room({ gameId: "mystery-box" });
+    const candidate = makeV2Room({ gameId: "mystery-box", version: 2 });
     const secret = "apple raw-model-output";
     mocks.loadGameRoom.mockResolvedValue(room);
-    mocks.applyQuestionGameRoomCommand.mockReturnValue(resolutionRequired(room));
+    mocks.applyQuestionGameRoomCommand
+      .mockReturnValueOnce(resolutionRequired(room))
+      .mockReturnValueOnce({ kind: "changed", room: candidate });
     mocks.findMysteryAiAnswerRequest.mockReturnValue(request);
     mocks.generateMysteryAiAnswer.mockRejectedValue(
       new Error(`${secret} ${request.question}`),
     );
+    mocks.saveGameRoom.mockResolvedValue({ kind: "saved", room: candidate });
 
     const response = await patch(commandBody());
     const body = await response.json();
 
-    expect(response.status).toBe(503);
-    expect(body).toEqual({
-      error: "답변을 준비하지 못했어요. 질문은 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.",
-    });
+    expect(response.status).toBe(200);
+    expect(body.room).toEqual(candidate);
+    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        mysteryAnswerResolution: {
+          ...request,
+          answer: "unknown",
+          source: "fallback",
+        },
+      }),
+    );
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(candidate);
     expect(JSON.stringify(body)).not.toContain(secret);
     expect(JSON.stringify(mocks.loggerWarn.mock.calls)).not.toContain(secret);
     expect(JSON.stringify(mocks.loggerWarn.mock.calls)).not.toContain(request.question);
-    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
   it("요청자를 확인하지 못하거나 두 번째 판정도 해결 필요면 안전한 500이고 저장하지 않는다", async () => {

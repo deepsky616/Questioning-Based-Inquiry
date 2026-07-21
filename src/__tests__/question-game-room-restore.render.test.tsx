@@ -29,6 +29,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("next-auth/react", () => ({
   useSession: () => ({ data: { user: { id: "student-1" } } }),
 }));
+vi.mock("@/app/(student)/student-question-play/games/RoomRelay", () => ({
+  default: () => <div data-testid="active-room-game">놀이 입력 영역</div>,
+}));
 
 describe("질문놀이 방 복원 화면", () => {
   const game = BUILT_IN_GAMES.find(({ id }) => id === "relay")!;
@@ -255,5 +258,58 @@ describe("질문놀이 방 복원 화면", () => {
     expect(screen.getByText(
       "이미 처리된 활동이에요. 저장된 최신 결과를 보여 줍니다.",
     )).toBeInTheDocument();
+  });
+
+  it("진행 중 동작 오류는 모든 친구 놀이에서 화면 아래에 보이고 닫을 수 있다", () => {
+    const clearError = vi.fn();
+    roomHook.useRoom.mockReturnValue({
+      room: {
+        code: "1234",
+        gameId: "relay",
+        hostId: "student-1",
+        status: "playing",
+        players: [{
+          id: "student-1",
+          name: "학생",
+          isHost: true,
+          joinedAt: 1,
+        }],
+        topic: "",
+        chain: [],
+        turnIndex: 0,
+        gameState: { stateVersion: 2 },
+        version: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      error: "질문을 보내지 못했어요",
+      actionNotice: null,
+      actionLoading: false,
+      isRestoring: false,
+      connectionState: "connected",
+      createRoom: vi.fn(),
+      joinRoom: vi.fn(),
+      sendAction: vi.fn(),
+      leaveRoom: vi.fn(),
+      setActiveCode: vi.fn(),
+      refreshRoom: vi.fn(),
+      clearActionNotice: vi.fn(),
+      clearError,
+    });
+
+    render(
+      <QuestionGameRoomFlow
+        game={game}
+        myId="student-1"
+        allowJoin
+        onExit={vi.fn()}
+      />,
+    );
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("질문을 보내지 못했어요");
+    expect(alert).toHaveClass("fixed", "bottom-4");
+    screen.getByRole("button", { name: "오류 알림 닫기" }).click();
+    expect(clearError).toHaveBeenCalledOnce();
   });
 });

@@ -61,6 +61,7 @@ describe("teacher navigation order", () => {
     const accountLinks = readAppNavAccountLinks(layoutSource);
     expect(accountLinks).toMatchObject({
       settingsHref: "/teacher-settings",
+      settingsType: "settings",
       studentManagementHref: "/teacher-students",
     });
     expect(accountLinks).not.toHaveProperty("withdrawalHref");

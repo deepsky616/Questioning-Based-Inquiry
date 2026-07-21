@@ -7,7 +7,7 @@
     "questions": "Explore Questions",
     "curriculum": "Inquiry Questions",
     "reports": "Activity Report",
-    "settings": "Edit profile",
+    "settings": "Settings",
     "ask": "Ask a Question",
     "explore": "Explore Questions",
     "logout": "Log out",
@@ -19,7 +19,7 @@
     "practice": "Practice",
     "questionLearning": "Question Learning",
     "accountMenu": "Account menu",
-    "personalInfo": "Edit profile",
+    "changePassword": "Change password",
     "withdraw": "Delete account",
     "studentManagement": "Student management",
     "rankings": "Rankings",
@@ -184,8 +184,8 @@
       "description": "View question, like, and comment trends and AI analysis by class or by student"
     },
     "teacherSettings": {
-      "title": "Edit profile",
-      "description": "Manage your teacher account, password, and AI settings"
+      "title": "Settings",
+      "description": "Manage account security and AI model settings separately"
     },
     "studentDashboard": {
       "title": "Student Dashboard",
@@ -204,7 +204,7 @@
       "description": "Review your question, comment, and question class activity trends with AI analysis"
     },
     "studentSettings": {
-      "title": "Edit profile",
+      "title": "Change password",
       "description": "View your account info and change your password"
     }
   },
@@ -765,7 +765,7 @@
     "resetPlaceholder": "e.g., edunet0079!",
     "resetRulePrefix": "Combine numbers + upper/lowercase letters + symbols (all three), 8-16 chars (allowed symbols: ",
     "resetRuleSuffix": ")",
-    "resetWarning": "💡 All selected students get the same password, so tell them to change it individually under [Settings] after logging in.",
+    "resetWarning": "💡 All selected students get the same password, so tell them to change it individually under [Change password] after logging in.",
     "resetting": "Resetting...",
     "resetBtn": "Reset password for {count} students",
     "resetCardTitle": "Reset student passwords",
@@ -1192,6 +1192,8 @@
     "errorsSuffix": " / {count} errors",
     "serverError": "A server error occurred",
     "accountInfo": "Account info",
+    "accountSecurityTab": "Account & security",
+    "aiSettingsTab": "AI settings",
     "name": "Name",
     "email": "Email",
     "school": "School",
@@ -1215,7 +1217,7 @@
     "defaultPassword": "Default password",
     "pwPlaceholder": "e.g., edunet0079!",
     "pwHint": "The password students use on first login. It must follow the password rules.",
-    "pwWarning": "💡 Everyone gets the same password, so tell students to change it under [Settings] after logging in.",
+    "pwWarning": "💡 Everyone gets the same password, so tell students to change it under [Change password] after logging in.",
     "studentList": "Student list",
     "bulkPlaceholder": "Enter one number and name per line\ne.g.:\n1 John Smith\n2 Jane Doe\n3 Alex Lee",
     "formatLabel": "Format: ",
@@ -1909,6 +1911,8 @@
     "roomConnectionRetry": "Check now",
     "roomConnectionRecovered": "The room connection is restored and the latest turn is ready.",
     "roomActionAlreadyProcessed": "This activity was already processed. The latest saved result is shown.",
+    "dismissRoomError": "Dismiss error message",
+    "mysteryFallbackSaved": "The AI answer was unavailable, so this was recorded as ‘Not sure’. Your question activity was saved normally. Continue with the next question.",
     "myTurnTitle": "My turn",
     "myTurnNotice": "It is your turn now.",
     "turnSoundOn": "Turn sound on",

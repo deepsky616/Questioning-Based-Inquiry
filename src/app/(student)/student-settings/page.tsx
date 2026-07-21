@@ -34,7 +34,7 @@ export default function SettingsPage() {
           <CardTitle>{tSet("accountInfo")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>{tSet("name")}</Label>
               <Input value={user?.name || ""} disabled />
@@ -50,7 +50,7 @@ export default function SettingsPage() {
               <Input value={user.school} disabled />
             </div>
           )}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {user?.grade && (
               <div className="space-y-2">
                 <Label>{t("grade")}</Label>

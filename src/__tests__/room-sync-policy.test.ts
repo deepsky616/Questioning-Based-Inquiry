@@ -65,9 +65,12 @@ describe("room sync policy", () => {
     expect(flow).toMatch(
       /const errorAlert = error \? \([\s\S]*?role="alert"[\s\S]*?\{error\}[\s\S]*?\) : null;/,
     );
-    expect(flow.match(/\{errorAlert\}/g)).toHaveLength(4);
+    expect(flow).toMatch(
+      /const activeErrorAlert = error \? \([\s\S]*?role="alert"[\s\S]*?fixed bottom-4[\s\S]*?\{error\}[\s\S]*?\) : null;/,
+    );
+    expect(flow.match(/\{errorAlert\}/g)).toHaveLength(3);
     expect(flow).toMatch(/\{errorAlert\}\s*<RoomLobby/);
-    expect(flow).toMatch(/\{errorAlert\}\s*<RoomComponent/);
+    expect(flow).toMatch(/<RoomComponent[\s\S]*?\{activeErrorAlert\}/);
     expect(flow).toMatch(/\{errorAlert\}\s*<div className="mx-auto max-w-lg/);
     expect(flow).not.toContain('config={{ mode: "friend"');
   });

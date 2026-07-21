@@ -320,17 +320,24 @@ async function handleQuestionGameCommand({
       );
     }
     const limited = checkRateLimit(`game-room-mystery-ai:${userId}`, 20);
-    if (limited) return limited;
-    try {
-      mysteryAnswerResolution = await generateMysteryAiAnswer(userId, request);
-    } catch {
-      logger.warn("미스터리 박스 에이아이 답변을 준비하지 못했습니다");
-      return NextResponse.json(
-        {
-          error: "답변을 준비하지 못했어요. 질문은 저장되지 않았습니다. 잠시 후 다시 시도해 주세요.",
-        },
-        { status: 503 },
-      );
+    if (limited) {
+      logger.warn("미스터리 박스 에이아이 요청 제한으로 임시 답변을 사용합니다");
+      mysteryAnswerResolution = {
+        ...request,
+        answer: "unknown",
+        source: "fallback",
+      };
+    } else {
+      try {
+        mysteryAnswerResolution = await generateMysteryAiAnswer(userId, request);
+      } catch {
+        logger.warn("미스터리 박스 에이아이 답변 실패로 임시 답변을 사용합니다");
+        mysteryAnswerResolution = {
+          ...request,
+          answer: "unknown",
+          source: "fallback",
+        };
+      }
     }
     try {
       result = applyCommand(room, mysteryAnswerResolution);

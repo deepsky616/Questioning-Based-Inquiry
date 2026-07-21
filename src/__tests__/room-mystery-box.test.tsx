@@ -310,6 +310,33 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
     expect(screen.getByText("남은 활동 18")).toBeVisible();
   });
 
+  it("인공지능을 사용할 수 없었던 질문은 입력 가까이에서 임시 답변임을 알린다", () => {
+    const fallbackQuestion = {
+      kind: "question",
+      playerId: "host",
+      playerName: "방장",
+      locale: "ko",
+      question: "무슨 소리가 나나요?",
+      answer: "unknown",
+      answerSource: "fallback",
+    } as unknown as MysteryHistoryItem;
+    const rawState = storedPlayState();
+    const { private: _private, ...publicRawState } = rawState;
+    const room = makeRoom({
+      ...publicRawState,
+      round: 2,
+      currentTurnIdx: 1,
+      history: [fallbackQuestion],
+      scores: { host: 1, other: 0 },
+    });
+
+    render(<RoomMysteryBox {...makeProps(room, vi.fn(), "other")} />);
+
+    expect(screen.getByText("무슨 소리가 나나요?")).toBeVisible();
+    expect(screen.getAllByText(/인공지능 답변을 연결하지 못해/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/질문 활동은 정상적으로 저장됐어요/)).toBeVisible();
+  });
+
   it("내 차례 질문과 추측을 서로 다른 서버 명령으로만 보낸다", async () => {
     stubCommandId();
     const room = makeRoom(publicState(storedPlayState()));

@@ -8,7 +8,7 @@ import type { QuestionGameRoomResult } from "@/lib/question-game-room-engine";
 
 export type MysteryAiAnswerRequest = Omit<
   MysteryAnswerResolution,
-  "answer"
+  "answer" | "source"
 >;
 
 const mysteryAiAnswerSchema = z.object({
