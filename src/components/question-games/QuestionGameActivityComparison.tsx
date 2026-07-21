@@ -71,10 +71,12 @@ function ClassParticipationTooltip({
   active,
   payload,
   classStudentCount,
+  modes,
 }: {
   active?: boolean;
   payload?: Array<{ payload?: ModeChartRow }>;
   classStudentCount: number;
+  modes: readonly QuestionGameHistoryMode[];
 }) {
   const t = useTranslations("gamePlay");
   const row = payload?.[0]?.payload;
@@ -88,7 +90,7 @@ function ClassParticipationTooltip({
     <div style={TOOLTIP_STYLE} className="max-w-64 p-3 shadow-lg">
       <p className="font-bold text-foreground">{row.name}</p>
       <dl className="mt-2 space-y-1.5">
-        {MODES.map((mode) => (
+        {modes.map((mode) => (
           <div className="flex items-start justify-between gap-3" key={mode}>
             <dt className="font-semibold" style={{ color: MODE_COLORS[mode] }}>{labels[mode]}</dt>
             <dd className="text-right text-card-foreground">
@@ -116,6 +118,7 @@ export function QuestionGameActivityComparison({
   const [requestedView, setRequestedView] = useState<"participation" | "completion">(
     "participation",
   );
+  const [selectedMode, setSelectedMode] = useState<"all" | QuestionGameHistoryMode>("all");
   const games = useMemo(() => localizeQuestionGames(BUILT_IN_GAMES, locale), [locale]);
   const modeLabels: Record<QuestionGameHistoryMode, string> = {
     solo: t("modeSolo"),
@@ -233,9 +236,45 @@ export function QuestionGameActivityComparison({
     : requestedView === "completion" && completionRows.length === 0
       ? "participation"
       : requestedView;
+  const visibleModes: readonly QuestionGameHistoryMode[] = selectedMode === "all"
+    ? MODES
+    : [selectedMode];
 
   return (
     <div className="min-w-0">
+      <h3
+        id={activeView === "participation"
+          ? "question-game-participation-class"
+          : "question-game-completion-class"}
+        className="mb-3 text-sm font-bold text-foreground"
+      >
+        {activeView === "participation"
+          ? t("gameModeBreakdownTitle")
+          : t("gameCompletionTitle")}
+      </h3>
+      {activeView === "participation" && (
+        <div
+          role="group"
+          aria-label={t("modeComparisonLabel")}
+          className="mb-3 inline-flex max-w-full flex-wrap rounded-md border border-border bg-muted p-1"
+        >
+          {(["all", ...MODES] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={selectedMode === mode}
+              onClick={() => setSelectedMode(mode)}
+              className={`min-h-8 rounded px-3 text-xs font-bold transition-colors ${
+                selectedMode === mode
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {mode === "all" ? t("allModeComparison") : modeLabels[mode]}
+            </button>
+          ))}
+        </div>
+      )}
       <div
         role="group"
         aria-label={t("comparisonViewLabel")}
@@ -262,13 +301,12 @@ export function QuestionGameActivityComparison({
       {activeView === "participation" ? (
         <>
           <figure aria-labelledby="question-game-participation-class">
-            <figcaption
-              id="question-game-participation-class"
-              className="mb-3 text-sm font-bold text-foreground"
+            <div
+              role="img"
+              aria-label={selectedMode === "all"
+                ? t("classParticipationAria")
+                : t("classParticipationModeAria", { mode: modeLabels[selectedMode] })}
             >
-              {t("gameModeBreakdownTitle")}
-            </figcaption>
-            <div role="img" aria-label={t("classParticipationAria")}>
               <ResponsiveContainer width="100%" height={Math.max(240, modeRows.length * 54)}>
                 <BarChart
                   data={modeRows}
@@ -294,12 +332,15 @@ export function QuestionGameActivityComparison({
                   />
                   <Tooltip
                     content={(
-                      <ClassParticipationTooltip classStudentCount={classStudentCount} />
+                      <ClassParticipationTooltip
+                        classStudentCount={classStudentCount}
+                        modes={visibleModes}
+                      />
                     )}
                     cursor={{ fill: GRID_COLOR, opacity: 0.3 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  {MODES.map((mode) => (
+                  {visibleModes.map((mode) => (
                     <Bar
                       key={mode}
                       dataKey={`${mode}Rate`}
@@ -313,7 +354,7 @@ export function QuestionGameActivityComparison({
               </ResponsiveContainer>
             </div>
             <ul className="sr-only">
-              {modeRows.flatMap((row) => MODES.map((mode) => (
+              {modeRows.flatMap((row) => visibleModes.map((mode) => (
                 <li key={`${row.gameId}-${mode}`}>
                   {t("classGameModeSummary", {
                     game: row.name,
@@ -331,14 +372,16 @@ export function QuestionGameActivityComparison({
           </figure>
 
           <div className="mt-4 overflow-x-auto border-t border-border pt-3">
-            <table className="w-full min-w-[640px] border-collapse text-xs">
+            <table className={`w-full border-collapse text-xs ${
+              selectedMode === "all" ? "min-w-[640px]" : "min-w-[360px]"
+            }`}>
               <caption className="pb-2 text-left font-bold text-foreground">
                 {t("classParticipationTableTitle")}
               </caption>
               <thead>
                 <tr className="border-y border-border bg-muted/50 text-foreground">
                   <th scope="col" className="px-2 py-2 text-left">{t("questionGame")}</th>
-                  {MODES.map((mode) => (
+                  {visibleModes.map((mode) => (
                     <th scope="col" className="px-2 py-2 text-center" key={mode}>
                       {modeLabels[mode]}
                     </th>
@@ -349,7 +392,7 @@ export function QuestionGameActivityComparison({
                 {modeRows.map((row) => (
                   <tr key={row.gameId}>
                     <th scope="row" className="px-2 py-2 text-left font-semibold">{row.name}</th>
-                    {MODES.map((mode) => (
+                    {visibleModes.map((mode) => (
                       <td className="px-2 py-2 text-center" key={mode}>
                         {t("participantCompletionCell", {
                           participants: row.modes[mode].participants,
@@ -369,12 +412,6 @@ export function QuestionGameActivityComparison({
         </>
       ) : (
         <figure aria-labelledby="question-game-completion-class">
-          <figcaption
-            id="question-game-completion-class"
-            className="mb-3 text-sm font-bold text-foreground"
-          >
-            {t("gameCompletionTitle")}
-          </figcaption>
           <div role="img" aria-label={t("gameCompletionAria")}>
             <ResponsiveContainer width="100%" height={Math.max(240, completionRows.length * 42)}>
               <BarChart

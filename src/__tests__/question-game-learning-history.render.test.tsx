@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import { QuestionGameLearningHistory } from "@/components/question-games/QuestionGameLearningHistory";
@@ -173,15 +173,37 @@ describe("질문놀이 학습 이력 화면", () => {
     expect(screen.getByRole("heading", { name: "학급 질문놀이 학습 현황" })).toBeVisible();
     expect(screen.getByText("최근 6주 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
+    expect(screen.getByText("최근 6주 변화").closest("figure")?.parentElement)
+      .not.toHaveClass("lg:grid-cols-2");
     expect(screen.getByRole("button", { name: "참여 현황" })).toHaveAttribute("aria-pressed", "true");
+    const modeSelector = screen.getByRole("group", { name: "놀이 방식 선택" });
+    expect(within(modeSelector).getByRole("button", { name: "모두 비교" }))
+      .toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("놀이별 참여 수치")).toBeVisible();
     expect(screen.getByText(
       "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 50%, 완료 3회",
     ).closest("ul")).toHaveClass("sr-only");
     expect(screen.getByRole("cell", { name: "2명 (50%) · 완료 3회" })).toBeVisible();
 
+    fireEvent.click(within(modeSelector).getByRole("button", { name: "친구와 함께" }));
+    expect(within(modeSelector).getByRole("button", { name: "친구와 함께" }))
+      .toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("img", {
+      name: "질문놀이별 친구와 함께 참여한 학생 비율 그래프",
+    })).toBeVisible();
+    const participationTable = screen.getByText("놀이별 참여 수치").closest("table");
+    expect(participationTable).not.toBeNull();
+    expect(within(participationTable!).getByRole("columnheader", { name: "친구와 함께" }))
+      .toBeVisible();
+    expect(within(participationTable!).queryByRole("columnheader", { name: "혼자 하기" }))
+      .not.toBeInTheDocument();
+    expect(within(participationTable!).queryByRole("columnheader", { name: "인공지능과 함께" }))
+      .not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "완료율" }));
     expect(screen.getByText("놀이별 완료율")).toBeVisible();
+    expect(screen.queryByRole("group", { name: "놀이 방식 선택" })).not.toBeInTheDocument();
+    expect(screen.getByText("최근 6주 변화")).toBeVisible();
     expect(screen.getByText("질문 릴레이: 참여 5회 중 완료 4회, 완료율 80%").closest("ul"))
       .toHaveClass("sr-only");
     expect(screen.queryByText("최근 완료한 놀이")).not.toBeInTheDocument();

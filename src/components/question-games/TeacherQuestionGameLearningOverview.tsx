@@ -138,9 +138,14 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
   if (classes.length === 0) return null;
 
   return (
-    <section className="space-y-3" aria-label={t("learningOverviewRegion")}>
-      <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">{t("learningOverviewDesc")}</p>
+    <section className="space-y-4" aria-labelledby="teacher-question-game-learning-overview">
+      <header className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 id="teacher-question-game-learning-overview" className="text-base font-black text-foreground">
+            {t("learningOverviewRegion")}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t("learningOverviewDesc")}</p>
+        </div>
         <label className="flex shrink-0 items-center gap-2 text-sm font-bold text-foreground">
           {t("learningClassLabel")}
           <select
@@ -154,7 +159,7 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
             })}
           </select>
         </label>
-      </div>
+      </header>
       {loading && (
         <div role="status" className="flex min-h-32 items-center justify-center border-y border-border text-sm text-muted-foreground">
           <LoaderCircle className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
@@ -177,6 +182,7 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
       {history && !loading && !loadError && (
         <QuestionGameLearningHistory
           audience="class"
+          hideHeader
           history={{ ...history, gameModes: classActivity.gameModes }}
           gameComparison={classActivity.gameComparison}
           classStudentCount={classActivity.studentCount}

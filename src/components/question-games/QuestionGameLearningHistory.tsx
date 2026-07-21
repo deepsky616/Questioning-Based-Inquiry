@@ -25,6 +25,7 @@ interface Props {
   studentId?: string;
   gameComparison?: QuestionGameCompletionComparison[];
   classStudentCount?: number;
+  hideHeader?: boolean;
 }
 
 const PAGE_SIZE = 8;
@@ -35,6 +36,7 @@ export function QuestionGameLearningHistory({
   studentId,
   gameComparison,
   classStudentCount,
+  hideHeader = false,
 }: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
@@ -139,13 +141,21 @@ export function QuestionGameLearningHistory({
   }
 
   return (
-    <section className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm" aria-labelledby={`question-game-history-${audience}`}>
-      <div className="flex items-center gap-2">
-        <History className="h-4 w-4 text-indigo-700 dark:text-indigo-300" aria-hidden="true" />
-        <h2 id={`question-game-history-${audience}`} className="text-sm font-black text-foreground">
-          {title}
-        </h2>
-      </div>
+    <section
+      className={audience === "class"
+        ? "text-foreground"
+        : "rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm"}
+      aria-labelledby={hideHeader ? undefined : `question-game-history-${audience}`}
+      aria-label={hideHeader ? title : undefined}
+    >
+      {!hideHeader && (
+        <div className="flex items-center gap-2">
+          <History className="h-4 w-4 text-indigo-700 dark:text-indigo-300" aria-hidden="true" />
+          <h2 id={`question-game-history-${audience}`} className="text-sm font-black text-foreground">
+            {title}
+          </h2>
+        </div>
+      )}
 
       <dl className="mt-3 grid grid-cols-3 divide-x divide-border border-y border-border py-3">
         {measures.map(({ label, value }) => (

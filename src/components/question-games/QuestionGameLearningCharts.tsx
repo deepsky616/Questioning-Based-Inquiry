@@ -71,7 +71,10 @@ export function QuestionGameLearningCharts({
   }
 
   return (
-    <div className="mt-4 grid gap-5 border-t border-border pt-4 lg:grid-cols-2">
+    <div className={audience === "class"
+      ? "mt-4 space-y-6 border-t border-border pt-4"
+      : "mt-4 grid gap-5 border-t border-border pt-4 lg:grid-cols-2"}
+    >
       {showWeekly && (
         <figure className="min-w-0" aria-labelledby={`question-game-weekly-${audience}`}>
           <figcaption
