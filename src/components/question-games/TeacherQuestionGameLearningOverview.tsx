@@ -92,7 +92,6 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
   const classActivity = useMemo(() => {
     if (!selectedClass) {
       return {
-        gameComparison: [],
         gameModes: [],
         studentCount: 0,
       };
@@ -103,14 +102,6 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
         .filter((student) => student.grade === grade && student.className === className)
         .map((student) => student.id),
     );
-    const gameComparison = Object.entries(statsByGame).map(([gameId, stat]) => {
-      const rows = stat.students.filter((student) => studentIds.has(student.id));
-      return {
-        gameId,
-        plays: rows.reduce((sum, student) => sum + student.plays, 0),
-        completions: rows.reduce((sum, student) => sum + student.completions, 0),
-      };
-    });
     const gameModes: QuestionGameModeSummary[] = Object.entries(statsByGame).map(
       ([gameId, stat]) => {
         const rows = stat.students.filter((student) => studentIds.has(student.id));
@@ -129,7 +120,6 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
       },
     );
     return {
-      gameComparison,
       gameModes,
       studentCount: studentIds.size,
     };
@@ -184,7 +174,6 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
           audience="class"
           hideHeader
           history={{ ...history, gameModes: classActivity.gameModes }}
-          gameComparison={classActivity.gameComparison}
           classStudentCount={classActivity.studentCount}
         />
       )}

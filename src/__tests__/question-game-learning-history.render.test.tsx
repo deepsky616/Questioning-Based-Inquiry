@@ -163,10 +163,6 @@ describe("질문놀이 학습 이력 화면", () => {
           recent: [],
         }}
         classStudentCount={4}
-        gameComparison={[
-          { gameId: "relay", plays: 5, completions: 4 },
-          { gameId: "dice", plays: 4, completions: 2 },
-        ]}
       />,
     );
 
@@ -175,7 +171,8 @@ describe("질문놀이 학습 이력 화면", () => {
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
     expect(screen.getByText("최근 6주 변화").closest("figure")?.parentElement)
       .not.toHaveClass("lg:grid-cols-2");
-    expect(screen.getByRole("button", { name: "참여 현황" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "완료율" })).not.toBeInTheDocument();
+    expect(screen.queryByText("놀이별 완료율")).not.toBeInTheDocument();
     const modeSelector = screen.getByRole("group", { name: "놀이 방식 선택" });
     expect(within(modeSelector).getByRole("button", { name: "모두 비교" }))
       .toHaveAttribute("aria-pressed", "true");
@@ -200,12 +197,8 @@ describe("질문놀이 학습 이력 화면", () => {
     expect(within(participationTable!).queryByRole("columnheader", { name: "인공지능과 함께" }))
       .not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "완료율" }));
-    expect(screen.getByText("놀이별 완료율")).toBeVisible();
-    expect(screen.queryByRole("group", { name: "놀이 방식 선택" })).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "놀이 방식 선택" })).toBeVisible();
     expect(screen.getByText("최근 6주 변화")).toBeVisible();
-    expect(screen.getByText("질문 릴레이: 참여 5회 중 완료 4회, 완료율 80%").closest("ul"))
-      .toHaveClass("sr-only");
     expect(screen.queryByText("최근 완료한 놀이")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "전체 이력 보기" })).not.toBeInTheDocument();
   });

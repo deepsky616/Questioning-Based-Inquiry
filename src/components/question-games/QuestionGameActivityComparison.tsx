@@ -21,16 +21,9 @@ import type {
   QuestionGameModeSummary,
 } from "@/lib/question-game-history";
 
-export interface QuestionGameCompletionComparison {
-  gameId: string;
-  plays: number;
-  completions: number;
-}
-
 interface Props {
   audience: "student" | "teacher" | "class";
   gameModes: QuestionGameModeSummary[];
-  gameComparison: QuestionGameCompletionComparison[];
   classStudentCount?: number;
 }
 
@@ -110,14 +103,10 @@ function ClassParticipationTooltip({
 export function QuestionGameActivityComparison({
   audience,
   gameModes,
-  gameComparison,
   classStudentCount = 0,
 }: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
-  const [requestedView, setRequestedView] = useState<"participation" | "completion">(
-    "participation",
-  );
   const [selectedMode, setSelectedMode] = useState<"all" | QuestionGameHistoryMode>("all");
   const games = useMemo(() => localizeQuestionGames(BUILT_IN_GAMES, locale), [locale]);
   const modeLabels: Record<QuestionGameHistoryMode, string> = {
@@ -147,20 +136,6 @@ export function QuestionGameActivityComparison({
       } satisfies ModeChartRow;
     })
     .filter((row): row is ModeChartRow => row !== null);
-  const completionRows = games
-    .map((game) => {
-      const value = gameComparison.find(({ gameId }) => gameId === game.id);
-      if (!value || value.plays <= 0) return null;
-      return {
-        gameId: game.id,
-        name: game.title,
-        plays: value.plays,
-        completions: value.completions,
-        completionRate: Math.min(100, Math.round((value.completions / value.plays) * 100)),
-      };
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null);
-
   if (audience !== "class") {
     if (modeRows.length === 0) return null;
     return (
@@ -230,12 +205,7 @@ export function QuestionGameActivityComparison({
     );
   }
 
-  if (modeRows.length === 0 && completionRows.length === 0) return null;
-  const activeView = requestedView === "participation" && modeRows.length === 0
-    ? "completion"
-    : requestedView === "completion" && completionRows.length === 0
-      ? "participation"
-      : requestedView;
+  if (modeRows.length === 0) return null;
   const visibleModes: readonly QuestionGameHistoryMode[] = selectedMode === "all"
     ? MODES
     : [selectedMode];
@@ -243,229 +213,142 @@ export function QuestionGameActivityComparison({
   return (
     <div className="min-w-0">
       <h3
-        id={activeView === "participation"
-          ? "question-game-participation-class"
-          : "question-game-completion-class"}
+        id="question-game-participation-class"
         className="mb-3 text-sm font-bold text-foreground"
       >
-        {activeView === "participation"
-          ? t("gameModeBreakdownTitle")
-          : t("gameCompletionTitle")}
+        {t("gameModeBreakdownTitle")}
       </h3>
-      {activeView === "participation" && (
-        <div
-          role="group"
-          aria-label={t("modeComparisonLabel")}
-          className="mb-3 inline-flex max-w-full flex-wrap rounded-md border border-border bg-muted p-1"
-        >
-          {(["all", ...MODES] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              aria-pressed={selectedMode === mode}
-              onClick={() => setSelectedMode(mode)}
-              className={`min-h-8 rounded px-3 text-xs font-bold transition-colors ${
-                selectedMode === mode
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {mode === "all" ? t("allModeComparison") : modeLabels[mode]}
-            </button>
-          ))}
-        </div>
-      )}
       <div
         role="group"
-        aria-label={t("comparisonViewLabel")}
-        className="mb-3 inline-flex rounded-md border border-border bg-muted p-1"
+        aria-label={t("modeComparisonLabel")}
+        className="mb-3 inline-flex max-w-full flex-wrap rounded-md border border-border bg-muted p-1"
       >
-        {(["participation", "completion"] as const).map((view) => (
+        {(["all", ...MODES] as const).map((mode) => (
           <button
-            key={view}
+            key={mode}
             type="button"
-            aria-pressed={activeView === view}
-            disabled={view === "participation" ? modeRows.length === 0 : completionRows.length === 0}
-            onClick={() => setRequestedView(view)}
-            className={`min-h-8 rounded px-3 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-              activeView === view
+            aria-pressed={selectedMode === mode}
+            onClick={() => setSelectedMode(mode)}
+            className={`min-h-8 rounded px-3 text-xs font-bold transition-colors ${
+              selectedMode === mode
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {view === "participation" ? t("participationView") : t("completionView")}
+            {mode === "all" ? t("allModeComparison") : modeLabels[mode]}
           </button>
         ))}
       </div>
 
-      {activeView === "participation" ? (
-        <>
-          <figure aria-labelledby="question-game-participation-class">
-            <div
-              role="img"
-              aria-label={selectedMode === "all"
-                ? t("classParticipationAria")
-                : t("classParticipationModeAria", { mode: modeLabels[selectedMode] })}
+      <figure aria-labelledby="question-game-participation-class">
+        <div
+          role="img"
+          aria-label={selectedMode === "all"
+            ? t("classParticipationAria")
+            : t("classParticipationModeAria", { mode: modeLabels[selectedMode] })}
+        >
+          <ResponsiveContainer width="100%" height={Math.max(240, modeRows.length * 54)}>
+            <BarChart
+              data={modeRows}
+              layout="vertical"
+              margin={{ top: 0, right: 12, bottom: 0, left: 8 }}
+              barCategoryGap="22%"
             >
-              <ResponsiveContainer width="100%" height={Math.max(240, modeRows.length * 54)}>
-                <BarChart
-                  data={modeRows}
-                  layout="vertical"
-                  margin={{ top: 0, right: 12, bottom: 0, left: 8 }}
-                  barCategoryGap="22%"
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
-                  <XAxis
-                    type="number"
-                    domain={[0, 100]}
-                    stroke={GRID_COLOR}
-                    tick={{ fontSize: 11, fill: TICK_COLOR }}
-                    tickFormatter={(value) => `${value}%`}
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
+              <XAxis
+                type="number"
+                domain={[0, 100]}
+                stroke={GRID_COLOR}
+                tick={{ fontSize: 11, fill: TICK_COLOR }}
+                tickFormatter={(value) => `${value}%`}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={116}
+                interval={0}
+                stroke={GRID_COLOR}
+                tick={{ fontSize: 10, fill: TICK_COLOR }}
+              />
+              <Tooltip
+                content={(
+                  <ClassParticipationTooltip
+                    classStudentCount={classStudentCount}
+                    modes={visibleModes}
                   />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={116}
-                    interval={0}
-                    stroke={GRID_COLOR}
-                    tick={{ fontSize: 10, fill: TICK_COLOR }}
-                  />
-                  <Tooltip
-                    content={(
-                      <ClassParticipationTooltip
-                        classStudentCount={classStudentCount}
-                        modes={visibleModes}
-                      />
-                    )}
-                    cursor={{ fill: GRID_COLOR, opacity: 0.3 }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
-                  {visibleModes.map((mode) => (
-                    <Bar
-                      key={mode}
-                      dataKey={`${mode}Rate`}
-                      name={modeLabels[mode]}
-                      fill={MODE_COLORS[mode]}
-                      radius={[0, 3, 3, 0]}
-                      isAnimationActive={false}
-                    />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <ul className="sr-only">
-              {modeRows.flatMap((row) => visibleModes.map((mode) => (
-                <li key={`${row.gameId}-${mode}`}>
-                  {t("classGameModeSummary", {
-                    game: row.name,
-                    mode: modeLabels[mode],
-                    participants: row.modes[mode].participants,
-                    rate: participationRate(
-                      row.modes[mode].participants,
-                      classStudentCount,
-                    ),
-                    completions: row.modes[mode].completions,
-                  })}
-                </li>
-              )))}
-            </ul>
-          </figure>
-
-          <div className="mt-4 overflow-x-auto border-t border-border pt-3">
-            <table className={`w-full border-collapse text-xs ${
-              selectedMode === "all" ? "min-w-[640px]" : "min-w-[360px]"
-            }`}>
-              <caption className="pb-2 text-left font-bold text-foreground">
-                {t("classParticipationTableTitle")}
-              </caption>
-              <thead>
-                <tr className="border-y border-border bg-muted/50 text-foreground">
-                  <th scope="col" className="px-2 py-2 text-left">{t("questionGame")}</th>
-                  {visibleModes.map((mode) => (
-                    <th scope="col" className="px-2 py-2 text-center" key={mode}>
-                      {modeLabels[mode]}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border text-foreground">
-                {modeRows.map((row) => (
-                  <tr key={row.gameId}>
-                    <th scope="row" className="px-2 py-2 text-left font-semibold">{row.name}</th>
-                    {visibleModes.map((mode) => (
-                      <td className="px-2 py-2 text-center" key={mode}>
-                        {t("participantCompletionCell", {
-                          participants: row.modes[mode].participants,
-                          rate: participationRate(
-                            row.modes[mode].participants,
-                            classStudentCount,
-                          ),
-                          completions: row.modes[mode].completions,
-                        })}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : (
-        <figure aria-labelledby="question-game-completion-class">
-          <div role="img" aria-label={t("gameCompletionAria")}>
-            <ResponsiveContainer width="100%" height={Math.max(240, completionRows.length * 42)}>
-              <BarChart
-                data={completionRows}
-                layout="vertical"
-                margin={{ top: 0, right: 16, bottom: 0, left: 8 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
-                <XAxis
-                  type="number"
-                  domain={[0, 100]}
-                  stroke={GRID_COLOR}
-                  tick={{ fontSize: 11, fill: TICK_COLOR }}
-                  tickFormatter={(value) => `${value}%`}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={116}
-                  interval={0}
-                  stroke={GRID_COLOR}
-                  tick={{ fontSize: 10, fill: TICK_COLOR }}
-                />
-                <Tooltip
-                  contentStyle={TOOLTIP_STYLE}
-                  labelStyle={{ color: "hsl(var(--card-foreground))" }}
-                  itemStyle={{ color: "hsl(var(--card-foreground))" }}
-                  cursor={{ fill: GRID_COLOR, opacity: 0.3 }}
-                />
+                )}
+                cursor={{ fill: GRID_COLOR, opacity: 0.3 }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              {visibleModes.map((mode) => (
                 <Bar
-                  dataKey="completionRate"
-                  name={t("completionRate")}
-                  unit="%"
-                  fill="#0891b2"
-                  radius={[0, 4, 4, 0]}
+                  key={mode}
+                  dataKey={`${mode}Rate`}
+                  name={modeLabels[mode]}
+                  fill={MODE_COLORS[mode]}
+                  radius={[0, 3, 3, 0]}
                   isAnimationActive={false}
                 />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <ul className="sr-only">
-            {completionRows.map((game) => (
-              <li key={game.gameId}>
-                {t("gameCompletionSummary", {
-                  game: game.name,
-                  completions: game.completions,
-                  plays: game.plays,
-                  rate: game.completionRate,
-                })}
-              </li>
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <ul className="sr-only">
+          {modeRows.flatMap((row) => visibleModes.map((mode) => (
+            <li key={`${row.gameId}-${mode}`}>
+              {t("classGameModeSummary", {
+                game: row.name,
+                mode: modeLabels[mode],
+                participants: row.modes[mode].participants,
+                rate: participationRate(
+                  row.modes[mode].participants,
+                  classStudentCount,
+                ),
+                completions: row.modes[mode].completions,
+              })}
+            </li>
+          )))}
+        </ul>
+      </figure>
+
+      <div className="mt-4 overflow-x-auto border-t border-border pt-3">
+        <table className={`w-full border-collapse text-xs ${
+          selectedMode === "all" ? "min-w-[640px]" : "min-w-[360px]"
+        }`}>
+          <caption className="pb-2 text-left font-bold text-foreground">
+            {t("classParticipationTableTitle")}
+          </caption>
+          <thead>
+            <tr className="border-y border-border bg-muted/50 text-foreground">
+              <th scope="col" className="px-2 py-2 text-left">{t("questionGame")}</th>
+              {visibleModes.map((mode) => (
+                <th scope="col" className="px-2 py-2 text-center" key={mode}>
+                  {modeLabels[mode]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border text-foreground">
+            {modeRows.map((row) => (
+              <tr key={row.gameId}>
+                <th scope="row" className="px-2 py-2 text-left font-semibold">{row.name}</th>
+                {visibleModes.map((mode) => (
+                  <td className="px-2 py-2 text-center" key={mode}>
+                    {t("participantCompletionCell", {
+                      participants: row.modes[mode].participants,
+                      rate: participationRate(
+                        row.modes[mode].participants,
+                        classStudentCount,
+                      ),
+                      completions: row.modes[mode].completions,
+                    })}
+                  </td>
+                ))}
+              </tr>
             ))}
-          </ul>
-        </figure>
-      )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

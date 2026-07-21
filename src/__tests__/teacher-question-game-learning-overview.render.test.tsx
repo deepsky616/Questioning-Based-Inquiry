@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import { TeacherQuestionGameLearningOverview } from "@/components/question-games/TeacherQuestionGameLearningOverview";
@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("교사 질문놀이 학습 현황", () => {
-  it("담당 학급의 주간 변화와 놀이별 완료율을 불러온다", async () => {
+  it("담당 학급의 주간 변화와 놀이별 참여 현황을 불러온다", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       totals: { plays: 3, points: 18, goodQuestions: 7 },
       modes: {
@@ -97,8 +97,7 @@ describe("교사 질문놀이 학습 현황", () => {
     ).closest("ul")).toHaveClass("sr-only");
     expect(screen.queryByText(/인공지능과 함께 참여 1명/)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "완료율" }));
-    expect(screen.getByText("질문 릴레이: 참여 5회 중 완료 4회, 완료율 80%").closest("ul"))
-      .toHaveClass("sr-only");
+    expect(screen.queryByRole("button", { name: "완료율" })).not.toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "2명 (100%) · 완료 2회" })).toBeVisible();
   });
 });

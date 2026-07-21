@@ -11,18 +11,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  QuestionGameActivityComparison,
-  type QuestionGameCompletionComparison,
-} from "@/components/question-games/QuestionGameActivityComparison";
+import { QuestionGameActivityComparison } from "@/components/question-games/QuestionGameActivityComparison";
 import type { QuestionGameLearningHistory } from "@/lib/question-game-history";
-
-export type { QuestionGameCompletionComparison } from "@/components/question-games/QuestionGameActivityComparison";
 
 interface Props {
   audience: "student" | "teacher" | "class";
   history: QuestionGameLearningHistory;
-  gameComparison?: QuestionGameCompletionComparison[];
   classStudentCount?: number;
 }
 
@@ -48,7 +42,6 @@ function weekLabel(weekStart: string, locale: string) {
 export function QuestionGameLearningCharts({
   audience,
   history,
-  gameComparison = [],
   classStudentCount,
 }: Props) {
   const locale = useLocale();
@@ -58,9 +51,7 @@ export function QuestionGameLearningCharts({
     label: weekLabel(point.weekStart, locale),
   }));
   const showWeekly = weekly.length > 0;
-  const showComparison = (history.gameModes ?? []).length > 0 || (
-    audience === "class" && gameComparison.some(({ plays }) => plays > 0)
-  );
+  const showComparison = (history.gameModes ?? []).length > 0;
 
   if (history.totals.plays === 0 || (!showWeekly && !showComparison)) {
     return (
@@ -137,7 +128,6 @@ export function QuestionGameLearningCharts({
         <QuestionGameActivityComparison
           audience={audience}
           gameModes={history.gameModes ?? []}
-          gameComparison={gameComparison}
           classStudentCount={classStudentCount}
         />
       )}

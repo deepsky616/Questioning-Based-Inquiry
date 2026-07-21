@@ -14,16 +14,12 @@ import type {
   QuestionGameHistoryPage,
   QuestionGameLearningHistory as LearningHistory,
 } from "@/lib/question-game-history";
-import {
-  QuestionGameLearningCharts,
-  type QuestionGameCompletionComparison,
-} from "@/components/question-games/QuestionGameLearningCharts";
+import { QuestionGameLearningCharts } from "@/components/question-games/QuestionGameLearningCharts";
 
 interface Props {
   audience: "student" | "teacher" | "class";
   history: LearningHistory;
   studentId?: string;
-  gameComparison?: QuestionGameCompletionComparison[];
   classStudentCount?: number;
   hideHeader?: boolean;
 }
@@ -34,7 +30,6 @@ export function QuestionGameLearningHistory({
   audience,
   history,
   studentId,
-  gameComparison,
   classStudentCount,
   hideHeader = false,
 }: Props) {
@@ -172,7 +167,6 @@ export function QuestionGameLearningHistory({
       <QuestionGameLearningCharts
         audience={audience}
         history={history}
-        gameComparison={gameComparison}
         classStudentCount={classStudentCount}
       />
 
