@@ -33,6 +33,10 @@ describe("학생 질문놀이 학습 기록", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("이력을 불러오는 중입니다");
     await waitFor(() => expect(resolveResponse).toBeTypeOf("function"));
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/reports/question-games?summary=1",
+      { cache: "no-store" },
+    );
 
     await act(async () => {
       resolveResponse?.(new Response(JSON.stringify({

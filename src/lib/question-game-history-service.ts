@@ -7,7 +7,7 @@ import type {
   QuestionGameHistoryMode,
   QuestionGameHistoryPage,
   QuestionGameLearningHistory,
-  QuestionGameWeeklyPoint,
+  QuestionGameDailyPoint,
 } from "@/lib/question-game-history";
 
 const DEFAULT_PAGE_SIZE = 8;
@@ -36,11 +36,13 @@ interface RawSummaryRow {
   goodQuestions: bigint | number;
 }
 
-interface RawWeeklyRow {
-  weekStart: string;
+interface RawDailyRow {
+  date: string;
   plays: bigint | number;
   goodQuestions: bigint | number;
 }
+
+type HistoryQueryClient = Pick<Prisma.TransactionClient, "$queryRaw">;
 
 function emptyHistory(): QuestionGameLearningHistory {
   return {
@@ -51,7 +53,7 @@ function emptyHistory(): QuestionGameLearningHistory {
       friend: { plays: 0, points: 0, goodQuestions: 0 },
     },
     recent: [],
-    weekly: [],
+    daily: [],
     gameModes: [],
     nextCursor: null,
   };
@@ -194,9 +196,12 @@ function summaryFromRows(rows: RawSummaryRow[]): QuestionGameLearningHistory {
   return history;
 }
 
-async function loadSummary(studentIds: string[]) {
+async function loadSummary(
+  client: HistoryQueryClient,
+  studentIds: string[],
+) {
   if (studentIds.length === 0) return emptyHistory();
-  const rows = await prisma.$queryRaw<RawSummaryRow[]>(Prisma.sql`
+  const rows = await client.$queryRaw<RawSummaryRow[]>(Prisma.sql`
     WITH ${playRowsSql(studentIds)}
     SELECT
       "gameId",
@@ -211,39 +216,36 @@ async function loadSummary(studentIds: string[]) {
   return summaryFromRows(rows);
 }
 
-async function loadWeeklyTrend(studentIds: string[]): Promise<QuestionGameWeeklyPoint[]> {
+async function loadDailyTrend(
+  client: HistoryQueryClient,
+  studentIds: string[],
+): Promise<QuestionGameDailyPoint[]> {
   if (studentIds.length === 0) return [];
-  const rows = await prisma.$queryRaw<RawWeeklyRow[]>(Prisma.sql`
+  const rows = await client.$queryRaw<RawDailyRow[]>(Prisma.sql`
     WITH ${playRowsSql(studentIds)},
     bounds AS (
-      SELECT DATE_TRUNC(
-        'week',
-        CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul'
-      )::date AS "currentWeek"
+      SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date AS "currentDate"
     ),
-    weeks AS (
+    days AS (
       SELECT GENERATE_SERIES(
-        "currentWeek" - INTERVAL '5 weeks',
-        "currentWeek",
-        INTERVAL '1 week'
-      )::date AS "weekStart"
+        "currentDate" - INTERVAL '13 days',
+        "currentDate",
+        INTERVAL '1 day'
+      )::date AS "date"
       FROM bounds
     )
     SELECT
-      TO_CHAR(weeks."weekStart", 'YYYY-MM-DD') AS "weekStart",
+      TO_CHAR(days."date", 'YYYY-MM-DD') AS "date",
       COUNT(all_plays."id") AS "plays",
       COALESCE(SUM(all_plays."goodQuestions"), 0) AS "goodQuestions"
-    FROM weeks
+    FROM days
     LEFT JOIN all_plays
-      ON DATE_TRUNC(
-        'week',
-        all_plays."completedAt" AT TIME ZONE 'Asia/Seoul'
-      )::date = weeks."weekStart"
-    GROUP BY weeks."weekStart"
-    ORDER BY weeks."weekStart" ASC
+      ON (all_plays."completedAt" AT TIME ZONE 'Asia/Seoul')::date = days."date"
+    GROUP BY days."date"
+    ORDER BY days."date" ASC
   `);
   return rows.map((row) => ({
-    weekStart: row.weekStart,
+    date: row.date,
     plays: safeNumber(row.plays),
     goodQuestions: safeNumber(row.goodQuestions),
   }));
@@ -260,19 +262,21 @@ function rowToHistoryItem(row: RawHistoryRow): QuestionGameHistoryItem {
   };
 }
 
-export async function loadQuestionGameHistoryPage({
-  studentId,
-  mode,
-  gameId,
-  cursor,
-  limit = DEFAULT_PAGE_SIZE,
-}: {
+interface HistoryPageOptions {
   studentId: string;
   mode?: QuestionGameHistoryMode;
   gameId?: string;
   cursor?: string;
   limit?: number;
-}): Promise<QuestionGameHistoryPage> {
+}
+
+async function loadQuestionGameHistoryPageWithClient(client: HistoryQueryClient, {
+  studentId,
+  mode,
+  gameId,
+  cursor,
+  limit = DEFAULT_PAGE_SIZE,
+}: HistoryPageOptions): Promise<QuestionGameHistoryPage> {
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
     throw new RangeError("올바르지 않은 페이지 크기입니다");
   }
@@ -291,7 +295,7 @@ export async function loadQuestionGameHistoryPage({
   const where = filters.length > 0
     ? Prisma.sql`WHERE ${Prisma.join(filters, " AND ")}`
     : Prisma.empty;
-  const rows = await prisma.$queryRaw<RawHistoryRow[]>(Prisma.sql`
+  const rows = await client.$queryRaw<RawHistoryRow[]>(Prisma.sql`
     WITH ${playRowsSql([studentId])}
     SELECT "id", "gameId", "mode", "completedAt", "points", "goodQuestions"
     FROM all_plays
@@ -308,30 +312,60 @@ export async function loadQuestionGameHistoryPage({
   };
 }
 
+export async function loadQuestionGameHistoryPage(
+  options: HistoryPageOptions,
+): Promise<QuestionGameHistoryPage> {
+  return loadQuestionGameHistoryPageWithClient(prisma, options);
+}
+
+function assertLearningHistoryConsistency(history: QuestionGameLearningHistory) {
+  const recentTotals = history.recent.reduce(
+    (totals, item) => ({
+      plays: totals.plays + 1,
+      points: totals.points + item.points,
+      goodQuestions: totals.goodQuestions + item.goodQuestions,
+    }),
+    { plays: 0, points: 0, goodQuestions: 0 },
+  );
+  if (
+    history.totals.plays < recentTotals.plays ||
+    history.totals.points < recentTotals.points ||
+    history.totals.goodQuestions < recentTotals.goodQuestions
+  ) {
+    throw new Error("질문놀이 학습 기록 집계가 일치하지 않습니다");
+  }
+}
+
 export async function loadQuestionGameLearningHistory(
   studentId: string,
   recentLimit = DEFAULT_PAGE_SIZE,
 ): Promise<QuestionGameLearningHistory> {
-  const [summary, page, weekly] = await Promise.all([
-    loadSummary([studentId]),
-    loadQuestionGameHistoryPage({ studentId, limit: recentLimit }),
-    loadWeeklyTrend([studentId]),
-  ]);
-  return {
-    ...summary,
-    recent: page.items,
-    weekly,
-    nextCursor: page.nextCursor,
-  };
+  return prisma.$transaction(async (tx) => {
+    const summary = await loadSummary(tx, [studentId]);
+    const page = await loadQuestionGameHistoryPageWithClient(tx, {
+      studentId,
+      limit: recentLimit,
+    });
+    const daily = await loadDailyTrend(tx, [studentId]);
+    const history = {
+      ...summary,
+      recent: page.items,
+      daily,
+      nextCursor: page.nextCursor,
+    };
+    assertLearningHistoryConsistency(history);
+    return history;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }
 
 export async function loadQuestionGameClassSummary(
   studentIds: string[],
 ): Promise<QuestionGameLearningHistory> {
   const uniqueIds = [...new Set(studentIds)];
-  const [summary, weekly] = await Promise.all([
-    loadSummary(uniqueIds),
-    loadWeeklyTrend(uniqueIds),
-  ]);
-  return { ...summary, weekly };
+  if (uniqueIds.length === 0) return emptyHistory();
+  return prisma.$transaction(async (tx) => {
+    const summary = await loadSummary(tx, uniqueIds);
+    const daily = await loadDailyTrend(tx, uniqueIds);
+    return { ...summary, daily };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
 }

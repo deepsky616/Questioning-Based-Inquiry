@@ -1,25 +1,37 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/db", () => ({
-  prisma: { $queryRaw: vi.fn() },
+const dbMocks = vi.hoisted(() => ({
+  queryRaw: vi.fn(),
+  transactionQueryRaw: vi.fn(),
+  transaction: vi.fn(),
 }));
 
-import { prisma } from "@/lib/db";
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    $queryRaw: dbMocks.queryRaw,
+    $transaction: dbMocks.transaction,
+  },
+}));
+
 import {
   loadQuestionGameClassSummary,
   loadQuestionGameHistoryPage,
   loadQuestionGameLearningHistory,
 } from "@/lib/question-game-history-service";
 
-const queryRaw = prisma.$queryRaw as ReturnType<typeof vi.fn>;
+const queryRaw = dbMocks.queryRaw;
+const transactionQueryRaw = dbMocks.transactionQueryRaw;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  dbMocks.transaction.mockImplementation(async (run) => run({
+    $queryRaw: transactionQueryRaw,
+  }));
 });
 
 describe("질문놀이 학습 이력 조회", () => {
   it("전체 기록 대신 합계와 제한된 최근 기록만 조회한다", async () => {
-    queryRaw
+    transactionQueryRaw
       .mockResolvedValueOnce([
         {
           gameId: "dice",
@@ -58,12 +70,12 @@ describe("질문놀이 학습 이력 조회", () => {
       ])
       .mockResolvedValueOnce([
         {
-          weekStart: "2026-07-06",
+          date: "2026-07-16",
           plays: BigInt(1),
           goodQuestions: BigInt(2),
         },
         {
-          weekStart: "2026-07-13",
+          date: "2026-07-17",
           plays: BigInt(2),
           goodQuestions: BigInt(3),
         },
@@ -71,15 +83,20 @@ describe("질문놀이 학습 이력 조회", () => {
 
     const history = await loadQuestionGameLearningHistory("student-1", 1);
 
-    expect(queryRaw).toHaveBeenCalledTimes(3);
+    expect(dbMocks.transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: "RepeatableRead" },
+    );
+    expect(transactionQueryRaw).toHaveBeenCalledTimes(3);
+    expect(queryRaw).not.toHaveBeenCalled();
     expect(history.totals).toEqual({ plays: 3, points: 14, goodQuestions: 5 });
     expect(history.recent).toEqual([
       expect.objectContaining({ id: "run:run-2", points: 4, goodQuestions: 1 }),
     ]);
     expect(history.nextCursor).toEqual(expect.any(String));
-    expect(history.weekly).toEqual([
-      { weekStart: "2026-07-06", plays: 1, goodQuestions: 2 },
-      { weekStart: "2026-07-13", plays: 2, goodQuestions: 3 },
+    expect(history.daily).toEqual([
+      { date: "2026-07-16", plays: 1, goodQuestions: 2 },
+      { date: "2026-07-17", plays: 2, goodQuestions: 3 },
     ]);
     expect(history.gameModes).toEqual([
       {
@@ -101,8 +118,8 @@ describe("질문놀이 학습 이력 조회", () => {
     ]);
   });
 
-  it("학급 학생들의 최근 주간 완료와 좋은 질문을 함께 집계한다", async () => {
-    queryRaw
+  it("학급 학생들의 최근 14일 완료와 인정 활동을 일별로 집계한다", async () => {
+    transactionQueryRaw
       .mockResolvedValueOnce([
         {
           gameId: "relay",
@@ -114,15 +131,19 @@ describe("질문놀이 학습 이력 조회", () => {
         },
       ])
       .mockResolvedValueOnce([
-        { weekStart: "2026-07-13", plays: BigInt(3), goodQuestions: BigInt(7) },
+        { date: "2026-07-17", plays: BigInt(3), goodQuestions: BigInt(7) },
       ]);
 
     const history = await loadQuestionGameClassSummary(["student-1", "student-2"]);
 
-    expect(queryRaw).toHaveBeenCalledTimes(2);
+    expect(dbMocks.transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: "RepeatableRead" },
+    );
+    expect(transactionQueryRaw).toHaveBeenCalledTimes(2);
     expect(history.totals).toEqual({ plays: 3, points: 18, goodQuestions: 7 });
-    expect(history.weekly).toEqual([
-      { weekStart: "2026-07-13", plays: 3, goodQuestions: 7 },
+    expect(history.daily).toEqual([
+      { date: "2026-07-17", plays: 3, goodQuestions: 7 },
     ]);
     expect(history.gameModes).toEqual([
       {
@@ -135,6 +156,23 @@ describe("질문놀이 학습 이력 조회", () => {
       },
     ]);
     expect(history.recent).toEqual([]);
+  });
+
+  it("최근 기록보다 작은 합계는 잘못된 시점 자료로 보고 반환하지 않는다", async () => {
+    transactionQueryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        id: "run:run-1",
+        gameId: "dice",
+        mode: "solo",
+        completedAt: new Date("2026-07-17T02:00:00Z"),
+        points: BigInt(4),
+        goodQuestions: BigInt(1),
+      }])
+      .mockResolvedValueOnce([]);
+
+    await expect(loadQuestionGameLearningHistory("student-1"))
+      .rejects.toThrow("질문놀이 학습 기록 집계가 일치하지 않습니다");
   });
 
   it("방식과 놀이 필터를 적용하고 커서로 다음 묶음을 반환한다", async () => {

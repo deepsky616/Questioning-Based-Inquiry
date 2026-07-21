@@ -52,7 +52,7 @@ describe("교사 질문놀이 방식 비교", () => {
               ai: { plays: 1, points: 8, goodQuestions: 2 },
               friend: { plays: 2, points: 22, goodQuestions: 3 },
             },
-            weekly: [{ weekStart: "2026-07-13", plays: 5, goodQuestions: 8 }],
+            daily: [{ date: "2026-07-17", plays: 5, goodQuestions: 8 }],
             recent: [],
             nextCursor: null,
           }

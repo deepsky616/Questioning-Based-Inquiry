@@ -19,7 +19,9 @@ export function StudentQuestionGameLearningHistory() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/reports/question-games?summary=1");
+      const response = await fetch("/api/reports/question-games?summary=1", {
+        cache: "no-store",
+      });
       const data: LearningHistory | { error?: string } = await response.json();
       if (!response.ok || !("totals" in data)) {
         throw new Error("error" in data && data.error ? data.error : t("couldNotLoadHistory"));

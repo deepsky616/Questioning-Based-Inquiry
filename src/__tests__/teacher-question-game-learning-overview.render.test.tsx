@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("교사 질문놀이 학습 현황", () => {
-  it("담당 학급의 주간 변화와 놀이별 참여 현황을 불러온다", async () => {
+  it("담당 학급의 최근 14일 변화와 놀이별 참여 현황을 불러온다", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       totals: { plays: 3, points: 18, goodQuestions: 7 },
       modes: {
@@ -31,7 +31,7 @@ describe("교사 질문놀이 학습 현황", () => {
         ai: { plays: 0, points: 0, goodQuestions: 0 },
         friend: { plays: 2, points: 14, goodQuestions: 6 },
       },
-      weekly: [{ weekStart: "2026-07-13", plays: 3, goodQuestions: 7 }],
+      daily: [{ date: "2026-07-17", plays: 3, goodQuestions: 7 }],
       recent: [],
       nextCursor: null,
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -90,7 +90,7 @@ describe("교사 질문놀이 학습 현황", () => {
     expect(overviewHeader).not.toBeNull();
     expect(within(overviewHeader!).getByLabelText("학급 선택")).toHaveValue("5|1");
     expect(screen.getAllByRole("heading", { name: "학급 질문놀이 학습 현황" })).toHaveLength(1);
-    expect(screen.getByText("최근 6주 변화")).toBeVisible();
+    expect(screen.getByText("최근 14일 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
     expect(screen.getByText(
       "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 100%, 완료 2회",

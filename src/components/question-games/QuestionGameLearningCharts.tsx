@@ -29,9 +29,9 @@ const TOOLTIP_STYLE = {
   color: "hsl(var(--card-foreground))",
   fontSize: 12,
 } as const;
-function weekLabel(weekStart: string, locale: string) {
-  const date = new Date(`${weekStart}T00:00:00+09:00`);
-  if (Number.isNaN(date.getTime())) return weekStart;
+function dayLabel(day: string, locale: string) {
+  const date = new Date(`${day}T00:00:00+09:00`);
+  if (Number.isNaN(date.getTime())) return day;
   return new Intl.DateTimeFormat(locale, {
     month: "numeric",
     day: "numeric",
@@ -46,14 +46,14 @@ export function QuestionGameLearningCharts({
 }: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
-  const weekly = (history.weekly ?? []).map((point) => ({
+  const daily = (history.daily ?? []).map((point) => ({
     ...point,
-    label: weekLabel(point.weekStart, locale),
+    label: dayLabel(point.date, locale),
   }));
-  const showWeekly = weekly.length > 0;
+  const showDaily = daily.length > 0;
   const showComparison = (history.gameModes ?? []).length > 0;
 
-  if (history.totals.plays === 0 || (!showWeekly && !showComparison)) {
+  if (history.totals.plays === 0 || (!showDaily && !showComparison)) {
     return (
       <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
         {t("learningChartEmpty")}
@@ -66,19 +66,24 @@ export function QuestionGameLearningCharts({
       ? "mt-4 space-y-6 border-t border-border pt-4"
       : "mt-4 grid gap-5 border-t border-border pt-4 lg:grid-cols-2"}
     >
-      {showWeekly && (
-        <figure className="min-w-0" aria-labelledby={`question-game-weekly-${audience}`}>
+      {showDaily && (
+        <figure className="min-w-0" aria-labelledby={`question-game-daily-${audience}`}>
           <figcaption
-            id={`question-game-weekly-${audience}`}
+            id={`question-game-daily-${audience}`}
             className="mb-3 text-sm font-bold text-foreground"
           >
-            {t("weeklyTrendTitle")}
+            {t("dailyTrendTitle")}
           </figcaption>
-          <div role="img" aria-label={t("weeklyTrendAria")}>
+          <div role="img" aria-label={t("dailyTrendAria")}>
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={weekly} margin={{ top: 5, right: 8, bottom: 0, left: -20 }}>
+              <LineChart data={daily} margin={{ top: 5, right: 8, bottom: 0, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
-                <XAxis dataKey="label" stroke={GRID_COLOR} tick={{ fontSize: 11, fill: TICK_COLOR }} />
+                <XAxis
+                  dataKey="label"
+                  minTickGap={24}
+                  stroke={GRID_COLOR}
+                  tick={{ fontSize: 11, fill: TICK_COLOR }}
+                />
                 <YAxis allowDecimals={false} stroke={GRID_COLOR} tick={{ fontSize: 11, fill: TICK_COLOR }} />
                 <Tooltip
                   contentStyle={TOOLTIP_STYLE}
@@ -111,10 +116,10 @@ export function QuestionGameLearningCharts({
             </ResponsiveContainer>
           </div>
           <ul className="sr-only">
-            {weekly.map((point) => (
-              <li key={point.weekStart}>
-                {t("weeklyActivitySummary", {
-                  week: point.label,
+            {daily.map((point) => (
+              <li key={point.date}>
+                {t("dailyActivitySummary", {
+                  date: point.label,
                   plays: point.plays,
                   goodQuestions: point.goodQuestions,
                 })}

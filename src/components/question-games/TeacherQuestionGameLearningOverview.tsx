@@ -70,6 +70,7 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
     setLoadError(false);
     const params = new URLSearchParams({ summary: "1", grade, className });
     fetch(`/api/reports/question-games?${params.toString()}`, {
+      cache: "no-store",
       signal: controller.signal,
     })
       .then(async (response) => {

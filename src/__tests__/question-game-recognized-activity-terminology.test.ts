@@ -10,7 +10,7 @@ describe("질문놀이 인정 질문과 활동 용어", () => {
     expect(ko.gamePlay.recognizedActivityHelp).toBe(
       "놀이 규칙에 맞게 작성하거나 완료하여 점수에 반영된 질문과 활동이에요.",
     );
-    expect(ko.gamePlay.weeklyActivitySummary).toContain("인정 질문·활동");
+    expect(ko.gamePlay.dailyActivitySummary).toContain("인정 질문·활동");
     expect(ko.gamePlay.goodquestionsGoodQuestionsPointsPts).toContain("인정 질문·활동");
 
     expect(ko.qPlay.statLine).toContain("인정 질문·활동");

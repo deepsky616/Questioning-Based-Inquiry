@@ -61,7 +61,7 @@ beforeEach(() => {
       ai: { plays: 0, points: 0, goodQuestions: 0 },
       friend: { plays: 3, points: 18, goodQuestions: 7 },
     },
-    weekly: [{ weekStart: "2026-07-13", plays: 3, goodQuestions: 7 }],
+    daily: [{ date: "2026-07-17", plays: 3, goodQuestions: 7 }],
     recent: [],
     nextCursor: null,
   });
@@ -130,8 +130,8 @@ describe("질문놀이 상세 이력 경로", () => {
       select: { id: true },
     });
     expect(mockLoadClassSummary).toHaveBeenCalledWith(["student-1", "student-2"]);
-    expect(body.weekly).toEqual([
-      { weekStart: "2026-07-13", plays: 3, goodQuestions: 7 },
+    expect(body.daily).toEqual([
+      { date: "2026-07-17", plays: 3, goodQuestions: 7 },
     ]);
   });
 

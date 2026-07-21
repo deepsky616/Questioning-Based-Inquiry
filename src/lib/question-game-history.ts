@@ -17,8 +17,8 @@ export interface QuestionGameHistoryItem {
   goodQuestions: number;
 }
 
-export interface QuestionGameWeeklyPoint {
-  weekStart: string;
+export interface QuestionGameDailyPoint {
+  date: string;
   plays: number;
   goodQuestions: number;
 }
@@ -42,7 +42,7 @@ export interface QuestionGameLearningHistory {
     goodQuestions: number;
   }>;
   recent: QuestionGameHistoryItem[];
-  weekly?: QuestionGameWeeklyPoint[];
+  daily?: QuestionGameDailyPoint[];
   gameModes?: QuestionGameModeSummary[];
   nextCursor?: string | null;
 }
