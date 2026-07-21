@@ -14,6 +14,7 @@ import type {
   QuestionGameHistoryPage,
   QuestionGameLearningHistory as LearningHistory,
 } from "@/lib/question-game-history";
+import { QuestionGameActivityComparison } from "@/components/question-games/QuestionGameActivityComparison";
 import { QuestionGameLearningCharts } from "@/components/question-games/QuestionGameLearningCharts";
 
 interface Props {
@@ -138,6 +139,9 @@ export function QuestionGameLearningHistory({
     );
   }
 
+  const showStudentActivityComparison = audience === "student" &&
+    (history.gameModes ?? []).length > 0;
+
   return (
     <section
       className={audience === "class"
@@ -171,6 +175,7 @@ export function QuestionGameLearningHistory({
         audience={audience}
         history={history}
         classStudentCount={classStudentCount}
+        showActivityComparison={audience !== "student"}
       />
 
       <div className="mt-3 grid grid-cols-1 gap-1.5 text-xs sm:grid-cols-3">
@@ -182,10 +187,28 @@ export function QuestionGameLearningHistory({
       </div>
 
       {audience !== "class" && (
-        <>
+        <div className={audience === "student"
+          ? showStudentActivityComparison
+            ? "mt-4 grid min-w-0 gap-5 xl:grid-cols-2 xl:items-start"
+            : "mt-4"
+          : ""}
+        >
+          {showStudentActivityComparison && (
+            <QuestionGameActivityComparison
+              audience="student"
+              gameModes={history.gameModes ?? []}
+            />
+          )}
+          <div className={showStudentActivityComparison
+            ? "min-w-0 xl:border-l xl:border-border xl:pl-5"
+            : "min-w-0"}
+          >
           {!expanded && (
-            <div className="mt-4">
-              <h3 className="text-xs font-bold text-foreground">
+            <div className={audience === "student" ? "" : "mt-4"}>
+              <h3 className={audience === "student"
+                ? "text-sm font-bold text-foreground"
+                : "text-xs font-bold text-foreground"}
+              >
                 {t("recentCompletedGames")}
               </h3>
               {history.recent.length === 0 ? (
@@ -268,7 +291,8 @@ export function QuestionGameLearningHistory({
               )}
             </div>
           )}
-        </>
+          </div>
+        </div>
       )}
     </section>
   );

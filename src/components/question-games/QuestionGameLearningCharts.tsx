@@ -18,6 +18,7 @@ interface Props {
   audience: "student" | "teacher" | "class";
   history: QuestionGameLearningHistory;
   classStudentCount?: number;
+  showActivityComparison?: boolean;
 }
 
 const GRID_COLOR = "hsl(var(--border))";
@@ -43,6 +44,7 @@ export function QuestionGameLearningCharts({
   audience,
   history,
   classStudentCount,
+  showActivityComparison = true,
 }: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
@@ -51,7 +53,7 @@ export function QuestionGameLearningCharts({
     label: dayLabel(point.date, locale),
   }));
   const showDaily = daily.length > 0;
-  const showComparison = (history.gameModes ?? []).length > 0;
+  const showComparison = showActivityComparison && (history.gameModes ?? []).length > 0;
 
   if (history.totals.plays === 0 || (!showDaily && !showComparison)) {
     return (
@@ -64,7 +66,9 @@ export function QuestionGameLearningCharts({
   return (
     <div className={audience === "class"
       ? "mt-4 space-y-6 border-t border-border pt-4"
-      : "mt-4 grid gap-5 border-t border-border pt-4 lg:grid-cols-2"}
+      : showDaily && showComparison
+        ? "mt-4 grid gap-5 border-t border-border pt-4 lg:grid-cols-2"
+        : "mt-4 space-y-5 border-t border-border pt-4"}
     >
       {showDaily && (
         <figure className="min-w-0" aria-labelledby={`question-game-daily-${audience}`}>

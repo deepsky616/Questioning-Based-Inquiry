@@ -62,6 +62,14 @@ describe("질문놀이 학습 이력 화면", () => {
     expect(screen.getByText("친구와 함께 1회")).toBeVisible();
     expect(screen.getByText("최근 14일 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
+    const dailyFigure = screen.getByText("최근 14일 변화").closest("figure");
+    expect(dailyFigure?.parentElement).not.toHaveClass("lg:grid-cols-2");
+    const activityFigure = screen.getByText("놀이별 참여 방식").closest("figure");
+    const studentActivityLayout = activityFigure?.parentElement;
+    expect(studentActivityLayout).toHaveClass("xl:grid-cols-2");
+    expect(studentActivityLayout).toContainElement(
+      screen.getByText("최근 완료한 놀이").parentElement,
+    );
     expect(screen.getByText(
       "질문 릴레이: 혼자 하기 완료 0회, 인공지능과 함께 완료 1회, 친구와 함께 완료 2회",
     ).closest("ul")).toHaveClass("sr-only");

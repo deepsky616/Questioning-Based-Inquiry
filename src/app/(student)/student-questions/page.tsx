@@ -10,15 +10,15 @@ import { useTranslations } from "next-intl";
 type Tab = "mine" | "explore" | "design";
 
 const TABS: { value: Tab; labelKey: "tabMine" | "tabExplore" | "tabDesign" }[] = [
-  { value: "mine", labelKey: "tabMine" },
   { value: "explore", labelKey: "tabExplore" },
   { value: "design", labelKey: "tabDesign" },
+  { value: "mine", labelKey: "tabMine" },
 ];
 
 export default function StudentQuestionsPage() {
   const tPages = useTranslations("pages");
   const t = useTranslations("studentQ");
-  const [tab, setTab] = useState<Tab>("mine");
+  const [tab, setTab] = useState<Tab>("explore");
 
   return (
     <div className="space-y-5">
