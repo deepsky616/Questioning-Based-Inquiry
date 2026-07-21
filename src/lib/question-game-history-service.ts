@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { emptyQuestionGameModeActivity } from "@/lib/question-game-history";
 import { BUILT_IN_QUESTION_GAME_IDS } from "@/lib/question-game-rules";
 import type {
   QuestionGameHistoryItem,
@@ -27,8 +28,10 @@ interface RawHistoryRow {
 }
 
 interface RawSummaryRow {
+  gameId: string;
   mode: QuestionGameHistoryMode;
   plays: bigint | number;
+  participants: bigint | number;
   points: bigint | number;
   goodQuestions: bigint | number;
 }
@@ -49,6 +52,7 @@ function emptyHistory(): QuestionGameLearningHistory {
     },
     recent: [],
     weekly: [],
+    gameModes: [],
     nextCursor: null,
   };
 }
@@ -101,6 +105,7 @@ function playRowsSql(studentIds: string[]) {
     solo_plays AS (
       SELECT
         'run:' || gr."id" AS "id",
+        gr."owner_id" AS "studentId",
         gr."game_id" AS "gameId",
         LOWER(gr."mode") AS "mode",
         gr."settled_at" AS "completedAt",
@@ -127,6 +132,7 @@ function playRowsSql(studentIds: string[]) {
     friend_plays AS (
       SELECT
         'friend:' || pl."room_code" AS "id",
+        pl."student_id" AS "studentId",
         (ARRAY_AGG(pl."game_id" ORDER BY pl."created_at" DESC))[1] AS "gameId",
         'friend'::text AS "mode",
         MAX(pl."created_at") AS "completedAt",
@@ -157,6 +163,7 @@ function playRowsSql(studentIds: string[]) {
 
 function summaryFromRows(rows: RawSummaryRow[]): QuestionGameLearningHistory {
   const history = emptyHistory();
+  const byGame = new Map<string, NonNullable<QuestionGameLearningHistory["gameModes"]>[number]>();
   for (const row of rows) {
     if (row.mode !== "solo" && row.mode !== "ai" && row.mode !== "friend") continue;
     const value = {
@@ -164,11 +171,26 @@ function summaryFromRows(rows: RawSummaryRow[]): QuestionGameLearningHistory {
       points: safeNumber(row.points),
       goodQuestions: safeNumber(row.goodQuestions),
     };
-    history.modes[row.mode] = value;
+    history.modes[row.mode].plays += value.plays;
+    history.modes[row.mode].points += value.points;
+    history.modes[row.mode].goodQuestions += value.goodQuestions;
     history.totals.plays += value.plays;
     history.totals.points += value.points;
     history.totals.goodQuestions += value.goodQuestions;
+    const game = byGame.get(row.gameId) ?? {
+      gameId: row.gameId,
+      modes: emptyQuestionGameModeActivity(),
+    };
+    game.modes[row.mode] = {
+      plays: value.plays,
+      completions: value.plays,
+      participants: safeNumber(row.participants),
+    };
+    byGame.set(row.gameId, game);
   }
+  history.gameModes = [...byGame.values()].sort((first, second) =>
+    first.gameId.localeCompare(second.gameId)
+  );
   return history;
 }
 
@@ -177,12 +199,14 @@ async function loadSummary(studentIds: string[]) {
   const rows = await prisma.$queryRaw<RawSummaryRow[]>(Prisma.sql`
     WITH ${playRowsSql(studentIds)}
     SELECT
+      "gameId",
       "mode",
       COUNT(*) AS "plays",
+      COUNT(DISTINCT "studentId") AS "participants",
       COALESCE(SUM("points"), 0) AS "points",
       COALESCE(SUM("goodQuestions"), 0) AS "goodQuestions"
     FROM all_plays
-    GROUP BY "mode"
+    GROUP BY "gameId", "mode"
   `);
   return summaryFromRows(rows);
 }

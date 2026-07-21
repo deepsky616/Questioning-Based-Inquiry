@@ -23,6 +23,16 @@ describe("질문놀이 학습 이력", () => {
       completedAt: "2026-07-16T01:03:00.000Z",
     })]);
     expect(history.totals).toEqual({ plays: 1, points: 6, goodQuestions: 3 });
+    expect(history.gameModes).toEqual([
+      {
+        gameId: "relay",
+        modes: {
+          solo: { plays: 0, completions: 0, participants: 0 },
+          ai: { plays: 0, completions: 0, participants: 0 },
+          friend: { plays: 1, completions: 1, participants: 1 },
+        },
+      },
+    ]);
   });
 
   it("완료된 혼자 및 인공지능 실행을 최근 순서와 방식별로 집계한다", () => {
@@ -56,5 +66,23 @@ describe("질문놀이 학습 이력", () => {
     expect(history.modes.solo).toEqual({ plays: 1, points: 4, goodQuestions: 2 });
     expect(history.modes.ai).toEqual({ plays: 1, points: 7, goodQuestions: 1 });
     expect(history.modes.friend).toEqual({ plays: 0, points: 0, goodQuestions: 0 });
+    expect(history.gameModes).toEqual([
+      {
+        gameId: "dice",
+        modes: {
+          solo: { plays: 1, completions: 1, participants: 1 },
+          ai: { plays: 0, completions: 0, participants: 0 },
+          friend: { plays: 0, completions: 0, participants: 0 },
+        },
+      },
+      {
+        gameId: "kaba",
+        modes: {
+          solo: { plays: 0, completions: 0, participants: 0 },
+          ai: { plays: 1, completions: 1, participants: 1 },
+          friend: { plays: 0, completions: 0, participants: 0 },
+        },
+      },
+    ]);
   });
 });

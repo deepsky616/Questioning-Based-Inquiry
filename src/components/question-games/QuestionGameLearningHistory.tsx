@@ -24,6 +24,7 @@ interface Props {
   history: LearningHistory;
   studentId?: string;
   gameComparison?: QuestionGameCompletionComparison[];
+  classStudentCount?: number;
 }
 
 const PAGE_SIZE = 8;
@@ -33,6 +34,7 @@ export function QuestionGameLearningHistory({
   history,
   studentId,
   gameComparison,
+  classStudentCount,
 }: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
@@ -158,6 +160,7 @@ export function QuestionGameLearningHistory({
         audience={audience}
         history={history}
         gameComparison={gameComparison}
+        classStudentCount={classStudentCount}
       />
 
       <div className="mt-3 grid grid-cols-1 gap-1.5 text-xs sm:grid-cols-3">

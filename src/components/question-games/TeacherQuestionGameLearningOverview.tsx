@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { QuestionGameLearningHistory } from "@/components/question-games/QuestionGameLearningHistory";
-import type { QuestionGameLearningHistory as LearningHistory } from "@/lib/question-game-history";
+import type {
+  QuestionGameHistoryMode,
+  QuestionGameLearningHistory as LearningHistory,
+  QuestionGameModeSummary,
+} from "@/lib/question-game-history";
 
 interface TeacherClass {
   grade: string;
@@ -21,6 +25,10 @@ interface StudentLearningStat {
   id: string;
   plays: number;
   completions: number;
+  modes?: Record<QuestionGameHistoryMode, {
+    plays: number;
+    completions: number;
+  }>;
 }
 
 interface GameLearningStat {
@@ -32,6 +40,8 @@ interface Props {
   students: TeacherStudent[];
   statsByGame: Record<string, GameLearningStat>;
 }
+
+const MODES = ["solo", "ai", "friend"] as const;
 
 export function TeacherQuestionGameLearningOverview({ classes, students, statsByGame }: Props) {
   const t = useTranslations("qPlay");
@@ -79,15 +89,21 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
     return () => controller.abort();
   }, [reloadKey, selectedClass]);
 
-  const gameComparison = useMemo(() => {
-    if (!selectedClass) return [];
+  const classActivity = useMemo(() => {
+    if (!selectedClass) {
+      return {
+        gameComparison: [],
+        gameModes: [],
+        studentCount: 0,
+      };
+    }
     const [grade, className] = selectedClass.split("|");
     const studentIds = new Set(
       students
         .filter((student) => student.grade === grade && student.className === className)
         .map((student) => student.id),
     );
-    return Object.entries(statsByGame).map(([gameId, stat]) => {
+    const gameComparison = Object.entries(statsByGame).map(([gameId, stat]) => {
       const rows = stat.students.filter((student) => studentIds.has(student.id));
       return {
         gameId,
@@ -95,6 +111,28 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
         completions: rows.reduce((sum, student) => sum + student.completions, 0),
       };
     });
+    const gameModes: QuestionGameModeSummary[] = Object.entries(statsByGame).map(
+      ([gameId, stat]) => {
+        const rows = stat.students.filter((student) => studentIds.has(student.id));
+        const modes = Object.fromEntries(MODES.map((mode) => {
+          const values = rows.map((student) => student.modes?.[mode] ?? {
+            plays: 0,
+            completions: 0,
+          });
+          return [mode, {
+            plays: values.reduce((sum, value) => sum + value.plays, 0),
+            completions: values.reduce((sum, value) => sum + value.completions, 0),
+            participants: values.filter((value) => value.plays > 0).length,
+          }];
+        })) as QuestionGameModeSummary["modes"];
+        return { gameId, modes };
+      },
+    );
+    return {
+      gameComparison,
+      gameModes,
+      studentCount: studentIds.size,
+    };
   }, [selectedClass, statsByGame, students]);
 
   if (classes.length === 0) return null;
@@ -139,8 +177,9 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
       {history && !loading && !loadError && (
         <QuestionGameLearningHistory
           audience="class"
-          history={history}
-          gameComparison={gameComparison}
+          history={{ ...history, gameModes: classActivity.gameModes }}
+          gameComparison={classActivity.gameComparison}
+          classStudentCount={classActivity.studentCount}
         />
       )}
     </section>

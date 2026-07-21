@@ -119,7 +119,7 @@ describe("교사 질문놀이 방식 비교", () => {
     expect(screen.getByText("인공지능과 함께 1회")).toBeVisible();
     expect(screen.getByText("친구와 함께 2회")).toBeVisible();
 
-    const participation = screen.getByRole("button", { name: /참여 현황/ });
+    const participation = screen.getByRole("button", { name: "📊 참여 현황" });
     fireEvent.click(participation);
 
     expect(await screen.findByRole("heading", { name: "놀이 방식 비교" })).toBeVisible();

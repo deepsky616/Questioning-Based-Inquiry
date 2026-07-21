@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderWithIntl as render } from "@/__tests__/test-utils/render-with-intl";
 import { TeacherQuestionGameLearningOverview } from "@/components/question-games/TeacherQuestionGameLearningOverview";
@@ -40,10 +40,41 @@ describe("교사 질문놀이 학습 현황", () => {
     render(
       <TeacherQuestionGameLearningOverview
         classes={[{ grade: "5", className: "1" }]}
-        students={[{ id: "student-1", grade: "5", className: "1" }]}
+        students={[
+          { id: "student-1", grade: "5", className: "1" },
+          { id: "student-2", grade: "5", className: "1" },
+          { id: "student-3", grade: "5", className: "2" },
+        ]}
         statsByGame={{
           relay: {
-            students: [{ id: "student-1", plays: 4, completions: 3 }],
+            students: [{
+              id: "student-1",
+              plays: 4,
+              completions: 3,
+              modes: {
+                solo: { plays: 2, completions: 2 },
+                ai: { plays: 0, completions: 0 },
+                friend: { plays: 2, completions: 1 },
+              },
+            }, {
+              id: "student-2",
+              plays: 1,
+              completions: 1,
+              modes: {
+                solo: { plays: 0, completions: 0 },
+                ai: { plays: 0, completions: 0 },
+                friend: { plays: 1, completions: 1 },
+              },
+            }, {
+              id: "student-3",
+              plays: 5,
+              completions: 5,
+              modes: {
+                solo: { plays: 0, completions: 0 },
+                ai: { plays: 5, completions: 5 },
+                friend: { plays: 0, completions: 0 },
+              },
+            }],
           },
         }}
       />,
@@ -55,8 +86,14 @@ describe("교사 질문놀이 학습 현황", () => {
     ));
     expect(await screen.findByRole("heading", { name: "학급 질문놀이 학습 현황" })).toBeVisible();
     expect(screen.getByText("최근 6주 변화")).toBeVisible();
-    expect(screen.getByText("놀이별 완료율")).toBeVisible();
-    expect(screen.getByText("질문 릴레이: 참여 4회 중 완료 3회, 완료율 75%").closest("ul"))
+    expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
+    expect(screen.getByText(
+      "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 100%, 완료 2회",
+    ).closest("ul")).toHaveClass("sr-only");
+    expect(screen.queryByText(/인공지능과 함께 참여 1명/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "완료율" }));
+    expect(screen.getByText("질문 릴레이: 참여 5회 중 완료 4회, 완료율 80%").closest("ul"))
       .toHaveClass("sr-only");
   });
 });

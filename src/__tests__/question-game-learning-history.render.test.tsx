@@ -35,6 +35,14 @@ describe("질문놀이 학습 이력 화면", () => {
             { weekStart: "2026-07-06", plays: 1, goodQuestions: 2 },
             { weekStart: "2026-07-13", plays: 2, goodQuestions: 4 },
           ],
+          gameModes: [{
+            gameId: "relay",
+            modes: {
+              solo: { plays: 0, completions: 0, participants: 0 },
+              ai: { plays: 1, completions: 1, participants: 1 },
+              friend: { plays: 2, completions: 2, participants: 1 },
+            },
+          }],
           recent: [{
             id: "friend:room:1",
             gameId: "relay",
@@ -53,7 +61,10 @@ describe("질문놀이 학습 이력 화면", () => {
     expect(screen.getByText("인공지능과 함께 1회")).toBeVisible();
     expect(screen.getByText("친구와 함께 1회")).toBeVisible();
     expect(screen.getByText("최근 6주 변화")).toBeVisible();
-    expect(screen.getByText("놀이 방식별 완료 횟수")).toBeVisible();
+    expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
+    expect(screen.getByText(
+      "질문 릴레이: 혼자 하기 완료 0회, 인공지능과 함께 완료 1회, 친구와 함께 완료 2회",
+    ).closest("ul")).toHaveClass("sr-only");
     expect(screen.getByText("7. 13. 시작 주: 완료 2회, 좋은 질문 4개").closest("ul"))
       .toHaveClass("sr-only");
     expect(screen.getByText("질문 릴레이")).toBeVisible();
@@ -137,8 +148,17 @@ describe("질문놀이 학습 이력 화면", () => {
             friend: { plays: 4, points: 30, goodQuestions: 12 },
           },
           weekly: [{ weekStart: "2026-07-13", plays: 8, goodQuestions: 21 }],
+          gameModes: [{
+            gameId: "relay",
+            modes: {
+              solo: { plays: 2, completions: 2, participants: 1 },
+              ai: { plays: 0, completions: 0, participants: 0 },
+              friend: { plays: 3, completions: 3, participants: 2 },
+            },
+          }],
           recent: [],
         }}
+        classStudentCount={4}
         gameComparison={[
           { gameId: "relay", plays: 5, completions: 4 },
           { gameId: "dice", plays: 4, completions: 2 },
@@ -148,6 +168,15 @@ describe("질문놀이 학습 이력 화면", () => {
 
     expect(screen.getByRole("heading", { name: "학급 질문놀이 학습 현황" })).toBeVisible();
     expect(screen.getByText("최근 6주 변화")).toBeVisible();
+    expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
+    expect(screen.getByRole("button", { name: "참여 현황" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("놀이별 참여 수치")).toBeVisible();
+    expect(screen.getByText(
+      "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 50%, 완료 3회",
+    ).closest("ul")).toHaveClass("sr-only");
+    expect(screen.getByRole("cell", { name: "2명 (50%) · 완료 3회" })).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "완료율" }));
     expect(screen.getByText("놀이별 완료율")).toBeVisible();
     expect(screen.getByText("질문 릴레이: 참여 5회 중 완료 4회, 완료율 80%").closest("ul"))
       .toHaveClass("sr-only");

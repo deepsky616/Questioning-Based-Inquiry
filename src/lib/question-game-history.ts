@@ -23,6 +23,17 @@ export interface QuestionGameWeeklyPoint {
   goodQuestions: number;
 }
 
+export interface QuestionGameModeActivity {
+  plays: number;
+  completions: number;
+  participants: number;
+}
+
+export interface QuestionGameModeSummary {
+  gameId: string;
+  modes: Record<QuestionGameHistoryMode, QuestionGameModeActivity>;
+}
+
 export interface QuestionGameLearningHistory {
   totals: { plays: number; points: number; goodQuestions: number };
   modes: Record<QuestionGameHistoryMode, {
@@ -32,6 +43,7 @@ export interface QuestionGameLearningHistory {
   }>;
   recent: QuestionGameHistoryItem[];
   weekly?: QuestionGameWeeklyPoint[];
+  gameModes?: QuestionGameModeSummary[];
   nextCursor?: string | null;
 }
 
@@ -63,6 +75,17 @@ function historyDate(value: Date | string | null): Date | null {
   if (value === null) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function emptyQuestionGameModeActivity(): Record<
+  QuestionGameHistoryMode,
+  QuestionGameModeActivity
+> {
+  return {
+    solo: { plays: 0, completions: 0, participants: 0 },
+    ai: { plays: 0, completions: 0, participants: 0 },
+    friend: { plays: 0, completions: 0, participants: 0 },
+  };
 }
 
 export function validQuestionCountFromReason(reason: string): number {
@@ -152,6 +175,18 @@ export function buildQuestionGameLearningHistory({
     modes[item.mode].points += item.points;
     modes[item.mode].goodQuestions += item.goodQuestions;
   }
+  const byGame = new Map<string, QuestionGameModeSummary>();
+  for (const item of items) {
+    const summary = byGame.get(item.gameId) ?? {
+      gameId: item.gameId,
+      modes: emptyQuestionGameModeActivity(),
+    };
+    const mode = summary.modes[item.mode];
+    mode.plays += 1;
+    mode.completions += 1;
+    mode.participants = 1;
+    byGame.set(item.gameId, summary);
+  }
 
   return {
     totals: {
@@ -160,6 +195,9 @@ export function buildQuestionGameLearningHistory({
       goodQuestions: items.reduce((sum, item) => sum + item.goodQuestions, 0),
     },
     modes,
+    gameModes: [...byGame.values()].sort((first, second) =>
+      first.gameId.localeCompare(second.gameId)
+    ),
     recent: items.slice(0, Math.max(0, recentLimit)),
   };
 }
