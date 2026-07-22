@@ -9,6 +9,8 @@ import {
 } from "@/lib/question-game-mystery-definition";
 import {
   MYSTERY_ATTRIBUTES,
+  MYSTERY_FACTS,
+  MYSTERY_ITEMS,
   mysteryQuestionForAttribute,
 } from "@/lib/mystery-box-rules";
 import {
@@ -873,6 +875,7 @@ describe("질문놀이 실행 정의", () => {
     }, () => 0);
 
     expect(state.privateItemId).toBe("apple");
+    expect(state.knowledgeVersion).toBe(2);
     expect(() => definition.ensureProgress(state, {
       mode: "AI",
       runVersion: 1,
@@ -898,6 +901,22 @@ describe("질문놀이 실행 정의", () => {
     expect(JSON.stringify(progress)).not.toContain("attribute");
   });
 
+  it("판정 버전이 없는 이전 미스터리 실행 상태를 버전 1로 읽는다", () => {
+    const definition = findQuestionGameRunDefinition("mystery-box");
+    expect(definition).toBeDefined();
+    if (!definition) return;
+    const current = createMysteryState({
+      mode: "SOLO",
+      locale: "ko",
+      topicHash: TOPIC_HASH,
+      topicLength: 0,
+    }, () => 0);
+    const legacy = JSON.parse(JSON.stringify(current));
+    delete legacy.knowledgeVersion;
+
+    expect(definition.parseState(legacy)).toMatchObject({ knowledgeVersion: 1 });
+  });
+
   it("미스터리 박스 인공지능 계획은 비밀 물건 없이 공개 단서만으로 결정된다", () => {
     const first = planMysteryAiActivity([], "ko");
     const repeated = planMysteryAiActivity([], "ko");
@@ -907,17 +926,14 @@ describe("질문놀이 실행 정의", () => {
     expect(first).not.toHaveProperty("itemId");
     expect(first.text).toMatch(/[?？]$/u);
 
-    const appleHistory: MysteryAiHistoryItem[] = MYSTERY_ATTRIBUTES.map(
+    const apple = MYSTERY_ITEMS.find(({ id }) => id === "apple");
+    expect(apple).toBeDefined();
+    if (!apple) return;
+    const appleHistory: MysteryAiHistoryItem[] = MYSTERY_FACTS.map(
       (attribute) => ({
         kind: "QUESTION",
         text: mysteryQuestionForAttribute(attribute, "ko"),
-        answer: attribute === "plant" ||
-            attribute === "edible" ||
-            attribute === "small" ||
-            attribute === "colorful" ||
-            attribute === "round"
-          ? "yes"
-          : "no",
+        answer: apple.facts[attribute] ? "yes" : "no",
       }),
     );
     expect(planMysteryAiActivity(appleHistory, "ko")).toMatchObject({

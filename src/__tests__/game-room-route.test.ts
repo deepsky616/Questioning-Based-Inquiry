@@ -807,6 +807,7 @@ describe("미스터리 박스 실제 공개 응답", () => {
       playerId: "user-1",
       locale: "ko",
       question,
+      knowledgeVersion: 2,
     });
     expect(mocks.checkRateLimit).toHaveBeenCalledWith(
       "game-room-mystery-ai:user-1",

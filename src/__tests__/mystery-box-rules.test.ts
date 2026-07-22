@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  CURRENT_MYSTERY_KNOWLEDGE_VERSION,
   MYSTERY_ATTRIBUTES,
+  MYSTERY_FACTS,
   MYSTERY_ITEMS,
   analyzeMysteryQuestion,
   classifyMysteryQuestion,
@@ -9,8 +11,12 @@ import {
 } from "@/lib/mystery-box-rules";
 
 const APPLE_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "apple");
+const PENCIL_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "pencil");
+const SUNFLOWER_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "sunflower");
 
 if (!APPLE_ITEM) throw new Error("사과 시험 자료가 필요합니다");
+if (!PENCIL_ITEM) throw new Error("연필 시험 자료가 필요합니다");
+if (!SUNFLOWER_ITEM) throw new Error("해바라기 시험 자료가 필요합니다");
 
 describe("미스터리 박스 질문 규칙", () => {
   it("내장 물건은 두 언어 이름과 별칭 및 모든 속성값을 가진다", () => {
@@ -27,6 +33,75 @@ describe("미스터리 박스 질문 규칙", () => {
         (value) => typeof value === "boolean",
       )).toBe(true);
     }
+  });
+
+  it("새 판정 자료는 모든 물건에 세분화된 사실값을 가진다", () => {
+    expect(CURRENT_MYSTERY_KNOWLEDGE_VERSION).toBe(2);
+    for (const item of MYSTERY_ITEMS) {
+      expect(Object.keys(item.facts).sort()).toEqual([...MYSTERY_FACTS].sort());
+      expect(Object.values(item.facts).every(
+        (value) => typeof value === "boolean",
+      )).toBe(true);
+    }
+  });
+
+  it.each([
+    ["나무인가요?", "no", "tree"],
+    ["풀인가요?", "yes", "herbaceousPlant"],
+    ["살아 있나요?", "yes", "living"],
+    ["스스로 움직이나요?", "no", "movesByItself"],
+  ] as const)("해바라기 질문 %s을 정확한 사실로 판정한다", (question, answer, attribute) => {
+    expect(analyzeMysteryQuestion(question, SUNFLOWER_ITEM, "ko")).toEqual({
+      answer,
+      attribute,
+      negated: false,
+    });
+  });
+
+  it.each([
+    ["필기도구인가요?", "yes", "writingTool"],
+    ["스스로 움직이나요?", "no", "movesByItself"],
+  ] as const)("연필 질문 %s을 정확한 사실로 판정한다", (question, answer, attribute) => {
+    expect(analyzeMysteryQuestion(question, PENCIL_ITEM, "ko")).toEqual({
+      answer,
+      attribute,
+      negated: false,
+    });
+  });
+
+  it.each([
+    ["살아 있지 않나요?", SUNFLOWER_ITEM, "no", "living"],
+    ["스스로 움직이지 않나요?", PENCIL_ITEM, "yes", "movesByItself"],
+  ] as const)("부정 질문 %s의 속성과 부정 범위를 함께 판정한다", (
+    question,
+    item,
+    answer,
+    attribute,
+  ) => {
+    expect(analyzeMysteryQuestion(question, item, "ko")).toEqual({
+      answer,
+      attribute,
+      negated: true,
+    });
+  });
+
+  it("열매 자체와 식물 전체를 구분한다", () => {
+    expect(classifyMysteryQuestion("식물인가요?", APPLE_ITEM, "ko")).toBe("no");
+    expect(classifyMysteryQuestion("열매인가요?", APPLE_ITEM, "ko")).toBe("yes");
+    expect(classifyMysteryQuestion("식물에서 자라나요?", APPLE_ITEM, "ko")).toBe("yes");
+  });
+
+  it("기존 기록은 이전 판정 의미로 다시 확인할 수 있다", () => {
+    expect(analyzeMysteryQuestion("나무인가요?", SUNFLOWER_ITEM, "ko", 1)).toEqual({
+      answer: "yes",
+      attribute: "plant",
+      negated: false,
+    });
+    expect(analyzeMysteryQuestion("식물인가요?", APPLE_ITEM, "ko", 1)).toEqual({
+      answer: "yes",
+      attribute: "plant",
+      negated: false,
+    });
   });
 
   it.each([
@@ -84,7 +159,7 @@ describe("미스터리 박스 질문 규칙", () => {
     ["Is it not edible?", "en", "no"],
     ["Can it not fly?", "en", "yes"],
     ["Is it not an animal?", "en", "yes"],
-    ["Isn't it a plant?", "en", "no"],
+    ["Isn't it a plant?", "en", "yes"],
   ] as const)("한 번 부정한 질문 %s은 값을 뒤집는다", (question, locale, expected) => {
     expect(classifyMysteryQuestion(question, APPLE_ITEM, locale)).toBe(
       expected,

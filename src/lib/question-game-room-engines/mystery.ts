@@ -1,11 +1,14 @@
 import {
+  CURRENT_MYSTERY_KNOWLEDGE_VERSION,
   MYSTERY_ITEMS,
   classifyMysteryQuestion,
   getMysteryItem,
   isMysteryGuessCorrect,
+  mysteryItemsForVersion,
   type MysteryAnswer,
   type MysteryAnswerResolution,
   type MysteryItem,
+  type MysteryKnowledgeVersion,
   type MysteryLocale,
 } from "@/lib/mystery-box-rules";
 import {
@@ -43,6 +46,7 @@ export type MysteryHistoryItem =
 
 export interface MysteryRoomState extends EngineStateBase {
   game: "mystery-box";
+  knowledgeVersion: MysteryKnowledgeVersion;
   phase: "setup" | "play" | "done";
   round: number;
   maxRounds: 20;
@@ -59,6 +63,7 @@ export type MysteryPublicRoomState = Pick<
   MysteryRoomState,
   | "stateVersion"
   | "game"
+  | "knowledgeVersion"
   | "phase"
   | "recentCommandIds"
   | "roundId"
@@ -96,6 +101,7 @@ const MYSTERY_STATE_OPTIONAL_KEYS = [
   "winnerId",
   "answer",
   "private",
+  "knowledgeVersion",
 ] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -263,6 +269,7 @@ function hasValidHistorySemantics(state: MysteryRoomState): boolean {
         historyItem.question,
         item,
         historyItem.locale,
+        state.knowledgeVersion,
       ) === historyItem.answer;
     }
     return isMysteryGuessCorrect(
@@ -387,10 +394,15 @@ export function readMysteryState(value: unknown): MysteryRoomState | null {
       value.endReason !== "completed" &&
       value.endReason !== "insufficient-players") ||
     (value.private !== undefined && !isValidPrivateState(value.private))
+    || (value.knowledgeVersion !== undefined &&
+      value.knowledgeVersion !== 1 && value.knowledgeVersion !== 2)
   ) {
     return null;
   }
-  const state = value as unknown as MysteryRoomState;
+  const state = {
+    ...value,
+    knowledgeVersion: (value.knowledgeVersion ?? 1) as MysteryKnowledgeVersion,
+  } as unknown as MysteryRoomState;
   return hasValidTurn(state) &&
       hasValidScores(state) &&
       hasValidHistorySemantics(state) &&
@@ -483,6 +495,9 @@ export function toPublicMysteryState(
 
   const state: Record<string, unknown> = {};
   if (value.stateVersion === 2) state.stateVersion = value.stateVersion;
+  if (value.knowledgeVersion === 1 || value.knowledgeVersion === 2) {
+    state.knowledgeVersion = value.knowledgeVersion;
+  }
   if (value.game === "mystery-box") state.game = value.game;
   if (value.phase === "setup" || value.phase === "play" || value.phase === "done") {
     state.phase = value.phase;
@@ -564,11 +579,13 @@ function isMysteryAnswerResolution(
       "locale",
       "question",
       "answer",
+      "knowledgeVersion",
     ], ["source"]) &&
     typeof value.itemId === "string" &&
     typeof value.playerId === "string" &&
     (value.locale === "ko" || value.locale === "en") &&
     typeof value.question === "string" &&
+    (value.knowledgeVersion === 1 || value.knowledgeVersion === 2) &&
     (value.answer === "yes" ||
       value.answer === "no" ||
       value.answer === "unknown") &&
@@ -593,6 +610,7 @@ function hasSamePlayerIds(
 export function createMysteryState(): MysteryRoomState {
   return {
     stateVersion: 2,
+    knowledgeVersion: CURRENT_MYSTERY_KNOWLEDGE_VERSION,
     game: "mystery-box",
     phase: "setup",
     recentCommandIds: [],
@@ -683,7 +701,8 @@ function startMystery(
       message: "서버 난수 결과가 올바르지 않습니다",
     };
   }
-  const item = MYSTERY_ITEMS[Math.floor(random * MYSTERY_ITEMS.length)];
+  const items = mysteryItemsForVersion(state.knowledgeVersion);
+  const item = items[Math.floor(random * items.length)];
   if (!item) {
     return {
       kind: "corrupt",
@@ -778,7 +797,12 @@ function askMysteryQuestion(
     };
   }
 
-  const ruleAnswer = classifyMysteryQuestion(question, item, locale);
+  const ruleAnswer = classifyMysteryQuestion(
+    question,
+    item,
+    locale,
+    state.knowledgeVersion,
+  );
   const resolution = context.mysteryAnswerResolution;
   let answer = ruleAnswer;
   let answerSource: "ai" | "fallback" | undefined;
@@ -788,7 +812,8 @@ function askMysteryQuestion(
       resolution.itemId === item.id &&
       resolution.playerId === context.userId &&
       resolution.locale === locale &&
-      resolution.question === question
+      resolution.question === question &&
+      resolution.knowledgeVersion === state.knowledgeVersion
     )) {
       return {
         kind: "resolution-required",
@@ -798,6 +823,7 @@ function askMysteryQuestion(
           playerId: context.userId,
           locale,
           question,
+          knowledgeVersion: state.knowledgeVersion,
         },
         message: "미스터리 박스 질문 답변 해결이 필요합니다",
       };

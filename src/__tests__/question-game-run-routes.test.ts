@@ -841,7 +841,11 @@ beforeEach(() => {
   users.set("teacher-1", { id: "teacher-1", role: "TEACHER", totalPoints: 0 });
   mocks.auth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
   mocks.checkRateLimit.mockReturnValue(null);
-  mocks.generateJson.mockResolvedValue({ answer: "yes" });
+  mocks.generateJson.mockResolvedValue({
+    attribute: "indoor",
+    negated: false,
+    confidence: "high",
+  });
   mocks.generateText.mockResolvedValue("그렇다면 별빛은 어디에서 시작될까요?");
   process.env.GAME_ACTIVITY_HASH_SECRET = "question-game-run-test-secret";
 
@@ -3926,7 +3930,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
     await createMystery();
     mocks.generateJson.mockImplementationOnce(async () => {
       expect(transactionDepth).toBe(0);
-      return { answer: "no" };
+      return { attribute: "indoor", negated: false, confidence: "high" };
     });
 
     const response = await submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?");
@@ -3957,7 +3961,11 @@ describe("미스터리 박스 서버 실행 경로", () => {
     async (outcome, status, rewriteRequired) => {
       await createMystery();
       if (outcome === "unknown") {
-        mocks.generateJson.mockResolvedValueOnce({ answer: "unknown" });
+        mocks.generateJson.mockResolvedValueOnce({
+          attribute: "unknown",
+          negated: false,
+          confidence: "low",
+        });
       } else {
         mocks.generateJson.mockRejectedValueOnce(new Error("private-provider-failure"));
       }
@@ -3985,7 +3993,11 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
   it("외부 판정 사이 실행이 바뀌면 늦은 판정을 버리고 어떤 자료나 점수도 더하지 않는다", async () => {
     await createMystery();
-    let finishProvider: ((value: { answer: "yes" }) => void) | undefined;
+    let finishProvider: ((value: {
+      attribute: "indoor";
+      negated: false;
+      confidence: "high";
+    }) => void) | undefined;
     mocks.generateJson.mockImplementationOnce(() => new Promise((resolve) => {
       finishProvider = resolve;
     }));
@@ -3994,7 +4006,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
     await vi.waitFor(() => expect(mocks.generateJson).toHaveBeenCalledOnce());
     const competing = await submitMysteryGuess(1, 1, "없는 물건");
     expect(competing.status).toBe(200);
-    finishProvider?.({ answer: "yes" });
+    finishProvider?.({ attribute: "indoor", negated: false, confidence: "high" });
     const late = await pending;
 
     expect(late.status).toBe(409);
@@ -4007,7 +4019,11 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
   it("외부 판정 대기 중 실행이 만료되면 늦은 판정을 버리고 정답을 공개하지 않는다", async () => {
     await createMystery();
-    let finishProvider: ((value: { answer: "yes" }) => void) | undefined;
+    let finishProvider: ((value: {
+      attribute: "indoor";
+      negated: false;
+      confidence: "high";
+    }) => void) | undefined;
     mocks.generateJson.mockImplementationOnce(() => new Promise((resolve) => {
       finishProvider = resolve;
     }));
@@ -4026,7 +4042,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
       },
       result: null,
     });
-    finishProvider?.({ answer: "yes" });
+    finishProvider?.({ attribute: "indoor", negated: false, confidence: "high" });
 
     const late = await pending;
     expect(late.status).toBe(409);
@@ -4088,7 +4104,11 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
   it("같은 규칙 밖 질문이 동시에 들어오면 한 활동만 기록하고 나머지는 저장 응답을 재생한다", async () => {
     await createMystery();
-    mocks.generateJson.mockResolvedValue({ answer: "yes" });
+    mocks.generateJson.mockResolvedValue({
+      attribute: "indoor",
+      negated: false,
+      confidence: "high",
+    });
 
     const responses = await Promise.all([
       submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?"),

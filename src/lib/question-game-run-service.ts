@@ -2028,7 +2028,12 @@ function mysteryQuestionEntry(
   if (!item) {
     throw new QuestionGameRunError("미스터리 박스 실행 상태가 손상되었습니다", 409);
   }
-  const analysis = analyzeMysteryQuestion(question, item, state.mysteryLocale);
+  const analysis = analyzeMysteryQuestion(
+    question,
+    item,
+    state.mysteryLocale,
+    state.knowledgeVersion,
+  );
   if (source === "RULE") {
     if (analysis.answer === "unknown" || analysis.answer !== answer) {
       throw new QuestionGameRunError("미스터리 박스 질문 판정을 확인할 수 없습니다", 409);
@@ -2218,7 +2223,12 @@ async function verifyMysteryActivitySequence(
         payload.answer !== history.answer ||
         payload.answerSource !== history.answerSource
       ) mysteryEvidenceError();
-      const analysis = analyzeMysteryQuestion(history.text, item, history.locale);
+      const analysis = analyzeMysteryQuestion(
+        history.text,
+        item,
+        history.locale,
+        state.knowledgeVersion,
+      );
       if (
         (history.answerSource === "RULE" &&
           (analysis.answer === "unknown" || analysis.answer !== history.answer)) ||
@@ -2236,7 +2246,11 @@ async function verifyMysteryActivitySequence(
       ) mysteryEvidenceError();
     }
     if (history.actor === "AI") {
-      const plan = planMysteryAiActivity(state.history.slice(0, index), state.mysteryLocale);
+      const plan = planMysteryAiActivity(
+        state.history.slice(0, index),
+        state.mysteryLocale,
+        state.knowledgeVersion,
+      );
       if (
         plan.kind !== history.kind ||
         plan.text !== history.text ||
@@ -2382,6 +2396,7 @@ function validateMysteryResolution(
     resolution.playerId !== expected.playerId ||
     resolution.locale !== expected.locale ||
     resolution.question !== expected.question ||
+    resolution.knowledgeVersion !== expected.knowledgeVersion ||
     (resolution.answer !== "yes" && resolution.answer !== "no")
   ) {
     throw new QuestionGameRunError("미스터리 박스 질문 판정을 확인할 수 없습니다", 409);
@@ -2439,7 +2454,12 @@ async function submitMysteryQuestion(
     if (!item) {
       throw new QuestionGameRunError("미스터리 박스 실행 상태가 손상되었습니다", 409);
     }
-    const analysis = analyzeMysteryQuestion(question, item, locale);
+    const analysis = analyzeMysteryQuestion(
+      question,
+      item,
+      locale,
+      state.knowledgeVersion,
+    );
     let answer: "yes" | "no";
     let source: "RULE" | "AI";
     if (analysis.answer === "unknown") {
@@ -2451,6 +2471,7 @@ async function submitMysteryQuestion(
         playerId: actor.id,
         locale,
         question,
+        knowledgeVersion: state.knowledgeVersion,
       };
       if (!resolution) {
         return {
@@ -2570,7 +2591,11 @@ async function applyMysteryAiTurn(
     if (state.mysteryNextStep !== "AI_TURN") {
       throw new QuestionGameRunError("지금은 인공지능 차례가 아닙니다", 409);
     }
-    const plan = planMysteryAiActivity(state.history, state.mysteryLocale);
+    const plan = planMysteryAiActivity(
+      state.history,
+      state.mysteryLocale,
+      state.knowledgeVersion,
+    );
     const textHash = hashActivityText(
       plan.kind === "QUESTION" ? "question" : "guess",
       plan.text,
@@ -2581,7 +2606,12 @@ async function applyMysteryAiTurn(
           if (!item) {
             throw new QuestionGameRunError("미스터리 박스 실행 상태가 손상되었습니다", 409);
           }
-          const analysis = analyzeMysteryQuestion(plan.text, item, state.mysteryLocale);
+          const analysis = analyzeMysteryQuestion(
+            plan.text,
+            item,
+            state.mysteryLocale,
+            state.knowledgeVersion,
+          );
           if (analysis.answer === "unknown") {
             throw new QuestionGameRunError("인공지능 질문 판정을 확인할 수 없습니다", 409);
           }

@@ -16,13 +16,30 @@ export const MYSTERY_ATTRIBUTES = [
 ] as const;
 
 export type MysteryAttribute = typeof MYSTERY_ATTRIBUTES[number];
+export const MYSTERY_FACTS = [
+  ...MYSTERY_ATTRIBUTES,
+  "tree",
+  "herbaceousPlant",
+  "flower",
+  "fruit",
+  "plantDerived",
+  "movesByItself",
+  "writingTool",
+  "musicalInstrument",
+  "vehicle",
+  "readingMaterial",
+] as const;
+
+export type MysteryFact = typeof MYSTERY_FACTS[number];
+export type MysteryKnowledgeVersion = 1 | 2;
+export const CURRENT_MYSTERY_KNOWLEDGE_VERSION: MysteryKnowledgeVersion = 2;
 export type MysteryLocale = "ko" | "en";
 export type MysteryAnswer = "yes" | "no" | "unknown";
 
 export type MysteryQuestionAnalysis =
   | {
       answer: Exclude<MysteryAnswer, "unknown">;
-      attribute: MysteryAttribute;
+      attribute: MysteryFact;
       negated: boolean;
     }
   | { answer: "unknown" };
@@ -33,6 +50,7 @@ export interface MysteryAnswerResolution {
   locale: MysteryLocale;
   question: string;
   answer: MysteryAnswer;
+  knowledgeVersion: MysteryKnowledgeVersion;
   source?: "ai" | "fallback";
 }
 
@@ -41,9 +59,12 @@ export interface MysteryItem {
   names: Record<MysteryLocale, string>;
   aliases: Record<MysteryLocale, string[]>;
   attributes: Record<MysteryAttribute, boolean>;
+  facts: Record<MysteryFact, boolean>;
 }
 
-export const MYSTERY_ITEMS: readonly MysteryItem[] = [
+type LegacyMysteryItem = Omit<MysteryItem, "facts">;
+
+const MYSTERY_ITEM_DEFINITIONS: readonly LegacyMysteryItem[] = [
   {
     id: "apple",
     names: { ko: "사과", en: "apple" },
@@ -255,6 +276,27 @@ export const MYSTERY_ITEMS: readonly MysteryItem[] = [
     },
   },
   {
+    id: "pencil",
+    names: { ko: "연필", en: "pencil" },
+    aliases: { ko: ["색연필"], en: ["writing pencil"] },
+    attributes: {
+      living: false,
+      animal: false,
+      plant: false,
+      edible: false,
+      small: true,
+      large: false,
+      colorful: false,
+      indoor: true,
+      legs: false,
+      fly: false,
+      humanMade: true,
+      hard: true,
+      wet: false,
+      round: false,
+    },
+  },
+  {
     id: "snowman",
     names: { ko: "눈사람", en: "snowman" },
     aliases: { ko: ["눈 인형"], en: ["snow figure"] },
@@ -298,6 +340,48 @@ export const MYSTERY_ITEMS: readonly MysteryItem[] = [
   },
 ] as const;
 
+const FACT_OVERRIDES: Record<string, Partial<Record<MysteryFact, boolean>>> = {
+  apple: { plant: false, fruit: true, plantDerived: true },
+  puppy: { movesByItself: true },
+  book: { readingMaterial: true },
+  car: { vehicle: true },
+  butterfly: { movesByItself: true },
+  piano: { musicalInstrument: true },
+  strawberry: { plant: false, fruit: true, plantDerived: true },
+  rocket: { vehicle: true },
+  sunflower: { herbaceousPlant: true, flower: true },
+  pencil: { writingTool: true },
+  dragon: { movesByItself: true },
+};
+
+function createFactProfile(
+  item: LegacyMysteryItem,
+): Record<MysteryFact, boolean> {
+  const facts = Object.fromEntries(
+    MYSTERY_FACTS.map((fact) => [
+      fact,
+      MYSTERY_ATTRIBUTES.includes(fact as MysteryAttribute)
+        ? item.attributes[fact as MysteryAttribute]
+        : false,
+    ]),
+  ) as Record<MysteryFact, boolean>;
+  return { ...facts, ...FACT_OVERRIDES[item.id] };
+}
+
+export const MYSTERY_ITEMS: readonly MysteryItem[] =
+  MYSTERY_ITEM_DEFINITIONS.map((item) => ({
+    ...item,
+    facts: createFactProfile(item),
+  }));
+
+export function mysteryItemsForVersion(
+  knowledgeVersion: MysteryKnowledgeVersion,
+): readonly MysteryItem[] {
+  return knowledgeVersion === 1
+    ? MYSTERY_ITEMS.filter(({ id }) => id !== "pencil")
+    : MYSTERY_ITEMS;
+}
+
 const KOREAN_NOUN_ENDING =
   "(?:인가요|입니까|이에요|예요|인가|이야|이다|이|가|은|는|을|를|도|만|의|에|에서|처럼)?";
 
@@ -315,7 +399,7 @@ function koreanForm(source: string): RegExp {
   );
 }
 
-const ATTRIBUTE_PATTERNS: Record<
+const LEGACY_ATTRIBUTE_PATTERNS: Record<
   MysteryLocale,
   Record<MysteryAttribute, readonly RegExp[]>
 > = {
@@ -407,6 +491,67 @@ const ATTRIBUTE_PATTERNS: Record<
   },
 };
 
+const FACT_PATTERNS: Record<
+  MysteryLocale,
+  Record<MysteryFact, readonly RegExp[]>
+> = {
+  ko: {
+    ...LEGACY_ATTRIBUTE_PATTERNS.ko,
+    living: [
+      koreanForm("살아\\s*있(?:나요|습니까|는|다|어요|어|지\\s*않(?:나요|습니까|는|다)?)?"),
+      koreanNoun("생물"),
+    ],
+    plant: [
+      koreanForm("식물(?:인가요|입니까|이에요|예요|인가|이야|이다|이|가|은|는|을|를|도|만)?"),
+    ],
+    tree: [
+      koreanForm("나무(?:인가요|입니까|이에요|예요|인가|이야|이다|이|가|은|는|을|를|도|만)?"),
+      koreanNoun("목본"),
+    ],
+    herbaceousPlant: [koreanNoun("풀"), koreanNoun("초본")],
+    flower: [koreanNoun("꽃")],
+    fruit: [koreanNoun("과일"), koreanNoun("열매")],
+    plantDerived: [
+      koreanForm("식물에서\\s*(?:자라(?:나요|는|다)?|나(?:나요|는|다)?|열리(?:나요|는|다)?)"),
+      koreanForm("나무에서\\s*(?:자라(?:나요|는|다)?|나(?:나요|는|다)?|열리(?:나요|는|다)?)"),
+    ],
+    movesByItself: [
+      koreanForm("(?:스스로|저절로|혼자)\\s*움직(?:이나요|입니까|여요|이나|인다|이는|일\\s*수\\s*있(?:나요|습니까)?|이지\\s*않(?:나요|습니까|는|다)?)?"),
+    ],
+    writingTool: [
+      koreanNoun("필기도구"),
+      koreanForm("(?:글씨|글)를\\s*쓰는\\s*도구"),
+    ],
+    musicalInstrument: [koreanNoun("악기")],
+    vehicle: [koreanNoun("탈것"), koreanNoun("교통수단")],
+    readingMaterial: [
+      koreanForm("읽는\\s*(?:것|자료|도구)"),
+      koreanForm("읽을\\s*수\\s*있(?:나요|습니까)?"),
+    ],
+  },
+  en: {
+    ...LEGACY_ATTRIBUTE_PATTERNS.en,
+    plant: [/\bplant\b/u],
+    tree: [/\btree\b/u, /\bwoody plant\b/u],
+    herbaceousPlant: [/\bherb(?:aceous)?\b/u, /\bnon-woody plant\b/u],
+    flower: [/\bflower(?:ing plant)?\b/u],
+    fruit: [/\bfruit\b/u],
+    plantDerived: [
+      /\b(?:grow|grows|grown|come|comes) (?:on|from) (?:a )?(?:plant|tree)\b/u,
+    ],
+    movesByItself: [
+      /\bmove(?:s)? (?:by itself|on its own|without help)\b/u,
+    ],
+    writingTool: [/\bwriting (?:tool|instrument)\b/u, /\bstationery\b/u],
+    musicalInstrument: [/\bmusical instrument\b/u, /\binstrument\b/u],
+    vehicle: [/\bvehicle\b/u, /\btransport(?:ation)?\b/u],
+    readingMaterial: [
+      /\breading material\b/u,
+      /\b(?:used for|something to) read\b/u,
+    ],
+  },
+};
+
 const NEGATION_PATTERNS: Record<MysteryLocale, RegExp> = {
   ko: /없|않|아닌|아니|못/gu,
   en: /\b(?:not|never|no|without|cannot|can't|isn't|aren't|doesn't|don't|didn't|won't|wouldn't|couldn't|shouldn't|wasn't|weren't|hasn't|haven't|hadn't|inedible)\b/gu,
@@ -447,6 +592,38 @@ const MYSTERY_ATTRIBUTE_QUESTIONS: Record<
     hard: "Is it hard?",
     wet: "Is it wet?",
     round: "Is it round?",
+  },
+};
+
+const MYSTERY_FACT_QUESTIONS: Record<
+  MysteryLocale,
+  Record<MysteryFact, string>
+> = {
+  ko: {
+    ...MYSTERY_ATTRIBUTE_QUESTIONS.ko,
+    tree: "나무인가요?",
+    herbaceousPlant: "풀인가요?",
+    flower: "꽃인가요?",
+    fruit: "열매인가요?",
+    plantDerived: "식물에서 자라나요?",
+    movesByItself: "스스로 움직이나요?",
+    writingTool: "필기도구인가요?",
+    musicalInstrument: "악기인가요?",
+    vehicle: "탈것인가요?",
+    readingMaterial: "읽는 데 사용하는 것인가요?",
+  },
+  en: {
+    ...MYSTERY_ATTRIBUTE_QUESTIONS.en,
+    tree: "Is it a tree?",
+    herbaceousPlant: "Is it an herbaceous plant?",
+    flower: "Is it a flower?",
+    fruit: "Is it a fruit?",
+    plantDerived: "Does it grow on a plant?",
+    movesByItself: "Does it move on its own?",
+    writingTool: "Is it a writing tool?",
+    musicalInstrument: "Is it a musical instrument?",
+    vehicle: "Is it a vehicle?",
+    readingMaterial: "Is it used for reading?",
   },
 };
 
@@ -521,23 +698,54 @@ export function getMysteryItem(itemId: string): MysteryItem | null {
 }
 
 export function mysteryQuestionForAttribute(
-  attribute: MysteryAttribute,
+  attribute: MysteryFact,
   locale: MysteryLocale,
 ): string {
-  return MYSTERY_ATTRIBUTE_QUESTIONS[locale][attribute];
+  return MYSTERY_FACT_QUESTIONS[locale][attribute];
+}
+
+export function mysteryAttributesForVersion(
+  knowledgeVersion: MysteryKnowledgeVersion,
+): readonly MysteryFact[] {
+  return knowledgeVersion === 1 ? MYSTERY_ATTRIBUTES : MYSTERY_FACTS;
+}
+
+export function isMysteryAttributeForVersion(
+  value: unknown,
+  knowledgeVersion: MysteryKnowledgeVersion,
+): value is MysteryFact {
+  return typeof value === "string" &&
+    mysteryAttributesForVersion(knowledgeVersion).includes(value as MysteryFact);
+}
+
+export function resolveMysteryAttribute(
+  item: MysteryItem,
+  attribute: MysteryFact,
+  negated: boolean,
+  knowledgeVersion: MysteryKnowledgeVersion = CURRENT_MYSTERY_KNOWLEDGE_VERSION,
+): Exclude<MysteryAnswer, "unknown"> {
+  const value = knowledgeVersion === 1
+    ? item.attributes[attribute as MysteryAttribute]
+    : item.facts[attribute];
+  return (negated ? !value : value) ? "yes" : "no";
 }
 
 export function analyzeMysteryQuestion(
   question: string,
   item: MysteryItem,
   locale: MysteryLocale,
+  knowledgeVersion: MysteryKnowledgeVersion = CURRENT_MYSTERY_KNOWLEDGE_VERSION,
 ): MysteryQuestionAnalysis {
   const normalized = normalizeText(question, locale);
-  const detectedAttributes = MYSTERY_ATTRIBUTES.map((attribute) => ({
+  const attributes = mysteryAttributesForVersion(knowledgeVersion);
+  const patterns = knowledgeVersion === 1
+    ? LEGACY_ATTRIBUTE_PATTERNS[locale]
+    : FACT_PATTERNS[locale];
+  const detectedAttributes = attributes.map((attribute) => ({
     attribute,
     matches: findPatternMatches(
       normalized,
-      ATTRIBUTE_PATTERNS[locale][attribute],
+      patterns[attribute as keyof typeof patterns],
     ),
   })).filter(({ matches }) => matches.length > 0);
   if (detectedAttributes.length !== 1) return { answer: "unknown" };
@@ -560,10 +768,13 @@ export function analyzeMysteryQuestion(
 
   const attribute = detectedAttributes[0].attribute;
   const negated = negations.length === 1;
-  const value = item.attributes[attribute];
-  const answer = negated ? !value : value;
   return {
-    answer: answer ? "yes" : "no",
+    answer: resolveMysteryAttribute(
+      item,
+      attribute,
+      negated,
+      knowledgeVersion,
+    ),
     attribute,
     negated,
   };
@@ -573,8 +784,14 @@ export function classifyMysteryQuestion(
   question: string,
   item: MysteryItem,
   locale: MysteryLocale,
+  knowledgeVersion: MysteryKnowledgeVersion = CURRENT_MYSTERY_KNOWLEDGE_VERSION,
 ): MysteryAnswer {
-  return analyzeMysteryQuestion(question, item, locale).answer;
+  return analyzeMysteryQuestion(
+    question,
+    item,
+    locale,
+    knowledgeVersion,
+  ).answer;
 }
 
 export function isMysteryGuessCorrect(

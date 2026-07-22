@@ -158,6 +158,7 @@ describe("미스터리 박스 방 판정기", () => {
       pointEvidenceVersion: 2,
       gameState: {
         stateVersion: 2,
+        knowledgeVersion: 2,
         game: "mystery-box",
         phase: "setup",
         round: 0,
@@ -171,6 +172,53 @@ describe("미스터리 박스 방 판정기", () => {
     });
     expect(room.gameState).not.toHaveProperty("private");
     expect(room.gameState).not.toHaveProperty("roundId");
+  });
+
+  it("이전 방 상태는 판정 버전 1로 읽어 기존 질문 의미를 유지한다", () => {
+    const room = prepareRoom();
+    const legacyState = {
+      ...(room.gameState as unknown as MysteryRoomState),
+      private: { itemId: "sunflower" },
+    } as Record<string, unknown>;
+    delete legacyState.knowledgeVersion;
+    const legacyRoom = { ...room, gameState: legacyState };
+
+    expect(readMysteryState(legacyState)).toMatchObject({ knowledgeVersion: 1 });
+    const result = applyMystery(
+      legacyRoom,
+      "mystery-ask",
+      { locale: "ko", question: "나무인가요?" },
+    );
+
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") return;
+    expect(result.room.gameState).toMatchObject({
+      knowledgeVersion: 1,
+      history: [{ kind: "question", answer: "yes" }],
+    });
+  });
+
+  it("새 방은 세분화된 사실표로 나무와 풀을 구분한다", () => {
+    const room = prepareRoom();
+    const currentRoom = {
+      ...room,
+      gameState: {
+        ...(room.gameState as unknown as MysteryRoomState),
+        private: { itemId: "sunflower" },
+      },
+    };
+    const result = applyMystery(
+      currentRoom,
+      "mystery-ask",
+      { locale: "ko", question: "나무인가요?" },
+    );
+
+    expect(result.kind).toBe("changed");
+    if (result.kind !== "changed") return;
+    expect(result.room.gameState).toMatchObject({
+      knowledgeVersion: 2,
+      history: [{ kind: "question", answer: "no" }],
+    });
   });
 
   it("방장 준비는 서버 물건과 첫 라운드 및 차례를 저장한다", () => {
@@ -273,6 +321,7 @@ describe("미스터리 박스 방 판정기", () => {
         playerId: "host",
         locale: "ko",
         question: "무슨 소리가 나나요?",
+        knowledgeVersion: 2,
       },
     });
     expect(result.room).toBe(room);
@@ -299,6 +348,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
+          knowledgeVersion: 2,
           answer: "unknown",
         },
       },
@@ -344,6 +394,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
+          knowledgeVersion: 2,
           answer: "unknown",
           source: "fallback",
         },
@@ -384,6 +435,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
+          knowledgeVersion: 2,
           answer: "yes",
           ...changedBinding,
         } as unknown as MysteryAnswerResolution,
@@ -425,6 +477,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "먹을 수 있나요?",
+          knowledgeVersion: 2,
           answer: "no",
         },
       },
@@ -846,6 +899,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
+          knowledgeVersion: 2,
           answer: "yes",
         },
       },
@@ -880,6 +934,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
+          knowledgeVersion: 2,
           answer: "no",
         },
       },

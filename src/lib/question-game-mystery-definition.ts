@@ -2,14 +2,20 @@ import { randomInt } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import {
+  CURRENT_MYSTERY_KNOWLEDGE_VERSION,
   MYSTERY_ATTRIBUTES,
+  MYSTERY_FACTS,
   MYSTERY_ITEMS,
   analyzeMysteryQuestion,
   getMysteryItem,
   isMysteryGuessCorrect,
   mysteryQuestionForAttribute,
+  mysteryAttributesForVersion,
+  mysteryItemsForVersion,
   type MysteryAnswer,
   type MysteryAttribute,
+  type MysteryFact,
+  type MysteryKnowledgeVersion,
   type MysteryLocale,
 } from "@/lib/mystery-box-rules";
 import {
@@ -45,7 +51,7 @@ export type MysteryRunHistoryItem =
       kind: "QUESTION";
       answer: Exclude<MysteryAnswer, "unknown">;
       answerSource: "RULE" | "AI";
-      attribute?: MysteryAttribute;
+      attribute?: MysteryFact;
       negated?: boolean;
     }
   | MysteryHistoryBase & {
@@ -56,6 +62,7 @@ export type MysteryRunHistoryItem =
 
 export interface MysteryRunState {
   game: "mystery-box";
+  knowledgeVersion: MysteryKnowledgeVersion;
   mysteryLocale: MysteryLocale;
   targetCount: 20;
   questionCount: number;
@@ -74,7 +81,7 @@ export type MysteryAiPlan =
   | {
       kind: "QUESTION";
       text: string;
-      attribute: MysteryAttribute;
+      attribute: MysteryFact;
       negated: false;
     }
   | {
@@ -121,8 +128,14 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]) {
   return Object.keys(value).every((key) => allowed.has(key));
 }
 
-function isAttribute(value: unknown): value is MysteryAttribute {
-  return MYSTERY_ATTRIBUTES.includes(value as MysteryAttribute);
+function isAttribute(
+  value: unknown,
+  knowledgeVersion: MysteryKnowledgeVersion,
+): value is MysteryFact {
+  const attributes = knowledgeVersion === 1
+    ? MYSTERY_ATTRIBUTES
+    : MYSTERY_FACTS;
+  return attributes.includes(value as never);
 }
 
 function isBoundedText(value: unknown, max: number): value is string {
@@ -142,6 +155,7 @@ function parseHistoryItem(
   value: unknown,
   index: number,
   privateItemId: string,
+  knowledgeVersion: MysteryKnowledgeVersion,
 ): MysteryRunHistoryItem {
   if (
     !isQuestionGameRunRecord(value) ||
@@ -170,10 +184,15 @@ function parseHistoryItem(
       (value.answer !== "yes" && value.answer !== "no") ||
       (value.answerSource !== "RULE" && value.answerSource !== "AI")
     ) damaged();
-    const analysis = analyzeMysteryQuestion(value.text, item, locale);
+    const analysis = analyzeMysteryQuestion(
+      value.text,
+      item,
+      locale,
+      knowledgeVersion,
+    );
     if (value.answerSource === "RULE") {
       if (
-      !isAttribute(value.attribute) ||
+      !isAttribute(value.attribute, knowledgeVersion) ||
       typeof value.negated !== "boolean" ||
       analysis.answer === "unknown" ||
       analysis.answer !== value.answer ||
@@ -196,7 +215,7 @@ function parseHistoryItem(
       answerSource: value.answerSource,
       ...(value.answerSource === "RULE"
         ? {
-            attribute: value.attribute as MysteryAttribute,
+            attribute: value.attribute as MysteryFact,
             negated: value.negated as boolean,
           }
         : {}),
@@ -231,6 +250,10 @@ function parseHistoryItem(
 }
 
 export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
+  const knowledgeVersion = isQuestionGameRunRecord(value) &&
+      (value.knowledgeVersion === 1 || value.knowledgeVersion === 2)
+    ? value.knowledgeVersion
+    : 1;
   if (
     !isQuestionGameRunRecord(value) ||
     value.game !== "mystery-box" ||
@@ -256,6 +279,8 @@ export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
     value.history.length !== value.questionCount ||
     typeof value.privateItemId !== "string" ||
     getMysteryItem(value.privateItemId) === null ||
+    (value.knowledgeVersion !== undefined &&
+      value.knowledgeVersion !== 1 && value.knowledgeVersion !== 2) ||
     (value.mysteryWinner !== undefined &&
       value.mysteryWinner !== "STUDENT" &&
       value.mysteryWinner !== "AI") ||
@@ -264,11 +289,17 @@ export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
       value.mysteryEndReason !== "LIMIT")
   ) damaged();
   const history = value.history.map((item, index) =>
-    parseHistoryItem(item, index, value.privateItemId as string)
+    parseHistoryItem(
+      item,
+      index,
+      value.privateItemId as string,
+      knowledgeVersion,
+    )
   );
   const result = parseQuestionGameRunResult(value.result);
   return {
     game: "mystery-box",
+    knowledgeVersion,
     mysteryLocale: value.mysteryLocale,
     targetCount: TARGET_COUNT,
     questionCount: value.questionCount,
@@ -287,12 +318,18 @@ export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
 function candidateItems(
   history: readonly MysteryAiHistoryItem[],
   locale: MysteryLocale,
+  knowledgeVersion: MysteryKnowledgeVersion,
 ) {
-  let candidates = [...MYSTERY_ITEMS];
+  let candidates = [...mysteryItemsForVersion(knowledgeVersion)];
   for (const activity of history) {
     if (activity.kind === "QUESTION") {
       const filtered = candidates.filter((item) => {
-        const analysis = analyzeMysteryQuestion(activity.text, item, locale);
+        const analysis = analyzeMysteryQuestion(
+          activity.text,
+          item,
+          locale,
+          knowledgeVersion,
+        );
         return analysis.answer === activity.answer;
       });
       if (filtered.length > 0) candidates = filtered;
@@ -308,8 +345,9 @@ function candidateItems(
 export function planMysteryAiActivity(
   history: readonly MysteryAiHistoryItem[],
   locale: MysteryLocale,
+  knowledgeVersion: MysteryKnowledgeVersion = CURRENT_MYSTERY_KNOWLEDGE_VERSION,
 ): MysteryAiPlan {
-  const candidates = candidateItems(history, locale);
+  const candidates = candidateItems(history, locale, knowledgeVersion);
   if (candidates.length === 1) {
     const candidate = candidates[0];
     return {
@@ -320,13 +358,22 @@ export function planMysteryAiActivity(
   }
   const used = new Set(history.flatMap((activity) => {
     if (activity.kind !== "QUESTION") return [];
-    const analysis = analyzeMysteryQuestion(activity.text, MYSTERY_ITEMS[0], locale);
+    const analysis = analyzeMysteryQuestion(
+      activity.text,
+      MYSTERY_ITEMS[0],
+      locale,
+      knowledgeVersion,
+    );
     return analysis.answer === "unknown" ? [] : [analysis.attribute];
   }));
-  const attribute = MYSTERY_ATTRIBUTES
+  const attribute = mysteryAttributesForVersion(knowledgeVersion)
     .filter((candidate) => !used.has(candidate))
     .map((candidate) => {
-      const yesCount = candidates.filter((item) => item.attributes[candidate]).length;
+      const yesCount = candidates.filter((item) =>
+        knowledgeVersion === 1
+          ? item.attributes[candidate as MysteryAttribute]
+          : item.facts[candidate]
+      ).length;
       return {
         attribute: candidate,
         split: Math.min(yesCount, candidates.length - yesCount),
@@ -334,7 +381,8 @@ export function planMysteryAiActivity(
     })
     .sort((left, right) => right.split - left.split)[0]?.attribute;
   if (!attribute) {
-    const candidate = candidates[0] ?? MYSTERY_ITEMS[0];
+    const candidate = candidates[0] ?? mysteryItemsForVersion(knowledgeVersion)[0];
+    if (!candidate) damaged();
     return {
       kind: "GUESS",
       text: candidate.names[locale],
@@ -405,7 +453,11 @@ export function ensureMysteryProgress(
       activity.locale !== state.mysteryLocale
     ) damaged();
     if (activity.actor === "AI") {
-      const plan = planMysteryAiActivity(state.history.slice(0, index), state.mysteryLocale);
+      const plan = planMysteryAiActivity(
+        state.history.slice(0, index),
+        state.mysteryLocale,
+        state.knowledgeVersion,
+      );
       if (
         activity.kind !== plan.kind ||
         activity.text !== plan.text ||
@@ -434,6 +486,7 @@ export function createMysteryState(
   }
   return {
     game: "mystery-box",
+    knowledgeVersion: CURRENT_MYSTERY_KNOWLEDGE_VERSION,
     mysteryLocale: input.locale,
     targetCount: TARGET_COUNT,
     questionCount: 0,
