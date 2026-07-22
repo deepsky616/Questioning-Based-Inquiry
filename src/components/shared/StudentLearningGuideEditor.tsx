@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { AlignLeft, CircleHelp, Lightbulb } from "lucide-react";
+import { AlignLeft, CircleHelp, Lightbulb, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   EMPTY_STUDENT_LEARNING_GUIDES,
@@ -14,6 +15,16 @@ import { formatInquiryKeywordLines, parseInquiryKeywordLines } from "@/lib/stude
 
 function replaceIndexed<T extends { index: number }>(items: T[], index: number, next: T): T[] {
   return [...items.filter((item) => item.index !== index), next].sort((a, b) => a.index - b.index);
+}
+
+export interface StudentLearningGuideSourceEditor {
+  onCoreIdeaChange: (value: string) => void;
+  onCoreSentenceChange: (index: number, value: string) => void;
+  onCoreSentenceRemove: (index: number) => void;
+  onCoreSentenceAdd: () => void;
+  onEssentialQuestionChange: (index: number, value: string) => void;
+  onEssentialQuestionRemove: (index: number) => void;
+  onEssentialQuestionAdd: () => void;
 }
 
 function PerspectiveEditor({
@@ -58,6 +69,7 @@ export function StudentLearningGuideEditor({
   guides,
   showEditors = true,
   emptyMessage = "",
+  sourceEditor,
   onChange,
 }: {
   coreIdea?: string;
@@ -66,9 +78,11 @@ export function StudentLearningGuideEditor({
   guides?: StudentLearningGuides;
   showEditors?: boolean;
   emptyMessage?: string;
+  sourceEditor?: StudentLearningGuideSourceEditor;
   onChange: (guides: StudentLearningGuides) => void;
 }) {
   const t = useTranslations("curriculum");
+  const tc = useTranslations("common");
   const fieldId = useId();
   const current = guides ?? EMPTY_STUDENT_LEARNING_GUIDES;
   const coreIdea = current.coreIdea ?? { explanation: "", lifeConnection: "", keywords: [] };
@@ -95,7 +109,23 @@ export function StudentLearningGuideEditor({
             </p>
           </div>
         </div>
-        {coreIdeaSource.trim() && (
+        {sourceEditor ? (
+          <div
+            data-student-guide-source="core-idea"
+            className="mt-3 rounded-lg border border-amber-200/70 bg-background/85 px-3 py-3 dark:border-amber-800/50"
+          >
+            <Label className="sr-only" htmlFor={`${fieldId}-core-idea-source`}>
+              {t("coreIdeaSourceLabel")}
+            </Label>
+            <textarea
+              id={`${fieldId}-core-idea-source`}
+              rows={3}
+              value={coreIdeaSource}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-medium leading-6 text-foreground"
+              onChange={(event) => sourceEditor.onCoreIdeaChange(event.target.value)}
+            />
+          </div>
+        ) : coreIdeaSource.trim() && (
           <p
             data-student-guide-source="core-idea"
             className="mt-3 rounded-lg border border-amber-200/70 bg-background/85 px-3 py-3 text-sm font-medium leading-6 text-foreground dark:border-amber-800/50"
@@ -104,7 +134,7 @@ export function StudentLearningGuideEditor({
           </p>
         )}
         {showEditors ? (
-        <div className="mt-4 grid gap-3 border-t border-amber-200/70 pt-4 dark:border-amber-800/50 lg:grid-cols-2">
+        <div data-student-understanding-editor className="mt-4 grid gap-3 border-t border-amber-200/70 pt-4 dark:border-amber-800/50 lg:grid-cols-2">
           <div className="space-y-1 lg:col-span-2">
             <Label htmlFor={`${fieldId}-core-explanation`}>{t("coreIdeaExplanationLabel")}</Label>
             <textarea
@@ -150,7 +180,7 @@ export function StudentLearningGuideEditor({
         )}
       </section>
 
-      {coreSentences.length > 0 && (
+      {(coreSentences.length > 0 || sourceEditor) && (
         <section
           data-student-guide-section="core-sentence"
           className="rounded-xl border border-sky-200/80 bg-sky-50/70 p-3.5 dark:border-sky-800/60 dark:bg-sky-950/20 sm:p-4"
@@ -173,11 +203,36 @@ export function StudentLearningGuideEditor({
               const guide = current.coreSentences.find((item) => item.index === index) ?? { index, explanation: "" };
               return (
                 <article key={`sentence-${index}`} className="rounded-lg border border-sky-200/70 bg-background/85 px-3 py-3 dark:border-sky-800/50">
-                  <p data-student-guide-source="core-sentence" className="text-sm font-medium leading-6 text-foreground">
-                    {sentence}
-                  </p>
+                  {sourceEditor ? (
+                    <div data-student-guide-source="core-sentence" className="flex items-start gap-2">
+                      <Label className="sr-only" htmlFor={`${fieldId}-sentence-source-${index}`}>
+                        {t("coreSentenceSourceLabel", { n: index + 1 })}
+                      </Label>
+                      <textarea
+                        id={`${fieldId}-sentence-source-${index}`}
+                        rows={2}
+                        value={sentence}
+                        className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium leading-6 text-foreground"
+                        onChange={(event) => sourceEditor.onCoreSentenceChange(index, event.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-destructive"
+                        onClick={() => sourceEditor.onCoreSentenceRemove(index)}
+                        aria-label={tc("delete")}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p data-student-guide-source="core-sentence" className="text-sm font-medium leading-6 text-foreground">
+                      {sentence}
+                    </p>
+                  )}
                   {showEditors ? (
-                  <div className="mt-3 space-y-1 border-t border-sky-200/70 pt-3 dark:border-sky-800/50">
+                  <div data-student-understanding-editor className="mt-3 space-y-1 border-t border-sky-200/70 pt-3 dark:border-sky-800/50">
                     <Label htmlFor={`${fieldId}-sentence-${index}`}>{t("coreSentenceEasyLabel", { n: index + 1 })}</Label>
                     <textarea
                       id={`${fieldId}-sentence-${index}`}
@@ -198,11 +253,17 @@ export function StudentLearningGuideEditor({
                 </article>
               );
             })}
+            {sourceEditor && (
+              <Button type="button" variant="outline" size="sm" onClick={sourceEditor.onCoreSentenceAdd}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {t("addItem")}
+              </Button>
+            )}
           </div>
         </section>
       )}
 
-      {essentialQuestions.length > 0 && (
+      {(essentialQuestions.length > 0 || sourceEditor) && (
         <section
           data-student-guide-section="essential-question"
           className="rounded-xl border border-violet-200/80 bg-violet-50/70 p-3.5 dark:border-violet-800/60 dark:bg-violet-950/20 sm:p-4"
@@ -229,11 +290,36 @@ export function StudentLearningGuideEditor({
               };
               return (
                 <article key={`question-${index}`} className="rounded-lg border border-violet-200/70 bg-background/85 px-3 py-3 dark:border-violet-800/50">
-                  <p data-student-guide-source="essential-question" className="text-sm font-medium leading-6 text-foreground">
-                    {question}
-                  </p>
+                  {sourceEditor ? (
+                    <div data-student-guide-source="essential-question" className="flex items-start gap-2">
+                      <Label className="sr-only" htmlFor={`${fieldId}-question-source-${index}`}>
+                        {t("essentialQuestionSourceLabel", { n: index + 1 })}
+                      </Label>
+                      <textarea
+                        id={`${fieldId}-question-source-${index}`}
+                        rows={2}
+                        value={question}
+                        className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium leading-6 text-foreground"
+                        onChange={(event) => sourceEditor.onEssentialQuestionChange(index, event.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-destructive"
+                        onClick={() => sourceEditor.onEssentialQuestionRemove(index)}
+                        aria-label={tc("delete")}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <p data-student-guide-source="essential-question" className="text-sm font-medium leading-6 text-foreground">
+                      {question}
+                    </p>
+                  )}
                   {showEditors ? (
-                  <div className="mt-3 grid gap-3 border-t border-violet-200/70 pt-3 dark:border-violet-800/50 lg:grid-cols-2">
+                  <div data-student-understanding-editor className="mt-3 grid gap-3 border-t border-violet-200/70 pt-3 dark:border-violet-800/50 lg:grid-cols-2">
                     <div className="space-y-1">
                       <Label htmlFor={`${fieldId}-question-${index}`}>{t("essentialQuestionFocusLabel", { n: index + 1 })}</Label>
                       <textarea
@@ -265,6 +351,12 @@ export function StudentLearningGuideEditor({
                 </article>
               );
             })}
+            {sourceEditor && (
+              <Button type="button" variant="outline" size="sm" onClick={sourceEditor.onEssentialQuestionAdd}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {t("addItem")}
+              </Button>
+            )}
           </div>
         </section>
       )}

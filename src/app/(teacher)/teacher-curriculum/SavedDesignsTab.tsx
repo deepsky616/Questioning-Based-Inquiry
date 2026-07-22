@@ -728,51 +728,6 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                       </div>
                     </div>
 
-                    {/* 핵심 아이디어 */}
-                    <div className="space-y-1">
-                      <Label>{t("coreIdea")}</Label>
-                      <textarea
-                        value={editCoreIdea}
-                        onChange={(e) => setEditCoreIdea(e.target.value)}
-                        rows={3}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-                      />
-                    </div>
-
-                    {/* 핵심 문장 */}
-                    <div className="space-y-1.5">
-                      <Label>{t("coreSentencesLabel")}</Label>
-                      {editCoreSentences.map((s, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <textarea
-                            value={s}
-                            onChange={(e) => updateTextItem(setEditCoreSentences, i, e.target.value)}
-                            rows={2}
-                            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-                          />
-                          <button type="button" onClick={() => removeLearningTextItem("coreSentences", setEditCoreSentences, i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>✕</button>
-                        </div>
-                      ))}
-                      <Button variant="outline" size="sm" onClick={() => addTextItem(setEditCoreSentences)}>＋ {t("addItem")}</Button>
-                    </div>
-
-                    {/* 핵심 질문 */}
-                    <div className="space-y-1.5">
-                      <Label>{t("essentialQuestionsLabel")}</Label>
-                      {editEssentialQuestions.map((s, i) => (
-                        <div key={i} className="flex items-start gap-2">
-                          <textarea
-                            value={s}
-                            onChange={(e) => updateTextItem(setEditEssentialQuestions, i, e.target.value)}
-                            rows={2}
-                            className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
-                          />
-                          <button type="button" onClick={() => removeLearningTextItem("essentialQuestions", setEditEssentialQuestions, i)} className="mt-1 shrink-0 text-sm text-red-500 hover:text-red-700" aria-label={tc("delete")}>✕</button>
-                        </div>
-                      ))}
-                      <Button variant="outline" size="sm" onClick={() => addTextItem(setEditEssentialQuestions)}>＋ {t("addItem")}</Button>
-                    </div>
-
                     <div className="space-y-3 border-t pt-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <Label>{t("studentGuideTitle")}</Label>
@@ -816,6 +771,15 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                       guides={editLearningGuides}
                       showEditors={hasCurrentEditStudentGuides}
                       emptyMessage={t(hasStaleEditStudentGuides ? "studentGuideStale" : "studentGuideEmpty")}
+                      sourceEditor={{
+                        onCoreIdeaChange: setEditCoreIdea,
+                        onCoreSentenceChange: (index, value) => updateTextItem(setEditCoreSentences, index, value),
+                        onCoreSentenceRemove: (index) => removeLearningTextItem("coreSentences", setEditCoreSentences, index),
+                        onCoreSentenceAdd: () => addTextItem(setEditCoreSentences),
+                        onEssentialQuestionChange: (index, value) => updateTextItem(setEditEssentialQuestions, index, value),
+                        onEssentialQuestionRemove: (index) => removeLearningTextItem("essentialQuestions", setEditEssentialQuestions, index),
+                        onEssentialQuestionAdd: () => addTextItem(setEditEssentialQuestions),
+                      }}
                       onChange={setEditLearningGuides}
                     />
                     </div>
