@@ -57,7 +57,7 @@ describe("미스터리 박스 질문 규칙", () => {
       )).toBe(true);
       expect(Object.keys(item.factsV3).sort()).toEqual([...MYSTERY_FACTS].sort());
       expect(Object.values(item.factsV3).every(
-        (value) => typeof value === "boolean" || value === "contextual",
+        (value) => typeof value === "boolean",
       )).toBe(true);
     }
   });
@@ -92,14 +92,16 @@ describe("미스터리 박스 질문 규칙", () => {
   });
 
   it.each([
-    "작은가요?",
-    "큰가요?",
-    "색깔이 다양한가요?",
-    "실내에 있나요?",
-    "단단한가요?",
-    "젖어 있나요?",
-  ])("상황에 따라 달라지는 질문 %s은 새 놀이에서 단정하지 않는다", (question) => {
-    expect(classifyMysteryQuestion(question, APPLE_ITEM, "ko", 3)).toBe("unknown");
+    ["작나요?", "yes"],
+    ["크기가 작나요?", "yes"],
+    ["크키가 작나요?", "yes"],
+    ["큰가요?", "no"],
+    ["색깔이 다양한가요?", "yes"],
+    ["실내에 있나요?", "no"],
+    ["단단한가요?", "no"],
+    ["젖어 있나요?", "no"],
+  ] as const)("놀이 기준 질문 %s은 새 놀이에서 %s로 판정한다", (question, answer) => {
+    expect(classifyMysteryQuestion(question, APPLE_ITEM, "ko", 3)).toBe(answer);
   });
 
   it("기존 버전 2 기록의 상황별 특징 판정은 그대로 유지한다", () => {
@@ -271,13 +273,16 @@ describe("미스터리 박스 질문 규칙", () => {
   });
 
   it.each(["ko", "en"] as const)(
-    "%s 고정 속성 질문은 모든 물건에서 한 속성으로 판정된다",
+    "%s 기본 특징 질문은 모든 물건에서 예 또는 아니오로 판정된다",
     (locale) => {
-      for (const attribute of MYSTERY_ATTRIBUTES) {
+      for (const attribute of MYSTERY_FACTS) {
         const question = mysteryQuestionForAttribute(attribute, locale);
         expect(question).toMatch(/[?？]$/u);
         for (const item of MYSTERY_ITEMS) {
-          expect(analyzeMysteryQuestion(question, item, locale)).toMatchObject({
+          const value = item.factsV3[attribute];
+          expect(typeof value).toBe("boolean");
+          expect(analyzeMysteryQuestion(question, item, locale)).toEqual({
+            answer: value ? "yes" : "no",
             attribute,
             negated: false,
           });

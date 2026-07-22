@@ -386,9 +386,6 @@ export function planMysteryAiActivity(
   }));
   const attribute = mysteryAttributesForVersion(knowledgeVersion)
     .filter((candidate) => !used.has(candidate))
-    .filter((candidate) => knowledgeVersion !== 3 || candidates.every(
-      (item) => typeof item.factsV3[candidate] === "boolean",
-    ))
     .map((candidate) => {
       const yesCount = candidates.filter((item) =>
         knowledgeVersion === 1

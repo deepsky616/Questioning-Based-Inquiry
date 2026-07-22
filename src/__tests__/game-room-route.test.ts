@@ -840,8 +840,16 @@ describe("미스터리 박스 실제 공개 응답", () => {
     expect(JSON.stringify(body)).not.toContain("apple");
   });
 
-  it("등록된 규칙 질문은 에이아이 없이 기존 답을 저장한다", async () => {
-    const question = "먹을 수 있나요?";
+  it.each([
+    ["먹을 수 있나요?", "yes"],
+    ["작나요?", "yes"],
+    ["크기가 작나요?", "yes"],
+    ["크키가 작나요?", "yes"],
+    ["큰가요?", "no"],
+  ] as const)("등록된 규칙 질문 %s은 에이아이 없이 %s를 저장한다", async (
+    question,
+    answer,
+  ) => {
     const state = makeMysteryPlayState();
     const room = makeMysteryRoom(state);
     mocks.loadGameRoom.mockResolvedValue(room);
@@ -865,7 +873,7 @@ describe("미스터리 박스 실제 공개 응답", () => {
     expect(response.status).toBe(200);
     expect(body.room.gameState.history[0]).toMatchObject({
       question,
-      answer: "yes",
+      answer,
     });
     expect(body.room.gameState.history[0]).not.toHaveProperty("answerSource");
     expect(mocks.generateMysteryAiAnswer).not.toHaveBeenCalled();

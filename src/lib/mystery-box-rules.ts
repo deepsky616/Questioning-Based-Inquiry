@@ -37,7 +37,7 @@ export const MYSTERY_FACTS = [
 ] as const;
 
 export type MysteryFact = typeof MYSTERY_FACTS[number];
-export type MysteryFactValue = boolean | "contextual";
+export type MysteryFactValue = boolean;
 export type MysteryKnowledgeVersion = 1 | 2 | 3;
 export const CURRENT_MYSTERY_KNOWLEDGE_VERSION: MysteryKnowledgeVersion = 3;
 export type MysteryLocale = "ko" | "en";
@@ -387,24 +387,10 @@ function createFactProfile(
   return { ...facts, ...FACT_OVERRIDES[item.id] };
 }
 
-const CONTEXTUAL_FACTS = new Set<MysteryFact>([
-  "small",
-  "large",
-  "colorful",
-  "indoor",
-  "hard",
-  "wet",
-]);
-
 function createV3FactProfile(
   facts: Record<MysteryFact, boolean>,
 ): Record<MysteryFact, MysteryFactValue> {
-  return Object.fromEntries(
-    MYSTERY_FACTS.map((fact) => [
-      fact,
-      CONTEXTUAL_FACTS.has(fact) ? "contextual" : facts[fact],
-    ]),
-  ) as Record<MysteryFact, MysteryFactValue>;
+  return { ...facts };
 }
 
 export const MYSTERY_ITEMS: readonly MysteryItem[] =
@@ -569,6 +555,7 @@ const FACT_PATTERNS: Record<
     vehicle: [koreanNoun("탈것"), koreanNoun("교통수단")],
     readingMaterial: [
       koreanForm("읽는\\s*(?:것|자료|도구)"),
+      koreanForm("읽는\\s*데\\s*사용하는\\s*것(?:인가요|입니까|이에요|예요|인가|이야|이다)?"),
       koreanForm("읽을\\s*수\\s*있(?:나요|습니까)?"),
     ],
     berry: [koreanNoun("베리류"), koreanNoun("딸기류")],
@@ -580,7 +567,11 @@ const FACT_PATTERNS: Record<
     ...LEGACY_ATTRIBUTE_PATTERNS.en,
     plant: [/\bplant\b/u],
     tree: [/\btree\b/u, /\bwoody plant\b/u],
-    herbaceousPlant: [/\bherb(?:aceous)?\b/u, /\bnon-woody plant\b/u],
+    herbaceousPlant: [
+      /\bherbaceous plant\b/u,
+      /\bnon-woody plant\b/u,
+      /\bherb(?:aceous)?\b/u,
+    ],
     flower: [/\bflower(?:ing plant)?\b/u],
     fruit: [/\bfruit\b/u],
     plantDerived: [
@@ -594,7 +585,7 @@ const FACT_PATTERNS: Record<
     vehicle: [/\bvehicle\b/u, /\btransport(?:ation)?\b/u],
     readingMaterial: [
       /\breading material\b/u,
-      /\b(?:used for|something to) read\b/u,
+      /\b(?:used for|something to) read(?:ing)?\b/u,
     ],
     berry: [/\bberry\b/u],
     imaginary: [/\bimaginary\b/u, /\bmythical\b/u],
@@ -800,7 +791,6 @@ export function resolveMysteryAttribute(
     : knowledgeVersion === 2
       ? item.facts[attribute]
       : item.factsV3[attribute];
-  if (value === "contextual") return "unknown";
   return (negated ? !value : value) ? "yes" : "no";
 }
 

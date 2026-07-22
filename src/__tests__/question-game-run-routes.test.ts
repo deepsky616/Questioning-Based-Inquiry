@@ -3926,8 +3926,34 @@ describe("미스터리 박스 서버 실행 경로", () => {
     expect(payload).not.toMatch(/itemId|attribute|classification|private/u);
   });
 
+  it.each(["작나요?", "크기가 작나요?", "크키가 작나요?", "큰가요?"])(
+    "크기 질문 %s은 외부 판정 없이 실행 활동으로 저장한다",
+    async (question) => {
+      await createMystery();
+      const secret = mysterySecret();
+      const response = await submitMysteryQuestion(0, 1, question);
+      const expectedAnswer = (
+        question === "큰가요?" ? secret.attributes.large : secret.attributes.small
+      ) ? "yes" : "no";
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        run: {
+          questionCount: 1,
+          mysteryStudentQuestionCount: 1,
+          mysteryHistory: [{
+            text: question,
+            answer: expectedAnswer,
+          }],
+        },
+      });
+      expect(mocks.generateJson).not.toHaveBeenCalled();
+    },
+  );
+
   it("규칙 밖 학생 질문은 트랜잭션 밖 에이아이 판정 뒤 같은 요청으로 확정한다", async () => {
     await createMystery();
+    const secret = mysterySecret();
     mocks.generateJson.mockImplementationOnce(async () => {
       expect(transactionDepth).toBe(0);
       return { attribute: "readingMaterial", negated: false, confidence: "high" };
@@ -3941,7 +3967,9 @@ describe("미스터리 박스 서버 실행 경로", () => {
         version: 2,
         questionCount: 1,
         mysteryStudentQuestionCount: 1,
-        mysteryHistory: [{ answer: "no" }],
+        mysteryHistory: [{
+          answer: secret.factsV3.readingMaterial ? "yes" : "no",
+        }],
         mysteryAnswerItemId: null,
       },
     });

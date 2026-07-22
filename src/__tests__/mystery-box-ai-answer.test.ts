@@ -129,7 +129,7 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     });
   });
 
-  it("뜻은 찾았지만 상황에 따라 달라지는 특징이면 판정 근거만 남기고 단정하지 않는다", async () => {
+  it("뜻을 찾은 기본 특징은 놀이 기준표에 따라 일관되게 답한다", async () => {
     mocks.generateJson.mockResolvedValue({
       attribute: "indoor",
       negated: false,
@@ -142,7 +142,7 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     })).resolves.toEqual({
       ...request,
       knowledgeVersion: 3,
-      answer: "unknown",
+      answer: "no",
       evidence: {
         attribute: "indoor",
         negated: false,

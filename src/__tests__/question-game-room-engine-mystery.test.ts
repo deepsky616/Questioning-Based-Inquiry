@@ -304,6 +304,26 @@ describe("미스터리 박스 방 판정기", () => {
     expect(state.private).toEqual({ itemId: "apple" });
   });
 
+  it.each(["작나요?", "크기가 작나요?", "크키가 작나요?", "큰가요?"])(
+    "크기 질문 %s은 인공지능 판정 없이 활동으로 기록한다",
+    (question) => {
+      const result = applyMystery(
+        prepareRoom(),
+        "mystery-ask",
+        { locale: "ko", question },
+        { nextRoundId: commandId(192) },
+      );
+
+      expect(result.kind).toBe("changed");
+      if (result.kind !== "changed") return;
+      expect(result.room.gameState).toMatchObject({
+        currentTurnIdx: 1,
+        scores: { host: 1, guest: 0 },
+        history: [{ question, answer: question === "큰가요?" ? "no" : "yes" }],
+      });
+    },
+  );
+
   it("규칙이 모르는 질문은 상태를 바꾸지 않고 해결값을 요청한다", () => {
     const room = prepareRoom();
     const result = applyMystery(
