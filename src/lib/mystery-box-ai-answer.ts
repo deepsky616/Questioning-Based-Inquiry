@@ -18,7 +18,7 @@ export type MysteryAiAnswerRequest = Omit<
 const mysteryAiAnswerSchema = z.object({
   attribute: z.string().refine(
     (value) => value === "unknown" ||
-      isMysteryAttributeForVersion(value, 2),
+      isMysteryAttributeForVersion(value, 3),
     "지원하지 않는 미스터리 박스 사실입니다",
   ),
   negated: z.boolean(),
@@ -103,12 +103,17 @@ export async function generateMysteryAiAnswer(
   ) {
     return { ...request, answer: "unknown" };
   }
+  const evidence = {
+    attribute: attribute as MysteryFact,
+    negated,
+    confidence: "high" as const,
+  };
   const answer = resolveMysteryAttribute(
     item,
-    attribute as MysteryFact,
+    evidence.attribute,
     negated,
     request.knowledgeVersion,
   );
 
-  return { ...request, answer };
+  return { ...request, answer, evidence };
 }

@@ -2085,6 +2085,8 @@
     "usedLength": "사용 {length}",
     "remainingLeft2": "남은 활동 {remaining}",
     "yesOrNoQuestion": "예 또는 아니오 질문",
+    "mysteryQuestionRewriteInline": "한 가지 특징만 묻고 예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요.",
+    "mysteryQuestionRetryInline": "질문 판정을 처리하지 못했습니다. 입력한 질문을 확인하고 다시 시도해 주세요.",
     "askOneSimpleQuestionEnding": "물음표로 끝나는 간단한 질문을 하나 써 주세요.",
     "canItBeEaten": "먹을 수 있나요?",
     "sendQuestion": "질문 보내기",

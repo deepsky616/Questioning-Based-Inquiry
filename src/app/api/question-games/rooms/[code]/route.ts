@@ -321,23 +321,27 @@ async function handleQuestionGameCommand({
     }
     const limited = checkRateLimit(`game-room-mystery-ai:${userId}`, 20);
     if (limited) {
-      logger.warn("미스터리 박스 에이아이 요청 제한으로 임시 답변을 사용합니다");
-      mysteryAnswerResolution = {
-        ...request,
-        answer: "unknown",
-        source: "fallback",
-      };
+      logger.warn("미스터리 박스 에이아이 요청 제한으로 질문 처리를 보류합니다");
+      return limited;
     } else {
       try {
         mysteryAnswerResolution = await generateMysteryAiAnswer(userId, request);
       } catch {
-        logger.warn("미스터리 박스 에이아이 답변 실패로 임시 답변을 사용합니다");
-        mysteryAnswerResolution = {
-          ...request,
-          answer: "unknown",
-          source: "fallback",
-        };
+        logger.warn("미스터리 박스 에이아이 답변 실패로 질문 처리를 보류합니다");
+        return NextResponse.json(
+          { error: "미스터리 박스 질문 판정을 잠시 처리할 수 없습니다. 다시 시도해 주세요" },
+          { status: 503 },
+        );
       }
+    }
+    if (mysteryAnswerResolution.answer === "unknown") {
+      return NextResponse.json(
+        {
+          error: "예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요",
+          mysteryRewriteRequired: true,
+        },
+        { status: 422 },
+      );
     }
     try {
       result = applyCommand(room, mysteryAnswerResolution);

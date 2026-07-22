@@ -14,6 +14,7 @@ export const MYSTERY_PRESENTATION: Record<
   strawberry: { emoji: "🍓", category: { ko: "과일", en: "fruit" } },
   rocket: { emoji: "🚀", category: { ko: "탈것", en: "vehicle" } },
   sunflower: { emoji: "🌻", category: { ko: "식물", en: "plant" } },
+  pencil: { emoji: "✏️", category: { ko: "필기도구", en: "writing tool" } },
   snowman: { emoji: "⛄", category: { ko: "만든 것", en: "made object" } },
   dragon: { emoji: "🐉", category: { ko: "상상 속 생물", en: "imaginary creature" } },
 };

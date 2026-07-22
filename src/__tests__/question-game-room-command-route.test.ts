@@ -845,7 +845,7 @@ describe("미스터리 박스 에이아이 해결 경계", () => {
     );
   });
 
-  it("에이아이 별도 호출 제한에도 임시 답변으로 질문을 저장한다", async () => {
+  it("에이아이 별도 호출 제한은 질문을 저장하지 않고 그대로 반환한다", async () => {
     const room = makeV2Room({ gameId: "mystery-box" });
     const candidate = makeV2Room({ gameId: "mystery-box", version: 2 });
     mocks.loadGameRoom.mockResolvedValue(room);
@@ -865,22 +865,13 @@ describe("미스터리 박스 에이아이 해결 경계", () => {
 
     const response = await patch(commandBody());
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(429);
     expect(mocks.generateMysteryAiAnswer).not.toHaveBeenCalled();
-    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        mysteryAnswerResolution: {
-          ...request,
-          answer: "unknown",
-          source: "fallback",
-        },
-      }),
-    );
-    expect(mocks.saveGameRoom).toHaveBeenCalledWith(candidate);
+    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
-  it("에이아이 오류는 내부 값을 노출하지 않고 임시 답변으로 질문을 저장한다", async () => {
+  it("에이아이 오류는 내부 값을 노출하지 않고 재시도 응답을 반환한다", async () => {
     const room = makeV2Room({ gameId: "mystery-box" });
     const candidate = makeV2Room({ gameId: "mystery-box", version: 2 });
     const secret = "apple raw-model-output";
@@ -897,22 +888,36 @@ describe("미스터리 박스 에이아이 해결 경계", () => {
     const response = await patch(commandBody());
     const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body.room).toEqual(candidate);
-    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        mysteryAnswerResolution: {
-          ...request,
-          answer: "unknown",
-          source: "fallback",
-        },
-      }),
-    );
-    expect(mocks.saveGameRoom).toHaveBeenCalledWith(candidate);
+    expect(response.status).toBe(503);
+    expect(body).toEqual({
+      error: "미스터리 박스 질문 판정을 잠시 처리할 수 없습니다. 다시 시도해 주세요",
+    });
+    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
     expect(JSON.stringify(body)).not.toContain(secret);
     expect(JSON.stringify(mocks.loggerWarn.mock.calls)).not.toContain(secret);
     expect(JSON.stringify(mocks.loggerWarn.mock.calls)).not.toContain(request.question);
+  });
+
+  it("뜻이 불분명한 에이아이 판정은 질문 수정 안내만 반환한다", async () => {
+    const room = makeV2Room({ gameId: "mystery-box" });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.applyQuestionGameRoomCommand.mockReturnValueOnce(resolutionRequired(room));
+    mocks.findMysteryAiAnswerRequest.mockReturnValue(request);
+    mocks.generateMysteryAiAnswer.mockResolvedValue({
+      ...resolution,
+      answer: "unknown",
+    });
+
+    const response = await patch(commandBody());
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      error: "예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요",
+      mysteryRewriteRequired: true,
+    });
+    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
   });
 
   it("요청자를 확인하지 못하거나 두 번째 판정도 해결 필요면 안전한 500이고 저장하지 않는다", async () => {

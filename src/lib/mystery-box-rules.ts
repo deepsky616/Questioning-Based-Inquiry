@@ -16,7 +16,7 @@ export const MYSTERY_ATTRIBUTES = [
 ] as const;
 
 export type MysteryAttribute = typeof MYSTERY_ATTRIBUTES[number];
-export const MYSTERY_FACTS = [
+export const MYSTERY_V2_FACTS = [
   ...MYSTERY_ATTRIBUTES,
   "tree",
   "herbaceousPlant",
@@ -30,9 +30,16 @@ export const MYSTERY_FACTS = [
   "readingMaterial",
 ] as const;
 
+export const MYSTERY_FACTS = [
+  ...MYSTERY_V2_FACTS,
+  "berry",
+  "imaginary",
+] as const;
+
 export type MysteryFact = typeof MYSTERY_FACTS[number];
-export type MysteryKnowledgeVersion = 1 | 2;
-export const CURRENT_MYSTERY_KNOWLEDGE_VERSION: MysteryKnowledgeVersion = 2;
+export type MysteryFactValue = boolean | "contextual";
+export type MysteryKnowledgeVersion = 1 | 2 | 3;
+export const CURRENT_MYSTERY_KNOWLEDGE_VERSION: MysteryKnowledgeVersion = 3;
 export type MysteryLocale = "ko" | "en";
 export type MysteryAnswer = "yes" | "no" | "unknown";
 
@@ -42,7 +49,11 @@ export type MysteryQuestionAnalysis =
       attribute: MysteryFact;
       negated: boolean;
     }
-  | { answer: "unknown" };
+  | {
+      answer: "unknown";
+      attribute?: MysteryFact;
+      negated?: boolean;
+    };
 
 export interface MysteryAnswerResolution {
   itemId: string;
@@ -52,6 +63,13 @@ export interface MysteryAnswerResolution {
   answer: MysteryAnswer;
   knowledgeVersion: MysteryKnowledgeVersion;
   source?: "ai" | "fallback";
+  evidence?: MysteryAnswerEvidence;
+}
+
+export interface MysteryAnswerEvidence {
+  attribute: MysteryFact;
+  negated: boolean;
+  confidence: "high";
 }
 
 export interface MysteryItem {
@@ -60,9 +78,10 @@ export interface MysteryItem {
   aliases: Record<MysteryLocale, string[]>;
   attributes: Record<MysteryAttribute, boolean>;
   facts: Record<MysteryFact, boolean>;
+  factsV3: Record<MysteryFact, MysteryFactValue>;
 }
 
-type LegacyMysteryItem = Omit<MysteryItem, "facts">;
+type LegacyMysteryItem = Omit<MysteryItem, "facts" | "factsV3">;
 
 const MYSTERY_ITEM_DEFINITIONS: readonly LegacyMysteryItem[] = [
   {
@@ -347,11 +366,11 @@ const FACT_OVERRIDES: Record<string, Partial<Record<MysteryFact, boolean>>> = {
   car: { vehicle: true },
   butterfly: { movesByItself: true },
   piano: { musicalInstrument: true },
-  strawberry: { plant: false, fruit: true, plantDerived: true },
+  strawberry: { plant: false, fruit: true, plantDerived: true, berry: true },
   rocket: { vehicle: true },
   sunflower: { herbaceousPlant: true, flower: true },
   pencil: { writingTool: true },
-  dragon: { movesByItself: true },
+  dragon: { movesByItself: true, imaginary: true },
 };
 
 function createFactProfile(
@@ -368,11 +387,35 @@ function createFactProfile(
   return { ...facts, ...FACT_OVERRIDES[item.id] };
 }
 
+const CONTEXTUAL_FACTS = new Set<MysteryFact>([
+  "small",
+  "large",
+  "colorful",
+  "indoor",
+  "hard",
+  "wet",
+]);
+
+function createV3FactProfile(
+  facts: Record<MysteryFact, boolean>,
+): Record<MysteryFact, MysteryFactValue> {
+  return Object.fromEntries(
+    MYSTERY_FACTS.map((fact) => [
+      fact,
+      CONTEXTUAL_FACTS.has(fact) ? "contextual" : facts[fact],
+    ]),
+  ) as Record<MysteryFact, MysteryFactValue>;
+}
+
 export const MYSTERY_ITEMS: readonly MysteryItem[] =
-  MYSTERY_ITEM_DEFINITIONS.map((item) => ({
-    ...item,
-    facts: createFactProfile(item),
-  }));
+  MYSTERY_ITEM_DEFINITIONS.map((item) => {
+    const facts = createFactProfile(item);
+    return {
+      ...item,
+      facts,
+      factsV3: createV3FactProfile(facts),
+    };
+  });
 
 export function mysteryItemsForVersion(
   knowledgeVersion: MysteryKnowledgeVersion,
@@ -520,13 +563,17 @@ const FACT_PATTERNS: Record<
     ],
     writingTool: [
       koreanNoun("필기도구"),
-      koreanForm("(?:글씨|글)를\\s*쓰는\\s*도구"),
+      koreanForm("(?:글씨를|글(?:을|를))\\s*쓰는\\s*도구(?:인가요|입니까|이에요|예요|인가|이야|이다|이|가|은|는|을|를|도|만)?"),
     ],
     musicalInstrument: [koreanNoun("악기")],
     vehicle: [koreanNoun("탈것"), koreanNoun("교통수단")],
     readingMaterial: [
       koreanForm("읽는\\s*(?:것|자료|도구)"),
       koreanForm("읽을\\s*수\\s*있(?:나요|습니까)?"),
+    ],
+    berry: [koreanNoun("베리류"), koreanNoun("딸기류")],
+    imaginary: [
+      koreanForm("상상으로\\s*만든\\s*존재(?:인가요|입니까|이에요|예요|인가|이야|이다)?"),
     ],
   },
   en: {
@@ -549,6 +596,8 @@ const FACT_PATTERNS: Record<
       /\breading material\b/u,
       /\b(?:used for|something to) read\b/u,
     ],
+    berry: [/\bberry\b/u],
+    imaginary: [/\bimaginary\b/u, /\bmythical\b/u],
   },
 };
 
@@ -611,6 +660,8 @@ const MYSTERY_FACT_QUESTIONS: Record<
     musicalInstrument: "악기인가요?",
     vehicle: "탈것인가요?",
     readingMaterial: "읽는 데 사용하는 것인가요?",
+    berry: "베리류인가요?",
+    imaginary: "상상으로 만든 존재인가요?",
   },
   en: {
     ...MYSTERY_ATTRIBUTE_QUESTIONS.en,
@@ -624,6 +675,8 @@ const MYSTERY_FACT_QUESTIONS: Record<
     musicalInstrument: "Is it a musical instrument?",
     vehicle: "Is it a vehicle?",
     readingMaterial: "Is it used for reading?",
+    berry: "Is it a berry?",
+    imaginary: "Is it imaginary?",
   },
 };
 
@@ -707,7 +760,11 @@ export function mysteryQuestionForAttribute(
 export function mysteryAttributesForVersion(
   knowledgeVersion: MysteryKnowledgeVersion,
 ): readonly MysteryFact[] {
-  return knowledgeVersion === 1 ? MYSTERY_ATTRIBUTES : MYSTERY_FACTS;
+  return knowledgeVersion === 1
+    ? MYSTERY_ATTRIBUTES
+    : knowledgeVersion === 2
+      ? MYSTERY_V2_FACTS
+      : MYSTERY_FACTS;
 }
 
 export function isMysteryAttributeForVersion(
@@ -718,15 +775,32 @@ export function isMysteryAttributeForVersion(
     mysteryAttributesForVersion(knowledgeVersion).includes(value as MysteryFact);
 }
 
+export function isMysteryAnswerEvidence(
+  value: unknown,
+  knowledgeVersion: MysteryKnowledgeVersion,
+): value is MysteryAnswerEvidence {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const evidence = value as Record<string, unknown>;
+  return Object.keys(evidence).length === 3 &&
+    isMysteryAttributeForVersion(evidence.attribute, knowledgeVersion) &&
+    typeof evidence.negated === "boolean" &&
+    evidence.confidence === "high";
+}
+
 export function resolveMysteryAttribute(
   item: MysteryItem,
   attribute: MysteryFact,
   negated: boolean,
   knowledgeVersion: MysteryKnowledgeVersion = CURRENT_MYSTERY_KNOWLEDGE_VERSION,
-): Exclude<MysteryAnswer, "unknown"> {
+): MysteryAnswer {
   const value = knowledgeVersion === 1
     ? item.attributes[attribute as MysteryAttribute]
-    : item.facts[attribute];
+    : knowledgeVersion === 2
+      ? item.facts[attribute]
+      : item.factsV3[attribute];
+  if (value === "contextual") return "unknown";
   return (negated ? !value : value) ? "yes" : "no";
 }
 
@@ -741,13 +815,52 @@ export function analyzeMysteryQuestion(
   const patterns = knowledgeVersion === 1
     ? LEGACY_ATTRIBUTE_PATTERNS[locale]
     : FACT_PATTERNS[locale];
-  const detectedAttributes = attributes.map((attribute) => ({
+  let detectedAttributes = attributes.map((attribute) => ({
     attribute,
     matches: findPatternMatches(
       normalized,
       patterns[attribute as keyof typeof patterns],
     ),
   })).filter(({ matches }) => matches.length > 0);
+  if (knowledgeVersion >= 2) {
+    const specializedPlantMatches = detectedAttributes
+      .filter(({ attribute }) => [
+        "tree",
+        "herbaceousPlant",
+        "flower",
+        "plantDerived",
+      ].includes(attribute))
+      .flatMap(({ matches }) => matches);
+    detectedAttributes = detectedAttributes
+      .map((detected) => detected.attribute !== "plant"
+        ? detected
+        : {
+            ...detected,
+            matches: detected.matches.filter((plantMatch) =>
+              !specializedPlantMatches.some((specializedMatch) =>
+                specializedMatch.start <= plantMatch.start &&
+                specializedMatch.end >= plantMatch.end
+              )
+            ),
+          })
+      .filter(({ matches }) => matches.length > 0);
+    const herbaceousMatches = detectedAttributes.find(
+      ({ attribute }) => attribute === "herbaceousPlant",
+    )?.matches ?? [];
+    detectedAttributes = detectedAttributes
+      .map((detected) => detected.attribute !== "tree"
+        ? detected
+        : {
+            ...detected,
+            matches: detected.matches.filter((treeMatch) =>
+              !herbaceousMatches.some((herbaceousMatch) =>
+                herbaceousMatch.start <= treeMatch.start &&
+                herbaceousMatch.end >= treeMatch.end
+              )
+            ),
+          })
+      .filter(({ matches }) => matches.length > 0);
+  }
   if (detectedAttributes.length !== 1) return { answer: "unknown" };
 
   const negations = findNegations(normalized, locale);
@@ -768,13 +881,17 @@ export function analyzeMysteryQuestion(
 
   const attribute = detectedAttributes[0].attribute;
   const negated = negations.length === 1;
+  const answer = resolveMysteryAttribute(
+    item,
+    attribute,
+    negated,
+    knowledgeVersion,
+  );
+  if (answer === "unknown") {
+    return { answer, attribute, negated };
+  }
   return {
-    answer: resolveMysteryAttribute(
-      item,
-      attribute,
-      negated,
-      knowledgeVersion,
-    ),
+    answer,
     attribute,
     negated,
   };

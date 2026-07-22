@@ -439,12 +439,42 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
     fireEvent.click(screen.getByRole("button", { name: "질문 보내기" }));
     await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
     expect(input).toHaveValue("먹을 수 있나요?");
+    await waitFor(() => expect(
+      screen.getByRole("button", { name: "질문 보내기" }),
+    ).toBeEnabled());
 
     fireEvent.click(screen.getByRole("button", { name: "질문 보내기" }));
     await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));
     expect(onAction.mock.calls[0]?.[2]?.commandId).toBe(COMMAND_ID);
     expect(onAction.mock.calls[1]?.[2]?.commandId).toBe(COMMAND_ID);
     await waitFor(() => expect(input).toHaveValue(""));
+  });
+
+  it("판정할 수 없는 질문은 입력칸 바로 아래에서 다시 쓰도록 안내한다", async () => {
+    stubCommandId();
+    const room = makeRoom(publicState(storedPlayState()));
+    const onAction = vi.fn<RoomActionHandler>().mockResolvedValue({
+      ok: false,
+      room,
+      status: 422,
+      reason: "rejected",
+    });
+    render(<RoomMysteryBox {...makeProps(room, onAction)} />);
+
+    const input = screen.getByLabelText("예 또는 아니오 질문");
+    fireEvent.change(input, { target: { value: "어떤 느낌인가요?" } });
+    fireEvent.click(screen.getByRole("button", { name: "질문 보내기" }));
+
+    await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
+    expect(input).toHaveValue("어떤 느낌인가요?");
+    expect(screen.getByText(
+      "한 가지 특징만 묻고 예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요.",
+    )).toBeVisible();
+
+    fireEvent.change(input, { target: { value: "먹을 수 있나요?" } });
+    expect(screen.queryByText(
+      "한 가지 특징만 묻고 예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요.",
+    )).not.toBeInTheDocument();
   });
 
   it.each([

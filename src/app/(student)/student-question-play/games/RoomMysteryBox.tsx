@@ -95,6 +95,7 @@ export default function RoomMysteryBox({
   const pendingRef = useRef<RetryRequest | null>(null);
   const retriesRef = useRef<Partial<Record<RequestKind, RetryRequest>>>({});
   const [questionInput, setQuestionInput] = useState("");
+  const [questionError, setQuestionError] = useState("");
   const [guessInput, setGuessInput] = useState("");
   const [pendingKind, setPendingKind] = useState<RequestKind | null>(null);
   const isHost = room.hostId === myId;
@@ -109,6 +110,7 @@ export default function RoomMysteryBox({
     retriesRef.current = {};
     setPendingKind(null);
     setQuestionInput("");
+    setQuestionError("");
     setGuessInput("");
   }, [identity]);
 
@@ -185,11 +187,18 @@ export default function RoomMysteryBox({
         delete retriesRef.current[kind];
       }
       if (kind === "mystery-ask") {
+        setQuestionError("");
         setQuestionInput((current) => current.trim() === value ? "" : current);
       }
       if (kind === "mystery-guess") {
         setGuessInput((current) => current.trim() === value ? "" : current);
       }
+    } else if (kind === "mystery-ask") {
+      setQuestionError(
+        result?.status === 422
+          ? t("mysteryQuestionRewriteInline")
+          : t("mysteryQuestionRetryInline"),
+      );
     }
 
     if (pendingRef.current === request) {
@@ -408,12 +417,15 @@ export default function RoomMysteryBox({
           </div>
           <textarea
             id="room-mystery-question"
+            aria-describedby={questionError ? "room-mystery-question-error" : undefined}
+            aria-invalid={questionError ? true : undefined}
             value={questionInput}
             maxLength={QUESTION_GAME_LIMITS.question}
             disabled={!canSubmit}
             onChange={(event) => {
               const value = event.target.value;
               setQuestionInput(value);
+              setQuestionError("");
               const retry = retriesRef.current["mystery-ask"];
               if (retry && retry.value !== value.trim()) {
                 delete retriesRef.current["mystery-ask"];
@@ -422,6 +434,15 @@ export default function RoomMysteryBox({
             className="h-28 w-full resize-none rounded-lg border-2 border-input bg-background p-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-pink-500 disabled:cursor-not-allowed disabled:bg-muted"
             placeholder={t("canItBeEaten")}
           />
+          {questionError ? (
+            <p
+              id="room-mystery-question-error"
+              role="alert"
+              className="text-sm font-semibold text-destructive"
+            >
+              {questionError}
+            </p>
+          ) : null}
           <Button
             type="button"
             onClick={() => {

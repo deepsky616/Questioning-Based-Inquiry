@@ -8,9 +8,8 @@ import {
   type MysteryAiHistoryItem,
 } from "@/lib/question-game-mystery-definition";
 import {
-  MYSTERY_ATTRIBUTES,
-  MYSTERY_FACTS,
   MYSTERY_ITEMS,
+  mysteryAttributesForVersion,
   mysteryQuestionForAttribute,
 } from "@/lib/mystery-box-rules";
 import {
@@ -875,7 +874,7 @@ describe("질문놀이 실행 정의", () => {
     }, () => 0);
 
     expect(state.privateItemId).toBe("apple");
-    expect(state.knowledgeVersion).toBe(2);
+    expect(state.knowledgeVersion).toBe(3);
     expect(() => definition.ensureProgress(state, {
       mode: "AI",
       runVersion: 1,
@@ -925,18 +924,23 @@ describe("질문놀이 실행 정의", () => {
     expect(first.kind).toBe("QUESTION");
     expect(first).not.toHaveProperty("itemId");
     expect(first.text).toMatch(/[?？]$/u);
+    if (first.kind === "QUESTION") {
+      expect(MYSTERY_ITEMS.every(
+        (item) => typeof item.factsV3[first.attribute] === "boolean",
+      )).toBe(true);
+    }
 
     const apple = MYSTERY_ITEMS.find(({ id }) => id === "apple");
     expect(apple).toBeDefined();
     if (!apple) return;
-    const appleHistory: MysteryAiHistoryItem[] = MYSTERY_FACTS.map(
+    const appleHistory: MysteryAiHistoryItem[] = mysteryAttributesForVersion(2).map(
       (attribute) => ({
         kind: "QUESTION",
         text: mysteryQuestionForAttribute(attribute, "ko"),
         answer: apple.facts[attribute] ? "yes" : "no",
       }),
     );
-    expect(planMysteryAiActivity(appleHistory, "ko")).toMatchObject({
+    expect(planMysteryAiActivity(appleHistory, "ko", 2)).toMatchObject({
       kind: "GUESS",
       text: "사과",
       guessedItemId: "apple",
@@ -1086,6 +1090,11 @@ describe("질문놀이 실행 정의", () => {
         textHash: "e".repeat(64),
         answer: "no",
         answerSource: "AI",
+        answerEvidence: {
+          attribute: "readingMaterial",
+          negated: false,
+          confidence: "high",
+        },
       }],
     })))).not.toThrow();
     expect(() => definition.parseState(JSON.parse(JSON.stringify({

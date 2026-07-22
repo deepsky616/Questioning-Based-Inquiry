@@ -3,16 +3,17 @@ import type { Prisma } from "@prisma/client";
 import { isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import {
   CURRENT_MYSTERY_KNOWLEDGE_VERSION,
-  MYSTERY_ATTRIBUTES,
-  MYSTERY_FACTS,
   MYSTERY_ITEMS,
   analyzeMysteryQuestion,
   getMysteryItem,
+  isMysteryAnswerEvidence,
   isMysteryGuessCorrect,
   mysteryQuestionForAttribute,
   mysteryAttributesForVersion,
   mysteryItemsForVersion,
+  resolveMysteryAttribute,
   type MysteryAnswer,
+  type MysteryAnswerEvidence,
   type MysteryAttribute,
   type MysteryFact,
   type MysteryKnowledgeVersion,
@@ -53,6 +54,7 @@ export type MysteryRunHistoryItem =
       answerSource: "RULE" | "AI";
       attribute?: MysteryFact;
       negated?: boolean;
+      answerEvidence?: MysteryAnswerEvidence;
     }
   | MysteryHistoryBase & {
       kind: "GUESS";
@@ -132,10 +134,7 @@ function isAttribute(
   value: unknown,
   knowledgeVersion: MysteryKnowledgeVersion,
 ): value is MysteryFact {
-  const attributes = knowledgeVersion === 1
-    ? MYSTERY_ATTRIBUTES
-    : MYSTERY_FACTS;
-  return attributes.includes(value as never);
+  return mysteryAttributesForVersion(knowledgeVersion).includes(value as never);
 }
 
 function isBoundedText(value: unknown, max: number): value is string {
@@ -177,6 +176,7 @@ function parseHistoryItem(
         "answerSource",
         "attribute",
         "negated",
+        "answerEvidence",
       ]) ||
       !isBoundedText(value.text, QUESTION_GAME_LIMITS.question) ||
       !/[?？]/u.test(value.text) ||
@@ -202,7 +202,17 @@ function parseHistoryItem(
     } else if (
       value.attribute !== undefined ||
       value.negated !== undefined ||
-      analysis.answer !== "unknown"
+      analysis.answer !== "unknown" ||
+      (value.answerEvidence === undefined && knowledgeVersion >= 3) ||
+      (value.answerEvidence !== undefined && (
+        !isMysteryAnswerEvidence(value.answerEvidence, knowledgeVersion) ||
+        resolveMysteryAttribute(
+          item,
+          value.answerEvidence.attribute,
+          value.answerEvidence.negated,
+          knowledgeVersion,
+        ) !== value.answer
+      ))
     ) damaged();
     return {
       sequence: index + 1,
@@ -218,7 +228,11 @@ function parseHistoryItem(
             attribute: value.attribute as MysteryFact,
             negated: value.negated as boolean,
           }
-        : {}),
+        : {
+            ...(value.answerEvidence !== undefined
+              ? { answerEvidence: value.answerEvidence as MysteryAnswerEvidence }
+              : {}),
+          }),
     };
   }
 
@@ -251,7 +265,9 @@ function parseHistoryItem(
 
 export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
   const knowledgeVersion = isQuestionGameRunRecord(value) &&
-      (value.knowledgeVersion === 1 || value.knowledgeVersion === 2)
+      (value.knowledgeVersion === 1 ||
+        value.knowledgeVersion === 2 ||
+        value.knowledgeVersion === 3)
     ? value.knowledgeVersion
     : 1;
   if (
@@ -280,7 +296,9 @@ export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
     typeof value.privateItemId !== "string" ||
     getMysteryItem(value.privateItemId) === null ||
     (value.knowledgeVersion !== undefined &&
-      value.knowledgeVersion !== 1 && value.knowledgeVersion !== 2) ||
+      value.knowledgeVersion !== 1 &&
+      value.knowledgeVersion !== 2 &&
+      value.knowledgeVersion !== 3) ||
     (value.mysteryWinner !== undefined &&
       value.mysteryWinner !== "STUDENT" &&
       value.mysteryWinner !== "AI") ||
@@ -368,11 +386,16 @@ export function planMysteryAiActivity(
   }));
   const attribute = mysteryAttributesForVersion(knowledgeVersion)
     .filter((candidate) => !used.has(candidate))
+    .filter((candidate) => knowledgeVersion !== 3 || candidates.every(
+      (item) => typeof item.factsV3[candidate] === "boolean",
+    ))
     .map((candidate) => {
       const yesCount = candidates.filter((item) =>
         knowledgeVersion === 1
           ? item.attributes[candidate as MysteryAttribute]
-          : item.facts[candidate]
+          : knowledgeVersion === 2
+            ? item.facts[candidate]
+            : item.factsV3[candidate] === true
       ).length;
       return {
         attribute: candidate,

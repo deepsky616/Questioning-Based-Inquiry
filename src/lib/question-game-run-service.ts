@@ -73,8 +73,11 @@ import {
   MYSTERY_ITEMS,
   analyzeMysteryQuestion,
   getMysteryItem,
+  isMysteryAnswerEvidence,
   isMysteryGuessCorrect,
+  resolveMysteryAttribute,
   type MysteryAnswerResolution,
+  type MysteryAnswerEvidence,
   type MysteryLocale,
 } from "@/lib/mystery-box-rules";
 import {
@@ -2023,6 +2026,7 @@ function mysteryQuestionEntry(
   textHash: string,
   answer: "yes" | "no",
   source: "RULE" | "AI",
+  answerEvidence?: MysteryAnswerEvidence,
 ): MysteryRunHistoryItem {
   const item = getMysteryItem(state.privateItemId);
   if (!item) {
@@ -2051,7 +2055,11 @@ function mysteryQuestionEntry(
       negated: analysis.negated,
     };
   }
-  if (actor !== "STUDENT" || analysis.answer !== "unknown") {
+  if (
+    actor !== "STUDENT" ||
+    analysis.answer !== "unknown" ||
+    (state.knowledgeVersion >= 3 && !answerEvidence)
+  ) {
     throw new QuestionGameRunError("미스터리 박스 질문 판정을 확인할 수 없습니다", 409);
   }
   return {
@@ -2063,6 +2071,7 @@ function mysteryQuestionEntry(
     textHash,
     answer,
     answerSource: "AI",
+    ...(answerEvidence ? { answerEvidence } : {}),
   };
 }
 
@@ -2401,7 +2410,27 @@ function validateMysteryResolution(
   ) {
     throw new QuestionGameRunError("미스터리 박스 질문 판정을 확인할 수 없습니다", 409);
   }
-  return resolution.answer;
+  const item = getMysteryItem(expected.itemId);
+  if (
+    !item ||
+    (expected.knowledgeVersion >= 3 && !resolution.evidence) ||
+    (resolution.evidence &&
+      (!isMysteryAnswerEvidence(
+        resolution.evidence,
+        expected.knowledgeVersion,
+      ) || resolveMysteryAttribute(
+        item,
+        resolution.evidence.attribute,
+        resolution.evidence.negated,
+        expected.knowledgeVersion,
+      ) !== resolution.answer))
+  ) {
+    throw new QuestionGameRunError("미스터리 박스 질문 판정을 확인할 수 없습니다", 409);
+  }
+  return {
+    answer: resolution.answer,
+    evidence: resolution.evidence,
+  };
 }
 
 async function submitMysteryQuestion(
@@ -2462,6 +2491,7 @@ async function submitMysteryQuestion(
     );
     let answer: "yes" | "no";
     let source: "RULE" | "AI";
+    let answerEvidence: MysteryAnswerEvidence | undefined;
     if (analysis.answer === "unknown") {
       const expectedResolution = {
         runId: run.id,
@@ -2479,7 +2509,9 @@ async function submitMysteryQuestion(
           resolution: expectedResolution,
         } satisfies MysteryQuestionResolutionRequired;
       }
-      answer = validateMysteryResolution(resolution, expectedResolution);
+      const validated = validateMysteryResolution(resolution, expectedResolution);
+      answer = validated.answer;
+      answerEvidence = validated.evidence;
       source = "AI";
     } else {
       if (resolution) {
@@ -2488,7 +2520,15 @@ async function submitMysteryQuestion(
       answer = analysis.answer;
       source = "RULE";
     }
-    const entry = mysteryQuestionEntry(state, "STUDENT", question, textHash, answer, source);
+    const entry = mysteryQuestionEntry(
+      state,
+      "STUDENT",
+      question,
+      textHash,
+      answer,
+      source,
+      answerEvidence,
+    );
     return storeMysteryTransition(
       tx,
       actor,

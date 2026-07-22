@@ -148,7 +148,7 @@ function askCurrentPlayer(
 }
 
 describe("미스터리 박스 방 판정기", () => {
-  it("일반 시작은 비밀 없는 버전 2 준비 상태를 만든다", () => {
+  it("일반 시작은 비밀 없는 최신 판정 준비 상태를 만든다", () => {
     const room = startRoom();
 
     expect(room).toMatchObject({
@@ -158,7 +158,7 @@ describe("미스터리 박스 방 판정기", () => {
       pointEvidenceVersion: 2,
       gameState: {
         stateVersion: 2,
-        knowledgeVersion: 2,
+        knowledgeVersion: 3,
         game: "mystery-box",
         phase: "setup",
         round: 0,
@@ -216,7 +216,7 @@ describe("미스터리 박스 방 판정기", () => {
     expect(result.kind).toBe("changed");
     if (result.kind !== "changed") return;
     expect(result.room.gameState).toMatchObject({
-      knowledgeVersion: 2,
+      knowledgeVersion: 3,
       history: [{ kind: "question", answer: "no" }],
     });
   });
@@ -321,7 +321,7 @@ describe("미스터리 박스 방 판정기", () => {
         playerId: "host",
         locale: "ko",
         question: "무슨 소리가 나나요?",
-        knowledgeVersion: 2,
+        knowledgeVersion: 3,
       },
     });
     expect(result.room).toBe(room);
@@ -348,8 +348,13 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 2,
-          answer: "unknown",
+          knowledgeVersion: 3,
+          answer: "no",
+          evidence: {
+            attribute: "readingMaterial",
+            negated: false,
+            confidence: "high",
+          },
         },
       },
     ));
@@ -367,9 +372,17 @@ describe("미스터리 박스 방 판정기", () => {
       playerName: "Host",
       locale: "ko",
       question: "무슨 소리가 나나요?",
-      answer: "unknown",
+      answer: "no",
       answerSource: "ai",
+      answerEvidence: {
+        attribute: "readingMaterial",
+        negated: false,
+        confidence: "high",
+      },
     }]);
+    expect(toPublicMysteryState(state)).not.toHaveProperty(
+      "history.0.answerEvidence",
+    );
 
     const repeated = applyMystery(
       asked,
@@ -378,6 +391,34 @@ describe("미스터리 박스 방 판정기", () => {
       { commandIndex: 12, nextRoundId: commandId(93) },
     );
     expect(repeated).toMatchObject({ kind: "forbidden", room: asked });
+  });
+
+  it("버전 2 방의 기존 인공지능 해결값은 근거 항목 없이도 계속 읽고 적용한다", () => {
+    const prepared = prepareRoom();
+    const room = {
+      ...prepared,
+      gameState: {
+        ...(prepared.gameState as unknown as MysteryRoomState),
+        knowledgeVersion: 2 as const,
+      },
+    };
+    const result = applyMystery(
+      room,
+      "mystery-ask",
+      { locale: "ko", question: "무슨 소리가 나나요?" },
+      {
+        mysteryAnswerResolution: {
+          itemId: "apple",
+          playerId: "host",
+          locale: "ko",
+          question: "무슨 소리가 나나요?",
+          knowledgeVersion: 2,
+          answer: "yes",
+        },
+      },
+    );
+
+    expect(result.kind).toBe("changed");
   });
 
   it("인공지능을 사용할 수 없으면 임시 답변 출처와 질문 점수를 저장한다", () => {
@@ -394,7 +435,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 2,
+          knowledgeVersion: 3,
           answer: "unknown",
           source: "fallback",
         },
@@ -435,8 +476,13 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 2,
+          knowledgeVersion: 3,
           answer: "yes",
+          evidence: {
+            attribute: "readingMaterial",
+            negated: true,
+            confidence: "high",
+          },
           ...changedBinding,
         } as unknown as MysteryAnswerResolution,
       },
@@ -477,7 +523,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "먹을 수 있나요?",
-          knowledgeVersion: 2,
+          knowledgeVersion: 3,
           answer: "no",
         },
       },
@@ -899,15 +945,26 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 2,
+          knowledgeVersion: 3,
           answer: "yes",
+          evidence: {
+            attribute: "readingMaterial",
+            negated: true,
+            confidence: "high",
+          },
         },
       },
     ));
     const state = room.gameState as unknown as MysteryRoomState;
     const aiQuestion = state.history[0];
-    const { answerSource: _answerSource, ...legacyQuestion } = aiQuestion as
-      typeof aiQuestion & { answerSource?: "ai" };
+    const {
+      answerSource: _answerSource,
+      answerEvidence: _answerEvidence,
+      ...legacyQuestion
+    } = aiQuestion as typeof aiQuestion & {
+      answerSource?: "ai";
+      answerEvidence?: unknown;
+    };
     const legacyState = {
       ...state,
       history: [{ ...legacyQuestion, answer: "unknown" }],
@@ -934,8 +991,13 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 2,
+          knowledgeVersion: 3,
           answer: "no",
+          evidence: {
+            attribute: "readingMaterial",
+            negated: false,
+            confidence: "high",
+          },
         },
       },
     ));

@@ -842,7 +842,7 @@ beforeEach(() => {
   mocks.auth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
   mocks.checkRateLimit.mockReturnValue(null);
   mocks.generateJson.mockResolvedValue({
-    attribute: "indoor",
+    attribute: "readingMaterial",
     negated: false,
     confidence: "high",
   });
@@ -2134,7 +2134,7 @@ describe("질문 주사위 서버 실행 경로", () => {
       finalBody = await submitted.json() as Record<string, unknown>;
     }
 
-    expect(finalBody).toMatchObject({
+    expect(finalBody, JSON.stringify(storedMysteryState())).toMatchObject({
       run: { status: "SETTLED", version: 7, questionCount: 3, nextStep: "COMPLETE" },
       result: { awarded: 5, preview: false },
     });
@@ -3930,7 +3930,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
     await createMystery();
     mocks.generateJson.mockImplementationOnce(async () => {
       expect(transactionDepth).toBe(0);
-      return { attribute: "indoor", negated: false, confidence: "high" };
+      return { attribute: "readingMaterial", negated: false, confidence: "high" };
     });
 
     const response = await submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?");
@@ -3946,10 +3946,20 @@ describe("미스터리 박스 서버 실행 경로", () => {
       },
     });
     expect(mocks.generateJson).toHaveBeenCalledOnce();
-    expect(storedMysteryState().history[0]).toMatchObject({ answerSource: "AI" });
+    expect(storedMysteryState().history[0]).toMatchObject({
+      answerSource: "AI",
+      answerEvidence: {
+        attribute: "readingMaterial",
+        negated: false,
+        confidence: "high",
+      },
+    });
     expect(activities).toHaveLength(1);
     expect(JSON.stringify(activities[0].responseSnapshot)).not.toContain(
       storedMysteryState().privateItemId,
+    );
+    expect(JSON.stringify(activities[0].responseSnapshot)).not.toContain(
+      "answerEvidence",
     );
   });
 
@@ -3994,7 +4004,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
   it("외부 판정 사이 실행이 바뀌면 늦은 판정을 버리고 어떤 자료나 점수도 더하지 않는다", async () => {
     await createMystery();
     let finishProvider: ((value: {
-      attribute: "indoor";
+      attribute: "readingMaterial";
       negated: false;
       confidence: "high";
     }) => void) | undefined;
@@ -4006,7 +4016,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
     await vi.waitFor(() => expect(mocks.generateJson).toHaveBeenCalledOnce());
     const competing = await submitMysteryGuess(1, 1, "없는 물건");
     expect(competing.status).toBe(200);
-    finishProvider?.({ attribute: "indoor", negated: false, confidence: "high" });
+    finishProvider?.({ attribute: "readingMaterial", negated: false, confidence: "high" });
     const late = await pending;
 
     expect(late.status).toBe(409);
@@ -4020,7 +4030,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
   it("외부 판정 대기 중 실행이 만료되면 늦은 판정을 버리고 정답을 공개하지 않는다", async () => {
     await createMystery();
     let finishProvider: ((value: {
-      attribute: "indoor";
+      attribute: "readingMaterial";
       negated: false;
       confidence: "high";
     }) => void) | undefined;
@@ -4042,7 +4052,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
       },
       result: null,
     });
-    finishProvider?.({ attribute: "indoor", negated: false, confidence: "high" });
+    finishProvider?.({ attribute: "readingMaterial", negated: false, confidence: "high" });
 
     const late = await pending;
     expect(late.status).toBe(409);
@@ -4105,7 +4115,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
   it("같은 규칙 밖 질문이 동시에 들어오면 한 활동만 기록하고 나머지는 저장 응답을 재생한다", async () => {
     await createMystery();
     mocks.generateJson.mockResolvedValue({
-      attribute: "indoor",
+      attribute: "readingMaterial",
       negated: false,
       confidence: "high",
     });
@@ -4222,11 +4232,9 @@ describe("미스터리 박스 서버 실행 경로", () => {
       const state = storedMysteryState();
       let response: Response;
       if (state.mysteryNextStep === "STUDENT_ACTION") {
-        const usedAttributes = new Set(state.history.flatMap((activity) =>
-          typeof activity.attribute === "string" ? [activity.attribute] : []
-        ));
+        const usedQuestions = new Set(state.history.map((activity) => activity.text));
         const attribute = MYSTERY_ATTRIBUTES.find((candidate) =>
-          !usedAttributes.has(candidate)
+          !usedQuestions.has(mysteryQuestionForAttribute(candidate, "ko"))
         );
         if (attribute) {
           response = await submitMysteryQuestion(
@@ -4245,7 +4253,10 @@ describe("미스터리 박스 서버 실행 경로", () => {
       } else {
         response = await runMysteryAiTurn(actionIndex, version);
       }
-      expect(response.status).toBe(200);
+      expect(
+        response.status,
+        JSON.stringify(await response.clone().json()),
+      ).toBe(200);
       const body = await response.json() as {
         run: { status: string; version: number };
         [key: string]: unknown;

@@ -54,7 +54,13 @@ export async function POST(req: Request, { params }: Params) {
         id,
         body,
         new Date(),
-        { ...result.resolution, answer: providerResolution.answer },
+        {
+          ...result.resolution,
+          answer: providerResolution.answer,
+          ...(providerResolution.evidence
+            ? { evidence: providerResolution.evidence }
+            : {}),
+        },
       );
       if (isMysteryQuestionResolutionRequired(result)) {
         throw new QuestionGameRunError("미스터리 박스 질문 판정을 확정할 수 없습니다", 409);

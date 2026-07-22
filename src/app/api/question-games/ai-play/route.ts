@@ -54,18 +54,6 @@ const PROMPTS: Record<string, (ctx: Record<string, string>) => string> = {
   "relay:ai-turn": (c) =>
     `질문 릴레이 게임입니다. 규칙: 대답 금지, 질문만 이어가기.\n\n처음 주제: "${c.topic}"\n가장 최근 질문: "${c.prev}"\n지금까지 나온 질문들: ${c.history}${languageLine(c)}\n\n이 게임의 다음 질문 하나를 만들어주세요.\n조건: 1) 가장 최근 질문과 연결될 것 2) 지금까지 나온 질문과 중복되지 않을 것 3) 질문 형태일 것\n질문만 한 줄로 출력하세요.`,
 
-  "mystery-box:setup": (_c) =>
-    `미스터리 박스 게임용 물건을 초등학생이 알만한 것에서 하나 골라주세요.${languageLine(_c)}\n다음 JSON 형식으로만 답하세요 (다른 말 없이):\n{"name":"물건 이름","category":"카테고리","emoji":"이모지 1개"}`,
-
-  "mystery-box:answer": (c) =>
-    c.locale === "en"
-      ? `Mystery Box game. The hidden object is "${c.itemName}".\nQuestion: "${c.question}"\nAnswer with exactly one of these only: "Yes", "No", "Not sure". Do not add anything else.`
-      : `미스터리 박스 게임입니다. 상자 안의 것은 "${c.itemName}"입니다.\n질문: "${c.question}"\n반드시 "네", "아니오", "잘 모르겠어요" 중 하나만 답하세요. 다른 말은 절대 하지 마세요.`,
-
-  // AI가 참가자로서 자기 차례에 예/아니오 질문을 만들고, 확신하면 추측까지 한다(물건 이름은 절대 모름)
-  "mystery-box:ai-turn": (c) =>
-    `미스터리 박스 스무고개 게임이에요. 당신(AI)은 상자 안의 숨은 물건을 맞히려는 참가자입니다. 물건이 무엇인지 전혀 모릅니다.\n지금까지 나온 질문과 대답:\n${c.history || (c.locale === "en" ? "(none yet)" : "(아직 없음)")}${languageLine(c)}\n\n규칙:\n1) 단서로 물건을 확신할 수 있으면 "guess"에 물건 이름 하나를 쓰세요. 확신이 없으면 "guess"는 빈 문자열("")로 두세요.\n2) "question"에는 다음에 물어볼, 아직 안 물어본 새로운 예/아니오 질문 하나를 쓰세요(짧게).\n\n반드시 아래 JSON으로만 답하세요 (다른 말 없이):\n{"question":"...","guess":""}`,
-
   "ladder:suggest": (c) =>
     `주제: "${c.topic}"${languageLine(c)}\n이 주제로 만들 수 있는 좋은 질문 2가지를 짧게 제안해주세요.\n번호 없이 각 질문을 한 줄씩, 총 2줄로 출력하세요.`,
 
@@ -160,8 +148,6 @@ export async function POST(req: NextRequest) {
 
   // JSON 응답 파싱이 필요한 액션들 — 실패 시 텍스트만 반환
   if (
-    action === "mystery-box:setup" ||
-    action === "mystery-box:ai-turn" ||
     action === "story-dice:words" ||
     action === "story-dice:words-bilingual"
   ) {

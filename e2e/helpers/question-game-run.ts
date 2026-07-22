@@ -1514,14 +1514,14 @@ export function createBrowserQuestionGameRunStore(): BrowserQuestionGameRunStore
       "날 수 있나요?",
       "둥근가요?",
       "사람이 만든 것인가요?",
-      "작은가요?",
+      "동물인가요?",
     ];
     const englishQuestions = [
       "Is it edible?",
       "Can it fly?",
       "Is it round?",
       "Is it human made?",
-      "Is it small?",
+      "Is it an animal?",
     ];
     const questions = run.locale === "en" ? englishQuestions : koreanQuestions;
     const question = questions[(aiTurnNumber - 1) % questions.length];

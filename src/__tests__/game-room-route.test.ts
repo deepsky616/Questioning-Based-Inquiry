@@ -776,6 +776,11 @@ describe("미스터리 박스 실제 공개 응답", () => {
       async (_userId: string, request: Record<string, unknown>) => ({
         ...request,
         answer: "yes",
+        evidence: {
+          attribute: "edible",
+          negated: false,
+          confidence: "high",
+        },
       }),
     );
     mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => {
@@ -801,13 +806,13 @@ describe("미스터리 박스 실제 공개 응답", () => {
     });
     const body = await response.json();
 
-    expect(response.status).toBe(200);
+    expect(response.status, JSON.stringify(body)).toBe(200);
     expect(mocks.generateMysteryAiAnswer).toHaveBeenCalledWith("user-1", {
       itemId: "apple",
       playerId: "user-1",
       locale: "ko",
       question,
-      knowledgeVersion: 2,
+      knowledgeVersion: 3,
     });
     expect(mocks.checkRateLimit).toHaveBeenCalledWith(
       "game-room-mystery-ai:user-1",
@@ -871,7 +876,7 @@ describe("미스터리 박스 실제 공개 응답", () => {
     expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
   });
 
-  it("미등록 질문의 에이아이 실패는 임시 답변으로 질문과 점수 및 다음 차례를 저장한다", async () => {
+  it("미등록 질문의 에이아이 실패는 질문과 점수 및 차례를 소비하지 않는다", async () => {
     const question = "비가 오면 잘 자라나요?";
     const state = makeMysteryPlayState();
     const room = makeMysteryRoom(state);
@@ -895,21 +900,51 @@ describe("미스터리 박스 실제 공개 응답", () => {
       question,
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     const body = await response.json();
-    expect(body.room.gameState).toMatchObject({
-      currentTurnIdx: 1,
-      scores: { "user-1": 1, "user-2": 0 },
-      history: [{
-        question,
-        answer: "unknown",
-        answerSource: "fallback",
-      }],
+    expect(body).toEqual({
+      error: "미스터리 박스 질문 판정을 잠시 처리할 수 없습니다. 다시 시도해 주세요",
     });
-    expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
     expect(state.history).toEqual([]);
     expect(state.scores).toEqual({ "user-1": 0, "user-2": 0 });
     expect(state.currentTurnIdx).toBe(0);
+  });
+
+  it("뜻이 불분명한 미등록 질문은 수정 안내만 하고 방 상태를 유지한다", async () => {
+    const question = "비가 오면 잘 자라나요?";
+    const state = makeMysteryPlayState();
+    const room = makeMysteryRoom(state);
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.generateMysteryAiAnswer.mockImplementation(
+      async (_userId: string, request: Record<string, unknown>) => ({
+        ...request,
+        answer: "unknown",
+      }),
+    );
+
+    const response = await patch({
+      action: "mystery-ask",
+      commandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      playId,
+      roundId,
+      locale: "ko",
+      question,
+    });
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      error: "예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요",
+      mysteryRewriteRequired: true,
+    });
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+    expect(state).toMatchObject({
+      currentTurnIdx: 0,
+      scores: { "user-1": 0, "user-2": 0 },
+      history: [],
+    });
   });
 
   it("조회와 같은 명령 재생 응답은 저장 상태를 바꾸지 않고 비밀을 뺀다", async () => {

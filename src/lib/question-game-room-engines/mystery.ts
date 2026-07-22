@@ -3,10 +3,14 @@ import {
   MYSTERY_ITEMS,
   classifyMysteryQuestion,
   getMysteryItem,
+  isMysteryAnswerEvidence,
   isMysteryGuessCorrect,
   mysteryItemsForVersion,
+  resolveMysteryAttribute,
   type MysteryAnswer,
   type MysteryAnswerResolution,
+  type MysteryAnswerEvidence,
+  type MysteryFact,
   type MysteryItem,
   type MysteryKnowledgeVersion,
   type MysteryLocale,
@@ -34,6 +38,9 @@ export type MysteryHistoryItem =
       question: string;
       answer: MysteryAnswer;
       answerSource?: "ai" | "fallback";
+      answerEvidence?: MysteryAnswerEvidence;
+      attribute?: MysteryFact;
+      negated?: boolean;
     }
   | {
       kind: "guess";
@@ -158,7 +165,7 @@ function isMysteryHistoryItem(value: unknown): value is MysteryHistoryItem {
         "question",
         "answer",
       ],
-      ["answerSource"],
+      ["answerSource", "answerEvidence", "attribute", "negated"],
     ) &&
       (value.locale === "ko" || value.locale === "en") &&
       isBoundedStoredText(value.question, QUESTION_GAME_LIMITS.question) &&
@@ -168,7 +175,12 @@ function isMysteryHistoryItem(value: unknown): value is MysteryHistoryItem {
         value.answer === "unknown") &&
       (value.answerSource === undefined ||
         value.answerSource === "ai" ||
-        (value.answerSource === "fallback" && value.answer === "unknown"));
+        (value.answerSource === "fallback" && value.answer === "unknown")) &&
+      (value.answerEvidence === undefined ||
+        isMysteryAnswerEvidence(value.answerEvidence, 3)) &&
+      ((value.attribute === undefined && value.negated === undefined) ||
+        (typeof value.attribute === "string" && typeof value.negated === "boolean")) &&
+      !(value.answerEvidence !== undefined && value.attribute !== undefined);
   }
   return value.kind === "guess" &&
     hasExactKeys(value, [
@@ -261,7 +273,31 @@ function hasValidHistorySemantics(state: MysteryRoomState): boolean {
 
   return state.history.every((historyItem) => {
     if (historyItem.kind === "question") {
-      if (historyItem.answerSource === "ai") return true;
+      if (historyItem.answerSource === "ai") {
+        const evidence = historyItem.answerEvidence ?? (
+          historyItem.attribute !== undefined && historyItem.negated !== undefined
+            ? {
+                attribute: historyItem.attribute,
+                negated: historyItem.negated,
+                confidence: "high" as const,
+              }
+            : null
+        );
+        if (!evidence) return state.knowledgeVersion < 3;
+        return isMysteryAnswerEvidence(evidence, state.knowledgeVersion) &&
+          classifyMysteryQuestion(
+            historyItem.question,
+            item,
+            historyItem.locale,
+            state.knowledgeVersion,
+          ) === "unknown" &&
+          resolveMysteryAttribute(
+            item,
+            evidence.attribute,
+            evidence.negated,
+            state.knowledgeVersion,
+          ) === historyItem.answer;
+      }
       if (historyItem.answerSource === "fallback") {
         return historyItem.answer === "unknown";
       }
@@ -395,7 +431,9 @@ export function readMysteryState(value: unknown): MysteryRoomState | null {
       value.endReason !== "insufficient-players") ||
     (value.private !== undefined && !isValidPrivateState(value.private))
     || (value.knowledgeVersion !== undefined &&
-      value.knowledgeVersion !== 1 && value.knowledgeVersion !== 2)
+      value.knowledgeVersion !== 1 &&
+      value.knowledgeVersion !== 2 &&
+      value.knowledgeVersion !== 3)
   ) {
     return null;
   }
@@ -468,6 +506,12 @@ function projectMysteryHistoryItem(
         ...(value.answerSource === "ai" || value.answerSource === "fallback"
           ? { answerSource: value.answerSource }
           : {}),
+        ...(isMysteryAnswerEvidence(value.answerEvidence, 3)
+          ? {
+              attribute: value.answerEvidence.attribute,
+              negated: value.answerEvidence.negated,
+            }
+          : {}),
       }
     : value.kind === "guess"
       ? {
@@ -495,7 +539,11 @@ export function toPublicMysteryState(
 
   const state: Record<string, unknown> = {};
   if (value.stateVersion === 2) state.stateVersion = value.stateVersion;
-  if (value.knowledgeVersion === 1 || value.knowledgeVersion === 2) {
+  if (
+    value.knowledgeVersion === 1 ||
+    value.knowledgeVersion === 2 ||
+    value.knowledgeVersion === 3
+  ) {
     state.knowledgeVersion = value.knowledgeVersion;
   }
   if (value.game === "mystery-box") state.game = value.game;
@@ -580,12 +628,16 @@ function isMysteryAnswerResolution(
       "question",
       "answer",
       "knowledgeVersion",
-    ], ["source"]) &&
+    ], ["source", "evidence"]) &&
     typeof value.itemId === "string" &&
     typeof value.playerId === "string" &&
     (value.locale === "ko" || value.locale === "en") &&
     typeof value.question === "string" &&
-    (value.knowledgeVersion === 1 || value.knowledgeVersion === 2) &&
+    (value.knowledgeVersion === 1 ||
+      value.knowledgeVersion === 2 ||
+      value.knowledgeVersion === 3) &&
+    (value.evidence === undefined ||
+      isMysteryAnswerEvidence(value.evidence, value.knowledgeVersion)) &&
     (value.answer === "yes" ||
       value.answer === "no" ||
       value.answer === "unknown") &&
@@ -828,6 +880,30 @@ function askMysteryQuestion(
         message: "미스터리 박스 질문 답변 해결이 필요합니다",
       };
     }
+    if (
+      state.knowledgeVersion >= 3 &&
+      resolution.source !== "fallback" &&
+      (!resolution.evidence ||
+        resolveMysteryAttribute(
+          item,
+          resolution.evidence.attribute,
+          resolution.evidence.negated,
+          state.knowledgeVersion,
+        ) !== resolution.answer)
+    ) {
+      return {
+        kind: "resolution-required",
+        room: context.room,
+        resolution: {
+          itemId: item.id,
+          playerId: context.userId,
+          locale,
+          question,
+          knowledgeVersion: state.knowledgeVersion,
+        },
+        message: "미스터리 박스 질문 답변 해결이 필요합니다",
+      };
+    }
     answer = resolution.answer;
     answerSource = resolution.source ?? "ai";
   }
@@ -846,6 +922,9 @@ function askMysteryQuestion(
         question,
         answer,
         ...(answerSource ? { answerSource } : {}),
+        ...(resolution?.evidence
+          ? { answerEvidence: resolution.evidence }
+          : {}),
       },
     ],
     { ...state.scores, [context.userId]: score + 1 },

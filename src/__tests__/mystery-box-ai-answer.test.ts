@@ -77,6 +77,11 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     await expect(generateMysteryAiAnswer("player-1", request)).resolves.toEqual({
       ...request,
       answer: "no",
+      evidence: {
+        attribute: "movesByItself",
+        negated: false,
+        confidence: "high",
+      },
     });
 
     expect(mocks.generateJson).toHaveBeenCalledOnce();
@@ -121,6 +126,28 @@ describe("미스터리 박스 에이아이 구조화 답변", () => {
     await expect(generateMysteryAiAnswer("player-1", request)).resolves.toEqual({
       ...request,
       answer: "unknown",
+    });
+  });
+
+  it("뜻은 찾았지만 상황에 따라 달라지는 특징이면 판정 근거만 남기고 단정하지 않는다", async () => {
+    mocks.generateJson.mockResolvedValue({
+      attribute: "indoor",
+      negated: false,
+      confidence: "high",
+    });
+
+    await expect(generateMysteryAiAnswer("player-1", {
+      ...request,
+      knowledgeVersion: 3,
+    })).resolves.toEqual({
+      ...request,
+      knowledgeVersion: 3,
+      answer: "unknown",
+      evidence: {
+        attribute: "indoor",
+        negated: false,
+        confidence: "high",
+      },
     });
   });
 

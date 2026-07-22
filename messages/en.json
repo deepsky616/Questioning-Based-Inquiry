@@ -2085,6 +2085,8 @@
     "usedLength": "Used {length}",
     "remainingLeft2": "{remaining} left",
     "yesOrNoQuestion": "Yes-or-no question",
+    "mysteryQuestionRewriteInline": "Ask about one feature and rewrite it so it can be answered with yes or no.",
+    "mysteryQuestionRetryInline": "We could not evaluate the question. Check what you wrote and try again.",
     "askOneSimpleQuestionEnding": "Ask one simple question ending with a question mark.",
     "canItBeEaten": "Can it be eaten?",
     "sendQuestion": "Send question",
