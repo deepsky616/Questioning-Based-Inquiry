@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Loader2, Pencil, RotateCcw, Save, Trash2, WandSparkles, X } from "lucide-react";
+import { BookOpenCheck, ChevronDown, ChevronUp, GripVertical, Loader2, Pencil, RotateCcw, Save, Search, Trash2, WandSparkles, X } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -820,17 +820,34 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                     />
                     </div>
 
-                    {/* 탐구 질문 */}
-                    <Label>{t("inquiryQuestionsLabel")}</Label>
-                    <div className="space-y-2">
+                    {/* 탐구 질문과 질문별 학생용 이해 자료 */}
+                    <section
+                      data-student-guide-section="inquiry-question"
+                      className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-3.5 dark:border-emerald-800/60 dark:bg-emerald-950/20 sm:p-4"
+                      aria-labelledby="saved-student-guide-inquiry-title"
+                    >
+                      <div className="flex items-start gap-3">
+                        <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200" aria-hidden="true">4</span>
+                        <div className="min-w-0">
+                          <h3 id="saved-student-guide-inquiry-title" className="flex items-center gap-1.5 text-sm font-semibold text-emerald-950 dark:text-emerald-100">
+                            <Search className="h-4 w-4" aria-hidden="true" />
+                            {t("studentGuideInquiryQuestionSectionTitle")}
+                          </h3>
+                          <p className="mt-0.5 text-xs leading-5 text-emerald-800/80 dark:text-emerald-200/75">
+                            {t("studentGuideInquiryQuestionSectionDesc")}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-2.5">
                       {editQuestions.map((q, i) => (
-                        <div
+                        <article
                           key={i}
+                          data-saved-inquiry-question
                           draggable
                           onDragStart={() => setDragIndex(i)}
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={() => handleEditDrop(i)}
-                          className="rounded-md border border-border bg-muted/20 p-3"
+                          className="rounded-lg border border-emerald-200/70 bg-background/85 p-3 dark:border-emerald-800/50"
                         >
                           <div className="flex items-start gap-2">
                             <div className="mt-1 flex shrink-0 flex-col items-center">
@@ -885,6 +902,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                             <div className="mt-2">
                               <StudentInquiryGuideEditor
                                 guide={q.studentGuide}
+                                defaultOpen
                                 onChange={(studentGuide) => updateEditQuestion(i, { studentGuide })}
                               />
                             </div>
@@ -893,7 +911,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                               {t(hasStaleEditStudentGuides ? "studentGuideStale" : "studentGuideIncomplete")}
                             </p>
                           ) : null}
-                        </div>
+                        </article>
                       ))}
                       <div className="flex items-center gap-2">
                         <select
@@ -908,7 +926,8 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                         </select>
                         <Button variant="outline" size="sm" onClick={() => addEditQuestion(addType)}>＋ {t("addQuestion")}</Button>
                       </div>
-                    </div>
+                      </div>
+                    </section>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                       <Button
                         onClick={() => saveEditDesign(d.id)}

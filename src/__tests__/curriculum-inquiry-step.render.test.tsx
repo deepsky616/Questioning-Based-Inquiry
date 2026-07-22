@@ -142,6 +142,16 @@ describe("다섯째 단계 질문 편집과 배포 자료 확인", () => {
       .toHaveClass("border-violet-200/80", "bg-violet-50/70", "dark:border-violet-800/60", "dark:bg-violet-950/20");
     expect(container.querySelector('[data-student-guide-section="inquiry-question"]'))
       .toHaveClass("border-emerald-200/80", "bg-emerald-50/70", "dark:border-emerald-800/60", "dark:bg-emerald-950/20");
+
+    for (const [name, number] of [
+      ["core-idea", "1"],
+      ["core-sentence", "2"],
+      ["essential-question", "3"],
+      ["inquiry-question", "4"],
+    ] as const) {
+      const section = container.querySelector(`[data-student-guide-section="${name}"]`);
+      expect(section?.querySelector("[data-student-guide-number]")).toHaveTextContent(number);
+    }
   });
 
   it("탐구 질문을 다시 생성하기 시작하면 질문 편집 화면으로 돌아간다", () => {

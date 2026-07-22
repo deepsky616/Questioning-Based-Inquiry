@@ -34,14 +34,14 @@ export function StudentInquiryQuestionReference({
         : "";
 
   return (
-    <li className={`border-l-4 px-3 py-2.5 ${TYPE_STYLE[question.type] ?? "border-muted bg-muted/30"}`}>
+    <li data-design-reference-inquiry-item className={`rounded-md border border-l-4 px-3 py-2.5 ${TYPE_STYLE[question.type] ?? "border-muted bg-muted/30"}`}>
       <p className="text-sm font-semibold leading-relaxed text-foreground">
         <span className="mr-1.5 text-xs font-medium text-muted-foreground">[{typeLabel}]</span>
         {question.content}
       </p>
       {typeHelp && <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{typeHelp}</p>}
       {guide && (
-        <dl className="mt-2 space-y-2 border-t border-border/70 pt-2 text-xs">
+        <dl data-student-understanding-guide="inquiry-question" className="mt-2 space-y-2 border-t border-border/70 pt-2 text-xs">
           {guide.meaning && (
             <div>
               <dt className="font-semibold text-foreground">{t("questionMeaning")}</dt>

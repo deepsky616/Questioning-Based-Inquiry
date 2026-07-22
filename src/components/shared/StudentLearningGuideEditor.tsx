@@ -84,7 +84,7 @@ export function StudentLearningGuideEditor({
         aria-labelledby={`${fieldId}-core-idea-title`}
       >
         <div className="flex items-start gap-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200" aria-hidden="true">1</span>
+          <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200" aria-hidden="true">1</span>
           <div className="min-w-0">
             <h3 id={`${fieldId}-core-idea-title`} className="flex items-center gap-1.5 text-sm font-semibold text-amber-950 dark:text-amber-100">
               <Lightbulb className="h-4 w-4" aria-hidden="true" />
@@ -157,7 +157,7 @@ export function StudentLearningGuideEditor({
           aria-labelledby={`${fieldId}-core-sentence-title`}
         >
           <div className="flex items-start gap-3">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-800 dark:bg-sky-900/60 dark:text-sky-200" aria-hidden="true">2</span>
+            <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-800 dark:bg-sky-900/60 dark:text-sky-200" aria-hidden="true">2</span>
             <div className="min-w-0">
               <h3 id={`${fieldId}-core-sentence-title`} className="flex items-center gap-1.5 text-sm font-semibold text-sky-950 dark:text-sky-100">
                 <AlignLeft className="h-4 w-4" aria-hidden="true" />
@@ -209,7 +209,7 @@ export function StudentLearningGuideEditor({
           aria-labelledby={`${fieldId}-essential-question-title`}
         >
           <div className="flex items-start gap-3">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800 dark:bg-violet-900/60 dark:text-violet-200" aria-hidden="true">3</span>
+            <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800 dark:bg-violet-900/60 dark:text-violet-200" aria-hidden="true">3</span>
             <div className="min-w-0">
               <h3 id={`${fieldId}-essential-question-title`} className="flex items-center gap-1.5 text-sm font-semibold text-violet-950 dark:text-violet-100">
                 <CircleHelp className="h-4 w-4" aria-hidden="true" />

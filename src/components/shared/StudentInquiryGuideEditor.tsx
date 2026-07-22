@@ -32,7 +32,7 @@ export function StudentInquiryGuideEditor({
   }, [formattedKeywords]);
 
   return (
-    <details open={defaultOpen} className="group border-t border-current/15 pt-2">
+    <details data-student-inquiry-guide-editor open={defaultOpen} className="group border-t border-current/15 pt-2">
       <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-semibold text-foreground">
         <BookOpenText className="h-4 w-4" aria-hidden="true" />
         {t("studentGuideTitle")}

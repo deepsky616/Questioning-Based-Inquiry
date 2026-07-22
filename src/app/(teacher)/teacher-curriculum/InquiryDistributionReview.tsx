@@ -130,7 +130,7 @@ export function InquiryDistributionReview({
         aria-labelledby="student-guide-inquiry-question-title"
       >
         <div className="flex items-start gap-3">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200" aria-hidden="true">4</span>
+          <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200" aria-hidden="true">4</span>
           <div className="min-w-0">
             <h3 id="student-guide-inquiry-question-title" className="flex items-center gap-1.5 text-sm font-semibold text-emerald-950 dark:text-emerald-100">
               <Search className="h-4 w-4" aria-hidden="true" />

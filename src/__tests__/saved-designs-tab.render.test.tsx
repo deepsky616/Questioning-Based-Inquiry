@@ -54,7 +54,7 @@ const design: SavedInquiryDesign = {
 
 describe("저장된 설계 학생용 설명 편집", () => {
   it("원문을 수정하면 기존 설명을 숨기고 다시 만들도록 안내한다", () => {
-    render(
+    const { container } = render(
       <ConfirmProvider>
         <SavedDesignsTab
           savedList={[design]}
@@ -67,6 +67,14 @@ describe("저장된 설계 학생용 설명 편집", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "수정" }));
     expect(screen.getByLabelText("핵심 아이디어 쉽게 풀어보기")).toBeInTheDocument();
+
+    const inquirySection = container.querySelector('[data-student-guide-section="inquiry-question"]');
+    expect(inquirySection).toHaveClass("border-emerald-200/80", "bg-emerald-50/70");
+    expect(inquirySection?.querySelector("[data-student-guide-number]")).toHaveTextContent("4");
+    const inquiryItem = screen.getByDisplayValue("생산자는 무엇일까?")
+      .closest("[data-saved-inquiry-question]");
+    expect(inquiryItem).toBeInTheDocument();
+    expect(inquiryItem?.querySelector("[data-student-inquiry-guide-editor]")).toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue("생물은 환경과 관계를 맺는다."), {
       target: { value: "생물은 변화한 환경에 적응한다." },

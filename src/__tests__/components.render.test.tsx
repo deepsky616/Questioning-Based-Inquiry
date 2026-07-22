@@ -83,7 +83,7 @@ describe("LanguageToggle", () => {
 
 describe("DesignReferenceView", () => {
   it("단원 제목·핵심 아이디어·탐구 질문을 렌더한다", () => {
-    renderWithIntl(
+    const { container } = renderWithIntl(
       <DesignReferenceView
         data={{
           title: "광합성",
@@ -132,5 +132,21 @@ describe("DesignReferenceView", () => {
     expect(screen.getByText(/엽록소/)).toBeInTheDocument();
     expect(screen.getByText("생각 시작하기")).toBeInTheDocument();
     expect(screen.getByText(/핵심 문장 하나/)).toBeInTheDocument();
+
+    const expectedSections = [
+      ["core-idea", "1", "border-amber-200/80", "bg-amber-50/70"],
+      ["core-sentence", "2", "border-sky-200/80", "bg-sky-50/70"],
+      ["essential-question", "3", "border-violet-200/80", "bg-violet-50/70"],
+      ["inquiry-question", "4", "border-emerald-200/80", "bg-emerald-50/70"],
+    ] as const;
+    for (const [name, number, border, background] of expectedSections) {
+      const section = container.querySelector(`[data-design-reference-section="${name}"]`);
+      expect(section).toHaveClass(border, background);
+      expect(section?.querySelector("[data-design-reference-number]")).toHaveTextContent(number);
+    }
+
+    const inquiryItem = container.querySelector("[data-design-reference-inquiry-item]");
+    expect(inquiryItem).toHaveTextContent("잎은 왜 초록색일까?");
+    expect(inquiryItem?.querySelector("[data-student-understanding-guide]")).toBeInTheDocument();
   });
 });

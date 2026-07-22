@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AlignLeft, CircleHelp, Lightbulb, Search } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { splitCoreIdeaLines } from "@/lib/content-selection";
 import { StudentInquiryQuestionReference } from "@/components/shared/StudentInquiryQuestionReference";
@@ -86,52 +87,118 @@ export function DesignReferenceView({
       )}
       {metaParts.length > 0 && <p className="mt-0.5 text-xs text-muted-foreground">{metaParts.join(" · ")}</p>}
 
-      <div className="mt-2 space-y-3 text-sm">
+      <div className="mt-3 space-y-3 text-sm">
         {coreIdeaLines.length > 0 && (
-          <section>
-            <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("coreIdea")}</p>
-            <p className="text-[11px] leading-snug text-muted-foreground">{t("coreIdeaDesc")}</p>
-            <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-foreground">
-              {coreIdeaLines.map((line, i) => <li key={i}>{line}</li>)}
-            </ul>
-            {learningGuides?.coreIdea && (
-              <dl className="mt-2 space-y-2 border-l-4 border-emerald-400 bg-emerald-50/60 px-3 py-2 text-xs dark:bg-emerald-950/20">
-                {learningGuides.coreIdea.explanation && <div><dt className="font-semibold">{t("easyExplanation")}</dt><dd className="mt-0.5 text-muted-foreground">{learningGuides.coreIdea.explanation}</dd></div>}
-                {learningGuides.coreIdea.lifeConnection && <div><dt className="font-semibold">{t("lifeConnection")}</dt><dd className="mt-0.5 text-muted-foreground">{learningGuides.coreIdea.lifeConnection}</dd></div>}
-                {learningGuides.coreIdea.keywords.length > 0 && <div><dt className="font-semibold">{t("keyWords")}</dt><dd className="mt-1 flex flex-wrap gap-1.5">{learningGuides.coreIdea.keywords.map((keyword, index) => <span key={`${keyword.term}-${index}`} className="rounded border border-border bg-background px-2 py-1"><strong>{keyword.term}</strong>{keyword.meaning ? `: ${keyword.meaning}` : ""}</span>)}</dd></div>}
-              </dl>
-            )}
+          <section
+            data-design-reference-section="core-idea"
+            className="rounded-lg border border-amber-200/80 bg-amber-50/70 p-3 dark:border-amber-800/60 dark:bg-amber-950/20"
+          >
+            <div className="flex items-start gap-2.5">
+              <span data-design-reference-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200" aria-hidden="true">1</span>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-amber-950 dark:text-amber-100">
+                  <Lightbulb className="h-4 w-4" aria-hidden="true" />
+                  {t("coreIdea")}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-amber-800/80 dark:text-amber-200/75">{t("coreIdeaDesc")}</p>
+              </div>
+            </div>
+            <article className="mt-3 rounded-md border border-amber-200/70 bg-background/85 p-3 dark:border-amber-800/50">
+              <ul className="list-disc space-y-0.5 pl-5 text-foreground">
+                {coreIdeaLines.map((line, i) => <li key={i}>{line}</li>)}
+              </ul>
+              {learningGuides?.coreIdea && (
+                <dl data-student-understanding-guide="core-idea" className="mt-3 space-y-2 border-t border-amber-200/70 pt-3 text-xs dark:border-amber-800/50">
+                  {learningGuides.coreIdea.explanation && <div><dt className="font-semibold">{t("easyExplanation")}</dt><dd className="mt-0.5 leading-relaxed text-muted-foreground">{learningGuides.coreIdea.explanation}</dd></div>}
+                  {learningGuides.coreIdea.lifeConnection && <div><dt className="font-semibold">{t("lifeConnection")}</dt><dd className="mt-0.5 leading-relaxed text-muted-foreground">{learningGuides.coreIdea.lifeConnection}</dd></div>}
+                  {learningGuides.coreIdea.keywords.length > 0 && <div><dt className="font-semibold">{t("keyWords")}</dt><dd className="mt-1 flex flex-wrap gap-1.5">{learningGuides.coreIdea.keywords.map((keyword, index) => <span key={`${keyword.term}-${index}`} className="rounded border border-border bg-background px-2 py-1"><strong>{keyword.term}</strong>{keyword.meaning ? `: ${keyword.meaning}` : ""}</span>)}</dd></div>}
+                </dl>
+              )}
+            </article>
           </section>
         )}
         {sentences.length > 0 && (
-          <section>
-            <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("coreSentences")}</p>
-            <p className="text-[11px] leading-snug text-muted-foreground">{t("coreSentencesDesc")}</p>
-            <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-foreground">
-              {sentences.map((s, i) => {
-                const guide = learningGuides?.coreSentences.find((item) => item.index === i);
-                return <li key={i}>{s}{guide?.explanation && <div className="mt-1 border-l-2 border-blue-300 pl-2 text-xs"><span className="font-semibold">{t("easySentence")}</span><p className="text-muted-foreground">{guide.explanation}</p></div>}</li>;
+          <section
+            data-design-reference-section="core-sentence"
+            className="rounded-lg border border-sky-200/80 bg-sky-50/70 p-3 dark:border-sky-800/60 dark:bg-sky-950/20"
+          >
+            <div className="flex items-start gap-2.5">
+              <span data-design-reference-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-800 dark:bg-sky-900/60 dark:text-sky-200" aria-hidden="true">2</span>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-sky-950 dark:text-sky-100">
+                  <AlignLeft className="h-4 w-4" aria-hidden="true" />
+                  {t("coreSentences")}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-sky-800/80 dark:text-sky-200/75">{t("coreSentencesDesc")}</p>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              {sentences.map((sentence, index) => {
+                const guide = learningGuides?.coreSentences.find((item) => item.index === index);
+                return (
+                  <article key={index} className="rounded-md border border-sky-200/70 bg-background/85 p-3 dark:border-sky-800/50">
+                    <p className="font-medium leading-relaxed text-foreground">{sentence}</p>
+                    {guide?.explanation && (
+                      <div data-student-understanding-guide="core-sentence" className="mt-3 border-t border-sky-200/70 pt-3 text-xs dark:border-sky-800/50">
+                        <p className="font-semibold">{t("easySentence")}</p>
+                        <p className="mt-0.5 leading-relaxed text-muted-foreground">{guide.explanation}</p>
+                      </div>
+                    )}
+                  </article>
+                );
               })}
-            </ul>
+            </div>
           </section>
         )}
         {essential.length > 0 && (
-          <section>
-            <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("essentialQuestions")}</p>
-            <p className="text-[11px] leading-snug text-muted-foreground">{t("essentialQuestionsDesc")}</p>
-            <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-foreground">
-              {essential.map((s, i) => {
-                const guide = learningGuides?.essentialQuestions.find((item) => item.index === i);
-                return <li key={i}>{s}{guide && <dl className="mt-1 border-l-2 border-amber-300 pl-2 text-xs">{guide.thinkingFocus && <div><dt className="font-semibold">{t("questionFocus")}</dt><dd className="text-muted-foreground">{guide.thinkingFocus}</dd></div>}{guide.perspectives.length > 0 && <div className="mt-1"><dt className="font-semibold">{t("thinkingPerspectives")}</dt><dd className="mt-0.5 flex flex-wrap gap-1">{guide.perspectives.map((item) => <span key={item} className="rounded border border-border bg-background px-1.5 py-0.5">{item}</span>)}</dd></div>}</dl>}</li>;
+          <section
+            data-design-reference-section="essential-question"
+            className="rounded-lg border border-violet-200/80 bg-violet-50/70 p-3 dark:border-violet-800/60 dark:bg-violet-950/20"
+          >
+            <div className="flex items-start gap-2.5">
+              <span data-design-reference-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800 dark:bg-violet-900/60 dark:text-violet-200" aria-hidden="true">3</span>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-violet-950 dark:text-violet-100">
+                  <CircleHelp className="h-4 w-4" aria-hidden="true" />
+                  {t("essentialQuestions")}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-violet-800/80 dark:text-violet-200/75">{t("essentialQuestionsDesc")}</p>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              {essential.map((question, index) => {
+                const guide = learningGuides?.essentialQuestions.find((item) => item.index === index);
+                return (
+                  <article key={index} className="rounded-md border border-violet-200/70 bg-background/85 p-3 dark:border-violet-800/50">
+                    <p className="font-medium leading-relaxed text-foreground">{question}</p>
+                    {guide && (
+                      <dl data-student-understanding-guide="essential-question" className="mt-3 space-y-2 border-t border-violet-200/70 pt-3 text-xs dark:border-violet-800/50">
+                        {guide.thinkingFocus && <div><dt className="font-semibold">{t("questionFocus")}</dt><dd className="mt-0.5 leading-relaxed text-muted-foreground">{guide.thinkingFocus}</dd></div>}
+                        {guide.perspectives.length > 0 && <div><dt className="font-semibold">{t("thinkingPerspectives")}</dt><dd className="mt-1 flex flex-wrap gap-1">{guide.perspectives.map((item) => <span key={item} className="rounded border border-border bg-background px-1.5 py-0.5">{item}</span>)}</dd></div>}
+                      </dl>
+                    )}
+                  </article>
+                );
               })}
-            </ul>
+            </div>
           </section>
         )}
         {inquiry.length > 0 && (
-          <section>
-            <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300">{t("inquiryQuestions")}</p>
-            <p className="text-[11px] leading-snug text-muted-foreground">{t("inquiryQuestionsDesc")}</p>
-            <ul className="mt-2 space-y-2 text-foreground">
+          <section
+            data-design-reference-section="inquiry-question"
+            className="rounded-lg border border-emerald-200/80 bg-emerald-50/70 p-3 dark:border-emerald-800/60 dark:bg-emerald-950/20"
+          >
+            <div className="flex items-start gap-2.5">
+              <span data-design-reference-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200" aria-hidden="true">4</span>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-950 dark:text-emerald-100">
+                  <Search className="h-4 w-4" aria-hidden="true" />
+                  {t("inquiryQuestions")}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-emerald-800/80 dark:text-emerald-200/75">{t("inquiryQuestionsDesc")}</p>
+              </div>
+            </div>
+            <ul className="mt-3 space-y-2 text-foreground">
               {inquiry.map((q, i) => (
                 <StudentInquiryQuestionReference key={i} question={q} typeLabel={typeLabel(q.type)} />
               ))}
