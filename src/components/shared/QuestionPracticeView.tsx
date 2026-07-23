@@ -36,6 +36,8 @@ import {
   localizePracticeQuizItem,
   localizePracticeTransformItem,
 } from "@/lib/question-practice-localization";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
+import { useLearningSounds } from "@/lib/learning-sounds";
 
 // /api/practice/bank 응답 — 담당 교사가 만든 커스텀 문항(내장 은행에 병합)
 interface CustomBank {
@@ -85,6 +87,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   const tCls = useTranslations("classification");
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { play: playSound } = useLearningSounds();
   const [tab, setTab] = useState<PracticeTab>(initialSelection?.tab ?? "quiz");
 
   const typeLabel = (target: TransformTarget) =>
@@ -192,6 +195,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
       if (typeof data.awarded === "number" && data.awarded > 0) {
         void queryClient.invalidateQueries({ queryKey: ["points-card"] });
       }
+      playSound(correct && data.awarded > 0 ? "point" : correct ? "success" : "retry");
       if (correct) setQuizAward(data);
     } catch (error) {
       if (quizRequestRef.current === requestId) {
@@ -397,6 +401,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
       }
       if (checkRequestRef.current !== requestId) return;
       setCheckResult(data);
+      playSound(data.achieved && data.awarded > 0 ? "point" : data.achieved ? "success" : "retry");
     } catch (err) {
       if (checkRequestRef.current !== requestId) return;
       setCheckError(err instanceof Error ? err.message : t("aiError"));
@@ -520,21 +525,24 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
   return (
     <div className="space-y-6">
       {/* 연습 모드 탭 */}
-      <div className="flex gap-2" role="tablist" aria-label={t("title")}>
-        {(["quiz", "transform", "create"] as const).map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            onClick={() => switchTab(key)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-              tab === key ? "bg-indigo-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/70"
-            }`}
-          >
-            {t(`tab_${key}`)}
-          </button>
-        ))}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label={t("title")}>
+          {(["quiz", "transform", "create"] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => switchTab(key)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                tab === key ? "bg-indigo-600 text-white" : "bg-muted text-muted-foreground hover:bg-muted/70"
+              }`}
+            >
+              {t(`tab_${key}`)}
+            </button>
+          ))}
+        </div>
+        <LearningSoundToggle />
       </div>
 
       {/* 모드 1: 분류 연습 */}

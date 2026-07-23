@@ -16,6 +16,8 @@ import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 import { useGameRun } from "./useGameRun";
 import { GameLearningSummary } from "./GameLearningSummary";
+import { useLearningSounds } from "@/lib/learning-sounds";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
 
 interface AIFeedback { verdict: KabaVerdict; reason: string; cheer: string }
 interface RoundEntry { original: string; student: string; isCorrect: boolean; playerName: string; feedback?: AIFeedback }
@@ -27,6 +29,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
   const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const kabaText = getKabaText(locale);
+  const { play: playSound } = useLearningSounds();
   const { mode, players } = config;
   const isAI = mode === "ai";
   const isMulti = mode === "friend";
@@ -103,6 +106,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
       return;
     }
     const correct = saved.correct;
+    playSound(correct ? "success" : "retry");
 
     if (isAI) {
       const requestId = ++aiRequestRef.current;
@@ -190,6 +194,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
       <div className="max-w-lg mx-auto space-y-5">
         <div className="flex items-center gap-3">
           <button disabled={backBlocked} onClick={handleBack} className="text-muted-foreground hover:text-foreground text-sm disabled:cursor-not-allowed disabled:opacity-50">{text.backToList}</button>
+          <LearningSoundToggle />
         </div>
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-10 flex flex-col items-center gap-5">
           <div className="text-6xl">{"⭐".repeat(stars)}</div>
@@ -259,6 +264,7 @@ export default function KabaGame({ game, onBack, config }: Props) {
             <p className="text-white text-sm">{kabaText.subtitle}</p>
           </div>
         </div>
+        <LearningSoundToggle />
       </div>
 
       {runConflict && (

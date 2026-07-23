@@ -1911,6 +1911,10 @@
     "backShort": "← Back",
     "teacherPlayer": "Teacher"
   },
+  "learningSound": {
+    "turnOn": "Turn sound effects on",
+    "turnOff": "Turn sound effects off"
+  },
   "gamePlay": {
     "notFound": "Game not found",
     "backToList": "← List",

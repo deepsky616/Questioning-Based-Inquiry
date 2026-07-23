@@ -22,6 +22,10 @@ import {
   type MemoryRunCard,
   type UnconfirmedMemoryAction,
 } from "./useGameRun";
+import {
+  useLearningSoundEvent,
+  useLearningSounds,
+} from "@/lib/learning-sounds";
 
 interface Props {
   game: BuiltInGame;
@@ -51,9 +55,11 @@ export default function MemoryGame({ game, onBack, config }: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
+  const { play: playSound } = useLearningSounds();
   const isAI = config.mode === "ai";
   const studentName = config.players[0]?.trim() || text.me;
   const [phase, setPhase] = useState<"setup" | "starting" | "play">("setup");
+  const [soundStarted, setSoundStarted] = useState(false);
   const [selectedDifficulty, setSelectedDifficulty] =
     useState<MemoryDifficulty>("normal");
   const autoAiKeyRef = useRef<string | null>(null);
@@ -76,6 +82,18 @@ export default function MemoryGame({ game, onBack, config }: Props) {
 
   const requestBlocked = pending !== null || unconfirmedMemoryAction !== null;
   const inputBlocked = requestBlocked || Boolean(conflict);
+  const totalMatches = (run?.studentMatchCount ?? 0) + (run?.aiMatchCount ?? 0);
+  const soundActive = phase === "play" && soundStarted;
+  useLearningSoundEvent(
+    "success",
+    run && totalMatches > 0 ? `${run.id}:memory-match:${totalMatches}` : null,
+    soundActive,
+  );
+  useLearningSoundEvent(
+    "retry",
+    run?.memoryMissReveal ? `${run.id}:memory-miss:${run.memoryMissReveal.id}` : null,
+    soundActive,
+  );
 
   useEffect(() => {
     if (
@@ -132,6 +150,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
       autoAiKeyRef.current = null;
       autoResolveKeyRef.current = null;
       lastStudentCardRef.current = null;
+      setSoundStarted(false);
       setPhase("play");
     }
   }
@@ -141,6 +160,7 @@ export default function MemoryGame({ game, onBack, config }: Props) {
     autoAiKeyRef.current = null;
     autoResolveKeyRef.current = null;
     lastStudentCardRef.current = null;
+    setSoundStarted(false);
     setPhase("setup");
   }
 
@@ -159,6 +179,8 @@ export default function MemoryGame({ game, onBack, config }: Props) {
         : null;
     if (card.type !== expectedType) return;
     lastStudentCardRef.current = card.id;
+    setSoundStarted(true);
+    playSound("flip");
     void flipMemoryCard(card.id, run);
   }
 

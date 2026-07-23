@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CheckCircle2, Lightbulb } from "lucide-react";
 import {
@@ -8,6 +9,7 @@ import {
   type QuestionGameLearningStrength,
   type QuestionGameMode,
 } from "@/lib/question-game-learning-summary";
+import { useLearningSounds } from "@/lib/learning-sounds";
 
 interface Props {
   mode: QuestionGameMode;
@@ -42,6 +44,8 @@ export function GameLearningSummary({
 }: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
+  const { play, ready } = useLearningSounds();
+  const completionPlayedRef = useRef(false);
   const isEnglish = locale === "en";
   const summary = buildQuestionGameLearningSummary(questions, completedActivities);
   const modeLabels: Record<QuestionGameMode, string> = {
@@ -53,6 +57,12 @@ export function GameLearningSummary({
     count: summary.validQuestionCount,
   });
   const nextStep = t(NEXT_STEP_KEY[summary.nextStep]);
+
+  useEffect(() => {
+    if (!ready || completionPlayedRef.current) return;
+    completionPlayedRef.current = true;
+    play("complete");
+  }, [play, ready]);
 
   const measures = [
     {

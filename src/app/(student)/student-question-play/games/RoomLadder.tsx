@@ -683,6 +683,7 @@ function LadderInsufficientResult({
         subtitle={t("ladderEnded")}
         onLeave={onLeave}
         disabled={disabled}
+        showSound={false}
       />
       <section className="border-y border-border bg-card px-4 py-7 text-center text-card-foreground sm:px-6">
         <AlertTriangle

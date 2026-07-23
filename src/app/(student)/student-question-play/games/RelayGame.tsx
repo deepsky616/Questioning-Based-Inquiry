@@ -5,6 +5,8 @@ import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useGameRun } from "./useGameRun";
 import { GameLearningSummary } from "./GameLearningSummary";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
+import { useLearningSounds } from "@/lib/learning-sounds";
 import { getQuestionGameText, getRelayTopics, isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import { QUESTION_GAME_LIMITS } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
@@ -22,6 +24,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
   const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const presetTopics = getRelayTopics(locale);
+  const { play: playSound } = useLearningSounds();
   const { mode, players } = config;
   const isAI = mode === "ai";
   const isMulti = mode !== "solo";
@@ -183,6 +186,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
       return;
     }
 
+    playSound("success");
     if (isAI && savedRun.awaitingAiTurn) {
       await runAITurn(newChain, finalTopic, savedRun);
     } else if (isMulti) {
@@ -229,6 +233,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
               <p className="text-white text-sm">{text.relaySubtitle}</p>
             </div>
           </div>
+          <LearningSoundToggle />
         </div>
 
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-6 space-y-5">
@@ -317,6 +322,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
           >
             {text.backToList}
           </button>
+          <LearningSoundToggle />
         </div>
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 flex flex-col items-center gap-4">
           <div className="text-6xl">🏆</div>
@@ -427,6 +433,7 @@ export default function RelayGame({ game, onBack, config }: Props) {
             <p className="text-xs">{text.connectedCount}</p>
           </div>
         </div>
+        <LearningSoundToggle />
       </div>
 
       {/* 친구 모드 턴 표시 */}

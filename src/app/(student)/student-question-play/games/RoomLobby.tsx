@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
 import { getQuestionGameRule } from "@/lib/question-game-rules";
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
 
 const PLAYER_COLORS = ["#C2410C", "#1D4ED8", "#047857", "#6D28D9", "#B91C1C", "#BE185D", "#0F766E", "#A16207"];
 
@@ -47,6 +48,7 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
             <p className="text-white text-sm">{t("lobbyWithFriends")} 🎮</p>
           </div>
         </div>
+        <LearningSoundToggle />
       </div>
 
       {/* 방 코드 카드 */}

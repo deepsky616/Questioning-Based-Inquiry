@@ -21,6 +21,8 @@ import LadderQuestionComposer from "./LadderQuestionComposer";
 import { useAIPlay } from "./useAIPlay";
 import { useGameRun, type GameRunSnapshot } from "./useGameRun";
 import { GameLearningSummary } from "./GameLearningSummary";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
+import { useLearningSounds } from "@/lib/learning-sounds";
 
 const MAX_ROUNDS = QUESTION_GAME_RULES.ladder.targets.solo.count;
 const SOLO_COLUMN_COUNT = 4;
@@ -60,6 +62,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
+  const { play: playSound } = useLearningSounds();
   const isAI = config.mode === "ai";
   const columnCount = isAI ? AI_COLUMN_COUNT : SOLO_COLUMN_COUNT;
   const myName = config.players[0]?.trim() || text.me;
@@ -211,6 +214,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
     );
     if (!assignment) return;
 
+    playSound("reveal");
     setSelectedStartColumn(startColumn);
     setPhase("compose");
 
@@ -242,6 +246,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
       run,
     );
     if (!saved) return false;
+    playSound("success");
 
     const record: LocalQuestionRecord = {
       round,
@@ -343,6 +348,7 @@ export default function LadderGame({ game, onBack, config }: Props) {
             <p className="break-words text-sm text-white">{text.ladderSubtitle}</p>
           </div>
         </div>
+        <LearningSoundToggle />
       </header>
 
       {runConflict && (

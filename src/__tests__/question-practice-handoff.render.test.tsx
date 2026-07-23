@@ -6,6 +6,7 @@ import "@testing-library/jest-dom/vitest";
 import { NextIntlClientProvider } from "next-intl";
 import { QuestionPracticeView } from "@/components/shared/QuestionPracticeView";
 import type { PracticeSelection } from "@/lib/practice-selection";
+import { installMockAudioContext } from "@/__tests__/test-utils/mock-audio-context";
 import ko from "../../messages/ko.json";
 
 const { push, customBankState, invalidateQueries } = vi.hoisted(() => ({
@@ -104,6 +105,7 @@ beforeEach(() => {
   invalidateQueries.mockReset().mockResolvedValue(undefined);
   customBankState.current = undefined;
   sessionStorage.clear();
+  localStorage.clear();
   vi.spyOn(Math, "random").mockReturnValue(0);
   vi.stubGlobal(
     "fetch",
@@ -125,6 +127,50 @@ afterEach(() => {
 });
 
 describe("연습 질문 전달", () => {
+  it("공통 효과음을 켠 뒤 서버가 확정한 분류 결과에 피드백음을 재생한다", async () => {
+    const audio = installMockAudioContext();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ correct: true, awarded: 1 }),
+    }));
+    renderPractice("student", "student-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "효과음 켜기" }));
+    expect(localStorage.getItem("question-game-turn-sound")).toBe("on");
+    expect(audio.contexts).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "닫힌 질문" }));
+
+    await screen.findByText(/정답이에요/);
+    await waitFor(() => expect(audio.contexts).toHaveBeenCalledTimes(2));
+  });
+
+  it("목표에 이르지 못한 질문에도 다시 생각하기 효과음을 한 번만 재생한다", async () => {
+    localStorage.setItem("question-game-turn-sound", "on");
+    const audio = installMockAudioContext();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        achieved: false,
+        awarded: 0,
+        classification: { closure: "closed", cognitive: "factual" },
+      }),
+    }));
+    renderPractice("student", "student-1", {
+      tab: "transform",
+      quizMode: "cognitive",
+      focus: null,
+    });
+    fireEvent.change(screen.getByPlaceholderText("바꾼 질문을 써 보세요"), {
+      target: { value: "우리나라의 수도는 어디인가요?" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "AI에게 확인받기" }));
+
+    await screen.findByText(/아직 열린 질문이 아니에요/);
+    await waitFor(() => expect(audio.contexts).toHaveBeenCalledTimes(1));
+  });
+
   it("분류 연습에서 포인트가 실제 지급되면 포인트 카드를 새로 읽는다", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: true,

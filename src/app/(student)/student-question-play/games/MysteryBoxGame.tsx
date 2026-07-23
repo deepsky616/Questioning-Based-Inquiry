@@ -11,6 +11,8 @@ import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 import { GameHeader } from "./GameHeader";
 import { GameLearningSummary } from "./GameLearningSummary";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
+import { useLearningSounds } from "@/lib/learning-sounds";
 import {
   useGameRun,
   type MysteryRunHistoryItem,
@@ -32,6 +34,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const t = useTranslations("gamePlay");
   const mysteryLocale = locale === "en" ? "en" : "ko";
   const text = getQuestionGameText(locale);
+  const { play: playSound } = useLearningSounds();
   const isAI = config.mode === "ai";
   const studentName = config.players[0]?.trim() || text.me;
   const [phase, setPhase] = useState<"setup" | "starting" | "play">("setup");
@@ -123,7 +126,10 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     const normalized = question.trim();
     if (!normalized) return;
     const submitted = await submitMysteryQuestion(normalized, mysteryLocale, run);
-    if (submitted) setQuestion("");
+    if (submitted) {
+      if (submitted.run.status !== "SETTLED") playSound("reveal");
+      setQuestion("");
+    }
   }
 
   async function handleGuessSubmit(event: React.FormEvent) {
@@ -133,6 +139,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
     if (!normalized) return;
     const submitted = await submitMysteryGuess(normalized, mysteryLocale, run);
     if (submitted) {
+      if (submitted.run.status !== "SETTLED") playSound("retry");
       setGuess("");
       setIsGuessing(false);
     }
@@ -148,7 +155,10 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
         uncertain.locale,
         run,
       );
-      if (submitted) setQuestion("");
+      if (submitted) {
+        if (submitted.run.status !== "SETTLED") playSound("reveal");
+        setQuestion("");
+      }
       return;
     }
     if (uncertain?.action === "mystery-submit-guess") {
@@ -158,6 +168,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
         run,
       );
       if (submitted) {
+        if (submitted.run.status !== "SETTLED") playSound("retry");
         setGuess("");
         setIsGuessing(false);
       }
@@ -194,6 +205,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
               </p>
             </div>
           </div>
+          <LearningSoundToggle />
         </div>
         <section className="space-y-5 rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
           <div className="text-center">

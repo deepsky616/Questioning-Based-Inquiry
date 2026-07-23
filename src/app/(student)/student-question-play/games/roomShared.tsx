@@ -3,6 +3,7 @@
 import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
 import { useLocale, useTranslations } from "next-intl";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
 
 export const PLAYER_COLORS = [
   "#C2410C", "#1D4ED8", "#047857", "#6D28D9",
@@ -22,12 +23,14 @@ export function RoomHeader({
   subtitle,
   onLeave,
   disabled = false,
+  showSound = true,
 }: {
   game: BuiltInGame;
   room: GameRoom;
   subtitle?: string;
   onLeave: () => void;
   disabled?: boolean;
+  showSound?: boolean;
 }) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
@@ -56,6 +59,7 @@ export function RoomHeader({
           <p className="text-xs">{text.inProgress}</p>
         </div>
       </div>
+      {showSound && <LearningSoundToggle />}
     </div>
   );
 }

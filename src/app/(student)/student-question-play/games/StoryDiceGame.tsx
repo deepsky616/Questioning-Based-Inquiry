@@ -19,6 +19,7 @@ import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 import { useGameRun, type GameRunSnapshot } from "./useGameRun";
 import { GameLearningSummary } from "./GameLearningSummary";
+import { useLearningSounds } from "@/lib/learning-sounds";
 
 interface ChainItem { type: "story" | "question" | "answer"; text: string; author: string; isAI?: boolean }
 
@@ -36,6 +37,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
+  const { play: playSound } = useLearningSounds();
   const { mode, players } = config;
   const isAI = mode === "ai";
   const isMulti = mode !== "solo";
@@ -103,6 +105,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     if (!words || !run || rolling || runBusy || runConflict) return;
     clearRunError();
     setLocalError(null);
+    playSound("start");
     setRolling({ protagonist: "?", place: "?", event: "?" });
     const saved = await rollStoryDiceRun(run);
     const final = saved?.storyRolledWords;
@@ -123,6 +126,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
         if (rollTimerRef.current) clearInterval(rollTimerRef.current);
         rollTimerRef.current = null;
         setRolling(null);
+        playSound("reveal");
         setPhase("story");
       }
     }, 100);

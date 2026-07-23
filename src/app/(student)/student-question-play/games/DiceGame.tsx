@@ -10,6 +10,8 @@ import { getQuestionDiceTypes, getQuestionGameText } from "@/lib/question-game-i
 import { QUESTION_GAME_LIMITS, QUESTION_GAME_RULES } from "@/lib/question-game-rules";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
+import { useLearningSounds } from "@/lib/learning-sounds";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
 
 const DOT_POSITIONS: Record<number, [number, number][]> = {
   1: [[50, 50]],
@@ -44,6 +46,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
   const [feedback, setFeedback] = useState("");
 
   const { ask, loading: aiLoading } = useAIPlay();
+  const { play: playSound } = useLearningSounds();
   const {
     run,
     result: runResult,
@@ -120,6 +123,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
     if (!rolledRun || !final) return;
 
     const rolledByAi = rolledRun.pendingRoll?.actor === "AI";
+    playSound("start");
     setPhase("rolling");
     setQuestion("");
     if (rolledByAi) setAiQuestion("");
@@ -133,6 +137,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
       rollTimerRef.current = null;
       setDisplayFace(final);
       setCurrentFace(final);
+      playSound("reveal");
       if (rolledByAi) {
         setPhase("ai-turn");
         void recordAiQuestion(rolledRun);
@@ -155,6 +160,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
     clearRunError();
     const saved = await submitDiceQuestion(trimmed, locale);
     if (!saved) return;
+    playSound("success");
     const studentEntry: RoundEntry = {
       player: currentPlayer,
       face: currentFace,
@@ -216,6 +222,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
             <span className="text-4xl">{game.emoji}</span>
             <h1 className="text-xl font-black">{game.title}</h1>
           </div>
+          <LearningSoundToggle />
         </div>
         <div className="bg-card text-foreground rounded-2xl shadow-sm border border-border p-8 text-center space-y-3">
           <div className="text-6xl">🎲</div>
@@ -293,6 +300,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
             <p className="text-white text-sm">{game.description}</p>
           </div>
         </div>
+        <LearningSoundToggle />
       </div>
 
       {runConflict && (

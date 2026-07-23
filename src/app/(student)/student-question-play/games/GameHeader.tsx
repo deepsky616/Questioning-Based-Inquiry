@@ -3,6 +3,7 @@
 import type { BuiltInGame } from "@/lib/question-games-data";
 import { useLocale } from "next-intl";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
 
 interface GameHeaderProps {
   game: BuiltInGame;
@@ -24,7 +25,7 @@ export function GameHeader({ game, subtitle, onBack, backDisabled = false }: Gam
         {text.backToList}
       </button>
       <div
-        className="flex-1 rounded-2xl py-4 px-6 text-white flex items-center gap-4"
+        className="min-w-0 flex-1 rounded-2xl py-4 px-4 text-white flex items-center gap-3 sm:px-6 sm:gap-4"
         style={{ background: game.gradientCss }}
       >
         <span className="text-4xl">{game.emoji}</span>
@@ -33,6 +34,7 @@ export function GameHeader({ game, subtitle, onBack, backDisabled = false }: Gam
           <p className="text-white text-sm">{subtitle}</p>
         </div>
       </div>
+      <LearningSoundToggle />
     </div>
   );
 }
