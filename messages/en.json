@@ -1913,7 +1913,12 @@
   },
   "learningSound": {
     "turnOn": "Turn sound effects on",
-    "turnOff": "Turn sound effects off"
+    "turnOff": "Turn sound effects off",
+    "guideLabel": "Sound effects guide",
+    "guideTitle": "Would you like to use sound effects?",
+    "guideDescription": "Hear cues for turns, success, and completion.",
+    "guideEnable": "Use sound effects",
+    "guideDismiss": "Not now"
   },
   "gamePlay": {
     "notFound": "Game not found",

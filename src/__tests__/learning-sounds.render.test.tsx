@@ -1,8 +1,17 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
 import { installMockAudioContext } from "@/__tests__/test-utils/mock-audio-context";
+import { renderWithIntl } from "@/__tests__/test-utils/render-with-intl";
 import {
   LEARNING_SOUND_KEY,
   useLearningSoundEvent,
@@ -51,5 +60,78 @@ describe("학습 효과음 사건 재생", () => {
 
     view.rerender(<SoundEvent active eventKey="round-1" />);
     await waitFor(() => expect(audio.contexts).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("학습 효과음 첫 안내", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    window.history.replaceState({}, "", "/student-practice");
+  });
+
+  afterEach(() => {
+    cleanup();
+    localStorage.clear();
+  });
+
+  it("학생에게 안내를 처음 한 번만 보여 준다", async () => {
+    const first = renderWithIntl(<LearningSoundToggle />);
+
+    expect(await screen.findByText("차례, 성공, 완료를 소리로 알 수 있어요.")).toBeTruthy();
+    first.unmount();
+
+    renderWithIntl(<LearningSoundToggle />);
+    await waitFor(() => {
+      expect(screen.queryByText("차례, 성공, 완료를 소리로 알 수 있어요.")).toBeNull();
+    });
+  });
+
+  it("한 화면에 소리 버튼이 여러 개여도 안내는 하나만 보여 준다", async () => {
+    renderWithIntl(
+      <>
+        <LearningSoundToggle />
+        <LearningSoundToggle />
+      </>,
+    );
+
+    expect(
+      await screen.findAllByText("차례, 성공, 완료를 소리로 알 수 있어요."),
+    ).toHaveLength(1);
+  });
+
+  it("효과음 켜기를 선택하면 설정을 저장하고 안내를 닫는다", async () => {
+    installMockAudioContext();
+    renderWithIntl(<LearningSoundToggle />);
+
+    const guide = await screen.findByRole("region", { name: "효과음 안내" });
+    fireEvent.click(within(guide).getByRole("button", { name: "효과음 사용하기" }));
+
+    await waitFor(() => {
+      expect(localStorage.getItem(LEARNING_SOUND_KEY)).toBe("on");
+      expect(screen.queryByText("차례, 성공, 완료를 소리로 알 수 있어요.")).toBeNull();
+    });
+    expect(screen.getByRole("button", { name: "효과음 끄기" })).toBeTruthy();
+  });
+
+  it("괜찮아요를 선택하면 꺼짐을 저장하고 안내를 닫는다", async () => {
+    renderWithIntl(<LearningSoundToggle />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "괜찮아요" }));
+
+    await waitFor(() => {
+      expect(localStorage.getItem(LEARNING_SOUND_KEY)).toBe("off");
+      expect(screen.queryByText("차례, 성공, 완료를 소리로 알 수 있어요.")).toBeNull();
+    });
+  });
+
+  it("학생과 교사의 안내 확인 기록을 구분한다", async () => {
+    const student = renderWithIntl(<LearningSoundToggle />);
+    expect(await screen.findByText("차례, 성공, 완료를 소리로 알 수 있어요.")).toBeTruthy();
+    student.unmount();
+
+    window.history.replaceState({}, "", "/teacher-practice");
+    renderWithIntl(<LearningSoundToggle />);
+
+    expect(await screen.findByText("차례, 성공, 완료를 소리로 알 수 있어요.")).toBeTruthy();
   });
 });

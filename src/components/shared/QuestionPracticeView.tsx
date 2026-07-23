@@ -542,7 +542,7 @@ export function QuestionPracticeView({ audience, studentId, initialSelection }: 
             </button>
           ))}
         </div>
-        <LearningSoundToggle />
+        <LearningSoundToggle audience={audience} />
       </div>
 
       {/* 모드 1: 분류 연습 */}

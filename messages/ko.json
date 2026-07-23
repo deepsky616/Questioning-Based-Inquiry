@@ -1913,7 +1913,12 @@
   },
   "learningSound": {
     "turnOn": "효과음 켜기",
-    "turnOff": "효과음 끄기"
+    "turnOff": "효과음 끄기",
+    "guideLabel": "효과음 안내",
+    "guideTitle": "효과음을 사용해 볼까요?",
+    "guideDescription": "차례, 성공, 완료를 소리로 알 수 있어요.",
+    "guideEnable": "효과음 사용하기",
+    "guideDismiss": "괜찮아요"
   },
   "gamePlay": {
     "notFound": "게임을 찾을 수 없어요",
