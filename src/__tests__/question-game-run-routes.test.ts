@@ -2757,18 +2757,18 @@ describe("까바놀이 서버 실행 경로", () => {
   it("서버가 질문 꼴을 판정하고 화면의 문장과 정답값을 무시하며 같은 요청을 한 번만 기록한다", async () => {
     await createKaba();
     const state = runs.get("run-1")?.state as { sentencePlan: string[] };
-    const catIndex = state.sentencePlan.indexOf("kaba-01");
-    if (catIndex >= 0) {
-      [state.sentencePlan[0], state.sentencePlan[catIndex]] = [
-        state.sentencePlan[catIndex],
+    const appleIndex = state.sentencePlan.indexOf("kaba-05");
+    if (appleIndex >= 0) {
+      [state.sentencePlan[0], state.sentencePlan[appleIndex]] = [
+        state.sentencePlan[appleIndex],
         state.sentencePlan[0],
       ];
     } else {
-      state.sentencePlan[0] = "kaba-01";
+      state.sentencePlan[0] = "kaba-05";
     }
     const correct = await submitKabaAttempt(
       0,
-      "고양이가 자나요?",
+      "사과가 빨갛니?",
       1,
       "run-1",
       "ko",
@@ -2776,7 +2776,7 @@ describe("까바놀이 서버 실행 경로", () => {
     );
     const replay = await submitKabaAttempt(
       0,
-      "고양이가 자나요?",
+      "사과가 빨갛니?",
       1,
       "run-1",
       "ko",
@@ -2823,7 +2823,7 @@ describe("까바놀이 서버 실행 경로", () => {
       ]);
     }
     const stored = JSON.stringify({ state: runs.get("run-1")?.state, activities });
-    expect(stored).not.toContain("고양이가 자나요?");
+    expect(stored).not.toContain("사과가 빨갛니?");
     expect(stored).not.toContain("이 문장은 질문이 아닙니다");
     expect(stored).not.toContain("화면이 바꾼 문장");
   });

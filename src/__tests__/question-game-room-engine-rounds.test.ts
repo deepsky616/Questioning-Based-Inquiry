@@ -131,6 +131,29 @@ function preparedKaba(count: number, random = () => 0): GameRoom {
   }));
 }
 
+function preparedKabaWithFirstSentence(sentence: string): GameRoom {
+  const room = preparedKaba(2);
+  const state = readKabaPublicState(room.gameState)!;
+  const selectedSentence = getKabaSentencePairs().find(
+    ({ text }) => text.ko === sentence,
+  );
+  if (!selectedSentence) throw new Error("missing kaba sentence");
+
+  const selectedIndex = state.sentencePlan.findIndex(
+    ({ text }) => text.ko === sentence,
+  );
+  const sentencePlan = [...state.sentencePlan];
+  if (selectedIndex >= 0) {
+    [sentencePlan[0], sentencePlan[selectedIndex]] = [
+      sentencePlan[selectedIndex],
+      sentencePlan[0],
+    ];
+  } else {
+    sentencePlan[0] = selectedSentence;
+  }
+  return { ...room, gameState: { ...state, sentencePlan } };
+}
+
 function completedRoom(gameId: "dice" | "relay" | "kaba"): GameRoom {
   if (gameId === "dice") {
     let room = start("dice", 2);
@@ -380,38 +403,31 @@ describe("카바 판정기", () => {
     }).kind).toBe("invalid");
   });
 
-  it("원문과 다른 내용을 질문 꼴로만 바꾼 시도는 오답으로 판정한다", () => {
-    const prepareFrogRoom = () => {
-      const room = preparedKaba(2);
-      const state = readKabaPublicState(room.gameState)!;
-      const frogSentence = getKabaSentencePairs().find(
-        ({ text }) => text.ko === "개구리가 울다",
-      );
-      expect(frogSentence).toBeDefined();
-      const frogIndex = state.sentencePlan.findIndex(
-        ({ text }) => text.ko === "개구리가 울다",
-      );
-      const sentencePlan = [...state.sentencePlan];
-      if (frogIndex >= 0) {
-        [sentencePlan[0], sentencePlan[frogIndex]] = [
-          sentencePlan[frogIndex],
-          sentencePlan[0],
-        ];
-      } else {
-        sentencePlan[0] = frogSentence!;
-      }
-      return { ...room, gameState: { ...state, sentencePlan } };
-    };
+  it("자연스러운 짧은 질문을 친구방에서도 정답으로 판정한다", () => {
+    const matching = changed(run(
+      preparedKabaWithFirstSentence("사과가 빨갛다"),
+      "host",
+      "kaba-submit-question",
+      92,
+      { locale: "ko", question: "사과가 빨갛니?" },
+    ));
 
+    expect(readKabaPublicState(matching.gameState)?.attempts[0]).toMatchObject({
+      question: "사과가 빨갛니?",
+      correct: true,
+    });
+  });
+
+  it("원문과 다른 내용을 질문 꼴로만 바꾼 시도는 오답으로 판정한다", () => {
     const unrelated = changed(run(
-      prepareFrogRoom(),
+      preparedKabaWithFirstSentence("개구리가 울다"),
       "host",
       "kaba-submit-question",
       93,
       { locale: "ko", question: "개구리가 노나요?" },
     ));
     const matching = changed(run(
-      prepareFrogRoom(),
+      preparedKabaWithFirstSentence("개구리가 울다"),
       "host",
       "kaba-submit-question",
       94,

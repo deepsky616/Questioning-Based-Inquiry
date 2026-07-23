@@ -19,6 +19,14 @@ const VALID_QUESTIONS = {
   ],
 } as const;
 
+const NATURAL_INFORMAL_QUESTIONS = [
+  "고양이가 자니?", "개미가 걷니?", "토끼가 뛰니?", "꽃이 예쁘니?", "사과가 빨갛니?",
+  "하늘이 파랗니?", "비가 오니?", "새가 날아가니?", "강아지가 짖니?", "물고기가 헤엄치니?",
+  "아이가 웃니?", "나무가 흔들리니?", "별이 빛나니?", "바람이 부니?", "눈이 내리니?",
+  "나비가 날개를 펴니?", "달이 밝니?", "파도가 치니?", "벌이 꿀을 모으니?", "원숭이가 나무에 오르니?",
+  "햇빛이 따뜻하니?", "구름이 하얗니?", "고래가 바다에 사니?", "개구리가 우니?", "아기 새가 둥지에 있니?",
+] as const;
+
 describe("까바놀이 내용 보존 판정", () => {
   it.each(["ko", "en"] as const)("%s 문장 스물다섯 개의 알맞은 질문을 모두 인정한다", (locale) => {
     KABA_SENTENCES[locale].forEach((sentence, index) => {
@@ -27,6 +35,25 @@ describe("까바놀이 내용 보존 판정", () => {
         `${sentence} -> ${VALID_QUESTIONS[locale][index]}`,
       ).toBe(true);
     });
+  });
+
+  it("한국어 문장 스물다섯 개의 자연스러운 짧은 질문을 모두 인정한다", () => {
+    KABA_SENTENCES.ko.forEach((sentence, index) => {
+      expect(
+        isKabaQuestionRewrite(sentence, NATURAL_INFORMAL_QUESTIONS[index], "ko"),
+        `${sentence} -> ${NATURAL_INFORMAL_QUESTIONS[index]}`,
+      ).toBe(true);
+    });
+  });
+
+  it.each([
+    ["사과가 빨갛다", "사과가 빨갛냐?"],
+    ["하늘이 파랗다", "하늘이 파랗냐?"],
+    ["달이 밝다", "달이 밝냐?"],
+    ["햇빛이 따뜻하다", "햇빛이 따뜻하냐?"],
+    ["아기 새가 둥지에 있다", "아기 새가 둥지에 있냐?"],
+  ])("자연스러운 짧은 물음 어미도 인정한다", (sentence, question) => {
+    expect(isKabaQuestionRewrite(sentence, question, "ko")).toBe(true);
   });
 
   it.each([
@@ -41,6 +68,15 @@ describe("까바놀이 내용 보존 판정", () => {
     ["The baby bird is in the nest", "Does the baby bird leave the nest?", "en"],
   ])("핵심 행동이나 대상이 바뀐 질문을 거절한다", (sentence, question, locale) => {
     expect(isKabaQuestionRewrite(sentence, question, locale)).toBe(false);
+  });
+
+  it.each([
+    ["사과가 빨갛다", "사과가 안 빨갛니?"],
+    ["사과가 빨갛다", "사과가 안빨갛니?"],
+    ["하늘이 파랗다", "하늘이 파랗지 않니?"],
+    ["고래가 바다에 산다", "고래가 바다에 안 사니?"],
+  ])("원문의 뜻을 반대로 바꾼 질문을 거절한다", (sentence, question) => {
+    expect(isKabaQuestionRewrite(sentence, question, "ko")).toBe(false);
   });
 
   it.each([
