@@ -3,10 +3,25 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
-import { AI_BONUS_TYPES, BASE_POINTS, shouldShowPointReason } from "@/lib/points-policy";
+import {
+  AI_BONUS_TYPES,
+  BASE_POINTS,
+  DAILY_LIMITS,
+  MAX_BONUS_PER_STUDENT,
+  MAX_BONUSES_PER_STUDENT,
+  shouldShowPointReason,
+} from "@/lib/points-policy";
 import { usePointBonusLabel } from "@/components/shared/use-point-label";
+import { MAX_ACTIVITY_BONUS_PER_STUDENT } from "@/lib/activity-bonus-policy";
 import { ACTIVITY_BASE_POINTS } from "@/lib/content-normalize";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PRACTICE_DAILY_CAP, PRACTICE_POINTS } from "@/lib/practice-points";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 
@@ -151,9 +166,10 @@ export default function PointsCard() {
 
       {/* 포인트 획득 방법 안내 */}
       <Dialog open={showGuide} onOpenChange={setShowGuide}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-h-[85vh] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t("guideTitle")}</DialogTitle>
+            <DialogDescription>{t("guideDesc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">
             <div className="rounded-lg border bg-card p-3">
@@ -162,6 +178,7 @@ export default function PointsCard() {
                 <li>{t("writeQuestion")} <b className="text-indigo-600">{t("pointsSuffix", { n: ACTIVITY_BASE_POINTS.QUESTION_WRITE })}</b></li>
                 <li>{t("writeComment")} <b className="text-indigo-600">{t("pointsSuffix", { n: ACTIVITY_BASE_POINTS.COMMENT_WRITE })}</b></li>
               </ul>
+              <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{t("writeLimitNote")}</p>
             </div>
             <div className="rounded-lg border bg-card p-3">
               <p className="font-semibold text-foreground">{t("gameSection")}</p>
@@ -171,7 +188,25 @@ export default function PointsCard() {
                 <li>{t("completion")} <b className="text-indigo-600">{t("pointsSuffix", { n: BASE_POINTS.COMPLETION })}</b></li>
                 <li>{t("winner")} <b className="text-indigo-600">{t("pointsSuffix", { n: BASE_POINTS.WINNER_BONUS })}</b></li>
               </ul>
-              <p className="mt-1 text-xs text-muted-foreground">{t("soloNote")}</p>
+              <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{t("friendScoringNote")}</p>
+              <p className="mt-2 text-xs font-semibold leading-5 text-foreground">
+                {t("gameDailyLimits", {
+                  solo: DAILY_LIMITS.SOLO,
+                  ai: DAILY_LIMITS.AI,
+                  friend: DAILY_LIMITS.FRIEND,
+                })}
+              </p>
+              <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{t("gameDailyLimitNote")}</p>
+            </div>
+            <div className="rounded-lg border bg-card p-3">
+              <p className="font-semibold text-foreground">{t("practiceSection")}</p>
+              <ul className="mt-1 space-y-0.5 text-muted-foreground">
+                <li>{t("practiceQuiz")} <b className="text-indigo-600">{t("pointsSuffix", { n: PRACTICE_POINTS.QUIZ_CORRECT })}</b></li>
+                <li>{t("practiceTarget")} <b className="text-indigo-600">{t("pointsSuffix", { n: PRACTICE_POINTS.TARGET_ACHIEVED })}</b></li>
+              </ul>
+              <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                {t("practiceLimitNote", { cap: PRACTICE_DAILY_CAP })}
+              </p>
             </div>
             <div className="rounded-lg border bg-card p-3">
               <p className="font-semibold text-foreground">{t("specialSection")}</p>
@@ -181,6 +216,17 @@ export default function PointsCard() {
                 ))}
               </ul>
               <p className="mt-1 text-xs text-muted-foreground">{t("aiNote")}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {t("specialLimitNote", {
+                  count: MAX_BONUSES_PER_STUDENT,
+                  points: MAX_BONUS_PER_STUDENT,
+                })}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {t("classBonusLimitNote", {
+                  points: MAX_ACTIVITY_BONUS_PER_STUDENT,
+                })}
+              </p>
             </div>
           </div>
         </DialogContent>
