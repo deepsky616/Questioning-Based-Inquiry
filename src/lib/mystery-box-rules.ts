@@ -64,10 +64,22 @@ export const MYSTERY_FACTS = [
 export type MysteryFact = typeof MYSTERY_FACTS[number];
 export type MysteryV4Fact = typeof MYSTERY_V4_FACTS[number];
 export type MysteryFactValue = boolean | "unknown";
-export type MysteryKnowledgeVersion = 1 | 2 | 3 | 4;
-export const CURRENT_MYSTERY_KNOWLEDGE_VERSION: MysteryKnowledgeVersion = 4;
+export type MysteryKnowledgeVersion = 1 | 2 | 3 | 4 | 5;
+export const CURRENT_MYSTERY_KNOWLEDGE_VERSION: MysteryKnowledgeVersion = 5;
 export type MysteryLocale = "ko" | "en";
 export type MysteryAnswer = "yes" | "no" | "unknown";
+
+export const MYSTERY_CATEGORIES = [
+  "animal",
+  "plant",
+  "food",
+  "object",
+  "vehicle",
+  "instrument",
+  "nature",
+  "imaginary",
+] as const;
+export type MysteryCategory = typeof MYSTERY_CATEGORIES[number];
 
 export type MysteryQuestionAnalysis =
   | {
@@ -115,6 +127,8 @@ export interface MysteryItem {
   id: string;
   names: Record<MysteryLocale, string>;
   aliases: Record<MysteryLocale, string[]>;
+  category: MysteryCategory;
+  emoji: string;
   attributes: Record<MysteryAttribute, boolean>;
   facts: Record<MysteryFact, boolean>;
   factsV3: Record<MysteryFact, MysteryFactValue>;
@@ -123,11 +137,46 @@ export interface MysteryItem {
 
 type LegacyMysteryItem = Omit<MysteryItem, "facts" | "factsV3" | "factsV4">;
 
+type MysteryItemDefinition = LegacyMysteryItem & {
+  factOverrides?: Partial<Record<MysteryFact, boolean>>;
+  v4FactValues?: Partial<Record<MysteryV4Fact, MysteryFactValue>>;
+};
+
+function defineMysteryItem<const Id extends string>(input: {
+  id: Id;
+  names: Record<MysteryLocale, string>;
+  aliases: Record<MysteryLocale, string[]>;
+  category: MysteryCategory;
+  emoji: string;
+  trueAttributes: readonly MysteryAttribute[];
+  factOverrides?: Partial<Record<MysteryFact, boolean>>;
+  v4FactValues?: Partial<Record<MysteryV4Fact, MysteryFactValue>>;
+}): MysteryItemDefinition & { id: Id } {
+  const trueAttributes = new Set<MysteryAttribute>(input.trueAttributes);
+  return {
+    id: input.id,
+    names: input.names,
+    aliases: input.aliases,
+    category: input.category,
+    emoji: input.emoji,
+    attributes: Object.fromEntries(
+      MYSTERY_ATTRIBUTES.map((attribute) => [
+        attribute,
+        trueAttributes.has(attribute),
+      ]),
+    ) as Record<MysteryAttribute, boolean>,
+    ...(input.factOverrides ? { factOverrides: input.factOverrides } : {}),
+    ...(input.v4FactValues ? { v4FactValues: input.v4FactValues } : {}),
+  };
+}
+
 const MYSTERY_ITEM_DEFINITIONS = [
   {
     id: "apple",
     names: { ko: "사과", en: "apple" },
     aliases: { ko: ["풋사과"], en: ["green apple"] },
+    category: "food",
+    emoji: "🍎",
     attributes: {
       living: false,
       animal: false,
@@ -149,6 +198,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "puppy",
     names: { ko: "강아지", en: "puppy" },
     aliases: { ko: ["개"], en: ["dog"] },
+    category: "animal",
+    emoji: "🐶",
     attributes: {
       living: true,
       animal: true,
@@ -170,6 +221,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "book",
     names: { ko: "책", en: "book" },
     aliases: { ko: ["도서"], en: ["volume"] },
+    category: "object",
+    emoji: "📚",
     attributes: {
       living: false,
       animal: false,
@@ -191,6 +244,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "car",
     names: { ko: "자동차", en: "car" },
     aliases: { ko: ["승용차"], en: ["automobile"] },
+    category: "vehicle",
+    emoji: "🚗",
     attributes: {
       living: false,
       animal: false,
@@ -212,6 +267,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "butterfly",
     names: { ko: "나비", en: "butterfly" },
     aliases: { ko: ["나비벌레"], en: ["butterfly insect"] },
+    category: "animal",
+    emoji: "🦋",
     attributes: {
       living: true,
       animal: true,
@@ -233,6 +290,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "piano",
     names: { ko: "피아노", en: "piano" },
     aliases: { ko: ["건반 악기"], en: ["keyboard instrument"] },
+    category: "instrument",
+    emoji: "🎹",
     attributes: {
       living: false,
       animal: false,
@@ -254,6 +313,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "sun",
     names: { ko: "태양", en: "sun" },
     aliases: { ko: ["해"], en: ["the sun"] },
+    category: "nature",
+    emoji: "☀️",
     attributes: {
       living: false,
       animal: false,
@@ -275,6 +336,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "strawberry",
     names: { ko: "딸기", en: "strawberry" },
     aliases: { ko: ["산딸기"], en: ["berry"] },
+    category: "food",
+    emoji: "🍓",
     attributes: {
       living: false,
       animal: false,
@@ -296,6 +359,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "rocket",
     names: { ko: "로켓", en: "rocket" },
     aliases: { ko: ["우주 로켓"], en: ["space rocket"] },
+    category: "vehicle",
+    emoji: "🚀",
     attributes: {
       living: false,
       animal: false,
@@ -317,6 +382,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "sunflower",
     names: { ko: "해바라기", en: "sunflower" },
     aliases: { ko: ["해바라기꽃"], en: ["sunflower plant"] },
+    category: "plant",
+    emoji: "🌻",
     attributes: {
       living: true,
       animal: false,
@@ -338,6 +405,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "pencil",
     names: { ko: "연필", en: "pencil" },
     aliases: { ko: ["색연필"], en: ["writing pencil"] },
+    category: "object",
+    emoji: "✏️",
     attributes: {
       living: false,
       animal: false,
@@ -359,6 +428,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "snowman",
     names: { ko: "눈사람", en: "snowman" },
     aliases: { ko: ["눈 인형"], en: ["snow figure"] },
+    category: "object",
+    emoji: "⛄",
     attributes: {
       living: false,
       animal: false,
@@ -380,6 +451,8 @@ const MYSTERY_ITEM_DEFINITIONS = [
     id: "dragon",
     names: { ko: "드래곤", en: "dragon" },
     aliases: { ko: ["용"], en: ["dragon creature"] },
+    category: "imaginary",
+    emoji: "🐉",
     attributes: {
       living: true,
       animal: true,
@@ -397,7 +470,442 @@ const MYSTERY_ITEM_DEFINITIONS = [
       round: false,
     },
   },
-] as const satisfies readonly LegacyMysteryItem[];
+  defineMysteryItem({
+    id: "cat",
+    names: { ko: "고양이", en: "cat" },
+    aliases: { ko: ["집고양이"], en: ["house cat"] },
+    category: "animal",
+    emoji: "🐱",
+    trueAttributes: ["living", "animal", "small", "colorful", "indoor", "legs"],
+    factOverrides: { movesByItself: true },
+    v4FactValues: {
+      mammal: true,
+      catFamily: true,
+      naturalObject: true,
+      makesSound: true,
+      pet: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "elephant",
+    names: { ko: "코끼리", en: "elephant" },
+    aliases: { ko: ["아프리카코끼리"], en: ["African elephant"] },
+    category: "animal",
+    emoji: "🐘",
+    trueAttributes: ["living", "animal", "large", "legs"],
+    factOverrides: { movesByItself: true },
+    v4FactValues: {
+      mammal: true,
+      naturalObject: true,
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "penguin",
+    names: { ko: "펭귄", en: "penguin" },
+    aliases: { ko: ["황제펭귄"], en: ["emperor penguin"] },
+    category: "animal",
+    emoji: "🐧",
+    trueAttributes: ["living", "animal", "small", "colorful", "legs", "wet"],
+    factOverrides: { movesByItself: true },
+    v4FactValues: {
+      naturalObject: true,
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "dolphin",
+    names: { ko: "돌고래", en: "dolphin" },
+    aliases: { ko: ["큰돌고래"], en: ["bottlenose dolphin"] },
+    category: "animal",
+    emoji: "🐬",
+    trueAttributes: ["living", "animal", "large", "wet"],
+    factOverrides: { movesByItself: true },
+    v4FactValues: {
+      mammal: true,
+      naturalObject: true,
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "pine-tree",
+    names: { ko: "소나무", en: "pine tree" },
+    aliases: { ko: ["솔나무"], en: ["pine"] },
+    category: "plant",
+    emoji: "🌲",
+    trueAttributes: ["living", "plant", "large", "hard"],
+    factOverrides: { tree: true },
+    v4FactValues: {
+      naturalObject: true,
+      hasSeeds: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "cactus",
+    names: { ko: "선인장", en: "cactus" },
+    aliases: { ko: ["사막 선인장"], en: ["desert cactus"] },
+    category: "plant",
+    emoji: "🌵",
+    trueAttributes: ["living", "plant", "small"],
+    factOverrides: { herbaceousPlant: true },
+    v4FactValues: {
+      naturalObject: true,
+      hasSeeds: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "rose",
+    names: { ko: "장미", en: "rose" },
+    aliases: { ko: ["장미꽃"], en: ["rose flower"] },
+    category: "plant",
+    emoji: "🌹",
+    trueAttributes: ["living", "plant", "small", "colorful"],
+    factOverrides: { herbaceousPlant: true, flower: true },
+    v4FactValues: {
+      naturalObject: true,
+      hasSeeds: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "bamboo",
+    names: { ko: "대나무", en: "bamboo" },
+    aliases: { ko: ["왕대"], en: ["bamboo plant"] },
+    category: "plant",
+    emoji: "🎋",
+    trueAttributes: ["living", "plant", "large", "hard"],
+    factOverrides: { herbaceousPlant: true },
+    v4FactValues: {
+      naturalObject: true,
+      hasSeeds: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "water-lily",
+    names: { ko: "수련", en: "water lily" },
+    aliases: { ko: ["수련꽃"], en: ["water lily flower"] },
+    category: "plant",
+    emoji: "🪷",
+    trueAttributes: ["living", "plant", "small", "colorful", "wet"],
+    factOverrides: { herbaceousPlant: true, flower: true },
+    v4FactValues: {
+      naturalObject: true,
+      hasSeeds: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "banana",
+    names: { ko: "바나나", en: "banana" },
+    aliases: { ko: ["노란 바나나"], en: ["yellow banana"] },
+    category: "food",
+    emoji: "🍌",
+    trueAttributes: ["plant", "edible", "small", "colorful"],
+    factOverrides: { plant: false, fruit: true, plantDerived: true },
+    v4FactValues: {
+      tropicalFruit: true,
+      naturalObject: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "pineapple",
+    names: { ko: "파인애플", en: "pineapple" },
+    aliases: { ko: ["파인애플 열매"], en: ["pineapple fruit"] },
+    category: "food",
+    emoji: "🍍",
+    trueAttributes: ["plant", "edible", "small", "colorful", "hard", "wet"],
+    factOverrides: { plant: false, fruit: true, plantDerived: true },
+    v4FactValues: {
+      tropicalFruit: true,
+      naturalObject: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "watermelon",
+    names: { ko: "수박", en: "watermelon" },
+    aliases: { ko: ["통수박"], en: ["whole watermelon"] },
+    category: "food",
+    emoji: "🍉",
+    trueAttributes: ["plant", "edible", "large", "colorful", "wet", "round"],
+    factOverrides: { plant: false, fruit: true, plantDerived: true },
+    v4FactValues: {
+      naturalObject: true,
+      hasSeeds: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "carrot",
+    names: { ko: "당근", en: "carrot" },
+    aliases: { ko: ["홍당무"], en: ["root carrot"] },
+    category: "food",
+    emoji: "🥕",
+    trueAttributes: ["plant", "edible", "small", "colorful", "hard"],
+    factOverrides: { plant: false, plantDerived: true },
+    v4FactValues: {
+      naturalObject: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "umbrella",
+    names: { ko: "우산", en: "umbrella" },
+    aliases: { ko: ["비 우산"], en: ["rain umbrella"] },
+    category: "object",
+    emoji: "☂️",
+    trueAttributes: ["small", "colorful", "humanMade", "wet"],
+  }),
+  defineMysteryItem({
+    id: "toothbrush",
+    names: { ko: "칫솔", en: "toothbrush" },
+    aliases: { ko: ["양치 칫솔"], en: ["tooth brush"] },
+    category: "object",
+    emoji: "🪥",
+    trueAttributes: ["small", "colorful", "indoor", "humanMade", "hard", "wet"],
+  }),
+  defineMysteryItem({
+    id: "clock",
+    names: { ko: "시계", en: "clock" },
+    aliases: { ko: ["벽시계"], en: ["wall clock"] },
+    category: "object",
+    emoji: "🕰️",
+    trueAttributes: ["small", "indoor", "humanMade", "hard", "round"],
+    v4FactValues: {
+      electronicDevice: "unknown",
+      usesElectricity: "unknown",
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "bicycle",
+    names: { ko: "자전거", en: "bicycle" },
+    aliases: { ko: ["두발자전거"], en: ["bike"] },
+    category: "vehicle",
+    emoji: "🚲",
+    trueAttributes: ["large", "colorful", "humanMade", "hard"],
+    factOverrides: { vehicle: true },
+    v4FactValues: {
+      hasWheels: true,
+      makesSound: "unknown",
+    },
+  }),
+  defineMysteryItem({
+    id: "train",
+    names: { ko: "기차", en: "train" },
+    aliases: { ko: ["열차"], en: ["railway train"] },
+    category: "vehicle",
+    emoji: "🚆",
+    trueAttributes: ["large", "humanMade", "hard"],
+    factOverrides: { vehicle: true },
+    v4FactValues: {
+      usesElectricity: "unknown",
+      hasWheels: true,
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "airplane",
+    names: { ko: "비행기", en: "airplane" },
+    aliases: { ko: ["항공기"], en: ["aeroplane"] },
+    category: "vehicle",
+    emoji: "✈️",
+    trueAttributes: ["large", "fly", "humanMade", "hard"],
+    factOverrides: { vehicle: true },
+    v4FactValues: {
+      usesElectricity: true,
+      hasWheels: true,
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "ship",
+    names: { ko: "배", en: "ship" },
+    aliases: { ko: ["선박"], en: ["vessel"] },
+    category: "vehicle",
+    emoji: "🚢",
+    trueAttributes: ["large", "humanMade", "hard", "wet"],
+    factOverrides: { vehicle: true },
+    v4FactValues: {
+      usesElectricity: true,
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "guitar",
+    names: { ko: "기타", en: "guitar" },
+    aliases: { ko: ["통기타"], en: ["acoustic guitar"] },
+    category: "instrument",
+    emoji: "🎸",
+    trueAttributes: ["small", "indoor", "humanMade", "hard"],
+    factOverrides: { musicalInstrument: true },
+    v4FactValues: {
+      madeOfWood: true,
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "drum",
+    names: { ko: "북", en: "drum" },
+    aliases: { ko: ["큰북"], en: ["bass drum"] },
+    category: "instrument",
+    emoji: "🥁",
+    trueAttributes: ["small", "indoor", "humanMade", "hard", "round"],
+    factOverrides: { musicalInstrument: true },
+    v4FactValues: {
+      madeOfWood: "unknown",
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "violin",
+    names: { ko: "바이올린", en: "violin" },
+    aliases: { ko: ["현악 바이올린"], en: ["fiddle"] },
+    category: "instrument",
+    emoji: "🎻",
+    trueAttributes: ["small", "colorful", "indoor", "humanMade", "hard"],
+    factOverrides: { musicalInstrument: true },
+    v4FactValues: {
+      madeOfWood: true,
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "flute",
+    names: { ko: "플루트", en: "flute" },
+    aliases: { ko: ["가로피리"], en: ["concert flute"] },
+    category: "instrument",
+    emoji: "🪈",
+    trueAttributes: ["small", "indoor", "humanMade", "hard"],
+    factOverrides: { musicalInstrument: true },
+    v4FactValues: {
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "trumpet",
+    names: { ko: "트럼펫", en: "trumpet" },
+    aliases: { ko: ["나팔"], en: ["brass trumpet"] },
+    category: "instrument",
+    emoji: "🎺",
+    trueAttributes: ["small", "colorful", "indoor", "humanMade", "hard"],
+    factOverrides: { musicalInstrument: true },
+    v4FactValues: {
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "moon",
+    names: { ko: "달", en: "moon" },
+    aliases: { ko: ["지구의 달"], en: ["the moon"] },
+    category: "nature",
+    emoji: "🌕",
+    trueAttributes: ["large", "hard", "round"],
+    v4FactValues: {
+      naturalObject: true,
+      spaceObject: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "rainbow",
+    names: { ko: "무지개", en: "rainbow" },
+    aliases: { ko: ["일곱 빛깔 무지개"], en: ["rain bow"] },
+    category: "nature",
+    emoji: "🌈",
+    trueAttributes: ["large", "colorful"],
+    v4FactValues: {
+      naturalObject: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "volcano",
+    names: { ko: "화산", en: "volcano" },
+    aliases: { ko: ["활화산"], en: ["active volcano"] },
+    category: "nature",
+    emoji: "🌋",
+    trueAttributes: ["large", "hard"],
+    v4FactValues: {
+      naturalObject: true,
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "iceberg",
+    names: { ko: "빙산", en: "iceberg" },
+    aliases: { ko: ["바다 빙산"], en: ["ice berg"] },
+    category: "nature",
+    emoji: "🧊",
+    trueAttributes: ["large", "hard", "wet"],
+    v4FactValues: {
+      naturalObject: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "cloud",
+    names: { ko: "구름", en: "cloud" },
+    aliases: { ko: ["하늘 구름"], en: ["sky cloud"] },
+    category: "nature",
+    emoji: "☁️",
+    trueAttributes: ["large", "wet"],
+    v4FactValues: {
+      naturalObject: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "unicorn",
+    names: { ko: "유니콘", en: "unicorn" },
+    aliases: { ko: ["뿔 달린 말"], en: ["horned horse"] },
+    category: "imaginary",
+    emoji: "🦄",
+    trueAttributes: ["living", "animal", "large", "colorful", "legs"],
+    factOverrides: { movesByItself: true, imaginary: true },
+    v4FactValues: {
+      mammal: true,
+      makesSound: "unknown",
+    },
+  }),
+  defineMysteryItem({
+    id: "mermaid",
+    names: { ko: "인어", en: "mermaid" },
+    aliases: { ko: ["바다 인어"], en: ["sea mermaid"] },
+    category: "imaginary",
+    emoji: "🧜",
+    trueAttributes: ["living", "animal", "large", "colorful", "wet"],
+    factOverrides: { movesByItself: true, imaginary: true },
+    v4FactValues: {
+      mammal: "unknown",
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "fairy",
+    names: { ko: "요정", en: "fairy" },
+    aliases: { ko: ["날개 요정"], en: ["winged fairy"] },
+    category: "imaginary",
+    emoji: "🧚",
+    trueAttributes: ["living", "small", "colorful", "legs", "fly"],
+    factOverrides: { movesByItself: true, imaginary: true },
+    v4FactValues: {
+      makesSound: true,
+    },
+  }),
+  defineMysteryItem({
+    id: "magic-carpet",
+    names: { ko: "마법 양탄자", en: "magic carpet" },
+    aliases: { ko: ["날아다니는 양탄자"], en: ["flying carpet"] },
+    category: "imaginary",
+    emoji: "🪄",
+    trueAttributes: ["colorful", "fly", "humanMade"],
+    factOverrides: { vehicle: true, imaginary: true },
+  }),
+  defineMysteryItem({
+    id: "giant",
+    names: { ko: "거인", en: "giant" },
+    aliases: { ko: ["큰 거인"], en: ["storybook giant"] },
+    category: "imaginary",
+    emoji: "🧌",
+    trueAttributes: ["living", "large", "legs"],
+    factOverrides: { movesByItself: true, imaginary: true },
+    v4FactValues: {
+      makesSound: true,
+    },
+  }),
+] as const satisfies readonly MysteryItemDefinition[];
 
 type BuiltInMysteryItemId = typeof MYSTERY_ITEM_DEFINITIONS[number]["id"];
 
@@ -415,10 +923,10 @@ const FACT_OVERRIDES: Record<string, Partial<Record<MysteryFact, boolean>>> = {
   dragon: { movesByItself: true, imaginary: true },
 };
 
-const V4_FACT_VALUES: Record<
+const V4_FACT_VALUES: Partial<Record<
   BuiltInMysteryItemId,
-  Record<MysteryV4Fact, MysteryFactValue>
-> = {
+  Partial<Record<MysteryV4Fact, MysteryFactValue>>
+>> = {
   apple: {
     mammal: false,
     insect: false,
@@ -669,7 +1177,7 @@ const V4_FACT_VALUES: Record<
 };
 
 function createFactProfile(
-  item: LegacyMysteryItem,
+  item: MysteryItemDefinition,
 ): Record<MysteryFact, boolean> {
   const facts = Object.fromEntries(
     MYSTERY_FACTS.map((fact) => [
@@ -679,7 +1187,11 @@ function createFactProfile(
         : false,
     ]),
   ) as Record<MysteryFact, boolean>;
-  return { ...facts, ...FACT_OVERRIDES[item.id] };
+  return {
+    ...facts,
+    ...FACT_OVERRIDES[item.id],
+    ...item.factOverrides,
+  };
 }
 
 function createV3FactProfile(
@@ -691,29 +1203,115 @@ function createV3FactProfile(
 function createV4FactProfile(
   itemId: BuiltInMysteryItemId,
   facts: Record<MysteryFact, boolean>,
+  overrides?: Partial<Record<MysteryV4Fact, MysteryFactValue>>,
 ): Record<MysteryFact, MysteryFactValue> {
   const v4Facts = V4_FACT_VALUES[itemId];
-  if (!v4Facts) throw new Error(`미스터리 박스 새 지식표가 없습니다: ${itemId}`);
-  return { ...facts, ...v4Facts };
+  return { ...facts, ...v4Facts, ...overrides };
 }
 
 export const MYSTERY_ITEMS: readonly MysteryItem[] =
   MYSTERY_ITEM_DEFINITIONS.map((item) => {
     const facts = createFactProfile(item);
+    const definition: MysteryItemDefinition = item;
+    const {
+      factOverrides: _factOverrides,
+      v4FactValues,
+      ...publicItem
+    } = definition;
     return {
-      ...item,
+      ...publicItem,
       facts,
       factsV3: createV3FactProfile(facts),
-      factsV4: createV4FactProfile(item.id, facts),
+      factsV4: createV4FactProfile(item.id, facts, v4FactValues),
     };
   });
 
 export function mysteryItemsForVersion(
   knowledgeVersion: MysteryKnowledgeVersion,
 ): readonly MysteryItem[] {
-  return knowledgeVersion === 1
-    ? MYSTERY_ITEMS.filter(({ id }) => id !== "pencil")
-    : MYSTERY_ITEMS;
+  if (knowledgeVersion === 5) return MYSTERY_ITEMS;
+  const originalIds = new Set([
+    "apple",
+    "puppy",
+    "book",
+    "car",
+    "butterfly",
+    "piano",
+    "sun",
+    "strawberry",
+    "rocket",
+    "sunflower",
+    "pencil",
+    "snowman",
+    "dragon",
+  ]);
+  return MYSTERY_ITEMS.filter(
+    ({ id }) => originalIds.has(id) && (knowledgeVersion !== 1 || id !== "pencil"),
+  );
+}
+
+export interface MysteryItemSelectionInput {
+  items?: readonly MysteryItem[];
+  roomUsedItemIds?: readonly string[];
+  recentItemIds?: readonly string[];
+  recentCategories?: readonly MysteryCategory[];
+  usageCounts?: Readonly<Record<string, number>>;
+  random: () => number;
+}
+
+export interface MysterySelectionProfile {
+  recentItemIds: string[];
+  recentCategories: MysteryCategory[];
+  usageCounts: Record<string, number>;
+}
+
+function preferMysteryCandidates(
+  candidates: readonly MysteryItem[],
+  predicate: (item: MysteryItem) => boolean,
+): MysteryItem[] {
+  const preferred = candidates.filter(predicate);
+  return preferred.length > 0 ? preferred : [...candidates];
+}
+
+export function selectMysteryItem(
+  input: MysteryItemSelectionInput,
+): MysteryItem {
+  const items = input.items ?? MYSTERY_ITEMS;
+  if (items.length === 0) {
+    throw new Error("미스터리 박스 정답 후보가 없습니다");
+  }
+
+  const used = new Set(input.roomUsedItemIds ?? []);
+  let candidates = items.filter(({ id }) => !used.has(id));
+  if (candidates.length === 0) candidates = [...items];
+
+  const recentItems = new Set(input.recentItemIds ?? []);
+  candidates = preferMysteryCandidates(
+    candidates,
+    ({ id }) => !recentItems.has(id),
+  );
+
+  const recentCategories = new Set(input.recentCategories ?? []);
+  candidates = preferMysteryCandidates(
+    candidates,
+    ({ category }) => !recentCategories.has(category),
+  );
+
+  const usageCounts = input.usageCounts ?? {};
+  const minimumUsage = Math.min(
+    ...candidates.map(({ id }) => usageCounts[id] ?? 0),
+  );
+  candidates = candidates.filter(
+    ({ id }) => (usageCounts[id] ?? 0) === minimumUsage,
+  );
+
+  const random = input.random();
+  if (!Number.isFinite(random) || random < 0 || random >= 1) {
+    throw new Error("미스터리 박스 난수값이 올바르지 않습니다");
+  }
+  const selected = candidates[Math.floor(random * candidates.length)];
+  if (!selected) throw new Error("미스터리 박스 정답을 고를 수 없습니다");
+  return selected;
 }
 
 const KOREAN_NOUN_ENDING =

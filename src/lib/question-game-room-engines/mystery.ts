@@ -7,6 +7,7 @@ import {
   isMysteryGuessCorrect,
   mysteryItemsForVersion,
   resolveMysteryAnswerEvidence,
+  selectMysteryItem,
   type MysteryAnswer,
   type MysteryAnswerResolution,
   type MysteryAnswerEvidence,
@@ -18,6 +19,7 @@ import {
 import {
   QUESTION_GAME_LIMITS,
   QUESTION_GAME_RULES,
+  getQuestionGameRoomTarget,
 } from "@/lib/question-game-rules";
 import { isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import type {
@@ -56,7 +58,8 @@ export interface MysteryRoomState extends EngineStateBase {
   knowledgeVersion: MysteryKnowledgeVersion;
   phase: "setup" | "play" | "done";
   round: number;
-  maxRounds: 20;
+  maxRounds: number;
+  playerCountAtStart?: number;
   turnOrder: string[];
   currentTurnIdx: number;
   history: MysteryHistoryItem[];
@@ -76,6 +79,7 @@ export type MysteryPublicRoomState = Pick<
   | "roundId"
   | "round"
   | "maxRounds"
+  | "playerCountAtStart"
   | "turnOrder"
   | "currentTurnIdx"
   | "history"
@@ -109,6 +113,7 @@ const MYSTERY_STATE_OPTIONAL_KEYS = [
   "answer",
   "private",
   "knowledgeVersion",
+  "playerCountAtStart",
 ] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -400,6 +405,50 @@ function hasValidPhase(state: MysteryRoomState): boolean {
     lastHistoryItem !== undefined;
 }
 
+function hasValidGuessRules(state: MysteryRoomState): boolean {
+  if (state.playerCountAtStart === undefined) return true;
+
+  const askedPlayerIds = new Set<string>();
+  const lastQuestionIndex = new Map<string, number>();
+  const lastWrongGuessIndex = new Map<string, number>();
+  for (const [index, item] of state.history.entries()) {
+    if (item.kind === "question") {
+      askedPlayerIds.add(item.playerId);
+      lastQuestionIndex.set(item.playerId, index);
+      continue;
+    }
+    if (
+      index < 3 ||
+      !state.turnOrder.every((playerId) => askedPlayerIds.has(playerId)) ||
+      (lastWrongGuessIndex.get(item.playerId) ?? -1) >=
+        (lastQuestionIndex.get(item.playerId) ?? -1)
+    ) {
+      return false;
+    }
+    if (!item.correct) lastWrongGuessIndex.set(item.playerId, index);
+  }
+  return true;
+}
+
+function expectedMysteryMaxRounds(value: Record<string, unknown>): number {
+  if (value.playerCountAtStart === undefined) {
+    return QUESTION_GAME_RULES["mystery-box"].targets.room.count;
+  }
+  if (
+    !Number.isSafeInteger(value.playerCountAtStart) ||
+    (value.playerCountAtStart as number) <
+      QUESTION_GAME_RULES["mystery-box"].multiplayer.min ||
+    (value.playerCountAtStart as number) >
+      QUESTION_GAME_RULES["mystery-box"].multiplayer.max
+  ) {
+    return -1;
+  }
+  return getQuestionGameRoomTarget(
+    "mystery-box",
+    value.playerCountAtStart as number,
+  ).maxRounds;
+}
+
 export function readMysteryState(value: unknown): MysteryRoomState | null {
   if (
     !isRecord(value) ||
@@ -417,7 +466,7 @@ export function readMysteryState(value: unknown): MysteryRoomState | null {
     !value.recentCommandIds.every((id) => UUID_V4_PATTERN.test(id)) ||
     !Number.isInteger(value.round) ||
     (value.round as number) < 0 ||
-    value.maxRounds !== QUESTION_GAME_RULES["mystery-box"].targets.room.count ||
+    value.maxRounds !== expectedMysteryMaxRounds(value) ||
     !isStringArray(value.turnOrder) ||
     !Number.isInteger(value.currentTurnIdx) ||
     (value.currentTurnIdx as number) < 0 ||
@@ -438,7 +487,8 @@ export function readMysteryState(value: unknown): MysteryRoomState | null {
       value.knowledgeVersion !== 1 &&
       value.knowledgeVersion !== 2 &&
       value.knowledgeVersion !== 3 &&
-      value.knowledgeVersion !== 4)
+      value.knowledgeVersion !== 4 &&
+      value.knowledgeVersion !== 5)
   ) {
     return null;
   }
@@ -449,6 +499,7 @@ export function readMysteryState(value: unknown): MysteryRoomState | null {
   return hasValidTurn(state) &&
       hasValidScores(state) &&
       hasValidHistorySemantics(state) &&
+      hasValidGuessRules(state) &&
       hasValidPhase(state)
     ? state
     : null;
@@ -553,7 +604,8 @@ export function toPublicMysteryState(
     value.knowledgeVersion === 1 ||
     value.knowledgeVersion === 2 ||
     value.knowledgeVersion === 3 ||
-    value.knowledgeVersion === 4
+    value.knowledgeVersion === 4 ||
+    value.knowledgeVersion === 5
   ) {
     state.knowledgeVersion = value.knowledgeVersion;
   }
@@ -573,8 +625,20 @@ export function toPublicMysteryState(
   if (Number.isInteger(value.round) && (value.round as number) >= 0) {
     state.round = value.round;
   }
-  if (value.maxRounds === QUESTION_GAME_RULES["mystery-box"].targets.room.count) {
+  if (
+    Number.isSafeInteger(value.maxRounds) &&
+    (value.maxRounds as number) >= 1
+  ) {
     state.maxRounds = value.maxRounds;
+  }
+  if (
+    Number.isSafeInteger(value.playerCountAtStart) &&
+    (value.playerCountAtStart as number) >=
+      QUESTION_GAME_RULES["mystery-box"].multiplayer.min &&
+    (value.playerCountAtStart as number) <=
+      QUESTION_GAME_RULES["mystery-box"].multiplayer.max
+  ) {
+    state.playerCountAtStart = value.playerCountAtStart;
   }
   if (isStringArray(value.turnOrder)) state.turnOrder = [...value.turnOrder];
   if (Number.isInteger(value.currentTurnIdx) && (value.currentTurnIdx as number) >= 0) {
@@ -647,7 +711,8 @@ function isMysteryAnswerResolution(
     (value.knowledgeVersion === 1 ||
       value.knowledgeVersion === 2 ||
       value.knowledgeVersion === 3 ||
-      value.knowledgeVersion === 4) &&
+      value.knowledgeVersion === 4 ||
+      value.knowledgeVersion === 5) &&
     (value.evidence === undefined ||
       isMysteryAnswerEvidence(value.evidence, value.knowledgeVersion)) &&
     (value.answer === "yes" ||
@@ -671,7 +736,13 @@ function hasSamePlayerIds(
     playerIds.every((playerId) => activeIds.has(playerId));
 }
 
-export function createMysteryState(): MysteryRoomState {
+export function createMysteryState(
+  context?: QuestionGameRoomEngineContext,
+): MysteryRoomState {
+  const playerCountAtStart = context?.room.players.length;
+  const maxRounds = playerCountAtStart === undefined
+    ? QUESTION_GAME_RULES["mystery-box"].targets.room.count
+    : getQuestionGameRoomTarget("mystery-box", playerCountAtStart).maxRounds;
   return {
     stateVersion: 2,
     knowledgeVersion: CURRENT_MYSTERY_KNOWLEDGE_VERSION,
@@ -679,7 +750,8 @@ export function createMysteryState(): MysteryRoomState {
     phase: "setup",
     recentCommandIds: [],
     round: 0,
-    maxRounds: QUESTION_GAME_RULES["mystery-box"].targets.room.count,
+    maxRounds,
+    ...(playerCountAtStart === undefined ? {} : { playerCountAtStart }),
     turnOrder: [],
     currentTurnIdx: 0,
     history: [],
@@ -757,17 +829,21 @@ function startMystery(
     };
   }
 
-  const random = context.random();
-  if (!Number.isFinite(random) || random < 0 || random >= 1) {
-    return {
-      kind: "corrupt",
-      room: context.room,
-      message: "서버 난수 결과가 올바르지 않습니다",
-    };
-  }
   const items = mysteryItemsForVersion(state.knowledgeVersion);
-  const item = items[Math.floor(random * items.length)];
-  if (!item) {
+  let item: MysteryItem;
+  try {
+    item = selectMysteryItem({
+      items,
+      roomUsedItemIds: context.room.mysteryRotation?.usedItemIds,
+      recentItemIds: context.mysterySelectionProfile?.recentItemIds,
+      recentCategories: [
+        ...(context.room.mysteryRotation?.recentCategories ?? []),
+        ...(context.mysterySelectionProfile?.recentCategories ?? []),
+      ],
+      usageCounts: context.mysterySelectionProfile?.usageCounts,
+      random: context.random,
+    });
+  } catch {
     return {
       kind: "corrupt",
       room: context.room,
@@ -775,18 +851,36 @@ function startMystery(
     };
   }
 
-  return changed(context, {
-    ...state,
-    phase: "play",
-    roundId: context.randomUUID(),
-    round: 1,
-    turnOrder: context.room.players.map(({ id }) => id),
-    currentTurnIdx: 0,
-    scores: Object.fromEntries(
-      context.room.players.map(({ id }) => [id, 0]),
+  const priorUsedIds = context.room.mysteryRotation?.usedItemIds ?? [];
+  const usedItemIds = priorUsedIds.length >= items.length
+    ? [item.id]
+    : [...priorUsedIds, item.id];
+  const recentCategories = [
+    item.category,
+    ...(context.room.mysteryRotation?.recentCategories ?? []).filter(
+      (category) => category !== item.category,
     ),
-    private: { itemId: item.id },
-  });
+  ].slice(0, 2);
+
+  return {
+    kind: "changed",
+    room: {
+      ...context.room,
+      mysteryRotation: { usedItemIds, recentCategories },
+      gameState: {
+        ...state,
+        phase: "play",
+        roundId: context.randomUUID(),
+        round: 1,
+        turnOrder: context.room.players.map(({ id }) => id),
+        currentTurnIdx: 0,
+        scores: Object.fromEntries(
+          context.room.players.map(({ id }) => [id, 0]),
+        ),
+        private: { itemId: item.id },
+      },
+    },
+  };
 }
 
 function finishOrAdvanceMysteryActivity(
@@ -971,6 +1065,44 @@ function guessMysteryItem(
       kind: "conflict",
       room: context.room,
       message: "최대 활동을 모두 사용했습니다",
+    };
+  }
+  const questions = state.history.filter(
+    (activity): activity is Extract<MysteryHistoryItem, { kind: "question" }> =>
+      activity.kind === "question",
+  );
+  const askedPlayerIds = new Set(
+    questions.map(({ playerId }) => playerId),
+  );
+  if (
+    state.playerCountAtStart !== undefined &&
+    (questions.length < 3 ||
+      !state.turnOrder.every((playerId) => askedPlayerIds.has(playerId)))
+  ) {
+    return {
+      kind: "conflict",
+      room: context.room,
+      message: "모든 참가자가 질문하고 질문이 세 개 쌓인 뒤 추측할 수 있습니다",
+    };
+  }
+  const lastQuestionIndex = state.history.findLastIndex(
+    (activity) =>
+      activity.kind === "question" && activity.playerId === context.userId,
+  );
+  const lastWrongGuessIndex = state.history.findLastIndex(
+    (activity) =>
+      activity.kind === "guess" &&
+      activity.playerId === context.userId &&
+      !activity.correct,
+  );
+  if (
+    state.playerCountAtStart !== undefined &&
+    lastWrongGuessIndex >= lastQuestionIndex
+  ) {
+    return {
+      kind: "conflict",
+      room: context.room,
+      message: "틀린 추측 뒤에는 새 질문을 한 번 써야 다시 추측할 수 있습니다",
     };
   }
   const nextActivityCount = activityCount + 1;

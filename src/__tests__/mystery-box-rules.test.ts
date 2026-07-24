@@ -9,6 +9,7 @@ import {
   isMysteryGuessCorrect,
   mysteryQuestionForAttribute,
 } from "@/lib/mystery-box-rules";
+import * as mysteryBoxRules from "@/lib/mystery-box-rules";
 import { MYSTERY_PRESENTATION } from "@/app/(student)/student-question-play/games/mystery-box-presentation";
 
 const APPLE_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "apple");
@@ -37,7 +38,7 @@ describe("미스터리 박스 질문 규칙", () => {
   });
 
   it("내장 물건은 두 언어 이름과 별칭 및 모든 속성값을 가진다", () => {
-    expect(MYSTERY_ITEMS.length).toBeGreaterThan(0);
+    expect(MYSTERY_ITEMS).toHaveLength(48);
     for (const item of MYSTERY_ITEMS) {
       expect(item.names.ko).not.toBe("");
       expect(item.names.en).not.toBe("");
@@ -52,8 +53,20 @@ describe("미스터리 박스 질문 규칙", () => {
     }
   });
 
+  it("여덟 분류에 정답을 여섯 개씩 균형 있게 둔다", () => {
+    const categories = new Map<string, number>();
+    for (const item of MYSTERY_ITEMS) {
+      const category = Reflect.get(item, "category");
+      expect(category).toBeTypeOf("string");
+      categories.set(category, (categories.get(category) ?? 0) + 1);
+    }
+    expect([...categories.values()].sort((a, b) => a - b)).toEqual(
+      Array.from({ length: 8 }, () => 6),
+    );
+  });
+
   it("새 판정 자료는 모든 물건에 세분화된 사실값을 가진다", () => {
-    expect(CURRENT_MYSTERY_KNOWLEDGE_VERSION).toBe(4);
+    expect(CURRENT_MYSTERY_KNOWLEDGE_VERSION).toBe(5);
     for (const item of MYSTERY_ITEMS) {
       expect(Object.keys(item.facts).sort()).toEqual([...MYSTERY_FACTS].sort());
       expect(Object.values(item.facts).every(
@@ -68,6 +81,45 @@ describe("미스터리 박스 질문 규칙", () => {
         (value) => typeof value === "boolean" || value === "unknown",
       )).toBe(true);
     }
+  });
+
+  it("같은 방, 최근 정답, 최근 분류, 적은 사용 횟수 순으로 정답을 고른다", () => {
+    const selector = Reflect.get(mysteryBoxRules, "selectMysteryItem");
+    expect(selector).toBeTypeOf("function");
+    const selected = selector({
+      items: MYSTERY_ITEMS.slice(0, 6),
+      roomUsedItemIds: [MYSTERY_ITEMS[0].id],
+      recentItemIds: [MYSTERY_ITEMS[1].id],
+      recentCategories: [
+        Reflect.get(MYSTERY_ITEMS[2], "category"),
+        Reflect.get(MYSTERY_ITEMS[3], "category"),
+      ],
+      usageCounts: Object.fromEntries(
+        MYSTERY_ITEMS.slice(0, 6).map((item, index) => [
+          item.id,
+          index === 4 ? 0 : 3,
+        ]),
+      ),
+      random: () => 0,
+    }) as { id: string };
+
+    expect(selected.id).toBe(MYSTERY_ITEMS[4].id);
+  });
+
+  it("방의 모든 정답을 쓴 뒤에만 새 순환을 시작한다", () => {
+    const selector = Reflect.get(mysteryBoxRules, "selectMysteryItem");
+    expect(selector).toBeTypeOf("function");
+    const items = MYSTERY_ITEMS.slice(0, 3);
+    const selected = selector({
+      items,
+      roomUsedItemIds: items.map(({ id }) => id),
+      recentItemIds: [],
+      recentCategories: [],
+      usageCounts: {},
+      random: () => 0,
+    }) as { id: string };
+
+    expect(selected.id).toBe(items[0].id);
   });
 
   it.each([

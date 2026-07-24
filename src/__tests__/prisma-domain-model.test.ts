@@ -25,6 +25,15 @@ describe("Prisma domain model hardening", () => {
     expect(schema).toContain("@@map(\"game_rooms\")");
   });
 
+  it("stores mystery answer selections separately from scores and activities", () => {
+    expect(schema).toContain("model MysteryAnswerUse");
+    expect(schema).toContain("@@map(\"mystery_answer_uses\")");
+    expect(schema).toContain(
+      '@@unique([userId, selectionKey], name: "uniq_mystery_answer_selection")',
+    );
+    expect(schema).toContain("@@index([userId, createdAt])");
+  });
+
   it("provides an explicit deployment schema check for the new Prisma tables", () => {
     expect(packageJson.scripts?.["db:check"]).toBe("node scripts/check-db-schema.mjs");
     expect(existsSync(dbCheckPath)).toBe(true);

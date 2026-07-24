@@ -28,6 +28,24 @@ interface Props {
 const AI_NAME = "🤖 AI";
 const AI_THINK_MS = 1_000;
 
+function localGuessBlockKey(
+  history: readonly MysteryRunHistoryItem[],
+  studentQuestionCount: number,
+) {
+  if (studentQuestionCount < 3) return "mysteryGuessNeedThreeStudentQuestions";
+  const lastStudentQuestion = history.findLastIndex(
+    (entry) => entry.actor === "STUDENT" && entry.kind === "QUESTION",
+  );
+  const lastStudentWrongGuess = history.findLastIndex(
+    (entry) =>
+      entry.actor === "STUDENT" &&
+      entry.kind === "GUESS" &&
+      !entry.correct,
+  );
+  return lastStudentWrongGuess >= lastStudentQuestion
+    ? "mysteryGuessNeedQuestionAfterWrong"
+    : null;
+}
 
 export default function MysteryBoxGame({ game, onBack, config }: Props) {
   const locale = useLocale();
@@ -135,6 +153,10 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
   async function handleGuessSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!run || inputBlocked || run.mysteryNextStep !== "STUDENT_ACTION") return;
+    if (localGuessBlockKey(
+      run.mysteryHistory ?? [],
+      run.mysteryStudentQuestionCount ?? 0,
+    )) return;
     const normalized = guess.trim();
     if (!normalized) return;
     const submitted = await submitMysteryGuess(normalized, mysteryLocale, run);
@@ -399,6 +421,10 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
 
   const remaining = Math.max(0, run.targetCount - run.questionCount);
   const aiTurn = run.mysteryNextStep === "AI_TURN";
+  const guessBlockKey = localGuessBlockKey(
+    run.mysteryHistory ?? [],
+    run.mysteryStudentQuestionCount ?? 0,
+  );
   const subtitle = aiTurn
     ? (t("aiSTurn"))
     : (t("studentnameSTurn", { studentName: studentName }));
@@ -509,12 +535,17 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                   type="button"
                   variant="outline"
                   className="shrink-0 font-bold"
-                  disabled={inputBlocked}
+                  disabled={inputBlocked || guessBlockKey !== null}
                   onClick={() => setIsGuessing(true)}
                 >
                   {t("makeAGuess")}
                 </Button>
               </div>
+              {guessBlockKey ? (
+                <p className="text-xs font-semibold leading-5 text-amber-800 dark:text-amber-200">
+                  {t(guessBlockKey)}
+                </p>
+              ) : null}
             </form>
           ) : (
             <form className="space-y-3" onSubmit={handleGuessSubmit}>
@@ -538,7 +569,7 @@ export default function MysteryBoxGame({ game, onBack, config }: Props) {
                 <Button
                   type="submit"
                   className="min-w-0 flex-1 font-bold"
-                  disabled={inputBlocked || !guess.trim()}
+                  disabled={inputBlocked || guessBlockKey !== null || !guess.trim()}
                 >
                   {pending === "action"
                     ? (t("checking"))

@@ -55,7 +55,15 @@ import {
   findMysteryAiAnswerRequest,
   generateMysteryAiAnswer,
 } from "@/lib/mystery-box-ai-answer";
-import type { MysteryAnswerResolution } from "@/lib/mystery-box-rules";
+import {
+  getMysteryItem,
+  type MysteryAnswerResolution,
+  type MysterySelectionProfile,
+} from "@/lib/mystery-box-rules";
+import {
+  loadMysterySelectionProfile,
+  recordMysteryAnswerUses,
+} from "@/lib/mystery-answer-rotation-service";
 import { ensureQuestionGameRoomPoints } from "@/lib/point-award-service";
 import {
   hasSettledQuestionGameRoomAward,
@@ -299,6 +307,22 @@ async function handleQuestionGameCommand({
   action: string;
   body: Record<string, unknown>;
 }) {
+  let mysterySelectionProfile: MysterySelectionProfile | undefined;
+  if (room.gameId === "mystery-box" && action === "mystery-start") {
+    try {
+      mysterySelectionProfile = await loadMysterySelectionProfile(
+        prisma,
+        room.players.map(({ id }) => id),
+      );
+    } catch {
+      logger.warn("미스터리 박스 정답 순환 기록을 불러오지 못했습니다");
+      return NextResponse.json(
+        { error: "미스터리 박스를 준비하지 못했습니다. 다시 시도해 주세요" },
+        { status: 503 },
+      );
+    }
+  }
+
   const applyCommand = (
     currentRoom: GameRoom,
     mysteryAnswerResolution?: MysteryAnswerResolution,
@@ -313,7 +337,44 @@ async function handleQuestionGameCommand({
       random: Math.random,
       randomUUID: () => globalThis.crypto.randomUUID(),
       ...(mysteryAnswerResolution ? { mysteryAnswerResolution } : {}),
+      ...(mysterySelectionProfile ? { mysterySelectionProfile } : {}),
     });
+
+  const ensureMysterySelectionRecorded = async (
+    selectedRoom: GameRoom,
+  ): Promise<boolean> => {
+    if (
+      selectedRoom.gameId !== "mystery-box" ||
+      action !== "mystery-start"
+    ) {
+      return true;
+    }
+    const privateState = selectedRoom.gameState.private;
+    const itemId = isRequestBody(privateState)
+      ? privateState.itemId
+      : undefined;
+    const item = typeof itemId === "string"
+      ? getMysteryItem(itemId)
+      : undefined;
+    if (!item || !selectedRoom.playId) return false;
+    try {
+      const participantIds = Array.isArray(selectedRoom.gameState.turnOrder)
+        ? selectedRoom.gameState.turnOrder.filter(
+          (id): id is string => typeof id === "string",
+        )
+        : selectedRoom.players.map(({ id }) => id);
+      await recordMysteryAnswerUses(prisma, {
+        userIds: participantIds,
+        item,
+        selectionKey:
+          `room:${selectedRoom.code}:${selectedRoom.createdAt}:${selectedRoom.playId}`,
+      });
+      return true;
+    } catch {
+      logger.warn("미스터리 박스 정답 순환 기록을 저장하지 못했습니다");
+      return false;
+    }
+  };
 
   let result: QuestionGameRoomResult;
   let mysteryAnswerResolution: MysteryAnswerResolution | undefined;
@@ -326,6 +387,12 @@ async function handleQuestionGameCommand({
     );
   }
   if (result.kind === "replayed") {
+    if (!await ensureMysterySelectionRecorded(result.room)) {
+      return NextResponse.json(
+        { error: "미스터리 박스를 준비하지 못했습니다. 다시 시도해 주세요" },
+        { status: 503 },
+      );
+    }
     return replayedCommandSuccess(result.room, result.result);
   }
   if (result.kind === "resolution-required") {
@@ -375,6 +442,12 @@ async function handleQuestionGameCommand({
       );
     }
     if (result.kind === "replayed") {
+      if (!await ensureMysterySelectionRecorded(result.room)) {
+        return NextResponse.json(
+          { error: "미스터리 박스를 준비하지 못했습니다. 다시 시도해 주세요" },
+          { status: 503 },
+        );
+      }
       return replayedCommandSuccess(result.room, result.result);
     }
   }
@@ -382,6 +455,12 @@ async function handleQuestionGameCommand({
 
   const saved = await saveGameRoom(result.room);
   if (saved.kind === "saved") {
+    if (!await ensureMysterySelectionRecorded(saved.room)) {
+      return NextResponse.json(
+        { error: "미스터리 박스를 준비하지 못했습니다. 다시 시도해 주세요" },
+        { status: 503 },
+      );
+    }
     return commandSuccess(
       await ensureCompletedRoomPoints(saved.room),
       result.result,
@@ -393,6 +472,12 @@ async function handleQuestionGameCommand({
   try {
     const replay = applyCommand(saved.room, mysteryAnswerResolution);
     if (replay.kind === "replayed") {
+      if (!await ensureMysterySelectionRecorded(replay.room)) {
+        return NextResponse.json(
+          { error: "미스터리 박스를 준비하지 못했습니다. 다시 시도해 주세요" },
+          { status: 503 },
+        );
+      }
       return replayedCommandSuccess(replay.room, replay.result);
     }
   } catch {

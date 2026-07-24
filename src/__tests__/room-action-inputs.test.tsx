@@ -169,6 +169,7 @@ async function expectFailureThenSuccess(
   fireEvent.click(submit);
   await waitFor(() => expect(onAction).toHaveBeenCalledTimes(1));
   expect(input).toHaveValue(value);
+  await waitFor(() => expect(submit).toBeEnabled());
 
   fireEvent.click(submit);
   await waitFor(() => expect(onAction).toHaveBeenCalledTimes(2));

@@ -69,6 +69,9 @@ const mocks = vi.hoisted(() => ({
   activityCount: vi.fn(),
   pointAggregate: vi.fn(),
   pointCreate: vi.fn(),
+  mysteryUseFindMany: vi.fn(),
+  mysteryUseGroupBy: vi.fn(),
+  mysteryUseCreateMany: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ auth: mocks.auth }));
@@ -97,6 +100,11 @@ vi.mock("@/lib/db", () => {
       count: mocks.activityCount,
     },
     pointLog: { aggregate: mocks.pointAggregate, create: mocks.pointCreate },
+    mysteryAnswerUse: {
+      findMany: mocks.mysteryUseFindMany,
+      groupBy: mocks.mysteryUseGroupBy,
+      createMany: mocks.mysteryUseCreateMany,
+    },
   };
   return { prisma: { ...tx, $transaction: mocks.transaction } };
 });
@@ -396,6 +404,35 @@ async function runMysteryAiTurn(
     expectedVersion,
     ...extra,
   }, id);
+}
+
+async function prepareMysteryGuess(mode: "solo" | "ai") {
+  let actionIndex = 0;
+  let version = 1;
+  for (let questionIndex = 0; questionIndex < 3; questionIndex += 1) {
+    const usedQuestions = new Set(
+      storedMysteryState().history.map((activity) => activity.text),
+    );
+    const attribute = MYSTERY_ATTRIBUTES.find((candidate) =>
+      !usedQuestions.has(mysteryQuestionForAttribute(candidate, "ko"))
+    );
+    if (!attribute) throw new Error("시험에 쓸 미스터리 질문이 부족합니다");
+    const questionResponse = await submitMysteryQuestion(
+      actionIndex,
+      version,
+      mysteryQuestionForAttribute(attribute, "ko"),
+    );
+    expect(questionResponse.status).toBe(200);
+    actionIndex += 1;
+    version += 1;
+    if (mode === "ai") {
+      const aiResponse = await runMysteryAiTurn(actionIndex, version);
+      expect(aiResponse.status).toBe(200);
+      actionIndex += 1;
+      version += 1;
+    }
+  }
+  return { actionIndex, version };
 }
 
 type TestMemoryState = {
@@ -875,6 +912,9 @@ beforeEach(() => {
       : mysteryDynamicPrimary();
   });
   mocks.generateText.mockResolvedValue("그렇다면 별빛은 어디에서 시작될까요?");
+  mocks.mysteryUseFindMany.mockResolvedValue([]);
+  mocks.mysteryUseGroupBy.mockResolvedValue([]);
+  mocks.mysteryUseCreateMany.mockResolvedValue({ count: 1 });
   process.env.GAME_ACTIVITY_HASH_SECRET = "question-game-run-test-secret";
 
   mocks.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) => {
@@ -940,6 +980,11 @@ beforeEach(() => {
           count: mocks.activityCount,
         },
         pointLog: { aggregate: mocks.pointAggregate, create: mocks.pointCreate },
+        mysteryAnswerUse: {
+          findMany: mocks.mysteryUseFindMany,
+          groupBy: mocks.mysteryUseGroupBy,
+          createMany: mocks.mysteryUseCreateMany,
+        },
       });
     } catch (error) {
       const rollbackSnapshot = snapshot as {
@@ -3911,6 +3956,38 @@ describe("미스터리 박스 서버 실행 경로", () => {
     await expect(replay.json()).resolves.toMatchObject({ replayed: true, run: body.run });
   });
 
+  it("학생은 질문 세 개를 쓰기 전에는 정답을 추측할 수 없다", async () => {
+    await createMystery();
+
+    const response = await submitMysteryGuess(
+      0,
+      1,
+      mysterySecret().names.ko,
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "질문을 세 개 쓴 뒤 정답을 추측할 수 있습니다",
+    });
+    expect(activities).toHaveLength(0);
+  });
+
+  it("틀린 추측 뒤에는 새 질문을 써야 다시 추측할 수 있다", async () => {
+    await createMystery();
+    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    await submitMysteryQuestion(1, 2, "동물인가요?");
+    await submitMysteryQuestion(2, 3, "먹을 수 있나요?");
+    const firstGuess = await submitMysteryGuess(3, 4, "강아지");
+    const blocked = await submitMysteryGuess(4, 5, "책");
+
+    expect(firstGuess.status).toBe(200);
+    expect(blocked.status).toBe(409);
+    await expect(blocked.json()).resolves.toMatchObject({
+      error: "틀린 추측 뒤에는 새 질문을 한 번 써야 다시 추측할 수 있습니다",
+    });
+    expect(activities).toHaveLength(4);
+  });
+
   it("규칙 질문을 원자적으로 기록하고 같은 요청 재생과 다른 질문을 구분한다", async () => {
     await createMystery();
     const secret = mysterySecret();
@@ -4095,7 +4172,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
     const pending = submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?");
     await vi.waitFor(() => expect(mocks.generateJson).toHaveBeenCalledOnce());
-    const competing = await submitMysteryGuess(1, 1, "없는 물건");
+    const competing = await submitMysteryQuestion(1, 1, "살아 있나요?");
     expect(competing.status).toBe(200);
     finishProvider?.(mysteryDynamicPrimary());
     const late = await pending;
@@ -4103,7 +4180,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
     expect(late.status).toBe(409);
     expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 2 });
     expect(activities).toHaveLength(1);
-    expect(activities[0]).toMatchObject({ type: "MYSTERY_STUDENT_GUESS" });
+    expect(activities[0]).toMatchObject({ type: "MYSTERY_STUDENT_QUESTION" });
     expect(pointLogs).toHaveLength(0);
     expect(users.get("student-1")?.totalPoints).toBe(0);
   });
@@ -4238,22 +4315,15 @@ describe("미스터리 박스 서버 실행 경로", () => {
   });
 
   it.each([
-    ["solo", 3, 30],
-    ["ai", 5, 50],
+    ["solo", 5, 30],
+    ["ai", 9, 50],
   ] as const)(
     "%s 모드는 학생 질문만 점수로 삼고 정답 추측에서 즉시 정산한다",
     async (mode, awarded, dailyLimit) => {
       await createMystery(mode);
       const premature = await postComplete({ requestId: COMPLETE_ID, expectedVersion: 1 });
       expect(premature.status).toBe(409);
-      await submitMysteryQuestion(0, 1, "살아 있나요?");
-      let version = 2;
-      let actionIndex = 1;
-      if (mode === "ai") {
-        await runMysteryAiTurn(actionIndex, version);
-        version += 1;
-        actionIndex += 1;
-      }
+      const { version, actionIndex } = await prepareMysteryGuess(mode);
       const secret = mysterySecret();
       const final = await submitMysteryGuess(
         actionIndex,
@@ -4270,14 +4340,14 @@ describe("미스터리 박스 서버 실행 경로", () => {
           mysteryWinner: "STUDENT",
           mysteryEndReason: "SOLVED",
           mysteryAnswerItemId: secret.id,
-          mysteryStudentQuestionCount: 1,
+          mysteryStudentQuestionCount: 3,
         },
         result: { awarded, dailyLimit, preview: false },
       });
       expect(activities.reduce(
         (sum, activity) => sum + activity.validQuestionCount,
         0,
-      )).toBe(1);
+      )).toBe(3);
       expect(pointLogs).toHaveLength(1);
       expect(users.get("student-1")?.totalPoints).toBe(awarded);
 
@@ -4304,11 +4374,31 @@ describe("미스터리 박스 서버 실행 경로", () => {
       const state = storedMysteryState();
       let response: Response;
       if (state.mysteryNextStep === "STUDENT_ACTION") {
+        const lastStudentQuestionIndex = state.history.findLastIndex(
+          (activity) =>
+            activity.actor === "STUDENT" && activity.kind === "QUESTION",
+        );
+        const lastStudentWrongGuessIndex = state.history.findLastIndex(
+          (activity) =>
+            activity.actor === "STUDENT" &&
+            activity.kind === "GUESS" &&
+            !activity.correct,
+        );
         const usedQuestions = new Set(state.history.map((activity) => activity.text));
         const attribute = MYSTERY_ATTRIBUTES.find((candidate) =>
           !usedQuestions.has(mysteryQuestionForAttribute(candidate, "ko"))
         );
-        if (attribute) {
+        if (lastStudentWrongGuessIndex >= lastStudentQuestionIndex) {
+          response = await submitMysteryQuestion(
+            actionIndex,
+            version,
+            `${turn + 1}번째 단서로 ${mysteryQuestionForAttribute(
+              MYSTERY_ATTRIBUTES[turn % MYSTERY_ATTRIBUTES.length],
+              "ko",
+            )}`,
+          );
+          studentQuestionCount += 1;
+        } else if (attribute) {
           response = await submitMysteryQuestion(
             actionIndex,
             version,
@@ -4434,14 +4524,14 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
   it("동시 마지막 추측은 한 건만 정산한다", async () => {
     await createMystery();
-    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const { actionIndex, version } = await prepareMysteryGuess("solo");
     const secret = mysterySecret();
 
     const responses = await Promise.all([
-      submitMysteryGuess(1, 2, secret.names.ko),
+      submitMysteryGuess(actionIndex, version, secret.names.ko),
       submitMysteryGuess(
-        1,
-        2,
+        actionIndex,
+        version,
         secret.names.ko,
         "ko",
         "run-1",
@@ -4451,29 +4541,29 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
     expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
     expect(pointLogs).toHaveLength(1);
-    expect(activities).toHaveLength(2);
-    expect(users.get("student-1")?.totalPoints).toBe(3);
+    expect(activities).toHaveLength(4);
+    expect(users.get("student-1")?.totalPoints).toBe(5);
   });
 
   it("마지막 활동 저장 실패는 실행과 점수를 되돌리고 같은 요청으로 재시도한다", async () => {
     await createMystery();
-    await submitMysteryQuestion(0, 1, "살아 있나요?");
+    const { actionIndex, version } = await prepareMysteryGuess("solo");
     const secret = mysterySecret();
     mocks.activityCreate.mockRejectedValueOnce(new Error("private-mystery-storage"));
 
-    const failed = await submitMysteryGuess(1, 2, secret.names.ko);
+    const failed = await submitMysteryGuess(actionIndex, version, secret.names.ko);
 
     expect(failed.status).toBe(500);
-    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 2 });
-    expect(activities).toHaveLength(1);
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version });
+    expect(activities).toHaveLength(3);
     expect(pointLogs).toHaveLength(0);
     expect(users.get("student-1")?.totalPoints).toBe(0);
 
-    const retry = await submitMysteryGuess(1, 2, secret.names.ko);
+    const retry = await submitMysteryGuess(actionIndex, version, secret.names.ko);
     expect(retry.status).toBe(200);
-    await expect(retry.json()).resolves.toMatchObject({ result: { awarded: 3 } });
+    await expect(retry.json()).resolves.toMatchObject({ result: { awarded: 5 } });
     expect(pointLogs).toHaveLength(1);
-    expect(users.get("student-1")?.totalPoints).toBe(3);
+    expect(users.get("student-1")?.totalPoints).toBe(5);
   });
 
   it("스무 번째 외부 판정 활동 저장 실패는 실행과 점수를 모두 되돌리고 같은 요청으로 제한 정산한다", async () => {
@@ -4531,8 +4621,12 @@ describe("미스터리 박스 서버 실행 경로", () => {
   it("교사와 하루 상한 및 만료와 자동 포기를 공통 정책으로 처리한다", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
     await createMystery();
-    await submitMysteryQuestion(0, 1, "살아 있나요?");
-    const teacherFinal = await submitMysteryGuess(1, 2, mysterySecret().names.ko);
+    const teacherReady = await prepareMysteryGuess("solo");
+    const teacherFinal = await submitMysteryGuess(
+      teacherReady.actionIndex,
+      teacherReady.version,
+      mysterySecret().names.ko,
+    );
     await expect(teacherFinal.json()).resolves.toMatchObject({
       result: { awarded: 0, preview: true },
       run: { preview: true, mysteryAnswerItemId: expect.any(String) },
@@ -4553,8 +4647,12 @@ describe("미스터리 박스 서버 실행 경로", () => {
       createdAt: new Date(),
     });
     await createMystery();
-    await submitMysteryQuestion(0, 1, "살아 있나요?");
-    const capped = await submitMysteryGuess(1, 2, mysterySecret().names.ko);
+    const cappedReady = await prepareMysteryGuess("solo");
+    const capped = await submitMysteryGuess(
+      cappedReady.actionIndex,
+      cappedReady.version,
+      mysterySecret().names.ko,
+    );
     await expect(capped.json()).resolves.toMatchObject({
       result: { awarded: 1, dailyRemaining: 0, cappedByLimit: true },
     });

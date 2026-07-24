@@ -467,16 +467,16 @@ describe("권위 상태 표시와 입력 가림", () => {
     expect(screen.queryByPlaceholderText(/질문으로 바꿔/)).not.toBeInTheDocument();
   });
 
-  it("질문자가 나간 이야기 방은 남은 실제 목표를 2 / 3으로 표시한다", () => {
+  it("질문자가 나가도 시작할 때 정한 목표를 유지해 2 / 4로 표시한다", () => {
     renderGame("story-dice", storyAfterQuestionerLeaves(), "user-1");
-    expect(screen.getByText("질문과 대답 2 / 3쌍")).toBeInTheDocument();
-    expect(screen.queryByText("질문과 대답 2 / 2쌍")).not.toBeInTheDocument();
+    expect(screen.getByText("질문과 대답 2 / 4쌍")).toBeInTheDocument();
+    expect(screen.queryByText("질문과 대답 2 / 3쌍")).not.toBeInTheDocument();
   });
 
-  it("질문자가 나간 뒤 이야기를 마치면 실제 기록대로 3 / 3을 표시한다", () => {
+  it("질문자가 나간 뒤 다음 순서를 마쳐도 시작할 때 정한 목표를 표시한다", () => {
     renderGame("story-dice", completedStoryAfterQuestionerLeaves(), "user-1");
-    expect(screen.getByText("질문과 대답 3 / 3쌍")).toBeInTheDocument();
-    expect(screen.queryByText("질문과 대답 3 / 2쌍")).not.toBeInTheDocument();
+    expect(screen.getByText("질문과 대답 3 / 4쌍")).toBeInTheDocument();
+    expect(screen.queryByText("질문과 대답 3 / 3쌍")).not.toBeInTheDocument();
   });
 });
 

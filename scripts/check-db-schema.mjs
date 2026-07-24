@@ -35,6 +35,7 @@ const REQUIRED_TABLES = [
   "game_room_create_attempts",
   "game_runs",
   "game_activities",
+  "mystery_answer_uses",
   "question_game_customs",
   "question_game_visibilities",
   "question_game_orders",
@@ -76,6 +77,11 @@ const REQUIRED_COLUMNS = [
   ["game_activities", "run_id", "text"],
   ["game_activities", "request_fingerprint", "text"],
   ["game_activities", "payload", "jsonb"],
+  ["mystery_answer_uses", "user_id", "text"],
+  ["mystery_answer_uses", "item_id", "text"],
+  ["mystery_answer_uses", "category", "text"],
+  ["mystery_answer_uses", "selection_key", "text"],
+  ["mystery_answer_uses", "created_at", "timestamp without time zone"],
 ];
 
 export const REQUIRED_INDEXES = [
@@ -163,6 +169,24 @@ export const REQUIRED_INDEXES = [
     isUnique: false,
     columns: ["game_run_id"],
   },
+  {
+    name: "uniq_mystery_answer_selection",
+    tableName: "mystery_answer_uses",
+    isUnique: true,
+    columns: ["user_id", "selection_key"],
+  },
+  {
+    name: "mystery_answer_uses_user_id_created_at_idx",
+    tableName: "mystery_answer_uses",
+    isUnique: false,
+    columns: ["user_id", "created_at"],
+  },
+  {
+    name: "mystery_answer_uses_item_id_created_at_idx",
+    tableName: "mystery_answer_uses",
+    isUnique: false,
+    columns: ["item_id", "created_at"],
+  },
 ];
 
 export const REQUIRED_FOREIGN_KEYS = [
@@ -205,6 +229,14 @@ export const REQUIRED_FOREIGN_KEYS = [
     targetTable: "game_runs",
     targetColumns: ["id"],
     onDelete: "RESTRICT",
+  },
+  {
+    name: "mystery_answer_uses_user_id_fkey",
+    sourceTable: "mystery_answer_uses",
+    sourceColumns: ["user_id"],
+    targetTable: "users",
+    targetColumns: ["id"],
+    onDelete: "CASCADE",
   },
 ];
 
@@ -266,6 +298,7 @@ const REQUIRED_RLS_TABLES = [
   "game_activities",
   "activity_award_claims",
   "game_room_settlements",
+  "mystery_answer_uses",
 ];
 
 function sameColumns(actual, expected) {

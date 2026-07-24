@@ -14,6 +14,7 @@ import {
   getLocalizedText,
   getQuestionDiceTypes,
   getQuestionGameText,
+  getRoomTurnGameText,
   isQuestionFormForLocale,
 } from "@/lib/question-game-i18n";
 import { pickFallbackLocalizedPairs } from "@/lib/memory-game-data";
@@ -113,16 +114,27 @@ describe("question play localization", () => {
     expect(teacherGamePage).toContain('{t("custom")}');
   });
 
-  it("미스터리 상자 안내는 질문과 추측을 합친 스무 활동 기준을 두 언어로 알린다", () => {
+  it("미스터리 상자 안내는 놀이 방식과 참여 인원에 따른 활동 기준을 두 언어로 알린다", () => {
     const mystery = BUILT_IN_GAMES.find((game) => game.id === "mystery-box")!;
     const englishMystery = localizeBuiltInGame(mystery, "en");
 
     expect(mystery.description).toContain("질문과 추측");
-    expect(mystery.instructions.join(" ")).toContain("20번의 활동");
+    expect(mystery.instructions.join(" ")).toContain("12~24회");
     expect(mystery.instructions.join(" ")).not.toContain("20개의 질문");
     expect(englishMystery.description).toContain("questions and guesses");
-    expect(englishMystery.instructions.join(" ")).toContain("20 activities");
+    expect(englishMystery.instructions.join(" ")).toContain("12-24");
     expect(englishMystery.instructions.join(" ")).not.toContain("20 questions");
+  });
+
+  it("친구 방의 동적 라운드 수를 사다리와 릴레이 안내에 그대로 표시한다", () => {
+    expect(getQuestionGameText("ko").ladderSetupTitle(2))
+      .toBe("2라운드에 쓸 질문 주제");
+    expect(getQuestionGameText("en").ladderDoneDescription(2))
+      .toContain("2 rounds");
+    expect(getRoomTurnGameText("ko").relaySubtitle(2))
+      .toBe("한 주제에서 질문을 2라운드 이어가요.");
+    expect(getRoomTurnGameText("en").relaySubtitle(3))
+      .toContain("3 rounds");
   });
 
   it("requires one friend before the host can start a room", () => {

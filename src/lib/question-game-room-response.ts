@@ -13,7 +13,11 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 export function toPublicGameRoom(room: GameRoom): GameRoom {
-  const { blockedPlayerIds: _blockedPlayerIds, ...publicRoom } = room;
+  const {
+    blockedPlayerIds: _blockedPlayerIds,
+    mysteryRotation: _mysteryRotation,
+    ...publicRoom
+  } = room;
   if (
     room.gameId === "mystery-box" ||
     room.gameState?.game === "mystery-box"

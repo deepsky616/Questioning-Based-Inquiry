@@ -874,7 +874,7 @@ describe("질문놀이 실행 정의", () => {
     }, () => 0);
 
     expect(state.privateItemId).toBe("apple");
-    expect(state.knowledgeVersion).toBe(4);
+    expect(state.knowledgeVersion).toBe(5);
     expect(() => definition.ensureProgress(state, {
       mode: "AI",
       runVersion: 1,
@@ -959,6 +959,7 @@ describe("질문놀이 실행 정의", () => {
     }, () => 0);
     const completed = {
       ...initial,
+      knowledgeVersion: 4 as const,
       questionCount: 1,
       activitySequence: 1,
       mysteryNextStep: "COMPLETE" as const,

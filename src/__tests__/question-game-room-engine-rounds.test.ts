@@ -183,6 +183,17 @@ function completedRoom(gameId: "dice" | "relay" | "kaba"): GameRoom {
   return room;
 }
 
+describe("참여 인원별 공유 라운드", () => {
+  it.each(["dice", "relay", "kaba"] as const)(
+    "%s 놀이는 세 명까지 세 라운드, 네 명부터 두 라운드로 정한다",
+    (gameId) => {
+      expect(start(gameId, 3).gameState.maxRounds).toBe(3);
+      expect(start(gameId, 4).gameState.maxRounds).toBe(2);
+      expect(start(gameId, 8).gameState.maxRounds).toBe(2);
+    },
+  );
+});
+
 describe("질문 주사위 판정기", () => {
   it("서버가 면을 정하고 모두 한 번씩 하면 다음 라운드로 넘긴다", () => {
     let room = start("dice", 2);
@@ -372,7 +383,7 @@ describe("질문 릴레이 판정기", () => {
 });
 
 describe("카바 판정기", () => {
-  it.each([[2, 6], [8, 24]])("참가자 %i명에게 겹치지 않는 문장 %i개를 서버가 배정한다", (count, total) => {
+  it.each([[2, 6], [8, 16]])("참가자 %i명에게 겹치지 않는 문장 %i개를 서버가 배정한다", (count, total) => {
     const room = preparedKaba(count, () => 0.37);
     const state = readKabaPublicState(room.gameState)!;
 

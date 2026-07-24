@@ -78,6 +78,32 @@ function historyResultLabel(item: MysteryHistoryItem, t: GameTranslate) {
   return item.correct ? t("guessCorrect") : t("guessNotCorrect");
 }
 
+function roomGuessBlockKey(
+  history: readonly MysteryHistoryItem[],
+  playerIds: readonly string[],
+  currentPlayerId: string,
+) {
+  const questions = history.filter((item) => item.kind === "question");
+  if (questions.length < 3) return "mysteryGuessNeedThreeSharedQuestions";
+  if (playerIds.some(
+    (playerId) => !questions.some((item) => item.playerId === playerId),
+  )) {
+    return "mysteryGuessNeedEveryPlayerQuestion";
+  }
+  const lastOwnQuestion = history.findLastIndex(
+    (item) => item.kind === "question" && item.playerId === currentPlayerId,
+  );
+  const lastOwnWrongGuess = history.findLastIndex(
+    (item) =>
+      item.kind === "guess" &&
+      item.playerId === currentPlayerId &&
+      !item.correct,
+  );
+  return lastOwnWrongGuess >= lastOwnQuestion
+    ? "mysteryGuessNeedQuestionAfterWrong"
+    : null;
+}
+
 export default function RoomMysteryBox({
   game,
   room,
@@ -350,6 +376,12 @@ export default function RoomMysteryBox({
     !requestPending &&
     state.history.length < state.maxRounds
   );
+  const guessBlockKey = roomGuessBlockKey(
+    state.history,
+    state.turnOrder,
+    myId,
+  );
+  const canGuess = canSubmit && guessBlockKey === null;
   const remaining = Math.max(0, state.maxRounds - state.history.length);
 
   return (
@@ -487,7 +519,7 @@ export default function RoomMysteryBox({
             type="text"
             value={guessInput}
             maxLength={QUESTION_GAME_LIMITS.shortWord}
-            disabled={!canSubmit}
+            disabled={!canGuess}
             onChange={(event) => {
               const value = event.target.value;
               setGuessInput(value);
@@ -499,11 +531,16 @@ export default function RoomMysteryBox({
             className="h-28 w-full rounded-lg border-2 border-input bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-pink-500 disabled:cursor-not-allowed disabled:bg-muted"
             placeholder={t("writeTheObjectName")}
           />
+          {guessBlockKey ? (
+            <p className="text-xs font-semibold leading-5 text-amber-800 dark:text-amber-200">
+              {t(guessBlockKey)}
+            </p>
+          ) : null}
           <Button
             type="button"
             onClick={() => {
               const value = guessInput.trim();
-              if (!canSubmit || !value || !room.playId || !state.roundId) return;
+              if (!canGuess || !value || !room.playId || !state.roundId) return;
               void sendRequest(
                 "mystery-guess",
                 {
@@ -517,7 +554,7 @@ export default function RoomMysteryBox({
                 state.roundId,
               );
             }}
-            disabled={!canSubmit || !guessInput.trim()}
+            disabled={!canGuess || !guessInput.trim()}
             className="w-full rounded-lg bg-pink-700 font-black text-white hover:bg-pink-800 dark:bg-pink-400 dark:text-slate-950 dark:hover:bg-pink-300"
           >
             {pendingKind === "mystery-guess" ? (
@@ -607,7 +644,7 @@ function MysteryCompletedDetails({
   const questionCount = state.history.filter(({ kind }) => kind === "question").length;
   const heading = state.winnerId
     ? (t("theAnswerWasFound"))
-    : (t("allTwentyActivitiesWereUsed"));
+    : (t("allMysteryActivitiesWereUsed", { count: state.maxRounds }));
 
   return (
     <div className="space-y-4">
@@ -680,7 +717,7 @@ function MysteryResult({
       ? (t("notEnoughPlayersBeforeStarting"))
       : endedDuringPlay
         ? (t("notEnoughPlayersToContinue"))
-        : (t("allTwentyActivitiesWereUsed"));
+        : (t("allMysteryActivitiesWereUsed", { count: state.maxRounds }));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">

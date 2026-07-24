@@ -380,7 +380,7 @@ export default function RoomLadder({
           <section className="space-y-5 border-y border-border bg-card px-4 py-6 text-card-foreground sm:px-6">
             <div>
               <h2 className="text-lg font-black text-foreground">
-                {text.ladderSetupTitle}
+                {text.ladderSetupTitle(state.maxRounds)}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {t("enterOneTopicForEach", { length: room.players.length })}
@@ -737,7 +737,7 @@ function LadderResultDetails({
             {text.ladderDoneTitle}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            {text.ladderDoneDescription}
+            {text.ladderDoneDescription(state.maxRounds)}
           </p>
         </div>
 

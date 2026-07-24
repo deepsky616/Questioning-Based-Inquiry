@@ -7,6 +7,11 @@ import {
   isGameAwardResult,
   type GameAwardResult,
 } from "@/lib/game-award-result";
+import {
+  MYSTERY_CATEGORIES,
+  MYSTERY_ITEMS,
+  type MysteryCategory,
+} from "@/lib/mystery-box-rules";
 
 // 교사가 지정한 순서(gameId 배열)대로 정렬. 순서에 없는 게임은 기본 order로 뒤에 둔다.
 export function sortGamesByOrder<T extends { id: string; order: number }>(
@@ -112,11 +117,11 @@ const BUILT_IN_GAME_TEXT: Record<"en", Record<string, BuiltInGameText>> = {
     },
     "mystery-box": {
       title: "Mystery Box",
-      description: "Use yes-or-no questions and guesses to identify the hidden object within 20 activities.",
+      description: "Use yes-or-no questions and guesses to identify the hidden object within the activity limit for the play mode.",
       instructions: [
         "Hide an object inside a box.",
         "Other players may ask only questions that can be answered yes or no.",
-        "Each question or guess uses one activity. Identify the object within 20 activities to succeed.",
+        "Each question or guess uses one activity. Solo and AI play use 20 activities; friend rooms use 12-24 based on player count.",
         "Better questions make the object easier to discover.",
       ],
     },
@@ -165,6 +170,11 @@ export interface RoomChainItem {
 
 export type RoomStatus = "waiting" | "playing" | "ended";
 
+export interface MysteryRoomRotation {
+  usedItemIds: string[];
+  recentCategories: MysteryCategory[];
+}
+
 export interface GameRoom {
   code: string;
   gameId: string;
@@ -172,6 +182,7 @@ export interface GameRoom {
   status: RoomStatus;
   players: RoomPlayer[];
   blockedPlayerIds?: string[];
+  mysteryRotation?: MysteryRoomRotation;
   topic: string;
   chain: RoomChainItem[];
   turnIndex: number;
@@ -284,6 +295,29 @@ function isBlockedPlayerList(
   return players.every(({ id }) => !ids.has(id));
 }
 
+function isMysteryRoomRotation(
+  value: unknown,
+  gameId: string,
+): value is MysteryRoomRotation {
+  if (gameId !== "mystery-box" || !isRecord(value)) return false;
+  const itemIds = new Set(MYSTERY_ITEMS.map(({ id }) => id));
+  const categories = new Set<string>(MYSTERY_CATEGORIES);
+  if (
+    !Array.isArray(value.usedItemIds) ||
+    value.usedItemIds.length > MYSTERY_ITEMS.length ||
+    !value.usedItemIds.every((id) => isNonEmptyString(id) && itemIds.has(id)) ||
+    new Set(value.usedItemIds).size !== value.usedItemIds.length ||
+    !Array.isArray(value.recentCategories) ||
+    value.recentCategories.length > 2 ||
+    !value.recentCategories.every(
+      (category) => isNonEmptyString(category) && categories.has(category),
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function isGameRoom(value: unknown): value is GameRoom {
   return (
     isRecord(value) &&
@@ -297,6 +331,8 @@ export function isGameRoom(value: unknown): value is GameRoom {
     value.players.every(isRoomPlayer) &&
     (value.blockedPlayerIds === undefined ||
       isBlockedPlayerList(value.blockedPlayerIds, value.players)) &&
+    (value.mysteryRotation === undefined ||
+      isMysteryRoomRotation(value.mysteryRotation, value.gameId)) &&
     typeof value.topic === "string" &&
     Array.isArray(value.chain) &&
     value.chain.every(isRoomChainItem) &&
@@ -609,7 +645,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
   {
     id: "mystery-box",
     title: "미스터리 박스",
-    description: "예 또는 아니오 질문과 추측으로 상자 속 물건을 20번의 활동 안에 맞혀보세요!",
+    description: "예 또는 아니오 질문과 추측으로 놀이 방식에 맞게 정해진 활동 안에 상자 속 물건을 맞혀보세요!",
     emoji: "📦",
     gradientCss: "linear-gradient(135deg, #BE185D 0%, #BE123C 100%)",
     accentColor: "#BE123C",
@@ -617,7 +653,7 @@ export const BUILT_IN_GAMES: BuiltInGame[] = [
     instructions: [
       "상자 안에 물건을 넣어 숨겨요.",
       "나머지 친구들은 '네/아니오'로 대답할 수 있는 질문만 해요.",
-      "질문이나 추측 한 번이 한 활동이며, 20번의 활동 안에 맞히면 성공해요.",
+      "질문이나 추측 한 번이 한 활동이에요. 혼자와 인공지능 놀이는 20회, 친구 방은 참여 인원에 따라 12~24회 진행해요.",
       "좋은 질문을 많이 할수록 더 쉽게 맞힐 수 있어요.",
     ],
     isBuiltIn: true,

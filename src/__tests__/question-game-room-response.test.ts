@@ -44,6 +44,21 @@ describe("toPublicGameRoom", () => {
     expect(room.blockedPlayerIds).toEqual(["student"]);
   });
 
+  it("미스터리 정답 순환 기록을 공개 응답에서 제거한다", () => {
+    const room = makeRoom({
+      gameId: "mystery-box",
+      mysteryRotation: {
+        usedItemIds: ["apple", "cat"],
+        recentCategories: ["animal", "food"],
+      },
+    });
+
+    const publicRoom = toPublicGameRoom(room);
+
+    expect(publicRoom.mysteryRotation).toBeUndefined();
+    expect(room.mysteryRotation?.usedItemIds).toEqual(["apple", "cat"]);
+  });
+
   it("미스터리 박스의 중첩 비공개 복사본과 알 수 없는 키를 제거한다", () => {
     const marker = "copied-secret";
     const gameState = {

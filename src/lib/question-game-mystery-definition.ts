@@ -12,6 +12,7 @@ import {
   mysteryAttributesForVersion,
   mysteryItemsForVersion,
   resolveMysteryAnswerEvidence,
+  selectMysteryItem,
   type MysteryAnswer,
   type MysteryAnswerEvidence,
   type MysteryAttribute,
@@ -269,7 +270,8 @@ export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
       (value.knowledgeVersion === 1 ||
         value.knowledgeVersion === 2 ||
         value.knowledgeVersion === 3 ||
-        value.knowledgeVersion === 4)
+        value.knowledgeVersion === 4 ||
+        value.knowledgeVersion === 5)
     ? value.knowledgeVersion
     : 1;
   if (
@@ -301,7 +303,8 @@ export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
       value.knowledgeVersion !== 1 &&
       value.knowledgeVersion !== 2 &&
       value.knowledgeVersion !== 3 &&
-      value.knowledgeVersion !== 4) ||
+      value.knowledgeVersion !== 4 &&
+      value.knowledgeVersion !== 5) ||
     (value.mysteryWinner !== undefined &&
       value.mysteryWinner !== "STUDENT" &&
       value.mysteryWinner !== "AI") ||
@@ -466,6 +469,9 @@ export function ensureMysteryProgress(
     (activeRun && settled)
   ) damaged();
 
+  let studentQuestionCount = 0;
+  let lastStudentQuestionIndex = -1;
+  let lastStudentWrongGuessIndex = -1;
   for (let index = 0; index < state.history.length; index += 1) {
     const activity = state.history[index];
     const expectedActor: MysteryActor = mode === "AI" && index % 2 === 1
@@ -475,6 +481,20 @@ export function ensureMysteryProgress(
       activity.actor !== expectedActor ||
       activity.locale !== state.mysteryLocale
     ) damaged();
+    if (activity.actor === "STUDENT" && activity.kind === "GUESS") {
+      if (
+        state.knowledgeVersion >= 5 &&
+        (studentQuestionCount < 3 ||
+          lastStudentWrongGuessIndex >= lastStudentQuestionIndex)
+      ) {
+        damaged();
+      }
+      if (!activity.correct) lastStudentWrongGuessIndex = index;
+    }
+    if (activity.actor === "STUDENT" && activity.kind === "QUESTION") {
+      studentQuestionCount += 1;
+      lastStudentQuestionIndex = index;
+    }
     if (activity.actor === "AI") {
       const plan = planMysteryAiActivity(
         state.history.slice(0, index),
@@ -499,14 +519,55 @@ export function ensureMysteryProgress(
   }
 }
 
+export function mysteryStudentGuessBlockReason(
+  state: MysteryRunState,
+): string | null {
+  if (state.knowledgeVersion < 5) return null;
+  const studentQuestions = state.history.filter(
+    (activity) =>
+      activity.actor === "STUDENT" && activity.kind === "QUESTION",
+  );
+  if (studentQuestions.length < 3) {
+    return "질문을 세 개 쓴 뒤 정답을 추측할 수 있습니다";
+  }
+  const lastQuestionIndex = state.history.findLastIndex(
+    (activity) =>
+      activity.actor === "STUDENT" && activity.kind === "QUESTION",
+  );
+  const lastWrongGuessIndex = state.history.findLastIndex(
+    (activity) =>
+      activity.actor === "STUDENT" &&
+      activity.kind === "GUESS" &&
+      !activity.correct,
+  );
+  return lastWrongGuessIndex >= lastQuestionIndex
+    ? "틀린 추측 뒤에는 새 질문을 한 번 써야 다시 추측할 수 있습니다"
+    : null;
+}
+
 export function createMysteryState(
   input: QuestionGameRunCreateStateInput,
   randomIndex: RandomIndex = secureRandomIndex,
 ): MysteryRunState {
-  const index = randomIndex(MYSTERY_ITEMS.length);
-  if (!Number.isSafeInteger(index) || index < 0 || index >= MYSTERY_ITEMS.length) {
-    throw new QuestionGameRunError("미스터리 박스 물건을 고를 수 없습니다", 500);
-  }
+  const item = selectMysteryItem({
+    recentItemIds: input.mysterySelectionProfile?.recentItemIds,
+    recentCategories: input.mysterySelectionProfile?.recentCategories,
+    usageCounts: input.mysterySelectionProfile?.usageCounts,
+    random: () => {
+      const index = randomIndex(MYSTERY_ITEMS.length);
+      if (
+        !Number.isSafeInteger(index) ||
+        index < 0 ||
+        index >= MYSTERY_ITEMS.length
+      ) {
+        throw new QuestionGameRunError(
+          "미스터리 박스 물건을 고를 수 없습니다",
+          500,
+        );
+      }
+      return index / MYSTERY_ITEMS.length;
+    },
+  });
   return {
     game: "mystery-box",
     knowledgeVersion: CURRENT_MYSTERY_KNOWLEDGE_VERSION,
@@ -518,7 +579,7 @@ export function createMysteryState(
     mysteryStudentQuestionCount: 0,
     mysteryNextStep: "STUDENT_ACTION",
     history: [],
-    privateItemId: MYSTERY_ITEMS[index].id,
+    privateItemId: item.id,
   };
 }
 

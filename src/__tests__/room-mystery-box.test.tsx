@@ -153,6 +153,17 @@ function storedPlayState(
   return state;
 }
 
+function guessReadyPlayState(
+  overrides: Partial<MysteryRoomState> = {},
+): MysteryRoomState {
+  return storedPlayState([
+    question("host", "방장", "먹을 수 있나요?"),
+    question("other", "학생", "작은가요?"),
+    question("host", "방장", "과일인가요?"),
+    question("other", "학생", "둥근가요?"),
+  ], overrides);
+}
+
 function publicState(state: MysteryRoomState): Record<string, unknown> {
   const projected = toPublicMysteryState(state);
   expect(projected).not.toHaveProperty("private");
@@ -362,7 +373,8 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
       },
     );
 
-    view.rerender(<RoomMysteryBox {...makeProps(room, onAction)} />);
+    const guessRoom = makeRoom(publicState(guessReadyPlayState()));
+    view.rerender(<RoomMysteryBox {...makeProps(guessRoom, onAction)} />);
     fireEvent.change(screen.getByLabelText("정답 추측"), {
       target: { value: "사과" },
     });
@@ -428,7 +440,7 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
 
   it("연결 실패 뒤 입력과 같은 명령 식별값을 보존하고 성공한 뒤에만 지운다", async () => {
     stubCommandId();
-    const room = makeRoom(publicState(storedPlayState()));
+    const room = makeRoom(publicState(guessReadyPlayState()));
     const onAction = vi.fn<RoomActionHandler>()
       .mockResolvedValueOnce(failure(room, "network"))
       .mockResolvedValueOnce(success(room));
@@ -452,7 +464,7 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
 
   it("판정할 수 없는 질문은 입력칸 바로 아래에서 다시 쓰도록 안내한다", async () => {
     stubCommandId();
-    const room = makeRoom(publicState(storedPlayState()));
+    const room = makeRoom(publicState(guessReadyPlayState()));
     const onAction = vi.fn<RoomActionHandler>().mockResolvedValue({
       ok: false,
       room,
@@ -500,7 +512,9 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
     sent,
   }) => {
     stubCommandId();
-    const room = makeRoom(publicState(storedPlayState()));
+    const room = makeRoom(publicState(
+      label === "정답 추측" ? guessReadyPlayState() : storedPlayState(),
+    ));
     const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(success(room));
     render(<RoomMysteryBox {...makeProps(room, onAction)} />);
 
@@ -519,7 +533,7 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
     const questionCommandId = "20000000-0000-4000-8000-000000000011";
     const guessCommandId = "20000000-0000-4000-8000-000000000012";
     stubCommandIds(questionCommandId, guessCommandId);
-    const room = makeRoom(publicState(storedPlayState()));
+    const room = makeRoom(publicState(guessReadyPlayState()));
     const onAction = vi.fn<RoomActionHandler>()
       .mockResolvedValueOnce(failure(room, "network"))
       .mockResolvedValueOnce(failure(room, "network"))
@@ -549,7 +563,7 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
     "%s 응답에서는 학생 입력을 보존한다",
     async (reason) => {
       stubCommandId();
-      const room = makeRoom(publicState(storedPlayState()));
+      const room = makeRoom(publicState(guessReadyPlayState()));
       const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(failure(room, reason));
       render(<RoomMysteryBox {...makeProps(room, onAction)} />);
 
@@ -601,7 +615,9 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
     value,
   }) => {
     stubCommandId();
-    const stored = storedPlayState();
+    const stored = label === "정답 추측"
+      ? guessReadyPlayState()
+      : storedPlayState();
     const room = makeRoom(publicState(stored));
     const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(failure(room, "network"));
     const view = render(<RoomMysteryBox {...makeProps(room, onAction)} />);
@@ -641,7 +657,9 @@ describe("미스터리 박스 친구 방 공개 상태", () => {
     changed,
   }) => {
     stubCommandId();
-    const stored = storedPlayState();
+    const stored = label === "정답 추측"
+      ? guessReadyPlayState()
+      : storedPlayState();
     const room = makeRoom(publicState(stored));
     const onAction = vi.fn<RoomActionHandler>().mockResolvedValue(failure(room, "network"));
     const view = render(<RoomMysteryBox {...makeProps(room, onAction)} />);
@@ -714,7 +732,7 @@ describe("미스터리 박스 친구 방 결과", () => {
   it("스무 활동 실패와 참가자 부족 종료를 구분한다", () => {
     const limitRoom = makeRoom(publicState(completedAtLimit()), { status: "ended" });
     const first = render(<RoomMysteryBox {...makeProps(limitRoom)} />);
-    expect(screen.getByText("스무 활동을 모두 사용했어요")).toBeVisible();
+    expect(screen.getByText("정해진 20회 활동을 모두 사용했어요")).toBeVisible();
     expect(screen.getByText("사과")).toBeVisible();
     first.unmount();
 
@@ -1193,6 +1211,12 @@ async function submitLocalMysteryGuess(value: string) {
   await flushLocalMystery();
 }
 
+async function prepareLocalMysteryGuess() {
+  await submitLocalMysteryQuestion("살아 있나요?");
+  await submitLocalMysteryQuestion("작은가요?");
+  await submitLocalMysteryQuestion("먹을 수 있나요?");
+}
+
 function expectLocalMysteryRemaining(value: number) {
   expect(screen.getByText(`${value}회 남음`)).toBeVisible();
 }
@@ -1204,12 +1228,12 @@ describe("지역 미스터리 박스 서버 실행", () => {
     expect(JSON.stringify(snapshot())).not.toContain("사과");
     expect(screen.queryByText("사과")).not.toBeInTheDocument();
 
-    await submitLocalMysteryQuestion("먹을 수 있나요?");
-    expect(screen.getByText("예")).toBeVisible();
-    expectLocalMysteryRemaining(19);
+    await prepareLocalMysteryGuess();
+    expect(screen.getAllByText("예")).toHaveLength(3);
+    expectLocalMysteryRemaining(17);
     await submitLocalMysteryGuess("책");
     expect(screen.getByText("정답이 아님")).toBeVisible();
-    expectLocalMysteryRemaining(18);
+    expectLocalMysteryRemaining(16);
 
     const actionBodies = fetchMock.mock.calls
       .filter(([url]) => String(url).endsWith("/actions"))
@@ -1219,11 +1243,23 @@ describe("지역 미스터리 박스 서버 실행", () => {
         action: "mystery-submit-question",
         expectedVersion: 1,
         locale: "ko",
+        question: "살아 있나요?",
+      }),
+      expect.objectContaining({
+        action: "mystery-submit-question",
+        expectedVersion: 2,
+        locale: "ko",
+        question: "작은가요?",
+      }),
+      expect.objectContaining({
+        action: "mystery-submit-question",
+        expectedVersion: 3,
+        locale: "ko",
         question: "먹을 수 있나요?",
       }),
       expect.objectContaining({
         action: "mystery-submit-guess",
-        expectedVersion: 2,
+        expectedVersion: 4,
         locale: "ko",
         guess: "책",
       }),
@@ -1374,11 +1410,12 @@ describe("지역 미스터리 박스 서버 실행", () => {
     const { fetchMock } = await startLocalMystery("solo", {
       loseFinalResponse: true,
     });
+    await prepareLocalMysteryGuess();
     await submitLocalMysteryGuess("사과");
 
     expect(await screen.findByText("정답을 맞혔어요!")).toBeVisible();
     expect(screen.getAllByText("사과").length).toBeGreaterThan(0);
-    expect(screen.getByRole("status")).toHaveTextContent("+2점 적립!");
+    expect(screen.getByRole("status")).toHaveTextContent("+5점 적립!");
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/result")))
       .toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([, init]) => init?.body && (
@@ -1388,6 +1425,7 @@ describe("지역 미스터리 박스 서버 실행", () => {
 
   it("정답 추측과 다른 물건 식별값이 담긴 완료 응답은 화면에 적용하지 않는다", async () => {
     await startLocalMystery("solo", { settledAnswerItemId: "book" });
+    await prepareLocalMysteryGuess();
     await submitLocalMysteryGuess("사과");
 
     expect(screen.getByRole("alert")).toHaveTextContent(
@@ -1399,6 +1437,7 @@ describe("지역 미스터리 박스 서버 실행", () => {
 
   it("현재 언어의 정답 별칭과 일치하는 완료 응답은 정상적으로 적용한다", async () => {
     await startLocalMystery();
+    await prepareLocalMysteryGuess();
     await submitLocalMysteryGuess("풋사과");
 
     expect(await screen.findByText("정답을 맞혔어요!")).toBeVisible();
@@ -1408,7 +1447,9 @@ describe("지역 미스터리 박스 서버 실행", () => {
 
   it("이전의 실제 정답 추측을 오답으로 기록한 성공 응답은 화면에 적용하지 않는다", async () => {
     await startLocalMystery("solo", { forceFirstMatchingGuessFalse: true });
+    await prepareLocalMysteryGuess();
     await submitLocalMysteryGuess("사과");
+    await submitLocalMysteryQuestion("둥근가요?");
     await submitLocalMysteryGuess("풋사과");
 
     expect(screen.getByRole("alert")).toHaveTextContent(
@@ -1419,8 +1460,9 @@ describe("지역 미스터리 박스 서버 실행", () => {
 
   it("실제 정답 추측을 오답으로 기록한 횟수 제한 응답은 화면에 적용하지 않는다", async () => {
     await startLocalMystery("solo", { forceFirstMatchingGuessFalse: true });
+    await prepareLocalMysteryGuess();
     await submitLocalMysteryGuess("사과");
-    for (let index = 0; index < 19; index += 1) {
+    for (let index = 0; index < 16; index += 1) {
       await submitLocalMysteryQuestion(`먹을 수 있나요 ${index + 1}?`);
     }
 

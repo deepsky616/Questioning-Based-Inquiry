@@ -32,7 +32,7 @@ const dynamicRequest: MysteryAiAnswerRequest = {
   playerId: "player-1",
   locale: "ko",
   question: "건전지가 필요한가요?",
-  knowledgeVersion: 4,
+  knowledgeVersion: 5,
 };
 
 function dynamicAnswers(pencilAnswer: "yes" | "no" | "unknown" = "no") {

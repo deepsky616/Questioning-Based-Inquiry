@@ -3,7 +3,10 @@ import {
   isBuiltInQuestionGameId,
   type BuiltInQuestionGameId,
 } from "@/lib/question-game-rules";
-import type { MysteryAnswerResolution } from "@/lib/mystery-box-rules";
+import type {
+  MysteryAnswerResolution,
+  MysterySelectionProfile,
+} from "@/lib/mystery-box-rules";
 import type {
   GameRoom,
   RoomCommandResult,
@@ -30,6 +33,7 @@ export interface EngineStateBase {
   roundId?: string;
   round?: number;
   maxRounds?: number;
+  playerCountAtStart?: number;
   endReason?: "completed" | "host" | "insufficient-players";
   [key: string]: unknown;
 }
@@ -44,6 +48,7 @@ export interface QuestionGameRoomCommandInput {
   random: () => number;
   randomUUID: () => string;
   mysteryAnswerResolution?: MysteryAnswerResolution;
+  mysterySelectionProfile?: MysterySelectionProfile;
 }
 
 export interface QuestionGameRoomEngineContext
@@ -205,6 +210,13 @@ function parseEngineState(value: unknown): EngineStateBase | null {
     return null;
   }
   if (
+    value.playerCountAtStart !== undefined &&
+    (!isNonNegativeInteger(value.playerCountAtStart) ||
+      value.playerCountAtStart < 1)
+  ) {
+    return null;
+  }
+  if (
     value.endReason !== undefined &&
     value.endReason !== "completed" &&
     value.endReason !== "host" &&
@@ -354,6 +366,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
     random,
     randomUUID,
     mysteryAnswerResolution,
+    mysterySelectionProfile,
   } = input;
 
   if (!room.players.some(({ id }) => id === userId)) {
@@ -477,6 +490,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
         random,
         randomUUID: checkedRandomUUID,
         mysteryAnswerResolution,
+        mysterySelectionProfile,
       });
     } catch {
       return unchanged(
@@ -511,6 +525,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
       random,
       randomUUID: checkedRandomUUID,
       mysteryAnswerResolution,
+      mysterySelectionProfile,
     });
   } catch {
     return unchanged(

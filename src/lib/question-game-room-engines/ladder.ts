@@ -2,6 +2,7 @@ import { checkProfanity } from "@/lib/profanity";
 import {
   QUESTION_GAME_LIMITS,
   QUESTION_GAME_RULES,
+  getQuestionGameRoomTarget,
 } from "@/lib/question-game-rules";
 import { isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import {
@@ -40,7 +41,7 @@ export interface LadderRoomState extends EngineStateBase {
   game: "ladder";
   phase: "setup" | "compose" | "done";
   round: number;
-  maxRounds: 3;
+  maxRounds: number;
   topicPool: string[];
   roundTopics: string[];
   grid: boolean[][];
@@ -72,7 +73,11 @@ const STATE_REQUIRED_KEYS = [
   "assignments",
   "questions",
 ] as const;
-const STATE_OPTIONAL_KEYS = ["roundId", "endReason"] as const;
+const STATE_OPTIONAL_KEYS = [
+  "roundId",
+  "endReason",
+  "playerCountAtStart",
+] as const;
 const ASSIGNMENT_KEYS = [
   "playerId",
   "playerName",
@@ -336,21 +341,27 @@ function hasValidPhase(state: LadderRoomState): boolean {
   }
   if (
     state.endReason !== "completed" ||
-    state.round !== MAX_ROUNDS
+    state.round !== state.maxRounds
   ) {
     return false;
   }
   return allTargetPlayersSubmitted(state, state.questions);
 }
 
-export function createLadderState(): LadderRoomState {
+export function createLadderState(
+  context?: QuestionGameRoomEngineContext,
+): LadderRoomState {
+  const playerCountAtStart = context?.room.players.length;
   return {
     stateVersion: 2,
     game: "ladder",
     phase: "setup",
     recentCommandIds: [],
     round: 0,
-    maxRounds: MAX_ROUNDS,
+    maxRounds: playerCountAtStart === undefined
+      ? MAX_ROUNDS
+      : getQuestionGameRoomTarget("ladder", playerCountAtStart).maxRounds,
+    ...(playerCountAtStart === undefined ? {} : { playerCountAtStart }),
     topicPool: [],
     roundTopics: [],
     grid: [],
@@ -375,7 +386,18 @@ function readLadderStateUnchecked(value: unknown): LadderRoomState | null {
     !isUnique(value.recentCommandIds) ||
     !Number.isInteger(value.round) ||
     (value.round as number) < 0 ||
-    value.maxRounds !== MAX_ROUNDS ||
+    value.maxRounds !== (
+      value.playerCountAtStart === undefined
+        ? MAX_ROUNDS
+        : Number.isSafeInteger(value.playerCountAtStart) &&
+            (value.playerCountAtStart as number) >= MIN_PLAYERS &&
+            (value.playerCountAtStart as number) <= MAX_PLAYERS
+          ? getQuestionGameRoomTarget(
+              "ladder",
+              value.playerCountAtStart as number,
+            ).maxRounds
+          : -1
+    ) ||
     !isStringList(
       value.topicPool,
       (item): item is string => isStoredText(item, QUESTION_GAME_LIMITS.topic),

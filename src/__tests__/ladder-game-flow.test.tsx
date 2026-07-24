@@ -502,7 +502,7 @@ describe("인공지능과 함께하는 질문 사다리", () => {
     await confirmWithoutHelp("셋째 학생 질문에서 무엇을 배울까요?");
     expect(await screen.findByText("질문 사다리 완성")).toBeInTheDocument();
     expect(
-      screen.getByRole("list", { name: "확정한 질문 셋" }).children,
+      screen.getByRole("list", { name: "확정한 질문 3개" }).children,
     ).toHaveLength(3);
     expect(screen.getByText("+9점 적립!")).toBeInTheDocument();
   });

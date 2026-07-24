@@ -253,7 +253,7 @@ export default function RoomRelay({
     <div className="mx-auto max-w-2xl space-y-5 text-foreground">
       <GameHeader
         game={game}
-        subtitle={text.relaySubtitle}
+        subtitle={text.relaySubtitle(state.maxRounds)}
         onLeave={onLeave}
         leave={text.leave}
         disabled={requestPending}

@@ -63,6 +63,7 @@ import {
 } from "@/lib/question-game-memory-definition";
 import {
   ensureMysteryProgress,
+  mysteryStudentGuessBlockReason,
   parseMysteryState,
   planMysteryAiActivity,
   type MysteryActor,
@@ -80,6 +81,10 @@ import {
   type MysteryAnswerEvidence,
   type MysteryLocale,
 } from "@/lib/mystery-box-rules";
+import {
+  loadMysterySelectionProfile,
+  recordMysteryAnswerUses,
+} from "@/lib/mystery-answer-rotation-service";
 import {
   ensureRelayProgress,
   parseRelayState,
@@ -2583,6 +2588,10 @@ async function submitMysteryGuess(
     if (state.mysteryLocale !== locale) {
       throw new QuestionGameRunError("실행을 만든 언어로 추측해 주세요", 409);
     }
+    const guessBlockReason = mysteryStudentGuessBlockReason(state);
+    if (guessBlockReason) {
+      throw new QuestionGameRunError(guessBlockReason, 409);
+    }
     const entry = mysteryGuessEntry(state, "STUDENT", guess, textHash);
     return storeMysteryTransition(
       tx,
@@ -2734,6 +2743,17 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
         throw new QuestionGameRunError("같은 요청 식별값에 다른 실행 정보가 들어왔습니다", 409);
       }
       const replayRun = await expireRunForRead(tx, existing as StoredRun, now);
+      if (existing.gameId === "mystery-box") {
+        const replayState = parseMysteryState(existing.state);
+        const replayItem = getMysteryItem(replayState.privateItemId);
+        if (replayItem) {
+          await recordMysteryAnswerUses(tx, {
+            userIds: [actor.id],
+            item: replayItem,
+            selectionKey: `run:${existing.id}`,
+          });
+        }
+      }
       return { run: publicRunWithRole(replayRun, actor.role), replayed: true };
     }
     const definition = findQuestionGameRunDefinition(gameId);
@@ -2777,6 +2797,9 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
       }
     }
 
+    const mysterySelectionProfile = gameId === "mystery-box"
+      ? await loadMysterySelectionProfile(tx, [actor.id])
+      : undefined;
     const state = definition.createState({
       mode,
       locale,
@@ -2784,6 +2807,7 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
       topicLength,
       ...(topicHashes ? { topicHashes } : {}),
       ...(difficulty ? { difficulty } : {}),
+      ...(mysterySelectionProfile ? { mysterySelectionProfile } : {}),
     });
     const run = await tx.gameRun.create({
       data: {
@@ -2803,6 +2827,21 @@ export async function createQuestionGameRun(actorId: string, input: unknown, now
         expiresAt: new Date(now.getTime() + RUN_LIFETIME_MS),
       },
     });
+    if (gameId === "mystery-box") {
+      const mystery = parseMysteryState(run.state);
+      const item = getMysteryItem(mystery.privateItemId);
+      if (!item) {
+        throw new QuestionGameRunError(
+          "미스터리 박스 정답 기록을 만들 수 없습니다",
+          500,
+        );
+      }
+      await recordMysteryAnswerUses(tx, {
+        userIds: [actor.id],
+        item,
+        selectionKey: `run:${run.id}`,
+      });
+    }
     return { run: publicRunWithRole(run as StoredRun, actor.role), replayed: false };
   });
 }

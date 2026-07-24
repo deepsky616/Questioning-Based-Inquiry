@@ -42,6 +42,7 @@ model User {
   gameRoomCreateAttempts GameRoomCreateAttempt[] @relation("GameRoomCreateAttempts")
   ownedGameRuns       GameRun[]            @relation("GameRunOwner")
   gameActivities      GameActivity[]       @relation("GameActivityActor")
+  mysteryAnswerUses   MysteryAnswerUse[]    @relation("MysteryAnswerUses")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -334,6 +335,21 @@ model GameActivity {
   @@index([actorId, createdAt])
   @@index([runId, type])
   @@map("game_activities")
+}
+
+model MysteryAnswerUse {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  user         User     @relation("MysteryAnswerUses", fields: [userId], references: [id], onDelete: Cascade)
+  itemId       String   @map("item_id")
+  category     String   @map("category")
+  selectionKey String   @map("selection_key")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, selectionKey], name: "uniq_mystery_answer_selection")
+  @@index([userId, createdAt])
+  @@index([itemId, createdAt])
+  @@map("mystery_answer_uses")
 }
 
 model QuestionGameCustom {

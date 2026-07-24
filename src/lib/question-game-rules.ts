@@ -19,6 +19,10 @@ type QuestionGameTarget =
   | { kind: "attempts"; count: 10 }
   | { kind: "attempts-per-player"; count: 3; minimumTotal: 6 };
 
+export type QuestionGameRoomTarget =
+  | { maxRounds: number }
+  | { maxAttempts: number };
+
 export const QUESTION_GAME_LIMITS = {
   commandBodyBytes: 64 * 1024,
   gameStateBytes: 128 * 1024,
@@ -50,7 +54,7 @@ export const QUESTION_GAME_RULES = {
       solo: { kind: "completed-pairs", count: 3, perQuestioner: false },
       ai: { kind: "completed-pairs", count: 3, perQuestioner: false },
     },
-    score: { maxValidQuestionsPerPlayer: 2, competitiveWinner: false },
+    score: { maxValidQuestionsPerPlayer: 3, competitiveWinner: false },
   },
   dice: {
     multiplayer: { min: 2, max: 8 },
@@ -91,8 +95,8 @@ export const QUESTION_GAME_RULES = {
       ai: { kind: "actions", count: 20 },
     },
     score: {
-      maxValidQuestionsPerPlayer: 20,
-      maxValidQuestionsPerRoom: 20,
+      maxValidQuestionsPerPlayer: 24,
+      maxValidQuestionsPerRoom: 24,
       competitiveWinner: false,
     },
   },
@@ -139,6 +143,53 @@ export function getQuestionGameRule(gameId: string) {
     throw new Error("지원하지 않는 질문놀이 식별값입니다");
   }
   return QUESTION_GAME_RULES[gameId];
+}
+
+function requireRoomPlayerCount(gameId: BuiltInQuestionGameId, playerCount: number) {
+  const { min, max } = QUESTION_GAME_RULES[gameId].multiplayer;
+  if (
+    !Number.isSafeInteger(playerCount) ||
+    playerCount < min ||
+    playerCount > max
+  ) {
+    throw new Error(`친구 놀이 인원은 ${min}명부터 ${max}명까지여야 합니다`);
+  }
+}
+
+export function getQuestionGameRoomTarget(
+  gameId: "memory",
+  playerCount: number,
+  difficulty: "easy" | "normal" | "hard",
+): { maxAttempts: number };
+export function getQuestionGameRoomTarget(
+  gameId: Exclude<BuiltInQuestionGameId, "memory">,
+  playerCount: number,
+  difficulty?: "easy" | "normal" | "hard",
+): { maxRounds: number };
+export function getQuestionGameRoomTarget(
+  gameId: BuiltInQuestionGameId,
+  playerCount: number,
+  difficulty?: "easy" | "normal" | "hard",
+): QuestionGameRoomTarget {
+  requireRoomPlayerCount(gameId, playerCount);
+
+  if (gameId === "memory") {
+    if (!difficulty) {
+      throw new Error("카드 짝 찾기 난이도가 필요합니다");
+    }
+    const baseAttempts = QUESTION_GAME_RULES.memory.targets.room[difficulty];
+    const minimumTurns = { easy: 3, normal: 4, hard: 5 }[difficulty];
+    return {
+      maxAttempts: Math.max(baseAttempts, playerCount * minimumTurns),
+    };
+  }
+  if (gameId === "mystery-box") {
+    return { maxRounds: 8 + playerCount * 2 };
+  }
+  if (gameId === "story-dice") {
+    return { maxRounds: playerCount <= 3 ? 3 : 2 };
+  }
+  return { maxRounds: playerCount <= 3 ? 3 : 2 };
 }
 
 export function applyQuestionGameRuleText(

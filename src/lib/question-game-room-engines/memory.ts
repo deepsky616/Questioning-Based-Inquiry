@@ -7,6 +7,7 @@ import {
 import {
   QUESTION_GAME_LIMITS,
   QUESTION_GAME_RULES,
+  getQuestionGameRoomTarget,
 } from "@/lib/question-game-rules";
 import type { GameRoom } from "@/lib/question-games-data";
 import type {
@@ -285,9 +286,19 @@ function hasValidPhase(state: MemoryRoomState): boolean {
   const matchedPairs = state.takenIds.length / 2;
   const recordedMisses = readResolvedRevealIds(state).length +
     (state.lastReveal?.result === "miss" ? 1 : 0);
+  const expectedMaxAttempts = state.playerCountAtStart === undefined
+    ? QUESTION_GAME_RULES.memory.targets.room[state.difficulty]
+    : Number.isSafeInteger(state.playerCountAtStart) &&
+        state.playerCountAtStart >= QUESTION_GAME_RULES.memory.multiplayer.min &&
+        state.playerCountAtStart <= QUESTION_GAME_RULES.memory.multiplayer.max
+      ? getQuestionGameRoomTarget(
+          "memory",
+          state.playerCountAtStart,
+          state.difficulty,
+        ).maxAttempts
+      : -1;
   if (
-    state.maxAttempts !==
-      QUESTION_GAME_RULES.memory.targets.room[state.difficulty] ||
+    state.maxAttempts !== expectedMaxAttempts ||
     state.attempts > state.maxAttempts ||
     state.attempts < matchedPairs ||
     recordedMisses > state.attempts - matchedPairs ||
@@ -518,7 +529,13 @@ function prepareMemory(
       context.room.players.map(({ id }) => [id, 0]),
     ),
     attempts: 0,
-    maxAttempts: QUESTION_GAME_RULES.memory.targets.room[difficulty],
+    maxAttempts: state.playerCountAtStart === undefined
+      ? QUESTION_GAME_RULES.memory.targets.room[difficulty]
+      : getQuestionGameRoomTarget(
+          "memory",
+          state.playerCountAtStart,
+          difficulty,
+        ).maxAttempts,
     lastReveal: null,
     resolvedRevealIds: [],
   };
@@ -1002,7 +1019,10 @@ function memoryPlayerLeft(
   return { ...context.room, status, gameState: nextState };
 }
 
-export function createMemoryState(): MemoryRoomState {
+export function createMemoryState(
+  context?: QuestionGameRoomEngineContext,
+): MemoryRoomState {
+  const playerCountAtStart = context?.room.players.length;
   return {
     stateVersion: 2,
     game: "memory",
@@ -1019,7 +1039,14 @@ export function createMemoryState(): MemoryRoomState {
     revealedIds: [],
     scores: {},
     attempts: 0,
-    maxAttempts: QUESTION_GAME_RULES.memory.targets.room.normal,
+    maxAttempts: playerCountAtStart === undefined
+      ? QUESTION_GAME_RULES.memory.targets.room.normal
+      : getQuestionGameRoomTarget(
+          "memory",
+          playerCountAtStart,
+          "normal",
+        ).maxAttempts,
+    ...(playerCountAtStart === undefined ? {} : { playerCountAtStart }),
     lastReveal: null,
     resolvedRevealIds: [],
   };

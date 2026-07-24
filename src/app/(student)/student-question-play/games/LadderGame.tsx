@@ -371,7 +371,9 @@ export default function LadderGame({ game, onBack, config }: Props) {
       {!runConflict && phase === "setup" && (
         <section className="space-y-5 rounded-lg border border-border bg-card p-5 text-card-foreground">
           <div className="space-y-1">
-            <h2 className="font-black text-foreground">{text.ladderSetupTitle}</h2>
+            <h2 className="font-black text-foreground">
+              {text.ladderSetupTitle(MAX_ROUNDS)}
+            </h2>
             <p className="text-sm text-muted-foreground">
               {text.ladderRoundProgress(1, MAX_ROUNDS)}
             </p>
@@ -507,11 +509,11 @@ export default function LadderGame({ game, onBack, config }: Props) {
               {text.ladderDoneTitle}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {text.ladderDoneDescription}
+              {text.ladderDoneDescription(MAX_ROUNDS)}
             </p>
           </div>
           <ol
-            aria-label={text.ladderRecordedQuestions}
+            aria-label={text.ladderRecordedQuestions(MAX_ROUNDS)}
             className="divide-y divide-border border-y border-border"
           >
             {questions.map((record) => (

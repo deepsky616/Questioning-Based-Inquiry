@@ -8,6 +8,7 @@ import { isKabaQuestionRewrite } from "@/lib/question-game-kaba-rules";
 import {
   QUESTION_GAME_LIMITS,
   QUESTION_GAME_RULES,
+  getQuestionGameRoomTarget,
 } from "@/lib/question-game-rules";
 import {
   STORY_DICE_FALLBACK,
@@ -37,6 +38,7 @@ const PLAYER_LIMITS_BY_GAME = {
   kaba: QUESTION_GAME_RULES.kaba.multiplayer,
 } as const;
 const STORY_MAX_ROUNDS = QUESTION_GAME_RULES["story-dice"].targets.room.count;
+const STORY_MAX_DYNAMIC_ROUNDS = 3;
 const DICE_MAX_ROUNDS = QUESTION_GAME_RULES.dice.targets.room.count;
 const RELAY_MAX_ROUNDS = QUESTION_GAME_RULES.relay.targets.room.count;
 const KABA_MAX_ROUNDS = QUESTION_GAME_RULES.kaba.targets.room.count;
@@ -86,7 +88,7 @@ export interface StoryDiceRoomState extends EngineStateBase {
   game: "story-dice";
   phase: "setup" | "roll" | "story" | "question" | "answer" | "done";
   round: number;
-  maxRounds: typeof STORY_MAX_ROUNDS;
+  maxRounds: number;
   completedRounds: number;
   players: TurnGamePlayer[];
   playerNames: Record<string, string>;
@@ -113,7 +115,7 @@ export interface DiceRoomState extends EngineStateBase {
   game: "dice";
   phase: "roll" | "question" | "done";
   round: number;
-  maxRounds: typeof DICE_MAX_ROUNDS;
+  maxRounds: number;
   completedRounds: number;
   players: TurnGamePlayer[];
   playerNames: Record<string, string>;
@@ -135,7 +137,7 @@ export interface RelayRoomState extends EngineStateBase {
   game: "relay";
   phase: "setup" | "question" | "done";
   round: number;
-  maxRounds: typeof RELAY_MAX_ROUNDS;
+  maxRounds: number;
   completedRounds: number;
   players: TurnGamePlayer[];
   playerNames: Record<string, string>;
@@ -165,7 +167,7 @@ export interface KabaRoomState extends EngineStateBase {
   game: "kaba";
   phase: "setup" | "question" | "done";
   round: number;
-  maxRounds: typeof KABA_MAX_ROUNDS;
+  maxRounds: number;
   completedRounds: number;
   players: TurnGamePlayer[];
   playerNames: Record<string, string>;
@@ -219,7 +221,11 @@ const BASE_ROUND_KEYS = [
   "turnOrder",
   "currentTurnIdx",
 ] as const;
-const STATE_OPTIONAL_KEYS = ["roundId", "endReason"] as const;
+const STATE_OPTIONAL_KEYS = [
+  "roundId",
+  "endReason",
+  "playerCountAtStart",
+] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -378,6 +384,16 @@ function isValidBaseRoundState(
   minActiveTargets: number,
 ): boolean {
   const players = readPlayers(value.players, value.playerNames, game);
+  const expectedMaxRounds = value.playerCountAtStart === undefined
+    ? maxRounds
+    : Number.isSafeInteger(value.playerCountAtStart) &&
+        (value.playerCountAtStart as number) >= PLAYER_LIMITS_BY_GAME[game].min &&
+        (value.playerCountAtStart as number) <= PLAYER_LIMITS_BY_GAME[game].max
+      ? getQuestionGameRoomTarget(
+          game,
+          value.playerCountAtStart as number,
+        ).maxRounds
+      : -1;
   if (
     value.stateVersion !== 2 || value.game !== game ||
     typeof value.phase !== "string" || !allowedPhases.includes(value.phase) ||
@@ -385,9 +401,9 @@ function isValidBaseRoundState(
     value.recentCommandIds.length > RECENT_COMMAND_LIMIT ||
     !value.recentCommandIds.every(isUuid) ||
     !isUnique(value.recentCommandIds) ||
-    !isIntegerBetween(value.round, 0, maxRounds) ||
-    value.maxRounds !== maxRounds ||
-    !isIntegerBetween(value.completedRounds, 0, maxRounds) ||
+    !isIntegerBetween(value.round, 0, expectedMaxRounds) ||
+    value.maxRounds !== expectedMaxRounds ||
+    !isIntegerBetween(value.completedRounds, 0, expectedMaxRounds) ||
     !players ||
     !isStringArray(value.roundPlayerIds) ||
     !isStringArray(value.roundTargetPlayerIds) ||
@@ -437,7 +453,9 @@ function isValidBaseRoundState(
       );
   }
   if (state.endReason === "completed") {
-    return state.round === maxRounds && state.completedRounds === maxRounds && allSubmitted;
+    return state.round === expectedMaxRounds &&
+      state.completedRounds === expectedMaxRounds &&
+      allSubmitted;
   }
   if (state.endReason === "host") {
     return state.completedRounds >= 1 && state.completedRounds === state.round - 1;
@@ -532,7 +550,8 @@ function isRolledWords(value: unknown, words: StoryDiceWordPool): value is Story
 function isStoryRecord(value: unknown): value is StoryDiceStoryRecord {
   return isRecord(value) && hasExactKeys(value, [
     "roundId", "round", "playerId", "playerName", "story",
-  ]) && isUuid(value.roundId) && isIntegerBetween(value.round, 1, STORY_MAX_ROUNDS) &&
+  ]) && isUuid(value.roundId) &&
+    isIntegerBetween(value.round, 1, STORY_MAX_DYNAMIC_ROUNDS) &&
     isPlayerId(value.playerId) && isPlayerName(value.playerName) &&
     isStoredText(value.story, QUESTION_GAME_LIMITS.story) &&
     !checkProfanity(value.story).flagged;
@@ -541,7 +560,8 @@ function isStoryRecord(value: unknown): value is StoryDiceStoryRecord {
 function isStoryQuestion(value: unknown): value is StoryDiceQuestionRecord {
   return isRecord(value) && hasExactKeys(value, [
     "roundId", "round", "playerId", "playerName", "locale", "question",
-  ]) && isUuid(value.roundId) && isIntegerBetween(value.round, 1, STORY_MAX_ROUNDS) &&
+  ]) && isUuid(value.roundId) &&
+    isIntegerBetween(value.round, 1, STORY_MAX_DYNAMIC_ROUNDS) &&
     isPlayerId(value.playerId) && isPlayerName(value.playerName) &&
     isQuestion(value.question, value.locale);
 }
@@ -550,7 +570,8 @@ function isStoryPair(value: unknown): value is StoryDicePair {
   return isRecord(value) && hasExactKeys(value, [
     "roundId", "round", "playerId", "playerName", "locale", "question",
     "taggerId", "taggerName", "answer",
-  ]) && isUuid(value.roundId) && isIntegerBetween(value.round, 1, STORY_MAX_ROUNDS) &&
+  ]) && isUuid(value.roundId) &&
+    isIntegerBetween(value.round, 1, STORY_MAX_DYNAMIC_ROUNDS) &&
     isPlayerId(value.playerId) && isPlayerName(value.playerName) &&
     isQuestion(value.question, value.locale) &&
     isPlayerId(value.taggerId) && isPlayerName(value.taggerName) &&
@@ -663,7 +684,7 @@ function readDiceStateUnchecked(value: unknown): DiceRoomState | null {
   }
   const state = value as unknown as DiceRoomState;
   if (state.round === 0 ||
-    state.questions.length > PLAYER_LIMITS_BY_GAME.dice.max * DICE_MAX_ROUNDS ||
+    state.questions.length > PLAYER_LIMITS_BY_GAME.dice.max * state.maxRounds ||
     hasDuplicateQuestions(state.questions.map(({ question }) => question)) ||
     !hasValidRecordRounds(state, state.questions, PLAYER_LIMITS_BY_GAME.dice.min)) {
     return null;
@@ -715,7 +736,7 @@ function readRelayStateUnchecked(value: unknown): RelayRoomState | null {
   }
   if (!isStoredText(state.topic, QUESTION_GAME_LIMITS.topic) ||
     checkProfanity(state.topic).flagged ||
-    state.questions.length > PLAYER_LIMITS_BY_GAME.relay.max * RELAY_MAX_ROUNDS ||
+    state.questions.length > PLAYER_LIMITS_BY_GAME.relay.max * state.maxRounds ||
     hasDuplicateQuestions(state.questions.map(({ question }) => question)) ||
     !hasValidRecordRounds(state, state.questions, PLAYER_LIMITS_BY_GAME.relay.min)) {
     return null;
@@ -802,10 +823,10 @@ function readKabaStateUnchecked(value: unknown): KabaRoomState | null {
   }
   const expectedPlanLength = Math.max(
     QUESTION_GAME_RULES.kaba.targets.room.minimumTotal,
-    state.players.length * QUESTION_GAME_RULES.kaba.targets.room.count,
+    state.players.length * state.maxRounds,
   );
   if (state.sentencePlan.length !== expectedPlanLength ||
-    state.sentencePlan.length > PLAYER_LIMITS_BY_GAME.kaba.max * KABA_MAX_ROUNDS ||
+    state.sentencePlan.length > PLAYER_LIMITS_BY_GAME.kaba.max * state.maxRounds ||
     state.attempts.length > state.sentencePlan.length ||
     !state.attempts.every((attempt, index) => {
       const planned = state.sentencePlan[index];
@@ -1004,13 +1025,18 @@ function makeRoundArrays(players: readonly RoomPlayer[], excludedId?: string) {
 
 function createStoryDiceState(context: QuestionGameRoomEngineContext): StoryDiceRoomState {
   const players = playersFromRoom(context.room.players, "story-dice");
+  const playerCountAtStart = players.length;
   return {
     stateVersion: 2,
     game: "story-dice",
     phase: "setup",
     recentCommandIds: [],
     round: 0,
-    maxRounds: STORY_MAX_ROUNDS,
+    maxRounds: getQuestionGameRoomTarget(
+      "story-dice",
+      playerCountAtStart,
+    ).maxRounds,
+    playerCountAtStart,
     completedRounds: 0,
     players,
     playerNames: namesForPlayers(players),
@@ -1030,13 +1056,15 @@ function createStoryDiceState(context: QuestionGameRoomEngineContext): StoryDice
 
 function createDiceState(context: QuestionGameRoomEngineContext): DiceRoomState {
   const players = playersFromRoom(context.room.players, "dice");
+  const playerCountAtStart = players.length;
   return {
     stateVersion: 2,
     game: "dice",
     phase: "roll",
     recentCommandIds: [],
     round: 1,
-    maxRounds: DICE_MAX_ROUNDS,
+    maxRounds: getQuestionGameRoomTarget("dice", playerCountAtStart).maxRounds,
+    playerCountAtStart,
     completedRounds: 0,
     roundId: context.randomUUID(),
     players,
@@ -1049,13 +1077,15 @@ function createDiceState(context: QuestionGameRoomEngineContext): DiceRoomState 
 
 function createRelayState(context: QuestionGameRoomEngineContext): RelayRoomState {
   const players = playersFromRoom(context.room.players, "relay");
+  const playerCountAtStart = players.length;
   return {
     stateVersion: 2,
     game: "relay",
     phase: "setup",
     recentCommandIds: [],
     round: 0,
-    maxRounds: RELAY_MAX_ROUNDS,
+    maxRounds: getQuestionGameRoomTarget("relay", playerCountAtStart).maxRounds,
+    playerCountAtStart,
     completedRounds: 0,
     players,
     playerNames: namesForPlayers(players),
@@ -1071,13 +1101,15 @@ function createRelayState(context: QuestionGameRoomEngineContext): RelayRoomStat
 
 function createKabaState(context: QuestionGameRoomEngineContext): KabaRoomState {
   const players = playersFromRoom(context.room.players, "kaba");
+  const playerCountAtStart = players.length;
   return {
     stateVersion: 2,
     game: "kaba",
     phase: "setup",
     recentCommandIds: [],
     round: 0,
-    maxRounds: KABA_MAX_ROUNDS,
+    maxRounds: getQuestionGameRoomTarget("kaba", playerCountAtStart).maxRounds,
+    playerCountAtStart,
     completedRounds: 0,
     players,
     playerNames: namesForPlayers(players),
@@ -1548,7 +1580,7 @@ function applyKabaCommand(context: QuestionGameRoomEngineContext): QuestionGameE
     try {
       const count = Math.max(
         QUESTION_GAME_RULES.kaba.targets.room.minimumTotal,
-        context.room.players.length * QUESTION_GAME_RULES.kaba.targets.room.count,
+        context.room.players.length * state.maxRounds,
       );
       const sentencePlan = shuffleWithRandom(getKabaSentencePairs(), context.random).slice(0, count);
       return changedKaba(context, {

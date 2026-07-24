@@ -196,6 +196,12 @@ function makeComposeState(
 }
 
 describe("질문 사다리 방 판정기", () => {
+  it("참가자가 세 명까지면 세 라운드, 네 명부터면 두 라운드로 정한다", () => {
+    expect(startRoom(3).gameState.maxRounds).toBe(3);
+    expect(startRoom(4).gameState.maxRounds).toBe(2);
+    expect(startRoom(8).gameState.maxRounds).toBe(2);
+  });
+
   it("일반 시작은 비어 있는 버전 2 준비 상태를 만든다", () => {
     const room = startRoom();
 
@@ -206,6 +212,7 @@ describe("질문 사다리 방 판정기", () => {
       recentCommandIds: [START_COMMAND_ID],
       round: 0,
       maxRounds: 3,
+      playerCountAtStart: 2,
       topicPool: [],
       roundTopics: [],
       grid: [],
@@ -929,7 +936,7 @@ describe("질문 사다리 방 판정기", () => {
       expect(state.questions).toHaveLength(8);
     });
 
-    it("여덟 명 시작 뒤 실제 이탈로 두 대상이 남아도 세 라운드를 정상 완료한다", () => {
+    it("여덟 명 시작 뒤 실제 이탈로 두 대상이 남아도 두 라운드를 정상 완료한다", () => {
       let room = prepareRoom(8);
       for (const playerId of [
         "guest-7",
@@ -959,18 +966,16 @@ describe("질문 사다리 방 판정기", () => {
 
       room = submitRound(room, 130, ROUND_2_ID);
       room = submitRound(room, 140, ROUND_3_ID);
-      room = changedRoom(applySubmit(room, "host", 150));
-      room = changedRoom(applySubmit(room, "guest-1", 151));
 
       expect(room.status).toBe("ended");
       expect(room.gameState).toMatchObject({
         phase: "done",
         endReason: "completed",
-        round: 3,
+        round: 2,
         roundTargetPlayerIds: ["host", "guest-1"],
       });
       expect((room.gameState as unknown as LadderRoomState).questions)
-        .toHaveLength(6);
+        .toHaveLength(4);
     });
 
     it.each([
@@ -1015,7 +1020,10 @@ describe("질문 사다리 방 판정기", () => {
       expect(restarted.kind).toBe("changed");
       if (restarted.kind !== "changed") throw new Error("다시 시작 결과가 필요합니다");
       const started = applyQuestionGameRoomCommand({
-        room: restarted.room,
+        room: {
+          ...restarted.room,
+          players: room.players,
+        },
         userId: "host",
         userName: "방장",
         action: "start",

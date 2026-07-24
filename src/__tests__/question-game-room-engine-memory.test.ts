@@ -15,16 +15,18 @@ const COMMAND_ID = "11111111-1111-4111-8111-111111111111";
 const PLAY_ID = "22222222-2222-4222-8222-222222222222";
 const ROUND_ID = "33333333-3333-4333-8333-333333333333";
 
-function makeWaitingRoom(): GameRoom {
+function makeWaitingRoom(playerCount = 2): GameRoom {
   return {
     code: "1234",
     gameId: "memory",
     hostId: "host",
     status: "waiting",
-    players: [
-      { id: "host", name: "Host", isHost: true, joinedAt: 1 },
-      { id: "guest", name: "Guest", isHost: false, joinedAt: 2 },
-    ],
+    players: Array.from({ length: playerCount }, (_, index) => ({
+      id: index === 0 ? "host" : `guest-${index}`,
+      name: index === 0 ? "Host" : `Guest ${index}`,
+      isHost: index === 0,
+      joinedAt: index + 1,
+    })),
     topic: "",
     chain: [],
     turnIndex: 0,
@@ -166,6 +168,35 @@ describe("질문-대답 짝 찾기 방 판정기", () => {
           recentCommandIds: [COMMAND_ID],
         },
       },
+    });
+  });
+
+  it("여덟 명의 쉬움과 보통 난이도는 모두에게 최소 차례를 보장한다", () => {
+    const started = applyQuestionGameRoomCommand({
+      room: makeWaitingRoom(8),
+      userId: "host",
+      userName: "Host",
+      action: "start",
+      body: {
+        commandId: COMMAND_ID,
+        expectedCreatedAt: 100,
+        expectedVersion: 1,
+      },
+      now: 200,
+      random: () => 0,
+      randomUUID: () => PLAY_ID,
+    });
+    const room = changedRoom(started);
+    const prepared = changedRoom(applyMemory(
+      room,
+      "memory-prepare",
+      { difficulty: "easy", pairs: makePairs(6) },
+      { random: () => 0, randomUUID: uuidSequence() },
+    ));
+
+    expect(prepared.gameState).toMatchObject({
+      playerCountAtStart: 8,
+      maxAttempts: 24,
     });
   });
 

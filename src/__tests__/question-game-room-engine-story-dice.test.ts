@@ -126,6 +126,13 @@ function completePair(
 }
 
 describe("이야기 주사위 방 판정기", () => {
+  it("참가자가 세 명까지면 세 순환, 네 명부터면 두 순환으로 정한다", () => {
+    expect(started(2).gameState.maxRounds).toBe(3);
+    expect(started(3).gameState.maxRounds).toBe(3);
+    expect(started(4).gameState.maxRounds).toBe(2);
+    expect(started(8).gameState.maxRounds).toBe(2);
+  });
+
   it("준비와 굴림 권한 및 서버 단어 주입 경계를 지킨다", () => {
     const room = started();
     expect(run(room, "guest-1", "story-prepare", 40).kind).toBe("forbidden");
@@ -163,7 +170,7 @@ describe("이야기 주사위 방 판정기", () => {
     expect(answeredState.turnOrder[answeredState.currentTurnIdx]).toBe("guest-2");
   });
 
-  it("모든 질문자가 공유 순환 두 번씩 질문과 답변을 마치면 끝낸다", () => {
+  it("세 명이면 모든 질문자가 공유 순환 세 번씩 마치면 끝낸다", () => {
     let room = storyReady();
     room = completePair(room, "guest-1", 10);
     room = completePair(room, "guest-2", 12, ROUND_2_ID);
@@ -172,18 +179,21 @@ describe("이야기 주사위 방 판정기", () => {
 
     room = completePair(room, "guest-1", 14);
     room = completePair(room, "guest-2", 16);
+    room = completePair(room, "guest-1", 18);
+    room = completePair(room, "guest-2", 20);
 
     const state = readStoryDiceState(room.gameState)!;
     expect(room.status).toBe("ended");
     expect(state.phase).toBe("done");
     expect(state.endReason).toBe("completed");
-    expect(state.pairs).toHaveLength(4);
+    expect(state.pairs).toHaveLength(6);
   });
 
   it("완료 뒤 일부와 마지막 참가자가 나가도 기록을 보존한 변경 결과를 낸다", () => {
     let room = storyReady(2);
     room = completePair(room, "guest-1", 60, ROUND_2_ID);
     room = completePair(room, "guest-1", 62);
+    room = completePair(room, "guest-1", 64);
     const completedState = structuredClone(room.gameState);
 
     const firstLeave = leaveQuestionGameRoom({ room, userId: "host" });

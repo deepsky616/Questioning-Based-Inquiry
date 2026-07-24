@@ -47,6 +47,9 @@ const mocks = vi.hoisted(() => {
     loadVerifiedGameAwardResult: vi.fn(),
     deleteGameRoomPresence: vi.fn(),
     generateMysteryAiAnswer: vi.fn(),
+    mysteryUseFindMany: vi.fn(),
+    mysteryUseGroupBy: vi.fn(),
+    mysteryUseCreateMany: vi.fn(),
     ensureQuestionGameRoomPoints: vi.fn(),
     settlementFindUnique: vi.fn(),
   };
@@ -97,6 +100,11 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     $transaction: mocks.transaction,
     gameRoomSettlement: { findUnique: mocks.settlementFindUnique },
+    mysteryAnswerUse: {
+      findMany: mocks.mysteryUseFindMany,
+      groupBy: mocks.mysteryUseGroupBy,
+      createMany: mocks.mysteryUseCreateMany,
+    },
   },
 }));
 import { POST } from "@/app/api/question-games/rooms/route";
@@ -183,6 +191,9 @@ beforeEach(() => {
   mocks.loadVerifiedGameAwardResult.mockReset();
   mocks.deleteGameRoomPresence.mockReset().mockResolvedValue(undefined);
   mocks.generateMysteryAiAnswer.mockReset();
+  mocks.mysteryUseFindMany.mockReset().mockResolvedValue([]);
+  mocks.mysteryUseGroupBy.mockReset().mockResolvedValue([]);
+  mocks.mysteryUseCreateMany.mockReset().mockResolvedValue({ count: 1 });
   mocks.ensureQuestionGameRoomPoints.mockReset().mockResolvedValue(null);
   mocks.settlementFindUnique.mockReset().mockResolvedValue({ outcome: "AWARDED" });
   mocks.consumeCreateLimit.mockReset().mockResolvedValue(true);
@@ -815,7 +826,7 @@ describe("미스터리 박스 실제 공개 응답", () => {
       playerId: "user-1",
       locale: "ko",
       question,
-      knowledgeVersion: 4,
+      knowledgeVersion: 5,
     });
     expect(mocks.checkRateLimit).toHaveBeenCalledWith(
       "game-room-mystery-ai:user-1",
