@@ -55,7 +55,7 @@ describe("질문놀이 학습 이력 화면", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "나의 질문놀이 학습 기록" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "나의 학습 기록" })).toBeVisible();
     expect(screen.getByText("완료한 놀이").nextSibling).toHaveTextContent("3");
     expect(screen.getByText("혼자 하기 1회")).toBeVisible();
     expect(screen.getByText("인공지능과 함께 1회")).toBeVisible();
@@ -174,7 +174,7 @@ describe("질문놀이 학습 이력 화면", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "학급 질문놀이 학습 현황" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "학급 학습 현황" })).toBeVisible();
     expect(screen.getByText("최근 14일 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
     expect(screen.getByText("최근 14일 변화").closest("figure")?.parentElement)

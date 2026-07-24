@@ -51,7 +51,7 @@ describe("학생 질문놀이 학습 기록", () => {
       }), { status: 200, headers: { "Content-Type": "application/json" } }));
     });
 
-    expect(await screen.findByRole("heading", { name: "나의 질문놀이 학습 기록" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "나의 학습 기록" })).toBeVisible();
   });
 
   it("서버 응답이 비어 있어도 이해할 수 있는 오류를 보여 준다", async () => {

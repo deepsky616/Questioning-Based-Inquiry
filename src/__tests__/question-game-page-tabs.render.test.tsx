@@ -101,20 +101,20 @@ describe("질문놀이 페이지 큰 탭", () => {
       "true",
     );
     expect(
-      screen.queryByRole("heading", { name: "나의 질문놀이 학습 기록" }),
+      screen.queryByRole("heading", { name: "나의 학습 기록" }),
     ).not.toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls.some(
       ([input]) => String(input).includes("/api/reports/question-games?"),
     )).toBe(false);
 
     fireEvent.mouseDown(
-      screen.getByRole("tab", { name: "나의 질문놀이 학습 기록" }),
+      screen.getByRole("tab", { name: "나의 학습 기록" }),
       { button: 0, ctrlKey: false },
     );
 
     expect(
       await screen.findByRole("heading", {
-        name: "나의 질문놀이 학습 기록",
+        name: "나의 학습 기록",
       }),
     ).toBeVisible();
     await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(
@@ -133,20 +133,20 @@ describe("질문놀이 페이지 큰 탭", () => {
       "true",
     );
     expect(
-      screen.queryByRole("heading", { name: "학급 질문놀이 학습 현황" }),
+      screen.queryByRole("heading", { name: "학급 학습 현황" }),
     ).not.toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls.some(
       ([input]) => String(input).includes("/api/reports/question-games?"),
     )).toBe(false);
 
     fireEvent.mouseDown(
-      screen.getByRole("tab", { name: "학급 질문놀이 학습 현황" }),
+      screen.getByRole("tab", { name: "학급 학습 현황" }),
       { button: 0, ctrlKey: false },
     );
 
     expect(
       await screen.findByRole("heading", {
-        name: "학급 질문놀이 학습 현황",
+        name: "학급 학습 현황",
       }),
     ).toBeVisible();
     await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(

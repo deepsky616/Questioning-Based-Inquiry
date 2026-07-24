@@ -84,12 +84,12 @@ describe("교사 질문놀이 학습 현황", () => {
       "/api/reports/question-games?summary=1&grade=5&className=1",
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     ));
-    const heading = await screen.findByRole("heading", { name: "학급 질문놀이 학습 현황" });
+    const heading = await screen.findByRole("heading", { name: "학급 학습 현황" });
     expect(heading).toBeVisible();
     const overviewHeader = heading.closest("header");
     expect(overviewHeader).not.toBeNull();
     expect(within(overviewHeader!).getByLabelText("학급 선택")).toHaveValue("5|1");
-    expect(screen.getAllByRole("heading", { name: "학급 질문놀이 학습 현황" })).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { name: "학급 학습 현황" })).toHaveLength(1);
     expect(screen.getByText("최근 14일 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
     expect(screen.getByText(

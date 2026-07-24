@@ -113,10 +113,10 @@ describe("교사 질문놀이 방식 비교", () => {
     render(<TeacherQuestionPlayPage />);
 
     fireEvent.mouseDown(
-      screen.getByRole("tab", { name: "학급 질문놀이 학습 현황" }),
+      screen.getByRole("tab", { name: "학급 학습 현황" }),
       { button: 0, ctrlKey: false },
     );
-    expect(await screen.findByRole("heading", { name: "학급 질문놀이 학습 현황" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "학급 학습 현황" })).toBeVisible();
     expect(screen.getByLabelText("학급 선택")).toHaveValue("5|1");
     expect(screen.getByText("완료한 놀이").nextSibling).toHaveTextContent("5");
     expect(screen.getByText("혼자 하기 2회")).toBeVisible();
