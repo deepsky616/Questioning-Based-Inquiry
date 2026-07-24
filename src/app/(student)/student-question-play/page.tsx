@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnyGame, localizeQuestionGames } from "@/lib/question-games-data";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StudentQuestionGameLearningHistory } from "@/components/question-games/StudentQuestionGameLearningHistory";
@@ -16,6 +17,7 @@ export default function StudentQuestionPlayPage() {
   const [games, setGames] = useState<AnyGame[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState<AnyGame | null>(null);
+  const [sectionTab, setSectionTab] = useState("games");
   const router = useRouter();
 
   useEffect(() => {
@@ -35,52 +37,73 @@ export default function StudentQuestionPlayPage() {
 
   return (
     <div className="min-h-screen">
-      {/* 히어로 배너 */}
-      <div
-        className="relative overflow-hidden rounded-3xl mb-10 py-14 px-8 text-center text-white"
-        style={{ background: "linear-gradient(135deg, #6D28D9 0%, #BE185D 50%, #A16207 100%)" }}
-      >
-        <span className="absolute top-4 left-6 text-5xl opacity-20 select-none">⭐</span>
-        <span className="absolute top-8 right-10 text-4xl opacity-20 select-none">🌟</span>
-        <span className="absolute bottom-4 left-20 text-3xl opacity-20 select-none">✨</span>
-        <span className="absolute bottom-6 right-16 text-5xl opacity-20 select-none">💫</span>
-        <span className="absolute top-1/2 left-4 -translate-y-1/2 text-6xl opacity-10 select-none">🎮</span>
-        <span className="absolute top-1/2 right-4 -translate-y-1/2 text-6xl opacity-10 select-none">🎮</span>
-        <div className="relative z-10">
-          <div className="text-7xl mb-4 drop-shadow-lg">🎮</div>
-          <h1 className="text-5xl font-black mb-3 tracking-tight" style={{ textShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-            {t("title")}
-          </h1>
-          <p className="text-xl font-medium text-white">{t("subtitle")}</p>
-          <div className="mt-4 flex justify-center gap-3">
-            <span className="bg-black/20 backdrop-blur-sm rounded-full px-4 py-1 text-sm font-medium">
-              {t("gameCount", { count: games.length })}
-            </span>
-          </div>
-        </div>
-      </div>
+      <Tabs className="mb-6" value={sectionTab} onValueChange={setSectionTab}>
+        <TabsList className="grid h-auto w-full max-w-xl grid-cols-2">
+          <TabsTrigger className="whitespace-normal py-2 text-center" value="games">
+            {t("sectionGames")}
+          </TabsTrigger>
+          <TabsTrigger className="whitespace-normal py-2 text-center" value="learning">
+            {t("sectionLearning")}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      <div className="mb-10">
+      {sectionTab === "learning" ? (
         <StudentQuestionGameLearningHistory />
-      </div>
+      ) : (
+        <>
+          {/* 히어로 배너 */}
+          <div
+            className="relative overflow-hidden rounded-3xl mb-10 py-14 px-8 text-center text-white"
+            style={{ background: "linear-gradient(135deg, #6D28D9 0%, #BE185D 50%, #A16207 100%)" }}
+          >
+            <span className="absolute top-4 left-6 text-5xl opacity-20 select-none">⭐</span>
+            <span className="absolute top-8 right-10 text-4xl opacity-20 select-none">🌟</span>
+            <span className="absolute bottom-4 left-20 text-3xl opacity-20 select-none">✨</span>
+            <span className="absolute bottom-6 right-16 text-5xl opacity-20 select-none">💫</span>
+            <span className="absolute top-1/2 left-4 -translate-y-1/2 text-6xl opacity-10 select-none">🎮</span>
+            <span className="absolute top-1/2 right-4 -translate-y-1/2 text-6xl opacity-10 select-none">🎮</span>
+            <div className="relative z-10">
+              <div className="text-7xl mb-4 drop-shadow-lg">🎮</div>
+              <h1
+                className="text-5xl font-black mb-3 tracking-tight"
+                style={{ textShadow: "0 2px 8px rgba(0,0,0,0.3)" }}
+              >
+                {t("title")}
+              </h1>
+              <p className="text-xl font-medium text-white">{t("subtitle")}</p>
+              <div className="mt-4 flex justify-center gap-3">
+                <span className="bg-black/20 backdrop-blur-sm rounded-full px-4 py-1 text-sm font-medium">
+                  {t("gameCount", { count: games.length })}
+                </span>
+              </div>
+            </div>
+          </div>
 
-      {isLoading && (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="text-5xl animate-bounce">🎲</div>
-          <p className="text-muted-foreground font-medium">{t("loading")}</p>
-        </div>
-      )}
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <div className="text-5xl animate-bounce">🎲</div>
+              <p className="text-muted-foreground font-medium">{t("loading")}</p>
+            </div>
+          )}
 
-      {!isLoading && games.length === 0 && (
-        <EmptyState icon="😢" title={t("emptyTitle")} description={t("emptyDesc")} className="py-24" />
-      )}
+          {!isLoading && games.length === 0 && (
+            <EmptyState icon="😢" title={t("emptyTitle")} description={t("emptyDesc")} className="py-24" />
+          )}
 
-      {!isLoading && games.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {localizeQuestionGames(games, locale).map((game, i) => (
-            <GameCard key={game.id} game={game} index={i} onSelect={() => setSelectedGame(game)} />
-          ))}
-        </div>
+          {!isLoading && games.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {localizeQuestionGames(games, locale).map((game, i) => (
+                <GameCard
+                  key={game.id}
+                  game={game}
+                  index={i}
+                  onSelect={() => setSelectedGame(game)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* 게임 안내 다이얼로그 */}

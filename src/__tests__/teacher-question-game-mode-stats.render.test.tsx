@@ -112,6 +112,10 @@ describe("교사 질문놀이 방식 비교", () => {
   it("전체 방식과 학생별 횟수를 같은 참여 화면에서 보여 준다", async () => {
     render(<TeacherQuestionPlayPage />);
 
+    fireEvent.mouseDown(
+      screen.getByRole("tab", { name: "학급 질문놀이 학습 현황" }),
+      { button: 0, ctrlKey: false },
+    );
     expect(await screen.findByRole("heading", { name: "학급 질문놀이 학습 현황" })).toBeVisible();
     expect(screen.getByLabelText("학급 선택")).toHaveValue("5|1");
     expect(screen.getByText("완료한 놀이").nextSibling).toHaveTextContent("5");
@@ -119,6 +123,10 @@ describe("교사 질문놀이 방식 비교", () => {
     expect(screen.getByText("인공지능과 함께 1회")).toBeVisible();
     expect(screen.getByText("친구와 함께 2회")).toBeVisible();
 
+    fireEvent.mouseDown(
+      screen.getByRole("tab", { name: "질문놀이" }),
+      { button: 0, ctrlKey: false },
+    );
     const participation = screen.getByRole("button", { name: "📊 참여 현황" });
     fireEvent.click(participation);
 

@@ -4031,6 +4031,25 @@ describe("미스터리 박스 서버 실행 경로", () => {
     expect(payload).not.toMatch(/itemId|attribute|classification|private/u);
   });
 
+  it("혼자 하기에서 사과는 동물 질문에 아니오로 저장한다", async () => {
+    await createMystery();
+    storedMysteryState().privateItemId = "apple";
+
+    const response = await submitMysteryQuestion(0, 1, "동물인가요?");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      run: {
+        questionCount: 1,
+        mysteryHistory: [{
+          text: "동물인가요?",
+          answer: "no",
+        }],
+      },
+    });
+    expect(mocks.generateJson).not.toHaveBeenCalled();
+  });
+
   it.each(["작나요?", "크기가 작나요?", "크키가 작나요?", "큰가요?"])(
     "크기 질문 %s은 외부 판정 없이 실행 활동으로 저장한다",
     async (question) => {

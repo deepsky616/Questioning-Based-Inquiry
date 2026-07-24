@@ -1658,6 +1658,8 @@
     "deleteFailed": "놀이 삭제에 실패했어요.",
     "title": "🎮 질문놀이 관리",
     "subtitle": "학생들에게 질문놀이를 공개해보세요",
+    "sectionGames": "질문놀이",
+    "sectionLearning": "학급 질문놀이 학습 현황",
     "statAll": "전체 놀이",
     "statPublic": "공개 중",
     "statHidden": "비공개",
@@ -1893,6 +1895,8 @@
   "playLanding": {
     "title": "질문놀이",
     "subtitle": "놀이로 배우는 신나는 질문의 세계! 🚀",
+    "sectionGames": "질문놀이",
+    "sectionLearning": "나의 질문놀이 학습 기록",
     "gameCount": "총 {count}가지 놀이",
     "loading": "놀이를 불러오는 중...",
     "emptyTitle": "아직 공개된 놀이가 없어요",

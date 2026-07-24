@@ -1658,6 +1658,8 @@
     "deleteFailed": "Failed to delete the game.",
     "title": "🎮 Question game management",
     "subtitle": "Share question games with your students",
+    "sectionGames": "Question games",
+    "sectionLearning": "Class question-game learning",
     "statAll": "All games",
     "statPublic": "Public",
     "statHidden": "Hidden",
@@ -1893,6 +1895,8 @@
   "playLanding": {
     "title": "Question games",
     "subtitle": "A fun world of questions through play! 🚀",
+    "sectionGames": "Question games",
+    "sectionLearning": "My question-game learning",
     "gameCount": "{count} games",
     "loading": "Loading games...",
     "emptyTitle": "No games shared yet",

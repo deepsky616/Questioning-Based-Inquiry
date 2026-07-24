@@ -434,6 +434,22 @@ describe("미스터리 박스 방 판정기", () => {
     expect(state.private).toEqual({ itemId: "apple" });
   });
 
+  it("친구 방에서 사과는 동물 질문에 아니오로 답한다", () => {
+    const result = applyMystery(
+      prepareRoom(),
+      "mystery-ask",
+      { locale: "ko", question: "동물인가요?" },
+      { nextRoundId: commandId(191) },
+    );
+    const state = changedRoom(result).gameState as unknown as MysteryRoomState;
+
+    expect(state.private).toEqual({ itemId: "apple" });
+    expect(state.history).toEqual([expect.objectContaining({
+      question: "동물인가요?",
+      answer: "no",
+    })]);
+  });
+
   it.each(["작나요?", "크기가 작나요?", "크키가 작나요?", "큰가요?"])(
     "크기 질문 %s은 인공지능 판정 없이 활동으로 기록한다",
     (question) => {

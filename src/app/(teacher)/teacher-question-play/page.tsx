@@ -75,6 +75,7 @@ export default function TeacherQuestionPlayPage() {
   const [games, setGames] = useState<AnyGame[]>([]);
   const [visibilityMap, setVisibilityMap] = useState<Record<string, GameVisibility>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [sectionTab, setSectionTab] = useState("games");
   const [tab, setTab] = useState("all");
 
   const { data: targetData } = useTeacherStudents<Student, TeacherClass>();
@@ -218,72 +219,86 @@ export default function TeacherQuestionPlayPage() {
         </p>
       </div>
 
-      <QuestionGameSettlementHealthPanel
-        health={settlementHealth}
-        repairing={settlementRepairing}
-        onRepair={() => { void repairSettlements(); }}
-      />
-
-      <TeacherQuestionGameLearningOverview
-        classes={teacherClasses}
-        students={students}
-        statsByGame={statsByGame}
-      />
-
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: t("statAll"), value: games.length, emoji: "🎮", color: "#7C3AED" },
-          { label: t("statPublic"), value: publicCount, emoji: "🌍", color: "#047857" },
-          { label: t("statHidden"), value: hiddenCount, emoji: "🔒", color: "#B91C1C" },
-        ].map((stat) => (
-          <div
-            key={stat.emoji}
-            className="rounded-2xl p-4 text-white text-center"
-            style={{ background: stat.color }}
-          >
-            <div className="text-3xl mb-1">{stat.emoji}</div>
-            <div className="text-2xl font-black">{stat.value}</div>
-            <div className="text-sm text-white">{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* 필터 탭 */}
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="all">{t("tabAll", { count: games.length })}</TabsTrigger>
-          <TabsTrigger value="public">{t("tabPublic", { count: publicCount })}</TabsTrigger>
-          <TabsTrigger value="hidden">{t("tabHidden", { count: hiddenCount })}</TabsTrigger>
+      <Tabs value={sectionTab} onValueChange={setSectionTab}>
+        <TabsList className="grid h-auto w-full max-w-xl grid-cols-2">
+          <TabsTrigger className="whitespace-normal py-2 text-center" value="games">
+            {t("sectionGames")}
+          </TabsTrigger>
+          <TabsTrigger className="whitespace-normal py-2 text-center" value="learning">
+            {t("sectionLearning")}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {/* 로딩 */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-4xl animate-bounce">🎲</div>
+      {sectionTab === "learning" ? (
+        <div className="space-y-6">
+          <TeacherQuestionGameLearningOverview
+            classes={teacherClasses}
+            students={students}
+            statsByGame={statsByGame}
+          />
+          <QuestionGameSettlementHealthPanel
+            health={settlementHealth}
+            repairing={settlementRepairing}
+            onRepair={() => { void repairSettlements(); }}
+          />
         </div>
-      )}
-
-      {/* 게임 카드 그리드 */}
-      {!isLoading && tab === "all" && (
-        <p className="text-xs text-muted-foreground mb-2">{t("dragHint")}</p>
-      )}
-      {!isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((game, index) => {
-            const vis = getVis(game.id);
-            const visInfo = VIS_LABEL[vis.type];
-            const dndEnabled = tab === "all";
-            return (
+      ) : (
+        <>
+          {/* 통계 카드 */}
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { label: t("statAll"), value: games.length, emoji: "🎮", color: "#7C3AED" },
+              { label: t("statPublic"), value: publicCount, emoji: "🌍", color: "#047857" },
+              { label: t("statHidden"), value: hiddenCount, emoji: "🔒", color: "#B91C1C" },
+            ].map((stat) => (
               <div
-                key={game.id}
-                draggable={dndEnabled}
-                onDragStart={() => dndEnabled && setDragIndex(index)}
-                onDragOver={(e) => { if (dndEnabled) e.preventDefault(); }}
-                onDrop={() => dndEnabled && handleDropAt(index)}
-                className={`rounded-2xl overflow-hidden border border-border bg-card shadow-sm hover:shadow-md transition-shadow ${dndEnabled ? "cursor-move" : ""} ${dragIndex === index ? "opacity-50 ring-2 ring-indigo-400" : ""}`}
+                key={stat.emoji}
+                className="rounded-2xl p-4 text-white text-center"
+                style={{ background: stat.color }}
               >
+                <div className="text-3xl mb-1">{stat.emoji}</div>
+                <div className="text-2xl font-black">{stat.value}</div>
+                <div className="text-sm text-white">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* 필터 탭 */}
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList>
+              <TabsTrigger value="all">{t("tabAll", { count: games.length })}</TabsTrigger>
+              <TabsTrigger value="public">{t("tabPublic", { count: publicCount })}</TabsTrigger>
+              <TabsTrigger value="hidden">{t("tabHidden", { count: hiddenCount })}</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* 로딩 */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-4xl animate-bounce">🎲</div>
+            </div>
+          )}
+
+          {/* 게임 카드 그리드 */}
+          {!isLoading && tab === "all" && (
+            <p className="text-xs text-muted-foreground mb-2">{t("dragHint")}</p>
+          )}
+          {!isLoading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((game, index) => {
+                const vis = getVis(game.id);
+                const visInfo = VIS_LABEL[vis.type];
+                const dndEnabled = tab === "all";
+                return (
+                  <div
+                    key={game.id}
+                    draggable={dndEnabled}
+                    onDragStart={() => dndEnabled && setDragIndex(index)}
+                    onDragOver={(e) => { if (dndEnabled) e.preventDefault(); }}
+                    onDrop={() => dndEnabled && handleDropAt(index)}
+                    className={`rounded-2xl overflow-hidden border border-border bg-card shadow-sm hover:shadow-md transition-shadow ${dndEnabled ? "cursor-move" : ""} ${dragIndex === index ? "opacity-50 ring-2 ring-indigo-400" : ""}`}
+                  >
                 {/* 카드 헤더 */}
                 <div
                   className="relative h-28 flex items-center justify-between px-5 overflow-hidden"
@@ -391,10 +406,12 @@ export default function TeacherQuestionPlayPage() {
                     )}
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {/* ── 참여 현황 다이얼로그 ── */}

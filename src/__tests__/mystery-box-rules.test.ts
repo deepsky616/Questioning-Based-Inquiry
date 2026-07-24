@@ -142,6 +142,23 @@ describe("미스터리 박스 질문 규칙", () => {
     },
   );
 
+  it("사과는 모든 지식 자료 버전에서 동물이 아니라고 판정한다", () => {
+    for (const knowledgeVersion of [1, 2, 3, 4, 5] as const) {
+      expect(
+        analyzeMysteryQuestion(
+          "동물인가요?",
+          APPLE_ITEM,
+          "ko",
+          knowledgeVersion,
+        ),
+      ).toEqual({
+        answer: "no",
+        attribute: "animal",
+        negated: false,
+      });
+    }
+  });
+
   it("새 판정 자료의 사실 관계가 서로 어긋나지 않는다", () => {
     for (const item of MYSTERY_ITEMS) {
       const facts = item.factsV4;
