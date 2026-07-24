@@ -450,6 +450,12 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
     room: GameRoom,
     identity: QuestionGameBrowserIdentity,
   ): TransportResponse => {
+    if (room.blockedPlayerIds?.includes(identity.id)) {
+      return {
+        status: 403,
+        body: { error: "방장이 이 방에서 내보냈어요." },
+      };
+    }
     if (room.players.some(({ id }) => id === identity.id)) {
       return resultResponse(room);
     }
@@ -526,7 +532,9 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
     body: Record<string, unknown>,
   ): TransportResponse => {
     if (!room.players.some(({ id }) => id === identity.id)) {
-      return { status: 403, body: { error: "방 참가자만 변경할 수 있어요" } };
+      return room.blockedPlayerIds?.includes(identity.id)
+        ? { status: 403, body: { error: "방장이 이 방에서 내보냈어요." } }
+        : { status: 403, body: { error: "방 참가자만 변경할 수 있어요" } };
     }
     if (body.expectedCreatedAt !== undefined &&
       body.expectedCreatedAt !== room.createdAt) {
@@ -536,6 +544,47 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
       };
     }
     if (action === "leave") return leaveRoom(room, identity);
+    if (action === "remove-player") {
+      const targetPlayerId =
+        typeof body.targetPlayerId === "string" ? body.targetPlayerId : "";
+      if (room.hostId !== identity.id) {
+        return {
+          status: 403,
+          body: { error: "방장만 참가자를 내보낼 수 있어요" },
+        };
+      }
+      if (room.status !== "waiting") {
+        return {
+          status: 409,
+          body: { error: "놀이를 시작하기 전에만 참가자를 내보낼 수 있어요" },
+        };
+      }
+      if (body.expectedVersion !== room.version) {
+        return {
+          status: 409,
+          body: { error: "기대 버전이 다릅니다", room: publicRoom(room) },
+        };
+      }
+      if (!targetPlayerId || targetPlayerId === identity.id) {
+        return {
+          status: 400,
+          body: { error: "내보낼 참가자가 올바르지 않습니다" },
+        };
+      }
+      if (!room.players.some(({ id }) => id === targetPlayerId)) {
+        return {
+          status: 400,
+          body: { error: "내보낼 참가자를 찾을 수 없어요" },
+        };
+      }
+      return resultResponse(save({
+        ...room,
+        players: room.players.filter(({ id }) => id !== targetPlayerId),
+        blockedPlayerIds: [
+          ...new Set([...(room.blockedPlayerIds ?? []), targetPlayerId]),
+        ],
+      }));
+    }
     if (action === "publish-award-result") {
       const result = awardResults.get(awardKey(room));
       if (!result || body.playId !== room.playId) {
@@ -617,10 +666,15 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
         return { status: 404, body: { error: "방을 찾을 수 없습니다" } };
       }
       if (!room.players.some(({ id }) => id === identity.id)) {
-        return {
-          status: 403,
-          body: { error: "방 참가자만 접속을 확인할 수 있어요" },
-        };
+        return room.blockedPlayerIds?.includes(identity.id)
+          ? {
+              status: 403,
+              body: { error: "방장이 이 방에서 내보냈어요." },
+            }
+          : {
+              status: 403,
+              body: { error: "방 참가자만 접속을 확인할 수 있어요" },
+            };
       }
       const body = requestBody(route);
       if (body.expectedCreatedAt !== room.createdAt) {
@@ -652,7 +706,9 @@ export function createSharedQuestionGameTransport(): SharedQuestionGameTransport
     if (method === "GET") {
       return room.players.some(({ id }) => id === identity.id)
         ? resultResponse(room)
-        : { status: 403, body: { error: "방 참가자만 확인할 수 있어요" } };
+        : room.blockedPlayerIds?.includes(identity.id)
+          ? { status: 403, body: { error: "방장이 이 방에서 내보냈어요." } }
+          : { status: 403, body: { error: "방 참가자만 확인할 수 있어요" } };
     }
     if (method !== "PATCH") {
       return { status: 405, body: { error: "허용하지 않는 요청입니다" } };

@@ -171,6 +171,7 @@ export interface GameRoom {
   hostId: string;
   status: RoomStatus;
   players: RoomPlayer[];
+  blockedPlayerIds?: string[];
   topic: string;
   chain: RoomChainItem[];
   turnIndex: number;
@@ -270,6 +271,19 @@ function isRoomChainItem(value: unknown): value is RoomChainItem {
   );
 }
 
+function isBlockedPlayerList(
+  value: unknown,
+  players: readonly RoomPlayer[],
+): value is string[] {
+  if (!Array.isArray(value)) return false;
+  const ids = new Set<string>();
+  for (const id of value) {
+    if (!isNonEmptyString(id) || ids.has(id)) return false;
+    ids.add(id);
+  }
+  return players.every(({ id }) => !ids.has(id));
+}
+
 export function isGameRoom(value: unknown): value is GameRoom {
   return (
     isRecord(value) &&
@@ -281,6 +295,8 @@ export function isGameRoom(value: unknown): value is GameRoom {
       value.status === "ended") &&
     Array.isArray(value.players) &&
     value.players.every(isRoomPlayer) &&
+    (value.blockedPlayerIds === undefined ||
+      isBlockedPlayerList(value.blockedPlayerIds, value.players)) &&
     typeof value.topic === "string" &&
     Array.isArray(value.chain) &&
     value.chain.every(isRoomChainItem) &&

@@ -18,6 +18,7 @@ import {
 
 const ROOM_REPLACED_MESSAGE =
   "방이 새로 만들어졌어요. 다시 참가해 주세요.";
+const ROOM_REMOVED_MESSAGE = "방장이 이 방에서 내보냈어요.";
 const ROOM_MARKER_PREFIX = "question-game-room:";
 const ROOM_PRESENCE_MS = 15_000;
 const useClientLayoutEffect =
@@ -503,6 +504,9 @@ export function useRoom(gameId?: string): UseRoomResult {
           return;
         }
         if (res.status === 403 || res.status === 404) {
+          if (data.error === ROOM_REMOVED_MESSAGE) {
+            setError(ROOM_REMOVED_MESSAGE);
+          }
           clearRoom();
           return;
         }

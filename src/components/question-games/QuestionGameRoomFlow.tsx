@@ -256,6 +256,12 @@ export function QuestionGameRoomFlow({
             actionLoading={actionLoading}
             onStart={() => { void sendAction("start"); }}
             onLeave={() => { void handleLeaveRoom(); }}
+            onRemovePlayer={async (playerId) => {
+              const result = await sendAction("remove-player", {
+                targetPlayerId: playerId,
+              });
+              return result.ok;
+            }}
           />
         </>
       );

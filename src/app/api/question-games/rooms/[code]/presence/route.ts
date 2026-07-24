@@ -70,6 +70,12 @@ export async function POST(req: NextRequest, { params }: Params) {
         { status: 404 },
       );
     }
+    if (result.kind === "removed") {
+      return NextResponse.json(
+        { error: "방장이 이 방에서 내보냈어요." },
+        { status: 403 },
+      );
+    }
     return NextResponse.json(
       { error: "방 참가자만 접속을 확인할 수 있어요" },
       { status: 403 },

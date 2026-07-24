@@ -297,9 +297,7 @@ export default function TeacherQuestionPlayPage() {
                     <span className="text-5xl drop-shadow">{game.emoji}</span>
                     <div className="text-white">
                       <h3 className="font-black text-lg leading-tight">{game.title}</h3>
-                      {game.isBuiltIn ? (
-                        <span className="text-white text-xs">{t("builtIn")}</span>
-                      ) : (
+                      {!game.isBuiltIn && (
                         <span className="text-white text-xs">{t("custom")}</span>
                       )}
                     </div>

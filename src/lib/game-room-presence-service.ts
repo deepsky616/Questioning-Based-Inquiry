@@ -19,6 +19,7 @@ const PRESENCE_WRITE_ATTEMPTS = 8;
 export type GameRoomPresenceUpdateResult =
   | { kind: "room"; room: GameRoom }
   | { kind: "conflict"; room: GameRoom }
+  | { kind: "removed" }
   | { kind: "forbidden" }
   | { kind: "missing" };
 
@@ -79,7 +80,11 @@ export async function updateGameRoomPresence({
         if (!room) return { kind: "missing" } as const;
 
         // 권한 확인은 방 수명 충돌보다 먼저 수행해 비참가자에게 방을 노출하지 않는다.
-        if (!isRoomMember(room, userId)) return { kind: "forbidden" } as const;
+        if (!isRoomMember(room, userId)) {
+          return room.blockedPlayerIds?.includes(userId)
+            ? { kind: "removed" } as const
+            : { kind: "forbidden" } as const;
+        }
         if (room.createdAt !== expectedCreatedAt) {
           return { kind: "conflict", room } as const;
         }

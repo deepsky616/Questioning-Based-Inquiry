@@ -1,11 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { Loader2, UserMinus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { getQuestionGameText } from "@/lib/question-game-i18n";
 import { getQuestionGameRule } from "@/lib/question-game-rules";
-import type { BuiltInGame, GameRoom } from "@/lib/question-games-data";
+import type {
+  BuiltInGame,
+  GameRoom,
+  RoomPlayer,
+} from "@/lib/question-games-data";
 import { LearningSoundToggle } from "@/components/shared/LearningSoundToggle";
 
 const PLAYER_COLORS = ["#C2410C", "#1D4ED8", "#047857", "#6D28D9", "#B91C1C", "#BE185D", "#0F766E", "#A16207"];
@@ -17,13 +30,24 @@ interface Props {
   actionLoading: boolean;
   onStart: () => void;
   onLeave: () => void;
+  onRemovePlayer: (playerId: string) => Promise<boolean>;
 }
 
-export default function RoomLobby({ game, room, myId, actionLoading, onStart, onLeave }: Props) {
+export default function RoomLobby({
+  game,
+  room,
+  myId,
+  actionLoading,
+  onStart,
+  onLeave,
+  onRemovePlayer,
+}: Props) {
   const locale = useLocale();
   const t = useTranslations("gamePlay");
   const text = getQuestionGameText(locale);
   const [copied, setCopied] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<RoomPlayer | null>(null);
+  const [removing, setRemoving] = useState(false);
   const isHost = room.hostId === myId;
   const { min, max } = getQuestionGameRule(game.id).multiplayer;
   const needsMorePlayers = room.players.length < min;
@@ -33,6 +57,14 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     }).catch(() => {});
+  }
+
+  async function handleRemovePlayer() {
+    if (!removeTarget || removing) return;
+    setRemoving(true);
+    const removed = await onRemovePlayer(removeTarget.id);
+    setRemoving(false);
+    if (removed) setRemoveTarget(null);
   }
 
   return (
@@ -100,6 +132,20 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
                   👑 {t("host")}
                 </span>
               )}
+              {isHost && p.id !== myId && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  aria-label={t("removePlayerAria", { name: p.name })}
+                  title={t("removePlayer")}
+                  disabled={actionLoading || removing}
+                  onClick={() => setRemoveTarget(p)}
+                >
+                  <UserMinus className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              )}
             </div>
           ))}
           {/* 빈 자리 안내 */}
@@ -136,6 +182,47 @@ export default function RoomLobby({ game, room, myId, actionLoading, onStart, on
           </div>
         </div>
       )}
+
+      <Dialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !removing) setRemoveTarget(null);
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {removeTarget
+                ? t("removePlayerTitle", { name: removeTarget.name })
+                : t("removePlayer")}
+            </DialogTitle>
+            <DialogDescription>
+              {t("removePlayerDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={removing}
+              onClick={() => setRemoveTarget(null)}
+            >
+              {t("removePlayerCancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={removing || actionLoading}
+              onClick={() => { void handleRemovePlayer(); }}
+            >
+              {removing && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+              )}
+              {removing ? t("removingPlayer") : t("removePlayerConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

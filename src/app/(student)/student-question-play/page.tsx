@@ -179,11 +179,6 @@ function GameCard({ game, index, onSelect }: { game: AnyGame; index: number; onS
         >
           {game.emoji}
         </span>
-        {game.isBuiltIn && (
-          <span className="absolute top-3 right-3 bg-black/25 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-medium">
-            {t("builtIn")}
-          </span>
-        )}
       </div>
       <div className="p-5">
         <h3 className="text-xl font-black text-foreground mb-1.5">{game.title}</h3>

@@ -456,6 +456,65 @@ test("같은 학생이 여러 창으로 참가해도 참가자와 포인트 대�
   }
 });
 
+test("방장은 대기방의 다른 학생을 내보내고 같은 방 재참가를 막는다", async ({ browser }) => {
+  const fixture = createQuestionGameBrowserFixture("remove-player");
+  const transport = createSharedQuestionGameTransport();
+  const sessions: QuestionGameBrowserSession[] = [];
+
+  try {
+    const host = await openStudentRoom(
+      browser,
+      fixture.students[0],
+      "relay",
+      transport,
+    );
+    const friend = await joinStudentRoom(
+      browser,
+      fixture.students[1],
+      "relay",
+      host.code,
+      transport,
+    );
+    sessions.push(host, friend);
+
+    await expect(
+      friend.page.getByRole("button", { name: /내보내기/ }),
+    ).toHaveCount(0);
+    await host.page.getByRole("button", {
+      name: `${friend.identity.name} 내보내기`,
+      exact: true,
+    }).click();
+    await expect(host.page.getByRole("dialog")).toContainText(
+      `${friend.identity.name} 학생을 방에서 내보낼까요?`,
+    );
+    await host.page.getByRole("button", {
+      name: "내보내기",
+      exact: true,
+    }).click();
+
+    await expect.poll(() => transport.getRoom(host.code)?.players.length).toBe(1);
+    await expect(
+      host.page.getByRole("heading", { name: /참가자 1/ }),
+    ).toBeVisible();
+    await expect(friend.page.getByRole("alert").filter({
+      hasText: "방장이 이 방에서 내보냈어요.",
+    })).toBeVisible({ timeout: 10_000 });
+
+    await submitQuestionGameRoomCode(friend.page, host.code);
+    await expect(friend.page.getByRole("alert").filter({
+      hasText: "방장이 이 방에서 내보냈어요.",
+    })).toBeVisible();
+    expect(
+      transport.getRoom(host.code)?.players.some(
+        ({ id }) => id === friend.identity.id,
+      ),
+    ).toBe(false);
+  } finally {
+    await closeQuestionGameSessions(sessions);
+    await transport.dispose();
+  }
+});
+
 test("두 명 전에는 시작할 수 없고 두 명이면 시작한다", async ({ browser }) => {
   const fixture = createQuestionGameBrowserFixture("minimum");
   const transport = createSharedQuestionGameTransport();

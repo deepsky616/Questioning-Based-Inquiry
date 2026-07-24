@@ -1915,6 +1915,42 @@ describe("useRoom 방 복원과 접속 확인", () => {
     unmount();
   });
 
+  it("접속 확인에서 방장 내보내기 안내를 받으면 방을 비우고 이유를 보여준다", async () => {
+    const currentRoom = makeRoom();
+    let removed = false;
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      if (requestBody(init)?.action === "join") {
+        return jsonResponse({ room: currentRoom });
+      }
+      if (String(input).endsWith("/presence") && removed) {
+        return jsonResponse(
+          { error: "방장이 이 방에서 내보냈어요." },
+          403,
+        );
+      }
+      return jsonResponse({ room: currentRoom });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result, unmount } = renderHook(() => useRoom(gameId));
+
+    await waitFor(() => expect(result.current.isRestoring).toBe(false));
+    await act(async () => {
+      await result.current.joinRoom("1234");
+    });
+    removed = true;
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+    });
+
+    await waitFor(() => expect(result.current.room).toBeNull());
+    expect(result.current.error).toBe("방장이 이 방에서 내보냈어요.");
+    expect(sessionStorage.getItem(markerKey)).toBeNull();
+    unmount();
+  });
+
   it("접속 확인이 다른 방 수명을 반환하면 방과 표지를 비운다", async () => {
     const currentRoom = makeRoom();
     let presenceRoom = currentRoom;

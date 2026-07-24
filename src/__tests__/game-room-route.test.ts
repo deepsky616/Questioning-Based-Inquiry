@@ -3053,6 +3053,124 @@ describe("방 참가 경계", () => {
   );
 });
 
+describe("대기방 참여자 내보내기", () => {
+  const removeCommandId = "11111111-1111-4111-8111-111111111111";
+
+  function roomWithGuest(overrides: Partial<GameRoom> = {}) {
+    return makeRoom({
+      players: [
+        { id: "user-1", name: "방장", isHost: true, joinedAt: 1 },
+        { id: "guest", name: "친구", isHost: false, joinedAt: 2 },
+      ],
+      ...overrides,
+    });
+  }
+
+  it("방장은 대기 중인 다른 학생을 내보내고 같은 방 재입장을 막는다", async () => {
+    const room = roomWithGuest();
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.saveGameRoom.mockImplementation(async (candidate: GameRoom) => ({
+      kind: "saved" as const,
+      room: { ...candidate, version: candidate.version + 1 },
+    }));
+
+    const response = await patch({
+      action: "remove-player",
+      commandId: removeCommandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      targetPlayerId: "guest",
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(expect.objectContaining({
+      players: [{ id: "user-1", name: "방장", isHost: true, joinedAt: 1 }],
+      blockedPlayerIds: ["guest"],
+    }));
+    expect(mocks.deleteGameRoomPresence).toHaveBeenCalledWith({
+      roomCode: room.code,
+      roomCreatedAt: room.createdAt,
+      userId: "guest",
+    });
+    const body = await response.json();
+    expect(body.room.players).toEqual([
+      { id: "user-1", name: "방장", isHost: true, joinedAt: 1 },
+    ]);
+    expect(body.room.blockedPlayerIds).toBeUndefined();
+  });
+
+  it("방장이 아닌 참가자와 자기 자신 내보내기를 거부한다", async () => {
+    const room = roomWithGuest();
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.auth.mockResolvedValueOnce({
+      user: { id: "guest", name: "친구" },
+    });
+
+    const memberResponse = await patch({
+      action: "remove-player",
+      commandId: removeCommandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      targetPlayerId: "user-1",
+    });
+
+    expect(memberResponse.status).toBe(403);
+    mocks.auth.mockResolvedValueOnce({
+      user: { id: "user-1", name: "방장" },
+    });
+    const selfResponse = await patch({
+      action: "remove-player",
+      commandId: removeCommandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      targetPlayerId: "user-1",
+    });
+
+    expect(selfResponse.status).toBe(400);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("놀이가 시작된 뒤에는 수동으로 학생을 내보낼 수 없다", async () => {
+    const room = roomWithGuest({ status: "playing" });
+    mocks.loadGameRoom.mockResolvedValue(room);
+
+    const response = await patch({
+      action: "remove-player",
+      commandId: removeCommandId,
+      expectedCreatedAt: room.createdAt,
+      expectedVersion: room.version,
+      targetPlayerId: "guest",
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("내보낸 학생의 같은 방 참가와 조회를 분명한 안내로 거부한다", async () => {
+    const room = makeRoom({
+      hostId: "other",
+      players: [
+        { id: "other", name: "다른 학생", isHost: true, joinedAt: 1 },
+      ],
+      blockedPlayerIds: ["user-1"],
+    });
+    mocks.loadGameRoom.mockResolvedValue(room);
+
+    const joinResponse = await patch({ action: "join" });
+    const readResponse = await get();
+
+    expect(joinResponse.status).toBe(403);
+    expect(readResponse.status).toBe(403);
+    await expect(joinResponse.json()).resolves.toEqual({
+      error: "방장이 이 방에서 내보냈어요.",
+    });
+    await expect(readResponse.json()).resolves.toEqual({
+      error: "방장이 이 방에서 내보냈어요.",
+    });
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+});
+
 describe("방 상태 쓰기 권한", () => {
   const versionedActions: Array<[string, Record<string, unknown>]> = [
     ["start", {}],

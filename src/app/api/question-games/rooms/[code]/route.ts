@@ -93,6 +93,13 @@ const PUBLISH_AWARD_RESULT_KEYS = new Set([
   "expectedVersion",
   "playId",
 ]);
+const REMOVE_PLAYER_KEYS = new Set([
+  "action",
+  "commandId",
+  "expectedCreatedAt",
+  "expectedVersion",
+  "targetPlayerId",
+]);
 
 function isRequestBody(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -142,8 +149,18 @@ function roomForbidden() {
   );
 }
 
+function roomRemoved() {
+  return NextResponse.json(
+    { error: "방장이 이 방에서 내보냈어요." },
+    { status: 403 },
+  );
+}
+
 function roomConflictForMember(room: GameRoom, userId: string) {
-  return isRoomMember(room, userId) ? roomConflict(room) : roomForbidden();
+  if (isRoomMember(room, userId)) return roomConflict(room);
+  return room.blockedPlayerIds?.includes(userId)
+    ? roomRemoved()
+    : roomForbidden();
 }
 
 function invalidRequest(error: string) {
@@ -597,6 +614,7 @@ async function joinRoom(
     let room = await loadLockedGameRoom(code, tx);
     if (!room) return roomMissing();
     const expectedCreatedAt = room.createdAt;
+    if (room.blockedPlayerIds?.includes(userId)) return roomRemoved();
     const currentUser = await tx.user.findUnique({
       where: { id: userId },
       select: { id: true, name: true, role: true },
@@ -672,6 +690,95 @@ async function clearMemberPresence(room: GameRoom, userId: string) {
   } catch {
     logger.warn("질문놀이 접속 기록 정리를 마치지 못했습니다");
   }
+}
+
+async function removeWaitingRoomPlayer(
+  room: GameRoom,
+  userId: string,
+  body: Record<string, unknown>,
+) {
+  if (!hasExactKeys(body, REMOVE_PLAYER_KEYS)) {
+    return invalidRequest("참가자 내보내기 요청이 올바르지 않습니다");
+  }
+  if (!isQuestionGameCommandId(body.commandId)) {
+    return invalidRequest("명령 식별값이 올바르지 않습니다");
+  }
+  if (
+    typeof body.expectedCreatedAt !== "number" ||
+    !Number.isFinite(body.expectedCreatedAt)
+  ) {
+    return invalidRequest("방 생성 시각이 올바르지 않습니다");
+  }
+  if (!isValidExpectedVersion(body.expectedVersion)) {
+    return invalidRequest("올바른 expectedVersion이 필요합니다");
+  }
+  if (
+    typeof body.targetPlayerId !== "string" ||
+    body.targetPlayerId.length === 0 ||
+    body.targetPlayerId.length > 128
+  ) {
+    return invalidRequest("내보낼 참가자가 올바르지 않습니다");
+  }
+  if (room.hostId !== userId) {
+    return NextResponse.json(
+      { error: "방장만 참가자를 내보낼 수 있어요" },
+      { status: 403 },
+    );
+  }
+  if (room.status !== "waiting") {
+    return NextResponse.json(
+      { error: "놀이를 시작하기 전에만 참가자를 내보낼 수 있어요" },
+      { status: 409 },
+    );
+  }
+  if (body.targetPlayerId === userId) {
+    return invalidRequest("방장은 자기 자신을 내보낼 수 없어요");
+  }
+  if (
+    body.expectedCreatedAt !== room.createdAt ||
+    isStaleRoomAction(room, body.expectedVersion)
+  ) {
+    return roomConflict(room);
+  }
+
+  const targetPlayer = room.players.find(
+    ({ id }) => id === body.targetPlayerId,
+  );
+  if (!targetPlayer) {
+    if (room.blockedPlayerIds?.includes(body.targetPlayerId)) {
+      return replayedCommandSuccess(room, undefined);
+    }
+    return invalidRequest("내보낼 참가자를 찾을 수 없어요");
+  }
+  if (targetPlayer.isHost) {
+    return invalidRequest("방장은 자기 자신을 내보낼 수 없어요");
+  }
+
+  const blockedPlayerIds = [
+    ...new Set([...(room.blockedPlayerIds ?? []), targetPlayer.id]),
+  ];
+  const saved = await saveGameRoom({
+    ...room,
+    players: room.players.filter(({ id }) => id !== targetPlayer.id),
+    blockedPlayerIds,
+  });
+  if (saved.kind === "saved") {
+    await clearMemberPresence(room, targetPlayer.id);
+    return commandSuccess(saved.room, undefined);
+  }
+  if (saved.kind === "missing") return roomMissing();
+  if (saved.room.createdAt !== room.createdAt) {
+    return roomConflictForMember(saved.room, userId);
+  }
+  if (
+    saved.room.hostId === userId &&
+    !isRoomMember(saved.room, targetPlayer.id) &&
+    saved.room.blockedPlayerIds?.includes(targetPlayer.id)
+  ) {
+    await clearMemberPresence(room, targetPlayer.id);
+    return replayedCommandSuccess(saved.room, undefined);
+  }
+  return roomConflictForMember(saved.room, userId);
 }
 
 async function leaveRoom(initialRoom: GameRoom, userId: string) {
@@ -850,6 +957,7 @@ export async function GET(
     return NextResponse.json({ error: "방을 찾을 수 없습니다" }, { status: 404 });
   }
   if (!isRoomMember(room, userId)) {
+    if (room.blockedPlayerIds?.includes(userId)) return roomRemoved();
     return NextResponse.json(
       { error: "방 참가자만 확인할 수 있어요" },
       { status: 403 },
@@ -920,6 +1028,7 @@ export async function PATCH(
     return NextResponse.json({ room: null });
   }
   if (!isMember) {
+    if (room.blockedPlayerIds?.includes(userId)) return roomRemoved();
     return NextResponse.json(
       { error: "방 참가자만 변경할 수 있어요" },
       { status: 403 },
@@ -937,6 +1046,9 @@ export async function PATCH(
 
   if (action === "publish-award-result") {
     return publishAwardResult({ room, body, userId });
+  }
+  if (action === "remove-player") {
+    return removeWaitingRoomPlayer(room, userId, body);
   }
 
   const isVersion2 = room.gameState.stateVersion === 2;

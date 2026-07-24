@@ -35,6 +35,15 @@ describe("toPublicGameRoom", () => {
     expect(room.gameState.private).toEqual({ answer: "사과" });
   });
 
+  it("내보낸 학생 목록을 공개 응답에서 제거한다", () => {
+    const room = makeRoom({ blockedPlayerIds: ["student"] });
+
+    const publicRoom = toPublicGameRoom(room);
+
+    expect(publicRoom.blockedPlayerIds).toBeUndefined();
+    expect(room.blockedPlayerIds).toEqual(["student"]);
+  });
+
   it("미스터리 박스의 중첩 비공개 복사본과 알 수 없는 키를 제거한다", () => {
     const marker = "copied-secret";
     const gameState = {

@@ -419,11 +419,9 @@ describe("question game theme tokens", () => {
     )?.[0] ?? "";
     expectWhiteTextContrast(hexColors(statPalette));
 
-    for (const marker of ['t("builtIn")', 't("custom")']) {
-      const label = openingTagNear(source, "span", marker);
-      expect(label).toMatch(/\btext-white\b/);
-      expect(label).not.toMatch(/\btext-white\/70\b/);
-    }
+    const customLabel = openingTagNear(source, "span", 't("custom")');
+    expect(customLabel).toMatch(/\btext-white\b/);
+    expect(customLabel).not.toMatch(/\btext-white\/70\b/);
 
     const visibilityBadge = openingTagNear(source, "span", "{visInfo.emoji}");
     expect(visibilityBadge).toMatch(/\bbg-black\/25\b/);

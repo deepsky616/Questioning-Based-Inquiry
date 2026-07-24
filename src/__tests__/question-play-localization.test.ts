@@ -65,6 +65,7 @@ function renderLobby(locale: "ko" | "en", playerCount: number) {
         actionLoading: false,
         onStart: () => {},
         onLeave: () => {},
+        onRemovePlayer: async () => true,
       }),
     ),
   );
@@ -104,6 +105,12 @@ describe("question play localization", () => {
     expect(BUILT_IN_GAMES.find((game) => game.id === "memory")?.duration).toBe("약 5~20분");
     expect(BUILT_IN_GAMES.find((game) => game.id === "ladder")?.duration).toBe("약 10~15분");
     expect(BUILT_IN_GAMES.find((game) => game.id === "mystery-box")?.duration).toBe("약 8~15분");
+  });
+
+  it("놀이 패널에서는 기본 제공 표시를 반복하지 않고 직접 만든 놀이만 구분한다", () => {
+    expect(studentLanding).not.toContain('{t("builtIn")}');
+    expect(teacherGamePage).not.toContain('{t("builtIn")}');
+    expect(teacherGamePage).toContain('{t("custom")}');
   });
 
   it("미스터리 상자 안내는 질문과 추측을 합친 스무 활동 기준을 두 언어로 알린다", () => {

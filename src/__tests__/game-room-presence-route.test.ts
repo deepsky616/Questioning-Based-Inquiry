@@ -125,6 +125,17 @@ describe("질문놀이 방 접속 확인", () => {
     await expect(response.json()).resolves.not.toHaveProperty("room");
   });
 
+  it("내보낸 학생에게 재입장할 수 없다는 안내를 반환한다", async () => {
+    mocks.updateGameRoomPresence.mockResolvedValue({ kind: "removed" });
+
+    const response = await post();
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "방장이 이 방에서 내보냈어요.",
+    });
+  });
+
   it("방 수명도 다를 때 비참가자에게 방 본문 없이 먼저 권한 오류를 반환한다", async () => {
     mocks.auth.mockResolvedValue({ user: { id: "outsider", name: "다른 사람" } });
     mocks.updateGameRoomPresence.mockResolvedValue({ kind: "forbidden" });

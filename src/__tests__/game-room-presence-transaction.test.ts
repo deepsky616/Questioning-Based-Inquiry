@@ -146,6 +146,22 @@ describe("질문놀이 접속 확인 거래", () => {
     expect(prismaMock.tx.gameRoomPresence.createMany).not.toHaveBeenCalled();
   });
 
+  it("잠근 최신 방에서 내보낸 학생은 별도 권한 결과를 받는다", async () => {
+    prismaMock.tx.$queryRaw.mockResolvedValue([{ data: makeRoom({
+      players: [{ id: "host", name: "방장", isHost: true, joinedAt: 1 }],
+      blockedPlayerIds: ["student"],
+    }) }]);
+
+    const result = await updateGameRoomPresence({
+      code: "1234",
+      userId: "student",
+      expectedCreatedAt: 1_000,
+    });
+
+    expect(result).toEqual({ kind: "removed" });
+    expect(prismaMock.tx.gameRoomPresence.createMany).not.toHaveBeenCalled();
+  });
+
   it("잠근 최신 방의 참가자는 수명이 다르면 접속 행을 건드리지 않고 충돌 방을 받는다", async () => {
     const replacement = makeRoom({ createdAt: 2_000 });
     prismaMock.tx.$queryRaw.mockResolvedValue([{ data: replacement }]);

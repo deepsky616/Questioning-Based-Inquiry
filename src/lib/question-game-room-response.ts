@@ -13,14 +13,18 @@ function isFiniteNumber(value: unknown): value is number {
 }
 
 export function toPublicGameRoom(room: GameRoom): GameRoom {
+  const { blockedPlayerIds: _blockedPlayerIds, ...publicRoom } = room;
   if (
     room.gameId === "mystery-box" ||
     room.gameState?.game === "mystery-box"
   ) {
-    return { ...room, gameState: toPublicMysteryState(room.gameState) };
+    return {
+      ...publicRoom,
+      gameState: toPublicMysteryState(room.gameState),
+    };
   }
   const { private: _private, ...gameState } = room.gameState ?? {};
-  return { ...room, gameState };
+  return { ...publicRoom, gameState };
 }
 
 export function readRoomCommandResult(
