@@ -11,7 +11,7 @@ import {
   mysteryQuestionForAttribute,
   mysteryAttributesForVersion,
   mysteryItemsForVersion,
-  resolveMysteryAttribute,
+  resolveMysteryAnswerEvidence,
   type MysteryAnswer,
   type MysteryAnswerEvidence,
   type MysteryAttribute,
@@ -206,10 +206,11 @@ function parseHistoryItem(
       (value.answerEvidence === undefined && knowledgeVersion >= 3) ||
       (value.answerEvidence !== undefined && (
         !isMysteryAnswerEvidence(value.answerEvidence, knowledgeVersion) ||
-        resolveMysteryAttribute(
+        (knowledgeVersion >= 4 && !("kind" in value.answerEvidence)) ||
+        resolveMysteryAnswerEvidence(
           item,
-          value.answerEvidence.attribute,
-          value.answerEvidence.negated,
+          value.answerEvidence,
+          value.text,
           knowledgeVersion,
         ) !== value.answer
       ))
@@ -267,7 +268,8 @@ export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
   const knowledgeVersion = isQuestionGameRunRecord(value) &&
       (value.knowledgeVersion === 1 ||
         value.knowledgeVersion === 2 ||
-        value.knowledgeVersion === 3)
+        value.knowledgeVersion === 3 ||
+        value.knowledgeVersion === 4)
     ? value.knowledgeVersion
     : 1;
   if (
@@ -298,7 +300,8 @@ export function parseMysteryState(value: Prisma.JsonValue): MysteryRunState {
     (value.knowledgeVersion !== undefined &&
       value.knowledgeVersion !== 1 &&
       value.knowledgeVersion !== 2 &&
-      value.knowledgeVersion !== 3) ||
+      value.knowledgeVersion !== 3 &&
+      value.knowledgeVersion !== 4) ||
     (value.mysteryWinner !== undefined &&
       value.mysteryWinner !== "STUDENT" &&
       value.mysteryWinner !== "AI") ||

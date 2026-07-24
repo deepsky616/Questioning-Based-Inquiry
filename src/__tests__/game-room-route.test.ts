@@ -777,9 +777,12 @@ describe("미스터리 박스 실제 공개 응답", () => {
         ...request,
         answer: "yes",
         evidence: {
-          attribute: "edible",
-          negated: false,
+          kind: "dynamic",
+          question,
+          predicate: "비가 올 때 잘 자란다",
+          answer: "yes",
           confidence: "high",
+          verification: "independent-agreement",
         },
       }),
     );
@@ -812,7 +815,7 @@ describe("미스터리 박스 실제 공개 응답", () => {
       playerId: "user-1",
       locale: "ko",
       question,
-      knowledgeVersion: 3,
+      knowledgeVersion: 4,
     });
     expect(mocks.checkRateLimit).toHaveBeenCalledWith(
       "game-room-mystery-ai:user-1",
@@ -846,6 +849,9 @@ describe("미스터리 박스 실제 공개 응답", () => {
     ["크기가 작나요?", "yes"],
     ["크키가 작나요?", "yes"],
     ["큰가요?", "no"],
+    ["전자기기인가요?", "no"],
+    ["고양이과인가요?", "no"],
+    ["열대과일인가요?", "no"],
   ] as const)("등록된 규칙 질문 %s은 에이아이 없이 %s를 저장한다", async (
     question,
     answer,

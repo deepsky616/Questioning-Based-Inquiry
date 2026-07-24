@@ -158,7 +158,7 @@ describe("미스터리 박스 방 판정기", () => {
       pointEvidenceVersion: 2,
       gameState: {
         stateVersion: 2,
-        knowledgeVersion: 3,
+        knowledgeVersion: 4,
         game: "mystery-box",
         phase: "setup",
         round: 0,
@@ -216,7 +216,7 @@ describe("미스터리 박스 방 판정기", () => {
     expect(result.kind).toBe("changed");
     if (result.kind !== "changed") return;
     expect(result.room.gameState).toMatchObject({
-      knowledgeVersion: 3,
+      knowledgeVersion: 4,
       history: [{ kind: "question", answer: "no" }],
     });
   });
@@ -341,7 +341,7 @@ describe("미스터리 박스 방 판정기", () => {
         playerId: "host",
         locale: "ko",
         question: "무슨 소리가 나나요?",
-        knowledgeVersion: 3,
+        knowledgeVersion: 4,
       },
     });
     expect(result.room).toBe(room);
@@ -368,12 +368,15 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 3,
+          knowledgeVersion: 4,
           answer: "no",
           evidence: {
-            attribute: "readingMaterial",
-            negated: false,
+            kind: "dynamic",
+            question: "무슨 소리가 나나요?",
+            predicate: "내는 소리의 종류",
+            answer: "no",
             confidence: "high",
+            verification: "independent-agreement",
           },
         },
       },
@@ -395,13 +398,17 @@ describe("미스터리 박스 방 판정기", () => {
       answer: "no",
       answerSource: "ai",
       answerEvidence: {
-        attribute: "readingMaterial",
-        negated: false,
+        kind: "dynamic",
+        question: "무슨 소리가 나나요?",
+        predicate: "내는 소리의 종류",
+        answer: "no",
         confidence: "high",
+        verification: "independent-agreement",
       },
     }]);
-    expect(toPublicMysteryState(state)).not.toHaveProperty(
-      "history.0.answerEvidence",
+    expect(toPublicMysteryState(state)).toHaveProperty(
+      "history.0.answerEvidence.kind",
+      "dynamic",
     );
 
     const repeated = applyMystery(
@@ -455,7 +462,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 3,
+          knowledgeVersion: 4,
           answer: "unknown",
           source: "fallback",
         },
@@ -496,12 +503,15 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 3,
+          knowledgeVersion: 4,
           answer: "yes",
           evidence: {
-            attribute: "readingMaterial",
-            negated: true,
+            kind: "dynamic",
+            question: "무슨 소리가 나나요?",
+            predicate: "내는 소리의 종류",
+            answer: "yes",
             confidence: "high",
+            verification: "independent-agreement",
           },
           ...changedBinding,
         } as unknown as MysteryAnswerResolution,
@@ -543,7 +553,7 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "먹을 수 있나요?",
-          knowledgeVersion: 3,
+          knowledgeVersion: 4,
           answer: "no",
         },
       },
@@ -965,12 +975,15 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 3,
+          knowledgeVersion: 4,
           answer: "yes",
           evidence: {
-            attribute: "readingMaterial",
-            negated: true,
+            kind: "dynamic",
+            question: "무슨 소리가 나나요?",
+            predicate: "내는 소리의 종류",
+            answer: "yes",
             confidence: "high",
+            verification: "independent-agreement",
           },
         },
       },
@@ -1011,12 +1024,15 @@ describe("미스터리 박스 방 판정기", () => {
           playerId: "host",
           locale: "ko",
           question: "무슨 소리가 나나요?",
-          knowledgeVersion: 3,
+          knowledgeVersion: 4,
           answer: "no",
           evidence: {
-            attribute: "readingMaterial",
-            negated: false,
+            kind: "dynamic",
+            question: "무슨 소리가 나나요?",
+            predicate: "내는 소리의 종류",
+            answer: "no",
             confidence: "high",
+            verification: "independent-agreement",
           },
         },
       },

@@ -75,7 +75,7 @@ import {
   getMysteryItem,
   isMysteryAnswerEvidence,
   isMysteryGuessCorrect,
-  resolveMysteryAttribute,
+  resolveMysteryAnswerEvidence,
   type MysteryAnswerResolution,
   type MysteryAnswerEvidence,
   type MysteryLocale,
@@ -2418,10 +2418,12 @@ function validateMysteryResolution(
       (!isMysteryAnswerEvidence(
         resolution.evidence,
         expected.knowledgeVersion,
-      ) || resolveMysteryAttribute(
+      ) ||
+      (expected.knowledgeVersion >= 4 && !("kind" in resolution.evidence)) ||
+      resolveMysteryAnswerEvidence(
         item,
-        resolution.evidence.attribute,
-        resolution.evidence.negated,
+        resolution.evidence,
+        expected.question,
         expected.knowledgeVersion,
       ) !== resolution.answer))
   ) {

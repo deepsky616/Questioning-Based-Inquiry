@@ -30,16 +30,42 @@ export const MYSTERY_V2_FACTS = [
   "readingMaterial",
 ] as const;
 
-export const MYSTERY_FACTS = [
+export const MYSTERY_V3_FACTS = [
   ...MYSTERY_V2_FACTS,
   "berry",
   "imaginary",
 ] as const;
 
+export const MYSTERY_V4_FACTS = [
+  "mammal",
+  "insect",
+  "dogFamily",
+  "catFamily",
+  "electronicDevice",
+  "usesElectricity",
+  "tropicalFruit",
+  "temperateFruit",
+  "stationery",
+  "naturalObject",
+  "spaceObject",
+  "hasSeeds",
+  "madeOfPaper",
+  "madeOfWood",
+  "hasWheels",
+  "makesSound",
+  "pet",
+] as const;
+
+export const MYSTERY_FACTS = [
+  ...MYSTERY_V3_FACTS,
+  ...MYSTERY_V4_FACTS,
+] as const;
+
 export type MysteryFact = typeof MYSTERY_FACTS[number];
-export type MysteryFactValue = boolean;
-export type MysteryKnowledgeVersion = 1 | 2 | 3;
-export const CURRENT_MYSTERY_KNOWLEDGE_VERSION: MysteryKnowledgeVersion = 3;
+export type MysteryV4Fact = typeof MYSTERY_V4_FACTS[number];
+export type MysteryFactValue = boolean | "unknown";
+export type MysteryKnowledgeVersion = 1 | 2 | 3 | 4;
+export const CURRENT_MYSTERY_KNOWLEDGE_VERSION: MysteryKnowledgeVersion = 4;
 export type MysteryLocale = "ko" | "en";
 export type MysteryAnswer = "yes" | "no" | "unknown";
 
@@ -66,11 +92,24 @@ export interface MysteryAnswerResolution {
   evidence?: MysteryAnswerEvidence;
 }
 
-export interface MysteryAnswerEvidence {
+export interface MysteryCatalogAnswerEvidence {
   attribute: MysteryFact;
   negated: boolean;
   confidence: "high";
 }
+
+export interface MysteryDynamicAnswerEvidence {
+  kind: "dynamic";
+  question: string;
+  predicate: string;
+  answer: Exclude<MysteryAnswer, "unknown">;
+  confidence: "high";
+  verification: "independent-agreement";
+}
+
+export type MysteryAnswerEvidence =
+  | MysteryCatalogAnswerEvidence
+  | MysteryDynamicAnswerEvidence;
 
 export interface MysteryItem {
   id: string;
@@ -79,11 +118,12 @@ export interface MysteryItem {
   attributes: Record<MysteryAttribute, boolean>;
   facts: Record<MysteryFact, boolean>;
   factsV3: Record<MysteryFact, MysteryFactValue>;
+  factsV4: Record<MysteryFact, MysteryFactValue>;
 }
 
-type LegacyMysteryItem = Omit<MysteryItem, "facts" | "factsV3">;
+type LegacyMysteryItem = Omit<MysteryItem, "facts" | "factsV3" | "factsV4">;
 
-const MYSTERY_ITEM_DEFINITIONS: readonly LegacyMysteryItem[] = [
+const MYSTERY_ITEM_DEFINITIONS = [
   {
     id: "apple",
     names: { ko: "사과", en: "apple" },
@@ -357,7 +397,9 @@ const MYSTERY_ITEM_DEFINITIONS: readonly LegacyMysteryItem[] = [
       round: false,
     },
   },
-] as const;
+] as const satisfies readonly LegacyMysteryItem[];
+
+type BuiltInMysteryItemId = typeof MYSTERY_ITEM_DEFINITIONS[number]["id"];
 
 const FACT_OVERRIDES: Record<string, Partial<Record<MysteryFact, boolean>>> = {
   apple: { plant: false, fruit: true, plantDerived: true },
@@ -371,6 +413,259 @@ const FACT_OVERRIDES: Record<string, Partial<Record<MysteryFact, boolean>>> = {
   sunflower: { herbaceousPlant: true, flower: true },
   pencil: { writingTool: true },
   dragon: { movesByItself: true, imaginary: true },
+};
+
+const V4_FACT_VALUES: Record<
+  BuiltInMysteryItemId,
+  Record<MysteryV4Fact, MysteryFactValue>
+> = {
+  apple: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: true,
+    stationery: false,
+    naturalObject: true,
+    spaceObject: false,
+    hasSeeds: true,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: false,
+    pet: false,
+  },
+  puppy: {
+    mammal: true,
+    insect: false,
+    dogFamily: true,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: true,
+    spaceObject: false,
+    hasSeeds: false,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: true,
+    pet: true,
+  },
+  book: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: false,
+    spaceObject: false,
+    hasSeeds: false,
+    madeOfPaper: true,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: false,
+    pet: false,
+  },
+  car: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: true,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: false,
+    spaceObject: false,
+    hasSeeds: false,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: true,
+    makesSound: true,
+    pet: false,
+  },
+  butterfly: {
+    mammal: false,
+    insect: true,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: true,
+    spaceObject: false,
+    hasSeeds: false,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: false,
+    pet: false,
+  },
+  piano: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: false,
+    spaceObject: false,
+    hasSeeds: false,
+    madeOfPaper: false,
+    madeOfWood: true,
+    hasWheels: false,
+    makesSound: true,
+    pet: false,
+  },
+  sun: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: true,
+    spaceObject: true,
+    hasSeeds: false,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: false,
+    pet: false,
+  },
+  strawberry: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: true,
+    stationery: false,
+    naturalObject: true,
+    spaceObject: false,
+    hasSeeds: true,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: false,
+    pet: false,
+  },
+  rocket: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: true,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: false,
+    spaceObject: true,
+    hasSeeds: false,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: true,
+    pet: false,
+  },
+  sunflower: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: true,
+    spaceObject: false,
+    hasSeeds: true,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: false,
+    pet: false,
+  },
+  pencil: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: true,
+    naturalObject: false,
+    spaceObject: false,
+    hasSeeds: false,
+    madeOfPaper: false,
+    madeOfWood: true,
+    hasWheels: false,
+    makesSound: false,
+    pet: false,
+  },
+  snowman: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: false,
+    spaceObject: false,
+    hasSeeds: false,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: false,
+    pet: false,
+  },
+  dragon: {
+    mammal: false,
+    insect: false,
+    dogFamily: false,
+    catFamily: false,
+    electronicDevice: false,
+    usesElectricity: false,
+    tropicalFruit: false,
+    temperateFruit: false,
+    stationery: false,
+    naturalObject: false,
+    spaceObject: false,
+    hasSeeds: false,
+    madeOfPaper: false,
+    madeOfWood: false,
+    hasWheels: false,
+    makesSound: "unknown",
+    pet: false,
+  },
 };
 
 function createFactProfile(
@@ -393,6 +688,15 @@ function createV3FactProfile(
   return { ...facts };
 }
 
+function createV4FactProfile(
+  itemId: BuiltInMysteryItemId,
+  facts: Record<MysteryFact, boolean>,
+): Record<MysteryFact, MysteryFactValue> {
+  const v4Facts = V4_FACT_VALUES[itemId];
+  if (!v4Facts) throw new Error(`미스터리 박스 새 지식표가 없습니다: ${itemId}`);
+  return { ...facts, ...v4Facts };
+}
+
 export const MYSTERY_ITEMS: readonly MysteryItem[] =
   MYSTERY_ITEM_DEFINITIONS.map((item) => {
     const facts = createFactProfile(item);
@@ -400,6 +704,7 @@ export const MYSTERY_ITEMS: readonly MysteryItem[] =
       ...item,
       facts,
       factsV3: createV3FactProfile(facts),
+      factsV4: createV4FactProfile(item.id, facts),
     };
   });
 
@@ -562,6 +867,52 @@ const FACT_PATTERNS: Record<
     imaginary: [
       koreanForm("상상으로\\s*만든\\s*존재(?:인가요|입니까|이에요|예요|인가|이야|이다)?"),
     ],
+    mammal: [koreanNoun("포유류"), koreanNoun("포유동물")],
+    insect: [koreanNoun("곤충")],
+    dogFamily: [koreanNoun("개과"), koreanNoun("갯과")],
+    catFamily: [koreanNoun("고양이과"), koreanNoun("고양잇과")],
+    electronicDevice: [
+      koreanNoun("전자\\s*기기"),
+      koreanNoun("전자\\s*제품"),
+      koreanNoun("전자제품"),
+    ],
+    usesElectricity: [
+      koreanForm("전기(?:를|가)?\\s*(?:쓰(?:나요|는|다)?|사용(?:하나요|합니까|하는|하다)?|필요(?:한가요|합니까|하다)?)"),
+    ],
+    tropicalFruit: [koreanNoun("열대\\s*과일")],
+    temperateFruit: [koreanNoun("온대\\s*과일")],
+    stationery: [koreanNoun("문구류"), koreanNoun("학용품")],
+    naturalObject: [
+      koreanForm("자연에서\\s*(?:생긴|생겨난|만들어진)"),
+      koreanNoun("자연물"),
+    ],
+    spaceObject: [
+      koreanNoun("우주\\s*물체"),
+      koreanNoun("우주에\\s*있는\\s*물체"),
+      koreanNoun("천체"),
+    ],
+    hasSeeds: [
+      koreanForm("씨(?:가|앗이)?\\s*있(?:나요|습니까|는|다)?"),
+      koreanForm("씨앗(?:이|을)?\\s*가지(?:나요|고\\s*있나요)?"),
+    ],
+    madeOfPaper: [
+      koreanForm("종이로\\s*(?:만든|만들어졌(?:나요|습니까|다)?)"),
+      koreanForm("종이로\\s*만들(?:었나요|었습니까|다)"),
+      koreanForm("종이\\s*재질"),
+    ],
+    madeOfWood: [
+      koreanForm("나무로\\s*(?:만든|만들어졌(?:나요|습니까|다)?)"),
+      koreanForm("나무로\\s*만들(?:었나요|었습니까|다)"),
+      koreanForm("나무\\s*재질"),
+    ],
+    hasWheels: [
+      koreanForm("바퀴(?:가|를)?\\s*있(?:나요|습니까|는|다)?"),
+      koreanNoun("바퀴"),
+    ],
+    makesSound: [
+      koreanForm("소리(?:가|를)?\\s*(?:나(?:나요|는|다)?|내(?:나요|는|다)?)"),
+    ],
+    pet: [koreanNoun("반려동물"), koreanNoun("애완동물")],
   },
   en: {
     ...LEGACY_ATTRIBUTE_PATTERNS.en,
@@ -589,6 +940,26 @@ const FACT_PATTERNS: Record<
     ],
     berry: [/\bberry\b/u],
     imaginary: [/\bimaginary\b/u, /\bmythical\b/u],
+    mammal: [/\bmammal\b/u],
+    insect: [/\binsect\b/u],
+    dogFamily: [/\b(?:dog|canine) family\b/u, /\bcanid\b/u],
+    catFamily: [/\b(?:cat|feline) family\b/u, /\bfelid\b/u],
+    electronicDevice: [/\belectronic (?:device|product)\b/u, /\belectronics?\b/u],
+    usesElectricity: [
+      /\b(?:use|uses|need|needs|require|requires) electricity\b/u,
+      /\belectric(?:ally)? powered\b/u,
+    ],
+    tropicalFruit: [/\btropical fruit\b/u],
+    temperateFruit: [/\btemperate fruit\b/u],
+    stationery: [/\bstationery\b/u, /\bschool suppl(?:y|ies)\b/u],
+    naturalObject: [/\bnatural object\b/u, /\boccurs? naturally\b/u],
+    spaceObject: [/\b(?:space|celestial) object\b/u, /\bcelestial body\b/u],
+    hasSeeds: [/\b(?:have|has|contain|contains) seeds?\b/u],
+    madeOfPaper: [/\bmade (?:of|from) paper\b/u, /\bpaper material\b/u],
+    madeOfWood: [/\bmade (?:of|from) wood\b/u, /\bwooden\b/u],
+    hasWheels: [/\b(?:have|has) wheels?\b/u],
+    makesSound: [/\b(?:make|makes|produce|produces) (?:a )?sounds?\b/u],
+    pet: [/\bpet\b/u, /\bcompanion animal\b/u],
   },
 };
 
@@ -653,6 +1024,23 @@ const MYSTERY_FACT_QUESTIONS: Record<
     readingMaterial: "읽는 데 사용하는 것인가요?",
     berry: "베리류인가요?",
     imaginary: "상상으로 만든 존재인가요?",
+    mammal: "포유류인가요?",
+    insect: "곤충인가요?",
+    dogFamily: "개과인가요?",
+    catFamily: "고양이과인가요?",
+    electronicDevice: "전자기기인가요?",
+    usesElectricity: "전기를 사용하나요?",
+    tropicalFruit: "열대과일인가요?",
+    temperateFruit: "온대과일인가요?",
+    stationery: "문구류인가요?",
+    naturalObject: "자연에서 생긴 것인가요?",
+    spaceObject: "우주에 있는 물체인가요?",
+    hasSeeds: "씨가 있나요?",
+    madeOfPaper: "종이로 만들었나요?",
+    madeOfWood: "나무로 만들었나요?",
+    hasWheels: "바퀴가 있나요?",
+    makesSound: "소리를 내나요?",
+    pet: "반려동물인가요?",
   },
   en: {
     ...MYSTERY_ATTRIBUTE_QUESTIONS.en,
@@ -668,6 +1056,23 @@ const MYSTERY_FACT_QUESTIONS: Record<
     readingMaterial: "Is it used for reading?",
     berry: "Is it a berry?",
     imaginary: "Is it imaginary?",
+    mammal: "Is it a mammal?",
+    insect: "Is it an insect?",
+    dogFamily: "Is it in the dog family?",
+    catFamily: "Is it in the cat family?",
+    electronicDevice: "Is it an electronic device?",
+    usesElectricity: "Does it use electricity?",
+    tropicalFruit: "Is it a tropical fruit?",
+    temperateFruit: "Is it a temperate fruit?",
+    stationery: "Is it stationery?",
+    naturalObject: "Does it occur naturally?",
+    spaceObject: "Is it a space object?",
+    hasSeeds: "Does it have seeds?",
+    madeOfPaper: "Is it made of paper?",
+    madeOfWood: "Is it made of wood?",
+    hasWheels: "Does it have wheels?",
+    makesSound: "Does it make a sound?",
+    pet: "Is it a pet?",
   },
 };
 
@@ -755,7 +1160,9 @@ export function mysteryAttributesForVersion(
     ? MYSTERY_ATTRIBUTES
     : knowledgeVersion === 2
       ? MYSTERY_V2_FACTS
-      : MYSTERY_FACTS;
+      : knowledgeVersion === 3
+        ? MYSTERY_V3_FACTS
+        : MYSTERY_FACTS;
 }
 
 export function isMysteryAttributeForVersion(
@@ -774,10 +1181,42 @@ export function isMysteryAnswerEvidence(
     return false;
   }
   const evidence = value as Record<string, unknown>;
+  if (evidence.kind === "dynamic") {
+    return knowledgeVersion >= 4 &&
+      Object.keys(evidence).length === 6 &&
+      typeof evidence.question === "string" &&
+      [...evidence.question].length > 0 &&
+      [...evidence.question].length <= 200 &&
+      evidence.question === evidence.question.trim() &&
+      typeof evidence.predicate === "string" &&
+      [...evidence.predicate].length > 0 &&
+      [...evidence.predicate].length <= 120 &&
+      evidence.predicate === evidence.predicate.trim() &&
+      (evidence.answer === "yes" || evidence.answer === "no") &&
+      evidence.confidence === "high" &&
+      evidence.verification === "independent-agreement";
+  }
   return Object.keys(evidence).length === 3 &&
     isMysteryAttributeForVersion(evidence.attribute, knowledgeVersion) &&
     typeof evidence.negated === "boolean" &&
     evidence.confidence === "high";
+}
+
+export function resolveMysteryAnswerEvidence(
+  item: MysteryItem,
+  evidence: MysteryAnswerEvidence,
+  question: string,
+  knowledgeVersion: MysteryKnowledgeVersion,
+): MysteryAnswer {
+  if ("kind" in evidence) {
+    return evidence.question === question ? evidence.answer : "unknown";
+  }
+  return resolveMysteryAttribute(
+    item,
+    evidence.attribute,
+    evidence.negated,
+    knowledgeVersion,
+  );
 }
 
 export function resolveMysteryAttribute(
@@ -790,7 +1229,10 @@ export function resolveMysteryAttribute(
     ? item.attributes[attribute as MysteryAttribute]
     : knowledgeVersion === 2
       ? item.facts[attribute]
-      : item.factsV3[attribute];
+      : knowledgeVersion === 3
+        ? item.factsV3[attribute]
+        : item.factsV4[attribute];
+  if (value === "unknown") return "unknown";
   return (negated ? !value : value) ? "yes" : "no";
 }
 
@@ -812,6 +1254,15 @@ export function analyzeMysteryQuestion(
       patterns[attribute as keyof typeof patterns],
     ),
   })).filter(({ matches }) => matches.length > 0);
+  if (
+    knowledgeVersion >= 4 &&
+    (/(?:무슨|어떤)\s*소리/gu.test(normalized) ||
+      /\b(?:what|which) sound\b/gu.test(normalized))
+  ) {
+    detectedAttributes = detectedAttributes.filter(
+      ({ attribute }) => attribute !== "makesSound",
+    );
+  }
   if (knowledgeVersion >= 2) {
     const specializedPlantMatches = detectedAttributes
       .filter(({ attribute }) => [
@@ -850,6 +1301,32 @@ export function analyzeMysteryQuestion(
             ),
           })
       .filter(({ matches }) => matches.length > 0);
+  }
+  if (knowledgeVersion >= 4) {
+    for (const [broadAttribute, specializedAttributes] of [
+      ["fruit", ["tropicalFruit", "temperateFruit"]],
+      ["humanMade", ["electronicDevice"]],
+      ["writingTool", ["stationery"]],
+    ] as const) {
+      const specializedMatches = detectedAttributes
+        .filter(({ attribute }) =>
+          specializedAttributes.includes(attribute as never)
+        )
+        .flatMap(({ matches }) => matches);
+      detectedAttributes = detectedAttributes
+        .map((detected) => detected.attribute !== broadAttribute
+          ? detected
+          : {
+              ...detected,
+              matches: detected.matches.filter((broadMatch) =>
+                !specializedMatches.some((specializedMatch) =>
+                  specializedMatch.start <= broadMatch.start &&
+                  specializedMatch.end >= broadMatch.end
+                )
+              ),
+            })
+        .filter(({ matches }) => matches.length > 0);
+    }
   }
   if (detectedAttributes.length !== 1) return { answer: "unknown" };
 

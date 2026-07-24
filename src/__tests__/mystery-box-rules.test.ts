@@ -12,11 +12,15 @@ import {
 import { MYSTERY_PRESENTATION } from "@/app/(student)/student-question-play/games/mystery-box-presentation";
 
 const APPLE_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "apple");
+const PUPPY_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "puppy");
 const PENCIL_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "pencil");
+const SNOWMAN_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "snowman");
 const SUNFLOWER_ITEM = MYSTERY_ITEMS.find(({ id }) => id === "sunflower");
 
 if (!APPLE_ITEM) throw new Error("사과 시험 자료가 필요합니다");
+if (!PUPPY_ITEM) throw new Error("강아지 시험 자료가 필요합니다");
 if (!PENCIL_ITEM) throw new Error("연필 시험 자료가 필요합니다");
+if (!SNOWMAN_ITEM) throw new Error("눈사람 시험 자료가 필요합니다");
 if (!SUNFLOWER_ITEM) throw new Error("해바라기 시험 자료가 필요합니다");
 
 describe("미스터리 박스 질문 규칙", () => {
@@ -49,7 +53,7 @@ describe("미스터리 박스 질문 규칙", () => {
   });
 
   it("새 판정 자료는 모든 물건에 세분화된 사실값을 가진다", () => {
-    expect(CURRENT_MYSTERY_KNOWLEDGE_VERSION).toBe(3);
+    expect(CURRENT_MYSTERY_KNOWLEDGE_VERSION).toBe(4);
     for (const item of MYSTERY_ITEMS) {
       expect(Object.keys(item.facts).sort()).toEqual([...MYSTERY_FACTS].sort());
       expect(Object.values(item.facts).every(
@@ -59,12 +63,36 @@ describe("미스터리 박스 질문 규칙", () => {
       expect(Object.values(item.factsV3).every(
         (value) => typeof value === "boolean",
       )).toBe(true);
+      expect(Object.keys(item.factsV4).sort()).toEqual([...MYSTERY_FACTS].sort());
+      expect(Object.values(item.factsV4).every(
+        (value) => typeof value === "boolean" || value === "unknown",
+      )).toBe(true);
     }
   });
 
+  it.each([
+    ["전자기기인가요?", PENCIL_ITEM, "no", "electronicDevice"],
+    ["전자 기기인가요?", PUPPY_ITEM, "no", "electronicDevice"],
+    ["전자제품인가요?", SNOWMAN_ITEM, "no", "electronicDevice"],
+    ["고양이과인가요?", PUPPY_ITEM, "no", "catFamily"],
+    ["고양잇과인가요?", PUPPY_ITEM, "no", "catFamily"],
+    ["개과인가요?", PUPPY_ITEM, "yes", "dogFamily"],
+    ["열대과일인가요?", APPLE_ITEM, "no", "tropicalFruit"],
+    ["온대 과일인가요?", APPLE_ITEM, "yes", "temperateFruit"],
+  ] as const)(
+    "세부 분류 질문 %s을 상위 분류로 넓히지 않고 판정한다",
+    (question, item, answer, attribute) => {
+      expect(analyzeMysteryQuestion(question, item, "ko", 4)).toEqual({
+        answer,
+        attribute,
+        negated: false,
+      });
+    },
+  );
+
   it("새 판정 자료의 사실 관계가 서로 어긋나지 않는다", () => {
     for (const item of MYSTERY_ITEMS) {
-      const facts = item.factsV3;
+      const facts = item.factsV4;
       if (facts.tree === true || facts.herbaceousPlant === true || facts.flower === true) {
         expect(facts.plant).toBe(true);
       }
@@ -81,12 +109,32 @@ describe("미스터리 박스 질문 규칙", () => {
         expect(facts.humanMade).toBe(true);
       }
       if (facts.movesByItself === true) expect(facts.living).toBe(true);
+      if (
+        facts.mammal === true ||
+        facts.insect === true ||
+        facts.dogFamily === true ||
+        facts.catFamily === true
+      ) {
+        expect(facts.animal).toBe(true);
+      }
+      if (facts.dogFamily === true || facts.catFamily === true) {
+        expect(facts.mammal).toBe(true);
+      }
+      if (facts.electronicDevice === true) {
+        expect(facts.humanMade).toBe(true);
+        expect(facts.usesElectricity).toBe(true);
+      }
+      if (facts.tropicalFruit === true || facts.temperateFruit === true) {
+        expect(facts.fruit).toBe(true);
+        expect(facts.plantDerived).toBe(true);
+      }
+      if (facts.stationery === true) expect(facts.humanMade).toBe(true);
     }
   });
 
   it("새 판정 자료에서 모든 물건은 객관적 사실 조합으로 구분된다", () => {
     const profiles = MYSTERY_ITEMS.map((item) => JSON.stringify(
-      MYSTERY_FACTS.map((fact) => item.factsV3[fact]),
+      MYSTERY_FACTS.map((fact) => item.factsV4[fact]),
     ));
     expect(new Set(profiles).size).toBe(MYSTERY_ITEMS.length);
   });
@@ -215,7 +263,6 @@ describe("미스터리 박스 질문 규칙", () => {
     ["실내화인가요?", "ko"],
     ["젖소인가요?", "ko"],
     ["먹을 수 있고 작은가요?", "ko"],
-    ["Does it make a sound?", "en"],
     ["Is it small and edible?", "en"],
   ] as const)("속성이 없거나 둘 이상인 질문 %s은 모름이다", (question, locale) => {
     expect(classifyMysteryQuestion(question, APPLE_ITEM, locale)).toBe(
@@ -273,16 +320,15 @@ describe("미스터리 박스 질문 규칙", () => {
   });
 
   it.each(["ko", "en"] as const)(
-    "%s 기본 특징 질문은 모든 물건에서 예 또는 아니오로 판정된다",
+    "%s 기본 특징 질문은 모든 물건에서 지식표 값으로 판정된다",
     (locale) => {
       for (const attribute of MYSTERY_FACTS) {
         const question = mysteryQuestionForAttribute(attribute, locale);
         expect(question).toMatch(/[?？]$/u);
         for (const item of MYSTERY_ITEMS) {
-          const value = item.factsV3[attribute];
-          expect(typeof value).toBe("boolean");
+          const value = item.factsV4[attribute];
           expect(analyzeMysteryQuestion(question, item, locale)).toEqual({
-            answer: value ? "yes" : "no",
+            answer: value === "unknown" ? "unknown" : value ? "yes" : "no",
             attribute,
             negated: false,
           });

@@ -874,7 +874,7 @@ describe("질문놀이 실행 정의", () => {
     }, () => 0);
 
     expect(state.privateItemId).toBe("apple");
-    expect(state.knowledgeVersion).toBe(3);
+    expect(state.knowledgeVersion).toBe(4);
     expect(() => definition.ensureProgress(state, {
       mode: "AI",
       runVersion: 1,
@@ -1091,9 +1091,12 @@ describe("질문놀이 실행 정의", () => {
         answer: "no",
         answerSource: "AI",
         answerEvidence: {
-          attribute: "readingMaterial",
-          negated: false,
+          kind: "dynamic",
+          question,
+          predicate: "등록되지 않은 긴 질문",
+          answer: "no",
           confidence: "high",
+          verification: "independent-agreement",
         },
       }],
     })))).not.toThrow();

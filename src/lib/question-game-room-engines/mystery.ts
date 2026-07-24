@@ -6,7 +6,7 @@ import {
   isMysteryAnswerEvidence,
   isMysteryGuessCorrect,
   mysteryItemsForVersion,
-  resolveMysteryAttribute,
+  resolveMysteryAnswerEvidence,
   type MysteryAnswer,
   type MysteryAnswerResolution,
   type MysteryAnswerEvidence,
@@ -177,7 +177,10 @@ function isMysteryHistoryItem(value: unknown): value is MysteryHistoryItem {
         value.answerSource === "ai" ||
         (value.answerSource === "fallback" && value.answer === "unknown")) &&
       (value.answerEvidence === undefined ||
-        isMysteryAnswerEvidence(value.answerEvidence, 3)) &&
+        isMysteryAnswerEvidence(
+          value.answerEvidence,
+          CURRENT_MYSTERY_KNOWLEDGE_VERSION,
+        )) &&
       ((value.attribute === undefined && value.negated === undefined) ||
         (typeof value.attribute === "string" && typeof value.negated === "boolean")) &&
       !(value.answerEvidence !== undefined && value.attribute !== undefined);
@@ -285,16 +288,17 @@ function hasValidHistorySemantics(state: MysteryRoomState): boolean {
         );
         if (!evidence) return state.knowledgeVersion < 3;
         return isMysteryAnswerEvidence(evidence, state.knowledgeVersion) &&
+          (state.knowledgeVersion < 4 || "kind" in evidence) &&
           classifyMysteryQuestion(
             historyItem.question,
             item,
             historyItem.locale,
             state.knowledgeVersion,
           ) === "unknown" &&
-          resolveMysteryAttribute(
+          resolveMysteryAnswerEvidence(
             item,
-            evidence.attribute,
-            evidence.negated,
+            evidence,
+            historyItem.question,
             state.knowledgeVersion,
           ) === historyItem.answer;
       }
@@ -433,7 +437,8 @@ export function readMysteryState(value: unknown): MysteryRoomState | null {
     || (value.knowledgeVersion !== undefined &&
       value.knowledgeVersion !== 1 &&
       value.knowledgeVersion !== 2 &&
-      value.knowledgeVersion !== 3)
+      value.knowledgeVersion !== 3 &&
+      value.knowledgeVersion !== 4)
   ) {
     return null;
   }
@@ -506,11 +511,16 @@ function projectMysteryHistoryItem(
         ...(value.answerSource === "ai" || value.answerSource === "fallback"
           ? { answerSource: value.answerSource }
           : {}),
-        ...(isMysteryAnswerEvidence(value.answerEvidence, 3)
-          ? {
-              attribute: value.answerEvidence.attribute,
-              negated: value.answerEvidence.negated,
-            }
+        ...(isMysteryAnswerEvidence(
+          value.answerEvidence,
+          CURRENT_MYSTERY_KNOWLEDGE_VERSION,
+        )
+          ? "kind" in value.answerEvidence
+            ? { answerEvidence: value.answerEvidence }
+            : {
+                attribute: value.answerEvidence.attribute,
+                negated: value.answerEvidence.negated,
+              }
           : {}),
       }
     : value.kind === "guess"
@@ -542,7 +552,8 @@ export function toPublicMysteryState(
   if (
     value.knowledgeVersion === 1 ||
     value.knowledgeVersion === 2 ||
-    value.knowledgeVersion === 3
+    value.knowledgeVersion === 3 ||
+    value.knowledgeVersion === 4
   ) {
     state.knowledgeVersion = value.knowledgeVersion;
   }
@@ -635,7 +646,8 @@ function isMysteryAnswerResolution(
     typeof value.question === "string" &&
     (value.knowledgeVersion === 1 ||
       value.knowledgeVersion === 2 ||
-      value.knowledgeVersion === 3) &&
+      value.knowledgeVersion === 3 ||
+      value.knowledgeVersion === 4) &&
     (value.evidence === undefined ||
       isMysteryAnswerEvidence(value.evidence, value.knowledgeVersion)) &&
     (value.answer === "yes" ||
@@ -884,10 +896,11 @@ function askMysteryQuestion(
       state.knowledgeVersion >= 3 &&
       resolution.source !== "fallback" &&
       (!resolution.evidence ||
-        resolveMysteryAttribute(
+        (state.knowledgeVersion >= 4 && !("kind" in resolution.evidence)) ||
+        resolveMysteryAnswerEvidence(
           item,
-          resolution.evidence.attribute,
-          resolution.evidence.negated,
+          resolution.evidence,
+          question,
           state.knowledgeVersion,
         ) !== resolution.answer)
     ) {

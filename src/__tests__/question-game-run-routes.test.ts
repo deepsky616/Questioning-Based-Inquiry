@@ -109,6 +109,8 @@ import { GET as getResult } from "@/app/api/question-games/runs/[id]/result/rout
 import { traceLadderColumns } from "@/lib/question-ladder";
 import {
   MYSTERY_ATTRIBUTES,
+  MYSTERY_ITEMS,
+  analyzeMysteryQuestion,
   getMysteryItem,
   mysteryQuestionForAttribute,
 } from "@/lib/mystery-box-rules";
@@ -826,6 +828,31 @@ async function playVerifiedAiRelay(id = "run-1") {
   };
 }
 
+function mysteryDynamicAnswers() {
+  return MYSTERY_ITEMS.map((item) => ({
+    itemId: item.id,
+    answer: item.factsV4.readingMaterial ? "yes" as const : "no" as const,
+  }));
+}
+
+function mysteryDynamicPrimary() {
+  return {
+    decision: "classifiable",
+    predicate: "학교에서 자주 볼 수 있다",
+    confidence: "high",
+    answers: mysteryDynamicAnswers(),
+  };
+}
+
+function mysteryDynamicVerifier() {
+  return {
+    decision: "classifiable",
+    meaningMatch: "exact",
+    confidence: "high",
+    answers: mysteryDynamicAnswers(),
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   users.clear();
@@ -841,10 +868,11 @@ beforeEach(() => {
   users.set("teacher-1", { id: "teacher-1", role: "TEACHER", totalPoints: 0 });
   mocks.auth.mockResolvedValue({ user: { id: "student-1", role: "STUDENT" } });
   mocks.checkRateLimit.mockReturnValue(null);
-  mocks.generateJson.mockResolvedValue({
-    attribute: "readingMaterial",
-    negated: false,
-    confidence: "high",
+  mocks.generateJson.mockImplementation(async (options: { prompt: string }) => {
+    const prompt = JSON.parse(options.prompt) as Record<string, unknown>;
+    return Object.prototype.hasOwnProperty.call(prompt, "proposedPredicate")
+      ? mysteryDynamicVerifier()
+      : mysteryDynamicPrimary();
   });
   mocks.generateText.mockResolvedValue("그렇다면 별빛은 어디에서 시작될까요?");
   process.env.GAME_ACTIVITY_HASH_SECRET = "question-game-run-test-secret";
@@ -3951,12 +3979,37 @@ describe("미스터리 박스 서버 실행 경로", () => {
     },
   );
 
+  it.each(["전자기기인가요?", "고양이과인가요?", "열대과일인가요?"])(
+    "세부 분류 질문 %s은 상위 분류로 넓히지 않고 서버 지식표로 저장한다",
+    async (question) => {
+      await createMystery();
+      const secret = mysterySecret();
+      const expected = analyzeMysteryQuestion(
+        question,
+        secret,
+        "ko",
+        4,
+      ).answer;
+
+      const response = await submitMysteryQuestion(0, 1, question);
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        run: {
+          questionCount: 1,
+          mysteryHistory: [{ text: question, answer: expected }],
+        },
+      });
+      expect(mocks.generateJson).not.toHaveBeenCalled();
+    },
+  );
+
   it("규칙 밖 학생 질문은 트랜잭션 밖 에이아이 판정 뒤 같은 요청으로 확정한다", async () => {
     await createMystery();
     const secret = mysterySecret();
     mocks.generateJson.mockImplementationOnce(async () => {
       expect(transactionDepth).toBe(0);
-      return { attribute: "readingMaterial", negated: false, confidence: "high" };
+      return mysteryDynamicPrimary();
     });
 
     const response = await submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?");
@@ -3973,13 +4026,16 @@ describe("미스터리 박스 서버 실행 경로", () => {
         mysteryAnswerItemId: null,
       },
     });
-    expect(mocks.generateJson).toHaveBeenCalledOnce();
+    expect(mocks.generateJson).toHaveBeenCalledTimes(2);
     expect(storedMysteryState().history[0]).toMatchObject({
       answerSource: "AI",
       answerEvidence: {
-        attribute: "readingMaterial",
-        negated: false,
+        kind: "dynamic",
+        question: "학교에서 자주 볼 수 있나요?",
+        predicate: "학교에서 자주 볼 수 있다",
+        answer: secret.factsV3.readingMaterial ? "yes" : "no",
         confidence: "high",
+        verification: "independent-agreement",
       },
     });
     expect(activities).toHaveLength(1);
@@ -4000,9 +4056,10 @@ describe("미스터리 박스 서버 실행 경로", () => {
       await createMystery();
       if (outcome === "unknown") {
         mocks.generateJson.mockResolvedValueOnce({
-          attribute: "unknown",
-          negated: false,
+          decision: "unsupported",
+          predicate: "",
           confidence: "low",
+          answers: [],
         });
       } else {
         mocks.generateJson.mockRejectedValueOnce(new Error("private-provider-failure"));
@@ -4031,11 +4088,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
   it("외부 판정 사이 실행이 바뀌면 늦은 판정을 버리고 어떤 자료나 점수도 더하지 않는다", async () => {
     await createMystery();
-    let finishProvider: ((value: {
-      attribute: "readingMaterial";
-      negated: false;
-      confidence: "high";
-    }) => void) | undefined;
+    let finishProvider: ((value: ReturnType<typeof mysteryDynamicPrimary>) => void) | undefined;
     mocks.generateJson.mockImplementationOnce(() => new Promise((resolve) => {
       finishProvider = resolve;
     }));
@@ -4044,7 +4097,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
     await vi.waitFor(() => expect(mocks.generateJson).toHaveBeenCalledOnce());
     const competing = await submitMysteryGuess(1, 1, "없는 물건");
     expect(competing.status).toBe(200);
-    finishProvider?.({ attribute: "readingMaterial", negated: false, confidence: "high" });
+    finishProvider?.(mysteryDynamicPrimary());
     const late = await pending;
 
     expect(late.status).toBe(409);
@@ -4057,11 +4110,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
   it("외부 판정 대기 중 실행이 만료되면 늦은 판정을 버리고 정답을 공개하지 않는다", async () => {
     await createMystery();
-    let finishProvider: ((value: {
-      attribute: "readingMaterial";
-      negated: false;
-      confidence: "high";
-    }) => void) | undefined;
+    let finishProvider: ((value: ReturnType<typeof mysteryDynamicPrimary>) => void) | undefined;
     mocks.generateJson.mockImplementationOnce(() => new Promise((resolve) => {
       finishProvider = resolve;
     }));
@@ -4080,7 +4129,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
       },
       result: null,
     });
-    finishProvider?.({ attribute: "readingMaterial", negated: false, confidence: "high" });
+    finishProvider?.(mysteryDynamicPrimary());
 
     const late = await pending;
     expect(late.status).toBe(409);
@@ -4142,11 +4191,6 @@ describe("미스터리 박스 서버 실행 경로", () => {
 
   it("같은 규칙 밖 질문이 동시에 들어오면 한 활동만 기록하고 나머지는 저장 응답을 재생한다", async () => {
     await createMystery();
-    mocks.generateJson.mockResolvedValue({
-      attribute: "readingMaterial",
-      negated: false,
-      confidence: "high",
-    });
 
     const responses = await Promise.all([
       submitMysteryQuestion(0, 1, "학교에서 자주 볼 수 있나요?"),
@@ -4481,7 +4525,7 @@ describe("미스터리 박스 서버 실행 경로", () => {
     expect(activities).toHaveLength(20);
     expect(pointLogs).toHaveLength(1);
     expect(users.get("student-1")?.totalPoints).toBe(22);
-    expect(mocks.generateJson).toHaveBeenCalledTimes(2);
+    expect(mocks.generateJson).toHaveBeenCalledTimes(4);
   });
 
   it("교사와 하루 상한 및 만료와 자동 포기를 공통 정책으로 처리한다", async () => {
