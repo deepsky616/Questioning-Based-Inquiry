@@ -133,6 +133,23 @@ describe("교사 질문놀이 방식 비교", () => {
     fireEvent.click(participation);
 
     expect(await screen.findByRole("heading", { name: "놀이 방식 비교" })).toBeVisible();
+    expect(screen.getByRole("dialog")).toHaveClass(
+      "w-[calc(100vw-1.5rem)]",
+      "max-w-[960px]",
+    );
+    expect(screen.getByRole("table")).toHaveClass(
+      "min-w-[760px]",
+      "table-fixed",
+    );
+    expect(screen.getByRole("columnheader", { name: "학생" })).toHaveClass(
+      "sticky",
+      "left-0",
+    );
+    for (const heading of ["완료한 놀이", "인정 질문·활동", "포인트", "최근 활동"]) {
+      expect(screen.getByRole("columnheader", { name: heading })).toHaveClass(
+        "whitespace-nowrap",
+      );
+    }
     expect(screen.getAllByText("참여 2명 · 완료 3회")).toHaveLength(2);
     expect(screen.getByText("참여 2명 · 완료 2회")).toBeVisible();
     expect(screen.getAllByText("1명당 1.5회 · 17점")).toHaveLength(1);

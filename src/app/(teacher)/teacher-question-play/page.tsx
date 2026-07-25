@@ -426,7 +426,7 @@ export default function TeacherQuestionPlayPage() {
 
       {/* ── 참여 현황 다이얼로그 ── */}
       <Dialog open={!!statsDialogGame} onOpenChange={(o) => { if (!o) setStatsDialogGame(null); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[960px] overflow-y-auto p-4 sm:p-6">
           {statsDialogGame && (() => {
             const st = statsByGame[statsDialogGame.id];
             const modeTotals = sumQuestionGameModes(st?.students ?? []);
@@ -487,24 +487,31 @@ export default function TeacherQuestionPlayPage() {
                         })}
                       </div>
                     </section>
-                    <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
-                      <table className="w-full text-sm">
+                    <div className="max-h-[min(24rem,45vh)] overflow-auto rounded-lg border border-border">
+                      <table className="w-full min-w-[760px] table-fixed text-sm">
+                        <colgroup>
+                          <col className="w-[30%]" />
+                          <col className="w-[16%]" />
+                          <col className="w-[22%]" />
+                          <col className="w-[12%]" />
+                          <col className="w-[20%]" />
+                        </colgroup>
                         <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
                           <tr>
-                            <th className="px-3 py-2 text-left">{t("colStudent")}</th>
-                            <th className="px-3 py-2 text-right">{t("colCompletedGames")}</th>
-                            <th className="px-3 py-2 text-right">{t("colGood")}</th>
-                            <th className="px-3 py-2 text-right">{t("colPoint")}</th>
-                            <th className="px-3 py-2 text-right">{t("colRecent")}</th>
+                            <th className="sticky left-0 z-20 whitespace-nowrap bg-muted px-3 py-2 text-left">{t("colStudent")}</th>
+                            <th className="whitespace-nowrap px-3 py-2 text-right">{t("colCompletedGames")}</th>
+                            <th className="whitespace-nowrap px-3 py-2 text-right">{t("colGood")}</th>
+                            <th className="whitespace-nowrap px-3 py-2 text-right">{t("colPoint")}</th>
+                            <th className="whitespace-nowrap px-3 py-2 text-right">{t("colRecent")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                           {st.students.map((s) => (
                             <tr key={s.id}>
-                              <td className="px-3 py-2">
+                              <td className="sticky left-0 z-10 bg-background px-3 py-2">
                                 {s.studentNumber ? <span className="text-muted-foreground mr-1">{s.studentNumber}.</span> : null}
                                 <span className="font-medium text-foreground">{s.name}</span>
-                                <p className="mt-0.5 whitespace-nowrap text-[11px] text-muted-foreground">
+                                <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
                                   {t("studentModeLine", {
                                     solo: s.modes?.solo.completions ?? 0,
                                     ai: s.modes?.ai.completions ?? 0,
