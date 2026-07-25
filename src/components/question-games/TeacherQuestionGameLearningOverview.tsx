@@ -17,6 +17,7 @@ interface TeacherClass {
 
 interface TeacherStudent {
   id: string;
+  name: string;
   grade: string;
   className: string;
 }
@@ -25,9 +26,12 @@ interface StudentLearningStat {
   id: string;
   plays: number;
   completions: number;
+  goodQuestions?: number;
+  lastPlayedAt?: string | null;
   modes?: Record<QuestionGameHistoryMode, {
     plays: number;
     completions: number;
+    goodQuestions?: number;
   }>;
 }
 
@@ -42,6 +46,18 @@ interface Props {
 }
 
 const MODES = ["solo", "ai", "friend"] as const;
+const RECENT_ACTIVITY_DAYS = 14;
+
+function laterActivity(
+  current: string | null,
+  candidate: string | null | undefined,
+) {
+  if (!candidate) return current;
+  const timestamp = new Date(candidate).getTime();
+  if (Number.isNaN(timestamp)) return current;
+  if (!current) return candidate;
+  return timestamp > new Date(current).getTime() ? candidate : current;
+}
 
 export function TeacherQuestionGameLearningOverview({ classes, students, statsByGame }: Props) {
   const t = useTranslations("qPlay");
@@ -98,14 +114,16 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
       return {
         gameModes: [],
         studentCount: 0,
+        participantCount: 0,
+        inactiveStudents: [] as TeacherStudent[],
+        oneTimeStudents: [] as TeacherStudent[],
       };
     }
     const [grade, className] = selectedClass.split("|");
-    const studentIds = new Set(
-      students
-        .filter((student) => student.grade === grade && student.className === className)
-        .map((student) => student.id),
+    const selectedStudents = students.filter(
+      (student) => student.grade === grade && student.className === className,
     );
+    const studentIds = new Set(selectedStudents.map((student) => student.id));
     const gameModes: QuestionGameModeSummary[] = Object.entries(statsByGame).map(
       ([gameId, stat]) => {
         const rows = stat.students.filter((student) => studentIds.has(student.id));
@@ -113,19 +131,54 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
           const values = rows.map((student) => student.modes?.[mode] ?? {
             plays: 0,
             completions: 0,
+            goodQuestions: 0,
           });
           return [mode, {
             plays: values.reduce((sum, value) => sum + value.plays, 0),
             completions: values.reduce((sum, value) => sum + value.completions, 0),
             participants: values.filter((value) => value.plays > 0).length,
+            goodQuestions: values.reduce(
+              (sum, value) => sum + (value.goodQuestions ?? 0),
+              0,
+            ),
           }];
         })) as QuestionGameModeSummary["modes"];
         return { gameId, modes };
       },
     );
+    const activityByStudent = new Map(selectedStudents.map((student) => [
+      student.id,
+      { plays: 0, completions: 0, lastPlayedAt: null as string | null },
+    ]));
+    for (const stat of Object.values(statsByGame)) {
+      for (const student of stat.students) {
+        const activity = activityByStudent.get(student.id);
+        if (!activity) continue;
+        activity.plays += student.plays;
+        activity.completions += student.completions;
+        activity.lastPlayedAt = laterActivity(
+          activity.lastPlayedAt,
+          student.lastPlayedAt,
+        );
+      }
+    }
+    const cutoff = Date.now() - RECENT_ACTIVITY_DAYS * 24 * 60 * 60 * 1000;
+    const participantCount = [...activityByStudent.values()].filter(
+      ({ plays }) => plays > 0,
+    ).length;
+    const inactiveStudents = selectedStudents.filter((student) => {
+      const lastPlayedAt = activityByStudent.get(student.id)?.lastPlayedAt;
+      return !lastPlayedAt || new Date(lastPlayedAt).getTime() < cutoff;
+    });
+    const oneTimeStudents = selectedStudents.filter(
+      (student) => activityByStudent.get(student.id)?.completions === 1,
+    );
     return {
       gameModes,
       studentCount: studentIds.size,
+      participantCount,
+      inactiveStudents,
+      oneTimeStudents,
     };
   }, [selectedClass, statsByGame, students]);
 
@@ -179,7 +232,60 @@ export function TeacherQuestionGameLearningOverview({ classes, students, statsBy
           hideHeader
           history={{ ...history, gameModes: classActivity.gameModes }}
           classStudentCount={classActivity.studentCount}
+          classParticipantCount={classActivity.participantCount}
         />
+      )}
+      {history && !loading && !loadError && (
+        <section
+          className="border-y border-border py-4"
+          aria-labelledby="question-game-participation-check"
+        >
+          <h3
+            id="question-game-participation-check"
+            className="text-sm font-bold text-foreground"
+          >
+            {t("learningParticipationCheckTitle")}
+          </h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {[
+              {
+                label: t("learningInactiveRecent", {
+                  days: RECENT_ACTIVITY_DAYS,
+                  count: classActivity.inactiveStudents.length,
+                }),
+                students: classActivity.inactiveStudents,
+              },
+              {
+                label: t("learningOneTime", {
+                  count: classActivity.oneTimeStudents.length,
+                }),
+                students: classActivity.oneTimeStudents,
+              },
+            ].map((item) => (
+              <details className="border-l-2 border-border pl-3" key={item.label}>
+                <summary className="cursor-pointer text-xs font-bold text-foreground">
+                  {item.label}
+                </summary>
+                {item.students.length === 0 ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {t("learningParticipationNone")}
+                  </p>
+                ) : (
+                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                    {item.students.map((student) => (
+                      <li
+                        className="rounded bg-muted px-2 py-1 text-xs text-foreground"
+                        key={student.id}
+                      >
+                        {student.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </details>
+            ))}
+          </div>
+        </section>
       )}
     </section>
   );

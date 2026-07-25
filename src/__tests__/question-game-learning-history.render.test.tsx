@@ -163,18 +163,21 @@ describe("질문놀이 학습 이력 화면", () => {
           gameModes: [{
             gameId: "relay",
             modes: {
-              solo: { plays: 2, completions: 2, participants: 1 },
+              solo: { plays: 2, completions: 2, participants: 1, goodQuestions: 4 },
               ai: { plays: 0, completions: 0, participants: 0 },
-              friend: { plays: 3, completions: 3, participants: 2 },
+              friend: { plays: 3, completions: 3, participants: 2, goodQuestions: 9 },
             },
           }],
           recent: [],
         }}
         classStudentCount={4}
+        classParticipantCount={2}
       />,
     );
 
     expect(screen.getByRole("heading", { name: "학급 학습 현황" })).toBeVisible();
+    expect(screen.getByText("참여 학생").nextSibling).toHaveTextContent("2/4명 · 50%");
+    expect(screen.queryByText("받은 포인트")).not.toBeInTheDocument();
     expect(screen.getByText("최근 14일 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
     expect(screen.getByText("최근 14일 변화").closest("figure")?.parentElement)
@@ -192,9 +195,11 @@ describe("질문놀이 학습 이력 화면", () => {
     expect(comparisonLayout).not.toBeNull();
     expect(comparisonLayout).toHaveClass("xl:grid-cols-2");
     expect(screen.getByText(
-      "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 50%, 완료 3회",
+      "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 50%, 완료 3회, 학생당 평균 1.5회, 인정 9개 · 완료당 3.0개",
     ).closest("ul")).toHaveClass("sr-only");
-    expect(screen.getByRole("cell", { name: "2명 (50%) · 완료 3회" })).toBeVisible();
+    expect(screen.getByRole("cell", {
+      name: "2명 (50%) 완료 3회 · 1명당 1.5회 인정 9개 · 완료당 3.0개",
+    })).toBeVisible();
 
     fireEvent.click(within(modeSelector).getByRole("button", { name: "친구와 함께" }));
     expect(within(modeSelector).getByRole("button", { name: "친구와 함께" }))

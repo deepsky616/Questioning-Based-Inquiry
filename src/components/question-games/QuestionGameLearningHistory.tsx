@@ -22,6 +22,7 @@ interface Props {
   history: LearningHistory;
   studentId?: string;
   classStudentCount?: number;
+  classParticipantCount?: number;
   hideHeader?: boolean;
 }
 
@@ -32,6 +33,7 @@ export function QuestionGameLearningHistory({
   history,
   studentId,
   classStudentCount,
+  classParticipantCount = 0,
   hideHeader = false,
 }: Props) {
   const locale = useLocale();
@@ -50,11 +52,30 @@ export function QuestionGameLearningHistory({
     : audience === "class"
       ? t("historyTitleClass")
       : t("historyTitle");
-  const measures = [
-    { label: t("completedGames"), value: history.totals.plays },
-    { label: t("goodQuestions"), value: history.totals.goodQuestions },
-    { label: t("pointsEarned"), value: history.totals.points },
-  ];
+  const classParticipationRate = classStudentCount && classStudentCount > 0
+    ? Math.min(
+        100,
+        Math.round((classParticipantCount / classStudentCount) * 100),
+      )
+    : 0;
+  const measures = audience === "class"
+    ? [
+        {
+          label: t("participatingStudents"),
+          value: t("classParticipantSummary", {
+            participants: classParticipantCount,
+            total: classStudentCount ?? 0,
+            rate: classParticipationRate,
+          }),
+        },
+        { label: t("completedGames"), value: history.totals.plays },
+        { label: t("goodQuestions"), value: history.totals.goodQuestions },
+      ]
+    : [
+        { label: t("completedGames"), value: history.totals.plays },
+        { label: t("goodQuestions"), value: history.totals.goodQuestions },
+        { label: t("pointsEarned"), value: history.totals.points },
+      ];
   const [expanded, setExpanded] = useState(false);
   const [mode, setMode] = useState<"all" | QuestionGameHistoryMode>("all");
   const [gameId, setGameId] = useState("all");

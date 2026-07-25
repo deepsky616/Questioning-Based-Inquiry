@@ -27,6 +27,7 @@ export interface QuestionGameModeActivity {
   plays: number;
   completions: number;
   participants: number;
+  goodQuestions?: number;
 }
 
 export interface QuestionGameModeSummary {

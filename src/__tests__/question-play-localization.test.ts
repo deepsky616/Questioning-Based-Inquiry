@@ -104,8 +104,10 @@ describe("question play localization", () => {
     }
 
     expect(BUILT_IN_GAMES.find((game) => game.id === "memory")?.duration).toBe("약 5~20분");
-    expect(BUILT_IN_GAMES.find((game) => game.id === "ladder")?.duration).toBe("약 10~15분");
-    expect(BUILT_IN_GAMES.find((game) => game.id === "mystery-box")?.duration).toBe("약 8~15분");
+    expect(BUILT_IN_GAMES.find((game) => game.id === "dice")?.duration).toBe("약 5~20분");
+    expect(BUILT_IN_GAMES.find((game) => game.id === "ladder")?.duration).toBe("약 10~20분");
+    expect(BUILT_IN_GAMES.find((game) => game.id === "relay")?.duration).toBe("약 5~20분");
+    expect(BUILT_IN_GAMES.find((game) => game.id === "mystery-box")?.duration).toBe("약 8~25분");
   });
 
   it("놀이 패널에서는 기본 제공 표시를 반복하지 않고 직접 만든 놀이만 구분한다", () => {

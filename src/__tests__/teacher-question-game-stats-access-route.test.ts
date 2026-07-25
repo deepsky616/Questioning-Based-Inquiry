@@ -143,6 +143,7 @@ describe("교사 질문놀이 통계 접근 경계", () => {
         plays: 2,
         completions: 2,
         points: 4,
+        lastPlayedAt: "2026-07-17T02:00:00.000Z",
       }),
     ]);
     expect(body.byGame.dice.students).toEqual([
@@ -151,6 +152,7 @@ describe("교사 질문놀이 통계 접근 경계", () => {
         plays: 1,
         completions: 1,
         points: 7,
+        lastPlayedAt: "2026-07-17T01:00:00.000Z",
       }),
     ]);
   });
@@ -216,6 +218,7 @@ describe("교사 질문놀이 통계 접근 경계", () => {
         completions: 2,
         points: 7,
         goodQuestions: 5,
+        lastPlayedAt: "2026-07-17T04:00:00.000Z",
         modes: {
           solo: { plays: 1, completions: 1, points: 0, goodQuestions: 3 },
           ai: { plays: 1, completions: 1, points: 7, goodQuestions: 2 },

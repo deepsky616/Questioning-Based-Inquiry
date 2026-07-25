@@ -60,6 +60,10 @@ function participationRate(participants: number, classStudentCount: number) {
   return Math.min(100, Math.round((participants / classStudentCount) * 100));
 }
 
+function oneDecimalAverage(total: number, count: number) {
+  return count > 0 ? (total / count).toFixed(1) : "0.0";
+}
+
 function ClassParticipationTooltip({
   active,
   payload,
@@ -87,11 +91,35 @@ function ClassParticipationTooltip({
           <div className="flex items-start justify-between gap-3" key={mode}>
             <dt className="font-semibold" style={{ color: MODE_COLORS[mode] }}>{labels[mode]}</dt>
             <dd className="text-right text-card-foreground">
-              {t("classParticipationTooltip", {
-                participants: row.modes[mode].participants,
-                rate: participationRate(row.modes[mode].participants, classStudentCount),
-                completions: row.modes[mode].completions,
-              })}
+              <p>
+                {t("participantCountCell", {
+                  participants: row.modes[mode].participants,
+                  rate: participationRate(
+                    row.modes[mode].participants,
+                    classStudentCount,
+                  ),
+                })}
+              </p>
+              <p>
+                {t("completionAverageCell", {
+                  completions: row.modes[mode].completions,
+                  average: oneDecimalAverage(
+                    row.modes[mode].completions,
+                    row.modes[mode].participants,
+                  ),
+                })}
+              </p>
+              <p>
+                {row.gameId === "memory"
+                  ? t("recognizedNotApplicable")
+                  : t("recognizedAverageCell", {
+                      goodQuestions: row.modes[mode].goodQuestions ?? 0,
+                      average: oneDecimalAverage(
+                        row.modes[mode].goodQuestions ?? 0,
+                        row.modes[mode].completions,
+                      ),
+                    })}
+              </p>
             </dd>
           </div>
         ))}
@@ -306,6 +334,19 @@ export function QuestionGameActivityComparison({
                     classStudentCount,
                   ),
                   completions: row.modes[mode].completions,
+                  average: oneDecimalAverage(
+                    row.modes[mode].completions,
+                    row.modes[mode].participants,
+                  ),
+                  recognized: row.gameId === "memory"
+                    ? t("recognizedNotApplicable")
+                    : t("recognizedAverageCell", {
+                        goodQuestions: row.modes[mode].goodQuestions ?? 0,
+                        average: oneDecimalAverage(
+                          row.modes[mode].goodQuestions ?? 0,
+                          row.modes[mode].completions,
+                        ),
+                      }),
                 })}
               </li>
             )))}
@@ -341,14 +382,35 @@ export function QuestionGameActivityComparison({
                   </th>
                   {visibleModes.map((mode) => (
                     <td className="break-words px-1.5 py-2 text-center" key={mode}>
-                      {t("participantCompletionCell", {
-                        participants: row.modes[mode].participants,
-                        rate: participationRate(
-                          row.modes[mode].participants,
-                          classStudentCount,
-                        ),
-                        completions: row.modes[mode].completions,
-                      })}
+                      <p className="font-semibold text-foreground">
+                        {t("participantCountCell", {
+                          participants: row.modes[mode].participants,
+                          rate: participationRate(
+                            row.modes[mode].participants,
+                            classStudentCount,
+                          ),
+                        })}
+                      </p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        {t("completionAverageCell", {
+                          completions: row.modes[mode].completions,
+                          average: oneDecimalAverage(
+                            row.modes[mode].completions,
+                            row.modes[mode].participants,
+                          ),
+                        })}
+                      </p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        {row.gameId === "memory"
+                          ? t("recognizedNotApplicable")
+                          : t("recognizedAverageCell", {
+                              goodQuestions: row.modes[mode].goodQuestions ?? 0,
+                              average: oneDecimalAverage(
+                                row.modes[mode].goodQuestions ?? 0,
+                                row.modes[mode].completions,
+                              ),
+                            })}
+                      </p>
                     </td>
                   ))}
                 </tr>

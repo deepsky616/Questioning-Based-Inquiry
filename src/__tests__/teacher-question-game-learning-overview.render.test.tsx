@@ -41,9 +41,9 @@ describe("교사 질문놀이 학습 현황", () => {
       <TeacherQuestionGameLearningOverview
         classes={[{ grade: "5", className: "1" }]}
         students={[
-          { id: "student-1", grade: "5", className: "1" },
-          { id: "student-2", grade: "5", className: "1" },
-          { id: "student-3", grade: "5", className: "2" },
+          { id: "student-1", name: "첫째", grade: "5", className: "1" },
+          { id: "student-2", name: "둘째", grade: "5", className: "1" },
+          { id: "student-3", name: "셋째", grade: "5", className: "2" },
         ]}
         statsByGame={{
           relay: {
@@ -51,24 +51,27 @@ describe("교사 질문놀이 학습 현황", () => {
               id: "student-1",
               plays: 4,
               completions: 3,
+              lastPlayedAt: "2026-07-24T00:00:00.000Z",
               modes: {
-                solo: { plays: 2, completions: 2 },
+                solo: { plays: 2, completions: 2, goodQuestions: 3 },
                 ai: { plays: 0, completions: 0 },
-                friend: { plays: 2, completions: 1 },
+                friend: { plays: 2, completions: 1, goodQuestions: 2 },
               },
             }, {
               id: "student-2",
               plays: 1,
               completions: 1,
+              lastPlayedAt: "2026-06-01T00:00:00.000Z",
               modes: {
                 solo: { plays: 0, completions: 0 },
                 ai: { plays: 0, completions: 0 },
-                friend: { plays: 1, completions: 1 },
+                friend: { plays: 1, completions: 1, goodQuestions: 1 },
               },
             }, {
               id: "student-3",
               plays: 5,
               completions: 5,
+              lastPlayedAt: "2026-07-24T00:00:00.000Z",
               modes: {
                 solo: { plays: 0, completions: 0 },
                 ai: { plays: 5, completions: 5 },
@@ -92,12 +95,19 @@ describe("교사 질문놀이 학습 현황", () => {
     expect(screen.getAllByRole("heading", { name: "학급 학습 현황" })).toHaveLength(1);
     expect(screen.getByText("최근 14일 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
+    expect(screen.getByText("참여 학생").nextSibling).toHaveTextContent("2/2명 · 100%");
     expect(screen.getByText(
-      "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 100%, 완료 2회",
+      "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 100%, 완료 2회, 학생당 평균 1.0회, 인정 3개 · 완료당 1.5개",
     ).closest("ul")).toHaveClass("sr-only");
     expect(screen.queryByText(/인공지능과 함께 참여 1명/)).not.toBeInTheDocument();
 
     expect(screen.queryByRole("button", { name: "완료율" })).not.toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "2명 (100%) · 완료 2회" })).toBeVisible();
+    const friendCell = screen.getByRole("cell", {
+      name: "2명 (100%) 완료 2회 · 1명당 1.0회 인정 3개 · 완료당 1.5개",
+    });
+    expect(friendCell).toBeVisible();
+    expect(screen.getByText("최근 14일 활동이 없는 학생 · 1명")).toBeVisible();
+    expect(screen.getByText("완료한 놀이가 한 번인 학생 · 1명")).toBeVisible();
+    expect(screen.getAllByText("둘째")).toHaveLength(2);
   });
 });

@@ -25,6 +25,7 @@ interface StudentPlay {
   completions: number;
   points: number;
   goodQuestions: number;
+  lastPlayedAt: string | null;
   modes: Record<PlayMode, ModeStat>;
 }
 
@@ -171,6 +172,7 @@ export async function GET() {
         completions: 0,
         points: 0,
         goodQuestions: 0,
+        lastPlayedAt: null,
         modes: emptyModes(),
       };
       perStudent[gameId].set(studentId, row);
@@ -178,11 +180,16 @@ export async function GET() {
     return row;
   };
 
-  const updateLastPlayedAt = (gameId: string, playedAt: Date | null) => {
+  const updateLastPlayedAt = (
+    gameId: string,
+    row: StudentPlay,
+    playedAt: Date | null,
+  ) => {
     if (!(playedAt instanceof Date) || Number.isNaN(playedAt.getTime())) return;
     const stat = ensureGame(gameId);
     const value = playedAt.toISOString();
     if (!stat.lastPlayedAt || value > stat.lastPlayedAt) stat.lastPlayedAt = value;
+    if (!row.lastPlayedAt || value > row.lastPlayedAt) row.lastPlayedAt = value;
   };
 
   const friendBaseRuns = new Set(
@@ -240,7 +247,7 @@ export async function GET() {
       row.goodQuestions += count;
       row.modes.friend.goodQuestions += count;
     }
-    updateLastPlayedAt(gameId, log.createdAt);
+    updateLastPlayedAt(gameId, row, log.createdAt);
   }
 
   for (const run of runs) {
@@ -280,7 +287,7 @@ export async function GET() {
     row.modes[mode].completions += 1;
     row.modes[mode].points += points;
     row.modes[mode].goodQuestions += goodQuestions;
-    updateLastPlayedAt(run.gameId, run.settledAt);
+    updateLastPlayedAt(run.gameId, row, run.settledAt);
   }
 
   for (const gameId of Object.keys(byGame)) {

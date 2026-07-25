@@ -32,8 +32,10 @@ describe("질문놀이 공통 규칙", () => {
       expect(applyQuestionGameRuleText(id, "en").playerCount).toBe("2-8 players");
     }
     expect(QUESTION_GAME_RULES.memory.duration.ko).toBe("약 5~20분");
-    expect(QUESTION_GAME_RULES.ladder.duration.ko).toBe("약 10~15분");
-    expect(QUESTION_GAME_RULES["mystery-box"].duration.ko).toBe("약 8~15분");
+    expect(QUESTION_GAME_RULES.dice.duration.ko).toBe("약 5~20분");
+    expect(QUESTION_GAME_RULES.ladder.duration.ko).toBe("약 10~20분");
+    expect(QUESTION_GAME_RULES.relay.duration.ko).toBe("약 5~20분");
+    expect(QUESTION_GAME_RULES["mystery-box"].duration.ko).toBe("약 8~25분");
     expect(QUESTION_GAME_RULES["story-dice"].targets.solo).toEqual({
       kind: "completed-pairs", count: 3, perQuestioner: false,
     });

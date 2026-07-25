@@ -88,7 +88,6 @@ describe("question game focused contrast regressions", () => {
 
     for (const classes of [
       "text-indigo-900 dark:text-indigo-200",
-      "text-emerald-900 dark:text-emerald-200",
       "text-amber-900 dark:text-amber-200",
       "text-rose-900 dark:text-rose-200",
     ]) {
@@ -101,8 +100,6 @@ describe("question game focused contrast regressions", () => {
     expectReadable([
       ["#312e81", "#ffffff"],
       ["#c7d2fe", "#111827"],
-      ["#064e3b", "#ffffff"],
-      ["#a7f3d0", "#111827"],
       ["#78350f", "#ffffff"],
       ["#fde68a", "#111827"],
       ["#881337", "#ffffff"],

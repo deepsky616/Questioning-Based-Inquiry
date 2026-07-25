@@ -60,10 +60,10 @@ describe("교사 질문놀이 방식 비교", () => {
         ? {
             byGame: {
               [game.id]: {
-                participants: 1,
-                plays: 6,
-                completions: 5,
-                goodQuestions: 8,
+                participants: 2,
+                plays: 9,
+                completions: 8,
+                goodQuestions: 12,
                 lastPlayedAt: "2026-07-17T00:00:00.000Z",
                 nonParticipants: [],
                 students: [{
@@ -74,6 +74,7 @@ describe("교사 질문놀이 방식 비교", () => {
                   completions: 5,
                   points: 42,
                   goodQuestions: 8,
+                  lastPlayedAt: "2026-07-17T00:00:00.000Z",
                   modes: {
                     solo: { plays: 2, completions: 2, points: 12, goodQuestions: 3 },
                     ai: { plays: 1, completions: 1, points: 8, goodQuestions: 2 },
@@ -87,6 +88,7 @@ describe("교사 질문놀이 방식 비교", () => {
                   completions: 3,
                   points: 21,
                   goodQuestions: 4,
+                  lastPlayedAt: "2026-07-16T00:00:00.000Z",
                   modes: {
                     solo: { plays: 1, completions: 1, points: 5, goodQuestions: 1 },
                     ai: { plays: 1, completions: 1, points: 7, goodQuestions: 1 },
@@ -131,9 +133,12 @@ describe("교사 질문놀이 방식 비교", () => {
     fireEvent.click(participation);
 
     expect(await screen.findByRole("heading", { name: "놀이 방식 비교" })).toBeVisible();
-    expect(screen.getByText("3회 · 완료 3회")).toBeVisible();
-    expect(screen.getByText("2회 · 완료 2회")).toBeVisible();
-    expect(screen.getByText("4회 · 완료 3회")).toBeVisible();
-    expect(screen.getByText("혼자 2 · 인공지능 1 · 친구 3")).toBeVisible();
+    expect(screen.getAllByText("참여 2명 · 완료 3회")).toHaveLength(2);
+    expect(screen.getByText("참여 2명 · 완료 2회")).toBeVisible();
+    expect(screen.getAllByText("1명당 1.5회 · 17점")).toHaveLength(1);
+    expect(screen.getAllByText("1명당 1.0회 · 15점")).toHaveLength(1);
+    expect(screen.getAllByText("1명당 1.5회 · 31점")).toHaveLength(1);
+    expect(screen.getByText("혼자 완료 2 · 인공지능 완료 1 · 친구 완료 2")).toBeVisible();
+    expect(screen.queryByText(/완료율/)).not.toBeInTheDocument();
   });
 });

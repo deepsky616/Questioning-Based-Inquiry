@@ -58,7 +58,7 @@ export const QUESTION_GAME_RULES = {
   },
   dice: {
     multiplayer: { min: 2, max: 8 },
-    duration: { ko: "약 5~15분", en: "About 5-15 min" },
+    duration: { ko: "약 5~20분", en: "About 5-20 min" },
     targets: {
       room: { kind: "student-questions", count: 3, perPlayer: true },
       solo: { kind: "student-questions", count: 3, perPlayer: false },
@@ -68,7 +68,7 @@ export const QUESTION_GAME_RULES = {
   },
   ladder: {
     multiplayer: { min: 2, max: 8 },
-    duration: { ko: "약 10~15분", en: "About 10-15 min" },
+    duration: { ko: "약 10~20분", en: "About 10-20 min" },
     targets: {
       room: { kind: "shared-rounds", count: 3 },
       solo: { kind: "student-questions", count: 3, perPlayer: false },
@@ -78,7 +78,7 @@ export const QUESTION_GAME_RULES = {
   },
   relay: {
     multiplayer: { min: 2, max: 8 },
-    duration: { ko: "약 5~15분", en: "About 5-15 min" },
+    duration: { ko: "약 5~20분", en: "About 5-20 min" },
     targets: {
       room: { kind: "student-questions", count: 3, perPlayer: true },
       solo: { kind: "student-questions", count: 3, perPlayer: false },
@@ -88,7 +88,7 @@ export const QUESTION_GAME_RULES = {
   },
   "mystery-box": {
     multiplayer: { min: 2, max: 8 },
-    duration: { ko: "약 8~15분", en: "About 8-15 min" },
+    duration: { ko: "약 8~25분", en: "About 8-25 min" },
     targets: {
       room: { kind: "actions", count: 20 },
       solo: { kind: "actions", count: 20 },

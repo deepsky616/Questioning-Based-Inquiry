@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -54,10 +55,15 @@ interface StudentPlay {
   completions: number;
   points: number;
   goodQuestions: number;
+  lastPlayedAt: string | null;
   modes: Record<"solo" | "ai" | "friend", QuestionGameModeStats>;
 }
 interface StudentLite { id: string; name: string; studentNumber: string | null }
 interface GameStat { participants: number; plays: number; completions: number; goodQuestions: number; lastPlayedAt: string | null; students: StudentPlay[]; nonParticipants: StudentLite[] }
+
+function oneDecimalAverage(total: number, count: number) {
+  return count > 0 ? (total / count).toFixed(1) : "0.0";
+}
 
 const VIS_LABEL: Record<VisType, { emoji: string; color: string }> = {
   all:      { emoji: "🌍", color: "#10b981" },
@@ -347,11 +353,15 @@ export default function TeacherQuestionPlayPage() {
                   {/* 참여 요약 */}
                   {(() => {
                     const st = statsByGame[game.id];
-                    const rate = st && st.plays > 0 ? Math.round((st.completions / st.plays) * 100) : 0;
                     return (
                       <div className="mb-3 rounded-xl bg-indigo-50/60 px-3 py-2 text-xs text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
-                        {st && st.plays > 0 ? (
-                          <span>{t.rich("statLine", { participants: st.participants, plays: st.plays, rate, good: st.goodQuestions, b: (c) => <b>{c}</b> })}</span>
+                        {st && st.participants > 0 ? (
+                          <span>{t.rich("statLine", {
+                            participants: st.participants,
+                            completions: st.completions,
+                            good: st.goodQuestions,
+                            b: (content) => <b>{content}</b>,
+                          })}</span>
                         ) : (
                           <span className="text-muted-foreground dark:text-muted-foreground">{t("noStats")}</span>
                         )}
@@ -419,7 +429,6 @@ export default function TeacherQuestionPlayPage() {
         <DialogContent className="max-w-lg">
           {statsDialogGame && (() => {
             const st = statsByGame[statsDialogGame.id];
-            const rate = st && st.plays > 0 ? Math.round((st.completions / st.plays) * 100) : 0;
             const modeTotals = sumQuestionGameModes(st?.students ?? []);
             return (
               <>
@@ -427,6 +436,9 @@ export default function TeacherQuestionPlayPage() {
                   <DialogTitle className="flex items-center gap-2">
                     <span>{statsDialogGame.emoji}</span> {t("statsDialogTitle", { title: statsDialogGame.title })}
                   </DialogTitle>
+                  <DialogDescription className="sr-only">
+                    {t("statsDialogDesc", { title: statsDialogGame.title })}
+                  </DialogDescription>
                 </DialogHeader>
                 {!st || st.students.length === 0 ? (
                   <EmptyState icon="🎮" title={t("noParticipants")} />
@@ -434,8 +446,12 @@ export default function TeacherQuestionPlayPage() {
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2 text-xs">
                       <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipParticipants", { n: st.participants })}</span>
-                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipPlays", { n: st.plays })}</span>
-                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipRate", { n: rate })}</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipCompleted", { n: st.completions })}</span>
+                      <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">
+                        {t("chipAverageCompleted", {
+                          average: oneDecimalAverage(st.completions, st.participants),
+                        })}
+                      </span>
                       <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipGood", { n: st.goodQuestions })}</span>
                       {st.lastPlayedAt && (
                         <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-1">{t("chipRecent", { date: formatDateOnly(st.lastPlayedAt) })}</span>
@@ -444,20 +460,31 @@ export default function TeacherQuestionPlayPage() {
                     <section aria-label={t("modeCompareTitle")} className="border-y border-border py-3">
                       <h3 className="mb-2 text-xs font-bold text-foreground">{t("modeCompareTitle")}</h3>
                       <div className="grid grid-cols-3 divide-x divide-border">
-                        {(["solo", "ai", "friend"] as const).map((mode) => (
-                          <div className="min-w-0 px-2 text-center first:pl-0 last:pr-0" key={mode}>
-                            <p className="text-xs font-bold text-foreground">{t(`mode_${mode}`)}</p>
-                            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                              {t("modeStatLine", {
-                                plays: modeTotals[mode].plays,
-                                completions: modeTotals[mode].completions,
-                              })}
-                            </p>
-                            <p className="text-xs font-semibold text-foreground">
-                              {t("modePointLine", { points: modeTotals[mode].points })}
-                            </p>
-                          </div>
-                        ))}
+                        {(["solo", "ai", "friend"] as const).map((mode) => {
+                          const participants = st.students.filter(
+                            (student) => student.modes[mode].completions > 0,
+                          ).length;
+                          return (
+                            <div className="min-w-0 px-2 text-center first:pl-0 last:pr-0" key={mode}>
+                              <p className="text-xs font-bold text-foreground">{t(`mode_${mode}`)}</p>
+                              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                                {t("modeStatLine", {
+                                  participants,
+                                  completions: modeTotals[mode].completions,
+                                })}
+                              </p>
+                              <p className="text-xs font-semibold text-foreground">
+                                {t("modeAverageLine", {
+                                  average: oneDecimalAverage(
+                                    modeTotals[mode].completions,
+                                    participants,
+                                  ),
+                                  points: modeTotals[mode].points,
+                                })}
+                              </p>
+                            </div>
+                          );
+                        })}
                       </div>
                     </section>
                     <div className="max-h-64 overflow-y-auto rounded-lg border border-border">
@@ -465,10 +492,10 @@ export default function TeacherQuestionPlayPage() {
                         <thead className="sticky top-0 bg-muted text-xs text-muted-foreground">
                           <tr>
                             <th className="px-3 py-2 text-left">{t("colStudent")}</th>
-                            <th className="px-3 py-2 text-right">{t("colPlay")}</th>
-                            <th className="px-3 py-2 text-right">{t("colComplete")}</th>
+                            <th className="px-3 py-2 text-right">{t("colCompletedGames")}</th>
                             <th className="px-3 py-2 text-right">{t("colGood")}</th>
                             <th className="px-3 py-2 text-right">{t("colPoint")}</th>
+                            <th className="px-3 py-2 text-right">{t("colRecent")}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -479,16 +506,18 @@ export default function TeacherQuestionPlayPage() {
                                 <span className="font-medium text-foreground">{s.name}</span>
                                 <p className="mt-0.5 whitespace-nowrap text-[11px] text-muted-foreground">
                                   {t("studentModeLine", {
-                                    solo: s.modes?.solo.plays ?? 0,
-                                    ai: s.modes?.ai.plays ?? 0,
-                                    friend: s.modes?.friend.plays ?? 0,
+                                    solo: s.modes?.solo.completions ?? 0,
+                                    ai: s.modes?.ai.completions ?? 0,
+                                    friend: s.modes?.friend.completions ?? 0,
                                   })}
                                 </p>
                               </td>
-                              <td className="px-3 py-2 text-right font-semibold text-indigo-900 dark:text-indigo-200">{s.plays}</td>
-                              <td className="px-3 py-2 text-right text-emerald-900 dark:text-emerald-200">{s.completions}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-indigo-900 dark:text-indigo-200">{s.completions}</td>
                               <td className="px-3 py-2 text-right text-amber-900 dark:text-amber-200">{s.goodQuestions}</td>
                               <td className="px-3 py-2 text-right font-bold text-rose-900 dark:text-rose-200">{s.points}</td>
+                              <td className="whitespace-nowrap px-3 py-2 text-right text-muted-foreground">
+                                {s.lastPlayedAt ? formatDateOnly(s.lastPlayedAt) : "-"}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
