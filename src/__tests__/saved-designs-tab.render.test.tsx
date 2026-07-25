@@ -128,7 +128,7 @@ describe("저장된 설계 학생용 설명 편집", () => {
         thinkingStart: "식물이 계절에 따라 어떻게 달라지는지 먼저 살펴봐요.",
       }],
     };
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify(generated), {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify(generated), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     }));

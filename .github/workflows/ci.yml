@@ -45,6 +45,45 @@ jobs:
       - name: Production build (route-shape gate)
         run: npx next build
 
+  e2e-question-games:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # 신뢰성 스펙은 인증·방·점수 요청을 브라우저 내부 가짜 상태로 처리한다.
+      # 실제 DB나 운영 시크릿 없이 친구 방 흐름을 검증하기 위한 더미 값이다.
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public"
+      NEXTAUTH_SECRET: "ci-dummy-secret"
+      NEXTAUTH_URL: "http://localhost:3000"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Question games desktop reliability E2E
+        run: npm run test:e2e:question-games
+
+      - name: Upload question games failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: question-games-reliability-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+
   e2e-tablet:
     runs-on: ubuntu-latest
     if: ${{ vars.RUN_E2E_TABLET == 'true' }}

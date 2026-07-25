@@ -4,23 +4,28 @@ import {
   QUESTION_GAME_RULES,
   applyQuestionGameRuleText,
   isBuiltInQuestionGameId,
+  type BuiltInQuestionGameId,
 } from "@/lib/question-game-rules";
 import * as questionGameRules from "@/lib/question-game-rules";
 
 function roomTarget(
-  gameId: string,
+  gameId: BuiltInQuestionGameId,
   playerCount: number,
   difficulty?: "easy" | "normal" | "hard",
 ) {
   const targetBuilder = Reflect.get(
     questionGameRules,
     "getQuestionGameRoomTarget",
-  );
-  expect(targetBuilder).toBeTypeOf("function");
-  return targetBuilder(gameId, playerCount, difficulty) as {
+  ) as (
+    gameId: BuiltInQuestionGameId,
+    playerCount: number,
+    difficulty?: "easy" | "normal" | "hard",
+  ) => {
     maxRounds?: number;
     maxAttempts?: number;
   };
+  expect(targetBuilder).toBeTypeOf("function");
+  return targetBuilder(gameId, playerCount, difficulty);
 }
 
 describe("질문놀이 공통 규칙", () => {
@@ -52,7 +57,7 @@ describe("질문놀이 공통 규칙", () => {
     expect(roomTarget("mystery-box", 5)).toEqual({ maxRounds: 18 });
     expect(roomTarget("mystery-box", 8)).toEqual({ maxRounds: 24 });
 
-    for (const gameId of ["dice", "ladder", "relay", "kaba"]) {
+    for (const gameId of ["dice", "ladder", "relay", "kaba"] as const) {
       expect(roomTarget(gameId, 2)).toEqual({ maxRounds: 3 });
       expect(roomTarget(gameId, 3)).toEqual({ maxRounds: 3 });
       expect(roomTarget(gameId, 4)).toEqual({ maxRounds: 2 });

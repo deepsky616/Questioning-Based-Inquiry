@@ -263,6 +263,27 @@ async function completeMystery(
   await startFriendGame(host, code, transport);
   await host.page.getByRole("button", { name: "미스터리 상자 시작", exact: true }).click();
   await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("play");
+  const questions = [
+    "동물인가요?",
+    "먹을 수 있나요?",
+    "스스로 움직이나요?",
+  ] as const;
+  for (const [index, question] of questions.entries()) {
+    const state = transport.getRoom(code)?.gameState as {
+      turnOrder?: string[];
+      currentTurnIdx?: number;
+    };
+    const playerId = state.turnOrder?.[state.currentTurnIdx ?? -1] ?? "";
+    const page = sessionForPlayer(sessions, playerId).page;
+    const input = page.locator("#room-mystery-question");
+    await expect(input).toBeEnabled();
+    await input.fill(question);
+    await page.getByRole("button", { name: "질문 보내기", exact: true }).click();
+    await expect.poll(
+      () => (transport.getRoom(code)?.gameState.history as unknown[] | undefined)?.length ?? 0,
+    ).toBe(index + 1);
+  }
+
   const state = transport.getRoom(code)?.gameState as {
     private?: { itemId?: string };
     turnOrder?: string[];
@@ -272,7 +293,9 @@ async function completeMystery(
   expect(item).not.toBeNull();
   const playerId = state.turnOrder?.[state.currentTurnIdx ?? -1] ?? "";
   const page = sessionForPlayer(sessions, playerId).page;
-  await page.locator("#room-mystery-guess").fill(item!.names.ko);
+  const guess = page.locator("#room-mystery-guess");
+  await expect(guess).toBeEnabled();
+  await guess.fill(item!.names.ko);
   await page.getByRole("button", { name: "추측 보내기", exact: true }).click();
 }
 
