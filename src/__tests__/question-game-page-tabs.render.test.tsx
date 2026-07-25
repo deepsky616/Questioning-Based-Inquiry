@@ -154,4 +154,46 @@ describe("질문놀이 페이지 큰 탭", () => {
     )).toBe(true));
     expect(screen.queryByText(game.title)).not.toBeInTheDocument();
   });
+
+  it("학생 질문놀이 응답이 비어 있으면 오류를 알리고 다시 불러온다", async () => {
+    const game = BUILT_IN_GAMES[0];
+    let attempts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) !== "/api/question-games") return jsonResponse(null);
+      attempts += 1;
+      return attempts === 1
+        ? new Response(null, { status: 200 })
+        : jsonResponse([game]);
+    }));
+
+    render(<StudentQuestionPlayPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "질문놀이를 불러오지 못했습니다.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByText(game.title)).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("교사 통계 응답만 비어 있어도 놀이 목록을 유지하고 다시 불러오기를 제공한다", async () => {
+    const game = BUILT_IN_GAMES[0];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/teacher/question-games") {
+        return jsonResponse({ games: [game], visibilityMap: {} });
+      }
+      if (url.endsWith("/stats")) return new Response(null, { status: 200 });
+      return jsonResponse(null);
+    }));
+
+    render(<TeacherQuestionPlayPage />);
+
+    expect(await screen.findByText(game.title)).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "일부 질문놀이 자료를 불러오지 못했습니다.",
+    );
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBeVisible();
+  });
 });

@@ -93,8 +93,10 @@ describe("교사 질문놀이 학습 현황", () => {
     expect(overviewHeader).not.toBeNull();
     expect(within(overviewHeader!).getByLabelText("학급 선택")).toHaveValue("5|1");
     expect(screen.getAllByRole("heading", { name: "학급 학습 현황" })).toHaveLength(1);
+    expect(screen.getByText("전체 누적 요약")).toBeVisible();
     expect(screen.getByText("최근 14일 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
+    expect(screen.getByText("전체 누적 기준")).toBeVisible();
     expect(screen.getByText("참여 학생").nextSibling).toHaveTextContent("2/2명 · 100%");
     expect(screen.getByText(
       "질문 릴레이: 친구와 함께 참여 2명, 학급 참여율 100%, 완료 2회, 학생당 평균 1.0회, 인정 3개 · 완료당 1.5개",

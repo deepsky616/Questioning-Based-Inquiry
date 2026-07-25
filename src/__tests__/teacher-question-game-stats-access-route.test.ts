@@ -12,6 +12,7 @@ vi.mock("@/lib/db", () => ({
 import { GET } from "@/app/api/teacher/question-games/stats/route";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { BUILT_IN_QUESTION_GAME_IDS } from "@/lib/question-game-rules";
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mockTeacher = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
@@ -85,7 +86,7 @@ describe("교사 질문놀이 통계 접근 경계", () => {
     expect(mockLogs).not.toHaveBeenCalled();
   });
 
-  it("확정된 포인트만 질문놀이 통계에 포함한다", async () => {
+  it("확정된 질문놀이 포인트만 통계 조회 범위에 포함한다", async () => {
     mockStudents.mockResolvedValue([
       { id: "student-1", name: "학생", studentNumber: "1" },
     ]);
@@ -93,7 +94,12 @@ describe("교사 질문놀이 통계 접근 경계", () => {
     await GET();
 
     expect(mockLogs).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ status: "APPROVED" }),
+      where: expect.objectContaining({
+        status: "APPROVED",
+        gameId: {
+          in: [...BUILT_IN_QUESTION_GAME_IDS, "ACTIVITY_SOLO", "ACTIVITY_AI"],
+        },
+      }),
     }));
   });
 
@@ -200,6 +206,7 @@ describe("교사 질문놀이 통계 접근 경계", () => {
     expect(mockRuns).toHaveBeenCalledWith(expect.objectContaining({
       where: {
         ownerId: { in: ["student-1", "student-2"] },
+        gameId: { in: [...BUILT_IN_QUESTION_GAME_IDS] },
         mode: { in: ["SOLO", "AI"] },
         status: "SETTLED",
       },

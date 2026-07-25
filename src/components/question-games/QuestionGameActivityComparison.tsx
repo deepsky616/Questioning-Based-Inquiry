@@ -170,9 +170,14 @@ export function QuestionGameActivityComparison({
       <figure className="min-w-0" aria-labelledby={`question-game-modes-${audience}`}>
         <figcaption
           id={`question-game-modes-${audience}`}
-          className="mb-3 text-sm font-bold text-foreground"
+          className="mb-3 flex flex-wrap items-baseline justify-between gap-2"
         >
-          {t("gameModeBreakdownTitle")}
+          <span className="text-sm font-bold text-foreground">
+            {t("gameModeBreakdownTitle")}
+          </span>
+          <span className="text-xs font-semibold text-muted-foreground">
+            {t("allTimeComparison")}
+          </span>
         </figcaption>
         <div role="img" aria-label={t("gameModeBreakdownAria")}>
           <ResponsiveContainer width="100%" height={Math.max(240, modeRows.length * 54)}>
@@ -240,12 +245,17 @@ export function QuestionGameActivityComparison({
 
   return (
     <div className="min-w-0">
-      <h3
-        id="question-game-participation-class"
-        className="mb-3 text-sm font-bold text-foreground"
-      >
-        {t("gameModeBreakdownTitle")}
-      </h3>
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h3
+          id="question-game-participation-class"
+          className="text-sm font-bold text-foreground"
+        >
+          {t("gameModeBreakdownTitle")}
+        </h3>
+        <p className="text-xs font-semibold text-muted-foreground">
+          {t("allTimeComparison")}
+        </p>
+      </div>
       <div
         role="group"
         aria-label={t("modeComparisonLabel")}

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { visibleDataRefetchInterval } from "@/lib/query-refresh";
+import { fetchJson } from "@/lib/client-fetch";
 
 interface PointLog {
   id: string;
@@ -56,10 +57,10 @@ async function fetchPointsCard() {
     { totalPoints?: number; recent?: PointLog[] },
     LeaderboardResp, LeaderboardResp, LeaderboardResp,
   ] = await Promise.all([
-    fetch("/api/points/me").then((r) => r.json()),
-    fetch("/api/points/leaderboard?scope=class").then((r) => r.json()),
-    fetch("/api/points/leaderboard?scope=school").then((r) => r.json()),
-    fetch("/api/points/leaderboard?scope=all").then((r) => r.json()),
+    fetchJson<{ totalPoints?: number; recent?: PointLog[] }>("/api/points/me"),
+    fetchJson<LeaderboardResp>("/api/points/leaderboard?scope=class"),
+    fetchJson<LeaderboardResp>("/api/points/leaderboard?scope=school"),
+    fetchJson<LeaderboardResp>("/api/points/leaderboard?scope=all"),
   ]);
   return {
     totalPoints: meRes.totalPoints ?? 0,
@@ -74,12 +75,13 @@ async function fetchPointsCard() {
 
 export default function PointsCard() {
   const t = useTranslations("points");
+  const tc = useTranslations("common");
   const tAward = useTranslations("pointLabel");
   const { label: bonusLabel, gameLabel } = usePointBonusLabel();
   const [showGuide, setShowGuide] = useState(false);
 
   // 폴링을 react-query로: 백그라운드 탭에선 자동 일시정지, 창 포커스 시 갱신
-  const { data, isSuccess } = useQuery({
+  const { data, isSuccess, isError, isFetching, refetch } = useQuery({
     queryKey: ["points-card"],
     queryFn: fetchPointsCard,
     refetchInterval: visibleDataRefetchInterval,
@@ -94,13 +96,32 @@ export default function PointsCard() {
 
   return (
     <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-3">
+      {isError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive md:col-span-3"
+        >
+          <span>{t("loadError")}</span>
+          <button
+            type="button"
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"
+            disabled={isFetching}
+            onClick={() => { void refetch(); }}
+          >
+            {tc("retry")}
+          </button>
+        </div>
+      )}
+
       {/* 내 포인트 + 순위 */}
       <div className="relative overflow-hidden rounded-2xl p-6 text-white md:h-full"
         style={{ background: "linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)" }}>
         <span className="absolute top-2 right-3 text-3xl opacity-20">⭐</span>
         <span className="absolute bottom-2 left-3 text-2xl opacity-20">✨</span>
         <p className="text-white/80 text-xs font-medium relative">{t("myPoints")}</p>
-        <p className="text-5xl font-black mt-1 relative">{loaded ? totalPoints : "..."}</p>
+        <p className="text-5xl font-black mt-1 relative">
+          {loaded ? totalPoints : isError ? "-" : "..."}
+        </p>
         <div className="mt-3 relative flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/90">
           <span>{t("ourClass")} <b className="font-black">{rankText(ranks.class)}</b></span>
           <span>{t("school")} <b className="font-black">{rankText(ranks.school)}</b></span>
@@ -118,7 +139,11 @@ export default function PointsCard() {
       {/* 최근 받은 포인트 */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm md:col-span-2 md:h-full">
         <h3 className="font-black text-foreground text-sm mb-3">{t("recentTitle")}</h3>
-        {recent.length === 0 ? (
+        {isError ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            {t("loadError")}
+          </p>
+        ) : recent.length === 0 ? (
           <EmptyState icon="⭐" title={t("emptyTitle")} description={t("emptyDesc")} />
         ) : (
           <div className="space-y-1.5 max-h-48 overflow-y-auto">

@@ -34,6 +34,7 @@ import {
   type QuestionGameSettlementHealth,
 } from "@/lib/question-game-settlement-health";
 import { TeacherQuestionGameLearningOverview } from "@/components/question-games/TeacherQuestionGameLearningOverview";
+import { fetchJson } from "@/lib/client-fetch";
 
 type VisType = "all" | "classes" | "students" | "hidden";
 
@@ -81,6 +82,7 @@ export default function TeacherQuestionPlayPage() {
   const [games, setGames] = useState<AnyGame[]>([]);
   const [visibilityMap, setVisibilityMap] = useState<Record<string, GameVisibility>>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [sectionTab, setSectionTab] = useState("games");
   const [tab, setTab] = useState("all");
 
@@ -99,25 +101,59 @@ export default function TeacherQuestionPlayPage() {
   const [editVis, setEditVis] = useState<GameVisibility>({ type: "all" });
   const [visSaving, setVisSaving] = useState(false);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setIsLoading(true);
-    Promise.all([
-      fetch("/api/teacher/question-games").then((r) => r.json()),
-      fetch("/api/teacher/question-games/stats").then((r) => r.json()),
-      fetch("/api/teacher/question-games/settlements")
-        .then((r) => r.ok ? r.json() : null)
-        .catch(() => null),
-    ])
-      .then(([gamesData, statsData, settlementData]) => {
-        setGames(gamesData.games ?? []);
-        setVisibilityMap(gamesData.visibilityMap ?? {});
-        setStatsByGame(statsData.byGame ?? {});
-        if (isQuestionGameSettlementHealth(settlementData)) {
-          setSettlementHealth(settlementData);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
+    setLoadError(false);
+    const [gamesResult, statsResult, settlementResult] =
+      await Promise.allSettled([
+        fetchJson<{
+          games?: AnyGame[];
+          visibilityMap?: Record<string, GameVisibility>;
+        }>("/api/teacher/question-games"),
+        fetchJson<{ byGame?: Record<string, GameStat> }>(
+          "/api/teacher/question-games/stats",
+        ),
+        fetchJson<unknown>("/api/teacher/question-games/settlements"),
+      ]);
+
+    let failed = false;
+    if (
+      gamesResult.status === "fulfilled" &&
+      Array.isArray(gamesResult.value.games)
+    ) {
+      setGames(gamesResult.value.games);
+      setVisibilityMap(
+        gamesResult.value.visibilityMap &&
+        typeof gamesResult.value.visibilityMap === "object"
+          ? gamesResult.value.visibilityMap
+          : {},
+      );
+    } else {
+      failed = true;
+    }
+
+    if (
+      statsResult.status === "fulfilled" &&
+      statsResult.value.byGame &&
+      typeof statsResult.value.byGame === "object"
+    ) {
+      setStatsByGame(statsResult.value.byGame);
+    } else {
+      failed = true;
+    }
+
+    if (settlementResult.status === "fulfilled") {
+      setSettlementHealth(
+        isQuestionGameSettlementHealth(settlementResult.value)
+          ? settlementResult.value
+          : null,
+      );
+    } else {
+      failed = true;
+    }
+
+    setLoadError(failed);
+    setIsLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -235,6 +271,24 @@ export default function TeacherQuestionPlayPage() {
           </TabsTrigger>
         </TabsList>
       </Tabs>
+
+      {loadError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          <span>{t("loadError")}</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isLoading}
+            onClick={() => { void load(); }}
+          >
+            {tc("retry")}
+          </Button>
+        </div>
+      )}
 
       {sectionTab === "learning" ? (
         <div className="space-y-6">

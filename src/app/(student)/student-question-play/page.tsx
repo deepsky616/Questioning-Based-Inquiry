@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,26 +9,37 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AnyGame, localizeQuestionGames } from "@/lib/question-games-data";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StudentQuestionGameLearningHistory } from "@/components/question-games/StudentQuestionGameLearningHistory";
+import { fetchJson } from "@/lib/client-fetch";
 
 export default function StudentQuestionPlayPage() {
   const t = useTranslations("playLanding");
+  const tc = useTranslations("common");
   const locale = useLocale();
   const tg = useTranslations("gamePlay");
   const [games, setGames] = useState<AnyGame[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedGame, setSelectedGame] = useState<AnyGame | null>(null);
   const [sectionTab, setSectionTab] = useState("games");
   const router = useRouter();
 
-  useEffect(() => {
-    fetch("/api/question-games")
-      .then((r) => r.json())
-      .then((data: AnyGame[]) =>
-        setGames(Array.isArray(data) ? data.filter((game) => game.isBuiltIn) : []),
-      )
-      .catch(() => {})
-      .finally(() => setIsLoading(false));
+  const loadGames = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(false);
+    try {
+      const data = await fetchJson<AnyGame[]>("/api/question-games");
+      if (!Array.isArray(data)) throw new Error();
+      setGames(data.filter((game) => game.isBuiltIn));
+    } catch {
+      setLoadError(true);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadGames();
+  }, [loadGames]);
 
   function startGame(game: AnyGame) {
     setSelectedGame(null);
@@ -87,7 +98,25 @@ export default function StudentQuestionPlayPage() {
             </div>
           )}
 
-          {!isLoading && games.length === 0 && (
+          {loadError && (
+            <div
+              role="alert"
+              className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+            >
+              <span>{t("loadError")}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+                onClick={() => { void loadGames(); }}
+              >
+                {tc("retry")}
+              </Button>
+            </div>
+          )}
+
+          {!isLoading && !loadError && games.length === 0 && (
             <EmptyState icon="😢" title={t("emptyTitle")} description={t("emptyDesc")} className="py-24" />
           )}
 

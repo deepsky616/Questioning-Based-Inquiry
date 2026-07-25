@@ -4,24 +4,25 @@ Questioning-Based Inquiry Web App - 질문기반 탐구수업 웹앱
 
 ## Features
 
-- 학생: 질문 작성 및 AI 분류, 질문 보기, 다른 학생 질문 탐구
-- 교사: 학생 질문 통계, 유형별 분석, 질문 수정/코멘트
+- 학생: 질문학습, 질문연습, 질문 작성과 탐구, 질문놀이, 학습 기록
+- 교사: 질문수업 설계와 배포, 질문 분석, 질문놀이 관리, 학생 관리
+- 공통: 역할별 대시보드, 알림, 포인트, 한국어와 영어 화면
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, TypeScript, Tailwind CSS, shadcn/ui
+- **Frontend**: Next.js 16, React 19, TypeScript, Tailwind CSS, shadcn/ui
 - **Backend**: NextAuth.js v5, Prisma, Supabase Postgres
-- **Email**: Resend
+- **Email**: Nodemailer with Gmail SMTP
 - **AI**: Google Gemini API
 
 ## Getting Started
 
 ```bash
-# Install dependencies
-npm install
+# Install the versions pinned in package-lock.json
+npm ci
 
 # Generate Prisma client
-npx prisma generate
+npm run db:generate
 
 # Apply versioned migrations, including database functions and triggers
 npm run db:migrate:deploy
@@ -47,28 +48,30 @@ DATABASE_URL="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pool
 DIRECT_URL="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
 NEXTAUTH_SECRET="your-secret-key"
 NEXTAUTH_URL="http://localhost:3000"
-GOOGLE_API_KEY="your-gemini-api-key"
+CRON_SECRET="replace-with-a-long-random-secret"
+GAME_ACTIVITY_HASH_SECRET="replace-with-at-least-32-characters"
 GMAIL_USER="your_gmail@gmail.com"
 GMAIL_APP_PASSWORD="xxxx xxxx xxxx xxxx"
 ```
 
-`GMAIL_USER` and `GMAIL_APP_PASSWORD` must both be present and belong to the same
-Google account. Use a Google app password, not the account password. Email is optional
-for local development, but password reset email is unavailable when either value is
-missing or invalid.
+`SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` are optional. See `.env.example` for
+the complete list and local defaults.
 
 ### Supabase Free setup
 
 1. Create a Supabase Free project.
 2. Copy the pooled Postgres connection string from Supabase Database settings.
 3. Set it as `DATABASE_URL`.
-4. Run `npx prisma generate` and `npm run db:migrate:deploy`.
+4. Run `npm run db:generate` and `npm run db:migrate:deploy`.
 5. Run `npm run db:security:apply` after the migrations and after adding database objects.
 6. Run `npm run db:check` and `npm run db:security:check` before deployment.
 
 Do not use `prisma db push` for an application environment. The versioned migrations
 create required database functions, triggers, claims, and security rules that schema
 push cannot reproduce.
+
+`prisma/schema.prisma` and the files under `prisma/migrations` are the only database
+schema sources of truth. Do not apply standalone or unversioned SQL schema files.
 
 ### Point-integrity migration rollout
 
@@ -145,7 +148,18 @@ Captured events: uncaught server/request errors (`onRequestError`), browser erro
 (server-side, so handled failures like point-award retries become alertable).
 PII is not sent (`sendDefaultPii: false`) and tracing is off to stay in the free tier.
 
-### Resend Free setup
+### AI setup
+
+The runtime application does not read `GOOGLE_API_KEY`. A teacher configures the
+Gemini API key and model in the teacher Settings page. The key selected by the
+server follows the signed-in teacher and student relationship, with a system
+configuration fallback when one has been set.
+
+`GOOGLE_API_KEY` is used only when a developer runs
+`scripts/translate-messages.mjs` directly. It is not a required deployment
+environment variable.
+
+### Gmail SMTP setup
 
 1. Enable two-step verification for the sending Google account.
 2. Create a Google app password for mail.
@@ -165,11 +179,14 @@ The app sends email only from server routes:
 2. Import project in Vercel (https://vercel.com/new)
 3. Set environment variables in Vercel dashboard:
    - `DATABASE_URL`: Supabase pooled Postgres connection string
+   - `DIRECT_URL`: Supabase direct session connection string
    - `NEXTAUTH_SECRET`: Generate with `openssl rand -base64 32`
    - `NEXTAUTH_URL`: Your Vercel deployment URL
-   - `GOOGLE_API_KEY`: Your Gemini API key
+   - `CRON_SECRET`: Long random value for scheduled cleanup routes
+   - `GAME_ACTIVITY_HASH_SECRET`: Separate random value of at least 32 characters
    - `GMAIL_USER`: Sending Google account address
    - `GMAIL_APP_PASSWORD`: App password created for the same account
+   - `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`: Optional error monitoring values
 
 After changing either email variable, redeploy the production deployment and complete
 one password reset using a registered teacher account. A successful request must log an
@@ -184,6 +201,9 @@ src/
 │   ├── (student)/       # Student portal
 │   ├── (teacher)/       # Teacher portal
 │   └── api/             # API routes
-├── components/ui/       # shadcn/ui components
-└── lib/                 # Auth, DB, Gemini
+├── components/          # Shared and feature components
+└── lib/                 # Auth, database, AI, and domain services
+prisma/
+├── schema.prisma        # Current database model
+└── migrations/          # Versioned database changes
 ```

@@ -56,12 +56,14 @@ describe("질문놀이 학습 이력 화면", () => {
     );
 
     expect(screen.getByRole("heading", { name: "나의 학습 기록" })).toBeVisible();
+    expect(screen.getByText("전체 누적 요약")).toBeVisible();
     expect(screen.getByText("완료한 놀이").nextSibling).toHaveTextContent("3");
     expect(screen.getByText("혼자 하기 1회")).toBeVisible();
     expect(screen.getByText("인공지능과 함께 1회")).toBeVisible();
     expect(screen.getByText("친구와 함께 1회")).toBeVisible();
     expect(screen.getByText("최근 14일 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
+    expect(screen.getByText("전체 누적 기준")).toBeVisible();
     const dailyFigure = screen.getByText("최근 14일 변화").closest("figure");
     expect(dailyFigure?.parentElement).not.toHaveClass("lg:grid-cols-2");
     const activityFigure = screen.getByText("놀이별 참여 방식").closest("figure");
@@ -176,10 +178,12 @@ describe("질문놀이 학습 이력 화면", () => {
     );
 
     expect(screen.getByRole("heading", { name: "학급 학습 현황" })).toBeVisible();
+    expect(screen.getByText("전체 누적 요약")).toBeVisible();
     expect(screen.getByText("참여 학생").nextSibling).toHaveTextContent("2/4명 · 50%");
     expect(screen.queryByText("받은 포인트")).not.toBeInTheDocument();
     expect(screen.getByText("최근 14일 변화")).toBeVisible();
     expect(screen.getByText("놀이별 참여 방식")).toBeVisible();
+    expect(screen.getByText("전체 누적 기준")).toBeVisible();
     expect(screen.getByText("최근 14일 변화").closest("figure")?.parentElement)
       .not.toHaveClass("lg:grid-cols-2");
     expect(screen.queryByRole("button", { name: "완료율" })).not.toBeInTheDocument();

@@ -180,7 +180,10 @@ export function QuestionGameLearningHistory({
         </div>
       )}
 
-      <dl className="mt-3 grid grid-cols-3 divide-x divide-border border-y border-border py-3">
+      <p className="mt-3 text-xs font-bold text-muted-foreground">
+        {t("allTimeSummary")}
+      </p>
+      <dl className="mt-1 grid grid-cols-3 divide-x divide-border border-y border-border py-3">
         {measures.map(({ label, value }) => (
           <div className="min-w-0 px-2 text-center first:pl-0 last:pr-0" key={label}>
             <dt className="text-xs leading-5 text-muted-foreground">{label}</dt>
