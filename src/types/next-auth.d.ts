@@ -11,6 +11,7 @@ declare module "next-auth" {
       grade: string | null;
       className: string | null;
       studentNumber: string | null;
+      isDemo: boolean;
     };
   }
 
@@ -23,6 +24,7 @@ declare module "next-auth" {
     grade: string | null;
     className: string | null;
     studentNumber: string | null;
+    isDemo: boolean;
   }
 }
 
@@ -34,5 +36,6 @@ declare module "next-auth/jwt" {
     grade: string | null;
     className: string | null;
     studentNumber: string | null;
+    isDemo: boolean;
   }
 }

@@ -1,6 +1,13 @@
 import type { UserRole } from "@/types/user";
 
-const PUBLIC_PREFIXES = ["/login", "/register", "/forgot-password", "/reset-password", "/api/"];
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/demo/launch",
+  "/api/",
+];
 
 export function isPublicRoute(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));

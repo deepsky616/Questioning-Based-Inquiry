@@ -6,6 +6,14 @@ import { buildLoginIdentity, isLoginAttemptAllowed } from "@/lib/login-guard";
 import { authCallbacks, authPages, authSession } from "@/lib/auth-shared";
 import { normalizeStudentIdentity } from "@/lib/student-registration";
 import type { UserRole } from "@/types/user";
+import {
+  DEMO_CLASS_NAME,
+  DEMO_GRADE,
+  DEMO_SCHOOL,
+  DEMO_STUDENT_NUMBER,
+  validateDemoLaunchTicket,
+} from "@/lib/demo-config";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -69,6 +77,50 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           grade: user.grade,
           className: user.className,
           studentNumber: user.studentNumber,
+          isDemo: user.isDemo,
+        };
+      },
+    }),
+    Credentials({
+      id: "demo-launch",
+      name: "시연 실행",
+      credentials: {
+        ticket: {},
+      },
+      authorize: async (credentials) => {
+        const ticket =
+          typeof credentials?.ticket === "string" ? credentials.ticket : "";
+        const validation = validateDemoLaunchTicket(ticket);
+        if (!validation.ok) return null;
+
+        const { success } = rateLimit("demo-launch", {
+          limit: 20,
+          windowMs: 60_000,
+        });
+        if (!success) return null;
+
+        const user = await prisma.user.findFirst({
+          where: {
+            role: "STUDENT",
+            isDemo: true,
+            school: DEMO_SCHOOL,
+            grade: DEMO_GRADE,
+            className: DEMO_CLASS_NAME,
+            studentNumber: DEMO_STUDENT_NUMBER,
+          },
+        });
+        if (!user) return null;
+
+        return {
+          id: user.id,
+          email: user.email ?? undefined,
+          role: user.role as UserRole,
+          name: user.name,
+          school: user.school,
+          grade: user.grade,
+          className: user.className,
+          studentNumber: user.studentNumber,
+          isDemo: true,
         };
       },
     }),

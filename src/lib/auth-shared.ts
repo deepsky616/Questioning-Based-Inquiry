@@ -10,6 +10,7 @@ export const authCallbacks = {
       token.grade = user.grade;
       token.className = user.className;
       token.studentNumber = user.studentNumber;
+      token.isDemo = user.isDemo;
     }
     return token;
   },
@@ -20,6 +21,7 @@ export const authCallbacks = {
     session.user.grade = (token.grade as string | null) ?? null;
     session.user.className = (token.className as string | null) ?? null;
     session.user.studentNumber = (token.studentNumber as string | null) ?? null;
+    session.user.isDemo = token.isDemo === true;
     return session;
   },
 } satisfies NextAuthConfig["callbacks"];

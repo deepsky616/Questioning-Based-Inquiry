@@ -8,6 +8,7 @@ export type SessionUser = {
   grade?: string | null;
   className?: string | null;
   studentNumber?: string | null;
+  isDemo: boolean;
 };
 
 export function getSessionUser(session: Session | null): SessionUser {
@@ -19,6 +20,7 @@ export function getSessionUser(session: Session | null): SessionUser {
     grade?: string | null;
     className?: string | null;
     studentNumber?: string | null;
+    isDemo?: boolean | null;
   } | undefined;
 
   return {
@@ -29,5 +31,6 @@ export function getSessionUser(session: Session | null): SessionUser {
     grade: user?.grade ?? null,
     className: user?.className ?? null,
     studentNumber: user?.studentNumber ?? null,
+    isDemo: user?.isDemo === true,
   };
 }
