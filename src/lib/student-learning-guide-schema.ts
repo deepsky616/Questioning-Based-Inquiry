@@ -11,6 +11,10 @@ export const studentLearningGuidesSchema = z.object({
     lifeConnection: z.string().max(500),
     keywords: z.array(studentKeywordSchema).max(5),
   }).optional(),
+  achievements: z.array(z.object({
+    index: z.number().int().min(0),
+    explanation: z.string().max(500),
+  })).max(30).default([]),
   coreSentences: z.array(z.object({
     index: z.number().int().min(0),
     explanation: z.string().max(500),

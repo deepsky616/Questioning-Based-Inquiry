@@ -172,6 +172,7 @@ const LEARNING_GUIDES = {
     lifeConnection: "화분이 햇빛 쪽으로 자라는 모습을 떠올려 보세요.",
     keywords: [{ term: "광합성", meaning: "빛으로 양분을 만드는 과정" }],
   },
+  achievements: [],
   coreSentences: [{ index: 0, explanation: "식물이 빛으로 필요한 물질을 만들어요." }],
   essentialQuestions: [{ index: 0, thinkingFocus: "에너지를 얻는 방법을 살펴봐요.", perspectives: ["원인", "변화"] }],
 };
@@ -204,6 +205,10 @@ const COMPLETE_GENERATED_GUIDES = {
         { term: "먹이 사슬", meaning: "먹고 먹히는 관계의 연결" },
       ],
     },
+    achievements: [{
+      index: 0,
+      explanation: "식물의 생활을 관찰하고 특징을 설명하는 목표를 쉽게 풀어요.",
+    }],
     coreSentences: [{ index: 0, explanation: "핵심 문장을 쉽게 풀어요." }],
     essentialQuestions: [{
       index: 0,
@@ -844,10 +849,15 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     });
 
     expect(prompt).toContain(VALID_DESIGN.coreIdea);
+    expect(prompt).toContain("[선택 성취기준]");
+    expect(prompt).toContain(PROMPT_BASE.achievements[0].code);
+    expect(prompt).toContain(PROMPT_BASE.achievements[0].content);
     expect(prompt).toContain(VALID_DESIGN.coreSentences[0]);
     expect(prompt).toContain(VALID_DESIGN.essentialQuestions[0]);
     expect(prompt).toContain("[선택한 핵심어] 광합성, 에너지 전환");
     expect(prompt).toContain("서로 다른 핵심 낱말을 3~5개");
+    expect(prompt).toContain("모든 성취기준");
+    expect(prompt).toContain("learningGuides.achievements");
     expect(prompt).toContain("모든 원문에 대해 쉬운 표현을 하나씩");
     expect(prompt).toContain("모든 원문에 대해 thinkingFocus 한 문장");
     expect(prompt).toContain("모든 탐구 질문에 대해 원문과 같은 index");

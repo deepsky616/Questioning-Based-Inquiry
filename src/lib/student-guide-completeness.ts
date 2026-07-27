@@ -9,6 +9,7 @@ import {
 } from "@/lib/student-inquiry-guide";
 
 export interface StudentGuideExpectedCounts {
+  achievementCount?: number;
   coreSentenceCount: number;
   essentialQuestionCount: number;
   inquiryQuestionCount: number;
@@ -64,6 +65,13 @@ export function validateStudentGuideBundle(
     || !hasUniqueTermsWithMeanings(coreIdea.keywords, 3, 5)
   ) {
     issues.push("핵심 아이디어 핵심 낱말은 서로 다른 3~5개이며 뜻이 있어야 합니다.");
+  }
+  const achievementCount = expected.achievementCount ?? 0;
+  if (!learningGuides || !hasExactIndexes(learningGuides.achievements, achievementCount)) {
+    issues.push("모든 성취기준의 쉬운 설명과 번호가 필요합니다.");
+  }
+  if (!learningGuides || learningGuides.achievements.some((item) => !item.explanation.trim())) {
+    issues.push("성취기준 쉬운 설명이 비어 있습니다.");
   }
   if (!learningGuides || !hasExactIndexes(learningGuides.coreSentences, expected.coreSentenceCount)) {
     issues.push("모든 핵심 문장의 쉬운 설명과 번호가 필요합니다.");

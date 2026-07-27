@@ -13,6 +13,11 @@ describe("학생용 단원 이해 자료", () => {
         lifeConnection: "  화분이 햇빛 쪽으로 자라는 모습을 떠올려 보세요. ",
         keywords: [{ term: " 광합성 ", meaning: " 빛으로 양분을 만드는 과정 " }],
       },
+      achievements: [
+        { index: 0, explanation: " 식물이 빛을 이용해 양분을 만드는 과정을 설명하는 목표예요. " },
+        { index: -1, explanation: "제외" },
+        { index: 1, explanation: "   " },
+      ],
       coreSentences: [
         { index: 0, explanation: " 식물이 빛으로 필요한 물질을 만들어요. " },
         { index: -1, explanation: "제외" },
@@ -28,6 +33,10 @@ describe("학생용 단원 이해 자료", () => {
         lifeConnection: "화분이 햇빛 쪽으로 자라는 모습을 떠올려 보세요.",
         keywords: [{ term: "광합성", meaning: "빛으로 양분을 만드는 과정" }],
       },
+      achievements: [{
+        index: 0,
+        explanation: "식물이 빛을 이용해 양분을 만드는 과정을 설명하는 목표예요.",
+      }],
       coreSentences: [{ index: 0, explanation: "식물이 빛으로 필요한 물질을 만들어요." }],
       essentialQuestions: [{
         index: 0,
@@ -39,6 +48,7 @@ describe("학생용 단원 이해 자료", () => {
 
   it("중간 항목을 지우면 뒤 설명의 번호를 한 칸 당긴다", () => {
     const guides = {
+      achievements: [],
       coreSentences: [
         { index: 0, explanation: "첫 문장 풀이" },
         { index: 1, explanation: "둘째 문장 풀이" },
@@ -55,11 +65,19 @@ describe("학생용 단원 이해 자료", () => {
 
   it("빈 원문을 저장에서 제외할 때 남은 설명 번호를 새 순서에 맞춘다", () => {
     const guides = {
+      achievements: [
+        { index: 0, explanation: "첫 성취기준 풀이" },
+        { index: 2, explanation: "셋째 성취기준 풀이" },
+      ],
       coreSentences: [{ index: 2, explanation: "셋째 문장 풀이" }],
       essentialQuestions: [{ index: 1, thinkingFocus: "둘째 질문 범위", perspectives: [] }],
     };
 
-    expect(remapStudentLearningGuides(guides, [0, 2], [1])).toEqual({
+    expect(remapStudentLearningGuides(guides, [0, 2], [0, 2], [1])).toEqual({
+      achievements: [
+        { index: 0, explanation: "첫 성취기준 풀이" },
+        { index: 1, explanation: "셋째 성취기준 풀이" },
+      ],
       coreSentences: [{ index: 1, explanation: "셋째 문장 풀이" }],
       essentialQuestions: [{ index: 0, thinkingFocus: "둘째 질문 범위", perspectives: [] }],
     });

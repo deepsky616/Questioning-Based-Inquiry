@@ -4,7 +4,12 @@ import {
   validateStudentGuideBundle,
 } from "@/lib/student-guide-completeness";
 
-const expected = { coreSentenceCount: 2, essentialQuestionCount: 1, inquiryQuestionCount: 2 };
+const expected = {
+  achievementCount: 2,
+  coreSentenceCount: 2,
+  essentialQuestionCount: 1,
+  inquiryQuestionCount: 2,
+};
 const complete = {
   learningGuides: {
     coreIdea: {
@@ -16,6 +21,10 @@ const complete = {
         { term: "먹이 사슬", meaning: "먹고 먹히는 관계의 연결" },
       ],
     },
+    achievements: [
+      { index: 0, explanation: "첫 성취기준을 학생 눈높이로 풀어요." },
+      { index: 1, explanation: "둘째 성취기준을 학생 눈높이로 풀어요." },
+    ],
     coreSentences: [
       { index: 0, explanation: "첫 문장을 쉽게 풀어요." },
       { index: 1, explanation: "둘째 문장을 쉽게 풀어요." },
@@ -47,6 +56,8 @@ describe("학생용 설명 묶음 완전성", () => {
     ["빈 낱말 뜻", { ...complete, learningGuides: { ...complete.learningGuides, coreIdea: { ...complete.learningGuides.coreIdea, keywords: complete.learningGuides.coreIdea.keywords.map((item, index) => index === 0 ? { ...item, meaning: "" } : item) } } }],
     ["중복 낱말", { ...complete, learningGuides: { ...complete.learningGuides, coreIdea: { ...complete.learningGuides.coreIdea, keywords: complete.learningGuides.coreIdea.keywords.map((item, index) => index === 1 ? { ...item, term: "생태계" } : item) } } }],
     ["핵심 아이디어 낱말 6개", { ...complete, learningGuides: { ...complete.learningGuides, coreIdea: { ...complete.learningGuides.coreIdea, keywords: [...complete.learningGuides.coreIdea.keywords, { term: "서식지", meaning: "생물이 살아가는 곳" }, { term: "분해자", meaning: "죽은 생물을 분해하는 생물" }, { term: "생산자", meaning: "스스로 양분을 만드는 생물" }] } } }],
+    ["성취기준 설명 누락", { ...complete, learningGuides: { ...complete.learningGuides, achievements: complete.learningGuides.achievements.slice(0, 1) } }],
+    ["성취기준 설명 빈칸", { ...complete, learningGuides: { ...complete.learningGuides, achievements: complete.learningGuides.achievements.map((item, index) => index === 0 ? { ...item, explanation: "" } : item) } }],
     ["문장 설명 누락", { ...complete, learningGuides: { ...complete.learningGuides, coreSentences: complete.learningGuides.coreSentences.slice(0, 1) } }],
     ["탐구 질문 낱말 부족", { ...complete, guides: complete.guides.map((guide, index) => index === 0 ? { ...guide, keywords: guide.keywords.slice(0, 1) } : guide) }],
     ["탐구 질문 낱말 6개", { ...complete, guides: complete.guides.map((guide, index) => index === 0 ? { ...guide, keywords: [...guide.keywords, { term: "추가 낱말 셋", meaning: "셋째 쉬운 뜻" }, { term: "추가 낱말 넷", meaning: "넷째 쉬운 뜻" }, { term: "추가 낱말 다섯", meaning: "다섯째 쉬운 뜻" }, { term: "추가 낱말 여섯", meaning: "여섯째 쉬운 뜻" }] } : guide) }],

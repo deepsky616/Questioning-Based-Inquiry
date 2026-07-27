@@ -6,6 +6,7 @@ import {
 
 const input = {
   coreIdea: "생물은 환경과 관계를 맺는다.",
+  achievements: [{ code: "[4과10-01]", content: "물이 세 가지 상태로 변할 수 있음을 안다." }],
   selectedKeywords: ["생물", "환경"],
   coreSentences: ["생물은 서로 연결된다."],
   essentialQuestions: ["생태계는 어떻게 유지될까?"],
@@ -31,6 +32,13 @@ describe("학생용 설명 원문 서명", () => {
     expect(buildStudentGuideSourceSignature(input)).not.toBe(buildStudentGuideSourceSignature({
       ...input,
       selectedKeywords: ["생물", "관계"],
+    }));
+  });
+
+  it("성취기준 번호나 내용이 바뀌면 다른 서명을 만든다", () => {
+    expect(buildStudentGuideSourceSignature(input)).not.toBe(buildStudentGuideSourceSignature({
+      ...input,
+      achievements: [{ code: "[4과10-02]", content: "물의 상태 변화를 관찰한다." }],
     }));
   });
 

@@ -6,6 +6,11 @@ export interface StudentCoreIdeaGuide {
   keywords: StudentInquiryKeyword[];
 }
 
+export interface StudentAchievementGuide {
+  index: number;
+  explanation: string;
+}
+
 export interface StudentCoreSentenceGuide {
   index: number;
   explanation: string;
@@ -19,11 +24,13 @@ export interface StudentEssentialQuestionGuide {
 
 export interface StudentLearningGuides {
   coreIdea?: StudentCoreIdeaGuide;
+  achievements: StudentAchievementGuide[];
   coreSentences: StudentCoreSentenceGuide[];
   essentialQuestions: StudentEssentialQuestionGuide[];
 }
 
 export const EMPTY_STUDENT_LEARNING_GUIDES: StudentLearningGuides = {
+  achievements: [],
   coreSentences: [],
   essentialQuestions: [],
 };
@@ -61,6 +68,17 @@ export function normalizeStudentLearningGuides(value: unknown): StudentLearningG
     }
   }
 
+  const achievements = Array.isArray(value.achievements)
+    ? value.achievements
+        .filter(isRecord)
+        .map((guide) => ({
+          index: typeof guide.index === "number" ? guide.index : -1,
+          explanation: typeof guide.explanation === "string" ? guide.explanation.trim().slice(0, 500) : "",
+        }))
+        .filter((guide) => Number.isInteger(guide.index) && guide.index >= 0 && guide.explanation)
+        .slice(0, 30)
+    : [];
+
   const coreSentences = Array.isArray(value.coreSentences)
     ? value.coreSentences
         .filter(isRecord)
@@ -90,8 +108,13 @@ export function normalizeStudentLearningGuides(value: unknown): StudentLearningG
         .slice(0, 20)
     : [];
 
-  if (!coreIdea && coreSentences.length === 0 && essentialQuestions.length === 0) return undefined;
-  return { ...(coreIdea ? { coreIdea } : {}), coreSentences, essentialQuestions };
+  if (
+    !coreIdea
+    && achievements.length === 0
+    && coreSentences.length === 0
+    && essentialQuestions.length === 0
+  ) return undefined;
+  return { ...(coreIdea ? { coreIdea } : {}), achievements, coreSentences, essentialQuestions };
 }
 
 export function removeIndexedStudentLearningGuide(
@@ -111,14 +134,20 @@ export function removeIndexedStudentLearningGuide(
 
 export function remapStudentLearningGuides(
   value: StudentLearningGuides | undefined,
+  achievementSourceIndexes: number[],
   coreSentenceSourceIndexes: number[],
   essentialQuestionSourceIndexes: number[],
 ): StudentLearningGuides | undefined {
   if (!value) return undefined;
+  const achievementIndexes = new Map(achievementSourceIndexes.map((sourceIndex, index) => [sourceIndex, index]));
   const sentenceIndexes = new Map(coreSentenceSourceIndexes.map((sourceIndex, index) => [sourceIndex, index]));
   const questionIndexes = new Map(essentialQuestionSourceIndexes.map((sourceIndex, index) => [sourceIndex, index]));
   return normalizeStudentLearningGuides({
     ...value,
+    achievements: value.achievements.flatMap((guide) => {
+      const index = achievementIndexes.get(guide.index);
+      return index === undefined ? [] : [{ ...guide, index }];
+    }),
     coreSentences: value.coreSentences.flatMap((guide) => {
       const index = sentenceIndexes.get(guide.index);
       return index === undefined ? [] : [{ ...guide, index }];
