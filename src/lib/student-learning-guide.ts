@@ -136,14 +136,20 @@ export function removeIndexedStudentLearningGuide(
 
 export function remapStudentLearningGuides(
   value: StudentLearningGuides | undefined,
+  achievementSourceIndexes: number[],
   coreSentenceSourceIndexes: number[],
   essentialQuestionSourceIndexes: number[],
 ): StudentLearningGuides | undefined {
   if (!value) return undefined;
+  const achievementIndexes = new Map(achievementSourceIndexes.map((sourceIndex, index) => [sourceIndex, index]));
   const sentenceIndexes = new Map(coreSentenceSourceIndexes.map((sourceIndex, index) => [sourceIndex, index]));
   const questionIndexes = new Map(essentialQuestionSourceIndexes.map((sourceIndex, index) => [sourceIndex, index]));
   return normalizeStudentLearningGuides({
     ...value,
+    achievements: (value.achievements ?? []).flatMap((guide) => {
+      const index = achievementIndexes.get(guide.index);
+      return index === undefined ? [] : [{ ...guide, index }];
+    }),
     coreSentences: value.coreSentences.flatMap((guide) => {
       const index = sentenceIndexes.get(guide.index);
       return index === undefined ? [] : [{ ...guide, index }];

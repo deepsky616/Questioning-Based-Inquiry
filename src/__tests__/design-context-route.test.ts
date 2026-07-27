@@ -76,6 +76,38 @@ describe("GET design-context 권한", () => {
     expect(body.context?.learningGuides.achievements[0].explanation).toContain("식물을 관찰하고");
   });
 
+  it("저장된 쉬운 설명이 없으면 교육과정 설명을 보완한다", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
+    mockFindUnique.mockResolvedValue({
+      unitDesignId: "ud1",
+      date: "2026-05-01",
+      teacherId: "t1",
+      targetType: "ALL",
+      targetGrade: null,
+      targetClassName: null,
+      targetStudentId: null,
+      targetStudentIds: [],
+    });
+    mockQueryRaw.mockResolvedValue([{
+      ...DESIGN_ROW,
+      grade_range: "3-4",
+      area: "물의 상태 변화",
+      selected_achievements: [{
+        code: "[4과10-01]",
+        content: "물이 세 가지 상태로 변할 수 있음을 안다.",
+      }],
+      learning_guides: null,
+    }]);
+
+    const res = await GET(req, ctx);
+    const body = await res.json();
+
+    expect(body.context?.learningGuides.achievements).toEqual([{
+      index: 0,
+      explanation: "물의 상태 변화는 관찰 가능한 현상 수준에서만 다루고, 물의 상태가 변하는 까닭은 다루지 않는다.",
+    }]);
+  });
+
   it("소유가 아닌 교사는 403", async () => {
     mockAuth.mockResolvedValue({ user: { id: "t2", role: "TEACHER" } });
     mockFindUnique.mockResolvedValue({ unitDesignId: "ud1", date: "2026-05-01", teacherId: "t1", targetType: "ALL", targetGrade: null, targetClassName: null, targetStudentId: null, targetStudentIds: [] });

@@ -30,6 +30,15 @@ import { StudentAskReferencePanel } from "./StudentAskReferencePanel";
 import { StudentAskSessionSelector } from "./StudentAskSessionSelector";
 import type { ClassificationResult, DesignContext, QuestionSession } from "./types";
 
+const CLASSIFICATION_RETRY_DELAY_MS = 600;
+
+function isRetryableClassificationFallback(result: ClassificationResult): boolean {
+  return (
+    result.analysisSource === "fallback" &&
+    (result.fallbackReason === "busy" || result.fallbackReason === "invalid-response")
+  );
+}
+
 export default function AskPage() {
   return (
     <Suspense fallback={<AskPageFallback />}>
@@ -335,21 +344,39 @@ function AskContent() {
     setSaveComplete(false);
     setIsLoading(true);
     try {
-      const res = await fetch("/api/classify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: normalized }),
-      });
-      const data = await res.json();
+      const requestClassification = async (): Promise<ClassificationResult> => {
+        const response = await fetch("/api/classify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: normalized }),
+        });
+        const responseData = await response.json();
+        if (!response.ok) {
+          throw new Error(responseData.error || t("classifyFailed"));
+        }
+        return responseData;
+      };
+
+      let data = await requestClassification();
 
       if (
         analysisRequestRef.current !== requestId ||
         selectedSessionIdRef.current !== analysisSessionId
       ) return;
-      if (!res.ok) {
-        throw new Error(data.error || t("classifyFailed"));
+
+      if (isRetryableClassificationFallback(data)) {
+        await new Promise((resolve) => setTimeout(resolve, CLASSIFICATION_RETRY_DELAY_MS));
+        if (
+          analysisRequestRef.current !== requestId ||
+          selectedSessionIdRef.current !== analysisSessionId
+        ) return;
+        data = await requestClassification();
       }
 
+      if (
+        analysisRequestRef.current !== requestId ||
+        selectedSessionIdRef.current !== analysisSessionId
+      ) return;
       setAnalysis({ content: normalized, sessionId: analysisSessionId, result: data });
     } catch (error: unknown) {
       if (analysisRequestRef.current !== requestId) return;

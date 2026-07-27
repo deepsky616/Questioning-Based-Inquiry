@@ -344,12 +344,15 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     const essentialSourceIndexes = editEssentialQuestions.map((item, index) => item.trim() ? index : -1).filter((index) => index >= 0);
     const cleanedSentences = sentenceSourceIndexes.map((index) => editCoreSentences[index].trim());
     const cleanedEssential = essentialSourceIndexes.map((index) => editEssentialQuestions[index].trim());
-    const cleanedAchievements = editAchievements
-      .map((achievement) => ({
-        code: achievement.code.trim(),
-        content: achievement.content.trim(),
-      }))
-      .filter((achievement) => achievement.code && achievement.content);
+    const achievementSourceIndexes = editAchievements
+      .map((achievement, index) => (
+        achievement.code.trim() && achievement.content.trim() ? index : -1
+      ))
+      .filter((index) => index >= 0);
+    const cleanedAchievements = achievementSourceIndexes.map((index) => ({
+      code: editAchievements[index].code.trim(),
+      content: editAchievements[index].content.trim(),
+    }));
     const res = await fetch(`/api/unit-design/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -367,7 +370,12 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         coreSentences: cleanedSentences,
         essentialQuestions: cleanedEssential,
         learningGuides: hasFreshEditStudentGuides
-          ? remapStudentLearningGuides(editLearningGuides, sentenceSourceIndexes, essentialSourceIndexes)
+          ? remapStudentLearningGuides(
+              editLearningGuides,
+              achievementSourceIndexes,
+              sentenceSourceIndexes,
+              essentialSourceIndexes,
+            )
           : null,
         inquiryQuestions: cleaned,
       }),

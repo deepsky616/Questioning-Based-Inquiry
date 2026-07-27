@@ -162,6 +162,7 @@ function learningGuide({
   explanation,
   lifeConnection,
   keywords,
+  achievementExplanations,
   sentenceExplanations,
   essentialQuestionGuides,
 }) {
@@ -174,6 +175,10 @@ function learningGuide({
         meaning: keywordMeaning,
       })),
     },
+    achievements: achievementExplanations.map((achievementExplanation, index) => ({
+      index,
+      explanation: achievementExplanation,
+    })),
     coreSentences: sentenceExplanations.map((sentenceExplanation, index) => ({
       index,
       explanation: sentenceExplanation,
@@ -196,6 +201,10 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
     grade: DEMO.grade,
     area: "읽기",
     coreIdea: "글쓴이의 주장을 바르게 이해하려면 주장을 뒷받침하는 근거가 알맞고 믿을 만한지 살펴보아야 한다.",
+    achievements: [{
+      code: "[4국02-05]",
+      content: "글이나 자료의 출처가 믿을 만한지 판단한다.",
+    }],
     selectedKeywords: ["주장", "근거", "적절성"],
     coreSentences: [
       "주장은 글쓴이가 다른 사람에게 전하고 싶은 생각이다.",
@@ -232,6 +241,7 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
       explanation: "글을 읽을 때 글쓴이의 생각만 찾는 것이 아니라 그 생각을 받쳐 주는 까닭과 자료도 함께 살펴봐요.",
       lifeConnection: "친구에게 학급 규칙을 바꾸자고 말할 때도 까닭과 예를 들면 내 생각을 더 잘 이해시킬 수 있어요.",
       keywords: [["주장", "다른 사람에게 전하려는 생각"], ["근거", "주장을 받쳐 주는 까닭이나 자료"], ["적절성", "주장과 근거가 알맞게 이어지는 정도"]],
+      achievementExplanations: ["글과 자료가 어디에서 왔는지 살펴보고 믿을 만한 내용인지 판단할 수 있어야 한다는 뜻이에요."],
       sentenceExplanations: [
         "주장은 글의 중심이 되는 글쓴이의 생각이에요.",
         "근거가 주장과 잘 이어지고 믿을 만한지 확인해야 해요.",
@@ -251,6 +261,10 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
     grade: DEMO.grade,
     area: "우리가 사는 지역",
     coreIdea: "지역의 문제는 여러 사람의 생활과 이어져 있으므로 다양한 의견과 자료를 살펴보고 함께 해결 방법을 찾아야 한다.",
+    achievements: [{
+      code: "[4사09-01]",
+      content: "생활 주변에서 찾을 수 있는 여러 가지 문제를 파악하고, 그 문제를 합리적으로 해결하는 능력을 기른다.",
+    }],
     selectedKeywords: ["지역 문제", "주민", "해결 방법"],
     coreSentences: [
       "지역 문제는 지역에 사는 사람들의 생활에 불편이나 어려움을 주는 일이다.",
@@ -287,6 +301,7 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
       explanation: "지역 문제는 한 사람만의 일이 아니므로 여러 사람의 생각과 실제 자료를 함께 살펴보아야 해요.",
       lifeConnection: "학교 앞 안전, 공원 쓰레기, 도서관 이용처럼 우리 주변에서도 함께 해결할 문제를 찾을 수 있어요.",
       keywords: [["지역 문제", "지역 사람들에게 어려움을 주는 일"], ["주민", "그 지역에 사는 사람"], ["해결 방법", "문제를 줄이거나 없애기 위한 방법"]],
+      achievementExplanations: ["우리 주변의 문제를 찾아 원인을 살펴보고 여러 사람이 받아들일 수 있는 해결 방법을 고를 수 있어야 한다는 뜻이에요."],
       sentenceExplanations: [
         "지역에서 여러 사람이 겪는 불편과 어려움을 지역 문제라고 해요.",
         "여러 의견을 듣고 실제로 할 수 있는 방법을 함께 골라야 해요.",
@@ -306,6 +321,10 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
     grade: DEMO.grade,
     area: "물질",
     coreIdea: "물은 얼음, 물, 수증기의 모습으로 존재하며 온도가 달라지면 한 상태에서 다른 상태로 변할 수 있다.",
+    achievements: [{
+      code: "[4과10-01]",
+      content: "물이 세 가지 상태로 변할 수 있음을 알고, 우리 주변에서 예를 찾을 수 있다.",
+    }],
     selectedKeywords: ["고체", "액체", "기체", "상태 변화"],
     coreSentences: [
       "물은 얼음인 고체, 흐르는 물인 액체, 눈에 잘 보이지 않는 수증기인 기체로 존재한다.",
@@ -342,6 +361,7 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
       explanation: "물은 고체, 액체, 기체의 모습으로 달라질 수 있지만 모두 같은 물질인 물이에요.",
       lifeConnection: "얼음이 녹고, 주전자의 물이 줄고, 차가운 컵에 물방울이 맺히는 모습에서 물의 변화를 볼 수 있어요.",
       keywords: [["고체", "모양과 부피가 일정한 상태"], ["액체", "담긴 그릇에 따라 모양이 달라지는 상태"], ["기체", "공간에 널리 퍼지는 상태"], ["상태 변화", "물질의 상태가 달라지는 현상"]],
+      achievementExplanations: ["물이 얼음, 물, 수증기의 세 가지 모습으로 바뀔 수 있음을 알고 생활 속 예를 찾을 수 있어야 한다는 뜻이에요."],
       sentenceExplanations: [
         "얼음, 물, 수증기는 모습은 달라도 모두 물이에요.",
         "물은 얼고 녹거나 증발해도 없어지는 것이 아니라 모습이 달라져요.",
@@ -361,6 +381,10 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
     grade: DEMO.grade,
     area: "자료와 가능성",
     coreIdea: "자료를 기준에 따라 분류하고 표와 그래프로 나타내면 수의 크기와 변화를 쉽게 비교하고 알맞은 결론을 찾을 수 있다.",
+    achievements: [{
+      code: "[4수04-03]",
+      content: "탐구 문제를 해결하기 위해 자료를 수집, 정리하여 막대그래프나 꺾은선그래프로 나타내고 해석할 수 있다.",
+    }],
     selectedKeywords: ["자료", "표", "그래프", "눈금"],
     coreSentences: [
       "표는 자료를 항목과 수에 따라 가지런히 정리한 것이다.",
@@ -397,6 +421,7 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
       explanation: "자료를 표로 정리하면 정확한 수를 찾기 쉽고, 그래프로 나타내면 크기와 차이를 빠르게 비교할 수 있어요.",
       lifeConnection: "우리 반이 좋아하는 운동이나 한 주 동안의 날씨를 조사해 표와 그래프로 나타낼 수 있어요.",
       keywords: [["자료", "조사하거나 관찰해 모은 내용"], ["표", "자료를 칸에 맞추어 정리한 것"], ["그래프", "자료의 크기와 변화를 쉽게 비교하도록 나타낸 것"], ["눈금", "수의 간격을 일정하게 표시한 것"]],
+      achievementExplanations: ["궁금한 문제에 맞는 자료를 모아 그래프로 나타내고, 그래프에서 알 수 있는 내용을 설명할 수 있어야 한다는 뜻이에요."],
       sentenceExplanations: [
         "표는 항목별 수를 정확하게 찾아보기 좋게 정리한 것이에요.",
         "그래프는 어느 항목이 크거나 작은지 빠르게 비교하게 도와줘요.",
@@ -416,6 +441,10 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
     grade: DEMO.grade,
     area: "물질",
     coreIdea: "물질은 온도에 따라 상태가 달라지며 상태가 변할 때 부피, 모양, 움직임처럼 관찰할 수 있는 변화가 나타난다.",
+    achievements: [{
+      code: "[4과10-02]",
+      content: "물이 얼 때, 얼음이 녹을 때, 물이 증발할 때와 끓을 때, 수증기가 응결할 때의 변화를 관찰할 수 있다.",
+    }],
     selectedKeywords: ["물질", "온도", "상태 변화"],
     coreSentences: [
       "물질에 열을 더하거나 빼면 고체, 액체, 기체 사이에서 상태가 달라질 수 있다.",
@@ -452,6 +481,7 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
       explanation: "물질은 온도가 달라지면 고체, 액체, 기체의 상태가 변하고 그 과정에서 눈으로 확인할 수 있는 변화가 나타나요.",
       lifeConnection: "얼음이 녹고 젖은 빨래가 마르며 냉동실에서 물이 어는 일에서 상태 변화를 찾을 수 있어요.",
       keywords: [["물질", "주변의 물건을 이루는 재료"], ["온도", "차갑고 뜨거운 정도"], ["상태 변화", "고체, 액체, 기체 사이에서 모습이 달라지는 현상"]],
+      achievementExplanations: ["물이 얼고 녹거나 수증기로 바뀔 때 어떤 모습이 나타나는지 직접 관찰할 수 있어야 한다는 뜻이에요."],
       sentenceExplanations: [
         "물질에 열을 더하거나 빼면 고체, 액체, 기체의 모습이 달라질 수 있어요.",
         "어떤 조건에서 어떻게 변했는지 관찰하면 생활 속 현상의 까닭을 설명할 수 있어요.",
@@ -471,6 +501,10 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
     grade: DEMO.grade,
     area: "지속 가능한 생활",
     coreIdea: "생활 속 작은 선택도 자연과 다른 사람에게 영향을 주므로 필요한 것과 환경에 미치는 영향을 함께 생각하고 행동해야 한다.",
+    achievements: [{
+      code: "[4사07-01]",
+      content: "자원의 희소성으로 인해 경제활동에서 선택의 문제가 발생함을 이해하고, 경제활동에서 합리적 선택의 방법을 탐색한다.",
+    }],
     selectedKeywords: ["환경", "자원", "생활 습관"],
     coreSentences: [
       "우리가 사용하는 물건과 에너지는 자연에서 얻은 자원과 이어져 있다.",
@@ -507,6 +541,7 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
       explanation: "우리가 물건과 에너지를 사용하는 방법은 자연에서 얻는 자원의 양과 버려지는 쓰레기의 양에 영향을 줘요.",
       lifeConnection: "물을 아껴 쓰고, 일회용품을 줄이고, 쓰지 않는 전등을 끄는 행동부터 시작할 수 있어요.",
       keywords: [["환경", "사람과 생물이 살아가는 주변"], ["자원", "생활에 필요한 것을 만드는 자연의 재료"], ["생활 습관", "생활 속에서 되풀이하는 행동"]],
+      achievementExplanations: ["쓸 수 있는 자원이 한정되어 있음을 알고, 필요한 것과 환경에 미치는 영향을 함께 생각해 선택할 수 있어야 한다는 뜻이에요."],
       sentenceExplanations: [
         "우리가 쓰는 물건과 전기는 자연에서 얻은 재료와 에너지로 만들어져요.",
         "적게 쓰고 다시 쓰며 바르게 버리면 자원과 환경을 지킬 수 있어요.",
@@ -1205,6 +1240,7 @@ async function createInquiryLearningData(tx, studentIds) {
         sessionDate: koreanDate(offsetDate(session.offsetDays)),
         area: design.area,
         coreIdea: design.coreIdea,
+        achievements: design.achievements,
         selectedKeywords: design.selectedKeywords,
         coreSentences: design.coreSentences,
         essentialQuestions: design.essentialQuestions,

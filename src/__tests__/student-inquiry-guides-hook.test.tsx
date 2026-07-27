@@ -11,6 +11,11 @@ const questions: InquiryQuestion[] = [
   { type: "factual", content: "생산자는 무엇일까?" },
 ];
 
+const achievements = [{
+  code: "[6과05-01]",
+  content: "생태계 구성 요소를 조사하고 생물 요소와 비생물 요소를 구분할 수 있다.",
+}];
+
 const generatedInquiryGuide = {
   meaning: "생산자의 뜻을 묻는 질문이에요.",
   keywords: [
@@ -31,6 +36,7 @@ const generatedBundle = {
         { term: "환경", meaning: "생물을 둘러싼 조건" },
       ],
     },
+    achievements: [],
     coreSentences: [{ index: 0, explanation: "문장의 뜻을 쉽게 풀어요." }],
     essentialQuestions: [{
       index: 0,
@@ -47,6 +53,57 @@ afterEach(() => {
 });
 
 describe("학생용 설명 생성 훅 최신 상태", () => {
+  it("성취기준을 생성 요청에 포함하고 기준이 바뀌면 이전 설명을 오래된 상태로 둔다", async () => {
+    const generatedWithAchievement = {
+      ...generatedBundle,
+      learningGuides: {
+        ...generatedBundle.learningGuides,
+        achievements: [{
+          index: 0,
+          explanation: "생태계 구성 요소를 찾아 두 종류로 구분할 수 있어야 한다는 뜻이에요.",
+        }],
+      },
+    };
+    const generate = vi.fn(async () => generatedWithAchievement);
+    const { result, rerender } = renderHook(
+      ({ currentAchievements }: { currentAchievements: typeof achievements }) => {
+        const [currentQuestions, setCurrentQuestions] = useState<InquiryQuestion[]>(questions);
+        return useStudentInquiryGuides({
+          questions: currentQuestions,
+          coreIdea: "생물은 환경과 관계를 맺는다.",
+          achievements: currentAchievements,
+          selectedKeywords: ["생물", "환경"],
+          coreSentences: ["생물은 서로 연결된다."],
+          essentialQuestions: ["생태계는 어떻게 유지될까?"],
+          setQuestions: setCurrentQuestions,
+          generate,
+          onSuccess: vi.fn(),
+          onError: vi.fn(),
+        });
+      },
+      { initialProps: { currentAchievements: achievements } },
+    );
+
+    await act(async () => {
+      await result.current.handleGenerateStudentGuides();
+    });
+
+    expect(generate).toHaveBeenCalledWith("learning_guides", expect.objectContaining({
+      achievements,
+    }));
+    expect(result.current.hasFreshStudentGuides).toBe(true);
+
+    rerender({
+      currentAchievements: [{
+        code: "[6과05-02]",
+        content: "생물 요소가 환경과 서로 영향을 주고받음을 설명할 수 있다.",
+      }],
+    });
+
+    await waitFor(() => expect(result.current.hasStaleStudentGuides).toBe(true));
+    expect(result.current.hasFreshStudentGuides).toBe(false);
+  });
+
   it("생성 원문과 현재 원문이 같은 동안에만 최신으로 판별한다", async () => {
     const generate = vi.fn(async () => generatedBundle);
     const { result, rerender } = renderHook(

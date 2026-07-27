@@ -345,8 +345,20 @@ describe("학생 질문 분석 결과", () => {
               grade: "4",
               area: "물질",
               coreIdea: "물은 온도에 따라 상태가 달라질 수 있습니다.",
+              achievements: [{
+                code: "[4과10-02]",
+                content: "물의 상태가 변할 때 나타나는 모습을 관찰할 수 있습니다.",
+              }],
               coreSentences: ["물은 얼고 녹으며 모습이 달라집니다."],
               essentialQuestions: ["물의 상태 변화는 생활과 어떻게 이어질까요?"],
+              learningGuides: {
+                achievements: [{
+                  index: 0,
+                  explanation: "물이 얼고 녹거나 수증기로 바뀔 때 달라지는 모습을 살펴보는 목표예요.",
+                }],
+                coreSentences: [],
+                essentialQuestions: [],
+              },
               inquiryQuestions: [
                 {
                   type: "controversial",
@@ -364,10 +376,15 @@ describe("학생 질문 분석 결과", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    renderWithIntl(<AskPage />);
+    const { container } = renderWithIntl(<AskPage />);
 
     expect(await screen.findByText("물의 모습과 변화를 알아보아요")).toBeInTheDocument();
     expect(screen.getByText("물은 온도에 따라 상태가 달라질 수 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText("[4과10-02]")).toBeInTheDocument();
+    expect(screen.getByText("물의 상태가 변할 때 나타나는 모습을 관찰할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText(
+      "물이 얼고 녹거나 수증기로 바뀔 때 달라지는 모습을 살펴보는 목표예요.",
+    )).toBeInTheDocument();
     expect(screen.getByText("물은 얼고 녹으며 모습이 달라집니다.")).toBeInTheDocument();
     expect(screen.getByText("물의 상태 변화는 생활과 어떻게 이어질까요?")).toBeInTheDocument();
     expect(screen.getByText("변화 관찰")).toBeInTheDocument();
@@ -376,6 +393,33 @@ describe("학생 질문 분석 결과", () => {
     expect(screen.getByText("물의 모습이 달라져도 같은 물질이라고 할 수 있을까요?")).toBeInTheDocument();
     expect(screen.queryByText("처음 단원 설계에 저장된 질문입니다.")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/sessions/session-1/design-context");
+
+    const coreIdea = container.querySelector('[data-design-reference-section="core-idea"]');
+    const achievement = container.querySelector('[data-design-reference-section="achievement"]');
+    const coreSentence = container.querySelector('[data-design-reference-section="core-sentence"]');
+    expect(coreIdea?.compareDocumentPosition(achievement as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(achievement?.compareDocumentPosition(coreSentence as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(achievement).toHaveClass(
+      "border-teal-200/80",
+      "bg-teal-50/70",
+      "dark:border-teal-800/60",
+      "dark:bg-teal-950/20",
+    );
+    for (const [name, number] of [
+      ["core-idea", "1"],
+      ["achievement", "2"],
+      ["core-sentence", "3"],
+      ["essential-question", "4"],
+      ["inquiry-question", "5"],
+    ] as const) {
+      expect(
+        container
+          .querySelector(`[data-design-reference-section="${name}"]`)
+          ?.querySelector("[data-design-reference-number]"),
+      ).toHaveTextContent(number);
+    }
   });
 
   it("저장 전에 기존 질문 조회를 취소하고 기존 질문과 요약 캐시를 함께 갱신한다", async () => {
@@ -661,6 +705,80 @@ describe("학생 질문 분석 결과", () => {
       "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
     );
     expect(screen.queryByText("인공지능 질문 분석 완료")).not.toBeInTheDocument();
+  });
+
+  it.each(["busy", "invalid-response"] as const)(
+    "일시적인 %s 기본 분석은 한 번 자동 재시도해 인공지능 결과로 복구한다",
+    async (fallbackReason) => {
+      Element.prototype.scrollIntoView = vi.fn();
+      let classifyAttempts = 0;
+      const fetchMock = vi.fn((input: RequestInfo | URL) => {
+        if (String(input) === "/api/classify") {
+          classifyAttempts += 1;
+          const responseBody = classifyAttempts === 1
+            ? { ...result, analysisSource: "fallback", fallbackReason }
+            : {
+                ...result,
+                analysisSource: "ai",
+                analysisModel: "gemini-2.5-flash",
+              };
+          return Promise.resolve({
+            ok: true,
+            json: async () => responseBody,
+          } as Response);
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ configured: true }),
+        } as Response);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      renderWithIntl(<AskPage />);
+      const input = await screen.findByLabelText("질문");
+      fireEvent.change(input, { target: { value: "광합성에 필요한 것은 무엇인가요?" } });
+      fireEvent.click(screen.getByRole("button", { name: "질문 분석하기" }));
+
+      expect(
+        await screen.findByText("인공지능 질문 분석 완료", {}, { timeout: 3_000 }),
+      ).toBeInTheDocument();
+      expect(classifyAttempts).toBe(2);
+      expect(screen.queryByText(
+        "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
+      )).not.toBeInTheDocument();
+    },
+  );
+
+  it("키 누락처럼 기다려도 해결되지 않는 기본 분석은 자동 재시도하지 않는다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    let classifyAttempts = 0;
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      if (String(input) === "/api/classify") {
+        classifyAttempts += 1;
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ...result,
+            analysisSource: "fallback",
+            fallbackReason: "missing-key",
+          }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ configured: true }),
+      } as Response);
+    }));
+
+    renderWithIntl(<AskPage />);
+    const input = await screen.findByLabelText("질문");
+    fireEvent.change(input, { target: { value: "광합성에 필요한 것은 무엇인가요?" } });
+    fireEvent.click(screen.getByRole("button", { name: "질문 분석하기" }));
+
+    expect(await screen.findByText(
+      "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
+    )).toBeInTheDocument();
+    expect(classifyAttempts).toBe(1);
   });
 
   it("이전 분석이 있으면 입력 카드의 기본 행동을 다시 분석으로 표시한다", () => {

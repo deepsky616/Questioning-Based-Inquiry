@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { studentCanAccessSession } from "@/lib/session-access";
+import {
+  normalizeAchievements,
+  withAchievementGuideFallback,
+} from "@/lib/student-achievement-reference";
 import { normalizeStudentLearningGuides } from "@/lib/student-learning-guide";
 
 type Params = { params: Promise<{ id: string }> };
@@ -69,6 +73,14 @@ export async function GET(_req: Request, { params }: Params) {
   if (!d) return NextResponse.json({ context: null });
 
   const asArray = (v: unknown) => (Array.isArray(v) ? v : []);
+  const achievements = normalizeAchievements(d.selected_achievements);
+  const learningGuides = withAchievementGuideFallback(
+    normalizeStudentLearningGuides(d.learning_guides),
+    achievements,
+    d.grade_range,
+    d.subject,
+    d.area,
+  );
   return NextResponse.json({
     context: {
       id: qs.unitDesignId,
@@ -79,10 +91,10 @@ export async function GET(_req: Request, { params }: Params) {
       grade: d.grade,
       area: d.area,
       coreIdea: d.core_idea,
-      achievements: asArray(d.selected_achievements) as { code: string; content: string }[],
+      achievements,
       coreSentences: asArray(d.core_sentences) as string[],
       essentialQuestions: asArray(d.essential_questions) as string[],
-      learningGuides: normalizeStudentLearningGuides(d.learning_guides),
+      learningGuides,
       inquiryQuestions: asArray(d.inquiry_questions) as { type: string; content: string }[],
     },
   });

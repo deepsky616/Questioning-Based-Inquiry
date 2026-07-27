@@ -63,11 +63,13 @@ describe("학생용 단원 이해 자료", () => {
 
   it("빈 원문을 저장에서 제외할 때 남은 설명 번호를 새 순서에 맞춘다", () => {
     const guides = {
+      achievements: [{ index: 2, explanation: "셋째 성취기준 풀이" }],
       coreSentences: [{ index: 2, explanation: "셋째 문장 풀이" }],
       essentialQuestions: [{ index: 1, thinkingFocus: "둘째 질문 범위", perspectives: [] }],
     };
 
-    expect(remapStudentLearningGuides(guides, [0, 2], [1])).toEqual({
+    expect(remapStudentLearningGuides(guides, [0, 2], [0, 2], [1])).toEqual({
+      achievements: [{ index: 1, explanation: "셋째 성취기준 풀이" }],
       coreSentences: [{ index: 1, explanation: "셋째 문장 풀이" }],
       essentialQuestions: [{ index: 0, thinkingFocus: "둘째 질문 범위", perspectives: [] }],
     });

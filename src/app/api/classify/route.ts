@@ -52,6 +52,7 @@ const CLASSIFICATION_RESPONSE_JSON_SCHEMA = {
 type FallbackReason = "missing-key" | "quota" | "busy" | "invalid-response";
 
 function fallbackResponse(content: string, fallbackReason: FallbackReason) {
+  logger.warn("질문 분석이 기본 분석으로 전환됐습니다", { fallbackReason });
   return NextResponse.json({
     ...fallbackClassification(content),
     analysisSource: "fallback" as const,
