@@ -137,6 +137,7 @@ describe("다섯째 단계 질문 편집과 배포 자료 확인", () => {
       <ConfirmProvider>
         <CurriculumInquiryStep
           {...baseProps}
+          hasCurrentStudentGuides
           learningGuides={{
             achievements: [{
               index: 0,
@@ -156,8 +157,8 @@ describe("다섯째 단계 질문 편집과 배포 자료 확인", () => {
       .toHaveClass("border-amber-200/80", "bg-amber-50/70", "dark:border-amber-800/60", "dark:bg-amber-950/20");
     expect(container.querySelector('[data-student-guide-section="achievement"]'))
       .toHaveTextContent("[6과05-01]");
-    expect(container.querySelector('[data-student-guide-section="achievement"]'))
-      .toHaveTextContent("생태계의 생물 요소와 비생물 요소를 찾아 구분하는 목표예요.");
+    expect(screen.getByDisplayValue("생태계의 생물 요소와 비생물 요소를 찾아 구분하는 목표예요."))
+      .toBeInTheDocument();
     expect(container.querySelector('[data-student-guide-section="core-sentence"]'))
       .toHaveClass("border-sky-200/80", "bg-sky-50/70", "dark:border-sky-800/60", "dark:bg-sky-950/20");
     expect(container.querySelector('[data-student-guide-section="essential-question"]'))

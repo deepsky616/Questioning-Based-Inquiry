@@ -7,7 +7,6 @@ import { buildStudentGuideSourceSignature } from "@/lib/student-guide-source";
 import type { Achievement } from "@/lib/achievement-selection";
 import type { StudentLearningGuides } from "@/lib/student-learning-guide";
 import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
-import type { Achievement } from "@/lib/achievement-selection";
 import type { InquiryQuestion } from "./types";
 
 interface UseStudentInquiryGuidesOptions {
