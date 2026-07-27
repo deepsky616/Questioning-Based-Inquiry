@@ -171,6 +171,13 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       expect(design?.grade).toBe("4");
       expect(design?.title.trim()).not.toBe("");
       expect(design?.coreIdea.trim()).not.toBe("");
+      expect(design?.achievements.length).toBeGreaterThan(0);
+      expect(design?.learningGuides.achievements).toHaveLength(
+        design?.achievements.length,
+      );
+      expect(design?.learningGuides.achievements.every((guide, index) => (
+        guide.index === index && guide.explanation.trim()
+      ))).toBe(true);
       expect(design?.coreSentences.length).toBeGreaterThan(0);
       expect(design?.essentialQuestions.length).toBeGreaterThan(0);
       expect(design?.inquiryQuestions.map(({ type }) => type).sort()).toEqual(
