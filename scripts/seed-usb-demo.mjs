@@ -40,7 +40,14 @@ const DEMO = {
   className: "1",
   teacherId: "usb-demo-teacher",
   teacherEmail: "usb-demo-teacher@questionlab.invalid",
-  unitDesignId: "usb-demo-unit-design",
+  unitDesignIds: {
+    pastKorean: "usb-demo-unit-design-korean",
+    pastSocial: "usb-demo-unit-design-local-community",
+    past: "usb-demo-unit-design-water-states",
+    pastMath: "usb-demo-unit-design-data",
+    today: "usb-demo-unit-design-temperature",
+    future: "usb-demo-unit-design-environment",
+  },
   sessionIds: {
     pastKorean: "usb-demo-session-past-korean",
     pastSocial: "usb-demo-session-past-social",
@@ -58,7 +65,7 @@ export const DEMO_SESSION_BLUEPRINTS = [
     offsetDays: -18,
     subject: "국어",
     topic: "주장과 근거의 적절성 판단하기",
-    unitDesignId: null,
+    unitDesignId: DEMO.unitDesignIds.pastKorean,
   },
   {
     key: "pastSocial",
@@ -66,7 +73,7 @@ export const DEMO_SESSION_BLUEPRINTS = [
     offsetDays: -12,
     subject: "사회",
     topic: "우리 지역의 문제와 해결 방법",
-    unitDesignId: null,
+    unitDesignId: DEMO.unitDesignIds.pastSocial,
   },
   {
     key: "past",
@@ -74,7 +81,7 @@ export const DEMO_SESSION_BLUEPRINTS = [
     offsetDays: -7,
     subject: "과학",
     topic: "물의 세 가지 상태",
-    unitDesignId: DEMO.unitDesignId,
+    unitDesignId: DEMO.unitDesignIds.past,
   },
   {
     key: "pastMath",
@@ -82,7 +89,7 @@ export const DEMO_SESSION_BLUEPRINTS = [
     offsetDays: -3,
     subject: "수학",
     topic: "자료를 표와 그래프로 나타내기",
-    unitDesignId: null,
+    unitDesignId: DEMO.unitDesignIds.pastMath,
   },
   {
     key: "today",
@@ -90,7 +97,7 @@ export const DEMO_SESSION_BLUEPRINTS = [
     offsetDays: 0,
     subject: "과학",
     topic: "온도에 따른 상태 변화",
-    unitDesignId: DEMO.unitDesignId,
+    unitDesignId: DEMO.unitDesignIds.today,
   },
   {
     key: "future",
@@ -98,7 +105,7 @@ export const DEMO_SESSION_BLUEPRINTS = [
     offsetDays: 5,
     subject: "사회",
     topic: "환경을 위한 생활 속 선택",
-    unitDesignId: null,
+    unitDesignId: DEMO.unitDesignIds.future,
   },
 ];
 
@@ -136,73 +143,381 @@ function offsetDate(days) {
   return new Date(Date.now() + days * 24 * 60 * 60 * 1_000);
 }
 
-function inquiryQuestions() {
-  return [
-    {
-      type: "factual",
-      content: "물이 얼 때 부피는 어떻게 달라질까?",
-      studentGuide: {
-        meaning: "물이 얼기 전과 얼고 난 뒤의 모습을 관찰해 사실을 확인하는 질문이에요.",
-        keywords: [
-          { term: "부피", meaning: "물체가 차지하는 공간의 크기" },
-          { term: "상태 변화", meaning: "물질의 모습이 달라지는 현상" },
-        ],
-        thinkingStart: "같은 양의 물을 얼리기 전과 후에 표시한 높이를 비교해 보세요.",
-      },
-    },
-    {
-      type: "conceptual",
-      content: "물질의 상태 변화와 온도는 어떤 관계가 있을까?",
-      studentGuide: {
-        meaning: "온도가 달라질 때 물질의 상태가 변하는 까닭과 관계를 찾는 질문이에요.",
-        keywords: [
-          { term: "온도", meaning: "차갑고 뜨거운 정도를 나타내는 값" },
-          { term: "관계", meaning: "두 가지가 서로 이어지는 방식" },
-        ],
-        thinkingStart: "얼음, 물, 수증기가 되는 때의 온도 변화를 순서대로 떠올려 보세요.",
-      },
-    },
-    {
-      type: "controversial",
-      content: "학교에서 일회용품 사용을 줄이기 위해 불편을 감수해야 할까?",
-      studentGuide: {
-        meaning: "환경 보호와 생활의 편리함 중 무엇을 더 중요하게 볼지 근거를 들어 판단하는 질문이에요.",
-        keywords: [
-          { term: "일회용품", meaning: "한 번 쓰고 버리는 물건" },
-          { term: "감수", meaning: "어려움이나 불편을 받아들이는 것" },
-        ],
-        thinkingStart: "환경에 주는 도움과 학생들이 겪을 불편을 각각 찾아 비교해 보세요.",
-      },
-    },
-  ];
-}
-
-function learningGuides() {
+function inquiryQuestion(type, content, meaning, keywords, thinkingStart) {
   return {
-    coreIdea: {
-      explanation: "물질은 온도에 따라 상태가 달라지며, 그 과정에서 관찰할 수 있는 변화가 나타나요.",
-      lifeConnection: "얼음이 녹고 젖은 빨래가 마르는 일처럼 우리 생활에서 상태 변화를 쉽게 찾을 수 있어요.",
-      keywords: [
-        { term: "물질", meaning: "주변의 물건을 이루는 재료" },
-        { term: "온도", meaning: "차갑고 뜨거운 정도" },
-        { term: "상태 변화", meaning: "고체, 액체, 기체 사이에서 모습이 달라지는 현상" },
-      ],
+    type,
+    content,
+    studentGuide: {
+      meaning,
+      keywords: keywords.map(([term, keywordMeaning]) => ({
+        term,
+        meaning: keywordMeaning,
+      })),
+      thinkingStart,
     },
-    coreSentences: [
-      {
-        index: 0,
-        explanation: "물질에 열을 더하거나 빼면 고체, 액체, 기체의 상태가 달라질 수 있다는 뜻이에요.",
-      },
-    ],
-    essentialQuestions: [
-      {
-        index: 0,
-        thinkingFocus: "상태 변화가 일어날 때 온도와 물질의 모습을 함께 살펴보세요.",
-        perspectives: ["관찰한 사실", "생활 속 쓰임"],
-      },
-    ],
   };
 }
+
+function learningGuide({
+  explanation,
+  lifeConnection,
+  keywords,
+  sentenceExplanations,
+  essentialQuestionGuides,
+}) {
+  return {
+    coreIdea: {
+      explanation,
+      lifeConnection,
+      keywords: keywords.map(([term, keywordMeaning]) => ({
+        term,
+        meaning: keywordMeaning,
+      })),
+    },
+    coreSentences: sentenceExplanations.map((sentenceExplanation, index) => ({
+      index,
+      explanation: sentenceExplanation,
+    })),
+    essentialQuestions: essentialQuestionGuides.map((guide, index) => ({
+      index,
+      thinkingFocus: guide.thinkingFocus,
+      perspectives: guide.perspectives,
+    })),
+  };
+}
+
+export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
+  {
+    key: "pastKorean",
+    id: DEMO.unitDesignIds.pastKorean,
+    title: "주장과 근거를 살펴보아요",
+    subject: "국어",
+    gradeRange: "3-4",
+    grade: DEMO.grade,
+    area: "읽기",
+    coreIdea: "글쓴이의 주장을 바르게 이해하려면 주장을 뒷받침하는 근거가 알맞고 믿을 만한지 살펴보아야 한다.",
+    selectedKeywords: ["주장", "근거", "적절성"],
+    coreSentences: [
+      "주장은 글쓴이가 다른 사람에게 전하고 싶은 생각이다.",
+      "근거가 주장과 알맞게 이어지고 믿을 만할 때 주장의 힘이 커진다.",
+    ],
+    essentialQuestions: [
+      "좋은 근거는 어떤 조건을 갖추어야 할까?",
+      "주장과 근거를 살피면 글을 더 바르게 이해할 수 있을까?",
+    ],
+    inquiryQuestions: [
+      inquiryQuestion(
+        "factual",
+        "글쓴이가 제시한 주장과 근거는 무엇일까?",
+        "글에서 직접 확인할 수 있는 주장과 근거를 찾아보는 질문이에요.",
+        [["주장", "글쓴이가 전하려는 생각"], ["근거", "주장을 뒷받침하는 까닭이나 자료"]],
+        "글에서 생각을 나타낸 문장과 그 까닭을 나타낸 문장을 서로 다른 색으로 표시해 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "알맞은 근거는 주장에 어떤 힘을 줄까?",
+        "주장과 근거가 어떻게 이어지고 왜 중요한지 관계를 찾는 질문이에요.",
+        [["적절성", "내용이나 상황에 알맞은 정도"], ["신뢰", "믿을 수 있다고 생각하는 마음"]],
+        "근거가 있을 때와 없을 때 어느 주장이 더 믿음직한지 비교해 보세요.",
+      ),
+      inquiryQuestion(
+        "controversial",
+        "친구의 경험도 주장을 뒷받침하는 믿을 만한 근거가 될 수 있을까?",
+        "경험을 근거로 쓸 수 있는 경우와 어려운 경우를 나누어 판단하는 질문이에요.",
+        [["경험", "직접 보고 듣거나 해 본 일"], ["판단", "여러 내용을 살펴보고 생각을 정하는 것"]],
+        "경험이 도움이 되는 경우와 다른 자료가 더 필요한 경우를 하나씩 떠올려 보세요.",
+      ),
+    ],
+    learningGuides: learningGuide({
+      explanation: "글을 읽을 때 글쓴이의 생각만 찾는 것이 아니라 그 생각을 받쳐 주는 까닭과 자료도 함께 살펴봐요.",
+      lifeConnection: "친구에게 학급 규칙을 바꾸자고 말할 때도 까닭과 예를 들면 내 생각을 더 잘 이해시킬 수 있어요.",
+      keywords: [["주장", "다른 사람에게 전하려는 생각"], ["근거", "주장을 받쳐 주는 까닭이나 자료"], ["적절성", "주장과 근거가 알맞게 이어지는 정도"]],
+      sentenceExplanations: [
+        "주장은 글의 중심이 되는 글쓴이의 생각이에요.",
+        "근거가 주장과 잘 이어지고 믿을 만한지 확인해야 해요.",
+      ],
+      essentialQuestionGuides: [
+        { thinkingFocus: "근거가 주장과 이어지는지, 사실을 바탕으로 하는지 살펴보세요.", perspectives: ["주장과의 관계", "자료의 믿음직함"] },
+        { thinkingFocus: "근거를 확인하기 전과 확인한 뒤 내 생각이 어떻게 달라지는지 비교해 보세요.", perspectives: ["글쓴이의 생각", "읽는 사람의 판단"] },
+      ],
+    }),
+  },
+  {
+    key: "pastSocial",
+    id: DEMO.unitDesignIds.pastSocial,
+    title: "우리 지역의 문제를 함께 해결해요",
+    subject: "사회",
+    gradeRange: "3-4",
+    grade: DEMO.grade,
+    area: "우리가 사는 지역",
+    coreIdea: "지역의 문제는 여러 사람의 생활과 이어져 있으므로 다양한 의견과 자료를 살펴보고 함께 해결 방법을 찾아야 한다.",
+    selectedKeywords: ["지역 문제", "주민", "해결 방법"],
+    coreSentences: [
+      "지역 문제는 지역에 사는 사람들의 생활에 불편이나 어려움을 주는 일이다.",
+      "서로 다른 의견을 듣고 실천할 수 있는 해결 방법을 함께 정해야 한다.",
+    ],
+    essentialQuestions: [
+      "우리 지역의 문제를 누구의 눈으로 살펴봐야 할까?",
+      "모두에게 도움이 되는 해결 방법은 어떻게 정할 수 있을까?",
+    ],
+    inquiryQuestions: [
+      inquiryQuestion(
+        "factual",
+        "우리 지역에서 해결이 필요한 문제에는 무엇이 있을까?",
+        "지역을 관찰하거나 자료를 조사해 실제 문제를 찾는 질문이에요.",
+        [["지역", "사람들이 함께 생활하는 일정한 곳"], ["지역 문제", "지역 사람들에게 불편이나 어려움을 주는 일"]],
+        "등굣길, 공원, 시장처럼 자주 가는 곳에서 불편했던 일을 떠올려 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "같은 지역 문제를 사람마다 다르게 바라보는 까닭은 무엇일까?",
+        "생활 모습과 필요가 다르면 문제를 보는 생각도 어떻게 달라지는지 찾는 질문이에요.",
+        [["관점", "어떤 일을 바라보는 생각이나 입장"], ["주민", "그 지역에 살고 있는 사람"]],
+        "어린이, 어른, 가게 주인이 같은 문제를 어떻게 생각할지 비교해 보세요.",
+      ),
+      inquiryQuestion(
+        "controversial",
+        "지역 문제를 빨리 해결하려면 일부 주민의 불편을 받아들여도 될까?",
+        "해결의 빠르기와 여러 사람의 권리를 함께 따져 판단하는 질문이에요.",
+        [["권리", "사람이라면 마땅히 누릴 수 있는 것"], ["공동체", "함께 생활하며 이어진 사람들의 모임"]],
+        "해결로 도움을 받는 사람과 불편을 겪는 사람이 누구인지 나누어 적어 보세요.",
+      ),
+    ],
+    learningGuides: learningGuide({
+      explanation: "지역 문제는 한 사람만의 일이 아니므로 여러 사람의 생각과 실제 자료를 함께 살펴보아야 해요.",
+      lifeConnection: "학교 앞 안전, 공원 쓰레기, 도서관 이용처럼 우리 주변에서도 함께 해결할 문제를 찾을 수 있어요.",
+      keywords: [["지역 문제", "지역 사람들에게 어려움을 주는 일"], ["주민", "그 지역에 사는 사람"], ["해결 방법", "문제를 줄이거나 없애기 위한 방법"]],
+      sentenceExplanations: [
+        "지역에서 여러 사람이 겪는 불편과 어려움을 지역 문제라고 해요.",
+        "여러 의견을 듣고 실제로 할 수 있는 방법을 함께 골라야 해요.",
+      ],
+      essentialQuestionGuides: [
+        { thinkingFocus: "문제로 영향을 받는 사람과 각자의 생활 모습을 살펴보세요.", perspectives: ["어린이", "주민", "지역에서 일하는 사람"] },
+        { thinkingFocus: "도움이 되는 정도, 필요한 시간과 비용, 실천 가능성을 비교해 보세요.", perspectives: ["공정함", "실천 가능성", "오래 이어질 수 있는지"] },
+      ],
+    }),
+  },
+  {
+    key: "past",
+    id: DEMO.unitDesignIds.past,
+    title: "물의 세 가지 상태",
+    subject: "과학",
+    gradeRange: "3-4",
+    grade: DEMO.grade,
+    area: "물질",
+    coreIdea: "물은 얼음, 물, 수증기의 모습으로 존재하며 온도가 달라지면 한 상태에서 다른 상태로 변할 수 있다.",
+    selectedKeywords: ["고체", "액체", "기체", "상태 변화"],
+    coreSentences: [
+      "물은 얼음인 고체, 흐르는 물인 액체, 눈에 잘 보이지 않는 수증기인 기체로 존재한다.",
+      "물이 얼거나 녹고 증발하는 동안 물질은 사라지지 않고 상태가 달라진다.",
+    ],
+    essentialQuestions: [
+      "물은 상태가 달라져도 같은 물질이라고 할 수 있을까?",
+      "물의 상태 변화는 우리 생활에서 어떻게 나타날까?",
+    ],
+    inquiryQuestions: [
+      inquiryQuestion(
+        "factual",
+        "물이 얼 때 부피는 어떻게 달라질까?",
+        "물이 얼기 전과 얼고 난 뒤의 모습을 관찰해 사실을 확인하는 질문이에요.",
+        [["부피", "물체가 차지하는 공간의 크기"], ["얼음", "물이 얼어 고체가 된 것"]],
+        "같은 양의 물을 얼리기 전과 후에 표시한 높이를 비교해 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "물의 상태가 달라져도 물이라고 할 수 있는 까닭은 무엇일까?",
+        "모습이 달라져도 같은 물질인지 공통점과 변화를 찾아보는 질문이에요.",
+        [["상태", "물질이 고체, 액체, 기체로 나타나는 모습"], ["변화", "모양이나 성질이 달라지는 것"]],
+        "얼음이 녹고 다시 어는 과정을 순서대로 그려 보세요.",
+      ),
+      inquiryQuestion(
+        "controversial",
+        "물을 아끼기 위해 학교에서 빗물을 모아 청소에 사용해야 할까?",
+        "물 절약의 도움과 사용 과정에서 살펴볼 점을 근거로 판단하는 질문이에요.",
+        [["물 절약", "필요한 만큼만 물을 사용하는 일"], ["빗물", "비가 내려 모인 물"]],
+        "빗물을 사용했을 때 좋은 점과 깨끗하게 관리해야 하는 점을 비교해 보세요.",
+      ),
+    ],
+    learningGuides: learningGuide({
+      explanation: "물은 고체, 액체, 기체의 모습으로 달라질 수 있지만 모두 같은 물질인 물이에요.",
+      lifeConnection: "얼음이 녹고, 주전자의 물이 줄고, 차가운 컵에 물방울이 맺히는 모습에서 물의 변화를 볼 수 있어요.",
+      keywords: [["고체", "모양과 부피가 일정한 상태"], ["액체", "담긴 그릇에 따라 모양이 달라지는 상태"], ["기체", "공간에 널리 퍼지는 상태"], ["상태 변화", "물질의 상태가 달라지는 현상"]],
+      sentenceExplanations: [
+        "얼음, 물, 수증기는 모습은 달라도 모두 물이에요.",
+        "물은 얼고 녹거나 증발해도 없어지는 것이 아니라 모습이 달라져요.",
+      ],
+      essentialQuestionGuides: [
+        { thinkingFocus: "상태마다 달라지는 점과 그대로인 점을 나누어 찾아보세요.", perspectives: ["겉모습", "움직임", "같은 물질"] },
+        { thinkingFocus: "집과 학교에서 볼 수 있는 물의 상태 변화를 찾아보세요.", perspectives: ["요리", "날씨", "생활 도구"] },
+      ],
+    }),
+  },
+  {
+    key: "pastMath",
+    id: DEMO.unitDesignIds.pastMath,
+    title: "자료를 표와 그래프로 나타내요",
+    subject: "수학",
+    gradeRange: "3-4",
+    grade: DEMO.grade,
+    area: "자료와 가능성",
+    coreIdea: "자료를 기준에 따라 분류하고 표와 그래프로 나타내면 수의 크기와 변화를 쉽게 비교하고 알맞은 결론을 찾을 수 있다.",
+    selectedKeywords: ["자료", "표", "그래프", "눈금"],
+    coreSentences: [
+      "표는 자료를 항목과 수에 따라 가지런히 정리한 것이다.",
+      "그래프는 자료의 크기와 차이를 한눈에 비교하도록 나타낸 것이다.",
+    ],
+    essentialQuestions: [
+      "자료에 알맞은 표와 그래프는 어떻게 고를 수 있을까?",
+      "같은 자료를 나타내는 방법이 달라지면 생각도 달라질 수 있을까?",
+    ],
+    inquiryQuestions: [
+      inquiryQuestion(
+        "factual",
+        "표와 그래프에서 가장 많고 가장 적은 항목은 무엇일까?",
+        "표와 그래프에 나타난 수를 직접 읽어 확인하는 질문이에요.",
+        [["항목", "자료를 나누는 각각의 종류"], ["눈금", "수의 크기를 나타내려고 일정하게 표시한 선이나 점"]],
+        "각 항목의 수를 읽고 가장 큰 수와 가장 작은 수에 표시해 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "표와 그래프는 자료를 이해하는 데 각각 어떤 도움을 줄까?",
+        "두 표현 방법의 특징과 쓰임을 비교해 관계를 찾는 질문이에요.",
+        [["표", "자료를 칸에 맞추어 정리한 것"], ["그래프", "자료의 크기나 변화를 그림처럼 나타낸 것"]],
+        "정확한 수를 찾을 때와 크기를 빠르게 비교할 때 무엇이 편한지 살펴보세요.",
+      ),
+      inquiryQuestion(
+        "controversial",
+        "자료의 차이를 크게 보이게 하려고 그래프의 눈금을 바꾸어도 될까?",
+        "그래프를 알아보기 쉽게 만드는 것과 자료를 바르게 전달하는 것을 함께 판단하는 질문이에요.",
+        [["왜곡", "사실과 다르게 보이도록 바꾸는 것"], ["공정한 표현", "자료를 치우치지 않게 나타내는 것"]],
+        "같은 자료를 서로 다른 눈금으로 그린 뒤 보는 사람의 생각이 어떻게 달라지는지 비교해 보세요.",
+      ),
+    ],
+    learningGuides: learningGuide({
+      explanation: "자료를 표로 정리하면 정확한 수를 찾기 쉽고, 그래프로 나타내면 크기와 차이를 빠르게 비교할 수 있어요.",
+      lifeConnection: "우리 반이 좋아하는 운동이나 한 주 동안의 날씨를 조사해 표와 그래프로 나타낼 수 있어요.",
+      keywords: [["자료", "조사하거나 관찰해 모은 내용"], ["표", "자료를 칸에 맞추어 정리한 것"], ["그래프", "자료의 크기와 변화를 쉽게 비교하도록 나타낸 것"], ["눈금", "수의 간격을 일정하게 표시한 것"]],
+      sentenceExplanations: [
+        "표는 항목별 수를 정확하게 찾아보기 좋게 정리한 것이에요.",
+        "그래프는 어느 항목이 크거나 작은지 빠르게 비교하게 도와줘요.",
+      ],
+      essentialQuestionGuides: [
+        { thinkingFocus: "자료의 종류와 알고 싶은 내용을 먼저 정해 보세요.", perspectives: ["정확한 수", "크기 비교", "시간에 따른 변화"] },
+        { thinkingFocus: "같은 자료를 표와 여러 그래프로 나타내고 느낌을 비교해 보세요.", perspectives: ["보기 쉬움", "정확함", "공정한 표현"] },
+      ],
+    }),
+  },
+  {
+    key: "today",
+    id: DEMO.unitDesignIds.today,
+    title: "온도에 따라 달라지는 물질의 상태",
+    subject: "과학",
+    gradeRange: "3-4",
+    grade: DEMO.grade,
+    area: "물질",
+    coreIdea: "물질은 온도에 따라 상태가 달라지며 상태가 변할 때 부피, 모양, 움직임처럼 관찰할 수 있는 변화가 나타난다.",
+    selectedKeywords: ["물질", "온도", "상태 변화"],
+    coreSentences: [
+      "물질에 열을 더하거나 빼면 고체, 액체, 기체 사이에서 상태가 달라질 수 있다.",
+      "상태 변화가 일어나는 조건과 모습을 관찰하면 생활 속 현상을 설명할 수 있다.",
+    ],
+    essentialQuestions: [
+      "온도는 물질의 상태 변화에 어떤 영향을 줄까?",
+      "상태 변화를 이용해 생활 속 문제를 어떻게 해결할 수 있을까?",
+    ],
+    inquiryQuestions: [
+      inquiryQuestion(
+        "factual",
+        "얼음은 어느 조건에서 가장 빨리 녹을까?",
+        "조건을 다르게 해 얼음이 녹는 시간을 관찰하고 비교하는 질문이에요.",
+        [["조건", "실험에서 다르게 하거나 같게 하는 것"], ["녹는 시간", "고체가 액체로 변하는 데 걸리는 시간"]],
+        "햇빛과 그늘처럼 한 가지 조건만 다르게 하고 나머지는 같게 정해 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "물질의 상태 변화와 온도는 어떤 관계가 있을까?",
+        "온도가 달라질 때 물질의 상태가 변하는 까닭과 관계를 찾는 질문이에요.",
+        [["온도", "차갑고 뜨거운 정도를 나타내는 값"], ["관계", "두 가지가 서로 이어지는 방식"]],
+        "얼음, 물, 수증기가 되는 때의 온도와 모습을 순서대로 떠올려 보세요.",
+      ),
+      inquiryQuestion(
+        "controversial",
+        "상태 변화를 이용하는 생활 도구는 편리함보다 에너지 절약을 먼저 생각해야 할까?",
+        "생활의 편리함과 에너지 사용을 함께 비교해 판단하는 질문이에요.",
+        [["에너지 절약", "필요하지 않은 에너지 사용을 줄이는 일"], ["생활 도구", "생활을 편리하게 하려고 사용하는 물건"]],
+        "냉장고나 에어컨이 주는 도움과 사용하는 에너지의 양을 함께 살펴보세요.",
+      ),
+    ],
+    learningGuides: learningGuide({
+      explanation: "물질은 온도가 달라지면 고체, 액체, 기체의 상태가 변하고 그 과정에서 눈으로 확인할 수 있는 변화가 나타나요.",
+      lifeConnection: "얼음이 녹고 젖은 빨래가 마르며 냉동실에서 물이 어는 일에서 상태 변화를 찾을 수 있어요.",
+      keywords: [["물질", "주변의 물건을 이루는 재료"], ["온도", "차갑고 뜨거운 정도"], ["상태 변화", "고체, 액체, 기체 사이에서 모습이 달라지는 현상"]],
+      sentenceExplanations: [
+        "물질에 열을 더하거나 빼면 고체, 액체, 기체의 모습이 달라질 수 있어요.",
+        "어떤 조건에서 어떻게 변했는지 관찰하면 생활 속 현상의 까닭을 설명할 수 있어요.",
+      ],
+      essentialQuestionGuides: [
+        { thinkingFocus: "온도가 달라질 때 물질의 모습과 변하는 시간을 함께 살펴보세요.", perspectives: ["온도", "시간", "물질의 모습"] },
+        { thinkingFocus: "상태 변화를 사용하는 물건이 어떤 도움을 주는지 찾아보세요.", perspectives: ["생활의 편리함", "안전", "에너지 절약"] },
+      ],
+    }),
+  },
+  {
+    key: "future",
+    id: DEMO.unitDesignIds.future,
+    title: "환경을 생각하는 생활 속 선택",
+    subject: "사회",
+    gradeRange: "3-4",
+    grade: DEMO.grade,
+    area: "지속 가능한 생활",
+    coreIdea: "생활 속 작은 선택도 자연과 다른 사람에게 영향을 주므로 필요한 것과 환경에 미치는 영향을 함께 생각하고 행동해야 한다.",
+    selectedKeywords: ["환경", "자원", "생활 습관"],
+    coreSentences: [
+      "우리가 사용하는 물건과 에너지는 자연에서 얻은 자원과 이어져 있다.",
+      "덜 쓰고 다시 쓰며 올바르게 나누어 버리는 행동은 환경을 지키는 데 도움이 된다.",
+    ],
+    essentialQuestions: [
+      "나의 생활 습관은 환경과 어떻게 이어져 있을까?",
+      "편리함과 환경 보호를 함께 지키는 선택은 무엇일까?",
+    ],
+    inquiryQuestions: [
+      inquiryQuestion(
+        "factual",
+        "학교에서 하루 동안 가장 많이 버리는 물건은 무엇일까?",
+        "학교에서 나온 쓰레기를 종류와 양에 따라 조사하는 질문이에요.",
+        [["쓰레기", "쓰고 난 뒤 버리는 물건"], ["분류", "같은 특징에 따라 나누는 것"]],
+        "교실과 급식실에서 버려진 물건을 종류별로 안전하게 조사해 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "우리의 소비 습관은 환경에 어떤 영향을 줄까?",
+        "물건을 사고 쓰고 버리는 과정이 자연과 어떻게 이어지는지 찾는 질문이에요.",
+        [["소비", "필요한 물건이나 서비스를 사서 사용하는 일"], ["자원", "생활에 필요한 것을 만들 때 사용하는 자연의 재료"]],
+        "물건 하나가 만들어져 버려질 때까지 필요한 재료와 에너지를 생각해 보세요.",
+      ),
+      inquiryQuestion(
+        "controversial",
+        "환경을 지키기 위해 조금 불편한 생활도 받아들여야 할까?",
+        "환경에 주는 도움과 생활의 불편을 비교해 내 생각을 정하는 질문이에요.",
+        [["환경 보호", "자연과 생활 터전을 건강하게 지키는 일"], ["실천", "생각한 것을 직접 행동으로 옮기는 일"]],
+        "텀블러 사용처럼 불편하지만 도움이 되는 행동과 더 쉬운 방법을 함께 찾아보세요.",
+      ),
+    ],
+    learningGuides: learningGuide({
+      explanation: "우리가 물건과 에너지를 사용하는 방법은 자연에서 얻는 자원의 양과 버려지는 쓰레기의 양에 영향을 줘요.",
+      lifeConnection: "물을 아껴 쓰고, 일회용품을 줄이고, 쓰지 않는 전등을 끄는 행동부터 시작할 수 있어요.",
+      keywords: [["환경", "사람과 생물이 살아가는 주변"], ["자원", "생활에 필요한 것을 만드는 자연의 재료"], ["생활 습관", "생활 속에서 되풀이하는 행동"]],
+      sentenceExplanations: [
+        "우리가 쓰는 물건과 전기는 자연에서 얻은 재료와 에너지로 만들어져요.",
+        "적게 쓰고 다시 쓰며 바르게 버리면 자원과 환경을 지킬 수 있어요.",
+      ],
+      essentialQuestionGuides: [
+        { thinkingFocus: "하루 동안 무엇을 사고 쓰고 버리는지 차례로 살펴보세요.", perspectives: ["물건", "에너지", "쓰레기"] },
+        { thinkingFocus: "환경에 주는 도움과 내가 겪을 불편을 함께 비교해 보세요.", perspectives: ["환경 보호", "생활의 편리함", "계속 실천할 수 있는지"] },
+      ],
+    }),
+  },
+];
 
 const SESSION_QUESTION_BANKS = {
   pastKorean: [
@@ -657,35 +972,43 @@ async function createClassAccounts(tx, passwordHash) {
 }
 
 async function createInquiryLearningData(tx, studentIds) {
-  const questions = inquiryQuestions();
-  const todayDate = koreanDate(offsetDate(0));
+  const sessionByKey = new Map(
+    DEMO_SESSION_BLUEPRINTS.map((blueprint) => [blueprint.key, blueprint]),
+  );
+  for (const design of DEMO_UNIT_DESIGN_BLUEPRINTS) {
+    const session = sessionByKey.get(design.key);
+    await tx.unitDesign.create({
+      data: {
+        id: design.id,
+        teacherId: DEMO.teacherId,
+        title: design.title,
+        subject: design.subject,
+        gradeRange: design.gradeRange,
+        grade: design.grade,
+        sessionDate: koreanDate(offsetDate(session.offsetDays)),
+        area: design.area,
+        coreIdea: design.coreIdea,
+        selectedKeywords: design.selectedKeywords,
+        coreSentences: design.coreSentences,
+        essentialQuestions: design.essentialQuestions,
+        inquiryQuestions: design.inquiryQuestions,
+        learningGuides: design.learningGuides,
+        targetClassValue: "4-1",
+        targetStudentIds: studentIds,
+      },
+    });
+  }
 
-  await tx.unitDesign.create({
-    data: {
-      id: DEMO.unitDesignId,
-      teacherId: DEMO.teacherId,
-      title: "온도에 따른 물질의 상태 변화",
-      subject: "과학",
-      gradeRange: "3-4",
-      grade: DEMO.grade,
-      sessionDate: todayDate,
-      area: "물질",
-      coreIdea: "물질은 온도에 따라 상태가 변하며, 상태 변화는 우리 생활과 밀접하게 이어져 있다.",
-      selectedKeywords: ["물질", "온도", "상태 변화"],
-      coreSentences: [
-        "물질에 열을 더하거나 빼면 고체, 액체, 기체 사이에서 상태가 달라질 수 있다.",
-      ],
-      essentialQuestions: [
-        "온도 변화는 물질의 상태와 우리 생활에 어떤 영향을 줄까?",
-      ],
-      inquiryQuestions: questions,
-      learningGuides: learningGuides(),
-      targetClassValue: "4-1",
-      targetStudentIds: studentIds,
-    },
-  });
-
+  const designById = new Map(
+    DEMO_UNIT_DESIGN_BLUEPRINTS.map((design) => [design.id, design]),
+  );
   for (const blueprint of DEMO_SESSION_BLUEPRINTS) {
+    const design = designById.get(blueprint.unitDesignId);
+    const publishedAt = offsetDate(blueprint.offsetDays).toISOString();
+    const sharedQuestions = design.inquiryQuestions.map((question) => ({
+      ...question,
+      publishedAt,
+    }));
     await tx.questionSession.create({
       data: {
         id: blueprint.id,
@@ -698,13 +1021,36 @@ async function createInquiryLearningData(tx, studentIds) {
         targetGrade: DEMO.grade,
         targetClassName: DEMO.className,
         targetStudentIds: studentIds,
-        sharedQuestions: questions,
+        sharedQuestions,
         defaultQuestionPublic: true,
         likesVisibleToPeers: true,
         commentsVisibleToPeers: true,
         isActive: true,
       },
     });
+
+    for (const [index, question] of sharedQuestions.entries()) {
+      const id = `usb-demo-shared-question-${blueprint.key}-${pad(index + 1)}`;
+      await tx.question.create({
+        data: {
+          id,
+          content: question.content,
+          normalizedContent: question.content,
+          dedupeKey: id,
+          closure: "open",
+          cognitive: question.type,
+          closureScore: 0.95,
+          cognitiveScore: 0.95,
+          context: blueprint.topic,
+          source: "TEACHER_SHARED",
+          inquiryType: question.type,
+          sessionId: blueprint.id,
+          authorId: DEMO.teacherId,
+          isPublic: true,
+          createdAt: offsetDate(blueprint.offsetDays),
+        },
+      });
+    }
   }
 
   const activityPlans = buildDemoLearningActivityPlans(studentIds);
@@ -965,6 +1311,8 @@ export async function seedUsbDemo() {
     const [
       count,
       sessionCount,
+      unitDesignCount,
+      sharedQuestionCount,
       questionCount,
       commentCount,
       likeCount,
@@ -983,6 +1331,10 @@ export async function seedUsbDemo() {
         },
       }),
       prisma.questionSession.count({ where: { teacherId: DEMO.teacherId } }),
+      prisma.unitDesign.count({ where: { teacherId: DEMO.teacherId } }),
+      prisma.question.count({
+        where: { authorId: DEMO.teacherId, source: "TEACHER_SHARED" },
+      }),
       prisma.question.count({ where: { authorId: { in: studentIds } } }),
       prisma.comment.count({ where: { authorId: { in: studentIds } } }),
       prisma.questionLike.count({ where: { userId: { in: studentIds } } }),
@@ -998,6 +1350,8 @@ export async function seedUsbDemo() {
     }
     if (
       sessionCount !== DEMO_SESSION_BLUEPRINTS.length
+      || unitDesignCount !== DEMO_UNIT_DESIGN_BLUEPRINTS.length
+      || sharedQuestionCount !== DEMO_SESSION_BLUEPRINTS.length * 3
       || questionCount !== 92
       || commentCount !== 93
       || likeCount !== 153
@@ -1007,12 +1361,12 @@ export async function seedUsbDemo() {
       || kimLikeCount !== 18
     ) {
       throw new Error(
-        `시연 자료 수가 예상과 다릅니다: 수업 ${sessionCount}, 질문 ${questionCount}, 댓글 ${commentCount}, 좋아요 ${likeCount}, 분석 ${analysisCount}`,
+        `시연 자료 수가 예상과 다릅니다: 수업 ${sessionCount}, 참고자료 ${unitDesignCount}, 배포 질문 ${sharedQuestionCount}, 학생 질문 ${questionCount}, 댓글 ${commentCount}, 좋아요 ${likeCount}, 분석 ${analysisCount}`,
       );
     }
 
     console.log(
-      `시연 학급 생성 완료: 김교사, 학생 ${count}명, 질문수업 ${sessionCount}개, 김질문 질문 ${kimQuestionCount}개, 댓글 ${kimCommentCount}개, 좋아요 ${kimLikeCount}개, 수업 분석 ${analysisCount}개`,
+      `시연 학급 생성 완료: 김교사, 학생 ${count}명, 질문수업 ${sessionCount}개, 참고자료 ${unitDesignCount}개, 김질문 질문 ${kimQuestionCount}개, 댓글 ${kimCommentCount}개, 좋아요 ${kimLikeCount}개, 수업 분석 ${analysisCount}개`,
     );
   } finally {
     await prisma.$disconnect();

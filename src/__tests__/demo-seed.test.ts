@@ -4,6 +4,7 @@ import packageJson from "../../package.json";
 import {
   buildDemoLearningActivityPlans,
   DEMO_SESSION_BLUEPRINTS,
+  DEMO_UNIT_DESIGN_BLUEPRINTS,
   STUDENT_NAMES,
 } from "../../scripts/seed-usb-demo.mjs";
 
@@ -114,6 +115,40 @@ describe("USB 시연 학급 자료 생성 명령", () => {
           && questionById.get(questionId)?.sessionId === analysis.sessionId
         )).length,
       );
+    }
+  });
+
+  it("모든 질문수업에 4학년 수준의 완전한 탐구 참고자료를 연결한다", () => {
+    expect(DEMO_UNIT_DESIGN_BLUEPRINTS).toHaveLength(6);
+    const designById = new Map(
+      DEMO_UNIT_DESIGN_BLUEPRINTS.map((design) => [design.id, design]),
+    );
+
+    for (const session of DEMO_SESSION_BLUEPRINTS) {
+      expect(session.unitDesignId).toBeTruthy();
+      const design = designById.get(session.unitDesignId);
+      expect(design).toBeDefined();
+      expect(design?.grade).toBe("4");
+      expect(design?.title.trim()).not.toBe("");
+      expect(design?.coreIdea.trim()).not.toBe("");
+      expect(design?.coreSentences.length).toBeGreaterThan(0);
+      expect(design?.essentialQuestions.length).toBeGreaterThan(0);
+      expect(design?.inquiryQuestions.map(({ type }) => type).sort()).toEqual(
+        ["conceptual", "controversial", "factual"],
+      );
+      expect(design?.learningGuides.coreSentences).toHaveLength(
+        design?.coreSentences.length,
+      );
+      expect(design?.learningGuides.essentialQuestions).toHaveLength(
+        design?.essentialQuestions.length,
+      );
+      expect(
+        design?.inquiryQuestions.every(({ studentGuide }) => (
+          Boolean(studentGuide?.meaning)
+          && Boolean(studentGuide?.thinkingStart)
+          && (studentGuide?.keywords.length ?? 0) >= 2
+        )),
+      ).toBe(true);
     }
   });
 
