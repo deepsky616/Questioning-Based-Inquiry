@@ -94,7 +94,6 @@ export function DemoLaunchClient() {
         return;
       }
       router.replace("/student-dashboard");
-      router.refresh();
     } catch {
       setState("offline");
     }
