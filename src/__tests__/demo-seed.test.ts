@@ -93,11 +93,17 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       plans.questions.map((question) => [question.id, question]),
     );
     expect(plans.analyses).toHaveLength(5);
+    expect(
+      new Set(plans.analyses.map(({ result }) => result.summary)).size,
+    ).toBe(5);
     for (const analysis of plans.analyses) {
       expect(analysis.studentId).toBe(studentIds[0]);
-      expect(analysis.result.summary).not.toBe("");
-      expect(analysis.result.growthInsights).not.toBe("");
-      expect(analysis.result.rewriteExample).not.toBe("");
+      expect(analysis.result.summary).toContain("질문아");
+      expect(analysis.result.growthInsights).toMatch(/지난|첫 질문수업/);
+      expect(analysis.result.rewriteExample).toContain("원래 질문:");
+      expect(analysis.result.rewriteExample).toContain("더 좋은 질문:");
+      expect(analysis.result.relevanceInsights).toContain("질문아");
+      expect(analysis.result.insights).toContain("다음");
       expect(analysis.result.totalQuestions).toBeGreaterThan(0);
       expect(analysis.result.totalQuestions).toBe(
         plans.questions.filter(({ authorId, sessionId }) => (
