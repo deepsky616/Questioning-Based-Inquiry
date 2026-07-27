@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
       school: true,
       grade: true,
       className: true,
+      isDemo: true,
       teacherClasses: { select: { grade: true, className: true } },
     },
   });
@@ -51,14 +52,17 @@ export async function GET(req: NextRequest) {
 
   const [classStudents, schoolRows, allRows] = await Promise.all([
     prisma.user.findMany({
-      where: { role: "STUDENT", school, grade, className },
+      where: { role: "STUDENT", school, grade, className, isDemo: me.isDemo },
       select: { id: true, name: true, studentNumber: true, totalPoints: true },
     }),
     prisma.user.findMany({
-      where: { role: "STUDENT", school },
+      where: { role: "STUDENT", school, isDemo: me.isDemo },
       select: { totalPoints: true },
     }),
-    prisma.user.findMany({ where: { role: "STUDENT" }, select: { totalPoints: true } }),
+    prisma.user.findMany({
+      where: { role: "STUDENT", isDemo: me.isDemo },
+      select: { totalPoints: true },
+    }),
   ]);
 
   const classPoints = classStudents.map((s) => s.totalPoints);

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { sendTeacherWelcomeEmail } from "@/lib/email";
 import { validatePasswordPolicy } from "@/lib/password-policy";
 import { checkRateLimit, getClientIp } from "@/lib/api-rate-limit";
+import { isReservedDemoSchool } from "@/lib/demo-config";
 
 const studentSchema = z.object({
   role: z.literal("STUDENT"),
@@ -42,6 +43,13 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const data = registerSchema.parse(body);
+
+    if (isReservedDemoSchool(data.school)) {
+      return NextResponse.json(
+        { error: "시연 전용 학교 이름은 회원가입에 사용할 수 없습니다" },
+        { status: 400 },
+      );
+    }
 
     if (data.role === "STUDENT") {
       return NextResponse.json(

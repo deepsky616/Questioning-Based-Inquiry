@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
       name: true,
       totalPoints: true,
       role: true,
+      isDemo: true,
       teacherClasses: { select: { grade: true, className: true } },
     },
   });
@@ -40,7 +41,10 @@ export async function GET(req: NextRequest) {
   const filterGrade = req.nextUrl.searchParams.get("grade");
   const filterClass = req.nextUrl.searchParams.get("className");
 
-  const where: Record<string, unknown> = { role: "STUDENT" };
+  const where: Record<string, unknown> = {
+    role: "STUDENT",
+    isDemo: me.isDemo,
+  };
   if (scope !== "all") where.school = me.school;
   if (scope === "class") {
     const grade = me.role === "TEACHER" ? filterGrade : me.grade;

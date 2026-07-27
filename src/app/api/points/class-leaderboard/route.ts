@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const me = await prisma.user.findUnique({
     where: { id: userId },
-    select: { school: true, grade: true, className: true },
+    select: { school: true, grade: true, className: true, isDemo: true },
   });
   if (!me) return NextResponse.json({ error: "사용자를 찾을 수 없습니다" }, { status: 404 });
 
@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
 
   const where: Record<string, unknown> = {
     role: "STUDENT",
+    isDemo: me.isDemo,
     school: { not: null },
     grade: { not: null },
     className: { not: null },

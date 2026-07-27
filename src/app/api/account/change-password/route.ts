@@ -23,8 +23,17 @@ export async function POST(req: Request) {
     const policyError = validatePasswordPolicy(newPassword);
     if (policyError) return NextResponse.json({ error: policyError }, { status: 400 });
 
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { password: true } });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { password: true, isDemo: true },
+    });
     if (!user) return NextResponse.json({ error: "사용자를 찾을 수 없습니다" }, { status: 404 });
+    if (user.isDemo) {
+      return NextResponse.json(
+        { error: "시연 계정의 비밀번호는 변경할 수 없습니다" },
+        { status: 403 },
+      );
+    }
 
     const ok = await bcrypt.compare(currentPassword, user.password);
     if (!ok) return NextResponse.json({ error: "현재 비밀번호가 올바르지 않습니다" }, { status: 400 });
