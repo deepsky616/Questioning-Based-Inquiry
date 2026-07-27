@@ -65,7 +65,10 @@ export async function POST(req: Request) {
         .filter((question) => question.content.trim().length > 0);
     } else {
       const studentQuestions = await prisma.question.findMany({
-        where: { sessionId: data.sessionId },
+        where: {
+          sessionId: data.sessionId,
+          author: { role: "STUDENT" },
+        },
         select: { id: true, content: true, cognitive: true, context: true, createdAt: true },
         orderBy: { createdAt: "asc" },
       });
@@ -92,6 +95,15 @@ export async function POST(req: Request) {
 
     const flow = getUnitFlow(data.flowId);
     let sequencedQuestions = fallbackSequenceQuestions(questions, flow.id);
+    if (data.mode === "merge") {
+      const sourceContentById = new Map(
+        questions.map((question) => [question.id, question.content]),
+      );
+      sequencedQuestions = sequencedQuestions.map((question) => ({
+        ...question,
+        mergedFrom: [sourceContentById.get(question.id) ?? question.content],
+      }));
+    }
     let generatedBy: "ai" | "rules" = "rules";
 
     const aiCfg = await resolveUserAiConfig(user.id);
@@ -116,7 +128,12 @@ export async function POST(req: Request) {
           apiKeyOverride: apiKey,
           modelOverride: aiCfg.model,
         });
-        const aiQuestions = normalizeSequencedQuestions(parsed?.sequencedQuestions, questions, data.mode);
+        const aiQuestions = normalizeSequencedQuestions(
+          parsed?.sequencedQuestions,
+          questions,
+          data.mode,
+          flow.id,
+        );
         // 정렬 모드는 질문 수가 유지돼야 하지만, 통합 모드는 줄어들 수 있다
         const ok = data.mode === "merge"
           ? aiQuestions.length > 0 && aiQuestions.length <= questions.length

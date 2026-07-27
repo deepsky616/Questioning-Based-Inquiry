@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync("src/components/teacher/QuestionSequenceEditor.tsx", "utf8");
+const routeSource = readFileSync("src/app/api/unit-design/sequence/route.ts", "utf8");
+const publishPanelSource = readFileSync(
+  "src/app/(teacher)/teacher-questions/QuestionSequencePanel.tsx",
+  "utf8",
+);
 
 describe("단원 설계 기준 설명 위치", () => {
   it("선택한 기준 설명을 기준 선택 영역 바로 아래에 보여준다", () => {
@@ -11,5 +16,18 @@ describe("단원 설계 기준 설명 위치", () => {
 
   it("기준 설명을 아래쪽의 별도 도움 패널로 분리하지 않는다", () => {
     expect(source).not.toContain("선택한 탐구 흐름 설명");
+  });
+
+  it("학생이 작성한 질문만 묶고 선택한 흐름 정보를 배포 자료에 보존한다", () => {
+    expect(routeSource).toContain('author: { role: "STUDENT" }');
+    for (const field of [
+      "lessonPhase",
+      "rationale",
+      "flowId",
+      "flowTitle",
+      "flowAxis",
+    ]) {
+      expect(publishPanelSource).toContain(`${field}: q.${field}`);
+    }
   });
 });

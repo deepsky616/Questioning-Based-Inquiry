@@ -811,10 +811,31 @@ export function buildDemoLearningActivityPlans(studentIds) {
 }
 
 const CLASS_INQUIRY_FLOW = [
-  { type: "factual", contentGroup: "사실 확인" },
-  { type: "conceptual", contentGroup: "관계와 까닭" },
-  { type: "controversial", contentGroup: "판단과 토론" },
+  {
+    type: "factual",
+    contentGroup: "사실 확인",
+    lessonPhase: "기초 확인",
+    rationale: "먼저 학생 질문에서 직접 확인할 사실과 핵심 낱말을 살펴보도록 배치했습니다.",
+  },
+  {
+    type: "conceptual",
+    contentGroup: "관계와 까닭",
+    lessonPhase: "관계 탐구",
+    rationale: "확인한 사실을 바탕으로 까닭과 관계를 깊이 생각하도록 배치했습니다.",
+  },
+  {
+    type: "controversial",
+    contentGroup: "판단과 토론",
+    lessonPhase: "적용과 판단",
+    rationale: "앞에서 탐구한 내용을 생활에 적용하고 여러 관점에서 판단하도록 배치했습니다.",
+  },
 ];
+
+const CLASS_INQUIRY_FLOW_BASIS = {
+  flowId: "cognitive-development",
+  flowTitle: "인지적 발달 흐름",
+  flowAxis: "사실 확인 → 관계와 까닭 → 적용과 판단",
+};
 
 export function buildDemoClassInquiryQuestions(
   design,
@@ -828,24 +849,27 @@ export function buildDemoClassInquiryQuestions(
     design.inquiryQuestions.map((question) => [question.type, question]),
   );
 
-  return CLASS_INQUIRY_FLOW.map(({ type, contentGroup }, index) => {
+  if (questionsInSession.length === 0) return [];
+
+  return CLASS_INQUIRY_FLOW.map((flowStep, index) => {
+    const { type, contentGroup, lessonPhase, rationale } = flowStep;
     const question = designQuestionByType.get(type);
     const sameTypeQuestions = questionsInSession.filter(
       (studentQuestion) => studentQuestion.inquiryType === type,
     );
-    const mergedFrom = (sameTypeQuestions.length > 0
-      ? sameTypeQuestions
-      : questionsInSession
-    )
-      .slice(0, 4)
-      .map((studentQuestion) => studentQuestion.content);
+    const mergedFrom = sameTypeQuestions.map(
+      (studentQuestion) => studentQuestion.content,
+    );
 
     return {
       ...question,
       contentGroup,
+      lessonPhase,
+      rationale,
       priority: index + 1,
       source: "student",
-      mergedFrom: mergedFrom.length > 0 ? mergedFrom : [question.content],
+      ...CLASS_INQUIRY_FLOW_BASIS,
+      mergedFrom,
     };
   });
 }
@@ -1395,7 +1419,7 @@ export async function seedUsbDemo() {
     if (
       sessionCount !== DEMO_SESSION_BLUEPRINTS.length
       || unitDesignCount !== DEMO_UNIT_DESIGN_BLUEPRINTS.length
-      || sharedQuestionCount !== DEMO_SESSION_BLUEPRINTS.length * 3
+      || sharedQuestionCount !== ACTIVITY_SESSION_BLUEPRINTS.length * 3
       || questionCount !== 92
       || commentCount !== 93
       || likeCount !== 153

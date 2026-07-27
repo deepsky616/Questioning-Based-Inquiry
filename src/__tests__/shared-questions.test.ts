@@ -17,6 +17,31 @@ describe("normalizeSharedQuestions", () => {
     ]);
     expect(result[0]).toEqual({ type: "student", content: "C", contentGroup: "광합성", priority: 5, source: "teacher" });
   });
+
+  it("단원 설계 흐름과 질문 배치 정보를 보존한다", () => {
+    const [result] = normalizeSharedQuestions([
+      {
+        type: "conceptual",
+        content: "대표 질문",
+        contentGroup: "관계와 까닭",
+        priority: 2,
+        source: "student",
+        lessonPhase: "관계 탐구",
+        rationale: "기초 확인 다음에 원리를 살펴보도록 배치했습니다.",
+        flowId: "cognitive-development",
+        flowTitle: "인지적 발달 흐름",
+        flowAxis: "사실 확인에서 적용과 판단으로",
+      },
+    ]);
+
+    expect(result).toMatchObject({
+      lessonPhase: "관계 탐구",
+      rationale: "기초 확인 다음에 원리를 살펴보도록 배치했습니다.",
+      flowId: "cognitive-development",
+      flowTitle: "인지적 발달 흐름",
+      flowAxis: "사실 확인에서 적용과 판단으로",
+    });
+  });
 });
 
 describe("groupSharedQuestions", () => {
@@ -40,9 +65,18 @@ describe("groupSharedQuestions", () => {
 describe("mergedFrom 관통", () => {
   it("normalize가 유효한 원본 질문 목록을 보존한다", () => {
     const [q] = normalizeSharedQuestions([
-      { content: "대표 질문", mergedFrom: ["원본1", "원본2", "", 3 as unknown as string] },
+      {
+        content: "대표 질문",
+        mergedFrom: [
+          "원본1",
+          "원본2",
+          "원본1",
+          "",
+          3 as unknown as string,
+        ],
+      },
     ]);
-    expect(q.mergedFrom).toEqual(["원본1", "원본2"]);
+    expect(q.mergedFrom).toEqual(["원본1", "원본2", "원본1"]);
   });
 
   it("mergedFrom이 없으면 필드를 만들지 않는다", () => {

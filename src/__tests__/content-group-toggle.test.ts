@@ -13,11 +13,11 @@ describe("내용별 묶음 접기 토글", () => {
     expect(teacherSource).toContain("className=\"mb-2 flex w-full items-center justify-between");
   });
 
-  it("학생 내용별 묶음 패널은 자체 접기 상태와 접근성 속성을 가진다", () => {
-    expect(studentSource).toContain("groupPanelOpen");
-    expect(studentSource).toContain("setGroupPanelOpen");
-    expect(studentSource).toContain("aria-expanded={groupPanelOpen}");
-    expect(studentSource).toContain("<CollapseChevron open={groupPanelOpen}");
-    expect(studentSource).toContain("className=\"flex w-full items-center justify-between");
+  it("학생 수업 탐구 질문은 참고자료나 중복 묶음 패널 없이 질문 흐름만 표시한다", () => {
+    expect(studentSource).not.toContain("SessionReferencePanel");
+    expect(studentSource).not.toContain("groupPanelOpen");
+    expect(studentSource).toContain("data-class-inquiry-flow");
+    expect(studentSource).toContain("data-student-question-cluster");
+    expect(studentSource).toContain("orderedQuestions");
   });
 });

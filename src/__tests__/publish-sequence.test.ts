@@ -53,7 +53,19 @@ describe("POST publish-questions (sequence 분기)", () => {
     const res = await POST(
       req({
         sequence: [
-          { type: "factual", content: "학생질문1", contentGroup: "광합성", priority: 1, source: "student" },
+          {
+            type: "factual",
+            content: "학생질문1",
+            contentGroup: "광합성",
+            priority: 1,
+            source: "student",
+            lessonPhase: "기초 확인",
+            rationale: "먼저 알아야 할 사실을 확인합니다.",
+            flowId: "cognitive-development",
+            flowTitle: "인지적 발달 흐름",
+            flowAxis: "낮은 사고에서 높은 사고로",
+            mergedFrom: ["학생 원본 질문 1", "학생 원본 질문 2"],
+          },
           { type: "conceptual", content: "교사질문1", contentGroup: "광합성", priority: 2, source: "teacher" },
         ],
       }),
@@ -63,7 +75,17 @@ describe("POST publish-questions (sequence 분기)", () => {
     const updateArg = mockSessUpdate.mock.calls[0][0];
     const saved = updateArg.data.sharedQuestions;
     expect(saved).toHaveLength(2);
-    expect(saved[0]).toMatchObject({ content: "학생질문1", contentGroup: "광합성", priority: 1 });
+    expect(saved[0]).toMatchObject({
+      content: "학생질문1",
+      contentGroup: "광합성",
+      priority: 1,
+      lessonPhase: "기초 확인",
+      rationale: "먼저 알아야 할 사실을 확인합니다.",
+      flowId: "cognitive-development",
+      flowTitle: "인지적 발달 흐름",
+      flowAxis: "낮은 사고에서 높은 사고로",
+      mergedFrom: ["학생 원본 질문 1", "학생 원본 질문 2"],
+    });
     // 학생·교사 질문 모두 TEACHER_SHARED로 배포되어 좋아요·댓글 대상이 된다
     expect(mockQCreate).toHaveBeenCalledTimes(2);
     const created = mockQCreate.mock.calls.map((c) => c[0].data.content);

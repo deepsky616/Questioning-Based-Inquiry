@@ -17,7 +17,20 @@ export interface QuestionSession {
   targetClassName?: string | null;
   targetStudentId?: string | null;
   targetStudentIds?: string[] | null;
-  sharedQuestions?: Array<{ type: string; content: string; contentGroup?: string; source?: "student" | "teacher"; priority?: number; mergedFrom?: string[]; publishedAt?: string }>;
+  sharedQuestions?: Array<{
+    type: string;
+    content: string;
+    contentGroup?: string;
+    source?: "student" | "teacher";
+    priority?: number;
+    lessonPhase?: string;
+    rationale?: string;
+    flowId?: string;
+    flowTitle?: string;
+    flowAxis?: string;
+    mergedFrom?: string[];
+    publishedAt?: string;
+  }>;
 }
 
 // 질문 조회 탭의 질문 한 건 (페이지·다이얼로그 공유)

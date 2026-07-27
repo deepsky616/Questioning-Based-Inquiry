@@ -159,7 +159,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     }
   });
 
-  it("학생 질문을 묶고 수업 흐름에 맞춘 수업 탐구 질문을 참고자료에 배포한다", () => {
+  it("학생 질문 전체를 묶고 단원 설계 흐름에 맞춘 수업 탐구 질문을 만든다", () => {
     const studentIds = STUDENT_NAMES.map(
       (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
     );
@@ -171,11 +171,19 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     for (const session of DEMO_SESSION_BLUEPRINTS) {
       const design = designById.get(session.unitDesignId);
       expect(design).toBeDefined();
+      const studentQuestions = activityPlans.questions.filter(
+        (question) => question.sessionId === session.id,
+      );
       const sharedQuestions = buildDemoClassInquiryQuestions(
         design!,
         session.id,
         activityPlans.questions,
       );
+
+      if (studentQuestions.length === 0) {
+        expect(sharedQuestions).toEqual([]);
+        continue;
+      }
 
       expect(sharedQuestions.map(({ priority }) => priority)).toEqual([1, 2, 3]);
       expect(sharedQuestions.map(({ contentGroup }) => contentGroup)).toEqual([
@@ -185,8 +193,22 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       ]);
       expect(sharedQuestions.every(({ source }) => source === "student")).toBe(true);
       expect(
+        sharedQuestions.every(({ flowId }) => flowId === "cognitive-development"),
+      ).toBe(true);
+      expect(
+        sharedQuestions.every(({ flowTitle }) => flowTitle === "인지적 발달 흐름"),
+      ).toBe(true);
+      expect(
+        sharedQuestions.every(({ lessonPhase, rationale }) => (
+          Boolean(lessonPhase) && Boolean(rationale)
+        )),
+      ).toBe(true);
+      expect(
         sharedQuestions.every(({ mergedFrom }) => (mergedFrom?.length ?? 0) > 0),
       ).toBe(true);
+      expect(
+        sharedQuestions.flatMap(({ mergedFrom }) => mergedFrom ?? []).sort(),
+      ).toEqual(studentQuestions.map(({ content }) => content).sort());
     }
   });
 

@@ -369,8 +369,11 @@ export function DeployedDesignList({ sessions, onChanged }: DeployedDesignListPr
                       source: q.source === "teacher" ? "teacher" : "student",
                       contentGroup: q.contentGroup || t("groupDefault"),
                       priority: q.priority ?? i + 1,
-                      lessonPhase: t("phaseDefault"),
-                      rationale: "",
+                      lessonPhase: q.lessonPhase || t("phaseDefault"),
+                      rationale: q.rationale || "",
+                      ...(q.flowId ? { flowId: q.flowId } : {}),
+                      ...(q.flowTitle ? { flowTitle: q.flowTitle } : {}),
+                      ...(q.flowAxis ? { flowAxis: q.flowAxis } : {}),
                       ...(q.mergedFrom && q.mergedFrom.length > 0 ? { mergedFrom: q.mergedFrom } : {}),
                     }))}
                     onDeployed={onChanged}

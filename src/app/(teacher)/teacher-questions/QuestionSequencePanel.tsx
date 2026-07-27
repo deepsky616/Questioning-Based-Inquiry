@@ -91,6 +91,11 @@ export function QuestionSequencePanel({
           sequence: result.map((q) => ({
             type: q.type, content: q.content,
             contentGroup: q.contentGroup, priority: q.priority, source: q.source,
+            lessonPhase: q.lessonPhase,
+            rationale: q.rationale,
+            flowId: q.flowId,
+            flowTitle: q.flowTitle,
+            flowAxis: q.flowAxis,
             // 묶기 추적: 대표 질문에 합쳐진 학생 원본 질문(내용별 묶음 표시용)
             ...(q.mergedFrom && q.mergedFrom.length > 0 ? { mergedFrom: q.mergedFrom } : {}),
           })),

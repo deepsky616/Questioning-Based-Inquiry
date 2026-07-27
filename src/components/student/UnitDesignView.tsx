@@ -8,13 +8,11 @@ import { useContentTranslation } from "@/components/shared/use-content-translati
 import { useSessionMetaTranslation } from "@/components/shared/use-session-meta-translation";
 import { TranslateToggle } from "@/components/shared/TranslateToggle";
 import { TranslateAllButton } from "@/components/shared/TranslateAllButton";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Layers3, ListOrdered } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { buildSessionLabel, sortSessionsAsc, sortSessionsDesc, getSessionFilterOptions, filterSessions, groupSessionDatesByMonth, groupSessionsByMonth, isSessionAvailable } from "@/lib/sessions";
-import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
-import { CollapseChevron } from "@/components/shared/SectionToggle";
-import { groupSharedQuestions } from "@/lib/shared-questions";
+import { normalizeSharedQuestions } from "@/lib/shared-questions";
 import { CommentThread } from "@/components/shared/CommentThread";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { getSessionUser } from "@/lib/auth-helpers";
@@ -28,6 +26,10 @@ interface SharedQuestion {
   lessonPhase?: string;
   rationale?: string;
   priority?: number;
+  source?: "student" | "teacher";
+  flowId?: string;
+  flowTitle?: string;
+  flowAxis?: string;
   /** 비슷한 질문 묶기로 이 대표 질문에 합쳐진 학생 원본 질문들 */
   mergedFrom?: string[];
 }
@@ -52,10 +54,20 @@ interface Published {
 
 const TYPE_STYLE: Record<string, string> = {
   factual: "bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30",
-  conceptual: "bg-violet-50 text-violet-700 border-violet-200",
+  conceptual: "bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-500/30",
   controversial: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30",
   student: "bg-muted/40 text-foreground border-border",
 };
+
+function orderedStudentInquiryQuestions(questions: SharedQuestion[] = []) {
+  return normalizeSharedQuestions(questions)
+    .filter(
+      (question) =>
+        question.source === "student" &&
+        (question.mergedFrom?.length ?? 0) > 0,
+    )
+    .sort((a, b) => a.priority - b.priority);
+}
 
 function LikeButton({
   id, likeCount, myLike, onChange,
@@ -108,7 +120,6 @@ export function UnitDesignView() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [groupPanelOpen, setGroupPanelOpen] = useState(true);
   // 조회(필터)·검색·정렬 — 목록이 쌓일 때 대비
   const [filterDate, setFilterDate] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
@@ -118,7 +129,9 @@ export function UnitDesignView() {
 
   const { data: rawSessions = [], isLoading } = useStudentSessions<QuestionSession>({ userId: user.id });
   const sessions = useMemo(
-    () => sortSessionsDesc(rawSessions).filter((session) => (session.sharedQuestions?.length ?? 0) > 0),
+    () => sortSessionsDesc(rawSessions).filter(
+      (session) => orderedStudentInquiryQuestions(session.sharedQuestions).length > 0,
+    ),
     [rawSessions],
   );
   const sessionText = useSessionMetaTranslation(sessions);
@@ -131,7 +144,6 @@ export function UnitDesignView() {
   // 세션 변경 시 펼침 상태 초기화
   useEffect(() => {
     setExpandedId(null);
-    setGroupPanelOpen(true);
   }, [selectedId]);
 
   // 선택 세션의 배포 질문(좋아요·댓글수)과 공개 설정도 주기 폴링(12초)+포커스 재조회.
@@ -155,6 +167,28 @@ export function UnitDesignView() {
   const commentsVisible = pubData?.commentsVisible ?? true;
 
   const selectedSession = sessions.find((session) => session.id === selectedId) ?? sessions[0] ?? null;
+  const orderedQuestions = useMemo(
+    () => orderedStudentInquiryQuestions(selectedSession?.sharedQuestions),
+    [selectedSession],
+  );
+  const originalQuestionCount = useMemo(
+    () => orderedQuestions.reduce(
+      (count, question) => count + (question.mergedFrom?.length ?? 0),
+      0,
+    ),
+    [orderedQuestions],
+  );
+  const flowBasisLabel = useMemo(() => {
+    const first = orderedQuestions[0];
+    if (first?.flowTitle) {
+      return first.flowAxis
+        ? `${first.flowTitle} · ${first.flowAxis}`
+        : first.flowTitle;
+    }
+    return Array.from(
+      new Set(orderedQuestions.map((question) => question.contentGroup)),
+    ).join(" → ");
+  }, [orderedQuestions]);
 
   // 조회(필터)·검색·정렬 적용 + 진행 중/지난 수업 구분
   const filterOptions = getSessionFilterOptions(sessions);
@@ -187,12 +221,6 @@ export function UnitDesignView() {
     const next = sortedSessions[selectedSessionIndex + offset];
     if (next) selectSession(next.id);
   };
-  const grouped = useMemo(
-    () => groupSharedQuestions(selectedSession?.sharedQuestions ?? []).map(
-      (g) => [g.group, g.questions] as [string, typeof g.questions],
-    ),
-    [selectedSession],
-  );
   const pubByContent = useMemo(
     () => new Map(published.map((p) => [p.content.trim(), p])),
     [published],
@@ -318,7 +346,11 @@ export function UnitDesignView() {
                                   {sessionText.label(session)}
                                 </p>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                  {t("questionCount", { count: session.sharedQuestions?.length ?? 0 })}
+                                  {t("questionCount", {
+                                    count: orderedStudentInquiryQuestions(
+                                      session.sharedQuestions,
+                                    ).length,
+                                  })}
                                   {session.teacher?.name ? t("teacherByline", { name: session.teacher.name }) : ""}
                                 </p>
                               </div>
@@ -347,7 +379,7 @@ export function UnitDesignView() {
                         total: selectedSessionTotal,
                       })}
                       {" · "}
-                      {t("questionCount", { count: selectedSession.sharedQuestions?.length ?? 0 })}
+                      {t("questionCount", { count: orderedQuestions.length })}
                       {selectedSession.teacher?.name ? t("teacherByline", { name: selectedSession.teacher.name }) : ""}
                     </p>
                   </div>
@@ -378,8 +410,6 @@ export function UnitDesignView() {
                 </div>
               </div>
             )}
-            {/* 참고자료(접기, 기본 닫힘) */}
-            {selectedId && <SessionReferencePanel sessionId={selectedId} />}
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -389,7 +419,7 @@ export function UnitDesignView() {
                       : t("fallbackTitle")}
                   </CardTitle>
                   <TranslateAllButton
-                    items={(selectedSession?.sharedQuestions ?? [])
+                    items={orderedQuestions
                       .map((q) => pubByContent.get(q.content.trim()))
                       .filter((p): p is NonNullable<typeof p> => Boolean(p))
                       .map((p) => ({ type: "QUESTION" as const, id: p.id }))}
@@ -399,11 +429,37 @@ export function UnitDesignView() {
                 <CardDescription>{t("detailDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {(selectedSession?.sharedQuestions ?? []).map((question, index) => {
+                <div
+                  data-class-inquiry-flow
+                  className="space-y-3"
+                >
+                  <div
+                    data-class-inquiry-flow-basis
+                    className="flex flex-col gap-2 border-y border-indigo-100 bg-indigo-50/60 px-3 py-3 dark:border-indigo-500/30 dark:bg-indigo-950/25 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex min-w-0 items-start gap-2">
+                      <ListOrdered className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" aria-hidden />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-indigo-900 dark:text-indigo-100">
+                          {t("flowBasisTitle")}
+                        </p>
+                        <p className="mt-0.5 text-xs leading-5 text-indigo-700 dark:text-indigo-200">
+                          {flowBasisLabel}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="shrink-0 text-xs font-medium text-indigo-700 dark:text-indigo-200">
+                      {t("studentQuestionCount", { count: originalQuestionCount })}
+                    </span>
+                  </div>
+
+                  {orderedQuestions.map((question, index) => {
                     const pub = pubByContent.get(question.content.trim());
                     return (
-                      <div key={`${question.content}-${index}`} className="rounded-lg border bg-white p-3 dark:bg-card">
+                      <div
+                        key={`${question.content}-${index}`}
+                        className="rounded-lg border bg-white p-3 dark:bg-card"
+                      >
                         <div className="flex gap-3">
                           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-900 text-sm font-semibold text-white">
                             {index + 1}
@@ -429,6 +485,24 @@ export function UnitDesignView() {
                             </p>
                             {ct.canTranslate && pub && <TranslateToggle item={{ type: "QUESTION", id: pub.id }} ct={ct} />}
                             {question.rationale && <p className="text-xs text-muted-foreground">{question.rationale}</p>}
+                            <details
+                              data-student-question-cluster
+                              className="group border-t border-border/70 pt-2"
+                            >
+                              <summary className="flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-emerald-700 marker:content-none hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200">
+                                <Layers3 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                {t("clusterTitle", {
+                                  count: question.mergedFrom?.length ?? 0,
+                                })}
+                              </summary>
+                              <ul className="mt-2 space-y-1 border-l-2 border-emerald-200 pl-3 text-xs leading-5 text-muted-foreground dark:border-emerald-500/30">
+                                {(question.mergedFrom ?? []).map((original, originalIndex) => (
+                                  <li key={`${original}-${originalIndex}`} className="break-words">
+                                    {original}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
                             {pub && (
                               <div className="flex items-center gap-3 pt-1">
                                 {likesVisible && (
@@ -471,54 +545,6 @@ export function UnitDesignView() {
                 </div>
               </CardContent>
             </Card>
-
-            {grouped.length > 1 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <button
-                    type="button"
-                    onClick={() => setGroupPanelOpen((open) => !open)}
-                    aria-expanded={groupPanelOpen}
-                    className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-base font-semibold text-foreground transition-colors hover:bg-muted/50 hover:text-primary"
-                  >
-                    <span>{t("groupTitle")}</span>
-                    <CollapseChevron open={groupPanelOpen} className="shrink-0" />
-                  </button>
-                  <CardDescription>{t("groupDesc")}</CardDescription>
-                </CardHeader>
-                {groupPanelOpen && (
-                  <CardContent>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {grouped.map(([group, questions]) => (
-                        <div key={group} className="rounded-lg border bg-white p-3 dark:bg-card">
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <h3 className="text-sm font-semibold text-foreground">{group}</h3>
-                            <span className="text-xs text-muted-foreground">{t("groupCount", { count: questions.length })}</span>
-                          </div>
-                          <ul className="space-y-1.5 text-xs text-muted-foreground">
-                            {questions.map((question, index) => (
-                              <li key={`${question.content}-${index}`}>
-                                <p className="line-clamp-2 font-medium text-foreground/80">
-                                  {question.priority}. {question.content}
-                                </p>
-                                {/* 이 대표 질문에 묶인 우리(학생들)의 원본 질문 */}
-                                {(question.mergedFrom?.length ?? 0) > 1 && (
-                                  <ul className="mt-0.5 space-y-0.5 border-l-2 border-emerald-200 pl-2 dark:border-emerald-500/30">
-                                    {question.mergedFrom!.map((original, i) => (
-                                      <li key={`${original}-${i}`} className="break-words">· {original}</li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            )}
           </div>
         </div>
       )}

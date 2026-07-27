@@ -4,6 +4,11 @@ export interface SharedQuestionItem {
   contentGroup?: string;
   priority?: number;
   source?: "student" | "teacher";
+  lessonPhase?: string;
+  rationale?: string;
+  flowId?: string;
+  flowTitle?: string;
+  flowAxis?: string;
   /** 비슷한 질문 묶기로 이 대표 질문에 합쳐진 학생 원본 질문들 */
   mergedFrom?: string[];
 }
@@ -14,6 +19,11 @@ export interface NormalizedSharedQuestion {
   contentGroup: string;
   priority: number;
   source: "student" | "teacher";
+  lessonPhase?: string;
+  rationale?: string;
+  flowId?: string;
+  flowTitle?: string;
+  flowAxis?: string;
   mergedFrom?: string[];
 }
 
@@ -22,14 +32,26 @@ export const DEFAULT_GROUP = "수업 순서";
 export function normalizeSharedQuestions(raw: SharedQuestionItem[]): NormalizedSharedQuestion[] {
   return raw.map((item, index) => {
     const mergedFrom = Array.isArray(item.mergedFrom)
-      ? item.mergedFrom.filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+      ? item.mergedFrom
+          .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+          .map((value) => value.trim())
       : [];
+    const lessonPhase = item.lessonPhase?.trim();
+    const rationale = item.rationale?.trim();
+    const flowId = item.flowId?.trim();
+    const flowTitle = item.flowTitle?.trim();
+    const flowAxis = item.flowAxis?.trim();
     return {
       type: item.type || "student",
       content: item.content,
       contentGroup: item.contentGroup?.trim() || DEFAULT_GROUP,
       priority: typeof item.priority === "number" ? item.priority : index + 1,
       source: item.source === "teacher" ? "teacher" : "student",
+      ...(lessonPhase ? { lessonPhase } : {}),
+      ...(rationale ? { rationale } : {}),
+      ...(flowId ? { flowId } : {}),
+      ...(flowTitle ? { flowTitle } : {}),
+      ...(flowAxis ? { flowAxis } : {}),
       ...(mergedFrom.length > 0 ? { mergedFrom } : {}),
     };
   });

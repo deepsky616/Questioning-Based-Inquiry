@@ -99,6 +99,9 @@ export interface SequencedQuestion {
   priority: number;
   lessonPhase: string;
   rationale: string;
+  flowId?: string;
+  flowTitle?: string;
+  flowAxis?: string;
   /** 묶기(merge)로 이 대표 질문에 합쳐진 원본 질문 내용들(검토 표시용) */
   mergedFrom?: string[];
 }
@@ -172,6 +175,9 @@ export function fallbackSequenceQuestions(
     priority: index + 1,
     lessonPhase: phase,
     rationale: `${flow.title} 기준에 따라 기초 확인, 원리 탐구, 적용·판단 질문 순서로 배치했습니다.`,
+    flowId: flow.id,
+    flowTitle: flow.title,
+    flowAxis: flow.axis,
   }));
 }
 
@@ -248,12 +254,14 @@ export function normalizeSequencedQuestions(
   value: unknown,
   sourceQuestions: SequenceInputQuestion[],
   mode: "merge" | "sort" = "sort",
+  flowId?: string,
 ): SequencedQuestion[] {
   if (!Array.isArray(value)) return [];
   const sourceById = new Map(sourceQuestions.map((question) => [question.id, question]));
+  const flow = flowId ? getUnitFlow(flowId) : null;
 
   return value
-    .map((item, index) => {
+    .map<SequencedQuestion | null>((item, index) => {
       if (!item || typeof item !== "object") return null;
       const raw = item as Record<string, unknown>;
       // 통합(merge) 모드에서는 새 통합 질문이므로 원본 id가 없으면 새 id를 부여한다
@@ -286,6 +294,13 @@ export function normalizeSequencedQuestions(
         rationale: typeof raw.rationale === "string" && raw.rationale.trim()
           ? raw.rationale.trim()
           : "단원 설계 흐름에 맞춰 배치했습니다.",
+        ...(flow
+          ? {
+              flowId: flow.id,
+              flowTitle: flow.title,
+              flowAxis: flow.axis,
+            }
+          : {}),
       } satisfies SequencedQuestion;
     })
     .filter((item): item is SequencedQuestion => item !== null)
