@@ -333,6 +333,7 @@ export function CurriculumCreateFlow({
         visible={step >= 5}
         inquiryQuestions={inquiryQuestions}
         coreIdea={selectedCoreIdeaLines.join("\n")}
+        achievements={getSelectedAchievements()}
         coreSentences={selectedCoreSentences}
         essentialQuestions={selectedEssentialQuestions}
         learningGuides={learningGuides}

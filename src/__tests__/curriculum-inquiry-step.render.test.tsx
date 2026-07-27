@@ -18,6 +18,10 @@ const baseProps: ComponentProps<typeof CurriculumInquiryStep> = {
     { type: "controversial", content: "개발을 제한해야 할까?" },
   ],
   coreIdea: "생물은 환경과 관계를 맺는다.",
+  achievements: [{
+    code: "[6과05-01]",
+    content: "생태계 구성 요소를 조사하고 생물 요소와 비생물 요소를 구분할 수 있다.",
+  }],
   coreSentences: ["생물은 서로 연결된다."],
   essentialQuestions: ["생태계는 어떻게 유지될까?"],
   learningGuides: undefined,
@@ -128,7 +132,7 @@ describe("다섯째 단계 질문 편집과 배포 자료 확인", () => {
     expect(screen.getByText("생태계와 환경")).toBeInTheDocument();
   });
 
-  it("확인 화면의 단원 자료를 중립·노랑·하늘·보라·초록 영역으로 나눈다", async () => {
+  it("확인 화면의 단원 자료를 구분하고 성취기준을 핵심 아이디어 다음에 둔다", async () => {
     const { container } = render(<InquiryStepHarness />);
     fireEvent.click(screen.getByRole("button", { name: "탐구 질문 만들기 완료" }));
 
@@ -136,6 +140,8 @@ describe("다섯째 단계 질문 편집과 배포 자료 확인", () => {
       .toHaveClass("border-slate-200", "bg-slate-50/80", "dark:border-slate-700", "dark:bg-slate-900/50");
     expect(container.querySelector('[data-student-guide-section="core-idea"]'))
       .toHaveClass("border-amber-200/80", "bg-amber-50/70", "dark:border-amber-800/60", "dark:bg-amber-950/20");
+    expect(container.querySelector('[data-student-guide-section="achievement"]'))
+      .toHaveTextContent("[6과05-01]");
     expect(container.querySelector('[data-student-guide-section="core-sentence"]'))
       .toHaveClass("border-sky-200/80", "bg-sky-50/70", "dark:border-sky-800/60", "dark:bg-sky-950/20");
     expect(container.querySelector('[data-student-guide-section="essential-question"]'))
@@ -145,9 +151,10 @@ describe("다섯째 단계 질문 편집과 배포 자료 확인", () => {
 
     for (const [name, number] of [
       ["core-idea", "1"],
-      ["core-sentence", "2"],
-      ["essential-question", "3"],
-      ["inquiry-question", "4"],
+      ["achievement", "2"],
+      ["core-sentence", "3"],
+      ["essential-question", "4"],
+      ["inquiry-question", "5"],
     ] as const) {
       const section = container.querySelector(`[data-student-guide-section="${name}"]`);
       expect(section?.querySelector("[data-student-guide-number]")).toHaveTextContent(number);

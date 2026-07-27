@@ -32,7 +32,7 @@ vi.mock("@google/genai", () => ({
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { GET, POST } from "@/app/api/unit-design/route";
-import { DELETE } from "@/app/api/unit-design/[id]/route";
+import { DELETE, PATCH } from "@/app/api/unit-design/[id]/route";
 import { POST as createSessionFromDesign } from "@/app/api/unit-design/[id]/session/route";
 import { POST as generatePOST } from "@/app/api/unit-design/generate/route";
 import { buildPrompt } from "@/lib/unit-design-prompt";
@@ -61,6 +61,20 @@ function makeRequest(body?: unknown, method = "POST"): Request {
 function makeDeleteRequest(id: string): [Request, { params: Promise<{ id: string }> }] {
   return [
     new Request(`http://localhost/api/unit-design/${id}`, { method: "DELETE" }),
+    { params: Promise.resolve({ id }) },
+  ];
+}
+
+function makePatchRequest(
+  id: string,
+  body: unknown,
+): [Request, { params: Promise<{ id: string }> }] {
+  return [
+    new Request(`http://localhost/api/unit-design/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
     { params: Promise.resolve({ id }) },
   ];
 }
@@ -109,6 +123,10 @@ describe("GET /api/unit-design — 탐구 질문 목록", () => {
         subject: "과학",
         grade_range: "3-4",
         area: "생명과학",
+        selected_achievements: [{
+          code: "[4과05-01]",
+          content: "식물의 생활을 관찰하고 특징을 설명할 수 있다.",
+        }],
         learning_guides: {
           coreIdea: { explanation: "식물이 빛을 이용하는 큰 원리를 알아봐요.", lifeConnection: "화분을 떠올려 보세요.", keywords: [] },
           coreSentences: [],
@@ -125,6 +143,10 @@ describe("GET /api/unit-design — 탐구 질문 목록", () => {
     expect(body).toHaveLength(1);
     expect(body[0].id).toBe("ud-1");
     expect(body[0].gradeRange).toBe("3-4");
+    expect(body[0].achievements).toEqual([{
+      code: "[4과05-01]",
+      content: "식물의 생활을 관찰하고 특징을 설명할 수 있다.",
+    }]);
     expect(body[0].inquiryQuestions).toEqual([
       { type: "factual", content: "광합성이 일어나는 장소는 어디인가?" },
     ]);
@@ -160,6 +182,10 @@ const VALID_DESIGN = {
   gradeRange: "3-4",
   area: "생명과학",
   coreIdea: "식물은 빛 에너지를 이용해 유기물을 합성한다",
+  achievements: [{
+    code: "[4과05-01]",
+    content: "식물의 생활을 관찰하고 특징을 설명할 수 있다.",
+  }],
   selectedKeywords: ["광합성", "엽록체", "에너지 전환"],
   coreSentences: ["식물은 빛 에너지를 이용해 포도당을 만든다"],
   essentialQuestions: ["생물은 어떻게 에너지를 얻고 활용하는가?"],
@@ -236,10 +262,12 @@ describe("POST /api/unit-design — 탐구 질문 저장", () => {
       id: body.designId,
       grade: "5",
       sessionDate: "2026-07-20",
+      achievements: VALID_DESIGN.achievements,
     });
     const savedArguments = mockQueryRawUnsafe.mock.calls[0].slice(1);
-    expect(JSON.parse(savedArguments[11] as string)).toEqual(LEARNING_GUIDES);
-    expect(savedArguments.slice(12)).toEqual([
+    expect(JSON.parse(savedArguments[8] as string)).toEqual(VALID_DESIGN.achievements);
+    expect(JSON.parse(savedArguments[12] as string)).toEqual(LEARNING_GUIDES);
+    expect(savedArguments.slice(13)).toEqual([
       "5",
       "2026-07-20",
       false,
@@ -283,6 +311,25 @@ describe("POST /api/unit-design — 탐구 질문 저장", () => {
 
     const res = await POST(makeRequest({ ...VALID_DESIGN, curriculumAreaId: undefined }));
     expect(res.status).toBe(200);
+  });
+});
+
+describe("PATCH /api/unit-design/[id] — 탐구 질문 수정", () => {
+  it("성취기준 번호와 내용을 함께 수정한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockQueryRaw.mockResolvedValue([{ teacher_id: "teacher-1" }]);
+    mockQueryRawUnsafe.mockResolvedValue([{ updated_at: new Date("2026-07-27T00:00:00.000Z") }]);
+    const achievements = [{
+      code: "[4과05-02]",
+      content: "식물의 생김새와 생활 방식이 환경과 관련되어 있음을 설명할 수 있다.",
+    }];
+
+    const [req, ctx] = makePatchRequest("ud-1", { achievements });
+    const res = await PATCH(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(mockQueryRawUnsafe.mock.calls[0][0]).toContain("selected_achievements = $1::jsonb");
+    expect(JSON.parse(mockQueryRawUnsafe.mock.calls[0][1] as string)).toEqual(achievements);
   });
 });
 

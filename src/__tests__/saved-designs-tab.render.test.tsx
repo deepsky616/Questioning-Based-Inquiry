@@ -22,6 +22,10 @@ const design: SavedInquiryDesign = {
   sessionDate: "2026-07-18",
   area: "생물과 환경",
   coreIdea: "생물은 환경과 관계를 맺는다.",
+  achievements: [{
+    code: "[6과05-01]",
+    content: "생태계 구성 요소를 조사하고 생물 요소와 비생물 요소를 구분할 수 있다.",
+  }],
   selectedKeywords: ["생물", "환경"],
   coreSentences: ["생물은 서로 연결된다."],
   essentialQuestions: ["생태계는 어떻게 유지될까?"],
@@ -84,7 +88,13 @@ describe("저장된 설계 학생용 설명 편집", () => {
 
     const inquirySection = container.querySelector('[data-student-guide-section="inquiry-question"]');
     expect(inquirySection).toHaveClass("border-emerald-200/80", "bg-emerald-50/70");
-    expect(inquirySection?.querySelector("[data-student-guide-number]")).toHaveTextContent("4");
+    expect(inquirySection?.querySelector("[data-student-guide-number]")).toHaveTextContent("5");
+    const achievementSection = container.querySelector('[data-student-guide-section="achievement"]');
+    expect(achievementSection).toContainElement(screen.getByDisplayValue("[6과05-01]"));
+    expect(achievementSection).toContainElement(
+      screen.getByDisplayValue("생태계 구성 요소를 조사하고 생물 요소와 비생물 요소를 구분할 수 있다."),
+    );
+    expect(achievementSection?.querySelector("[data-student-guide-number]")).toHaveTextContent("2");
     const inquiryItem = screen.getByDisplayValue("생산자는 무엇일까?")
       .closest("[data-saved-inquiry-question]");
     expect(inquiryItem).toBeInTheDocument();
@@ -177,5 +187,45 @@ describe("저장된 설계 학생용 설명 편집", () => {
       target: { value: "교사가 다시 다듬은 설명" },
     });
     expect(screen.getByDisplayValue("교사가 다시 다듬은 설명")).toBeInTheDocument();
+  });
+
+  it("수정한 성취기준 번호와 내용을 저장 요청에 포함한다", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
+      ok: true,
+      updatedAt: "2026-07-27T00:00:00.000Z",
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ConfirmProvider>
+        <SavedDesignsTab
+          savedList={[design]}
+          onChanged={vi.fn()}
+          students={[]}
+          targetClasses={[]}
+        />
+      </ConfirmProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "수정" }));
+    fireEvent.change(screen.getByDisplayValue("[6과05-01]"), {
+      target: { value: "[6과05-02]" },
+    });
+    fireEvent.change(screen.getByDisplayValue(
+      "생태계 구성 요소를 조사하고 생물 요소와 비생물 요소를 구분할 수 있다.",
+    ), {
+      target: { value: "생물 요소가 환경과 서로 영향을 주고받음을 설명할 수 있다." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "저장", exact: true }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(request.achievements).toEqual([{
+      code: "[6과05-02]",
+      content: "생물 요소가 환경과 서로 영향을 주고받음을 설명할 수 있다.",
+    }]);
   });
 });

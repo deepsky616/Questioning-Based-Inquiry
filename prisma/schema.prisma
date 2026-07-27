@@ -486,6 +486,7 @@ model UnitDesign {
   sessionDate        String?         @map("session_date")   // 수업 예정 날짜(저장 시 선택)
   area               String          @map("area")
   coreIdea           String          @db.Text @map("core_idea")
+  achievements       Json            @default("[]") @map("selected_achievements") // [{code, content}] 선택한 성취기준
   selectedKeywords   Json            @map("selected_keywords")   // string[]
   coreSentences      Json            @map("core_sentences")      // string[]
   essentialQuestions Json            @map("essential_questions") // string[]

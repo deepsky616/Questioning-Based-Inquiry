@@ -34,6 +34,7 @@ import {
   type StudentLearningGuides,
 } from "@/lib/student-learning-guide";
 import { appQueryKeys } from "@/lib/app-queries";
+import type { Achievement } from "@/lib/achievement-selection";
 import {
   postQuestionClassFromDesign,
   runSavedDesignQuestionClassCreation,
@@ -136,6 +137,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   const [editTargetClassValue, setEditTargetClassValue] = useState("all");
   const [editSelectedStudentIds, setEditSelectedStudentIds] = useState<string[]>([]);
   const [editCoreIdea, setEditCoreIdea] = useState("");
+  const [editAchievements, setEditAchievements] = useState<Achievement[]>([]);
   const [editCoreSentences, setEditCoreSentences] = useState<string[]>([]);
   const [editEssentialQuestions, setEditEssentialQuestions] = useState<string[]>([]);
   const [editQuestions, setEditQuestions] = useState<InquiryQuestion[]>([]);
@@ -238,6 +240,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
       setEditSelectedStudentIds([...(design.targetStudentIds ?? [])]);
     }
     setEditCoreIdea(design.coreIdea ?? "");
+    setEditAchievements((design.achievements ?? []).map((achievement) => ({ ...achievement })));
     setEditCoreSentences([...(design.coreSentences ?? [])]);
     setEditEssentialQuestions([...(design.essentialQuestions ?? [])]);
     const nextLearningGuides = normalizeStudentLearningGuides(design.learningGuides);
@@ -258,6 +261,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     setEditingDesignId(null);
     setEditTitle("");
     setEditCoreIdea("");
+    setEditAchievements([]);
     setEditCoreSentences([]);
     setEditEssentialQuestions([]);
     setEditLearningGuides(undefined);
@@ -277,6 +281,10 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   ) => setter((prev) => prev.filter((_, i) => i !== index));
   const addTextItem = (setter: React.Dispatch<React.SetStateAction<string[]>>) =>
     setter((prev) => [...prev, ""]);
+  const updateAchievement = (index: number, value: Achievement) =>
+    setEditAchievements((previous) => previous.map((item, itemIndex) => (
+      itemIndex === index ? value : item
+    )));
   const removeLearningTextItem = (
     kind: "coreSentences" | "essentialQuestions",
     setter: React.Dispatch<React.SetStateAction<string[]>>,
@@ -333,6 +341,12 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     const essentialSourceIndexes = editEssentialQuestions.map((item, index) => item.trim() ? index : -1).filter((index) => index >= 0);
     const cleanedSentences = sentenceSourceIndexes.map((index) => editCoreSentences[index].trim());
     const cleanedEssential = essentialSourceIndexes.map((index) => editEssentialQuestions[index].trim());
+    const cleanedAchievements = editAchievements
+      .map((achievement) => ({
+        code: achievement.code.trim(),
+        content: achievement.content.trim(),
+      }))
+      .filter((achievement) => achievement.code && achievement.content);
     const res = await fetch(`/api/unit-design/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -346,6 +360,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         targetClassValue: editTargetClassValue,
         targetStudentIds: editSelectedStudentIds,
         coreIdea: editCoreIdea.trim(),
+        achievements: cleanedAchievements,
         coreSentences: cleanedSentences,
         essentialQuestions: cleanedEssential,
         learningGuides: hasFreshEditStudentGuides
@@ -766,6 +781,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                     )}
                     <StudentLearningGuideEditor
                       coreIdea={editCoreIdea}
+                      achievements={editAchievements}
                       coreSentences={editCoreSentences}
                       essentialQuestions={editEssentialQuestions}
                       guides={editLearningGuides}
@@ -780,6 +796,15 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                         onEssentialQuestionRemove: (index) => removeLearningTextItem("essentialQuestions", setEditEssentialQuestions, index),
                         onEssentialQuestionAdd: () => addTextItem(setEditEssentialQuestions),
                       }}
+                      achievementEditor={{
+                        onChange: updateAchievement,
+                        onRemove: (index) => setEditAchievements((previous) => (
+                          previous.filter((_, itemIndex) => itemIndex !== index)
+                        )),
+                        onAdd: () => setEditAchievements((previous) => (
+                          [...previous, { code: "", content: "" }]
+                        )),
+                      }}
                       onChange={setEditLearningGuides}
                     />
                     </div>
@@ -791,7 +816,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
                       aria-labelledby="saved-student-guide-inquiry-title"
                     >
                       <div className="flex items-start gap-3">
-                        <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200" aria-hidden="true">4</span>
+                        <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200" aria-hidden="true">5</span>
                         <div className="min-w-0">
                           <h3 id="saved-student-guide-inquiry-title" className="flex items-center gap-1.5 text-sm font-semibold text-emerald-950 dark:text-emerald-100">
                             <Search className="h-4 w-4" aria-hidden="true" />

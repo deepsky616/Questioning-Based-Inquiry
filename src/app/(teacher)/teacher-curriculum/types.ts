@@ -21,6 +21,7 @@ export interface SavedInquiryDesign {
   sessionDate?: string | null;
   area: string;
   coreIdea?: string;
+  achievements?: Achievement[];
   selectedKeywords?: string[];
   coreSentences?: string[];
   essentialQuestions?: string[];

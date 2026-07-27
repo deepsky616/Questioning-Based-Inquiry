@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { StudentInquiryGuideEditor } from "@/components/shared/StudentInquiryGuideEditor";
 import { StudentLearningGuideEditor } from "@/components/shared/StudentLearningGuideEditor";
 import { Button } from "@/components/ui/button";
+import type { Achievement } from "@/lib/achievement-selection";
 import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import type { StudentLearningGuides } from "@/lib/student-learning-guide";
 import type { InquiryQuestion } from "./types";
@@ -19,6 +20,7 @@ const TYPE_BADGE_COLOR: Record<InquiryQuestion["type"], string> = {
 interface InquiryDistributionReviewProps {
   unitTitle: string;
   coreIdea: string;
+  achievements: Achievement[];
   coreSentences: string[];
   essentialQuestions: string[];
   inquiryQuestions: InquiryQuestion[];
@@ -39,6 +41,7 @@ interface InquiryDistributionReviewProps {
 export function InquiryDistributionReview({
   unitTitle,
   coreIdea,
+  achievements,
   coreSentences,
   essentialQuestions,
   inquiryQuestions,
@@ -116,6 +119,7 @@ export function InquiryDistributionReview({
 
       <StudentLearningGuideEditor
         coreIdea={coreIdea}
+        achievements={achievements}
         coreSentences={coreSentences}
         essentialQuestions={essentialQuestions}
         guides={learningGuides}
@@ -130,7 +134,7 @@ export function InquiryDistributionReview({
         aria-labelledby="student-guide-inquiry-question-title"
       >
         <div className="flex items-start gap-3">
-          <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200" aria-hidden="true">4</span>
+          <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200" aria-hidden="true">5</span>
           <div className="min-w-0">
             <h3 id="student-guide-inquiry-question-title" className="flex items-center gap-1.5 text-sm font-semibold text-emerald-950 dark:text-emerald-100">
               <Search className="h-4 w-4" aria-hidden="true" />

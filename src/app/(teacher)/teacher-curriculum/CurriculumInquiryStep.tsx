@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { formatDateTime } from "@/lib/datetime";
 import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import type { StudentLearningGuides } from "@/lib/student-learning-guide";
+import type { Achievement } from "@/lib/achievement-selection";
 import type { SessionTargetClass, SessionTargetStudent } from "@/lib/session-targeting";
 import { InquiryDistributionReview } from "./InquiryDistributionReview";
 import { InquiryQuestionEditor } from "./InquiryQuestionEditor";
@@ -24,6 +25,7 @@ interface CurriculumInquiryStepProps {
   visible: boolean;
   inquiryQuestions: InquiryQuestion[];
   coreIdea: string;
+  achievements: Achievement[];
   coreSentences: string[];
   essentialQuestions: string[];
   learningGuides?: StudentLearningGuides;
@@ -82,6 +84,7 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
     visible,
     inquiryQuestions,
     coreIdea,
+    achievements,
     coreSentences,
     essentialQuestions,
     learningGuides,
@@ -204,6 +207,7 @@ export function CurriculumInquiryStep(props: CurriculumInquiryStepProps) {
             <InquiryDistributionReview
               unitTitle={saveTitle}
               coreIdea={coreIdea}
+              achievements={achievements}
               coreSentences={coreSentences}
               essentialQuestions={essentialQuestions}
               inquiryQuestions={inquiryQuestions}

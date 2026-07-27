@@ -30,6 +30,11 @@ const inquiryQuestionSchema = z.object({
   studentGuide: studentGuideSchema.optional(),
 }).passthrough();
 
+const achievementSchema = z.object({
+  code: z.string().trim().max(80),
+  content: z.string().trim().max(1000),
+});
+
 const saveSchema = z.object({
   title: z.string().min(1),
   curriculumAreaId: z.string().optional(),
@@ -39,6 +44,7 @@ const saveSchema = z.object({
   sessionDate: sessionDateSchema.optional(),
   area: z.string(),
   coreIdea: z.string(),
+  achievements: z.array(achievementSchema).max(30).optional().default([]),
   selectedKeywords: z.array(z.string()),
   coreSentences: z.array(z.string()),
   essentialQuestions: z.array(z.string()),
@@ -67,6 +73,7 @@ export async function GET(req: Request) {
       session_date: string | null;
       area: string;
       core_idea: string;
+      selected_achievements: unknown;
       core_sentences: unknown;
       essential_questions: unknown;
       inquiry_questions: unknown;
@@ -84,7 +91,7 @@ export async function GET(req: Request) {
     }[]
   >`
     SELECT id, title, subject, grade_range, grade, session_date, area,
-           core_idea, core_sentences, essential_questions, inquiry_questions, learning_guides,
+           core_idea, selected_achievements, core_sentences, essential_questions, inquiry_questions, learning_guides,
            is_active, default_question_public, likes_visible_to_peers, comments_visible_to_peers,
            target_class_value, target_student_ids,
            (SELECT count(*) FROM question_sessions qs WHERE qs.unit_design_id = unit_designs.id) AS session_count,
@@ -101,6 +108,7 @@ export async function GET(req: Request) {
       id: d.id, title: d.title, subject: d.subject,
       gradeRange: d.grade_range, grade: d.grade, sessionDate: d.session_date, area: d.area,
       coreIdea: d.core_idea ?? "",
+      achievements: asArray(d.selected_achievements),
       coreSentences: asArray(d.core_sentences) as string[],
       essentialQuestions: asArray(d.essential_questions) as string[],
       inquiryQuestions: asArray(d.inquiry_questions),
@@ -134,13 +142,13 @@ export async function POST(req: Request) {
     const inserted = await prisma.$queryRawUnsafe<{ id: string; created_at: Date; updated_at: Date }[]>(
       `INSERT INTO unit_designs
          (id, teacher_id, curriculum_area_id, title, subject, grade_range, area,
-          core_idea, selected_keywords, core_sentences, essential_questions, inquiry_questions, learning_guides,
+          core_idea, selected_keywords, selected_achievements, core_sentences, essential_questions, inquiry_questions, learning_guides,
           grade, session_date, is_active, default_question_public, likes_visible_to_peers,
           comments_visible_to_peers, target_class_value, target_student_ids, created_at, updated_at)
        VALUES
          (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6,
-          $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb,
-          $13, $14, $15, $16, $17, $18, $19, $20::jsonb, now(), now())
+          $7, $8::jsonb, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb,
+          $14, $15, $16, $17, $18, $19, $20, $21::jsonb, now(), now())
        RETURNING id, created_at, updated_at`,
       teacherId,
       data.curriculumAreaId ?? null,
@@ -150,6 +158,7 @@ export async function POST(req: Request) {
       data.area,
       data.coreIdea,
       JSON.stringify(data.selectedKeywords),
+      JSON.stringify(data.achievements),
       JSON.stringify(data.coreSentences),
       JSON.stringify(data.essentialQuestions),
       JSON.stringify(data.inquiryQuestions),
@@ -179,6 +188,11 @@ export async function POST(req: Request) {
             grade: data.grade ?? null,
             sessionDate: data.sessionDate ?? null,
             area: data.area,
+            coreIdea: data.coreIdea,
+            achievements: data.achievements,
+            selectedKeywords: data.selectedKeywords,
+            coreSentences: data.coreSentences,
+            essentialQuestions: data.essentialQuestions,
             inquiryQuestions: data.inquiryQuestions,
             learningGuides: data.learningGuides,
             sessionCount: 0,

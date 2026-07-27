@@ -415,7 +415,7 @@ export default function CurriculumPage() {
     gradeRange: curriculumData?.gradeRange,
     grade: saveGrade,
     sessionDate: saveDate,
-    area: curriculumData?.area,
+    area: curriculumData?.area, achievements: getSelectedAchievements(),
     selectedKeywords,
     coreSentences: selectedCoreSentences,
     essentialQuestions: selectedEssentialQuestions,

@@ -30,6 +30,11 @@ const inquiryQuestionSchema = z.object({
   studentGuide: studentGuideSchema.optional(),
 }).passthrough();
 
+const achievementSchema = z.object({
+  code: z.string().trim().max(80),
+  content: z.string().trim().max(1000),
+});
+
 // 부분 업데이트: 보낸 필드만 갱신(나머지 필드 보존). 호출자가 전체 객체를 갖고 있지 않아도 안전.
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -37,6 +42,7 @@ const updateSchema = z.object({
   gradeRange: z.string().optional(),
   area: z.string().optional(),
   coreIdea: z.string().optional(),
+  achievements: z.array(achievementSchema).max(30).optional(),
   selectedKeywords: z.array(z.string()).optional(),
   coreSentences: z.array(z.string()).optional(),
   essentialQuestions: z.array(z.string()).optional(),
@@ -85,6 +91,7 @@ export async function PATCH(req: Request, { params }: Params) {
     if (data.gradeRange !== undefined) add("grade_range", data.gradeRange);
     if (data.area !== undefined) add("area", data.area);
     if (data.coreIdea !== undefined) add("core_idea", data.coreIdea);
+    if (data.achievements !== undefined) add("selected_achievements", JSON.stringify(data.achievements), "::jsonb");
     if (data.selectedKeywords !== undefined) add("selected_keywords", JSON.stringify(data.selectedKeywords), "::jsonb");
     if (data.coreSentences !== undefined) add("core_sentences", JSON.stringify(data.coreSentences), "::jsonb");
     if (data.essentialQuestions !== undefined) add("essential_questions", JSON.stringify(data.essentialQuestions), "::jsonb");

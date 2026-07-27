@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import { AlignLeft, CircleHelp, Lightbulb, Plus, Trash2 } from "lucide-react";
+import { AlignLeft, BadgeCheck, CircleHelp, Lightbulb, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import type { Achievement } from "@/lib/achievement-selection";
 import {
   EMPTY_STUDENT_LEARNING_GUIDES,
   type StudentEssentialQuestionGuide,
@@ -25,6 +26,12 @@ export interface StudentLearningGuideSourceEditor {
   onEssentialQuestionChange: (index: number, value: string) => void;
   onEssentialQuestionRemove: (index: number) => void;
   onEssentialQuestionAdd: () => void;
+}
+
+export interface AchievementSourceEditor {
+  onChange: (index: number, value: Achievement) => void;
+  onRemove: (index: number) => void;
+  onAdd: () => void;
 }
 
 function PerspectiveEditor({
@@ -64,21 +71,25 @@ function PerspectiveEditor({
 
 export function StudentLearningGuideEditor({
   coreIdea: coreIdeaSource = "",
+  achievements = [],
   coreSentences,
   essentialQuestions,
   guides,
   showEditors = true,
   emptyMessage = "",
   sourceEditor,
+  achievementEditor,
   onChange,
 }: {
   coreIdea?: string;
+  achievements?: Achievement[];
   coreSentences: string[];
   essentialQuestions: string[];
   guides?: StudentLearningGuides;
   showEditors?: boolean;
   emptyMessage?: string;
   sourceEditor?: StudentLearningGuideSourceEditor;
+  achievementEditor?: AchievementSourceEditor;
   onChange: (guides: StudentLearningGuides) => void;
 }) {
   const t = useTranslations("curriculum");
@@ -89,6 +100,9 @@ export function StudentLearningGuideEditor({
   const formattedKeywords = formatInquiryKeywordLines(coreIdea.keywords);
   const [keywordDraft, setKeywordDraft] = useState(formattedKeywords);
   useEffect(() => setKeywordDraft(formattedKeywords), [formattedKeywords]);
+  const hasAchievementSection = achievements.length > 0 || Boolean(achievementEditor);
+  const coreSentenceNumber = hasAchievementSection ? 3 : 2;
+  const essentialQuestionNumber = hasAchievementSection ? 4 : 3;
 
   return (
     <div className="space-y-4">
@@ -180,6 +194,95 @@ export function StudentLearningGuideEditor({
         )}
       </section>
 
+      {hasAchievementSection && (
+        <section
+          data-student-guide-section="achievement"
+          className="rounded-xl border border-teal-200/80 bg-teal-50/70 p-3.5 dark:border-teal-800/60 dark:bg-teal-950/20 sm:p-4"
+          aria-labelledby={`${fieldId}-achievement-title`}
+        >
+          <div className="flex items-start gap-3">
+            <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-800 dark:bg-teal-900/60 dark:text-teal-200" aria-hidden="true">2</span>
+            <div className="min-w-0">
+              <h3 id={`${fieldId}-achievement-title`} className="flex items-center gap-1.5 text-sm font-semibold text-teal-950 dark:text-teal-100">
+                <BadgeCheck className="h-4 w-4" aria-hidden="true" />
+                {t("studentGuideAchievementSectionTitle")}
+              </h3>
+              <p className="mt-0.5 text-xs leading-5 text-teal-800/80 dark:text-teal-200/75">
+                {t("studentGuideAchievementSectionDesc")}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 space-y-2">
+            {achievements.map((achievement, index) => (
+              <article
+                key={`${achievement.code}-${index}`}
+                data-student-guide-source="achievement"
+                className="rounded-lg border border-teal-200/70 bg-background/85 px-3 py-3 dark:border-teal-800/50"
+              >
+                {achievementEditor ? (
+                  <div className="grid gap-2 sm:grid-cols-[minmax(9rem,0.35fr)_minmax(0,1fr)_auto]">
+                    <div className="space-y-1">
+                      <Label className="sr-only" htmlFor={`${fieldId}-achievement-code-${index}`}>
+                        {t("achievementCodeLabel", { n: index + 1 })}
+                      </Label>
+                      <input
+                        id={`${fieldId}-achievement-code-${index}`}
+                        value={achievement.code}
+                        placeholder={t("achievementCodePlaceholder")}
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-semibold text-foreground"
+                        onChange={(event) => achievementEditor.onChange(index, {
+                          ...achievement,
+                          code: event.target.value,
+                        })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="sr-only" htmlFor={`${fieldId}-achievement-content-${index}`}>
+                        {t("achievementContentLabel", { n: index + 1 })}
+                      </Label>
+                      <textarea
+                        id={`${fieldId}-achievement-content-${index}`}
+                        rows={2}
+                        value={achievement.content}
+                        placeholder={t("achievementContentPlaceholder")}
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 text-foreground"
+                        onChange={(event) => achievementEditor.onChange(index, {
+                          ...achievement,
+                          content: event.target.value,
+                        })}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive"
+                      onClick={() => achievementEditor.onRemove(index)}
+                      aria-label={tc("delete")}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3">
+                    <span className="shrink-0 text-sm font-semibold text-teal-800 dark:text-teal-200">
+                      {achievement.code}
+                    </span>
+                    <p className="text-sm leading-6 text-foreground">{achievement.content}</p>
+                  </div>
+                )}
+              </article>
+            ))}
+            {achievementEditor && (
+              <Button type="button" variant="outline" size="sm" onClick={achievementEditor.onAdd}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {t("addAchievement")}
+              </Button>
+            )}
+          </div>
+        </section>
+      )}
+
       {(coreSentences.length > 0 || sourceEditor) && (
         <section
           data-student-guide-section="core-sentence"
@@ -187,7 +290,7 @@ export function StudentLearningGuideEditor({
           aria-labelledby={`${fieldId}-core-sentence-title`}
         >
           <div className="flex items-start gap-3">
-            <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-800 dark:bg-sky-900/60 dark:text-sky-200" aria-hidden="true">2</span>
+            <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-800 dark:bg-sky-900/60 dark:text-sky-200" aria-hidden="true">{coreSentenceNumber}</span>
             <div className="min-w-0">
               <h3 id={`${fieldId}-core-sentence-title`} className="flex items-center gap-1.5 text-sm font-semibold text-sky-950 dark:text-sky-100">
                 <AlignLeft className="h-4 w-4" aria-hidden="true" />
@@ -270,7 +373,7 @@ export function StudentLearningGuideEditor({
           aria-labelledby={`${fieldId}-essential-question-title`}
         >
           <div className="flex items-start gap-3">
-            <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800 dark:bg-violet-900/60 dark:text-violet-200" aria-hidden="true">3</span>
+            <span data-student-guide-number className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-800 dark:bg-violet-900/60 dark:text-violet-200" aria-hidden="true">{essentialQuestionNumber}</span>
             <div className="min-w-0">
               <h3 id={`${fieldId}-essential-question-title`} className="flex items-center gap-1.5 text-sm font-semibold text-violet-950 dark:text-violet-100">
                 <CircleHelp className="h-4 w-4" aria-hidden="true" />

@@ -41,6 +41,10 @@ const inquiryQuestions = [{
 const baseProps = {
   unitTitle: "생물과 환경",
   coreIdea: "생물은 환경과 관계를 맺는다.",
+  achievements: [{
+    code: "[6과05-01]",
+    content: "생태계 구성 요소를 조사하고 생물 요소와 비생물 요소를 구분할 수 있다.",
+  }],
   coreSentences: ["생물은 서로 연결된다."],
   essentialQuestions: ["생태계는 어떻게 유지될까?"],
   inquiryQuestions,
@@ -59,6 +63,27 @@ const baseProps = {
 };
 
 describe("학생 배포 자료 확인", () => {
+  it("핵심 아이디어 다음에 선택한 성취기준을 읽기 전용으로 보여준다", () => {
+    const { container } = render(<InquiryDistributionReview {...baseProps} />);
+
+    const coreIdea = container.querySelector('[data-student-guide-section="core-idea"]');
+    const achievement = container.querySelector('[data-student-guide-section="achievement"]');
+    const coreSentence = container.querySelector('[data-student-guide-section="core-sentence"]');
+
+    expect(achievement).toHaveTextContent("[6과05-01]");
+    expect(achievement).toHaveTextContent("생태계 구성 요소를 조사하고");
+    expect(coreIdea?.compareDocumentPosition(achievement as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(achievement?.compareDocumentPosition(coreSentence as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(achievement?.querySelector("[data-student-guide-number]")).toHaveTextContent("2");
+    expect(coreSentence?.querySelector("[data-student-guide-number]")).toHaveTextContent("3");
+    expect(
+      container.querySelector('[data-student-guide-section="inquiry-question"] [data-student-guide-number]'),
+    ).toHaveTextContent("5");
+    expect(screen.queryByDisplayValue("[6과05-01]")).not.toBeInTheDocument();
+  });
+
   it("읽기 전용 원문 바로 아래의 학생용 설명만 수정한다", () => {
     const onLearningGuidesChange = vi.fn();
     const onInquiryGuideChange = vi.fn();
