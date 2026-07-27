@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import packageJson from "../../package.json";
+import {
+  buildDemoLearningActivityPlans,
+  DEMO_SESSION_BLUEPRINTS,
+  STUDENT_NAMES,
+} from "../../scripts/seed-usb-demo.mjs";
 
 describe("USB 시연 학급 자료 생성 명령", () => {
   it("4학년 1반 학생 28명을 고정된 순서로 제공한다", () => {
@@ -40,6 +45,76 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     expect(source).toContain('"SOLO"');
     expect(source).toContain('"AI"');
     expect(source).toContain("`room:usb-demo:${pad(number)}`");
+  });
+
+  it("질문수업 여섯 개와 풍부한 학생 참여 자료를 중복 없이 계획한다", () => {
+    const studentIds = STUDENT_NAMES.map(
+      (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
+    );
+    const plans = buildDemoLearningActivityPlans(studentIds);
+
+    expect(DEMO_SESSION_BLUEPRINTS).toHaveLength(6);
+    expect(new Set(DEMO_SESSION_BLUEPRINTS.map(({ id }) => id)).size).toBe(6);
+    expect(plans.questions.filter(({ authorId }) => authorId === studentIds[0]))
+      .toHaveLength(11);
+    expect(plans.comments.filter(({ authorId }) => authorId === studentIds[0]))
+      .toHaveLength(12);
+    expect(plans.likes.filter(({ userId }) => userId === studentIds[0]))
+      .toHaveLength(18);
+
+    for (const studentId of studentIds.slice(1)) {
+      expect(plans.questions.filter(({ authorId }) => authorId === studentId).length)
+        .toBeGreaterThanOrEqual(3);
+      expect(plans.comments.filter(({ authorId }) => authorId === studentId))
+        .toHaveLength(3);
+      expect(plans.likes.filter(({ userId }) => userId === studentId))
+        .toHaveLength(5);
+    }
+
+    expect(
+      new Set(plans.likes.map(({ questionId, userId }) => `${questionId}:${userId}`))
+        .size,
+    ).toBe(plans.likes.length);
+    const kimQuestionIds = new Set(
+      plans.questions
+        .filter(({ authorId }) => authorId === studentIds[0])
+        .map(({ id }) => id),
+    );
+    expect(
+      plans.comments.filter(({ questionId }) => kimQuestionIds.has(questionId)).length,
+    ).toBeGreaterThanOrEqual(27);
+    expect(
+      plans.likes.filter(({ questionId }) => kimQuestionIds.has(questionId)).length,
+    ).toBeGreaterThanOrEqual(27);
+
+    const questionById = new Map(
+      plans.questions.map((question) => [question.id, question]),
+    );
+    expect(plans.analyses).toHaveLength(5);
+    for (const analysis of plans.analyses) {
+      expect(analysis.studentId).toBe(studentIds[0]);
+      expect(analysis.result.summary).not.toBe("");
+      expect(analysis.result.growthInsights).not.toBe("");
+      expect(analysis.result.rewriteExample).not.toBe("");
+      expect(analysis.result.totalQuestions).toBeGreaterThan(0);
+      expect(analysis.result.totalQuestions).toBe(
+        plans.questions.filter(({ authorId, sessionId }) => (
+          authorId === studentIds[0] && sessionId === analysis.sessionId
+        )).length,
+      );
+      expect(analysis.result.totalComments).toBe(
+        plans.comments.filter(({ authorId, questionId }) => (
+          authorId === studentIds[0]
+          && questionById.get(questionId)?.sessionId === analysis.sessionId
+        )).length,
+      );
+      expect(analysis.result.totalLikes).toBe(
+        plans.likes.filter(({ userId, questionId }) => (
+          userId === studentIds[0]
+          && questionById.get(questionId)?.sessionId === analysis.sessionId
+        )).length,
+      );
+    }
   });
 
   it("꾸러미 명령을 패키지 명령으로 제공한다", () => {

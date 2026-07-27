@@ -42,11 +42,69 @@ const DEMO = {
   teacherEmail: "usb-demo-teacher@questionlab.invalid",
   unitDesignId: "usb-demo-unit-design",
   sessionIds: {
+    pastKorean: "usb-demo-session-past-korean",
+    pastSocial: "usb-demo-session-past-social",
     past: "usb-demo-session-past",
+    pastMath: "usb-demo-session-past-math",
     today: "usb-demo-session-today",
     future: "usb-demo-session-future",
   },
 };
+
+export const DEMO_SESSION_BLUEPRINTS = [
+  {
+    key: "pastKorean",
+    id: DEMO.sessionIds.pastKorean,
+    offsetDays: -18,
+    subject: "국어",
+    topic: "주장과 근거의 적절성 판단하기",
+    unitDesignId: null,
+  },
+  {
+    key: "pastSocial",
+    id: DEMO.sessionIds.pastSocial,
+    offsetDays: -12,
+    subject: "사회",
+    topic: "우리 지역의 문제와 해결 방법",
+    unitDesignId: null,
+  },
+  {
+    key: "past",
+    id: DEMO.sessionIds.past,
+    offsetDays: -7,
+    subject: "과학",
+    topic: "물의 세 가지 상태",
+    unitDesignId: DEMO.unitDesignId,
+  },
+  {
+    key: "pastMath",
+    id: DEMO.sessionIds.pastMath,
+    offsetDays: -3,
+    subject: "수학",
+    topic: "자료를 표와 그래프로 나타내기",
+    unitDesignId: null,
+  },
+  {
+    key: "today",
+    id: DEMO.sessionIds.today,
+    offsetDays: 0,
+    subject: "과학",
+    topic: "온도에 따른 상태 변화",
+    unitDesignId: DEMO.unitDesignId,
+  },
+  {
+    key: "future",
+    id: DEMO.sessionIds.future,
+    offsetDays: 5,
+    subject: "사회",
+    topic: "환경을 위한 생활 속 선택",
+    unitDesignId: null,
+  },
+];
+
+const ACTIVITY_SESSION_BLUEPRINTS = DEMO_SESSION_BLUEPRINTS.filter(
+  ({ key }) => key !== "future",
+);
 
 function loadLocalDatabaseUrl() {
   if (process.env.DATABASE_URL?.trim()) return;
@@ -146,15 +204,296 @@ function learningGuides() {
   };
 }
 
-const QUESTION_STARTERS = [
-  "물이 얼면 왜 부피가 달라질까요?",
-  "얼음은 어떤 온도에서 가장 빨리 녹을까요?",
-  "젖은 빨래는 바람이 불면 왜 빨리 마를까요?",
-  "물방울은 차가운 컵 표면에 어떻게 생길까요?",
-  "온도가 높아지면 물의 모습은 어떻게 달라질까요?",
-  "같은 물질도 상태에 따라 성질이 달라질까요?",
-  "겨울철 수도관은 왜 얼어서 터질 수 있을까요?",
+const SESSION_QUESTION_BANKS = {
+  pastKorean: [
+    "글쓴이가 제시한 근거는 주장과 어떻게 이어질까요?",
+    "근거가 믿을 만한지 확인하려면 무엇을 살펴봐야 할까요?",
+    "같은 자료를 보고 서로 다른 주장을 할 수 있을까요?",
+    "주장에 어울리지 않는 근거는 어떻게 찾을 수 있을까요?",
+    "경험을 근거로 사용할 때 주의할 점은 무엇일까요?",
+  ],
+  pastSocial: [
+    "우리 지역에서 어린이가 가장 불편해하는 문제는 무엇일까요?",
+    "지역 문제의 원인은 누구의 관점에서 살펴봐야 할까요?",
+    "주민들의 의견이 다르면 해결 방법을 어떻게 정해야 할까요?",
+    "지역 문제를 해결하는 데 학생도 참여할 수 있을까요?",
+    "한 가지 해결 방법이 모든 주민에게 도움이 될까요?",
+  ],
+  past: [
+    "물이 얼면 왜 부피가 달라질까요?",
+    "얼음은 어떤 온도에서 가장 빨리 녹을까요?",
+    "물방울은 차가운 컵 표면에 어떻게 생길까요?",
+    "같은 물질도 상태에 따라 성질이 달라질까요?",
+    "물이 수증기가 되면 무게도 달라질까요?",
+  ],
+  pastMath: [
+    "같은 자료도 표와 그래프에서 다르게 보일 수 있을까요?",
+    "어떤 그래프가 자료의 차이를 가장 잘 보여 줄까요?",
+    "자료가 많아지면 표를 어떻게 정리해야 알아보기 쉬울까요?",
+    "그래프의 눈금이 달라지면 자료가 다르게 느껴질까요?",
+    "우리 반의 생활 모습을 어떤 자료로 나타내면 좋을까요?",
+  ],
+  today: [
+    "온도가 높아지면 물의 모습은 어떻게 달라질까요?",
+    "젖은 빨래는 바람이 불면 왜 빨리 마를까요?",
+    "겨울철 수도관은 왜 얼어서 터질 수 있을까요?",
+    "그늘과 햇빛 아래에서 얼음이 녹는 속도는 얼마나 다를까요?",
+    "상태 변화를 이용하면 생활 속 어떤 문제를 해결할 수 있을까요?",
+  ],
+};
+
+const KIM_QUESTION_PLANS = [
+  {
+    sessionKey: "pastKorean",
+    content: "글쓴이의 주장을 믿으려면 어떤 근거를 먼저 살펴봐야 할까요?",
+    closure: "open",
+    cognitive: "conceptual",
+  },
+  {
+    sessionKey: "pastKorean",
+    content: "같은 근거를 보고도 서로 다른 주장을 할 수 있을까요?",
+    closure: "open",
+    cognitive: "controversial",
+  },
+  {
+    sessionKey: "pastSocial",
+    content: "우리 지역에서 어린이가 가장 불편해하는 문제는 무엇일까요?",
+    closure: "open",
+    cognitive: "factual",
+  },
+  {
+    sessionKey: "pastSocial",
+    content: "지역 문제를 해결할 때 주민의 의견이 다르면 어떻게 정해야 할까요?",
+    closure: "open",
+    cognitive: "controversial",
+  },
+  {
+    sessionKey: "past",
+    content: "물이 얼 때 부피가 커지는 까닭은 무엇일까요?",
+    closure: "open",
+    cognitive: "conceptual",
+  },
+  {
+    sessionKey: "past",
+    content: "얼음이 녹은 물의 양은 녹기 전과 같을까요?",
+    closure: "closed",
+    cognitive: "factual",
+  },
+  {
+    sessionKey: "pastMath",
+    content: "같은 자료도 표와 그래프에서 다르게 보일 수 있을까요?",
+    closure: "open",
+    cognitive: "conceptual",
+  },
+  {
+    sessionKey: "pastMath",
+    content: "어떤 그래프를 써야 자료의 차이가 가장 잘 보일까요?",
+    closure: "open",
+    cognitive: "conceptual",
+  },
+  {
+    sessionKey: "today",
+    content: "온도가 높아질수록 물은 언제나 더 빨리 증발할까요?",
+    closure: "open",
+    cognitive: "conceptual",
+  },
+  {
+    sessionKey: "today",
+    content: "겨울철 수도관이 얼면 왜 터질 수 있을까요?",
+    closure: "open",
+    cognitive: "factual",
+  },
+  {
+    sessionKey: "today",
+    content: "생활의 편리함을 위해 상태 변화를 이용할 때 환경도 고려해야 할까요?",
+    closure: "open",
+    cognitive: "controversial",
+  },
 ];
+
+const STUDENT_ANALYSIS_COPY = {
+  pastKorean: {
+    summary: "주장과 근거가 어떻게 이어지는지 살피는 질문 두 개를 만들고 친구의 생각에도 적극적으로 반응했습니다.",
+    insights: "근거의 출처와 믿을 만한 정도를 비교하면 주장 판단이 더욱 탄탄해집니다.",
+    relevanceInsights: "두 질문 모두 수업의 핵심인 주장과 근거의 관계에 알맞게 집중했습니다.",
+    growthInsights: "사실을 확인하는 데서 그치지 않고 같은 근거에 다른 주장이 가능한지 생각의 범위를 넓혔습니다.",
+    rewriteExample: "\"어떤 근거를 먼저 살펴봐야 할까요?\" → \"주장을 믿을 만하다고 판단하려면 근거의 출처와 내용을 어떤 순서로 살펴봐야 할까요?\"",
+  },
+  pastSocial: {
+    summary: "지역 문제를 어린이와 주민의 관점에서 살피고 해결 과정의 기준을 묻는 질문을 만들었습니다.",
+    insights: "문제의 원인과 영향을 받는 사람을 나누어 조사하면 해결 방법을 더 공정하게 비교할 수 있습니다.",
+    relevanceInsights: "지역 문제와 주민 의견이라는 수업 주제를 구체적으로 담은 질문을 작성했습니다.",
+    growthInsights: "앞선 수업보다 여러 사람의 관점을 비교하고 선택 기준을 찾는 힘이 좋아졌습니다.",
+    rewriteExample: "\"의견이 다르면 어떻게 정해야 할까요?\" → \"주민의 의견이 다를 때 모두에게 도움이 되는 해결 방법을 어떤 기준으로 정해야 할까요?\"",
+  },
+  past: {
+    summary: "물이 얼고 녹을 때 나타나는 변화를 부피와 양을 중심으로 관찰하는 질문을 만들었습니다.",
+    insights: "예상한 내용과 실제 관찰 결과를 표로 비교하면 상태 변화의 특징을 더 분명히 설명할 수 있습니다.",
+    relevanceInsights: "물의 세 가지 상태와 직접 이어지는 질문을 작성해 수업 내용에 잘 집중했습니다.",
+    growthInsights: "원인을 묻는 열린 질문과 관찰로 확인할 수 있는 질문을 함께 사용해 질문의 균형이 좋아졌습니다.",
+    rewriteExample: "\"얼음이 녹은 물의 양은 같을까요?\" → \"같은 양의 얼음을 녹였을 때 녹기 전과 후의 부피와 무게는 각각 어떻게 달라질까요?\"",
+  },
+  pastMath: {
+    summary: "표와 그래프의 표현 차이를 살피고 자료에 알맞은 그래프를 선택하는 질문을 만들었습니다.",
+    insights: "자료의 종류, 비교할 항목, 눈금 간격을 기준으로 그래프를 고르면 까닭을 분명히 말할 수 있습니다.",
+    relevanceInsights: "자료를 표와 그래프로 나타내는 수업 목표에 맞는 비교 질문을 작성했습니다.",
+    growthInsights: "자료를 읽는 것에서 한 걸음 나아가 표현 방법에 따라 해석이 달라지는지 탐구했습니다.",
+    rewriteExample: "\"어떤 그래프를 써야 잘 보일까요?\" → \"항목별 수의 차이를 가장 쉽게 비교하려면 어떤 그래프를 써야 하며 그 까닭은 무엇일까요?\"",
+  },
+  today: {
+    summary: "온도와 증발의 관계, 겨울철 수도관, 환경까지 연결한 질문 세 개를 만들고 친구의 질문에도 활발히 참여했습니다.",
+    insights: "온도뿐 아니라 바람, 넓이 같은 조건도 함께 비교하면 증발 현상을 더 정확하게 설명할 수 있습니다.",
+    relevanceInsights: "상태 변화의 원리와 생활 속 활용을 모두 다룬 성의 있는 질문을 작성했습니다.",
+    growthInsights: "개념을 생활 문제와 환경에 연결하고 여러 조건을 따져 보는 질문으로 발전했습니다.",
+    rewriteExample: "\"온도가 높으면 언제나 빨리 증발할까요?\" → \"물의 양과 넓이가 같을 때 온도가 높아질수록 증발 속도는 어떻게 달라질까요?\"",
+  },
+};
+
+const COMMENT_CONTENTS = [
+  "질문에 답하려면 어떤 자료를 먼저 찾아야 할지 함께 정해 보면 좋겠어요.",
+  "두 가지 경우를 표로 비교하면 차이와 까닭이 더 잘 보일 것 같아요.",
+  "다른 사람의 관점에서는 어떻게 생각할지도 덧붙여 보면 좋겠어요.",
+  "생활 속 예를 하나 넣으면 질문의 뜻을 더 쉽게 이해할 수 있을 것 같아요.",
+  "관찰할 조건을 같게 정하면 결과를 더 정확하게 비교할 수 있어요.",
+  "왜 그렇게 생각했는지 근거까지 물어보는 질문으로 넓혀 보면 좋겠어요.",
+];
+
+function questionTypeFor(index) {
+  return ["factual", "conceptual", "controversial"][index % 3];
+}
+
+function pickUniqueQuestion(candidates, usedQuestionIds, startIndex) {
+  for (let offset = 0; offset < candidates.length; offset += 1) {
+    const candidate = candidates[(startIndex + offset) % candidates.length];
+    if (!usedQuestionIds.has(candidate.id)) return candidate;
+  }
+  throw new Error("좋아요를 배치할 질문이 부족합니다.");
+}
+
+export function buildDemoLearningActivityPlans(studentIds) {
+  if (studentIds.length !== STUDENT_NAMES.length) {
+    throw new Error(`시연 학생은 ${STUDENT_NAMES.length}명이어야 합니다.`);
+  }
+
+  const sessionByKey = new Map(
+    ACTIVITY_SESSION_BLUEPRINTS.map((blueprint) => [blueprint.key, blueprint]),
+  );
+  const questions = [];
+
+  for (const [index, plan] of KIM_QUESTION_PLANS.entries()) {
+    const session = sessionByKey.get(plan.sessionKey);
+    questions.push({
+      id: `usb-demo-question-01-${pad(index + 1)}`,
+      authorId: studentIds[0],
+      sessionId: session.id,
+      content: plan.content,
+      context: session.topic,
+      closure: plan.closure,
+      cognitive: plan.cognitive,
+      inquiryType: plan.cognitive,
+      createdDays: session.offsetDays + 1,
+    });
+  }
+
+  for (let studentIndex = 1; studentIndex < studentIds.length; studentIndex += 1) {
+    for (let questionIndex = 0; questionIndex < 3; questionIndex += 1) {
+      const session = ACTIVITY_SESSION_BLUEPRINTS[
+        (studentIndex + questionIndex) % ACTIVITY_SESSION_BLUEPRINTS.length
+      ];
+      const bank = SESSION_QUESTION_BANKS[session.key];
+      const content = bank[(studentIndex + questionIndex * 2) % bank.length];
+      questions.push({
+        id: `usb-demo-question-${pad(studentIndex + 1)}-${pad(questionIndex + 1)}`,
+        authorId: studentIds[studentIndex],
+        sessionId: session.id,
+        content,
+        context: session.topic,
+        closure: questionIndex === 0 && studentIndex % 4 === 0 ? "closed" : "open",
+        cognitive: questionTypeFor(studentIndex + questionIndex),
+        inquiryType: questionTypeFor(studentIndex + questionIndex),
+        createdDays: session.offsetDays + 1 + (studentIndex % 2),
+      });
+    }
+  }
+
+  const kimQuestions = questions.filter(({ authorId }) => authorId === studentIds[0]);
+  const comments = [];
+  for (let studentIndex = 0; studentIndex < studentIds.length; studentIndex += 1) {
+    const authorId = studentIds[studentIndex];
+    const count = studentIndex === 0 ? 12 : 3;
+    const otherQuestions = questions.filter((question) => question.authorId !== authorId);
+    for (let commentIndex = 0; commentIndex < count; commentIndex += 1) {
+      const target = studentIndex > 0 && commentIndex === 0
+        ? kimQuestions[(studentIndex - 1) % kimQuestions.length]
+        : otherQuestions[
+          (studentIndex * 7 + commentIndex * 11) % otherQuestions.length
+        ];
+      const content = COMMENT_CONTENTS[(studentIndex + commentIndex) % COMMENT_CONTENTS.length];
+      comments.push({
+        id: `usb-demo-comment-${pad(studentIndex + 1)}-${pad(commentIndex + 1)}`,
+        authorId,
+        questionId: target.id,
+        content,
+        createdDays: Math.min(0, target.createdDays + 1 + (commentIndex % 2)),
+      });
+    }
+  }
+
+  const likes = [];
+  for (let studentIndex = 0; studentIndex < studentIds.length; studentIndex += 1) {
+    const userId = studentIds[studentIndex];
+    const count = studentIndex === 0 ? 18 : 5;
+    const otherQuestions = questions.filter((question) => question.authorId !== userId);
+    const usedQuestionIds = new Set();
+    for (let likeIndex = 0; likeIndex < count; likeIndex += 1) {
+      const preferred = studentIndex > 0 && likeIndex === 0
+        ? kimQuestions[(studentIndex - 1) % kimQuestions.length]
+        : pickUniqueQuestion(
+          otherQuestions,
+          usedQuestionIds,
+          studentIndex * 5 + likeIndex * 13,
+        );
+      const target = usedQuestionIds.has(preferred.id)
+        ? pickUniqueQuestion(otherQuestions, usedQuestionIds, likeIndex)
+        : preferred;
+      usedQuestionIds.add(target.id);
+      likes.push({
+        id: `usb-demo-like-${pad(studentIndex + 1)}-${pad(likeIndex + 1)}`,
+        userId,
+        questionId: target.id,
+        createdDays: Math.min(0, target.createdDays + 2 + (likeIndex % 2)),
+      });
+    }
+  }
+
+  const questionById = new Map(questions.map((question) => [question.id, question]));
+  const analyses = ACTIVITY_SESSION_BLUEPRINTS.map((session, index) => {
+    const totalQuestions = questions.filter(
+      ({ authorId, sessionId }) => authorId === studentIds[0] && sessionId === session.id,
+    ).length;
+    const totalComments = comments.filter(({ authorId, questionId }) => (
+      authorId === studentIds[0] && questionById.get(questionId)?.sessionId === session.id
+    )).length;
+    const totalLikes = likes.filter(({ userId, questionId }) => (
+      userId === studentIds[0] && questionById.get(questionId)?.sessionId === session.id
+    )).length;
+    return {
+      id: `usb-demo-analysis-student-01-${pad(index + 1)}`,
+      sessionId: session.id,
+      studentId: studentIds[0],
+      result: {
+        ...STUDENT_ANALYSIS_COPY[session.key],
+        totalQuestions,
+        totalComments,
+        totalLikes,
+        analyzedAt: offsetDate(0).toISOString(),
+        analysisModel: "gemini-2.5-flash",
+      },
+    };
+  });
+
+  return { questions, comments, likes, analyses };
+}
 
 async function removePreviousDemoData(tx, studentIds) {
   const sessionIds = Object.values(DEMO.sessionIds);
@@ -319,9 +658,7 @@ async function createClassAccounts(tx, passwordHash) {
 
 async function createInquiryLearningData(tx, studentIds) {
   const questions = inquiryQuestions();
-  const pastDate = koreanDate(offsetDate(-7));
   const todayDate = koreanDate(offsetDate(0));
-  const futureDate = koreanDate(offsetDate(5));
 
   await tx.unitDesign.create({
     data: {
@@ -348,33 +685,14 @@ async function createInquiryLearningData(tx, studentIds) {
     },
   });
 
-  const sessionData = [
-    {
-      id: DEMO.sessionIds.past,
-      date: pastDate,
-      subject: "과학",
-      topic: "물의 세 가지 상태",
-      unitDesignId: DEMO.unitDesignId,
-    },
-    {
-      id: DEMO.sessionIds.today,
-      date: todayDate,
-      subject: "과학",
-      topic: "온도에 따른 상태 변화",
-      unitDesignId: DEMO.unitDesignId,
-    },
-    {
-      id: DEMO.sessionIds.future,
-      date: futureDate,
-      subject: "사회",
-      topic: "환경을 위한 생활 속 선택",
-      unitDesignId: null,
-    },
-  ];
-  for (const item of sessionData) {
+  for (const blueprint of DEMO_SESSION_BLUEPRINTS) {
     await tx.questionSession.create({
       data: {
-        ...item,
+        id: blueprint.id,
+        date: koreanDate(offsetDate(blueprint.offsetDays)),
+        subject: blueprint.subject,
+        topic: blueprint.topic,
+        unitDesignId: blueprint.unitDesignId,
         teacherId: DEMO.teacherId,
         targetType: "CLASS",
         targetGrade: DEMO.grade,
@@ -389,41 +707,63 @@ async function createInquiryLearningData(tx, studentIds) {
     });
   }
 
-  for (const [index, authorId] of studentIds.entries()) {
-    const content = QUESTION_STARTERS[index % QUESTION_STARTERS.length];
+  const activityPlans = buildDemoLearningActivityPlans(studentIds);
+  for (const question of activityPlans.questions) {
     await tx.question.create({
       data: {
-        id: `usb-demo-question-${pad(index + 1)}`,
-        content,
-        normalizedContent: `${content} ${index + 1}`,
-        dedupeKey: `usb-demo-question-${pad(index + 1)}`,
-        closure: "open",
-        cognitive: ["factual", "conceptual", "controversial"][index % 3],
+        id: question.id,
+        content: question.content,
+        normalizedContent: question.content,
+        dedupeKey: question.id,
+        closure: question.closure,
+        cognitive: question.cognitive,
         closureScore: 0.9,
         cognitiveScore: 0.78,
-        context: "온도에 따른 물질의 상태 변화",
+        context: question.context,
         source: "STUDENT",
-        inquiryType: ["factual", "conceptual", "controversial"][index % 3],
-        sessionId: DEMO.sessionIds.past,
-        authorId,
+        inquiryType: question.inquiryType,
+        sessionId: question.sessionId,
+        authorId: question.authorId,
         isPublic: true,
-        createdAt: offsetDate(-6 + (index % 3)),
+        createdAt: offsetDate(question.createdDays),
       },
     });
   }
 
-  for (let index = 0; index < studentIds.length; index += 1) {
-    const authorId = studentIds[index];
-    const targetNumber = ((index + 1) % studentIds.length) + 1;
+  for (const comment of activityPlans.comments) {
     await tx.comment.create({
       data: {
-        id: `usb-demo-comment-${pad(index + 1)}`,
-        content: "관찰 결과를 표로 정리해서 비교하면 까닭을 더 잘 찾을 수 있을 것 같아요.",
-        normalizedContent: `관찰 결과 비교 의견 ${index + 1}`,
-        dedupeKey: `usb-demo-comment-${pad(index + 1)}`,
-        authorId,
-        questionId: `usb-demo-question-${pad(targetNumber)}`,
-        createdAt: offsetDate(-4 + (index % 2)),
+        id: comment.id,
+        content: comment.content,
+        normalizedContent: comment.content,
+        dedupeKey: comment.id,
+        authorId: comment.authorId,
+        questionId: comment.questionId,
+        createdAt: offsetDate(comment.createdDays),
+      },
+    });
+  }
+
+  for (const like of activityPlans.likes) {
+    await tx.questionLike.create({
+      data: {
+        id: like.id,
+        questionId: like.questionId,
+        userId: like.userId,
+        createdAt: offsetDate(like.createdDays),
+      },
+    });
+  }
+
+  for (const analysis of activityPlans.analyses) {
+    await tx.sessionAnalysis.create({
+      data: {
+        id: analysis.id,
+        sessionId: analysis.sessionId,
+        scope: "student",
+        studentId: analysis.studentId,
+        result: analysis.result,
+        locale: "ko",
       },
     });
   }
@@ -622,20 +962,58 @@ export async function seedUsbDemo() {
       await createQuestionGameData(tx, studentIds);
     }, { timeout: 120_000 });
 
-    const count = await prisma.user.count({
-      where: {
-        role: "STUDENT",
-        school: DEMO.school,
-        grade: DEMO.grade,
-        className: DEMO.className,
-        isDemo: true,
-      },
-    });
+    const [
+      count,
+      sessionCount,
+      questionCount,
+      commentCount,
+      likeCount,
+      analysisCount,
+      kimQuestionCount,
+      kimCommentCount,
+      kimLikeCount,
+    ] = await Promise.all([
+      prisma.user.count({
+        where: {
+          role: "STUDENT",
+          school: DEMO.school,
+          grade: DEMO.grade,
+          className: DEMO.className,
+          isDemo: true,
+        },
+      }),
+      prisma.questionSession.count({ where: { teacherId: DEMO.teacherId } }),
+      prisma.question.count({ where: { authorId: { in: studentIds } } }),
+      prisma.comment.count({ where: { authorId: { in: studentIds } } }),
+      prisma.questionLike.count({ where: { userId: { in: studentIds } } }),
+      prisma.sessionAnalysis.count({
+        where: { scope: "student", studentId: studentIds[0] },
+      }),
+      prisma.question.count({ where: { authorId: studentIds[0] } }),
+      prisma.comment.count({ where: { authorId: studentIds[0] } }),
+      prisma.questionLike.count({ where: { userId: studentIds[0] } }),
+    ]);
     if (count !== STUDENT_NAMES.length) {
       throw new Error(`시연 학생 수가 ${count}명으로 확인되었습니다.`);
     }
+    if (
+      sessionCount !== DEMO_SESSION_BLUEPRINTS.length
+      || questionCount !== 92
+      || commentCount !== 93
+      || likeCount !== 153
+      || analysisCount !== ACTIVITY_SESSION_BLUEPRINTS.length
+      || kimQuestionCount !== 11
+      || kimCommentCount !== 12
+      || kimLikeCount !== 18
+    ) {
+      throw new Error(
+        `시연 자료 수가 예상과 다릅니다: 수업 ${sessionCount}, 질문 ${questionCount}, 댓글 ${commentCount}, 좋아요 ${likeCount}, 분석 ${analysisCount}`,
+      );
+    }
 
-    console.log(`시연 학급 생성 완료: 김교사, 학생 ${count}명`);
+    console.log(
+      `시연 학급 생성 완료: 김교사, 학생 ${count}명, 질문수업 ${sessionCount}개, 김질문 질문 ${kimQuestionCount}개, 댓글 ${kimCommentCount}개, 좋아요 ${kimLikeCount}개, 수업 분석 ${analysisCount}개`,
+    );
   } finally {
     await prisma.$disconnect();
   }
