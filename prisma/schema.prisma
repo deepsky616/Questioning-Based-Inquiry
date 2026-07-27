@@ -27,7 +27,8 @@ model User {
   aiApiKey String? @map("ai_api_key")
   aiModel  String? @map("ai_model")
 
-  totalPoints Int @default(0) @map("total_points")
+  totalPoints Int     @default(0) @map("total_points")
+  isDemo Boolean @default(false) @map("is_demo")
 
   questions           Question[]           @relation("QuestionAuthor")
   comments            Comment[]            @relation("CommentAuthor")
@@ -43,6 +44,7 @@ model User {
   ownedGameRuns       GameRun[]            @relation("GameRunOwner")
   gameActivities      GameActivity[]       @relation("GameActivityActor")
   mysteryAnswerUses   MysteryAnswerUse[]    @relation("MysteryAnswerUses")
+  demoAiDailyUsages   DemoAiDailyUsage[]    @relation("DemoAiDailyUsages")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -53,6 +55,18 @@ model User {
   @@index([role, school, totalPoints])
   @@unique([school, grade, className, studentNumber], name: "studentIdentity", map: "uniq_student_identity")
   @@map("users")
+}
+
+model DemoAiDailyUsage {
+  userId       String   @map("user_id")
+  user         User     @relation("DemoAiDailyUsages", fields: [userId], references: [id], onDelete: Cascade)
+  usageDate    String   @map("usage_date")
+  requestCount Int      @default(0) @map("request_count")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@id([userId, usageDate], map: "demo_ai_daily_usages_pkey")
+  @@map("demo_ai_daily_usages")
 }
 
 model PointLog {
