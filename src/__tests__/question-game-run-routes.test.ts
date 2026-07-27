@@ -4339,6 +4339,11 @@ describe("미스터리 박스 서버 실행 경로", () => {
   ] as const)(
     "%s 모드는 학생 질문만 점수로 삼고 정답 추측에서 즉시 정산한다",
     async (mode, awarded, dailyLimit) => {
+      mocks.mysteryUseGroupBy.mockResolvedValue(
+        MYSTERY_ITEMS
+          .filter(({ id }) => id !== "flute")
+          .map(({ id }) => ({ itemId: id, _count: { _all: 1 } })),
+      );
       await createMystery(mode);
       const premature = await postComplete({ requestId: COMPLETE_ID, expectedVersion: 1 });
       expect(premature.status).toBe(409);
