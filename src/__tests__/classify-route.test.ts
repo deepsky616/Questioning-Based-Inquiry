@@ -4,6 +4,12 @@ vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({
   rateLimit: vi.fn(() => ({ success: true })),
 }));
+vi.mock("@/lib/logger", () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 vi.mock("@/lib/ai", () => ({
   AiKeyMissingError: class AiKeyMissingError extends Error {},
   AiQuotaError: class AiQuotaError extends Error {},
@@ -13,6 +19,7 @@ vi.mock("@/lib/ai", () => ({
 
 import { POST } from "@/app/api/classify/route";
 import { auth } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 import {
   AiBusyError,
   AiKeyMissingError,
@@ -21,6 +28,7 @@ import {
 
 const mAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mGenerate = generateJsonWithMetadata as unknown as ReturnType<typeof vi.fn>;
+const mWarn = logger.warn as unknown as ReturnType<typeof vi.fn>;
 
 function request(content = "광합성이란 무엇인가요?") {
   return new Request("http://localhost/api/classify", {
@@ -94,5 +102,9 @@ describe("POST /api/classify", () => {
       fallbackReason: "busy",
       reasoning: "키워드 기반 자동 분류",
     });
+    expect(mWarn).toHaveBeenCalledWith(
+      "질문 분석이 기본 분석으로 전환됐습니다",
+      { fallbackReason: "busy" },
+    );
   });
 });

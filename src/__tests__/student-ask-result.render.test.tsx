@@ -663,6 +663,80 @@ describe("학생 질문 분석 결과", () => {
     expect(screen.queryByText("인공지능 질문 분석 완료")).not.toBeInTheDocument();
   });
 
+  it.each(["busy", "invalid-response"] as const)(
+    "일시적인 %s 기본 분석은 한 번 자동 재시도해 인공지능 결과로 복구한다",
+    async (fallbackReason) => {
+      Element.prototype.scrollIntoView = vi.fn();
+      let classifyAttempts = 0;
+      const fetchMock = vi.fn((input: RequestInfo | URL) => {
+        if (String(input) === "/api/classify") {
+          classifyAttempts += 1;
+          const responseBody = classifyAttempts === 1
+            ? { ...result, analysisSource: "fallback", fallbackReason }
+            : {
+                ...result,
+                analysisSource: "ai",
+                analysisModel: "gemini-2.5-flash",
+              };
+          return Promise.resolve({
+            ok: true,
+            json: async () => responseBody,
+          } as Response);
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ configured: true }),
+        } as Response);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      renderWithIntl(<AskPage />);
+      const input = await screen.findByLabelText("질문");
+      fireEvent.change(input, { target: { value: "광합성에 필요한 것은 무엇인가요?" } });
+      fireEvent.click(screen.getByRole("button", { name: "질문 분석하기" }));
+
+      expect(
+        await screen.findByText("인공지능 질문 분석 완료", {}, { timeout: 3_000 }),
+      ).toBeInTheDocument();
+      expect(classifyAttempts).toBe(2);
+      expect(screen.queryByText(
+        "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
+      )).not.toBeInTheDocument();
+    },
+  );
+
+  it("키 누락처럼 기다려도 해결되지 않는 기본 분석은 자동 재시도하지 않는다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    let classifyAttempts = 0;
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      if (String(input) === "/api/classify") {
+        classifyAttempts += 1;
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ...result,
+            analysisSource: "fallback",
+            fallbackReason: "missing-key",
+          }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ configured: true }),
+      } as Response);
+    }));
+
+    renderWithIntl(<AskPage />);
+    const input = await screen.findByLabelText("질문");
+    fireEvent.change(input, { target: { value: "광합성에 필요한 것은 무엇인가요?" } });
+    fireEvent.click(screen.getByRole("button", { name: "질문 분석하기" }));
+
+    expect(await screen.findByText(
+      "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
+    )).toBeInTheDocument();
+    expect(classifyAttempts).toBe(1);
+  });
+
   it("이전 분석이 있으면 입력 카드의 기본 행동을 다시 분석으로 표시한다", () => {
     renderWithIntl(
       <StudentAskInputCard
