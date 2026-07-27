@@ -14,6 +14,7 @@ export interface SavedDesignLike {
   subject: string;
   area: string;
   title: string;
+  unitTitle?: string;
   createdAt?: string | Date;
 }
 
@@ -33,7 +34,7 @@ export function filterSortSavedDesigns<T extends SavedDesignLike>(
       (!filters.grade || d.grade === filters.grade) &&
       (!filters.subject || d.subject === filters.subject) &&
       (!filters.area || d.area === filters.area) &&
-      (!filters.unit || d.title === filters.unit),
+      (!filters.unit || (d.unitTitle ?? d.title) === filters.unit),
     )
     .sort((a, b) => {
       const av = sortKey(a);

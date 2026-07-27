@@ -15,6 +15,7 @@ export type LastDesignAction = { type: "saved" | "deployed"; at: string };
 export interface SavedInquiryDesign {
   id: string;
   title: string;
+  unitTitle?: string;
   subject: string;
   gradeRange: string;
   grade?: string | null;

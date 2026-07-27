@@ -6,6 +6,10 @@ import { prisma } from "@/lib/db";
 import { isValidSessionDateString } from "@/lib/sessions";
 import { normalizeStudentLearningGuides } from "@/lib/student-learning-guide";
 import { studentLearningGuidesSchema } from "@/lib/student-learning-guide-schema";
+import {
+  buildInquiryDesignTitle,
+  extractInquiryDesignUnitTitle,
+} from "@/lib/inquiry-design-title";
 
 const sessionDateSchema = z.string().trim().refine(isValidSessionDateString);
 
@@ -104,26 +108,41 @@ export async function GET(req: Request) {
 
   const asArray = (v: unknown) => (Array.isArray(v) ? v : []);
   return NextResponse.json(
-    designs.map((d) => ({
-      id: d.id, title: d.title, subject: d.subject,
-      gradeRange: d.grade_range, grade: d.grade, sessionDate: d.session_date, area: d.area,
-      coreIdea: d.core_idea ?? "",
-      achievements: asArray(d.selected_achievements),
-      coreSentences: asArray(d.core_sentences) as string[],
-      essentialQuestions: asArray(d.essential_questions) as string[],
-      inquiryQuestions: asArray(d.inquiry_questions),
-      learningGuides: normalizeStudentLearningGuides(d.learning_guides),
-      isActive: d.is_active,
-      defaultQuestionPublic: d.default_question_public,
-      likesVisibleToPeers: d.likes_visible_to_peers,
-      commentsVisibleToPeers: d.comments_visible_to_peers,
-      targetClassValue: d.target_class_value ?? "all",
-      targetStudentIds: asArray(d.target_student_ids) as string[],
-      sessionCount: Number(d.session_count ?? 0),
-      lastDeployedAt: d.last_deployed_at,
-      createdAt: d.created_at,
-      updatedAt: d.updated_at,
-    }))
+    designs.map((d) => {
+      const unitTitle = extractInquiryDesignUnitTitle({
+        title: d.title,
+        grade: d.grade,
+        subject: d.subject,
+      });
+      return {
+        id: d.id,
+        title: buildInquiryDesignTitle({
+          sessionDate: d.session_date,
+          grade: d.grade,
+          subject: d.subject,
+          unitTitle,
+        }),
+        unitTitle,
+        subject: d.subject,
+        gradeRange: d.grade_range, grade: d.grade, sessionDate: d.session_date, area: d.area,
+        coreIdea: d.core_idea ?? "",
+        achievements: asArray(d.selected_achievements),
+        coreSentences: asArray(d.core_sentences) as string[],
+        essentialQuestions: asArray(d.essential_questions) as string[],
+        inquiryQuestions: asArray(d.inquiry_questions),
+        learningGuides: normalizeStudentLearningGuides(d.learning_guides),
+        isActive: d.is_active,
+        defaultQuestionPublic: d.default_question_public,
+        likesVisibleToPeers: d.likes_visible_to_peers,
+        commentsVisibleToPeers: d.comments_visible_to_peers,
+        targetClassValue: d.target_class_value ?? "all",
+        targetStudentIds: asArray(d.target_student_ids) as string[],
+        sessionCount: Number(d.session_count ?? 0),
+        lastDeployedAt: d.last_deployed_at,
+        createdAt: d.created_at,
+        updatedAt: d.updated_at,
+      };
+    })
   );
 }
 
@@ -137,6 +156,17 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = saveSchema.parse(body);
     const teacherId = (session.user as { id: string }).id;
+    const unitTitle = extractInquiryDesignUnitTitle({
+      title: data.title,
+      grade: data.grade,
+      subject: data.subject,
+    });
+    const designTitle = buildInquiryDesignTitle({
+      sessionDate: data.sessionDate,
+      grade: data.grade,
+      subject: data.subject,
+      unitTitle,
+    });
 
     // 탐구 질문 저장 (ID를 RETURNING으로 회수)
     const inserted = await prisma.$queryRawUnsafe<{ id: string; created_at: Date; updated_at: Date }[]>(
@@ -152,7 +182,7 @@ export async function POST(req: Request) {
        RETURNING id, created_at, updated_at`,
       teacherId,
       data.curriculumAreaId ?? null,
-      data.title,
+      designTitle,
       data.subject,
       data.gradeRange,
       data.area,
@@ -182,7 +212,8 @@ export async function POST(req: Request) {
       design: designId
         ? {
             id: designId,
-            title: data.title,
+            title: designTitle,
+            unitTitle,
             subject: data.subject,
             gradeRange: data.gradeRange,
             grade: data.grade ?? null,

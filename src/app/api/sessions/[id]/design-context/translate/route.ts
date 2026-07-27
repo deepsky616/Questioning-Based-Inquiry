@@ -14,6 +14,7 @@ import {
 import { normalizeStudentInquiryGuide, type StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import { normalizeStudentLearningGuides, type StudentLearningGuides } from "@/lib/student-learning-guide";
 import type { Achievement } from "@/lib/achievement-selection";
+import { buildInquiryDesignTitle } from "@/lib/inquiry-design-title";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -255,7 +256,12 @@ export async function POST(req: Request, { params }: Params) {
   const achievements = normalizeAchievements(design.selected_achievements);
   const context: DesignReferenceContext = {
     id: design.id,
-    title: design.title,
+    title: buildInquiryDesignTitle({
+      sessionDate: qs.date,
+      grade: design.grade,
+      subject: design.subject,
+      unitTitle: design.title,
+    }),
     sessionDate: qs.date,
     subject: design.subject,
     gradeRange: design.grade_range,
