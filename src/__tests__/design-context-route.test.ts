@@ -33,10 +33,15 @@ const DESIGN_ROW = {
   grade: "4",
   area: "생명",
   core_idea: "핵심 아이디어",
+  selected_achievements: [{
+    code: "[4과10-01]",
+    content: "물이 세 가지 상태로 변할 수 있음을 안다.",
+  }],
   core_sentences: ["문장1"],
   essential_questions: ["질문1"],
   learning_guides: {
     coreIdea: { explanation: "핵심 아이디어 쉬운 설명", lifeConnection: "생활 속 사례", keywords: [] },
+    achievements: [{ index: 0, explanation: "물의 세 가지 모습을 찾고 설명하는 목표예요." }],
     coreSentences: [],
     essentialQuestions: [],
   },
@@ -66,6 +71,12 @@ describe("GET design-context 권한", () => {
     expect(res.status).toBe(200);
     expect(body.context?.title).toBe("광합성");
     expect(body.context?.sessionDate).toBe("2026-05-01");
+    expect(body.context?.achievements).toEqual([{
+      code: "[4과10-01]",
+      content: "물이 세 가지 상태로 변할 수 있음을 안다.",
+    }]);
+    expect(body.context?.learningGuides.achievements[0].explanation)
+      .toBe("물의 세 가지 모습을 찾고 설명하는 목표예요.");
     expect(body.context?.learningGuides.coreIdea.explanation).toBe("핵심 아이디어 쉬운 설명");
   });
 
@@ -107,5 +118,32 @@ describe("GET design-context 권한", () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.context).toBeNull();
+  });
+
+  it("저장된 성취기준 설명이 없으면 교육과정 해설을 대체 설명으로 반환한다", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "t1", role: "TEACHER" } });
+    mockFindUnique.mockResolvedValue({
+      unitDesignId: "ud1",
+      date: "2026-05-01",
+      teacherId: "t1",
+      targetType: "ALL",
+      targetGrade: null,
+      targetClassName: null,
+      targetStudentId: null,
+      targetStudentIds: [],
+    });
+    mockQueryRaw.mockResolvedValue([{
+      ...DESIGN_ROW,
+      subject: "과학",
+      grade_range: "3-4",
+      area: "물의 상태 변화",
+      learning_guides: null,
+    }]);
+
+    const res = await GET(req, ctx);
+    const body = await res.json();
+
+    expect(body.context.learningGuides.achievements[0].explanation)
+      .toBe("물의 상태 변화는 관찰 가능한 현상 수준에서만 다루고, 물의 상태가 변하는 까닭은 다루지 않는다.");
   });
 });

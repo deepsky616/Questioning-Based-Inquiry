@@ -9,6 +9,11 @@ import { logger } from "@/lib/logger";
 import { studentCanAccessSession } from "@/lib/session-access";
 import { normalizeStudentInquiryGuide, type StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import { normalizeStudentLearningGuides, type StudentLearningGuides } from "@/lib/student-learning-guide";
+import type { Achievement } from "@/lib/achievement-selection";
+import {
+  normalizeAchievements,
+  withAchievementGuideFallback,
+} from "@/lib/student-achievement-reference";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,6 +32,7 @@ interface DesignReferenceContext {
   grade: string | null;
   area: string;
   coreIdea: string;
+  achievements: Achievement[];
   coreSentences: string[];
   essentialQuestions: string[];
   learningGuides?: StudentLearningGuides;
@@ -75,6 +81,13 @@ function buildEntries(context: DesignReferenceContext): [string, string][] {
   return [
     ...base,
     ...coreIdeaEntries,
+    ...context.achievements.flatMap((achievement, index): [string, string][] => {
+      const guide = learningGuides?.achievements.find((item) => item.index === index);
+      return [
+        [`achievements.${index}.content`, achievement.content],
+        ...(guide ? [[`learningGuides.achievements.${index}.explanation`, guide.explanation] as [string, string]] : []),
+      ];
+    }),
     ...context.coreSentences.flatMap((value, index): [string, string][] => {
       const guide = learningGuides?.coreSentences.find((item) => item.index === index);
       return [
@@ -115,6 +128,10 @@ function applyTranslations(context: DesignReferenceContext, fields: Record<strin
     subject: fields.subject ?? context.subject,
     area: fields.area ?? context.area,
     coreIdea: fields.coreIdea ?? context.coreIdea,
+    achievements: context.achievements.map((achievement, index) => ({
+      ...achievement,
+      content: fields[`achievements.${index}.content`] ?? achievement.content,
+    })),
     coreSentences: context.coreSentences.map((value, index) => fields[`coreSentences.${index}`] ?? value),
     essentialQuestions: context.essentialQuestions.map((value, index) => fields[`essentialQuestions.${index}`] ?? value),
     ...(context.learningGuides ? {
@@ -129,6 +146,10 @@ function applyTranslations(context: DesignReferenceContext, fields: Record<strin
             })),
           },
         } : {}),
+        achievements: context.learningGuides.achievements.map((guide) => ({
+          ...guide,
+          explanation: fields[`learningGuides.achievements.${guide.index}.explanation`] ?? guide.explanation,
+        })),
         coreSentences: context.learningGuides.coreSentences.map((guide) => ({
           ...guide,
           explanation: fields[`learningGuides.coreSentences.${guide.index}.explanation`] ?? guide.explanation,
@@ -213,6 +234,7 @@ export async function POST(req: Request, { params }: Params) {
       grade: string | null;
       area: string;
       core_idea: string;
+      selected_achievements: unknown;
       core_sentences: unknown;
       essential_questions: unknown;
       inquiry_questions: unknown;
@@ -220,7 +242,7 @@ export async function POST(req: Request, { params }: Params) {
     }[]
   >`
     SELECT id, title, subject, grade_range, grade, area, core_idea,
-           core_sentences, essential_questions, inquiry_questions, learning_guides
+           selected_achievements, core_sentences, essential_questions, inquiry_questions, learning_guides
     FROM unit_designs
     WHERE id = ${qs.unitDesignId} AND teacher_id = ${qs.teacherId}
     LIMIT 1
@@ -228,6 +250,7 @@ export async function POST(req: Request, { params }: Params) {
   const design = rows[0];
   if (!design) return NextResponse.json({ context: null });
 
+  const achievements = normalizeAchievements(design.selected_achievements);
   const context: DesignReferenceContext = {
     id: design.id,
     title: design.title,
@@ -237,9 +260,16 @@ export async function POST(req: Request, { params }: Params) {
     grade: design.grade,
     area: design.area,
     coreIdea: design.core_idea,
+    achievements,
     coreSentences: asStringArray(design.core_sentences),
     essentialQuestions: asStringArray(design.essential_questions),
-    learningGuides: normalizeStudentLearningGuides(design.learning_guides),
+    learningGuides: withAchievementGuideFallback(
+      normalizeStudentLearningGuides(design.learning_guides),
+      achievements,
+      design.grade_range,
+      design.subject,
+      design.area,
+    ),
     inquiryQuestions: asInquiryQuestions(design.inquiry_questions),
   };
   const entries = buildEntries(context);

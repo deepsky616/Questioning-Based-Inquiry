@@ -3,11 +3,14 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { studentCanAccessSession } from "@/lib/session-access";
 import { normalizeStudentLearningGuides } from "@/lib/student-learning-guide";
+import {
+  normalizeAchievements,
+  withAchievementGuideFallback,
+} from "@/lib/student-achievement-reference";
 
 type Params = { params: Promise<{ id: string }> };
 
-// "탐구질문 수업" 세션이 참조하는 탐구설계 맥락(핵심아이디어·핵심어·핵심문장·핵심질문·탐구질문)을
-// 반환한다. 학생 질문하기의 참고 자료 패널에서 사용. (성취기준은 후속 단계에서 추가)
+// "탐구질문 수업" 세션이 참조하는 탐구설계 맥락을 학생 질문하기 참고자료에 반환한다.
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
   const session = await auth();
@@ -53,6 +56,7 @@ export async function GET(_req: Request, { params }: Params) {
       grade: string | null;
       area: string;
       core_idea: string;
+      selected_achievements: unknown;
       core_sentences: unknown;
       essential_questions: unknown;
       inquiry_questions: unknown;
@@ -60,7 +64,7 @@ export async function GET(_req: Request, { params }: Params) {
     }[]
   >`
     SELECT title, subject, grade_range, grade, area, core_idea,
-           core_sentences, essential_questions, inquiry_questions, learning_guides
+           selected_achievements, core_sentences, essential_questions, inquiry_questions, learning_guides
     FROM unit_designs
     WHERE id = ${qs.unitDesignId} AND teacher_id = ${qs.teacherId}
     LIMIT 1
@@ -69,6 +73,14 @@ export async function GET(_req: Request, { params }: Params) {
   if (!d) return NextResponse.json({ context: null });
 
   const asArray = (v: unknown) => (Array.isArray(v) ? v : []);
+  const achievements = normalizeAchievements(d.selected_achievements);
+  const learningGuides = withAchievementGuideFallback(
+    normalizeStudentLearningGuides(d.learning_guides),
+    achievements,
+    d.grade_range,
+    d.subject,
+    d.area,
+  );
   return NextResponse.json({
     context: {
       id: qs.unitDesignId,
@@ -79,9 +91,10 @@ export async function GET(_req: Request, { params }: Params) {
       grade: d.grade,
       area: d.area,
       coreIdea: d.core_idea,
+      achievements,
       coreSentences: asArray(d.core_sentences) as string[],
       essentialQuestions: asArray(d.essential_questions) as string[],
-      learningGuides: normalizeStudentLearningGuides(d.learning_guides),
+      learningGuides,
       inquiryQuestions: asArray(d.inquiry_questions) as { type: string; content: string }[],
     },
   });
