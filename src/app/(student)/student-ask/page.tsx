@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { appNotificationQueryKeys, useAppNotifications } from "@/lib/app-notifications";
 import {
@@ -195,7 +195,7 @@ function AskContent() {
   }, [needsQuestionScope, replaceSessionInUrl, requestedSessionId, sessions, sessionsError, sessionsLoaded, transitionSession]);
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
-  const isInquirySession = selectedSession ? isInquiryDesignSession(selectedSession) : false;
+  const hasDesignReference = Boolean(selectedSession?.unitDesignId);
 
   // 탐구질문 수업 세션이면 참고 자료(탐구설계 맥락)를 불러온다
   const fetchDesignContext = useCallback(async (sessionId: string) => {
@@ -216,7 +216,7 @@ function AskContent() {
   useEffect(() => {
     setDesignContext(null);
     const sel = sessions.find((s) => s.id === selectedSessionId);
-    if (selectedSessionId && sel && isInquiryDesignSession(sel)) {
+    if (selectedSessionId && sel?.unitDesignId) {
       setShowRef(true);
       fetchDesignContext(selectedSessionId);
     }
@@ -226,7 +226,7 @@ function AskContent() {
   useEffect(() => {
     const onFocus = () => {
       const sel = sessions.find((s) => s.id === selectedSessionId);
-      if (selectedSessionId && sel && isInquiryDesignSession(sel)) fetchDesignContext(selectedSessionId);
+      if (selectedSessionId && sel?.unitDesignId) fetchDesignContext(selectedSessionId);
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
@@ -616,7 +616,7 @@ function AskContent() {
         referencePanel={
           <StudentAskReferencePanel
             selectedSession={selectedSession}
-            isInquirySession={isInquirySession}
+            hasDesignReference={hasDesignReference}
             designContext={designContext}
             showReference={showRef}
             onToggleReference={() => setShowRef((value) => !value)}

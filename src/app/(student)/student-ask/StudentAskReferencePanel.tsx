@@ -13,7 +13,7 @@ import type { DesignContext, QuestionSession } from "./types";
 
 interface StudentAskReferencePanelProps {
   selectedSession: QuestionSession | null;
-  isInquirySession: boolean;
+  hasDesignReference: boolean;
   designContext: DesignContext | null;
   showReference: boolean;
   onToggleReference: () => void;
@@ -21,7 +21,7 @@ interface StudentAskReferencePanelProps {
 
 export function StudentAskReferencePanel({
   selectedSession,
-  isInquirySession,
+  hasDesignReference,
   designContext,
   showReference,
   onToggleReference,
@@ -37,7 +37,15 @@ export function StudentAskReferencePanel({
   const sharedQuestions = Array.isArray(selectedSession?.sharedQuestions)
     ? selectedSession.sharedQuestions.filter((question) => question.content?.trim())
     : [];
-  const hasReference = (isInquirySession && designContext) || sharedQuestions.length > 0;
+  const mergedReference = hasDesignReference && designContext
+    ? {
+        ...designContext,
+        inquiryQuestions: sharedQuestions.length > 0
+          ? sharedQuestions
+          : designContext.inquiryQuestions,
+      }
+    : null;
+  const hasReference = Boolean(mergedReference) || sharedQuestions.length > 0;
 
   // 참고할 것이 없는 일반 세션 — 좋은 질문 도우미가 이 자리를 채운다
   if (!hasReference) {
@@ -57,7 +65,7 @@ export function StudentAskReferencePanel({
 
   return (
     <div className="student-ask-reference-panel max-h-[34rem] space-y-3 overflow-y-auto pr-1">
-      {sharedQuestions.length > 0 && (
+      {!mergedReference && sharedQuestions.length > 0 && (
         <div className="rounded-lg border border-indigo-200 dark:border-indigo-500/30 bg-indigo-50 dark:bg-indigo-950/40 p-4 space-y-2">
           <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">{t("teacherInquiryQuestions")}</p>
           <p className="text-xs text-indigo-500 mb-2">{t("inquiryHint")}</p>
@@ -73,7 +81,7 @@ export function StudentAskReferencePanel({
         </div>
       )}
 
-      {isInquirySession && designContext && (
+      {mergedReference && (
         <div className="rounded-lg border-2 border-indigo-300 bg-indigo-50 p-4 dark:border-indigo-500/40 dark:bg-indigo-950/40">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -93,7 +101,7 @@ export function StudentAskReferencePanel({
           </div>
           {showReference && (
             <DesignReferenceView
-              data={designContext}
+              data={mergedReference}
               sourceSessionId={selectedSession?.id}
               className="mt-3"
             />

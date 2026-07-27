@@ -810,6 +810,46 @@ export function buildDemoLearningActivityPlans(studentIds) {
   return { questions, comments, likes, analyses };
 }
 
+const CLASS_INQUIRY_FLOW = [
+  { type: "factual", contentGroup: "사실 확인" },
+  { type: "conceptual", contentGroup: "관계와 까닭" },
+  { type: "controversial", contentGroup: "판단과 토론" },
+];
+
+export function buildDemoClassInquiryQuestions(
+  design,
+  sessionId,
+  studentQuestions,
+) {
+  const questionsInSession = studentQuestions.filter(
+    (question) => question.sessionId === sessionId,
+  );
+  const designQuestionByType = new Map(
+    design.inquiryQuestions.map((question) => [question.type, question]),
+  );
+
+  return CLASS_INQUIRY_FLOW.map(({ type, contentGroup }, index) => {
+    const question = designQuestionByType.get(type);
+    const sameTypeQuestions = questionsInSession.filter(
+      (studentQuestion) => studentQuestion.inquiryType === type,
+    );
+    const mergedFrom = (sameTypeQuestions.length > 0
+      ? sameTypeQuestions
+      : questionsInSession
+    )
+      .slice(0, 4)
+      .map((studentQuestion) => studentQuestion.content);
+
+    return {
+      ...question,
+      contentGroup,
+      priority: index + 1,
+      source: "student",
+      mergedFrom: mergedFrom.length > 0 ? mergedFrom : [question.content],
+    };
+  });
+}
+
 async function removePreviousDemoData(tx, studentIds) {
   const sessionIds = Object.values(DEMO.sessionIds);
   const questionIds = (
@@ -1002,10 +1042,15 @@ async function createInquiryLearningData(tx, studentIds) {
   const designById = new Map(
     DEMO_UNIT_DESIGN_BLUEPRINTS.map((design) => [design.id, design]),
   );
+  const activityPlans = buildDemoLearningActivityPlans(studentIds);
   for (const blueprint of DEMO_SESSION_BLUEPRINTS) {
     const design = designById.get(blueprint.unitDesignId);
     const publishedAt = offsetDate(blueprint.offsetDays).toISOString();
-    const sharedQuestions = design.inquiryQuestions.map((question) => ({
+    const sharedQuestions = buildDemoClassInquiryQuestions(
+      design,
+      blueprint.id,
+      activityPlans.questions,
+    ).map((question) => ({
       ...question,
       publishedAt,
     }));
@@ -1053,7 +1098,6 @@ async function createInquiryLearningData(tx, studentIds) {
     }
   }
 
-  const activityPlans = buildDemoLearningActivityPlans(studentIds);
   for (const question of activityPlans.questions) {
     await tx.question.create({
       data: {

@@ -8,6 +8,16 @@ import { StudentInquiryQuestionReference } from "@/components/shared/StudentInqu
 import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import type { StudentLearningGuides } from "@/lib/student-learning-guide";
 
+export interface DesignReferenceInquiryQuestion {
+  type: string;
+  content: string;
+  studentGuide?: StudentInquiryGuide;
+  contentGroup?: string;
+  priority?: number;
+  source?: "student" | "teacher";
+  mergedFrom?: string[];
+}
+
 export interface DesignReference {
   id?: string;
   title?: string;
@@ -20,7 +30,7 @@ export interface DesignReference {
   coreSentences?: string[];
   essentialQuestions?: string[];
   learningGuides?: StudentLearningGuides;
-  inquiryQuestions?: { type: string; content: string; studentGuide?: StudentInquiryGuide }[];
+  inquiryQuestions?: DesignReferenceInquiryQuestion[];
 }
 
 /**
@@ -74,7 +84,28 @@ export function DesignReferenceView({
   const coreIdeaLines = splitCoreIdeaLines(view.coreIdea ?? "");
   const sentences = (view.coreSentences ?? []).filter((s) => s.trim());
   const essential = (view.essentialQuestions ?? []).filter((s) => s.trim());
-  const inquiry = (view.inquiryQuestions ?? []).filter((q) => q.content.trim());
+  const inquiry = (view.inquiryQuestions ?? [])
+    .filter((q) => q.content.trim())
+    .map((question, index) => ({
+      question,
+      order: typeof question.priority === "number" ? question.priority : index + 1,
+    }))
+    .sort((a, b) => a.order - b.order);
+  const hasInquiryGroups = inquiry.some(({ question }) => question.contentGroup?.trim());
+  const inquiryGroups = inquiry.reduce<
+    { label: string; items: typeof inquiry }[]
+  >((groups, item) => {
+    const label = hasInquiryGroups
+      ? item.question.contentGroup?.trim() || t("inquiryQuestions")
+      : "";
+    const previous = groups[groups.length - 1];
+    if (previous?.label === label) {
+      previous.items.push(item);
+    } else {
+      groups.push({ label, items: [item] });
+    }
+    return groups;
+  }, []);
   const learningGuides = view.learningGuides;
 
   return (
@@ -198,11 +229,27 @@ export function DesignReferenceView({
                 <p className="mt-0.5 text-[11px] leading-snug text-emerald-800/80 dark:text-emerald-200/75">{t("inquiryQuestionsDesc")}</p>
               </div>
             </div>
-            <ul className="mt-3 space-y-2 text-foreground">
-              {inquiry.map((q, i) => (
-                <StudentInquiryQuestionReference key={i} question={q} typeLabel={typeLabel(q.type)} />
+            <div className="mt-3 space-y-3">
+              {inquiryGroups.map((group, groupIndex) => (
+                <div key={`${group.label}-${groupIndex}`} className="space-y-2">
+                  {group.label && (
+                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                      {group.label}
+                    </p>
+                  )}
+                  <ul className="space-y-2 text-foreground">
+                    {group.items.map(({ question, order }) => (
+                      <StudentInquiryQuestionReference
+                        key={`${question.content}-${order}`}
+                        question={question}
+                        typeLabel={typeLabel(question.type)}
+                        sequenceNumber={order}
+                      />
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
           </section>
         )}
       </div>

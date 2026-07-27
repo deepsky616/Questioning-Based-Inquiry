@@ -306,6 +306,78 @@ describe("학생 질문 분석 결과", () => {
     expect(screen.queryByText("첫째 참고 자료")).not.toBeInTheDocument();
   });
 
+  it("배포된 수업 탐구 질문을 단원 설계 참고자료의 네 번째 영역에 표시한다", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    appState.sessions = [
+      {
+        id: "session-1",
+        date: "2026-07-13",
+        subject: "과학",
+        topic: "물의 상태 변화",
+        teacher: { name: "선생님" },
+        unitDesignId: "design-1",
+        sharedQuestions: [
+          {
+            type: "conceptual",
+            content: "물의 모습이 달라져도 같은 물질이라고 할 수 있을까요?",
+            contentGroup: "공통 성질",
+            priority: 2,
+          },
+          {
+            type: "factual",
+            content: "얼음이 녹을 때 어떤 변화가 나타날까요?",
+            contentGroup: "변화 관찰",
+            priority: 1,
+          },
+        ],
+        defaultQuestionPublic: false,
+      },
+    ] as never;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input) === "/api/sessions/session-1/design-context") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            context: {
+              title: "물의 모습과 변화를 알아보아요",
+              subject: "과학",
+              gradeRange: "3-4",
+              grade: "4",
+              area: "물질",
+              coreIdea: "물은 온도에 따라 상태가 달라질 수 있습니다.",
+              coreSentences: ["물은 얼고 녹으며 모습이 달라집니다."],
+              essentialQuestions: ["물의 상태 변화는 생활과 어떻게 이어질까요?"],
+              inquiryQuestions: [
+                {
+                  type: "controversial",
+                  content: "처음 단원 설계에 저장된 질문입니다.",
+                },
+              ],
+            },
+          }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ configured: true }),
+      } as Response);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithIntl(<AskPage />);
+
+    expect(await screen.findByText("물의 모습과 변화를 알아보아요")).toBeInTheDocument();
+    expect(screen.getByText("물은 온도에 따라 상태가 달라질 수 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText("물은 얼고 녹으며 모습이 달라집니다.")).toBeInTheDocument();
+    expect(screen.getByText("물의 상태 변화는 생활과 어떻게 이어질까요?")).toBeInTheDocument();
+    expect(screen.getByText("변화 관찰")).toBeInTheDocument();
+    expect(screen.getByText("공통 성질")).toBeInTheDocument();
+    expect(screen.getByText("얼음이 녹을 때 어떤 변화가 나타날까요?")).toBeInTheDocument();
+    expect(screen.getByText("물의 모습이 달라져도 같은 물질이라고 할 수 있을까요?")).toBeInTheDocument();
+    expect(screen.queryByText("처음 단원 설계에 저장된 질문입니다.")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/sessions/session-1/design-context");
+  });
+
   it("저장 전에 기존 질문 조회를 취소하고 기존 질문과 요약 캐시를 함께 갱신한다", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL, init?: RequestInit) => {

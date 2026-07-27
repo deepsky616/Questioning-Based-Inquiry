@@ -19,9 +19,11 @@ export interface StudentInquiryQuestionReferenceData {
 export function StudentInquiryQuestionReference({
   question,
   typeLabel,
+  sequenceNumber,
 }: {
   question: StudentInquiryQuestionReferenceData;
   typeLabel: string;
+  sequenceNumber?: number;
 }) {
   const t = useTranslations("designRef");
   const guide = question.studentGuide;
@@ -36,6 +38,11 @@ export function StudentInquiryQuestionReference({
   return (
     <li data-design-reference-inquiry-item className={`rounded-md border border-l-4 px-3 py-2.5 ${TYPE_STYLE[question.type] ?? "border-muted bg-muted/30"}`}>
       <p className="text-sm font-semibold leading-relaxed text-foreground">
+        {typeof sequenceNumber === "number" && (
+          <span className="mr-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+            {sequenceNumber}.
+          </span>
+        )}
         <span className="mr-1.5 text-xs font-medium text-muted-foreground">[{typeLabel}]</span>
         {question.content}
       </p>

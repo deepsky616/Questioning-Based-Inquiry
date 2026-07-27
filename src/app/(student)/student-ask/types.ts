@@ -5,6 +5,10 @@ export interface SharedQuestion {
   type: string;
   content: string;
   studentGuide?: StudentInquiryGuide;
+  contentGroup?: string;
+  priority?: number;
+  source?: "student" | "teacher";
+  mergedFrom?: string[];
 }
 
 export interface QuestionSession {

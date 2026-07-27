@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import packageJson from "../../package.json";
 import {
+  buildDemoClassInquiryQuestions,
   buildDemoLearningActivityPlans,
   DEMO_SESSION_BLUEPRINTS,
   DEMO_UNIT_DESIGN_BLUEPRINTS,
@@ -148,6 +149,37 @@ describe("USB 시연 학급 자료 생성 명령", () => {
           && Boolean(studentGuide?.thinkingStart)
           && (studentGuide?.keywords.length ?? 0) >= 2
         )),
+      ).toBe(true);
+    }
+  });
+
+  it("학생 질문을 묶고 수업 흐름에 맞춘 수업 탐구 질문을 참고자료에 배포한다", () => {
+    const studentIds = STUDENT_NAMES.map(
+      (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
+    );
+    const activityPlans = buildDemoLearningActivityPlans(studentIds);
+    const designById = new Map(
+      DEMO_UNIT_DESIGN_BLUEPRINTS.map((design) => [design.id, design]),
+    );
+
+    for (const session of DEMO_SESSION_BLUEPRINTS) {
+      const design = designById.get(session.unitDesignId);
+      expect(design).toBeDefined();
+      const sharedQuestions = buildDemoClassInquiryQuestions(
+        design!,
+        session.id,
+        activityPlans.questions,
+      );
+
+      expect(sharedQuestions.map(({ priority }) => priority)).toEqual([1, 2, 3]);
+      expect(sharedQuestions.map(({ contentGroup }) => contentGroup)).toEqual([
+        "사실 확인",
+        "관계와 까닭",
+        "판단과 토론",
+      ]);
+      expect(sharedQuestions.every(({ source }) => source === "student")).toBe(true);
+      expect(
+        sharedQuestions.every(({ mergedFrom }) => (mergedFrom?.length ?? 0) > 0),
       ).toBe(true);
     }
   });
