@@ -180,9 +180,17 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       ))).toBe(true);
       expect(design?.coreSentences.length).toBeGreaterThan(0);
       expect(design?.essentialQuestions.length).toBeGreaterThan(0);
-      expect(design?.inquiryQuestions.map(({ type }) => type).sort()).toEqual(
-        ["conceptual", "controversial", "factual"],
-      );
+      expect(design?.inquiryQuestions).toHaveLength(5);
+      expect(
+        design?.inquiryQuestions.reduce<Record<string, number>>((counts, question) => {
+          counts[question.type] = (counts[question.type] ?? 0) + 1;
+          return counts;
+        }, {}),
+      ).toEqual({
+        factual: 2,
+        conceptual: 2,
+        controversial: 1,
+      });
       expect(design?.learningGuides.coreSentences).toHaveLength(
         design?.coreSentences.length,
       );
@@ -231,6 +239,11 @@ describe("USB 시연 학급 자료 생성 명령", () => {
         "관계와 까닭",
         "판단과 토론",
       ]);
+      expect(sharedQuestions.map(({ content }) => content)).toEqual(
+        ["factual", "conceptual", "controversial"].map(
+          (type) => design?.inquiryQuestions.find((question) => question.type === type)?.content,
+        ),
+      );
       expect(sharedQuestions.every(({ source }) => source === "student")).toBe(true);
       expect(
         sharedQuestions.every(({ flowId }) => flowId === "cognitive-development"),
