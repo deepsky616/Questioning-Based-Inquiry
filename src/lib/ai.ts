@@ -5,7 +5,6 @@ import { getRequestLocale, languageDirective } from "@/lib/locale";
 import { alternateModel, chooseModelAuto, chooseQualityModel, resolveGeminiModel } from "@/lib/api-config";
 import { AiBusyError, AiKeyMissingError, AiQuotaError, DemoAiQuotaError, isDailyQuotaError, isTransientAiError } from "@/lib/ai-errors";
 import type { GeminiModel } from "@/lib/api-config";
-import { consumeDemoAiQuota } from "@/lib/demo-ai-quota";
 import { rateLimit } from "@/lib/rate-limit";
 
 // 기존 import 경로 호환을 위해 재노출 (라우트들은 @/lib/ai에서 가져온다)
@@ -91,6 +90,7 @@ async function callGeminiWithMetadata({
       windowMs: 60_000,
     });
     if (!success) throw new AiBusyError();
+    const { consumeDemoAiQuota } = await import("@/lib/demo-ai-quota");
     await consumeDemoAiQuota(userId);
   }
 

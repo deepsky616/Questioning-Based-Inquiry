@@ -9,6 +9,7 @@ import {
 } from "@/lib/question-game-mystery-definition";
 import {
   MYSTERY_ITEMS,
+  analyzeMysteryQuestion,
   mysteryAttributesForVersion,
   mysteryQuestionForAttribute,
 } from "@/lib/mystery-box-rules";
@@ -945,6 +946,36 @@ describe("질문놀이 실행 정의", () => {
       text: "사과",
       guessedItemId: "apple",
     });
+  });
+
+  it("미스터리 박스 인공지능은 모든 등록 정답을 열 차례 안에 해결한다", () => {
+    for (const secret of MYSTERY_ITEMS) {
+      const history: MysteryAiHistoryItem[] = [];
+      let solved = false;
+
+      for (let turn = 0; turn < 10; turn += 1) {
+        const plan = planMysteryAiActivity(history, "ko");
+        if (plan.kind === "GUESS") {
+          const correct = plan.guessedItemId === secret.id;
+          history.push({ kind: "GUESS", text: plan.text, correct });
+          if (correct) {
+            solved = true;
+            break;
+          }
+          continue;
+        }
+
+        const answer = analyzeMysteryQuestion(plan.text, secret, "ko").answer;
+        expect(answer, `${secret.id} 정답의 ${plan.attribute} 단서`).not.toBe(
+          "unknown",
+        );
+        if (answer !== "unknown") {
+          history.push({ kind: "QUESTION", text: plan.text, answer });
+        }
+      }
+
+      expect(solved, `${secret.id} 정답을 열 차례 안에 해결`).toBe(true);
+    }
   });
 
   it("미스터리 박스는 해결된 완료 상태에서만 정답 물건 식별값을 공개한다", () => {

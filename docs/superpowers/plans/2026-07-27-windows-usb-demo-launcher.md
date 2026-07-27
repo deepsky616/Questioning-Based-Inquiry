@@ -422,7 +422,7 @@ git commit -m "feat: USB 시연 자동 실행 화면 추가"
 - 제공: `npm run demo:usb`
 - 제공: 실행할 때 생성한 32바이트 임의 실행 표
 
-- [ ] **1단계: 실패하는 묶음 생성 검사 작성**
+- [x] **1단계: 실패하는 묶음 생성 검사 작성**
 
 ```ts
 expect(builderSource).toContain("DEMO_LAUNCH_TICKET");
@@ -431,20 +431,20 @@ expect(builderSource).toContain("login-inquiry-hero.png");
 expect(builderSource).not.toContain("DEMO_AI_SOURCE_EMAIL");
 ```
 
-- [ ] **2단계: 실패 확인**
+- [x] **2단계: 실패 확인**
 
 실행: `npm test -- src/__tests__/usb-demo-bundle.test.ts`
 
 예상: 생성 명령이 없어 실패
 
-- [ ] **3단계: 실행 파일과 매체 복사 구현**
+- [x] **3단계: 실행 파일과 매체 복사 구현**
 
 생성 명령은 `randomBytes(32).toString("base64url")`로 실행 표를 만들고, `index.html`에
 즉시 이동과 대체 버튼을 넣는다. 두 이미지는 `public`에서 복사한다. `start.wav`는
 8킬로헤르츠, 16비트, 단일 통로, 0.25초 길이의 660헤르츠 사인파를 노드 `Buffer`로 만든다.
 명령 출력에는 실행 표 원문 대신 sha256 해시만 표시한다.
 
-- [ ] **4단계: 제출 폴더 생성과 내용 검사**
+- [x] **4단계: 제출 폴더 생성과 내용 검사**
 
 실행: `npm run demo:usb`
 
@@ -457,7 +457,7 @@ rg -n "questioning-based-inquiry.vercel.app/demo/launch" /Users/youngmini/Docume
 
 예상: 지정된 네 파일이 존재하고 인공지능 키 문자열이 없음
 
-- [ ] **5단계: 커밋**
+- [x] **5단계: 커밋**
 
 ```bash
 git add package.json scripts/build-usb-demo-bundle.mjs src/__tests__/usb-demo-bundle.test.ts
@@ -470,19 +470,19 @@ git commit -m "feat: 윈도우 USB 제출 묶음 생성 추가"
 - 새 파일 없음
 - 앞선 작업에서 만든 파일만 오류가 확인된 경우 수정
 
-- [ ] **1단계: 전체 단위 검사**
+- [x] **1단계: 전체 단위 검사**
 
 실행: `npm test`
 
 예상: 실패 0개
 
-- [ ] **2단계: 정적 검사와 빌드**
+- [x] **2단계: 정적 검사와 빌드**
 
 실행: `npm run lint && npm run build`
 
 예상: 두 명령 모두 종료값 0
 
-- [ ] **3단계: 데이터베이스 변경과 시연 자료 적용**
+- [x] **3단계: 데이터베이스 변경과 시연 자료 적용**
 
 실행: `npm run db:migrate:deploy && npm run demo:seed`
 

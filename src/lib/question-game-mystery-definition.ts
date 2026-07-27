@@ -11,11 +11,11 @@ import {
   mysteryQuestionForAttribute,
   mysteryAttributesForVersion,
   mysteryItemsForVersion,
+  resolveMysteryAttribute,
   resolveMysteryAnswerEvidence,
   selectMysteryItem,
   type MysteryAnswer,
   type MysteryAnswerEvidence,
-  type MysteryAttribute,
   type MysteryFact,
   type MysteryKnowledgeVersion,
   type MysteryLocale,
@@ -393,16 +393,16 @@ export function planMysteryAiActivity(
   const attribute = mysteryAttributesForVersion(knowledgeVersion)
     .filter((candidate) => !used.has(candidate))
     .map((candidate) => {
-      const yesCount = candidates.filter((item) =>
-        knowledgeVersion === 1
-          ? item.attributes[candidate as MysteryAttribute]
-          : knowledgeVersion === 2
-            ? item.facts[candidate]
-            : item.factsV3[candidate] === true
-      ).length;
+      const answers = candidates.map((item) =>
+        resolveMysteryAttribute(item, candidate, false, knowledgeVersion)
+      );
+      const unknownCount = answers.filter((answer) => answer === "unknown").length;
+      const yesCount = answers.filter((answer) => answer === "yes").length;
       return {
         attribute: candidate,
-        split: Math.min(yesCount, candidates.length - yesCount),
+        split: unknownCount === 0
+          ? Math.min(yesCount, candidates.length - yesCount)
+          : -1,
       };
     })
     .sort((left, right) => right.split - left.split)[0]?.attribute;
