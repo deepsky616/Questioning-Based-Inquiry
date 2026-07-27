@@ -26,7 +26,8 @@
     "db:security:check": "node scripts/check-db-security.mjs",
     "db:security:rollback": "node scripts/apply-db-security.mjs --rollback",
     "db:studio": "prisma studio",
-    "demo:seed": "node scripts/seed-usb-demo.mjs"
+    "demo:seed": "node scripts/seed-usb-demo.mjs",
+    "demo:usb": "node scripts/build-usb-demo-bundle.mjs"
   },
   "engines": {
     "node": ">=20.19.0"

@@ -12,6 +12,8 @@
 
 - 시작 파일은 `/Users/youngmini/Documents/QuestionLab/program/index.html`이다.
 - 실행 주소는 `https://questioning-based-inquiry.vercel.app/demo/launch`이다.
+- 윈도우 최신 크롬과 엣지, 안드로이드 태블릿 최신 크롬에서 실행한다.
+- 운영체제 전용 설치 프로그램은 만들지 않고 표준 웹브라우저만 지원한다.
 - 자동 로그인 계정은 질문초등학교 4학년 1반 1번 김질문 학생뿐이다.
 - 시연 학급은 1번부터 28번까지 생성한다.
 - 비밀번호와 인공지능 키를 USB, 주소 요청부, 브라우저 저장소, 응답에 넣지 않는다.
