@@ -1,5 +1,6 @@
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { createHash, randomBytes } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -7,37 +8,64 @@ const DEFAULT_TARGET_ROOT = "/Users/youngmini/Documents/QuestionLab";
 const DEMO_LAUNCH_URL =
   "https://questioning-based-inquiry.vercel.app/demo/launch";
 
-function createStartSound() {
-  const sampleRate = 8_000;
-  const durationSeconds = 0.25;
-  const sampleCount = Math.floor(sampleRate * durationSeconds);
-  const dataSize = sampleCount * 2;
-  const wav = Buffer.alloc(44 + dataSize);
+const SOURCE_DIRECTORIES = [
+  ".github/",
+  "e2e/",
+  "messages/",
+  "prisma/",
+  "public/",
+  "scripts/",
+  "src/",
+];
 
-  wav.write("RIFF", 0);
-  wav.writeUInt32LE(36 + dataSize, 4);
-  wav.write("WAVE", 8);
-  wav.write("fmt ", 12);
-  wav.writeUInt32LE(16, 16);
-  wav.writeUInt16LE(1, 20);
-  wav.writeUInt16LE(1, 22);
-  wav.writeUInt32LE(sampleRate, 24);
-  wav.writeUInt32LE(sampleRate * 2, 28);
-  wav.writeUInt16LE(2, 32);
-  wav.writeUInt16LE(16, 34);
-  wav.write("data", 36);
-  wav.writeUInt32LE(dataSize, 40);
+const SOURCE_ROOT_FILES = new Set([
+  ".env.example",
+  ".gitignore",
+  "README.md",
+  "eslint.config.mjs",
+  "next-env.d.ts",
+  "next.config.js",
+  "package-lock.json",
+  "package.json",
+  "playwright.config.ts",
+  "postcss.config.js",
+  "sentry.edge.config.ts",
+  "sentry.server.config.ts",
+  "tailwind.config.ts",
+  "tsconfig.json",
+  "vercel.json",
+  "vitest.config.ts",
+]);
 
-  for (let index = 0; index < sampleCount; index += 1) {
-    const envelope = Math.min(index / 160, (sampleCount - index) / 320, 1);
-    const sample =
-      Math.sin((2 * Math.PI * 660 * index) / sampleRate) *
-      8_000 *
-      Math.max(0, envelope);
-    wav.writeInt16LE(Math.round(sample), 44 + index * 2);
+function sourceFileAllowed(relativePath) {
+  if (
+    relativePath.startsWith("/") ||
+    relativePath.split("/").includes("..") ||
+    (relativePath.startsWith(".env") && relativePath !== ".env.example")
+  ) {
+    return false;
   }
+  return SOURCE_ROOT_FILES.has(relativePath) ||
+    SOURCE_DIRECTORIES.some((directory) => relativePath.startsWith(directory));
+}
 
-  return wav;
+function copySourceFiles(sourceRoot, destinationRoot) {
+  const trackedFiles = execFileSync(
+    "git",
+    ["-C", sourceRoot, "ls-files", "-z"],
+    { encoding: "utf8" },
+  )
+    .split("\0")
+    .filter(Boolean)
+    .filter(sourceFileAllowed);
+
+  rmSync(destinationRoot, { recursive: true, force: true });
+  mkdirSync(destinationRoot, { recursive: true });
+  for (const relativePath of trackedFiles) {
+    const destinationPath = join(destinationRoot, relativePath);
+    mkdirSync(dirname(destinationPath), { recursive: true });
+    copyFileSync(join(sourceRoot, relativePath), destinationPath);
+  }
 }
 
 function createLauncherHtml(targetUrl) {
@@ -112,9 +140,11 @@ export function buildUsbDemoBundle({
   const imageDir = join(targetRoot, "media", "image");
   const soundDir = join(targetRoot, "media", "sound");
   const programDir = join(targetRoot, "program");
+  const sourceDir = join(programDir, "source");
   mkdirSync(imageDir, { recursive: true });
   mkdirSync(soundDir, { recursive: true });
   mkdirSync(programDir, { recursive: true });
+  rmSync(join(soundDir, "start.wav"), { force: true });
 
   copyFileSync(
     join(sourceRoot, "public", "login-inquiry-hero.png"),
@@ -124,7 +154,7 @@ export function buildUsbDemoBundle({
     join(sourceRoot, "public", "question-learning-cover.png"),
     join(imageDir, "question-learning-cover.png"),
   );
-  writeFileSync(join(soundDir, "start.wav"), createStartSound());
+  copySourceFiles(sourceRoot, sourceDir);
 
   const targetUrl = `${DEMO_LAUNCH_URL}#ticket=${encodeURIComponent(normalizedTicket)}`;
   writeFileSync(

@@ -152,14 +152,24 @@ QuestionLab/
 │  │  ├─ login-inquiry-hero.png
 │  │  └─ question-learning-cover.png
 │  └─ sound/
-│     └─ start.wav
 └─ program/
-   └─ index.html
+   ├─ index.html
+   └─ source/
+      ├─ src/
+      ├─ public/
+      ├─ prisma/
+      ├─ scripts/
+      ├─ e2e/
+      ├─ messages/
+      ├─ package.json
+      └─ 개발 설정 파일
 ```
 
 `index.html`은 로컬 이미지 하나를 표시하고 즉시 웹앱을 연다. 자바스크립트가 꺼진 경우에도
-버튼으로 열 수 있어야 한다. 소리 파일은 제출 폴더 구성용으로 포함하되, 브라우저의 자동
-재생 제한과 교실 환경을 고려해 시작할 때 자동 재생하지 않는다.
+버튼으로 열 수 있어야 한다. 웹앱이 소리 파일을 직접 사용하지 않으므로 `sound` 폴더는
+비워 둔다. `source`에는 깃에 기록된 실행 소스, 데이터 구조, 검사와 개발 설정을 복사한다.
+`.env.local`, 실제 비밀값, 깃 내부 자료, 설치 의존성, 빌드 결과와 사용자가 따로 만든 파일은
+복사하지 않는다.
 
 ## 검사
 

@@ -1,8 +1,11 @@
 import {
+  existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,9 +22,12 @@ afterEach(() => {
 });
 
 describe("윈도우 USB 제출 묶음", () => {
-  it("시작 파일, 이미지 두 개와 시작음을 지정 폴더에 만든다", () => {
+  it("시작 파일, 이미지 두 개와 비밀값을 제외한 소스 파일을 만든다", () => {
     const targetRoot = mkdtempSync(join(tmpdir(), "questionlab-usb-"));
     tempRoots.push(targetRoot);
+    const soundDir = join(targetRoot, "media", "sound");
+    mkdirSync(soundDir, { recursive: true });
+    writeFileSync(join(soundDir, "start.wav"), "사용하지 않는 이전 파일");
 
     const result = buildUsbDemoBundle({
       targetRoot,
@@ -48,11 +54,23 @@ describe("윈도우 USB 제출 묶음", () => {
         .size,
     ).toBeGreaterThan(0);
 
-    const wav = readFileSync(
-      join(targetRoot, "media", "sound", "start.wav"),
-    );
-    expect(wav.subarray(0, 4).toString("ascii")).toBe("RIFF");
-    expect(wav.subarray(8, 12).toString("ascii")).toBe("WAVE");
+    expect(statSync(soundDir).isDirectory()).toBe(true);
+    expect(existsSync(join(soundDir, "start.wav"))).toBe(false);
+
+    const sourceDir = join(targetRoot, "program", "source");
+    expect(
+      readFileSync(join(sourceDir, "package.json"), "utf8"),
+    ).toContain('"name": "question-lab"');
+    expect(
+      readFileSync(join(sourceDir, "src", "app", "layout.tsx"), "utf8"),
+    ).toContain("RootLayout");
+    expect(
+      readFileSync(join(sourceDir, "prisma", "schema.prisma"), "utf8"),
+    ).toContain("model User");
+    expect(existsSync(join(sourceDir, ".env.example"))).toBe(true);
+    expect(existsSync(join(sourceDir, ".env.local"))).toBe(false);
+    expect(existsSync(join(sourceDir, ".git"))).toBe(false);
+    expect(existsSync(join(sourceDir, "node_modules"))).toBe(false);
     expect(result.ticketHash).toMatch(/^[a-f0-9]{64}$/);
   });
 

@@ -414,9 +414,10 @@ git commit -m "feat: USB 시연 자동 실행 화면 추가"
 - 수정: `package.json`
 - 검사: `src/__tests__/usb-demo-bundle.test.ts`
 - 생성 결과: `/Users/youngmini/Documents/QuestionLab/program/index.html`
+- 생성 결과: `/Users/youngmini/Documents/QuestionLab/program/source`
 - 생성 결과: `/Users/youngmini/Documents/QuestionLab/media/image/login-inquiry-hero.png`
 - 생성 결과: `/Users/youngmini/Documents/QuestionLab/media/image/question-learning-cover.png`
-- 생성 결과: `/Users/youngmini/Documents/QuestionLab/media/sound/start.wav`
+- 생성 결과: `/Users/youngmini/Documents/QuestionLab/media/sound` 빈 폴더
 
 **연결 규약:**
 - 제공: `npm run demo:usb`
@@ -440,9 +441,9 @@ expect(builderSource).not.toContain("DEMO_AI_SOURCE_EMAIL");
 - [x] **3단계: 실행 파일과 매체 복사 구현**
 
 생성 명령은 `randomBytes(32).toString("base64url")`로 실행 표를 만들고, `index.html`에
-즉시 이동과 대체 버튼을 넣는다. 두 이미지는 `public`에서 복사한다. `start.wav`는
-8킬로헤르츠, 16비트, 단일 통로, 0.25초 길이의 660헤르츠 사인파를 노드 `Buffer`로 만든다.
-명령 출력에는 실행 표 원문 대신 sha256 해시만 표시한다.
+즉시 이동과 대체 버튼을 넣는다. 두 이미지는 `public`에서 복사한다. 소리 파일은 만들지 않고
+빈 `sound` 폴더만 유지한다. 깃에 기록된 소스 중 실제 환경 파일과 설치·빌드 결과를 제외한
+내용을 `program/source`에 복사한다. 명령 출력에는 실행 표 원문 대신 sha256 해시만 표시한다.
 
 - [x] **4단계: 제출 폴더 생성과 내용 검사**
 
@@ -455,7 +456,7 @@ find /Users/youngmini/Documents/QuestionLab -maxdepth 3 -type f -print
 rg -n "questioning-based-inquiry.vercel.app/demo/launch" /Users/youngmini/Documents/QuestionLab/program/index.html
 ```
 
-예상: 지정된 네 파일이 존재하고 인공지능 키 문자열이 없음
+예상: 시작 파일, 이미지 두 개와 소스 폴더가 존재하고 인공지능 키 문자열이 없음
 
 - [x] **5단계: 커밋**
 
