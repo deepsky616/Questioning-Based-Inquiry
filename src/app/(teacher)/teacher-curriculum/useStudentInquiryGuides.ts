@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 
 import { validateStudentGuideBundle } from "@/lib/student-guide-completeness";
 import { buildStudentGuideSourceSignature } from "@/lib/student-guide-source";
+import type { Achievement } from "@/lib/achievement-selection";
 import type { StudentLearningGuides } from "@/lib/student-learning-guide";
 import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import type { InquiryQuestion } from "./types";
@@ -11,6 +12,7 @@ import type { InquiryQuestion } from "./types";
 interface UseStudentInquiryGuidesOptions {
   questions: InquiryQuestion[];
   coreIdea: string;
+  achievements?: Achievement[];
   selectedKeywords: string[];
   coreSentences: string[];
   essentialQuestions: string[];
@@ -30,6 +32,7 @@ interface StudentGuideSnapshot {
 export function useStudentInquiryGuides({
   questions,
   coreIdea,
+  achievements = [],
   selectedKeywords,
   coreSentences,
   essentialQuestions,
@@ -41,6 +44,7 @@ export function useStudentInquiryGuides({
 }: UseStudentInquiryGuidesOptions) {
   const sourceSignature = buildStudentGuideSourceSignature({
     coreIdea,
+    achievements,
     selectedKeywords,
     coreSentences,
     essentialQuestions,
@@ -65,6 +69,7 @@ export function useStudentInquiryGuides({
       ? [{ ...question.studentGuide, index }]
       : []),
   }, {
+    achievementCount: achievements.length,
     coreSentenceCount: coreSentences.length,
     essentialQuestionCount: essentialQuestions.length,
     inquiryQuestionCount: inquiryQuestions.length,
@@ -94,6 +99,7 @@ export function useStudentInquiryGuides({
     try {
       const result = await generate("learning_guides", {
         coreIdea,
+        achievements,
         coreSentences,
         essentialQuestions,
         inquiryQuestions: indexedQuestions.map(({ question }) => ({
@@ -102,6 +108,7 @@ export function useStudentInquiryGuides({
         })),
       });
       const checked = validateStudentGuideBundle(result, {
+        achievementCount: achievements.length,
         coreSentenceCount: coreSentences.length,
         essentialQuestionCount: essentialQuestions.length,
         inquiryQuestionCount: indexedQuestions.length,

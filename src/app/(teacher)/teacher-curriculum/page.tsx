@@ -350,7 +350,7 @@ export default function CurriculumPage() {
     hasCurrentStudentGuides, hasFreshStudentGuides, hasIncompleteStudentGuides,
     hasStaleStudentGuides, canRestoreStudentGuides, restorePreviousStudentGuides,
     clearStudentGuides } = useStudentInquiryGuides({
-    questions: inquiryQuestions, coreIdea: selectedCoreIdeaLines.join("\n"), selectedKeywords, coreSentences: selectedCoreSentences, essentialQuestions: selectedEssentialQuestions,
+    questions: inquiryQuestions, coreIdea: selectedCoreIdeaLines.join("\n"), achievements: getSelectedAchievements(), selectedKeywords, coreSentences: selectedCoreSentences, essentialQuestions: selectedEssentialQuestions,
     setQuestions: setInquiryQuestions, generate: callGenerate,
     onSuccess: () => toast({ description: t("studentGuideGenerated") }),
     onError: () => toast({ variant: "destructive", description: t("studentGuideGenerateFailed") }),

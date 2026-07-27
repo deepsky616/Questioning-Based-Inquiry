@@ -929,6 +929,8 @@
     "studentGuideCoreIdeaSectionDesc": "Explain the lesson's big idea with simple language and a familiar example.",
     "studentGuideAchievementSectionTitle": "Achievement standards",
     "studentGuideAchievementSectionDesc": "Review the learning standards students should reach in this class.",
+    "studentGuideAchievementEasyLabel": "Explain achievement standard {n} simply",
+    "studentGuideAchievementEasyTitle": "In simpler words",
     "achievementCodeLabel": "Achievement standard {n} code",
     "achievementContentLabel": "Achievement standard {n} content",
     "achievementCodePlaceholder": "Example: [4SC05-01]",

@@ -39,6 +39,10 @@ const design: SavedInquiryDesign = {
         { term: "관계", meaning: "서로 영향을 주고받는 연결" },
       ],
     },
+    achievements: [{
+      index: 0,
+      explanation: "생태계의 생물 요소와 비생물 요소를 찾아 구분하는 목표예요.",
+    }],
     coreSentences: [{ index: 0, explanation: "생물은 혼자 살지 않아요." }],
     essentialQuestions: [{ index: 0, thinkingFocus: "관계를 살펴봐요.", perspectives: ["생물", "환경"] }],
   },
@@ -94,6 +98,9 @@ describe("저장된 설계 학생용 설명 편집", () => {
     expect(achievementSection).toContainElement(
       screen.getByDisplayValue("생태계 구성 요소를 조사하고 생물 요소와 비생물 요소를 구분할 수 있다."),
     );
+    expect(achievementSection).toContainElement(
+      screen.getByDisplayValue("생태계의 생물 요소와 비생물 요소를 찾아 구분하는 목표예요."),
+    );
     expect(achievementSection?.querySelector("[data-student-guide-number]")).toHaveTextContent("2");
     const inquiryItem = screen.getByDisplayValue("생산자는 무엇일까?")
       .closest("[data-saved-inquiry-question]");
@@ -121,6 +128,10 @@ describe("저장된 설계 학생용 설명 편집", () => {
             { term: "적응", meaning: "환경에 맞게 살아가는 모습" },
           ],
         },
+        achievements: [{
+          index: 0,
+          explanation: "생태계를 이루는 요소를 찾아 두 종류로 구분할 수 있어야 한다는 뜻이에요.",
+        }],
         coreSentences: [{ index: 0, explanation: "생물은 환경이 바뀌면 살아가는 모습도 달라져요." }],
         essentialQuestions: [{
           index: 0,
@@ -175,6 +186,7 @@ describe("저장된 설계 학생용 설명 편집", () => {
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(request).toMatchObject({
       coreIdea: "생물은 변화한 환경에 적응한다.",
+      achievements: design.achievements,
       coreSentences: ["생물은 환경 변화에 맞춰 달라진다."],
       essentialQuestions: ["생물은 환경 변화에 어떻게 적응할까?"],
     });
@@ -182,6 +194,9 @@ describe("저장된 설계 학생용 설명 편집", () => {
     expect(coreSection).toContainElement(
       screen.getByDisplayValue("생물은 달라진 환경에 맞춰 살아가는 방법을 바꿔요."),
     );
+    expect(screen.getByDisplayValue(
+      "생태계를 이루는 요소를 찾아 두 종류로 구분할 수 있어야 한다는 뜻이에요.",
+    )).toBeInTheDocument();
 
     fireEvent.change(screen.getByDisplayValue("생물은 달라진 환경에 맞춰 살아가는 방법을 바꿔요."), {
       target: { value: "교사가 다시 다듬은 설명" },
@@ -219,7 +234,9 @@ describe("저장된 설계 학생용 설명 편집", () => {
     ), {
       target: { value: "생물 요소가 환경과 서로 영향을 주고받음을 설명할 수 있다." },
     });
+    expect(screen.getByRole("status")).toHaveTextContent("원본 내용이 바뀌어");
     fireEvent.click(screen.getByRole("button", { name: "저장", exact: true }));
+    fireEvent.click(await screen.findByRole("button", { name: "설명 없이 저장하기" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));

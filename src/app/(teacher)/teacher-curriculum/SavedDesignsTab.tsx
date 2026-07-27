@@ -152,6 +152,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   const editingDesign = savedList.find((design) => design.id === editingDesignId);
   const editGuideSourceSignature = buildStudentGuideSourceSignature({
     coreIdea: editCoreIdea,
+    achievements: editAchievements,
     selectedKeywords: editingDesign?.selectedKeywords ?? [],
     coreSentences: editCoreSentences,
     essentialQuestions: editEssentialQuestions,
@@ -172,6 +173,9 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
       ? [{ ...question.studentGuide, index }]
       : []),
   }, {
+    achievementCount: editAchievements.filter((achievement) =>
+      achievement.code.trim() && achievement.content.trim()
+    ).length,
     coreSentenceCount: editCoreSentences.length,
     essentialQuestionCount: editEssentialQuestions.length,
     inquiryQuestionCount: editInquiryQuestions.length,
@@ -250,6 +254,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     const hasGuides = Boolean(nextLearningGuides) || nextQuestions.some((question) => question.studentGuide);
     setGeneratedEditGuideSourceSignature(hasGuides ? buildStudentGuideSourceSignature({
       coreIdea: design.coreIdea ?? "",
+      achievements: design.achievements ?? [],
       selectedKeywords: design.selectedKeywords ?? [],
       coreSentences: design.coreSentences ?? [],
       essentialQuestions: design.essentialQuestions ?? [],
@@ -341,12 +346,15 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     const essentialSourceIndexes = editEssentialQuestions.map((item, index) => item.trim() ? index : -1).filter((index) => index >= 0);
     const cleanedSentences = sentenceSourceIndexes.map((index) => editCoreSentences[index].trim());
     const cleanedEssential = essentialSourceIndexes.map((index) => editEssentialQuestions[index].trim());
-    const cleanedAchievements = editAchievements
-      .map((achievement) => ({
-        code: achievement.code.trim(),
-        content: achievement.content.trim(),
-      }))
-      .filter((achievement) => achievement.code && achievement.content);
+    const achievementSourceIndexes = editAchievements
+      .map((achievement, index) => (
+        achievement.code.trim() && achievement.content.trim() ? index : -1
+      ))
+      .filter((index) => index >= 0);
+    const cleanedAchievements = achievementSourceIndexes.map((index) => ({
+      code: editAchievements[index].code.trim(),
+      content: editAchievements[index].content.trim(),
+    }));
     const res = await fetch(`/api/unit-design/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -364,7 +372,12 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
         coreSentences: cleanedSentences,
         essentialQuestions: cleanedEssential,
         learningGuides: hasFreshEditStudentGuides
-          ? remapStudentLearningGuides(editLearningGuides, sentenceSourceIndexes, essentialSourceIndexes)
+          ? remapStudentLearningGuides(
+              editLearningGuides,
+              achievementSourceIndexes,
+              sentenceSourceIndexes,
+              essentialSourceIndexes,
+            )
           : null,
         inquiryQuestions: cleaned,
       }),
@@ -374,6 +387,12 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   };
 
   const generateEditStudentGuides = async (design: SavedInquiryDesign) => {
+    const achievements = editAchievements
+      .map((achievement) => ({
+        code: achievement.code.trim(),
+        content: achievement.content.trim(),
+      }))
+      .filter((achievement) => achievement.code && achievement.content);
     const indexedQuestions = editQuestions
       .map((question, originalIndex) => ({ question, originalIndex }))
       .filter(({ question }) => question.content.trim());
@@ -400,6 +419,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
           area: design.area,
           unitName: editTitle.trim(),
           coreIdea: editCoreIdea.trim(),
+          achievements,
           selectedKeywords: design.selectedKeywords ?? [],
           coreSentences: editCoreSentences,
           essentialQuestions: editEssentialQuestions,
@@ -411,6 +431,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
       });
       const data = await response.json().catch(() => ({}));
       const expected = {
+        achievementCount: achievements.length,
         coreSentenceCount: editCoreSentences.length,
         essentialQuestionCount: editEssentialQuestions.length,
         inquiryQuestionCount: indexedQuestions.length,

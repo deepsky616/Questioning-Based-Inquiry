@@ -213,66 +213,95 @@ export function StudentLearningGuideEditor({
             </div>
           </div>
           <div className="mt-3 space-y-2">
-            {achievements.map((achievement, index) => (
-              <article
-                key={`${achievement.code}-${index}`}
-                data-student-guide-source="achievement"
-                className="rounded-lg border border-teal-200/70 bg-background/85 px-3 py-3 dark:border-teal-800/50"
-              >
-                {achievementEditor ? (
-                  <div className="grid gap-2 sm:grid-cols-[minmax(9rem,0.35fr)_minmax(0,1fr)_auto]">
-                    <div className="space-y-1">
-                      <Label className="sr-only" htmlFor={`${fieldId}-achievement-code-${index}`}>
-                        {t("achievementCodeLabel", { n: index + 1 })}
-                      </Label>
-                      <input
-                        id={`${fieldId}-achievement-code-${index}`}
-                        value={achievement.code}
-                        placeholder={t("achievementCodePlaceholder")}
-                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-semibold text-foreground"
-                        onChange={(event) => achievementEditor.onChange(index, {
-                          ...achievement,
-                          code: event.target.value,
-                        })}
-                      />
+            {achievements.map((achievement, index) => {
+              const guide = current.achievements.find((item) => item.index === index)
+                ?? { index, explanation: "" };
+              return (
+                <article
+                  key={`${achievement.code}-${index}`}
+                  data-student-guide-source="achievement"
+                  className="rounded-lg border border-teal-200/70 bg-background/85 px-3 py-3 dark:border-teal-800/50"
+                >
+                  {achievementEditor ? (
+                    <div className="grid gap-2 sm:grid-cols-[minmax(9rem,0.35fr)_minmax(0,1fr)_auto]">
+                      <div className="space-y-1">
+                        <Label className="sr-only" htmlFor={`${fieldId}-achievement-code-${index}`}>
+                          {t("achievementCodeLabel", { n: index + 1 })}
+                        </Label>
+                        <input
+                          id={`${fieldId}-achievement-code-${index}`}
+                          value={achievement.code}
+                          placeholder={t("achievementCodePlaceholder")}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm font-semibold text-foreground"
+                          onChange={(event) => achievementEditor.onChange(index, {
+                            ...achievement,
+                            code: event.target.value,
+                          })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="sr-only" htmlFor={`${fieldId}-achievement-content-${index}`}>
+                          {t("achievementContentLabel", { n: index + 1 })}
+                        </Label>
+                        <textarea
+                          id={`${fieldId}-achievement-content-${index}`}
+                          rows={2}
+                          value={achievement.content}
+                          placeholder={t("achievementContentPlaceholder")}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 text-foreground"
+                          onChange={(event) => achievementEditor.onChange(index, {
+                            ...achievement,
+                            content: event.target.value,
+                          })}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-destructive"
+                        onClick={() => achievementEditor.onRemove(index)}
+                        aria-label={tc("delete")}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
                     </div>
-                    <div className="space-y-1">
-                      <Label className="sr-only" htmlFor={`${fieldId}-achievement-content-${index}`}>
-                        {t("achievementContentLabel", { n: index + 1 })}
+                  ) : (
+                    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3">
+                      <span className="shrink-0 text-sm font-semibold text-teal-800 dark:text-teal-200">
+                        {achievement.code}
+                      </span>
+                      <p className="text-sm leading-6 text-foreground">{achievement.content}</p>
+                    </div>
+                  )}
+                  {showEditors ? (
+                    <div data-student-understanding-editor className="mt-3 border-t border-teal-200/70 pt-3 dark:border-teal-800/50">
+                      <Label htmlFor={`${fieldId}-achievement-explanation-${index}`}>
+                        {t("studentGuideAchievementEasyLabel", { n: index + 1 })}
                       </Label>
                       <textarea
-                        id={`${fieldId}-achievement-content-${index}`}
+                        id={`${fieldId}-achievement-explanation-${index}`}
                         rows={2}
-                        value={achievement.content}
-                        placeholder={t("achievementContentPlaceholder")}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 text-foreground"
-                        onChange={(event) => achievementEditor.onChange(index, {
-                          ...achievement,
-                          content: event.target.value,
+                        value={guide.explanation}
+                        className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 text-foreground"
+                        onChange={(event) => onChange({
+                          ...current,
+                          achievements: replaceIndexed(current.achievements, index, {
+                            index,
+                            explanation: event.target.value,
+                          }),
                         })}
                       />
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 text-destructive"
-                      onClick={() => achievementEditor.onRemove(index)}
-                      aria-label={tc("delete")}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-3">
-                    <span className="shrink-0 text-sm font-semibold text-teal-800 dark:text-teal-200">
-                      {achievement.code}
-                    </span>
-                    <p className="text-sm leading-6 text-foreground">{achievement.content}</p>
-                  </div>
-                )}
-              </article>
-            ))}
+                  ) : guide.explanation ? (
+                    <div data-student-understanding-guide="achievement" className="mt-3 border-t border-teal-200/70 pt-3 text-xs dark:border-teal-800/50">
+                      <p className="font-semibold">{t("studentGuideAchievementEasyTitle")}</p>
+                      <p className="mt-0.5 leading-relaxed text-muted-foreground">{guide.explanation}</p>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
             {achievementEditor && (
               <Button type="button" variant="outline" size="sm" onClick={achievementEditor.onAdd}>
                 <Plus className="h-4 w-4" aria-hidden="true" />

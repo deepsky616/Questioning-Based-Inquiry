@@ -133,7 +133,21 @@ describe("다섯째 단계 질문 편집과 배포 자료 확인", () => {
   });
 
   it("확인 화면의 단원 자료를 구분하고 성취기준을 핵심 아이디어 다음에 둔다", async () => {
-    const { container } = render(<InquiryStepHarness />);
+    const { container } = render(
+      <ConfirmProvider>
+        <CurriculumInquiryStep
+          {...baseProps}
+          learningGuides={{
+            achievements: [{
+              index: 0,
+              explanation: "생태계의 생물 요소와 비생물 요소를 찾아 구분하는 목표예요.",
+            }],
+            coreSentences: [],
+            essentialQuestions: [],
+          }}
+        />
+      </ConfirmProvider>,
+    );
     fireEvent.click(screen.getByRole("button", { name: "탐구 질문 만들기 완료" }));
 
     expect(container.querySelector('[data-student-guide-section="unit-title"]'))
@@ -142,6 +156,8 @@ describe("다섯째 단계 질문 편집과 배포 자료 확인", () => {
       .toHaveClass("border-amber-200/80", "bg-amber-50/70", "dark:border-amber-800/60", "dark:bg-amber-950/20");
     expect(container.querySelector('[data-student-guide-section="achievement"]'))
       .toHaveTextContent("[6과05-01]");
+    expect(container.querySelector('[data-student-guide-section="achievement"]'))
+      .toHaveTextContent("생태계의 생물 요소와 비생물 요소를 찾아 구분하는 목표예요.");
     expect(container.querySelector('[data-student-guide-section="core-sentence"]'))
       .toHaveClass("border-sky-200/80", "bg-sky-50/70", "dark:border-sky-800/60", "dark:bg-sky-950/20");
     expect(container.querySelector('[data-student-guide-section="essential-question"]'))
