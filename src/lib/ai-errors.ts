@@ -24,6 +24,15 @@ export class AiQuotaError extends Error {
   }
 }
 
+/** USB 시연 계정에 설정한 서버측 하루 한도 초과. */
+export class DemoAiQuotaError extends AiQuotaError {
+  constructor() {
+    super();
+    this.message = "DEMO_AI_DAILY_LIMIT_EXCEEDED";
+    this.name = "DemoAiQuotaError";
+  }
+}
+
 /**
  * Gemini 무료 티어 '일일' 한도 초과 판별 — 분당 한도(잠시 후 재시도 가능)와 달리
  * 같은 모델 재시도가 무의미하므로 즉시 대체 모델로 넘어가거나 사용자에게 안내한다.

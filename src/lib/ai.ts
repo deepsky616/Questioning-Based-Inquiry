@@ -3,11 +3,13 @@ import { resolveUserAiConfig } from "@/lib/resolve-ai-config";
 import { extractJsonArray, extractJsonObject } from "@/lib/json-extract";
 import { getRequestLocale, languageDirective } from "@/lib/locale";
 import { alternateModel, chooseModelAuto, chooseQualityModel, resolveGeminiModel } from "@/lib/api-config";
-import { AiBusyError, AiKeyMissingError, AiQuotaError, isDailyQuotaError, isTransientAiError } from "@/lib/ai-errors";
+import { AiBusyError, AiKeyMissingError, AiQuotaError, DemoAiQuotaError, isDailyQuotaError, isTransientAiError } from "@/lib/ai-errors";
 import type { GeminiModel } from "@/lib/api-config";
+import { consumeDemoAiQuota } from "@/lib/demo-ai-quota";
+import { rateLimit } from "@/lib/rate-limit";
 
 // 기존 import 경로 호환을 위해 재노출 (라우트들은 @/lib/ai에서 가져온다)
-export { AiBusyError, AiKeyMissingError, AiQuotaError, isDailyQuotaError, isTransientAiError };
+export { AiBusyError, AiKeyMissingError, AiQuotaError, DemoAiQuotaError, isDailyQuotaError, isTransientAiError };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -74,15 +76,33 @@ async function callGeminiWithMetadata({
   responseMimeType,
   responseJsonSchema,
 }: GenerateOptions): Promise<GenerateTextResult> {
-  const cfg = apiKeyOverride
-    ? { apiKey: apiKeyOverride, model: resolveGeminiModel(modelOverride) }
-    : await resolveUserAiConfig(userId);
+  const resolved = await resolveUserAiConfig(userId);
+  const cfg = resolved.isDemo || !apiKeyOverride
+    ? resolved
+    : {
+        apiKey: apiKeyOverride,
+        model: resolveGeminiModel(modelOverride),
+        isDemo: false,
+      };
   if (!cfg.apiKey) throw new AiKeyMissingError();
+  if (cfg.isDemo) {
+    const { success } = rateLimit(`demo-ai:${userId}`, {
+      limit: 10,
+      windowMs: 60_000,
+    });
+    if (!success) throw new AiBusyError();
+    await consumeDemoAiQuota(userId);
+  }
 
   const fullPrompt = localize && req ? prompt + languageDirective(getRequestLocale(req)) : prompt;
-  const configuredModel = resolveGeminiModel(modelOverride ?? cfg.model);
+  const configuredModel = resolveGeminiModel(
+    cfg.isDemo ? cfg.model : modelOverride ?? cfg.model,
+  );
   const primary = quality ? chooseQualityModel(configuredModel) : chooseModelAuto(configuredModel, fullPrompt.length);
   const temp = temperature ?? (quality ? CONSISTENT_TEMPERATURE : undefined);
+  const effectiveMaxOutputTokens = cfg.isDemo
+    ? Math.min(maxOutputTokens ?? 2_048, 2_048)
+    : maxOutputTokens;
 
   const genAI = new GoogleGenAI({ apiKey: cfg.apiKey });
   const runWith = async (modelName: GeminiModel, attempts: number): Promise<GenerateTextResult> => {
@@ -91,7 +111,9 @@ async function callGeminiWithMetadata({
         const config = {
           ...(systemInstruction ? { systemInstruction } : {}),
           ...(temp != null ? { temperature: temp } : {}),
-          ...(maxOutputTokens !== undefined ? { maxOutputTokens } : {}),
+          ...(effectiveMaxOutputTokens !== undefined
+            ? { maxOutputTokens: effectiveMaxOutputTokens }
+            : {}),
           ...(thinkingBudget !== undefined
             ? { thinkingConfig: { thinkingBudget } }
             : {}),

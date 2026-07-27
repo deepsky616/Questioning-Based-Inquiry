@@ -4,6 +4,7 @@ import { resolveGeminiModel } from "@/lib/api-config";
 export interface ResolvedAiConfig {
   apiKey: string | null;
   model: string;
+  isDemo: boolean;
 }
 
 /**
@@ -15,12 +16,43 @@ export interface ResolvedAiConfig {
 export async function resolveUserAiConfig(userId: string): Promise<ResolvedAiConfig> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true, school: true, grade: true, className: true, aiApiKey: true, aiModel: true },
+    select: {
+      role: true,
+      school: true,
+      grade: true,
+      className: true,
+      aiApiKey: true,
+      aiModel: true,
+      isDemo: true,
+    },
   });
+
+  if (user?.isDemo) {
+    const sourceEmail =
+      process.env.DEMO_AI_SOURCE_EMAIL?.trim() || "climbing1126@gmail.com";
+    const sourceTeacher = await prisma.user.findFirst({
+      where: {
+        email: sourceEmail,
+        role: "TEACHER",
+        isDemo: false,
+        aiApiKey: { not: null },
+      },
+      select: { aiApiKey: true, aiModel: true },
+    });
+    return {
+      apiKey: sourceTeacher?.aiApiKey ?? null,
+      model: resolveGeminiModel(sourceTeacher?.aiModel),
+      isDemo: true,
+    };
+  }
 
   // 1) 교사 본인 키
   if (user?.role === "TEACHER" && user.aiApiKey) {
-    return { apiKey: user.aiApiKey, model: resolveGeminiModel(user.aiModel) };
+    return {
+      apiKey: user.aiApiKey,
+      model: resolveGeminiModel(user.aiModel),
+      isDemo: false,
+    };
   }
 
   // 2) 학생 → 담당 학급 교사의 키
@@ -36,7 +68,11 @@ export async function resolveUserAiConfig(userId: string): Promise<ResolvedAiCon
       orderBy: { updatedAt: "desc" },
     });
     if (teacher?.aiApiKey) {
-      return { apiKey: teacher.aiApiKey, model: resolveGeminiModel(teacher.aiModel) };
+      return {
+        apiKey: teacher.aiApiKey,
+        model: resolveGeminiModel(teacher.aiModel),
+        isDemo: false,
+      };
     }
   }
 
@@ -45,5 +81,9 @@ export async function resolveUserAiConfig(userId: string): Promise<ResolvedAiCon
     prisma.systemConfig.findUnique({ where: { key: "gemini_api_key" } }),
     prisma.systemConfig.findUnique({ where: { key: "gemini_model" } }),
   ]);
-  return { apiKey: keyRecord?.value ?? null, model: resolveGeminiModel(modelRecord?.value) };
+  return {
+    apiKey: keyRecord?.value ?? null,
+    model: resolveGeminiModel(modelRecord?.value),
+    isDemo: false,
+  };
 }
