@@ -1,5 +1,6 @@
 import type { StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import type { StudentLearningGuides } from "@/lib/student-learning-guide";
+import type { Achievement } from "@/lib/achievement-selection";
 
 export interface SharedQuestion {
   type: string;
@@ -33,6 +34,7 @@ export interface DesignContext {
   grade: string | null;
   area: string;
   coreIdea: string;
+  achievements?: Achievement[];
   coreSentences: string[];
   essentialQuestions: string[];
   learningGuides?: StudentLearningGuides;

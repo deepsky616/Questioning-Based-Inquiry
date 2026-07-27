@@ -6,8 +6,7 @@ import { normalizeStudentLearningGuides } from "@/lib/student-learning-guide";
 
 type Params = { params: Promise<{ id: string }> };
 
-// "탐구질문 수업" 세션이 참조하는 탐구설계 맥락(핵심아이디어·핵심어·핵심문장·핵심질문·탐구질문)을
-// 반환한다. 학생 질문하기의 참고 자료 패널에서 사용. (성취기준은 후속 단계에서 추가)
+// "탐구질문 수업" 세션이 참조하는 탐구설계 맥락을 학생 질문하기 참고 자료로 반환한다.
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
   const session = await auth();
@@ -53,13 +52,14 @@ export async function GET(_req: Request, { params }: Params) {
       grade: string | null;
       area: string;
       core_idea: string;
+      selected_achievements: unknown;
       core_sentences: unknown;
       essential_questions: unknown;
       inquiry_questions: unknown;
       learning_guides: unknown;
     }[]
   >`
-    SELECT title, subject, grade_range, grade, area, core_idea,
+    SELECT title, subject, grade_range, grade, area, core_idea, selected_achievements,
            core_sentences, essential_questions, inquiry_questions, learning_guides
     FROM unit_designs
     WHERE id = ${qs.unitDesignId} AND teacher_id = ${qs.teacherId}
@@ -79,6 +79,7 @@ export async function GET(_req: Request, { params }: Params) {
       grade: d.grade,
       area: d.area,
       coreIdea: d.core_idea,
+      achievements: asArray(d.selected_achievements) as { code: string; content: string }[],
       coreSentences: asArray(d.core_sentences) as string[],
       essentialQuestions: asArray(d.essential_questions) as string[],
       learningGuides: normalizeStudentLearningGuides(d.learning_guides),

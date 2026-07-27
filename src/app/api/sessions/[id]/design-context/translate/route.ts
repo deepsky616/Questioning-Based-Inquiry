@@ -9,6 +9,7 @@ import { logger } from "@/lib/logger";
 import { studentCanAccessSession } from "@/lib/session-access";
 import { normalizeStudentInquiryGuide, type StudentInquiryGuide } from "@/lib/student-inquiry-guide";
 import { normalizeStudentLearningGuides, type StudentLearningGuides } from "@/lib/student-learning-guide";
+import type { Achievement } from "@/lib/achievement-selection";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -27,6 +28,7 @@ interface DesignReferenceContext {
   grade: string | null;
   area: string;
   coreIdea: string;
+  achievements: Achievement[];
   coreSentences: string[];
   essentialQuestions: string[];
   learningGuides?: StudentLearningGuides;
@@ -35,6 +37,22 @@ interface DesignReferenceContext {
 
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function asAchievements(value: unknown): Achievement[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (
+      typeof item !== "object"
+      || item === null
+      || typeof (item as { code?: unknown }).code !== "string"
+      || typeof (item as { content?: unknown }).content !== "string"
+    ) return [];
+    return [{
+      code: (item as { code: string }).code,
+      content: (item as { content: string }).content,
+    }];
+  });
 }
 
 function asInquiryQuestions(value: unknown): InquiryQuestion[] {
@@ -75,6 +93,15 @@ function buildEntries(context: DesignReferenceContext): [string, string][] {
   return [
     ...base,
     ...coreIdeaEntries,
+    ...context.achievements.flatMap((achievement, index): [string, string][] => {
+      const guide = learningGuides?.achievements?.find((item) => item.index === index);
+      return [
+        [`achievements.${index}.content`, achievement.content],
+        ...(guide?.explanation
+          ? [[`learningGuides.achievements.${index}.explanation`, guide.explanation] as [string, string]]
+          : []),
+      ];
+    }),
     ...context.coreSentences.flatMap((value, index): [string, string][] => {
       const guide = learningGuides?.coreSentences.find((item) => item.index === index);
       return [
@@ -115,6 +142,10 @@ function applyTranslations(context: DesignReferenceContext, fields: Record<strin
     subject: fields.subject ?? context.subject,
     area: fields.area ?? context.area,
     coreIdea: fields.coreIdea ?? context.coreIdea,
+    achievements: context.achievements.map((achievement, index) => ({
+      ...achievement,
+      content: fields[`achievements.${index}.content`] ?? achievement.content,
+    })),
     coreSentences: context.coreSentences.map((value, index) => fields[`coreSentences.${index}`] ?? value),
     essentialQuestions: context.essentialQuestions.map((value, index) => fields[`essentialQuestions.${index}`] ?? value),
     ...(context.learningGuides ? {
@@ -129,6 +160,10 @@ function applyTranslations(context: DesignReferenceContext, fields: Record<strin
             })),
           },
         } : {}),
+        achievements: (context.learningGuides.achievements ?? []).map((guide) => ({
+          ...guide,
+          explanation: fields[`learningGuides.achievements.${guide.index}.explanation`] ?? guide.explanation,
+        })),
         coreSentences: context.learningGuides.coreSentences.map((guide) => ({
           ...guide,
           explanation: fields[`learningGuides.coreSentences.${guide.index}.explanation`] ?? guide.explanation,
@@ -213,13 +248,14 @@ export async function POST(req: Request, { params }: Params) {
       grade: string | null;
       area: string;
       core_idea: string;
+      selected_achievements: unknown;
       core_sentences: unknown;
       essential_questions: unknown;
       inquiry_questions: unknown;
       learning_guides: unknown;
     }[]
   >`
-    SELECT id, title, subject, grade_range, grade, area, core_idea,
+    SELECT id, title, subject, grade_range, grade, area, core_idea, selected_achievements,
            core_sentences, essential_questions, inquiry_questions, learning_guides
     FROM unit_designs
     WHERE id = ${qs.unitDesignId} AND teacher_id = ${qs.teacherId}
@@ -237,6 +273,7 @@ export async function POST(req: Request, { params }: Params) {
     grade: design.grade,
     area: design.area,
     coreIdea: design.core_idea,
+    achievements: asAchievements(design.selected_achievements),
     coreSentences: asStringArray(design.core_sentences),
     essentialQuestions: asStringArray(design.essential_questions),
     learningGuides: normalizeStudentLearningGuides(design.learning_guides),

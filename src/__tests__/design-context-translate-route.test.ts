@@ -67,6 +67,10 @@ beforeEach(() => {
     grade: "5",
     area: "도형과 측정",
     core_idea: "도형은 길이와 넓이로 설명할 수 있다",
+    selected_achievements: [{
+      code: "[6수03-01]",
+      content: "도형의 둘레와 넓이를 구하고 비교할 수 있다.",
+    }],
     core_sentences: ["둘레는 도형의 가장자리 길이입니다."],
     essential_questions: ["넓이는 어떻게 비교할 수 있을까요?"],
     learning_guides: {
@@ -75,6 +79,10 @@ beforeEach(() => {
         lifeConnection: "교실 바닥의 테두리와 안쪽을 떠올려 보세요.",
         keywords: [{ term: "넓이", meaning: "도형 안쪽이 차지하는 크기" }],
       },
+      achievements: [{
+        index: 0,
+        explanation: "도형의 둘레와 넓이를 구해 서로 비교해 보는 기준이에요.",
+      }],
       coreSentences: [{ index: 0, explanation: "둘레는 도형을 한 바퀴 돈 길이예요." }],
       essentialQuestions: [{ index: 0, thinkingFocus: "서로 다른 도형의 넓이를 비교하는 방법을 살펴봐요.", perspectives: ["단위", "배열"] }],
     },
@@ -100,6 +108,8 @@ beforeEach(() => {
     "Think of the border and inside of your classroom floor.",
     "Area",
     "The amount of space inside a shape",
+    "Find and compare the perimeter and area of shapes.",
+    "This standard asks you to find and compare perimeter and area.",
     "Perimeter is the length around a figure.",
     "Perimeter is the distance around a shape.",
     "How can we compare area?",
@@ -123,6 +133,9 @@ describe("POST design-context translate", () => {
     expect(data.context.title).toBe("Perimeter and Area of Plane Figures");
     expect(data.context.coreSentences[0]).toBe("Perimeter is the length around a figure.");
     expect(data.context.learningGuides.coreIdea.explanation).toBe("Explore shapes in two ways: length and area.");
+    expect(data.context.achievements[0].content).toBe("Find and compare the perimeter and area of shapes.");
+    expect(data.context.learningGuides.achievements[0].explanation)
+      .toBe("This standard asks you to find and compare perimeter and area.");
     expect(data.context.learningGuides.coreSentences[0].explanation).toBe("Perimeter is the distance around a shape.");
     expect(data.context.learningGuides.essentialQuestions[0].perspectives).toEqual(["Unit", "Arrangement"]);
     expect(data.context.inquiryQuestions[0].content).toBe("How do you find the perimeter of a rectangle?");
@@ -141,6 +154,8 @@ describe("POST design-context translate", () => {
         "교실 바닥의 테두리와 안쪽을 떠올려 보세요.",
         "넓이",
         "도형 안쪽이 차지하는 크기",
+        "도형의 둘레와 넓이를 구하고 비교할 수 있다.",
+        "도형의 둘레와 넓이를 구해 서로 비교해 보는 기준이에요.",
         "둘레는 도형의 가장자리 길이입니다.",
         "둘레는 도형을 한 바퀴 돈 길이예요.",
         "넓이는 어떻게 비교할 수 있을까요?",

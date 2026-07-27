@@ -190,6 +190,9 @@ ${questions}
     const inquiryQuestions = (data.inquiryQuestions ?? [])
       .map((question, index) => `${index}. [${question.type}] ${question.content}`)
       .join("\n");
+    const achievementGuidesExample = JSON.stringify(
+      data.achievements.map((_, index) => ({ index, explanation: "..." })),
+    );
     return `당신은 학생의 이해와 탐구를 돕는 수업 설계 전문가입니다.
 아래 원문을 바꾸지 않고 ${gradeLabel} 학생을 위한 짧은 이해 자료를 만드세요.
 
@@ -197,6 +200,8 @@ ${questions}
 [선택한 핵심어] ${data.selectedKeywords.join(", ") || "(선택한 핵심어 없음)"}
 [핵심 아이디어]
 ${data.coreIdea}
+[성취기준]
+${data.achievements.map((item, index) => `${index}. ${item.code} ${item.content}`).join("\n")}
 [핵심 문장]
 ${data.coreSentences.map((item, index) => `${index}. ${item}`).join("\n")}
 [핵심 질문]
@@ -210,12 +215,13 @@ ${inquiryQuestions}
 - coreIdea.explanation은 핵심 아이디어를 학생 눈높이 1~2문장으로 풀어 쓰세요.
 - coreIdea.lifeConnection은 생활 속 익숙한 사례 하나만 제시하세요.
 - coreIdea.keywords는 선택한 핵심어를 우선해 학생이 꼭 알아야 할 서로 다른 핵심 낱말을 3~5개 만들고 모든 낱말에 쉬운 뜻을 붙이세요.
+- achievements는 모든 성취기준에 대해 쉬운 설명을 하나씩 만드세요. 학생이 무엇을 배우고 해 볼지 알 수 있게 쓰고 0부터 시작하는 원래 index를 빠짐없이 유지하세요.
 - coreSentences는 모든 원문에 대해 쉬운 표현을 하나씩 만들고 0부터 시작하는 원래 index를 빠짐없이 유지하세요.
 - essentialQuestions는 모든 원문에 대해 thinkingFocus 한 문장과 perspectives 2~3개를 만들고 원래 index를 빠짐없이 유지하세요.
 - guides는 모든 탐구 질문에 대해 원문과 같은 index, meaning, 서로 다른 핵심 낱말 2~5개와 쉬운 뜻, thinkingStart를 빠짐없이 만드세요.
 
 아래 JSON만 출력:
-{"learningGuides":{"coreIdea":{"explanation":"...","lifeConnection":"...","keywords":[{"term":"핵심 낱말 1","meaning":"첫 번째 핵심 낱말의 쉬운 뜻"},{"term":"핵심 낱말 2","meaning":"두 번째 핵심 낱말의 쉬운 뜻"},{"term":"핵심 낱말 3","meaning":"세 번째 핵심 낱말의 쉬운 뜻"}]},"coreSentences":[{"index":0,"explanation":"..."}],"essentialQuestions":[{"index":0,"thinkingFocus":"...","perspectives":["...","..."]}]},"guides":[{"index":0,"meaning":"...","keywords":[{"term":"질문 낱말 1","meaning":"첫 번째 질문 낱말의 쉬운 뜻"},{"term":"질문 낱말 2","meaning":"두 번째 질문 낱말의 쉬운 뜻"}],"thinkingStart":"..."}]}`;
+{"learningGuides":{"coreIdea":{"explanation":"...","lifeConnection":"...","keywords":[{"term":"핵심 낱말 1","meaning":"첫 번째 핵심 낱말의 쉬운 뜻"},{"term":"핵심 낱말 2","meaning":"두 번째 핵심 낱말의 쉬운 뜻"},{"term":"핵심 낱말 3","meaning":"세 번째 핵심 낱말의 쉬운 뜻"}]},"achievements":${achievementGuidesExample},"coreSentences":[{"index":0,"explanation":"..."}],"essentialQuestions":[{"index":0,"thinkingFocus":"...","perspectives":["...","..."]}]},"guides":[{"index":0,"meaning":"...","keywords":[{"term":"질문 낱말 1","meaning":"첫 번째 질문 낱말의 쉬운 뜻"},{"term":"질문 낱말 2","meaning":"두 번째 질문 낱말의 쉬운 뜻"}],"thinkingStart":"..."}]}`;
   }
 
   return `당신은 수업 설계 전문가입니다.

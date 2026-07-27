@@ -204,6 +204,10 @@ const COMPLETE_GENERATED_GUIDES = {
         { term: "먹이 사슬", meaning: "먹고 먹히는 관계의 연결" },
       ],
     },
+    achievements: [{
+      index: 0,
+      explanation: "식물의 생활을 관찰하고 특징을 쉽게 설명해 보는 기준이에요.",
+    }],
     coreSentences: [{ index: 0, explanation: "핵심 문장을 쉽게 풀어요." }],
     essentialQuestions: [{
       index: 0,
@@ -675,6 +679,7 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     const res = await generatePOST(makeRequest({
       ...GENERATE_BASE,
       step: "learning_guides",
+      achievements: VALID_DESIGN.achievements,
       coreSentences: VALID_DESIGN.coreSentences,
       essentialQuestions: VALID_DESIGN.essentialQuestions,
       inquiryQuestions: VALID_DESIGN.inquiryQuestions,
@@ -683,6 +688,7 @@ describe("POST /api/unit-design/generate — AI 생성", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.learningGuides.coreIdea.lifeConnection).toContain("화단");
+    expect(body.learningGuides.achievements[0].explanation).toContain("식물의 생활");
   });
 
   it("학생용 설명 첫 응답이 불완전하면 한 번 보완해 완전한 결과만 반환한다", async () => {
@@ -844,11 +850,14 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
     });
 
     expect(prompt).toContain(VALID_DESIGN.coreIdea);
+    expect(prompt).toContain(PROMPT_BASE.achievements[0].code);
+    expect(prompt).toContain(PROMPT_BASE.achievements[0].content);
     expect(prompt).toContain(VALID_DESIGN.coreSentences[0]);
     expect(prompt).toContain(VALID_DESIGN.essentialQuestions[0]);
     expect(prompt).toContain("[선택한 핵심어] 광합성, 에너지 전환");
     expect(prompt).toContain("서로 다른 핵심 낱말을 3~5개");
     expect(prompt).toContain("모든 원문에 대해 쉬운 표현을 하나씩");
+    expect(prompt).toContain("모든 성취기준에 대해 쉬운 설명");
     expect(prompt).toContain("모든 원문에 대해 thinkingFocus 한 문장");
     expect(prompt).toContain("모든 탐구 질문에 대해 원문과 같은 index");
     expect(prompt).toContain("서로 다른 핵심 낱말 2~5개");
@@ -884,6 +893,23 @@ describe("unit-design prompt — 선택 성취기준 맥락", () => {
       expect(guide.keywords.length).toBeLessThanOrEqual(5);
       expect(guide.keywords.every(({ term, meaning }) => term.trim() && meaning.trim())).toBe(true);
     }
+  });
+
+  it("선택한 성취기준이 없으면 학생용 설명 제이슨 예시도 빈 목록을 사용한다", () => {
+    const prompt = buildPrompt({
+      ...PROMPT_BASE,
+      step: "learning_guides",
+      achievements: [],
+      coreSentences: VALID_DESIGN.coreSentences,
+      essentialQuestions: VALID_DESIGN.essentialQuestions,
+      inquiryQuestions: VALID_DESIGN.inquiryQuestions,
+    });
+    const exampleStart = prompt.indexOf('{"learningGuides"');
+    const example = JSON.parse(prompt.slice(exampleStart)) as {
+      learningGuides: { achievements: Array<{ index: number; explanation: string }> };
+    };
+
+    expect(example.learningGuides.achievements).toEqual([]);
   });
 
   it("student_guides 단계는 질문 원문과 학년 수준을 포함하고 원문 변경을 금지한다", () => {

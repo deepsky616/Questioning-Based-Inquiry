@@ -4,7 +4,7 @@ import {
   validateStudentGuideBundle,
 } from "@/lib/student-guide-completeness";
 
-const expected = { coreSentenceCount: 2, essentialQuestionCount: 1, inquiryQuestionCount: 2 };
+const expected = { achievementCount: 1, coreSentenceCount: 2, essentialQuestionCount: 1, inquiryQuestionCount: 2 };
 const complete = {
   learningGuides: {
     coreIdea: {
@@ -16,6 +16,7 @@ const complete = {
         { term: "먹이 사슬", meaning: "먹고 먹히는 관계의 연결" },
       ],
     },
+    achievements: [{ index: 0, explanation: "생태계 구성 요소를 찾아 나누어 보는 배움의 기준이에요." }],
     coreSentences: [
       { index: 0, explanation: "첫 문장을 쉽게 풀어요." },
       { index: 1, explanation: "둘째 문장을 쉽게 풀어요." },
@@ -37,9 +38,27 @@ const complete = {
 
 describe("학생용 설명 묶음 완전성", () => {
   it("모든 필수 설명과 핵심 낱말이 있으면 정규화된 결과를 반환한다", () => {
-    const result = validateStudentGuideBundle(complete, expected);
+    const result = validateStudentGuideBundle(complete, { ...expected, achievementCount: 1 });
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value.guides).toHaveLength(2);
+    if (result.ok) {
+      expect(result.value.guides).toHaveLength(2);
+      expect(result.value.learningGuides.achievements).toEqual(complete.learningGuides.achievements);
+    }
+  });
+
+  it("선택한 모든 성취기준의 쉬운 설명이 없으면 불완전한 결과로 판정한다", () => {
+    const withoutAchievementGuides = {
+      ...complete,
+      learningGuides: { ...complete.learningGuides, achievements: [] },
+    };
+
+    const result = validateStudentGuideBundle(withoutAchievementGuides, {
+      ...expected,
+      achievementCount: 1,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues).toContain("모든 성취기준의 쉬운 설명과 번호가 필요합니다.");
   });
 
   it.each([

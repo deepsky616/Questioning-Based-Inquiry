@@ -11,6 +11,11 @@ export interface StudentCoreSentenceGuide {
   explanation: string;
 }
 
+export interface StudentAchievementGuide {
+  index: number;
+  explanation: string;
+}
+
 export interface StudentEssentialQuestionGuide {
   index: number;
   thinkingFocus: string;
@@ -19,11 +24,13 @@ export interface StudentEssentialQuestionGuide {
 
 export interface StudentLearningGuides {
   coreIdea?: StudentCoreIdeaGuide;
+  achievements?: StudentAchievementGuide[];
   coreSentences: StudentCoreSentenceGuide[];
   essentialQuestions: StudentEssentialQuestionGuide[];
 }
 
 export const EMPTY_STUDENT_LEARNING_GUIDES: StudentLearningGuides = {
+  achievements: [],
   coreSentences: [],
   essentialQuestions: [],
 };
@@ -61,6 +68,17 @@ export function normalizeStudentLearningGuides(value: unknown): StudentLearningG
     }
   }
 
+  const achievements = Array.isArray(value.achievements)
+    ? value.achievements
+        .filter(isRecord)
+        .map((guide) => ({
+          index: typeof guide.index === "number" ? guide.index : -1,
+          explanation: typeof guide.explanation === "string" ? guide.explanation.trim().slice(0, 500) : "",
+        }))
+        .filter((guide) => Number.isInteger(guide.index) && guide.index >= 0 && guide.explanation)
+        .slice(0, 30)
+    : [];
+
   const coreSentences = Array.isArray(value.coreSentences)
     ? value.coreSentences
         .filter(isRecord)
@@ -90,8 +108,15 @@ export function normalizeStudentLearningGuides(value: unknown): StudentLearningG
         .slice(0, 20)
     : [];
 
-  if (!coreIdea && coreSentences.length === 0 && essentialQuestions.length === 0) return undefined;
-  return { ...(coreIdea ? { coreIdea } : {}), coreSentences, essentialQuestions };
+  if (!coreIdea && achievements.length === 0 && coreSentences.length === 0 && essentialQuestions.length === 0) {
+    return undefined;
+  }
+  return {
+    ...(coreIdea ? { coreIdea } : {}),
+    ...(achievements.length > 0 ? { achievements } : {}),
+    coreSentences,
+    essentialQuestions,
+  };
 }
 
 export function removeIndexedStudentLearningGuide(

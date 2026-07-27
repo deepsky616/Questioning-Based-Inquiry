@@ -33,10 +33,15 @@ const DESIGN_ROW = {
   grade: "4",
   area: "생명",
   core_idea: "핵심 아이디어",
+  selected_achievements: [{
+    code: "[4과05-01]",
+    content: "식물의 생활을 관찰하고 특징을 설명할 수 있다.",
+  }],
   core_sentences: ["문장1"],
   essential_questions: ["질문1"],
   learning_guides: {
     coreIdea: { explanation: "핵심 아이디어 쉬운 설명", lifeConnection: "생활 속 사례", keywords: [] },
+    achievements: [{ index: 0, explanation: "식물을 관찰하고 특징을 설명해 보는 기준이에요." }],
     coreSentences: [],
     essentialQuestions: [],
   },
@@ -67,6 +72,8 @@ describe("GET design-context 권한", () => {
     expect(body.context?.title).toBe("광합성");
     expect(body.context?.sessionDate).toBe("2026-05-01");
     expect(body.context?.learningGuides.coreIdea.explanation).toBe("핵심 아이디어 쉬운 설명");
+    expect(body.context?.achievements).toEqual(DESIGN_ROW.selected_achievements);
+    expect(body.context?.learningGuides.achievements[0].explanation).toContain("식물을 관찰하고");
   });
 
   it("소유가 아닌 교사는 403", async () => {

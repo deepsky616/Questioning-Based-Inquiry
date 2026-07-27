@@ -75,6 +75,7 @@ export async function POST(req: Request) {
 
     if (data.step === "learning_guides") {
       const expected = {
+        achievementCount: data.achievements.length,
         coreSentenceCount: data.coreSentences.length,
         essentialQuestionCount: data.essentialQuestions.length,
         inquiryQuestionCount: data.inquiryQuestions?.length ?? 0,

@@ -91,6 +91,10 @@ describe("DesignReferenceView", () => {
           subject: "과학",
           area: "생명",
           coreIdea: "식물은 빛으로 양분을 만든다",
+          achievements: [{
+            code: "[4과05-01]",
+            content: "식물의 생활을 관찰하고 특징을 설명할 수 있다.",
+          }],
           coreSentences: ["핵심 문장 하나"],
           essentialQuestions: ["핵심 질문 하나"],
           learningGuides: {
@@ -99,6 +103,10 @@ describe("DesignReferenceView", () => {
               lifeConnection: "창가의 식물이 햇빛 쪽으로 자라는 모습을 떠올려 보세요.",
               keywords: [{ term: "양분", meaning: "식물이 자라는 데 필요한 물질" }],
             },
+            achievements: [{
+              index: 0,
+              explanation: "식물을 자세히 관찰하고 특징을 설명해 보는 기준이에요.",
+            }],
             coreSentences: [{ index: 0, explanation: "식물이 빛으로 필요한 물질을 만들어요." }],
             essentialQuestions: [{
               index: 0,
@@ -120,8 +128,9 @@ describe("DesignReferenceView", () => {
     );
     expect(screen.getByText(/광합성/)).toBeInTheDocument();
     expect(screen.getByText(/식물은 빛으로 양분을 만든다/)).toBeInTheDocument();
-    expect(screen.getByText("쉽게 풀어보기")).toBeInTheDocument();
+    expect(screen.getAllByText("쉽게 풀어보기").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText(/식물이 빛을 이용해 살아가는 큰 원리/)).toBeInTheDocument();
+    expect(screen.getByText(/식물을 자세히 관찰하고 특징을 설명해 보는 기준/)).toBeInTheDocument();
     expect(screen.getByText("생활 속 연결")).toBeInTheDocument();
     expect(screen.getByText("쉬운 문장으로 보기")).toBeInTheDocument();
     expect(screen.getByText("이 질문에서 생각할 것")).toBeInTheDocument();
@@ -135,9 +144,10 @@ describe("DesignReferenceView", () => {
 
     const expectedSections = [
       ["core-idea", "1", "border-amber-200/80", "bg-amber-50/70"],
-      ["core-sentence", "2", "border-sky-200/80", "bg-sky-50/70"],
-      ["essential-question", "3", "border-violet-200/80", "bg-violet-50/70"],
-      ["inquiry-question", "4", "border-emerald-200/80", "bg-emerald-50/70"],
+      ["achievement", "2", "border-teal-200/80", "bg-teal-50/70"],
+      ["core-sentence", "3", "border-sky-200/80", "bg-sky-50/70"],
+      ["essential-question", "4", "border-violet-200/80", "bg-violet-50/70"],
+      ["inquiry-question", "5", "border-emerald-200/80", "bg-emerald-50/70"],
     ] as const;
     for (const [name, number, border, background] of expectedSections) {
       const section = container.querySelector(`[data-design-reference-section="${name}"]`);

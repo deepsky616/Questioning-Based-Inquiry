@@ -17,6 +17,10 @@ const learningGuides = {
       { term: "관계", meaning: "서로 영향을 주고받는 연결" },
     ],
   },
+  achievements: [{
+    index: 0,
+    explanation: "생태계를 이루는 생물과 환경을 찾아 알맞게 나누어 보는 기준이에요.",
+  }],
   coreSentences: [{ index: 0, explanation: "생물은 혼자 살지 않고 서로 이어져 있어요." }],
   essentialQuestions: [{
     index: 0,
@@ -72,6 +76,7 @@ describe("학생 배포 자료 확인", () => {
 
     expect(achievement).toHaveTextContent("[6과05-01]");
     expect(achievement).toHaveTextContent("생태계 구성 요소를 조사하고");
+    expect(achievement).toHaveTextContent("생태계를 이루는 생물과 환경을 찾아");
     expect(coreIdea?.compareDocumentPosition(achievement as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
     expect(achievement?.compareDocumentPosition(coreSentence as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
@@ -82,6 +87,9 @@ describe("학생 배포 자료 확인", () => {
       container.querySelector('[data-student-guide-section="inquiry-question"] [data-student-guide-number]'),
     ).toHaveTextContent("5");
     expect(screen.queryByDisplayValue("[6과05-01]")).not.toBeInTheDocument();
+    expect(screen.getByDisplayValue(
+      "생태계를 이루는 생물과 환경을 찾아 알맞게 나누어 보는 기준이에요.",
+    )).toBeInTheDocument();
   });
 
   it("읽기 전용 원문 바로 아래의 학생용 설명만 수정한다", () => {

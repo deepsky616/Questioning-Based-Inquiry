@@ -12,9 +12,17 @@ describe("학생용 단원 이해 자료 편집", () => {
     render(
       <StudentLearningGuideEditor
         coreIdea="식물은 빛을 이용해 양분을 만든다."
+        achievements={[{
+          code: "[4과05-01]",
+          content: "식물의 생활을 관찰하고 특징을 설명할 수 있다.",
+        }]}
         coreSentences={["식물은 빛 에너지를 양분으로 바꾼다."]}
         essentialQuestions={["생물은 어떻게 에너지를 얻을까?"]}
-        guides={undefined}
+        guides={{
+          achievements: [{ index: 0, explanation: "식물을 자세히 살펴보고 특징을 말해 보는 기준이에요." }],
+          coreSentences: [],
+          essentialQuestions: [],
+        }}
         showEditors
         emptyMessage="학생용 설명을 만들어 주세요."
         onChange={onChange}
@@ -26,6 +34,16 @@ describe("학생용 단원 이해 자료 편집", () => {
     });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
       coreIdea: expect.objectContaining({ explanation: "식물이 빛을 이용하는 큰 원리를 알아봐요." }),
+    }));
+
+    fireEvent.change(screen.getByLabelText("1번 성취기준 쉽게 풀어보기"), {
+      target: { value: "식물을 관찰하고 생김새와 생활의 특징을 쉽게 설명해 봐요." },
+    });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      achievements: [{
+        index: 0,
+        explanation: "식물을 관찰하고 생김새와 생활의 특징을 쉽게 설명해 봐요.",
+      }],
     }));
 
     fireEvent.change(screen.getByLabelText("1번 핵심 문장 쉬운 문장으로 보기"), {

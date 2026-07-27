@@ -34,6 +34,20 @@ describe("학생용 설명 원문 서명", () => {
     }));
   });
 
+  it("성취기준 번호나 내용이 바뀌면 다른 서명을 만든다", () => {
+    const first = {
+      ...input,
+      achievements: [{ code: "[6과05-01]", content: "생태계 구성 요소를 조사할 수 있다." }],
+    };
+    const changed = {
+      ...input,
+      achievements: [{ code: "[6과05-02]", content: "생물과 환경의 관계를 설명할 수 있다." }],
+    };
+
+    expect(buildStudentGuideSourceSignature(first))
+      .not.toBe(buildStudentGuideSourceSignature(changed));
+  });
+
   it("저장 자료의 핵심 생각은 선택한 줄을 합친 값과 일치한다", () => {
     const payload = withSelectedCoreIdea(
       { title: "생태계", coreIdea: "선택하지 않은 전체 핵심 생각" },

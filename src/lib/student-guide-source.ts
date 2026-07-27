@@ -1,7 +1,9 @@
 import type { InquiryQuestion } from "@/app/(teacher)/teacher-curriculum/types";
+import type { Achievement } from "@/lib/achievement-selection";
 
 export interface StudentGuideSourceInput {
   coreIdea: string;
+  achievements?: Achievement[];
   selectedKeywords: string[];
   coreSentences: string[];
   essentialQuestions: string[];
@@ -20,6 +22,10 @@ export function withSelectedCoreIdea<T extends object>(
 export function buildStudentGuideSourceSignature(input: StudentGuideSourceInput): string {
   return JSON.stringify({
     coreIdea: clean(input.coreIdea),
+    achievements: (input.achievements ?? []).map((achievement) => ({
+      code: clean(achievement.code),
+      content: clean(achievement.content),
+    })),
     selectedKeywords: input.selectedKeywords.map(clean).filter(Boolean),
     coreSentences: input.coreSentences.map(clean),
     essentialQuestions: input.essentialQuestions.map(clean),

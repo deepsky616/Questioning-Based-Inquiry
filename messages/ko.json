@@ -934,6 +934,7 @@
     "achievementCodePlaceholder": "예: [4과05-01]",
     "achievementContentPlaceholder": "성취기준 내용을 입력하세요.",
     "addAchievement": "성취기준 추가",
+    "achievementEasyLabel": "{n}번 성취기준 쉽게 풀어보기",
     "studentGuideCoreSentenceSectionTitle": "핵심 문장",
     "studentGuideCoreSentenceSectionDesc": "학생에게 어려울 수 있는 문장을 쉬운 표현으로 바꿔 주세요.",
     "studentGuideEssentialQuestionSectionTitle": "핵심 질문",
@@ -2302,6 +2303,7 @@
   },
   "designRef": {
     "coreIdea": "핵심 아이디어",
+    "achievements": "성취기준",
     "coreSentences": "핵심 문장",
     "essentialQuestions": "핵심 질문",
     "inquiryQuestions": "탐구 질문",
@@ -2309,6 +2311,7 @@
     "labelArea": "영역",
     "labelUnit": "단원",
     "coreIdeaDesc": "이 단원에서 꼭 이해해야 할 가장 큰 생각이에요.",
+    "achievementsDesc": "이번 수업에서 무엇을 배우고 해 볼지 알려 주는 기준이에요.",
     "coreSentencesDesc": "핵심 아이디어를 문장으로 풀어 정리한 거예요.",
     "essentialQuestionsDesc": "단원 전체를 아우르는 큰 질문이에요.",
     "inquiryQuestionsDesc": "직접 탐구해볼 수 있는 구체적인 질문이에요. 내 질문을 만들 때 참고하세요.",

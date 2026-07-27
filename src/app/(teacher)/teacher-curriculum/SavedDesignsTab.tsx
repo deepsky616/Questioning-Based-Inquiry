@@ -152,6 +152,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   const editingDesign = savedList.find((design) => design.id === editingDesignId);
   const editGuideSourceSignature = buildStudentGuideSourceSignature({
     coreIdea: editCoreIdea,
+    achievements: editAchievements,
     selectedKeywords: editingDesign?.selectedKeywords ?? [],
     coreSentences: editCoreSentences,
     essentialQuestions: editEssentialQuestions,
@@ -172,6 +173,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
       ? [{ ...question.studentGuide, index }]
       : []),
   }, {
+    achievementCount: editAchievements.length,
     coreSentenceCount: editCoreSentences.length,
     essentialQuestionCount: editEssentialQuestions.length,
     inquiryQuestionCount: editInquiryQuestions.length,
@@ -250,6 +252,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     const hasGuides = Boolean(nextLearningGuides) || nextQuestions.some((question) => question.studentGuide);
     setGeneratedEditGuideSourceSignature(hasGuides ? buildStudentGuideSourceSignature({
       coreIdea: design.coreIdea ?? "",
+      achievements: design.achievements ?? [],
       selectedKeywords: design.selectedKeywords ?? [],
       coreSentences: design.coreSentences ?? [],
       essentialQuestions: design.essentialQuestions ?? [],
@@ -400,6 +403,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
           area: design.area,
           unitName: editTitle.trim(),
           coreIdea: editCoreIdea.trim(),
+          achievements: editAchievements,
           selectedKeywords: design.selectedKeywords ?? [],
           coreSentences: editCoreSentences,
           essentialQuestions: editEssentialQuestions,
@@ -411,6 +415,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
       });
       const data = await response.json().catch(() => ({}));
       const expected = {
+        achievementCount: editAchievements.length,
         coreSentenceCount: editCoreSentences.length,
         essentialQuestionCount: editEssentialQuestions.length,
         inquiryQuestionCount: indexedQuestions.length,

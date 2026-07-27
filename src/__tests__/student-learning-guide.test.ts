@@ -13,6 +13,10 @@ describe("학생용 단원 이해 자료", () => {
         lifeConnection: "  화분이 햇빛 쪽으로 자라는 모습을 떠올려 보세요. ",
         keywords: [{ term: " 광합성 ", meaning: " 빛으로 양분을 만드는 과정 " }],
       },
+      achievements: [
+        { index: 0, explanation: " 식물의 생활을 관찰하고 특징을 쉽게 설명해 보는 기준이에요. " },
+        { index: -1, explanation: "제외" },
+      ],
       coreSentences: [
         { index: 0, explanation: " 식물이 빛으로 필요한 물질을 만들어요. " },
         { index: -1, explanation: "제외" },
@@ -28,6 +32,10 @@ describe("학생용 단원 이해 자료", () => {
         lifeConnection: "화분이 햇빛 쪽으로 자라는 모습을 떠올려 보세요.",
         keywords: [{ term: "광합성", meaning: "빛으로 양분을 만드는 과정" }],
       },
+      achievements: [{
+        index: 0,
+        explanation: "식물의 생활을 관찰하고 특징을 쉽게 설명해 보는 기준이에요.",
+      }],
       coreSentences: [{ index: 0, explanation: "식물이 빛으로 필요한 물질을 만들어요." }],
       essentialQuestions: [{
         index: 0,
