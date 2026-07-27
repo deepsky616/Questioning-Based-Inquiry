@@ -63,6 +63,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       .toHaveLength(12);
     expect(plans.likes.filter(({ userId }) => userId === studentIds[0]))
       .toHaveLength(18);
+    expect(plans.classInquiryQuestions).toHaveLength(15);
 
     for (const studentId of studentIds.slice(1)) {
       expect(plans.questions.filter(({ authorId }) => authorId === studentId).length)
@@ -90,8 +91,40 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     ).toBeGreaterThanOrEqual(27);
 
     const questionById = new Map(
-      plans.questions.map((question) => [question.id, question]),
+      [...plans.questions, ...plans.classInquiryQuestions]
+        .map((question) => [question.id, question]),
     );
+    for (const sharedQuestion of plans.classInquiryQuestions) {
+      const comments = plans.comments.filter(
+        ({ questionId }) => questionId === sharedQuestion.id,
+      );
+      const likes = plans.likes.filter(
+        ({ questionId }) => questionId === sharedQuestion.id,
+      );
+
+      expect(comments).toHaveLength(2);
+      expect(comments.every(({ content }) => content.length >= 20)).toBe(true);
+      expect(likes.length).toBeGreaterThanOrEqual(4);
+      expect(likes.length).toBeLessThanOrEqual(6);
+      expect(new Set(likes.map(({ userId }) => userId)).size).toBe(likes.length);
+    }
+    for (const session of DEMO_SESSION_BLUEPRINTS.slice(0, 5)) {
+      const sessionSharedIds = new Set(
+        plans.classInquiryQuestions
+          .filter(({ sessionId }) => sessionId === session.id)
+          .map(({ id }) => id),
+      );
+      expect(
+        plans.comments.some(({ authorId, questionId }) => (
+          authorId === studentIds[0] && sessionSharedIds.has(questionId)
+        )),
+      ).toBe(true);
+      expect(
+        plans.likes.some(({ userId, questionId }) => (
+          userId === studentIds[0] && sessionSharedIds.has(questionId)
+        )),
+      ).toBe(true);
+    }
     expect(plans.analyses).toHaveLength(5);
     expect(
       new Set(plans.analyses.map(({ result }) => result.summary)).size,

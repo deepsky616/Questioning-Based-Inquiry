@@ -781,7 +781,24 @@ export function buildDemoLearningActivityPlans(studentIds) {
     }
   }
 
-  const questionById = new Map(questions.map((question) => [question.id, question]));
+  const classInquiryQuestions = buildDemoClassInquiryQuestionRefs();
+  distributeClassInquiryComments(
+    comments,
+    questions,
+    classInquiryQuestions,
+    studentIds[0],
+  );
+  distributeClassInquiryLikes(
+    likes,
+    questions,
+    classInquiryQuestions,
+    studentIds[0],
+  );
+
+  const questionById = new Map(
+    [...questions, ...classInquiryQuestions]
+      .map((question) => [question.id, question]),
+  );
   const analyses = ACTIVITY_SESSION_BLUEPRINTS.map((session, index) => {
     const totalQuestions = questions.filter(
       ({ authorId, sessionId }) => authorId === studentIds[0] && sessionId === session.id,
@@ -807,7 +824,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
     };
   });
 
-  return { questions, comments, likes, analyses };
+  return { questions, classInquiryQuestions, comments, likes, analyses };
 }
 
 const CLASS_INQUIRY_FLOW = [
@@ -831,11 +848,147 @@ const CLASS_INQUIRY_FLOW = [
   },
 ];
 
+const CLASS_INQUIRY_COMMENT_CONTENTS = {
+  factual: [
+    "수업 자료에서 확인할 수 있는 사실과 낱말의 뜻을 먼저 찾아보면 좋겠어요.",
+    "친구들이 찾은 사례를 함께 모으면 이 질문에 더 정확하게 답할 수 있을 것 같아요.",
+  ],
+  conceptual: [
+    "앞에서 확인한 사실을 서로 연결하면 왜 그런지 더 분명하게 설명할 수 있을 것 같아요.",
+    "한 가지 사례뿐 아니라 다른 상황에서도 같은 관계가 나타나는지 비교해 보고 싶어요.",
+  ],
+  controversial: [
+    "서로 다른 선택의 좋은 점과 어려운 점을 비교한 뒤 우리 반의 판단 기준을 정해 보면 좋겠어요.",
+    "생각이 다른 친구의 근거도 함께 들으면 더 공정한 해결 방법을 찾을 수 있을 것 같아요.",
+  ],
+};
+
 const CLASS_INQUIRY_FLOW_BASIS = {
   flowId: "cognitive-development",
   flowTitle: "인지적 발달 흐름",
   flowAxis: "사실 확인 → 관계와 까닭 → 적용과 판단",
 };
+
+function sharedQuestionId(sessionKey, index) {
+  return `usb-demo-shared-question-${sessionKey}-${pad(index + 1)}`;
+}
+
+function buildDemoClassInquiryQuestionRefs() {
+  return ACTIVITY_SESSION_BLUEPRINTS.flatMap((session, sessionIndex) => (
+    CLASS_INQUIRY_FLOW.map((flowStep, index) => ({
+      id: sharedQuestionId(session.key, index),
+      sessionId: session.id,
+      sessionIndex,
+      type: flowStep.type,
+      priority: index + 1,
+    }))
+  ));
+}
+
+function selectAvailableActivity(
+  activities,
+  sourceQuestionById,
+  usedIds,
+  sessionId,
+  targetAuthorId,
+  preferredParticipantId,
+  participantKey,
+  excludedParticipantIds = new Set(),
+) {
+  const candidates = activities.filter((activity) => {
+    const sourceQuestion = sourceQuestionById.get(activity.questionId);
+    return (
+      !usedIds.has(activity.id)
+      && sourceQuestion?.sessionId === sessionId
+      && sourceQuestion.authorId !== targetAuthorId
+      && !excludedParticipantIds.has(activity[participantKey])
+    );
+  });
+  return (
+    candidates.find(
+      (activity) => activity[participantKey] === preferredParticipantId,
+    )
+    ?? candidates[0]
+  );
+}
+
+function distributeClassInquiryComments(
+  comments,
+  questions,
+  classInquiryQuestions,
+  kimStudentId,
+) {
+  const sourceQuestionById = new Map(
+    questions.map((question) => [question.id, question]),
+  );
+  const usedIds = new Set();
+
+  for (const target of classInquiryQuestions) {
+    const usedAuthors = new Set();
+    for (let slot = 0; slot < 2; slot += 1) {
+      const preferredAuthorId = target.priority === 1 && slot === 0
+        ? kimStudentId
+        : undefined;
+      const activity = selectAvailableActivity(
+        comments,
+        sourceQuestionById,
+        usedIds,
+        target.sessionId,
+        kimStudentId,
+        preferredAuthorId,
+        "authorId",
+        usedAuthors,
+      );
+      if (!activity) {
+        throw new Error("수업 탐구 질문에 배치할 댓글이 부족합니다.");
+      }
+      usedIds.add(activity.id);
+      usedAuthors.add(activity.authorId);
+      activity.questionId = target.id;
+      activity.content = CLASS_INQUIRY_COMMENT_CONTENTS[target.type][
+        (target.sessionIndex + target.priority + slot) % 2
+      ];
+    }
+  }
+}
+
+function distributeClassInquiryLikes(
+  likes,
+  questions,
+  classInquiryQuestions,
+  kimStudentId,
+) {
+  const sourceQuestionById = new Map(
+    questions.map((question) => [question.id, question]),
+  );
+  const usedIds = new Set();
+
+  for (const target of classInquiryQuestions) {
+    const usedUsers = new Set();
+    const count = 4 + ((target.sessionIndex + target.priority - 1) % 3);
+    for (let slot = 0; slot < count; slot += 1) {
+      const preferredUserId = target.priority === 1 && slot === 0
+        ? kimStudentId
+        : undefined;
+      const activity = selectAvailableActivity(
+        likes,
+        sourceQuestionById,
+        usedIds,
+        target.sessionId,
+        kimStudentId,
+        preferredUserId,
+        "userId",
+        usedUsers,
+      );
+      if (!activity) {
+        throw new Error("수업 탐구 질문에 배치할 좋아요가 부족합니다.");
+      }
+      usedIds.add(activity.id);
+      usedUsers.add(activity.userId);
+      activity.questionId = target.id;
+    }
+  }
+}
 
 export function buildDemoClassInquiryQuestions(
   design,
@@ -1099,7 +1252,7 @@ async function createInquiryLearningData(tx, studentIds) {
     });
 
     for (const [index, question] of sharedQuestions.entries()) {
-      const id = `usb-demo-shared-question-${blueprint.key}-${pad(index + 1)}`;
+      const id = sharedQuestionId(blueprint.key, index);
       await tx.question.create({
         data: {
           id,
