@@ -4,6 +4,10 @@ import { prisma } from "@/lib/db";
 import { isValidSessionDateString } from "@/lib/sessions";
 import { z } from "zod";
 import { studentLearningGuidesSchema } from "@/lib/student-learning-guide-schema";
+import {
+  buildInquiryDesignTitle,
+  extractInquiryDesignUnitTitle,
+} from "@/lib/inquiry-design-title";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -58,11 +62,26 @@ const updateSchema = z.object({
   targetStudentIds: z.array(z.string()).optional(),
 });
 
-async function assertOwner(id: string, teacherId: string) {
-  const rows = await prisma.$queryRaw<{ teacher_id: string }[]>`
-    SELECT teacher_id FROM unit_designs WHERE id = ${id} LIMIT 1
+interface DesignMetadata {
+  teacher_id: string;
+  title?: string;
+  subject?: string;
+  grade?: string | null;
+  session_date?: string | null;
+}
+
+async function getDesignMetadata(id: string) {
+  const rows = await prisma.$queryRaw<DesignMetadata[]>`
+    SELECT teacher_id, title, subject, grade, session_date
+    FROM unit_designs
+    WHERE id = ${id}
+    LIMIT 1
   `;
-  return rows[0]?.teacher_id === teacherId;
+  return rows[0];
+}
+
+async function assertOwner(id: string, teacherId: string) {
+  return (await getDesignMetadata(id))?.teacher_id === teacherId;
 }
 
 export async function PATCH(req: Request, { params }: Params) {
@@ -75,7 +94,8 @@ export async function PATCH(req: Request, { params }: Params) {
   try {
     const teacherId = (session.user as { id: string }).id;
     const { id } = await params;
-    if (!(await assertOwner(id, teacherId))) {
+    const current = await getDesignMetadata(id);
+    if (current?.teacher_id !== teacherId) {
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
@@ -86,7 +106,27 @@ export async function PATCH(req: Request, { params }: Params) {
       vals.push(val);
       sets.push(`${col} = $${vals.length}${cast}`);
     };
-    if (data.title !== undefined) add("title", data.title);
+    if (
+      data.title !== undefined
+      || data.subject !== undefined
+      || data.grade !== undefined
+      || data.sessionDate !== undefined
+    ) {
+      const subject = data.subject ?? current.subject;
+      const grade = data.grade !== undefined ? data.grade : current.grade;
+      const sessionDate = data.sessionDate !== undefined ? data.sessionDate : current.session_date;
+      const unitTitle = extractInquiryDesignUnitTitle({
+        title: data.title ?? current.title ?? "",
+        grade,
+        subject,
+      });
+      add("title", buildInquiryDesignTitle({
+        sessionDate,
+        grade,
+        subject,
+        unitTitle,
+      }));
+    }
     if (data.subject !== undefined) add("subject", data.subject);
     if (data.gradeRange !== undefined) add("grade_range", data.gradeRange);
     if (data.area !== undefined) add("area", data.area);

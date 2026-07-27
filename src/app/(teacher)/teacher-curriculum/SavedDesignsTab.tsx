@@ -197,7 +197,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
     grades: uniq(savedList.map((d) => d.grade)),
     subjects: uniq(savedList.map((d) => d.subject)),
     areas: uniq(savedList.map((d) => d.area)),
-    units: uniq(savedList.map((d) => d.title)),
+    units: uniq(savedList.map((d) => d.unitTitle ?? d.title)),
   };
   const savedDateMonthGroups = groupSessionDatesByMonth(savedFilterOptions.dates);
   const hasSavedFilter = Boolean(savedFilterDate || savedFilterGrade || savedFilterSubject || savedFilterArea || savedFilterUnit);
@@ -224,7 +224,7 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
   // ── 저장 설계 인라인 편집(제목·질문 수정/추가/삭제) ──────────────────
   const startEditDesign = (design: SavedInquiryDesign) => {
     setEditingDesignId(design.id);
-    setEditTitle(design.title);
+    setEditTitle(design.unitTitle ?? design.title);
     setEditDate(design.sessionDate || todayStr());
     setEditVisibility({
       isActive: design.isActive ?? true,
@@ -515,7 +515,6 @@ export function SavedDesignsTab({ savedList, onChanged, students, targetClasses 
             fallbackError: t("sessionCreateFailed"),
             payload: {
               date: editDate,
-              topic: editTitle.trim(),
               defaultQuestionPublic: editVisibility.defaultQuestionPublic,
               isActive: editVisibility.isActive,
               likesVisibleToPeers: editVisibility.likesVisibleToPeers,

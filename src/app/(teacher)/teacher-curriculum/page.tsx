@@ -493,7 +493,6 @@ export default function CurriculumPage() {
             fallbackError: t("sessionCreateFailed"),
             payload: {
               date: saveDate,
-              topic: saveTitle.trim(),
               defaultQuestionPublic,
               isActive: sessionIsActive,
               likesVisibleToPeers: sessionLikesVisible,

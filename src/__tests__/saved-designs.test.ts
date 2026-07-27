@@ -23,6 +23,16 @@ describe("filterSortSavedDesigns", () => {
     expect(r.map((d) => d.title)).toEqual(["지형"]);
   });
 
+  it("표준 제목이 붙은 자료도 단원명으로 필터한다", () => {
+    const titledList = [{
+      ...list[0],
+      title: "2026-05-01 4학년 과학 광합성",
+      unitTitle: "광합성",
+    }];
+
+    expect(filterSortSavedDesigns(titledList, { unit: "광합성" }, "desc")).toHaveLength(1);
+  });
+
   it("최신순(desc): 수업날짜 내림차순, 날짜 없으면 생성일 사용", () => {
     const r = filterSortSavedDesigns(list, {}, "desc");
     // 2026-05-10 > 2026-05-01 > (지형: createdAt 2026-04-03)

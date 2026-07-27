@@ -122,6 +122,8 @@ describe("GET /api/unit-design — 탐구 질문 목록", () => {
         title: "광합성 단원",
         subject: "과학",
         grade_range: "3-4",
+        grade: "4",
+        session_date: "2026-05-01",
         area: "생명과학",
         selected_achievements: [{
           code: "[4과05-01]",
@@ -142,6 +144,8 @@ describe("GET /api/unit-design — 탐구 질문 목록", () => {
     const body = await res.json();
     expect(body).toHaveLength(1);
     expect(body[0].id).toBe("ud-1");
+    expect(body[0].title).toBe("2026-05-01 4학년 과학 광합성 단원");
+    expect(body[0].unitTitle).toBe("광합성 단원");
     expect(body[0].gradeRange).toBe("3-4");
     expect(body[0].achievements).toEqual([{
       code: "[4과05-01]",
@@ -264,11 +268,14 @@ describe("POST /api/unit-design — 탐구 질문 저장", () => {
     expect(body.designId).toBe("ud-new");
     expect(body.design).toMatchObject({
       id: body.designId,
+      title: "2026-07-20 5학년 과학 광합성과 에너지",
+      unitTitle: "광합성과 에너지",
       grade: "5",
       sessionDate: "2026-07-20",
       achievements: VALID_DESIGN.achievements,
     });
     const savedArguments = mockQueryRawUnsafe.mock.calls[0].slice(1);
+    expect(savedArguments[2]).toBe("2026-07-20 5학년 과학 광합성과 에너지");
     expect(JSON.parse(savedArguments[8] as string)).toEqual(VALID_DESIGN.achievements);
     expect(JSON.parse(savedArguments[12] as string)).toEqual(LEARNING_GUIDES);
     expect(savedArguments.slice(13)).toEqual([
@@ -319,6 +326,28 @@ describe("POST /api/unit-design — 탐구 질문 저장", () => {
 });
 
 describe("PATCH /api/unit-design/[id] — 탐구 질문 수정", () => {
+  it("날짜와 단원명을 수정하면 학년과 교과를 포함한 제목으로 다시 저장한다", async () => {
+    mockAuth.mockResolvedValue(TEACHER_SESSION);
+    mockQueryRaw.mockResolvedValue([{
+      teacher_id: "teacher-1",
+      title: "2026-07-20 5학년 과학 광합성과 에너지",
+      subject: "과학",
+      grade: "5",
+      session_date: "2026-07-20",
+    }]);
+    mockQueryRawUnsafe.mockResolvedValue([{ updated_at: new Date("2026-07-27T00:00:00.000Z") }]);
+
+    const [req, ctx] = makePatchRequest("ud-1", {
+      title: "식물과 에너지",
+      sessionDate: "2026-08-04",
+    });
+    const res = await PATCH(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect(mockQueryRawUnsafe.mock.calls[0][0]).toContain("title = $1");
+    expect(mockQueryRawUnsafe.mock.calls[0][1]).toBe("2026-08-04 5학년 과학 식물과 에너지");
+  });
+
   it("성취기준 번호와 내용을 함께 수정한다", async () => {
     mockAuth.mockResolvedValue(TEACHER_SESSION);
     mockQueryRaw.mockResolvedValue([{ teacher_id: "teacher-1" }]);

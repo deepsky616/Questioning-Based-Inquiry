@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { studentCanAccessSession } from "@/lib/session-access";
 import { normalizeStudentLearningGuides } from "@/lib/student-learning-guide";
+import { buildInquiryDesignTitle } from "@/lib/inquiry-design-title";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -72,7 +73,12 @@ export async function GET(_req: Request, { params }: Params) {
   return NextResponse.json({
     context: {
       id: qs.unitDesignId,
-      title: d.title,
+      title: buildInquiryDesignTitle({
+        sessionDate: qs.date,
+        grade: d.grade,
+        subject: d.subject,
+        unitTitle: d.title,
+      }),
       sessionDate: qs.date,
       subject: d.subject,
       gradeRange: d.grade_range,

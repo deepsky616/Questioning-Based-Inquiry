@@ -100,7 +100,7 @@ beforeEach(() => {
   mUpsert.mockResolvedValue({});
   mResolve.mockResolvedValue({ apiKey: "k", model: "m" });
   mTranslate.mockResolvedValue([
-    "Perimeter and Area of Plane Figures",
+    "2026-07-01 Grade 5 Math: Perimeter and Area of Plane Figures",
     "Math",
     "Shapes and Measurement",
     "Shapes can be described by length and area.",
@@ -130,7 +130,7 @@ describe("POST design-context translate", () => {
     const data = await res.json();
     expect(res.status).toBe(200);
     expect(data.context.subject).toBe("Math");
-    expect(data.context.title).toBe("Perimeter and Area of Plane Figures");
+    expect(data.context.title).toBe("2026-07-01 Grade 5 Math: Perimeter and Area of Plane Figures");
     expect(data.context.coreSentences[0]).toBe("Perimeter is the length around a figure.");
     expect(data.context.learningGuides.coreIdea.explanation).toBe("Explore shapes in two ways: length and area.");
     expect(data.context.achievements[0].content).toBe("Find and compare the perimeter and area of shapes.");
@@ -146,7 +146,7 @@ describe("POST design-context translate", () => {
     });
     expect(mTranslate).toHaveBeenCalledWith(
       [
-        "평면도형의 둘레와 넓이",
+        "2026-07-01 5학년 수학 평면도형의 둘레와 넓이",
         "수학",
         "도형과 측정",
         "도형은 길이와 넓이로 설명할 수 있다",

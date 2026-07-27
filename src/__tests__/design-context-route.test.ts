@@ -69,7 +69,7 @@ describe("GET design-context 권한", () => {
     const res = await GET(req, ctx);
     const body = await res.json();
     expect(res.status).toBe(200);
-    expect(body.context?.title).toBe("광합성");
+    expect(body.context?.title).toBe("2026-05-01 4학년 과학 광합성");
     expect(body.context?.sessionDate).toBe("2026-05-01");
     expect(body.context?.learningGuides.coreIdea.explanation).toBe("핵심 아이디어 쉬운 설명");
     expect(body.context?.achievements).toEqual(DESIGN_ROW.selected_achievements);
