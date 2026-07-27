@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Clock3,
@@ -58,7 +57,6 @@ function failureState(reason: unknown): LaunchState {
 }
 
 export function DemoLaunchClient() {
-  const router = useRouter();
   const [state, setState] = useState<LaunchState>("loading");
   const ticketRef = useRef("");
   const startedRef = useRef(false);
@@ -93,11 +91,11 @@ export function DemoLaunchClient() {
         setState("invalid");
         return;
       }
-      router.replace("/student-dashboard");
+      window.location.replace("/student-dashboard");
     } catch {
       setState("offline");
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     if (startedRef.current) return;
