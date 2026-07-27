@@ -2304,6 +2304,7 @@
   },
   "designRef": {
     "coreIdea": "핵심 아이디어",
+    "achievements": "성취기준",
     "coreSentences": "핵심 문장",
     "essentialQuestions": "핵심 질문",
     "inquiryQuestions": "탐구 질문",
@@ -2311,6 +2312,7 @@
     "labelArea": "영역",
     "labelUnit": "단원",
     "coreIdeaDesc": "이 단원에서 꼭 이해해야 할 가장 큰 생각이에요.",
+    "achievementsDesc": "이 단원에서 배우고 할 수 있어야 하는 내용을 알려줘요.",
     "coreSentencesDesc": "핵심 아이디어를 문장으로 풀어 정리한 거예요.",
     "essentialQuestionsDesc": "단원 전체를 아우르는 큰 질문이에요.",
     "inquiryQuestionsDesc": "직접 탐구해볼 수 있는 구체적인 질문이에요. 내 질문을 만들 때 참고하세요.",

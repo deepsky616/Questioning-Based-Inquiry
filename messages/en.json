@@ -2304,6 +2304,7 @@
   },
   "designRef": {
     "coreIdea": "Core idea",
+    "achievements": "Achievement standards",
     "coreSentences": "Core sentences",
     "essentialQuestions": "Essential questions",
     "inquiryQuestions": "Inquiry questions",
@@ -2311,6 +2312,7 @@
     "labelArea": "Area",
     "labelUnit": "Unit",
     "coreIdeaDesc": "The biggest idea you should understand in this unit.",
+    "achievementsDesc": "What you should understand and be able to do in this unit.",
     "coreSentencesDesc": "The core idea written out as sentences.",
     "essentialQuestionsDesc": "A big question that runs through the whole unit.",
     "inquiryQuestionsDesc": "Concrete questions you can investigate. Use them to make your own question.",
