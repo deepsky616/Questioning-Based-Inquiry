@@ -96,6 +96,7 @@ export function StudentLearningGuideEditor({
   const tc = useTranslations("common");
   const fieldId = useId();
   const current = guides ?? EMPTY_STUDENT_LEARNING_GUIDES;
+  const achievementGuides = current.achievements ?? [];
   const coreIdea = current.coreIdea ?? { explanation: "", lifeConnection: "", keywords: [] };
   const formattedKeywords = formatInquiryKeywordLines(coreIdea.keywords);
   const [keywordDraft, setKeywordDraft] = useState(formattedKeywords);
@@ -214,7 +215,7 @@ export function StudentLearningGuideEditor({
           </div>
           <div className="mt-3 space-y-2">
             {achievements.map((achievement, index) => {
-              const guide = current.achievements.find((item) => item.index === index)
+              const guide = achievementGuides.find((item) => item.index === index)
                 ?? { index, explanation: "" };
               return (
                 <article
@@ -286,7 +287,7 @@ export function StudentLearningGuideEditor({
                         className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-6 text-foreground"
                         onChange={(event) => onChange({
                           ...current,
-                          achievements: replaceIndexed(current.achievements, index, {
+                          achievements: replaceIndexed(achievementGuides, index, {
                             index,
                             explanation: event.target.value,
                           }),
