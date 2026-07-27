@@ -40,6 +40,7 @@ export interface ClassificationResult {
   cognitiveScore: number;
   reasoning: string;
   feedback?: string;
+  improvedExample?: string;
   inappropriate?: boolean;
   inappropriateReason?: string;
 }

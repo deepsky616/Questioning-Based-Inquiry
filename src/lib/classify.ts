@@ -73,6 +73,9 @@ export function parseClassificationResponse(text: string): ClassificationResult 
       cognitiveScore,
       reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : "",
       ...(typeof parsed.feedback === "string" ? { feedback: parsed.feedback } : {}),
+      ...(typeof parsed.improvedExample === "string"
+        ? { improvedExample: parsed.improvedExample }
+        : {}),
       inappropriate: parsed.inappropriate === true,
       inappropriateReason: typeof parsed.inappropriateReason === "string" ? parsed.inappropriateReason : "",
     };

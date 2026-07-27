@@ -41,6 +41,29 @@ export function StudentAskResultCard({
         <CardTitle>{t("resultHeader")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {result.analysisSource === "ai" && (
+          <div
+            role="status"
+            className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sky-900 dark:border-sky-400/30 dark:bg-sky-950/40 dark:text-sky-100"
+          >
+            <p className="text-sm font-semibold">{t("aiAnalysisComplete")}</p>
+            {result.analysisModel && (
+              <p className="mt-1 text-xs text-sky-700 dark:text-sky-300">
+                {t("analysisModel", { model: result.analysisModel })}
+              </p>
+            )}
+          </div>
+        )}
+
+        {result.analysisSource === "fallback" && (
+          <div
+            role="status"
+            className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-400/40 dark:bg-amber-950/40 dark:text-amber-100"
+          >
+            <p className="text-sm font-semibold">{t("fallbackAnalysisNotice")}</p>
+          </div>
+        )}
+
         {!analysisCurrent && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-200">
             <p className="text-sm font-semibold">{t("reanalyzeBeforeSave")}</p>

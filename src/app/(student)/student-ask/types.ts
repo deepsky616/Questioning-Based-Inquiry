@@ -49,6 +49,9 @@ export interface ClassificationResult {
   improvedExample?: string;
   inappropriate?: boolean;
   inappropriateReason?: string;
+  analysisSource?: "ai" | "fallback";
+  analysisModel?: string;
+  fallbackReason?: "missing-key" | "quota" | "busy" | "invalid-response";
 }
 
 export type AskTaskScope = "today-unasked" | "future-unasked" | "past-unasked" | "shared" | null;

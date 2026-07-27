@@ -617,6 +617,52 @@ describe("학생 질문 분석 결과", () => {
     expect(onUseImprovedExample).toHaveBeenCalledWith(result.improvedExample);
   });
 
+  it("인공지능 분석이면 완료 상태와 실제 사용 모델을 보여준다", () => {
+    renderWithIntl(
+      <StudentAskResultCard
+        result={{
+          ...result,
+          analysisSource: "ai",
+          analysisModel: "gemini-2.5-flash",
+        }}
+        analyzedContent="왜 비가 올까요?"
+        analysisCurrent
+        saveComplete={false}
+        isSaving={false}
+        onRewrite={() => {}}
+        onUseImprovedExample={() => {}}
+        onSave={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("인공지능 질문 분석 완료")).toBeInTheDocument();
+    expect(screen.getByText("분석 모델: gemini-2.5-flash")).toBeInTheDocument();
+  });
+
+  it("기본 분석이면 인공지능 분석이 아님을 분명하게 안내한다", () => {
+    renderWithIntl(
+      <StudentAskResultCard
+        result={{
+          ...result,
+          analysisSource: "fallback",
+          fallbackReason: "busy",
+        }}
+        analyzedContent="왜 비가 올까요?"
+        analysisCurrent
+        saveComplete={false}
+        isSaving={false}
+        onRewrite={() => {}}
+        onUseImprovedExample={() => {}}
+        onSave={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
+    );
+    expect(screen.queryByText("인공지능 질문 분석 완료")).not.toBeInTheDocument();
+  });
+
   it("이전 분석이 있으면 입력 카드의 기본 행동을 다시 분석으로 표시한다", () => {
     renderWithIntl(
       <StudentAskInputCard

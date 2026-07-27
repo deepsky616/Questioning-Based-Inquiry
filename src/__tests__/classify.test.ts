@@ -138,6 +138,13 @@ describe("parseClassificationResponse", () => {
     expect(result!.feedback).toBe("왜로 시작하면 더 좋은 질문이 됩니다");
   });
 
+  it("인공지능이 만든 개선 질문 예시를 잃지 않고 반환한다", () => {
+    const text = `{"closure":"closed","cognitive":"factual","closureScore":0.8,"cognitiveScore":0.7,"reasoning":"테스트","feedback":"좋은 질문입니다","improvedExample":"광합성이 없다면 생태계는 어떻게 달라질까요?","inappropriate":false,"inappropriateReason":""}`;
+    const result = parseClassificationResponse(text);
+    expect(result).not.toBeNull();
+    expect(result!.improvedExample).toBe("광합성이 없다면 생태계는 어떻게 달라질까요?");
+  });
+
   it("feedback 필드가 없어도 정상 파싱된다", () => {
     const text = `{"closure":"closed","cognitive":"factual","closureScore":0.8,"cognitiveScore":0.7,"reasoning":"테스트"}`;
     const result = parseClassificationResponse(text);
