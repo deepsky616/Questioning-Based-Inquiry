@@ -37,6 +37,8 @@ interface SharedQuestion {
 interface QuestionSession {
   id: string;
   date: string;
+  grade?: string | null;
+  targetGrade?: string | null;
   subject: string;
   topic: string;
   teacher?: { name: string };

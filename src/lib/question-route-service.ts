@@ -163,7 +163,15 @@ const teacherQuestionPageSelect = {
   closureScore: true,
   cognitiveScore: true,
   sessionId: true,
-  session: { select: { id: true, date: true, subject: true, topic: true } },
+  session: {
+    select: {
+      id: true,
+      date: true,
+      subject: true,
+      topic: true,
+      targetGrade: true,
+    },
+  },
   author: {
     select: { id: true, name: true, className: true, grade: true, studentNumber: true },
   },
@@ -532,14 +540,23 @@ export async function listTeacherQuestionPage(
   const summaryTotal = closureGroups.reduce((sum, group) => sum + group._count._all, 0);
 
   return {
-    items: pageRows.map(({ _count, comments, likes, ...question }) => ({
-      ...question,
-      likeCount: _count.likes,
-      commentCount: _count.comments,
-      hasFlaggedComment: comments.length > 0,
-      myLike: likes.some((like) => like.userId === requireUserId(sessionUser)),
-      likedBy: likes.map((like) => ({ id: like.user.id, name: like.user.name })),
-    })),
+    items: pageRows.map(({ _count, comments, likes, ...question }) => {
+      const questionSession = question.session
+        ? {
+            ...question.session,
+            grade: question.session.targetGrade ?? question.author.grade,
+          }
+        : null;
+      return {
+        ...question,
+        session: questionSession,
+        likeCount: _count.likes,
+        commentCount: _count.comments,
+        hasFlaggedComment: comments.length > 0,
+        myLike: likes.some((like) => like.userId === requireUserId(sessionUser)),
+        likedBy: likes.map((like) => ({ id: like.user.id, name: like.user.name })),
+      };
+    }),
     pageInfo: {
       page,
       pageSize,
@@ -596,7 +613,15 @@ export async function listQuestionsForUser(req: Request, sessionUser: QuestionRo
         select: { id: true, name: true, className: true, grade: true, studentNumber: true },
       },
       session: {
-        select: { id: true, date: true, subject: true, topic: true, likesVisibleToPeers: true, commentsVisibleToPeers: true },
+        select: {
+          id: true,
+          date: true,
+          subject: true,
+          topic: true,
+          targetGrade: true,
+          likesVisibleToPeers: true,
+          commentsVisibleToPeers: true,
+        },
       },
       comments: {
         include: {
@@ -628,6 +653,12 @@ export async function listQuestionsForUser(req: Request, sessionUser: QuestionRo
     );
     return {
       ...q,
+      session: q.session
+        ? {
+            ...q.session,
+            grade: q.session.targetGrade ?? q.author.grade,
+          }
+        : null,
       comments: visibleComments.map(({ author, ...c }) => ({ ...c, author: { id: author.id, name: author.name } })),
       likeCount: q.likes.length,
       commentCount: visibleComments.length,

@@ -244,7 +244,12 @@ export function StudentAskSessionSelector({
                       )}
                     </div>
                     <div className="mt-2 space-y-1">
-                      <p className="line-clamp-1 text-sm font-semibold">{sessionText.subject(session)}</p>
+                      <p className="line-clamp-1 text-sm font-semibold">
+                        {sessionText.gradeLabel(session)
+                          ? `${sessionText.gradeLabel(session)} · `
+                          : ""}
+                        {sessionText.subject(session)}
+                      </p>
                       <p className="line-clamp-3 min-h-[3.75rem] text-sm leading-5 text-muted-foreground">
                         {sessionText.topic(session).trim() || t("emptyTopic")}
                       </p>

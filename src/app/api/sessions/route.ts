@@ -28,6 +28,51 @@ const createSchema = z.object({
   isActive: z.boolean().optional().default(true),
 });
 
+type SessionGradeSource = {
+  unitDesignId?: string | null;
+  targetGrade?: string | null;
+};
+
+async function loadUnitDesignGrades(
+  sessions: SessionGradeSource[],
+  teacherId?: string,
+): Promise<Map<string, string>> {
+  const unitDesignIds = Array.from(
+    new Set(
+      sessions
+        .map((item) => item.unitDesignId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  if (unitDesignIds.length === 0) return new Map();
+
+  const designs = await prisma.unitDesign.findMany({
+    where: {
+      id: { in: unitDesignIds },
+      ...(teacherId ? { teacherId } : {}),
+    },
+    select: { id: true, grade: true },
+  });
+  return new Map(
+    designs
+      .filter((design): design is typeof design & { grade: string } => Boolean(design.grade))
+      .map((design) => [design.id, design.grade]),
+  );
+}
+
+function preferredSessionGrade(
+  session: SessionGradeSource,
+  unitDesignGrades: Map<string, string>,
+  fallbackGrade?: string | null,
+): string | null {
+  return (
+    (session.unitDesignId ? unitDesignGrades.get(session.unitDesignId) : null)
+    ?? session.targetGrade
+    ?? fallbackGrade
+    ?? null
+  );
+}
+
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -61,7 +106,12 @@ export async function GET(req: Request) {
           sharedQuestions: true,
         },
       });
-      return NextResponse.json(sessions);
+      return NextResponse.json(
+        sessions.map((item) => ({
+          ...item,
+          grade: item.targetGrade ?? null,
+        })),
+      );
     }
 
     const [sessions, teacher] = await Promise.all([
@@ -78,11 +128,17 @@ export async function GET(req: Request) {
         },
       }),
     ]);
+    const unitDesignGrades = await loadUnitDesignGrades(sessions, user.id);
+    const teacherClassGrades = Array.from(
+      new Set((teacher?.teacherClasses ?? []).map((item) => item.grade).filter(Boolean)),
+    );
+    const teacherGradeFallback = teacherClassGrades.length === 1 ? teacherClassGrades[0] : null;
 
     if (sessions.length === 0 || !teacher?.school) {
       return NextResponse.json(
         sessions.map((item) => ({
           ...item,
+          grade: preferredSessionGrade(item, unitDesignGrades, teacherGradeFallback),
           participation: { total: 0, submitted: 0, missing: 0, percent: 0 },
         })),
       );
@@ -124,8 +180,15 @@ export async function GET(req: Request) {
       const total = targetStudents.length;
       const missing = Math.max(total - submitted, 0);
       const percent = total > 0 ? Math.round((submitted / total) * 100) : 0;
+      const targetGrades = Array.from(
+        new Set(targetStudents.map((student) => student.grade).filter(Boolean)),
+      );
+      const targetGradeFallback = targetGrades.length === 1
+        ? targetGrades[0]
+        : teacherGradeFallback;
       return {
         ...item,
+        grade: preferredSessionGrade(item, unitDesignGrades, targetGradeFallback),
         participation: { total, submitted, missing, percent },
       };
     });
@@ -177,7 +240,13 @@ export async function GET(req: Request) {
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     include: { teacher: { select: { name: true } } },
   });
-  return NextResponse.json(sessions);
+  const unitDesignGrades = await loadUnitDesignGrades(sessions);
+  return NextResponse.json(
+    sessions.map((item) => ({
+      ...item,
+      grade: preferredSessionGrade(item, unitDesignGrades, student.grade),
+    })),
+  );
 }
 
 export async function POST(req: Request) {

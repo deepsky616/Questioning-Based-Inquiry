@@ -54,8 +54,6 @@ export function StudentAskInputCard({
 }: StudentAskInputCardProps) {
   const t = useTranslations("ask");
   const sessionText = useSessionMetaTranslation(selectedSession ? [selectedSession] : []);
-  const currentSubject = selectedSession ? sessionText.subject(selectedSession) : "";
-  const currentTopic = selectedSession ? sessionText.topic(selectedSession).trim() : "";
 
   return (
     <Card>
@@ -111,13 +109,7 @@ export function StudentAskInputCard({
                   {t("currentSession")}
                 </span>
                 <span className="text-sm font-bold text-indigo-950 dark:text-indigo-50">
-                  {currentSubject}
-                  {currentTopic && (
-                    <span className="font-semibold text-indigo-700 dark:text-indigo-200"> · {currentTopic}</span>
-                  )}
-                </span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-700 shadow-sm dark:bg-indigo-900 dark:text-indigo-100">
-                  📅 {selectedSession.date}
+                  {sessionText.label(selectedSession)}
                 </span>
                 {selectedSession.unitDesignId && (
                   <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-700 shadow-sm dark:bg-indigo-900 dark:text-indigo-100">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocale } from "next-intl";
-import { buildSessionLabel } from "@/lib/sessions";
+import { buildSessionLabel, formatSessionGradeLabel } from "@/lib/sessions";
 import type { TranslatableItem } from "@/components/shared/use-content-translation";
 
 export interface SessionMetaText {
@@ -10,6 +10,8 @@ export interface SessionMetaText {
   date: string;
   subject: string;
   topic: string;
+  grade?: string | null;
+  targetGrade?: string | null;
 }
 
 const keyOf = (type: TranslatableItem["type"], id: string) => `${type}:${id}`;
@@ -75,17 +77,40 @@ export function useSessionMetaTranslation<T extends SessionMetaText>(sessions: T
     (session: SessionMetaText) => (canTranslate ? map[keyOf("SESSION_TOPIC", session.id)] ?? session.topic : session.topic),
     [canTranslate, map],
   );
+  const grade = useCallback(
+    (session: SessionMetaText) => {
+      const match = unique.find((candidate) => candidate.id === session.id);
+      return session.grade?.trim()
+        || session.targetGrade?.trim()
+        || match?.grade?.trim()
+        || match?.targetGrade?.trim()
+        || null;
+    },
+    [unique],
+  );
+  const gradeLabel = useCallback(
+    (session: SessionMetaText) => formatSessionGradeLabel(grade(session), locale),
+    [grade, locale],
+  );
   const label = useCallback(
-    (session: SessionMetaText) => buildSessionLabel(session.date, subject(session), topic(session)),
-    [subject, topic],
+    (session: SessionMetaText) =>
+      buildSessionLabel(
+        session.date,
+        subject(session),
+        topic(session),
+        grade(session),
+        locale,
+      ),
+    [grade, locale, subject, topic],
   );
   const compactLabel = useCallback(
     (session: SessionMetaText) => {
       const translatedSubject = subject(session);
       const translatedTopic = topic(session);
-      return `${session.date} · ${translatedSubject}${translatedTopic.trim() ? ` - ${translatedTopic}` : ""}`;
+      const translatedGrade = gradeLabel(session);
+      return `${session.date} · ${translatedGrade ? `${translatedGrade} · ` : ""}${translatedSubject}${translatedTopic.trim() ? ` - ${translatedTopic}` : ""}`;
     },
-    [subject, topic],
+    [gradeLabel, subject, topic],
   );
   const subjectOption = useCallback(
     (value: string) => {
@@ -102,5 +127,15 @@ export function useSessionMetaTranslation<T extends SessionMetaText>(sessions: T
     [topic, unique],
   );
 
-  return { canTranslate, subject, topic, label, compactLabel, subjectOption, topicOption };
+  return {
+    canTranslate,
+    subject,
+    topic,
+    grade,
+    gradeLabel,
+    label,
+    compactLabel,
+    subjectOption,
+    topicOption,
+  };
 }

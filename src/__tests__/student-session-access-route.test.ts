@@ -6,6 +6,7 @@ vi.mock("@/lib/db", () => ({
     user: { findUnique: vi.fn(), findMany: vi.fn() },
     teacherClass: { findMany: vi.fn() },
     questionSession: { findMany: vi.fn() },
+    unitDesign: { findMany: vi.fn() },
   },
 }));
 
@@ -18,6 +19,7 @@ const mUserFind = prisma.user.findUnique as unknown as ReturnType<typeof vi.fn>;
 const mTeacherFindMany = prisma.user.findMany as unknown as ReturnType<typeof vi.fn>;
 const mTeacherClassFindMany = prisma.teacherClass.findMany as unknown as ReturnType<typeof vi.fn>;
 const mSessionFindMany = prisma.questionSession.findMany as unknown as ReturnType<typeof vi.fn>;
+const mUnitDesignFindMany = prisma.unitDesign.findMany as unknown as ReturnType<typeof vi.fn>;
 
 function containsSchoolScope(value: unknown, school: string): boolean {
   if (Array.isArray(value)) return value.some((item) => containsSchoolScope(item, school));
@@ -62,6 +64,7 @@ beforeEach(() => {
     { teacherId: "teacher-other-school" },
   ]);
   mSessionFindMany.mockResolvedValue([]);
+  mUnitDesignFindMany.mockResolvedValue([]);
 });
 
 describe("학생 질문수업 목록 권한", () => {
@@ -124,5 +127,84 @@ describe("학생 질문수업 목록 권한", () => {
     const accessQueries = [teacherQuery, teacherClassQuery, sessionQuery];
     expect(containsSchoolScope(accessQueries, "한빛초")).toBe(true);
     expect(containsTeacherWithoutClassesScope(accessQueries)).toBe(true);
+  });
+
+  it("학생 질문 화면에서 탐구질문 수업의 개별 학년을 함께 반환한다", async () => {
+    mTeacherFindMany.mockResolvedValue([{ id: "teacher-1" }]);
+    mSessionFindMany.mockResolvedValue([
+      {
+        id: "session-1",
+        date: "2026-07-28",
+        subject: "수학",
+        topic: "6. 평면도형의 둘레와 넓이",
+        unitDesignId: "design-1",
+        targetGrade: null,
+        teacher: { name: "김교사" },
+      },
+    ]);
+    mUnitDesignFindMany.mockResolvedValue([{ id: "design-1", grade: "5" }]);
+
+    const response = await GET(new Request("http://localhost/api/sessions"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      expect.objectContaining({ id: "session-1", grade: "5" }),
+    ]);
+  });
+
+  it("일반 질문수업은 현재 학생의 학년을 보완해 반환한다", async () => {
+    mTeacherFindMany.mockResolvedValue([{ id: "teacher-1" }]);
+    mSessionFindMany.mockResolvedValue([
+      {
+        id: "session-2",
+        date: "2026-07-28",
+        subject: "국어",
+        topic: "이야기 읽기",
+        unitDesignId: null,
+        targetGrade: null,
+        teacher: { name: "김교사" },
+      },
+    ]);
+
+    const response = await GET(new Request("http://localhost/api/sessions"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      expect.objectContaining({ id: "session-2", grade: "5" }),
+    ]);
+    expect(mUnitDesignFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("교사 질문수업 목록 학년", () => {
+  it("탐구질문 수업은 연결된 단원 설계의 개별 학년을 반환한다", async () => {
+    mAuth.mockResolvedValue({ user: { id: "teacher-1", role: "TEACHER" } });
+    mUserFind.mockResolvedValue({
+      school: null,
+      teacherClasses: [{ grade: "5", className: "1" }],
+    });
+    mSessionFindMany.mockResolvedValue([
+      {
+        id: "session-1",
+        date: "2026-07-28",
+        subject: "수학",
+        topic: "6. 평면도형의 둘레와 넓이",
+        unitDesignId: "design-1",
+        targetGrade: null,
+        teacher: { name: "김교사" },
+      },
+    ]);
+    mUnitDesignFindMany.mockResolvedValue([{ id: "design-1", grade: "5" }]);
+
+    const response = await GET(new Request("http://localhost/api/sessions"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([
+      expect.objectContaining({ id: "session-1", grade: "5" }),
+    ]);
+    expect(mUnitDesignFindMany).toHaveBeenCalledWith({
+      where: { id: { in: ["design-1"] }, teacherId: "teacher-1" },
+      select: { id: true, grade: true },
+    });
   });
 });

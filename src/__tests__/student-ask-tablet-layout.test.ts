@@ -36,7 +36,7 @@ describe("student ask staged layout", () => {
     // 교과·주제 + 날짜·탐구질문 수업·공개 여부 칩, 밝은/어두운 테마 색 모두 지정.
     expect(inputCardSource).toContain("student-ask-current-session");
     expect(inputCardSource).toContain('t("currentSession")');
-    expect(inputCardSource).toContain("selectedSession.date");
+    expect(inputCardSource).toContain("sessionText.label(selectedSession)");
     expect(inputCardSource).toContain('t("inquiryClassTag")');
     expect(inputCardSource).toContain("defaultQuestionPublic");
     expect(inputCardSource).toContain("bg-indigo-50");

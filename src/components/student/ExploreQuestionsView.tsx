@@ -29,6 +29,8 @@ import { visibleDataRefetchInterval } from "@/lib/query-refresh";
 interface QuestionSession {
   id: string;
   date: string;
+  grade?: string | null;
+  targetGrade?: string | null;
   subject: string;
   topic: string;
   unitDesignId?: string | null;
@@ -50,7 +52,14 @@ interface Question {
   myLike: boolean;
   likesVisibleToPeers?: boolean;
   commentsVisibleToPeers?: boolean;
-  session?: { id: string; date: string; subject: string; topic: string } | null;
+  session?: {
+    id: string;
+    date: string;
+    grade?: string | null;
+    targetGrade?: string | null;
+    subject: string;
+    topic: string;
+  } | null;
 }
 
 

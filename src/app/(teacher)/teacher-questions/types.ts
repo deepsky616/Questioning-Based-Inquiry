@@ -2,6 +2,7 @@
 export interface QuestionSession {
   id: string;
   date: string;
+  grade?: string | null;
   subject: string;
   topic: string;
   createdAt?: string;
@@ -42,7 +43,14 @@ export interface Question {
   closureScore: number;
   cognitiveScore: number;
   sessionId: string | null;
-  session: { id: string; date: string; subject: string; topic: string } | null;
+  session: {
+    id: string;
+    date: string;
+    grade?: string | null;
+    targetGrade?: string | null;
+    subject: string;
+    topic: string;
+  } | null;
   author: { id: string; name: string; className?: string; grade?: string; studentNumber?: string };
   isPublic: boolean;
   flagged?: boolean;

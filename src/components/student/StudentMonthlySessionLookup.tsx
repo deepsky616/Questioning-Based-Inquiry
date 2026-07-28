@@ -47,6 +47,8 @@ export function StudentMonthlyDateSelect({
 
 type LookupSession = SortableSession & {
   id: string;
+  grade?: string | null;
+  targetGrade?: string | null;
   subject: string;
   topic: string;
   unitDesignId?: string | null;

@@ -40,9 +40,73 @@ export function isInquiryDesignSession(s: {
   return Boolean(s.unitDesignId) && (s.sharedQuestions?.length ?? 0) === 0;
 }
 
-export function buildSessionLabel(date: string, subject: string, topic: string): string {
-  const parts = [formatSessionDateLabel(date), subject];
-  if (topic.trim()) parts.push(topic.trim());
+export function normalizeSessionGrade(grade: string | null | undefined): string | null {
+  const normalized = grade?.trim().replace(/\s*학년$/, "").trim();
+  return normalized || null;
+}
+
+export function formatSessionGradeLabel(
+  grade: string | null | undefined,
+  locale = "ko",
+): string {
+  const normalized = normalizeSessionGrade(grade);
+  if (!normalized) return "";
+  return locale === "ko" ? `${normalized}학년` : `Grade ${normalized}`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripLeadingSessionDelimiter(value: string): string {
+  return value.replace(/^(?:\s*·\s*|\s+)/, "").trimStart();
+}
+
+function normalizeSessionTopicForLabel(
+  date: string,
+  grade: string | null | undefined,
+  subject: string,
+  topic: string,
+): string {
+  let normalized = topic.trim();
+  if (!normalized) return "";
+
+  const datePattern = new RegExp(`^${escapeRegExp(formatSessionDateLabel(date))}(?=$|\\s|·)`);
+  if (!datePattern.test(normalized)) return normalized;
+
+  normalized = stripLeadingSessionDelimiter(normalized.replace(datePattern, ""));
+  const gradeLabels = [
+    formatSessionGradeLabel(grade, "ko"),
+    formatSessionGradeLabel(grade, "en"),
+  ].filter(Boolean);
+  for (const gradeLabel of gradeLabels) {
+    const gradePattern = new RegExp(`^${escapeRegExp(gradeLabel)}(?=$|\\s|·)`, "i");
+    if (gradePattern.test(normalized)) {
+      normalized = stripLeadingSessionDelimiter(normalized.replace(gradePattern, ""));
+      break;
+    }
+  }
+
+  const subjectPattern = new RegExp(`^${escapeRegExp(subject.trim())}(?=$|\\s|·)`, "i");
+  if (subject.trim() && subjectPattern.test(normalized)) {
+    normalized = stripLeadingSessionDelimiter(normalized.replace(subjectPattern, ""));
+  }
+  return normalized.trim();
+}
+
+export function buildSessionLabel(
+  date: string,
+  subject: string,
+  topic: string,
+  grade?: string | null,
+  locale = "ko",
+): string {
+  const parts = [formatSessionDateLabel(date)];
+  const gradeLabel = formatSessionGradeLabel(grade, locale);
+  if (gradeLabel) parts.push(gradeLabel);
+  parts.push(subject);
+  const normalizedTopic = normalizeSessionTopicForLabel(date, grade, subject, topic);
+  if (normalizedTopic) parts.push(normalizedTopic);
   return parts.join(" · ");
 }
 
