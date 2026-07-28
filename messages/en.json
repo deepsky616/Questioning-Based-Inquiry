@@ -1521,6 +1521,7 @@
     "moveUp": "Move up",
     "moveDown": "Move down",
     "mergeSummary": "Grouped {from} questions into {to} representative questions",
+    "sortSummary": "Sorted {count} representative questions by ‘{flow}’",
     "mergedFromLabel": "{count} merged questions"
   },
   "aiProgress": {

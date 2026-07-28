@@ -1521,6 +1521,7 @@
     "moveUp": "위로 이동",
     "moveDown": "아래로 이동",
     "mergeSummary": "질문 {from}개를 대표 질문 {to}개로 묶었어요",
+    "sortSummary": "대표 질문 {count}개를 ‘{flow}’ 기준으로 정렬했어요",
     "mergedFromLabel": "묶인 질문 {count}개"
   },
   "aiProgress": {

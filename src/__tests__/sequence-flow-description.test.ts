@@ -11,7 +11,12 @@ const publishPanelSource = readFileSync(
 describe("단원 설계 기준 설명 위치", () => {
   it("선택한 기준 설명을 기준 선택 영역 바로 아래에 보여준다", () => {
     expect(source).toContain("flow-help-inline");
-    expect(source).toMatch(/<Select value=\{flowId\} onValueChange=\{setFlowId\}>[\s\S]*flow-help-inline/);
+    const flowSelectStart = source.indexOf("<Select\n");
+    const flowHelpStart = source.indexOf("flow-help-inline");
+    expect(flowSelectStart).toBeGreaterThan(-1);
+    expect(flowHelpStart).toBeGreaterThan(flowSelectStart);
+    expect(source.slice(flowSelectStart, flowHelpStart)).toContain("value={flowId}");
+    expect(source.slice(flowSelectStart, flowHelpStart)).toContain("onValueChange=");
   });
 
   it("기준 설명을 아래쪽의 별도 도움 패널로 분리하지 않는다", () => {

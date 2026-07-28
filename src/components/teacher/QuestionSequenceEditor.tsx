@@ -43,6 +43,10 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
   const [teacherInput, setTeacherInput] = useState("");
   const [generatedBy, setGeneratedBy] = useState<"ai" | "rules" | "">("");
   const [error, setError] = useState<string | null>(null);
+  const [sortSummary, setSortSummary] = useState<{
+    count: number;
+    flowTitle: string;
+  } | null>(null);
   // ① 묶기를 한 번이라도 실행해야 ② 흐름 정렬을 켤 수 있다(순차 진행). 편집 모드는 이미 질문이 있으므로 켜둔다.
   const [merged, setMerged] = useState(Boolean(editMode));
   // 인라인 내용 편집 상태
@@ -58,8 +62,9 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
       return next;
     });
 
-  const update = useCallback((next: SequencedQuestion[]) => {
+  const update = useCallback((next: SequencedQuestion[], keepSortSummary = false) => {
     setSequenced(next);
+    if (!keepSortSummary) setSortSummary(null);
     onChange(next);
   }, [onChange]);
 
@@ -90,6 +95,7 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
     setIsRunning(true);
     setRunningKind(mode === "merge" ? "questionGrouping" : "questionSorting");
     setError(null);
+    setSortSummary(null);
     try {
       const res = await fetch("/api/unit-design/sequence", {
         method: "POST",
@@ -110,9 +116,17 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
           return kept ? { ...q, mergedFrom: kept } : q;
         });
       }
-      update(next);
+      update(next, mode === "sort");
       setGeneratedBy(data.generatedBy ?? "rules");
-      if (mode === "merge") setMerged(true);
+      if (mode === "merge") {
+        setMerged(true);
+      } else if (next.length > 0) {
+        const completedFlow = UNIT_FLOW_OPTIONS.find((flow) => flow.id === flowId);
+        setSortSummary({
+          count: next.length,
+          flowTitle: completedFlow?.title ?? activeFlow?.title ?? flowId,
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : t("sortFailed"));
     } finally {
@@ -192,7 +206,13 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
                 <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{activeFlow ? `${activeFlow.title} · ${activeFlow.axis}` : t("flowPlaceholder")}</p>
               </div>
             </div>
-            <Select value={flowId} onValueChange={setFlowId}>
+            <Select
+              value={flowId}
+              onValueChange={(value) => {
+                setFlowId(value);
+                setSortSummary(null);
+              }}
+            >
               <SelectTrigger className="h-9 w-full bg-background"><SelectValue placeholder={t("flowPlaceholder")} /></SelectTrigger>
               <SelectContent>
                 {UNIT_FLOW_OPTIONS.map((flow) => (
@@ -250,6 +270,21 @@ export function QuestionSequenceEditor({ sessionId, subject, topic, onChange, in
           </p>
         );
       })()}
+
+      {sortSummary && !isRunning && (
+        <p
+          role="status"
+          className="flex items-center gap-1.5 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-medium text-indigo-800 dark:border-indigo-500/30 dark:bg-indigo-950/30 dark:text-indigo-300"
+        >
+          <ListOrdered className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            {t("sortSummary", {
+              count: sortSummary.count,
+              flow: sortSummary.flowTitle,
+            })}
+          </span>
+        </p>
+      )}
 
       {/* ③ 교사 질문 추가 */}
       <div className="flex gap-2">
