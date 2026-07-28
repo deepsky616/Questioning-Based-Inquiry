@@ -59,20 +59,20 @@ const DEMO = {
 };
 
 export const DEMO_RANKING_CLASS_BLUEPRINTS = [
-  { school: "질문초등학교", grade: "4", className: "2", averagePoints: 31.5 },
-  { school: "질문초등학교", grade: "4", className: "3", averagePoints: 28.5 },
-  { school: "질문초등학교", grade: "4", className: "4", averagePoints: 24.5 },
-  { school: "질문초등학교", grade: "4", className: "5", averagePoints: 21.5 },
-  { school: "대답초등학교", grade: "4", className: "1", averagePoints: 33.5 },
-  { school: "대답초등학교", grade: "4", className: "2", averagePoints: 29.5 },
-  { school: "대답초등학교", grade: "4", className: "3", averagePoints: 27.5 },
-  { school: "대답초등학교", grade: "4", className: "4", averagePoints: 23.5 },
-  { school: "대답초등학교", grade: "4", className: "5", averagePoints: 19.5 },
-  { school: "탐구초등학교", grade: "4", className: "1", averagePoints: 32.5 },
-  { school: "탐구초등학교", grade: "4", className: "2", averagePoints: 30.5 },
-  { school: "탐구초등학교", grade: "4", className: "3", averagePoints: 25.5 },
-  { school: "탐구초등학교", grade: "4", className: "4", averagePoints: 22.5 },
-  { school: "탐구초등학교", grade: "4", className: "5", averagePoints: 20.5 },
+  { school: "질문초등학교", grade: "4", className: "2", studentCount: 23, averagePoints: 37 },
+  { school: "질문초등학교", grade: "4", className: "3", studentCount: 25, averagePoints: 32 },
+  { school: "질문초등학교", grade: "4", className: "4", studentCount: 27, averagePoints: 24 },
+  { school: "질문초등학교", grade: "4", className: "5", studentCount: 30, averagePoints: 19.5 },
+  { school: "대답초등학교", grade: "4", className: "1", studentCount: 24, averagePoints: 38.5 },
+  { school: "대답초등학교", grade: "4", className: "2", studentCount: 26, averagePoints: 35.5 },
+  { school: "대답초등학교", grade: "4", className: "3", studentCount: 28, averagePoints: 30.5 },
+  { school: "대답초등학교", grade: "4", className: "4", studentCount: 29, averagePoints: 23 },
+  { school: "대답초등학교", grade: "4", className: "5", studentCount: 30, averagePoints: 18.5 },
+  { school: "탐구초등학교", grade: "4", className: "1", studentCount: 25, averagePoints: 37 },
+  { school: "탐구초등학교", grade: "4", className: "2", studentCount: 26, averagePoints: 36.5 },
+  { school: "탐구초등학교", grade: "4", className: "3", studentCount: 27, averagePoints: 25 },
+  { school: "탐구초등학교", grade: "4", className: "4", studentCount: 28, averagePoints: 21.5 },
+  { school: "탐구초등학교", grade: "4", className: "5", studentCount: 29, averagePoints: 17 },
 ];
 
 const RANKING_STUDENT_SURNAMES = [
@@ -81,11 +81,8 @@ const RANKING_STUDENT_SURNAMES = [
   "안", "송", "전", "홍", "문", "양", "손", "배",
 ];
 const RANKING_STUDENT_GIVEN_NAMES = [
-  "가온", "나윤", "다온", "라희", "민재", "서윤", "예준",
-];
-const RANKING_POINT_OFFSETS = [
-  -10.5, -8.5, -6.5, -4.5, -2.5, -0.5,
-  0.5, 2.5, 4.5, 6.5, 8.5, 10.5,
+  "가온", "나윤", "다온", "라희", "민재", "서윤", "예준", "지우",
+  "하린", "도현", "수빈", "채민", "유진", "시온", "주아", "현준",
 ];
 
 export const DEMO_SESSION_BLUEPRINTS = [
@@ -160,10 +157,31 @@ function studentId(number) {
   return `usb-demo-student-${pad(number)}`;
 }
 
+function buildRankingPointTotals(studentCount, averagePoints) {
+  const points = Array.from(
+    { length: studentCount },
+    (_, index) => Math.round(averagePoints) + (index % 11) - 5,
+  );
+  const targetTotal = Math.round(studentCount * averagePoints);
+  let difference = targetTotal - points.reduce((sum, value) => sum + value, 0);
+  let index = 0;
+  while (difference !== 0) {
+    const adjustment = difference > 0 ? 1 : -1;
+    points[index % points.length] += adjustment;
+    difference -= adjustment;
+    index += 1;
+  }
+  return points;
+}
+
 export function buildDemoRankingStudents() {
   let studentIndex = 0;
-  return DEMO_RANKING_CLASS_BLUEPRINTS.flatMap((blueprint, classIndex) =>
-    RANKING_POINT_OFFSETS.map((pointOffset, index) => {
+  return DEMO_RANKING_CLASS_BLUEPRINTS.flatMap((blueprint, classIndex) => {
+    const pointTotals = buildRankingPointTotals(
+      blueprint.studentCount,
+      blueprint.averagePoints,
+    );
+    return pointTotals.map((totalPoints, index) => {
       const number = index + 1;
       const name = `${
         RANKING_STUDENT_SURNAMES[studentIndex % RANKING_STUDENT_SURNAMES.length]
@@ -181,10 +199,10 @@ export function buildDemoRankingStudents() {
         grade: blueprint.grade,
         className: blueprint.className,
         studentNumber: String(number),
-        totalPoints: blueprint.averagePoints + pointOffset,
+        totalPoints,
       };
-    }),
-  );
+    });
+  });
 }
 
 function koreanDate(date) {

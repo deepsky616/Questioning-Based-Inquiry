@@ -219,8 +219,19 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     expect(questionSchoolClasses).toEqual(["2", "3", "4", "5"]);
     expect(answerSchoolClasses).toEqual(["1", "2", "3", "4", "5"]);
     expect(inquirySchoolClasses).toEqual(["1", "2", "3", "4", "5"]);
-    expect(rankingStudents).toHaveLength(168);
-    expect(new Set(rankingStudents.map(({ id }) => id)).size).toBe(168);
+    expect(rankingStudents).toHaveLength(377);
+    expect(new Set(rankingStudents.map(({ id }) => id)).size).toBe(377);
+    expect(new Set(rankingStudents.map(({ name }) => name)).size).toBe(377);
+    expect(
+      new Set(DEMO_RANKING_CLASS_BLUEPRINTS.map(({ studentCount }) => studentCount)),
+    ).toEqual(new Set([23, 24, 25, 26, 27, 28, 29, 30]));
+    expect(
+      new Set(
+        DEMO_RANKING_CLASS_BLUEPRINTS.map(
+          ({ averagePoints }) => averagePoints,
+        ),
+      ).size,
+    ).toBeGreaterThanOrEqual(10);
 
     for (const blueprint of DEMO_RANKING_CLASS_BLUEPRINTS) {
       const classStudents = rankingStudents.filter((student) => (
@@ -233,7 +244,9 @@ describe("USB 시연 학급 자료 생성 명령", () => {
         0,
       ) / classStudents.length;
 
-      expect(classStudents).toHaveLength(12);
+      expect(blueprint.studentCount).toBeGreaterThanOrEqual(23);
+      expect(blueprint.studentCount).toBeLessThanOrEqual(30);
+      expect(classStudents).toHaveLength(blueprint.studentCount);
       expect(average).toBe(blueprint.averagePoints);
       expect(classStudents.every(({ totalPoints }) => (
         Number.isInteger(totalPoints) && totalPoints > 0
@@ -257,14 +270,14 @@ describe("USB 시연 학급 자료 생성 명령", () => {
         ...questionSchoolStudents.map(({ totalPoints }) => totalPoints),
       ],
       35,
-    )).toBe(12);
+    )).toBe(26);
     expect(rankIn(
       [
         ...DEMO_STUDENT_POINT_TOTALS,
         ...rankingStudents.map(({ totalPoints }) => totalPoints),
       ],
       35,
-    )).toBe(30);
+    )).toBe(86);
     expect(rankIn(
       [
         mainClassAverage,
