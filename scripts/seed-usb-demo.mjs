@@ -676,6 +676,44 @@ const SESSION_QUESTION_BANKS = {
   ],
 };
 
+const SESSION_QUESTION_TYPES = {
+  pastKorean: [
+    "conceptual",
+    "factual",
+    "controversial",
+    "conceptual",
+    "controversial",
+  ],
+  pastSocial: [
+    "factual",
+    "conceptual",
+    "controversial",
+    "controversial",
+    "controversial",
+  ],
+  past: [
+    "conceptual",
+    "factual",
+    "factual",
+    "conceptual",
+    "factual",
+  ],
+  pastMath: [
+    "conceptual",
+    "conceptual",
+    "factual",
+    "controversial",
+    "conceptual",
+  ],
+  today: [
+    "factual",
+    "conceptual",
+    "conceptual",
+    "factual",
+    "conceptual",
+  ],
+};
+
 const KIM_QUESTION_PLANS = [
   {
     sessionKey: "pastKorean",
@@ -792,10 +830,6 @@ const COMMENT_CONTENTS = [
   "왜 그렇게 생각했는지 근거까지 물어보는 질문으로 넓혀 보면 좋겠어요.",
 ];
 
-function questionTypeFor(index) {
-  return ["factual", "conceptual", "controversial"][index % 3];
-}
-
 function pickUniqueQuestion(candidates, usedQuestionIds, startIndex) {
   for (let offset = 0; offset < candidates.length; offset += 1) {
     const candidate = candidates[(startIndex + offset) % candidates.length];
@@ -825,7 +859,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
       closure: plan.closure,
       cognitive: plan.cognitive,
       inquiryType: plan.cognitive,
-      createdDays: session.offsetDays + 1,
+      createdDays: Math.min(0, session.offsetDays + 1),
     });
   }
 
@@ -835,7 +869,9 @@ export function buildDemoLearningActivityPlans(studentIds) {
         (studentIndex + questionIndex) % ACTIVITY_SESSION_BLUEPRINTS.length
       ];
       const bank = SESSION_QUESTION_BANKS[session.key];
-      const content = bank[(studentIndex + questionIndex * 2) % bank.length];
+      const bankIndex = (studentIndex + questionIndex * 2) % bank.length;
+      const content = bank[bankIndex];
+      const inquiryType = SESSION_QUESTION_TYPES[session.key][bankIndex];
       questions.push({
         id: `usb-demo-question-${pad(studentIndex + 1)}-${pad(questionIndex + 1)}`,
         authorId: studentIds[studentIndex],
@@ -843,9 +879,12 @@ export function buildDemoLearningActivityPlans(studentIds) {
         content,
         context: session.topic,
         closure: questionIndex === 0 && studentIndex % 4 === 0 ? "closed" : "open",
-        cognitive: questionTypeFor(studentIndex + questionIndex),
-        inquiryType: questionTypeFor(studentIndex + questionIndex),
-        createdDays: session.offsetDays + 1 + (studentIndex % 2),
+        cognitive: inquiryType,
+        inquiryType,
+        createdDays: Math.min(
+          0,
+          session.offsetDays + 1 + (studentIndex % 2),
+        ),
       });
     }
   }
@@ -854,7 +893,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
   const comments = [];
   for (let studentIndex = 0; studentIndex < studentIds.length; studentIndex += 1) {
     const authorId = studentIds[studentIndex];
-    const count = studentIndex === 0 ? 12 : 3;
+    const count = studentIndex === 0 ? 12 : 4;
     const otherQuestions = questions.filter((question) => question.authorId !== authorId);
     for (let commentIndex = 0; commentIndex < count; commentIndex += 1) {
       const target = studentIndex > 0 && commentIndex === 0
@@ -876,7 +915,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
   const likes = [];
   for (let studentIndex = 0; studentIndex < studentIds.length; studentIndex += 1) {
     const userId = studentIds[studentIndex];
-    const count = studentIndex === 0 ? 18 : 5;
+    const count = studentIndex === 0 ? 18 : 6;
     const otherQuestions = questions.filter((question) => question.authorId !== userId);
     const usedQuestionIds = new Set();
     for (let likeIndex = 0; likeIndex < count; likeIndex += 1) {
@@ -900,7 +939,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
     }
   }
 
-  const classInquiryQuestions = buildDemoClassInquiryQuestionRefs();
+  const classInquiryQuestions = buildDemoClassInquiryQuestionRefs(questions);
   distributeClassInquiryComments(
     comments,
     questions,
@@ -992,13 +1031,20 @@ function sharedQuestionId(sessionKey, index) {
   return `usb-demo-shared-question-${sessionKey}-${pad(index + 1)}`;
 }
 
-function buildDemoClassInquiryQuestionRefs() {
+function buildDemoClassInquiryQuestionRefs(studentQuestions) {
+  const designById = new Map(
+    DEMO_UNIT_DESIGN_BLUEPRINTS.map((design) => [design.id, design]),
+  );
   return ACTIVITY_SESSION_BLUEPRINTS.flatMap((session, sessionIndex) => (
-    CLASS_INQUIRY_FLOW.map((flowStep, index) => ({
+    buildDemoClassInquiryQuestions(
+      designById.get(session.unitDesignId),
+      session.id,
+      studentQuestions,
+    ).map((question, index) => ({
       id: sharedQuestionId(session.key, index),
       sessionId: session.id,
       sessionIndex,
-      type: flowStep.type,
+      type: question.type,
       priority: index + 1,
     }))
   ));
@@ -1014,20 +1060,26 @@ function selectAvailableActivity(
   participantKey,
   excludedParticipantIds = new Set(),
 ) {
-  const candidates = activities.filter((activity) => {
+  const available = activities.filter((activity) => {
     const sourceQuestion = sourceQuestionById.get(activity.questionId);
     return (
       !usedIds.has(activity.id)
       && sourceQuestion?.sessionId === sessionId
-      && sourceQuestion.authorId !== targetAuthorId
       && !excludedParticipantIds.has(activity[participantKey])
     );
   });
+  const candidates = available.filter((activity) => (
+    sourceQuestionById.get(activity.questionId)?.authorId !== targetAuthorId
+  ));
   return (
     candidates.find(
       (activity) => activity[participantKey] === preferredParticipantId,
     )
     ?? candidates[0]
+    ?? available.find(
+      (activity) => activity[participantKey] === preferredParticipantId,
+    )
+    ?? available[0]
   );
 }
 
@@ -1117,34 +1169,74 @@ export function buildDemoClassInquiryQuestions(
   const questionsInSession = studentQuestions.filter(
     (question) => question.sessionId === sessionId,
   );
-  const designQuestionByType = new Map();
+  const designQuestionsByType = new Map();
   for (const question of design.inquiryQuestions) {
-    if (!designQuestionByType.has(question.type)) {
-      designQuestionByType.set(question.type, question);
-    }
+    const questions = designQuestionsByType.get(question.type) ?? [];
+    questions.push(question);
+    designQuestionsByType.set(question.type, questions);
   }
 
   if (questionsInSession.length === 0) return [];
 
-  return CLASS_INQUIRY_FLOW.map((flowStep, index) => {
-    const { type, contentGroup, lessonPhase, rationale } = flowStep;
-    const question = designQuestionByType.get(type);
-    const sameTypeQuestions = questionsInSession.filter(
-      (studentQuestion) => studentQuestion.inquiryType === type,
-    );
-    const mergedFrom = sameTypeQuestions.map(
-      (studentQuestion) => studentQuestion.content,
-    );
+  const typeOrder = new Map(
+    CLASS_INQUIRY_FLOW.map(({ type }, index) => [type, index]),
+  );
+  const flowByType = new Map(
+    CLASS_INQUIRY_FLOW.map((flowStep) => [flowStep.type, flowStep]),
+  );
+  const groupedByContent = new Map();
+
+  for (const [index, question] of questionsInSession.entries()) {
+    const key = question.content.trim().replace(/\s+/g, " ");
+    const group = groupedByContent.get(key) ?? {
+      firstIndex: index,
+      questions: [],
+    };
+    group.questions.push(question);
+    groupedByContent.set(key, group);
+  }
+
+  const groups = [...groupedByContent.values()]
+    .map((group) => {
+      const typeCounts = new Map();
+      for (const question of group.questions) {
+        typeCounts.set(
+          question.inquiryType,
+          (typeCounts.get(question.inquiryType) ?? 0) + 1,
+        );
+      }
+      let type = group.questions[0].inquiryType;
+      for (const candidate of CLASS_INQUIRY_FLOW.map(({ type: value }) => value)) {
+        if ((typeCounts.get(candidate) ?? 0) > (typeCounts.get(type) ?? 0)) {
+          type = candidate;
+        }
+      }
+      return { ...group, type };
+    })
+    .sort((a, b) => (
+      (typeOrder.get(a.type) ?? 0) - (typeOrder.get(b.type) ?? 0)
+      || a.firstIndex - b.firstIndex
+    ));
+
+  const designCursorByType = new Map();
+  return groups.map((group, index) => {
+    const flowStep = flowByType.get(group.type) ?? CLASS_INQUIRY_FLOW[0];
+    const designQuestions = designQuestionsByType.get(group.type) ?? [];
+    const cursor = designCursorByType.get(group.type) ?? 0;
+    const guideSource = designQuestions[cursor % Math.max(designQuestions.length, 1)];
+    designCursorByType.set(group.type, cursor + 1);
 
     return {
-      ...question,
-      contentGroup,
-      lessonPhase,
-      rationale,
+      ...(guideSource ?? {}),
+      type: group.type,
+      content: group.questions[0].content,
+      contentGroup: flowStep.contentGroup,
+      lessonPhase: flowStep.lessonPhase,
+      rationale: flowStep.rationale,
       priority: index + 1,
       source: "student",
       ...CLASS_INQUIRY_FLOW_BASIS,
-      mergedFrom,
+      mergedFrom: group.questions.map(({ content }) => content),
     };
   });
 }
@@ -1490,20 +1582,130 @@ async function createInquiryLearningData(tx, studentIds) {
   });
 }
 
+export const DEMO_STUDENT_POINT_TOTALS = [
+  35, 23, 40, 18, 32, 26, 38,
+  15, 30, 21, 36, 14, 28, 34,
+  19, 39, 25, 31, 17, 37, 22,
+  29, 13, 33, 20, 27, 16, 24,
+];
+
+export const DEMO_RECENT_CONTENT_POINT_PLANS = [
+  {
+    id: "usb-demo-point-question-write-01",
+    bonusType: "QUESTION_WRITE",
+    points: 2,
+    reason: "질문수업 질문 작성",
+    sessionId: DEMO.sessionIds.today,
+    relatedQuestionId: "usb-demo-question-01-09",
+    createdDays: 0,
+  },
+  {
+    id: "usb-demo-point-question-write-02",
+    bonusType: "QUESTION_WRITE",
+    points: 2,
+    reason: "질문수업 질문 작성",
+    sessionId: DEMO.sessionIds.today,
+    relatedQuestionId: "usb-demo-question-01-10",
+    createdDays: -0.01,
+  },
+  {
+    id: "usb-demo-point-comment-write-01",
+    bonusType: "COMMENT_WRITE",
+    points: 1,
+    reason: "친구 질문에 답변 작성",
+    sessionId: DEMO.sessionIds.today,
+    relatedCommentId: "usb-demo-comment-01-03",
+    createdDays: -0.02,
+  },
+  {
+    id: "usb-demo-point-comment-write-02",
+    bonusType: "COMMENT_WRITE",
+    points: 1,
+    reason: "친구 질문에 답변 작성",
+    sessionId: DEMO.sessionIds.today,
+    relatedCommentId: "usb-demo-comment-01-09",
+    createdDays: -0.03,
+  },
+];
+
+export function buildDemoQuestionGamePointProfiles(studentIds) {
+  if (studentIds.length !== DEMO_STUDENT_POINT_TOTALS.length) {
+    throw new Error(
+      `포인트 시연 학생은 ${DEMO_STUDENT_POINT_TOTALS.length}명이어야 합니다.`,
+    );
+  }
+
+  return studentIds.map((studentId, index) => {
+    const totalPoints = DEMO_STUDENT_POINT_TOTALS[index];
+    const contentPoints = index === 0
+      ? DEMO_RECENT_CONTENT_POINT_PLANS.reduce(
+        (sum, plan) => sum + plan.points,
+        0,
+      )
+      : 0;
+    const gamePoints = totalPoints - contentPoints;
+    const counts = [1, 1, 1];
+    const additionalQuestions = gamePoints - 13;
+    for (let step = 0; step < additionalQuestions; step += 1) {
+      counts[(index + step) % counts.length] += 1;
+    }
+    return {
+      studentId,
+      totalPoints,
+      gamePoints,
+      contentPoints,
+      validQuestions: {
+        SOLO: counts[0],
+        AI: counts[1],
+        FRIEND: counts[2],
+      },
+    };
+  });
+}
+
 async function createQuestionGameData(tx, studentIds) {
   const gameIds = ["dice", "relay", "mystery-box", "kaba"];
   const pointTotals = new Map(studentIds.map((id) => [id, 0]));
+  const pointProfiles = buildDemoQuestionGamePointProfiles(studentIds);
+  const pointProfileByStudent = new Map(
+    pointProfiles.map((profile) => [profile.studentId, profile]),
+  );
+
+  for (const plan of DEMO_RECENT_CONTENT_POINT_PLANS) {
+    await tx.pointLog.create({
+      data: {
+        id: plan.id,
+        studentId: studentIds[0],
+        gameId: "ACTIVITY",
+        bonusType: plan.bonusType,
+        points: plan.points,
+        reason: plan.reason,
+        status: "APPROVED",
+        sessionId: plan.sessionId,
+        relatedQuestionId: plan.relatedQuestionId,
+        relatedCommentId: plan.relatedCommentId,
+        createdAt: offsetDate(plan.createdDays),
+      },
+    });
+    pointTotals.set(
+      studentIds[0],
+      (pointTotals.get(studentIds[0]) ?? 0) + plan.points,
+    );
+  }
 
   for (const [index, ownerId] of studentIds.entries()) {
     const number = index + 1;
+    const pointProfile = pointProfileByStudent.get(ownerId);
     for (const mode of ["SOLO", "AI"]) {
       const modeKey = mode.toLowerCase();
       const runId = `usb-demo-run-${modeKey}-${pad(number)}`;
       const gameId = gameIds[(index + (mode === "AI" ? 1 : 0)) % gameIds.length];
-      const validQuestions = 1 + ((index + (mode === "AI" ? 1 : 0)) % 3);
+      const validQuestions = pointProfile.validQuestions[mode];
       const participationPoints = 3;
       const activityPoints = validQuestions;
       const completedAt = offsetDate(-13 + ((index * 2 + (mode === "AI" ? 1 : 0)) % 13));
+      const dailyLimit = mode === "SOLO" ? 30 : 50;
+      const awarded = participationPoints + activityPoints;
 
       await tx.gameRun.create({
         data: {
@@ -1518,9 +1720,9 @@ async function createQuestionGameData(tx, studentIds) {
           state: {
             demo: true,
             result: {
-              awarded: participationPoints + activityPoints,
-              dailyLimit: mode === "SOLO" ? 20 : 15,
-              dailyRemaining: 0,
+              awarded,
+              dailyLimit,
+              dailyRemaining: dailyLimit - awarded,
               cappedByLimit: false,
               preview: false,
             },
@@ -1583,7 +1785,7 @@ async function createQuestionGameData(tx, studentIds) {
 
     const friendGameId = gameIds[(index + 2) % gameIds.length];
     const roomCode = `room:usb-demo:${pad(number)}`;
-    const friendQuestions = 1 + (index % 3);
+    const friendQuestions = pointProfile.validQuestions.FRIEND;
     const friendCompletedAt = offsetDate(-((index % 12) + 1));
     await tx.pointLog.create({
       data: {
@@ -1618,6 +1820,12 @@ async function createQuestionGameData(tx, studentIds) {
   }
 
   for (const [id, totalPoints] of pointTotals) {
+    const expectedTotal = pointProfileByStudent.get(id)?.totalPoints;
+    if (totalPoints !== expectedTotal) {
+      throw new Error(
+        `시연 포인트 합계가 맞지 않습니다: ${id} ${totalPoints}/${expectedTotal}`,
+      );
+    }
     await tx.user.update({
       where: { id },
       data: { totalPoints },
@@ -1695,10 +1903,10 @@ export async function seedUsbDemo() {
     if (
       sessionCount !== DEMO_SESSION_BLUEPRINTS.length
       || unitDesignCount !== DEMO_UNIT_DESIGN_BLUEPRINTS.length
-      || sharedQuestionCount !== ACTIVITY_SESSION_BLUEPRINTS.length * 3
+      || sharedQuestionCount !== 25
       || questionCount !== 92
-      || commentCount !== 93
-      || likeCount !== 153
+      || commentCount !== 120
+      || likeCount !== 180
       || analysisCount !== ACTIVITY_SESSION_BLUEPRINTS.length
       || kimQuestionCount !== 11
       || kimCommentCount !== 12

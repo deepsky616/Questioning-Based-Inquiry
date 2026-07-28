@@ -4,7 +4,10 @@ import packageJson from "../../package.json";
 import {
   buildDemoClassInquiryQuestions,
   buildDemoLearningActivityPlans,
+  buildDemoQuestionGamePointProfiles,
+  DEMO_RECENT_CONTENT_POINT_PLANS,
   DEMO_SESSION_BLUEPRINTS,
+  DEMO_STUDENT_POINT_TOTALS,
   DEMO_UNIT_DESIGN_BLUEPRINTS,
   STUDENT_NAMES,
 } from "../../scripts/seed-usb-demo.mjs";
@@ -63,15 +66,15 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       .toHaveLength(12);
     expect(plans.likes.filter(({ userId }) => userId === studentIds[0]))
       .toHaveLength(18);
-    expect(plans.classInquiryQuestions).toHaveLength(15);
+    expect(plans.classInquiryQuestions).toHaveLength(25);
 
     for (const studentId of studentIds.slice(1)) {
       expect(plans.questions.filter(({ authorId }) => authorId === studentId).length)
         .toBeGreaterThanOrEqual(3);
       expect(plans.comments.filter(({ authorId }) => authorId === studentId))
-        .toHaveLength(3);
+        .toHaveLength(4);
       expect(plans.likes.filter(({ userId }) => userId === studentId))
-        .toHaveLength(5);
+        .toHaveLength(6);
     }
 
     expect(
@@ -107,6 +110,13 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       expect(likes.length).toBeGreaterThanOrEqual(4);
       expect(likes.length).toBeLessThanOrEqual(6);
       expect(new Set(likes.map(({ userId }) => userId)).size).toBe(likes.length);
+    }
+    for (const session of DEMO_SESSION_BLUEPRINTS.slice(0, 5)) {
+      const count = plans.classInquiryQuestions.filter(
+        ({ sessionId }) => sessionId === session.id,
+      ).length;
+      expect(count).toBeGreaterThanOrEqual(4);
+      expect(count).toBeLessThanOrEqual(7);
     }
     for (const session of DEMO_SESSION_BLUEPRINTS.slice(0, 5)) {
       const sessionSharedIds = new Set(
@@ -155,6 +165,82 @@ describe("USB 시연 학급 자료 생성 명령", () => {
           && questionById.get(questionId)?.sessionId === analysis.sessionId
         )).length,
       );
+    }
+  });
+
+  it("전체 학생의 포인트와 순위를 다양하게 구성한다", () => {
+    const studentIds = STUDENT_NAMES.map(
+      (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
+    );
+    const profiles = buildDemoQuestionGamePointProfiles(studentIds);
+    const ranked = [...profiles].sort(
+      (a, b) => b.totalPoints - a.totalPoints,
+    );
+
+    expect(DEMO_STUDENT_POINT_TOTALS).toHaveLength(28);
+    expect(new Set(DEMO_STUDENT_POINT_TOTALS).size).toBe(28);
+    expect(Math.min(...DEMO_STUDENT_POINT_TOTALS)).toBe(13);
+    expect(Math.max(...DEMO_STUDENT_POINT_TOTALS)).toBe(40);
+    expect(profiles[0].totalPoints).toBe(35);
+    expect(profiles[0].contentPoints).toBe(6);
+    expect(profiles[0].gamePoints).toBe(29);
+    expect(ranked.findIndex(({ studentId }) => studentId === studentIds[0]) + 1)
+      .toBe(6);
+
+    for (const profile of profiles) {
+      const recognizedTotal = Object.values(profile.validQuestions).reduce(
+        (sum, count) => sum + count,
+        0,
+      );
+      expect(Object.values(profile.validQuestions).every(
+        (count) => count >= 1 && count <= 10,
+      )).toBe(true);
+      expect(profile.gamePoints).toBe(10 + recognizedTotal);
+      expect(profile.totalPoints).toBe(
+        profile.gamePoints + profile.contentPoints,
+      );
+    }
+  });
+
+  it("김질문의 최근 질문과 댓글 작성 포인트를 제공한다", () => {
+    const studentIds = STUDENT_NAMES.map(
+      (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
+    );
+    const activityPlans = buildDemoLearningActivityPlans(studentIds);
+    const kimId = studentIds[0];
+
+    expect(DEMO_RECENT_CONTENT_POINT_PLANS).toHaveLength(4);
+    expect(DEMO_RECENT_CONTENT_POINT_PLANS.map(({ bonusType }) => bonusType))
+      .toEqual([
+        "QUESTION_WRITE",
+        "QUESTION_WRITE",
+        "COMMENT_WRITE",
+        "COMMENT_WRITE",
+      ]);
+    expect(
+      DEMO_RECENT_CONTENT_POINT_PLANS.reduce(
+        (sum, plan) => sum + plan.points,
+        0,
+      ),
+    ).toBe(6);
+
+    for (const plan of DEMO_RECENT_CONTENT_POINT_PLANS) {
+      if (plan.relatedQuestionId) {
+        expect(activityPlans.questions).toContainEqual(
+          expect.objectContaining({
+            id: plan.relatedQuestionId,
+            authorId: kimId,
+          }),
+        );
+      }
+      if (plan.relatedCommentId) {
+        expect(activityPlans.comments).toContainEqual(
+          expect.objectContaining({
+            id: plan.relatedCommentId,
+            authorId: kimId,
+          }),
+        );
+      }
     }
   });
 
@@ -233,17 +319,31 @@ describe("USB 시연 학급 자료 생성 명령", () => {
         continue;
       }
 
-      expect(sharedQuestions.map(({ priority }) => priority)).toEqual([1, 2, 3]);
-      expect(sharedQuestions.map(({ contentGroup }) => contentGroup)).toEqual([
-        "사실 확인",
-        "관계와 까닭",
-        "판단과 토론",
-      ]);
-      expect(sharedQuestions.map(({ content }) => content)).toEqual(
-        ["factual", "conceptual", "controversial"].map(
-          (type) => design?.inquiryQuestions.find((question) => question.type === type)?.content,
-        ),
+      expect(sharedQuestions.length).toBeGreaterThanOrEqual(4);
+      expect(sharedQuestions.length).toBeLessThanOrEqual(7);
+      expect(sharedQuestions).toHaveLength(
+        new Set(studentQuestions.map(({ content }) => content)).size,
       );
+      expect(sharedQuestions.map(({ priority }) => priority)).toEqual(
+        sharedQuestions.map((_, index) => index + 1),
+      );
+      const flowOrder = new Map([
+        ["사실 확인", 0],
+        ["관계와 까닭", 1],
+        ["판단과 토론", 2],
+      ]);
+      const contentGroupOrder = sharedQuestions.map(
+        ({ contentGroup }) => flowOrder.get(contentGroup),
+      );
+      expect(contentGroupOrder.every((order) => order !== undefined)).toBe(true);
+      expect(contentGroupOrder).toEqual(
+        [...contentGroupOrder].sort((a, b) => a! - b!),
+      );
+      expect(
+        sharedQuestions.every(({ content }) => (
+          studentQuestions.some((question) => question.content === content)
+        )),
+      ).toBe(true);
       expect(sharedQuestions.every(({ source }) => source === "student")).toBe(true);
       expect(
         sharedQuestions.every(({ flowId }) => flowId === "cognitive-development"),
