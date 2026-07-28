@@ -369,7 +369,13 @@ export function TeacherReportsView() {
   };
 
   const students = report?.perStudent ?? [];
-  const currentStudent = students.find((s) => s.id === studentId);
+  const studentReportSubtitle = studentReport
+    ? [
+        studentReport.student.grade && t("gradeLabel", { grade: studentReport.student.grade }),
+        studentReport.student.className && t("classLabel", { className: studentReport.student.className }),
+        studentReport.student.studentNumber && t("numberLabel", { n: studentReport.student.studentNumber }),
+      ].filter(Boolean).join(" ")
+    : undefined;
 
   return (
     <div className="space-y-5">
@@ -478,7 +484,7 @@ export function TeacherReportsView() {
           <ReportView
             scope="student"
             title={t("studentReportTitle", { name: studentReport.student.name })}
-            subtitle={currentStudent?.studentNumber ? t("studentReportSubtitle", { number: currentStudent.studentNumber }) : undefined}
+            subtitle={studentReportSubtitle}
             totals={studentReport.totals}
             weekly={studentReport.weekly}
             monthly={studentReport.monthly}

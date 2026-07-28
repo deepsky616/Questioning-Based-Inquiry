@@ -159,6 +159,7 @@ export async function GET(req: NextRequest) {
   });
   const sessionsWithAnalysis = sessions.map(({ teacherId: _teacherId, ...item }) => ({
     ...item,
+    grade,
     ...(activityBySession.get(item.id) ?? {}),
     analysis: analysisBySession.get(item.id) ?? null,
   }));

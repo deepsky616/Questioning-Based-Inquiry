@@ -198,8 +198,16 @@ describe("학급 보고서 접근 경계", () => {
       select: { sessionId: true, result: true },
     });
     expect(body.sessions).toEqual([
-      expect.objectContaining({ id: "session-owned", analysis: { summary: "내 수업 분석" } }),
-      expect.objectContaining({ id: "session-other", analysis: null }),
+      expect.objectContaining({
+        id: "session-owned",
+        grade: "5",
+        analysis: { summary: "내 수업 분석" },
+      }),
+      expect.objectContaining({
+        id: "session-other",
+        grade: "5",
+        analysis: null,
+      }),
     ]);
   });
 });
