@@ -7,6 +7,7 @@ import type { QuestionTypeSummary } from "@/lib/stats-calc";
 import type { SessionAnalysisResult } from "@/components/reports/ReportView";
 import { printTextOf } from "@/lib/report-print-safe";
 import { formatDateOnly } from "@/lib/datetime";
+import { buildSessionLabel } from "@/lib/sessions";
 
 // 인쇄 추세 꺾은선 시리즈(화면 리포트와 동일 색)
 const TREND_SERIES: { key: keyof SeriesPoint; color: string }[] = [
@@ -28,7 +29,15 @@ export interface PrintReportItem {
   classification: QuestionTypeSummary;
   weekly?: SeriesPoint[];
   monthly?: SeriesPoint[];
-  sessions: { id: string; date: string; subject: string; topic: string; analysis?: SessionAnalysisResult | null }[];
+  sessions: {
+    id: string;
+    date: string;
+    grade?: string | null;
+    targetGrade?: string | null;
+    subject: string;
+    topic: string;
+    analysis?: SessionAnalysisResult | null;
+  }[];
   roster?: {
     id: string;
     name: string;
@@ -387,7 +396,14 @@ export function ReportPrintDoc({ items }: { items: PrintReportItem[] }) {
             ) : (
               analyzed.map((s) => (
                 <div key={s.id} className="rdoc-feedback">
-                  <h3 className="rdoc-feedback-h">{s.date} · {s.subject}{s.topic ? ` - ${s.topic}` : ""}</h3>
+                  <h3 className="rdoc-feedback-h">
+                    {buildSessionLabel(
+                      s.date,
+                      s.subject,
+                      s.topic,
+                      s.grade ?? s.targetGrade ?? it.grade,
+                    )}
+                  </h3>
                   {blocksOf(s.analysis as SessionAnalysisResult).filter(([, v]) => v && v.trim()).map(([h, v]) => (
                     <div key={h} className="rdoc-fb-block">
                       <p className="rdoc-fb-h">{h}</p>

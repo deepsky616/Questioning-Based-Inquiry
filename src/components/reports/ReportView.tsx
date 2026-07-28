@@ -39,6 +39,8 @@ export interface PerStudentRow {
 export interface SessionMeta {
   id: string;
   date: string;
+  grade?: string | null;
+  targetGrade?: string | null;
   subject: string;
   topic: string;
   analysis?: SessionAnalysisResult | null;

@@ -61,6 +61,7 @@ export async function buildStudentReport(targetId: string) {
   });
   const sessionsWithAnalysis = sessions.map((s) => ({
     ...s,
+    grade: student.grade,
     ...(activityBySession.get(s.id) ?? {}),
     analysis: analysisBySession.get(s.id) ?? null,
   }));
