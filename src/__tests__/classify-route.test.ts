@@ -75,6 +75,41 @@ describe("POST /api/classify", () => {
     }));
   });
 
+  it("짧은 질문 분류에서는 사고 예산을 끄고 완전한 구조화 응답을 받는다", async () => {
+    mGenerate.mockImplementation(async (options: { thinkingBudget?: number }) => ({
+      data: options.thinkingBudget === 0
+        ? {
+            closure: "open",
+            cognitive: "conceptual",
+            closureScore: 0.2,
+            cognitiveScore: 0.9,
+            reasoning: "두 현상의 차이를 비교하고 설명하는 질문입니다.",
+            feedback: "좋은 비교 질문이에요. 관찰할 기준을 더해 보세요.",
+            improvedExample: "",
+            inappropriate: false,
+            inappropriateReason: "",
+          }
+        : {
+            closure: "",
+            cognitive: "",
+            closureScore: null,
+            cognitiveScore: null,
+          },
+      model: "gemini-2.5-flash",
+    }));
+
+    const response = await POST(request(
+      "물이 끓을 때와 빨래가 마를 때 생기는 수증기는 어떻게 다를까요?",
+    ));
+    const data = await response.json();
+
+    expect(data).toMatchObject({
+      analysisSource: "ai",
+      cognitive: "conceptual",
+      analysisModel: "gemini-2.5-flash",
+    });
+  });
+
   it("인공지능 키가 없으면 기본 분석임을 숨기지 않는다", async () => {
     mGenerate.mockRejectedValue(new AiKeyMissingError());
 

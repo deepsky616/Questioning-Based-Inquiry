@@ -95,6 +95,7 @@ export async function POST(req: Request) {
       responseMimeType: "application/json",
       responseJsonSchema: CLASSIFICATION_RESPONSE_JSON_SCHEMA,
       maxOutputTokens: 1_024,
+      thinkingBudget: 0,
     });
 
     const parsed = parseClassificationResponse(JSON.stringify(generated.data));
