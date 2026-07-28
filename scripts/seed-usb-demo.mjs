@@ -58,6 +58,36 @@ const DEMO = {
   },
 };
 
+export const DEMO_RANKING_CLASS_BLUEPRINTS = [
+  { school: "질문초등학교", grade: "4", className: "2", averagePoints: 31.5 },
+  { school: "질문초등학교", grade: "4", className: "3", averagePoints: 28.5 },
+  { school: "질문초등학교", grade: "4", className: "4", averagePoints: 24.5 },
+  { school: "질문초등학교", grade: "4", className: "5", averagePoints: 21.5 },
+  { school: "대답초등학교", grade: "4", className: "1", averagePoints: 33.5 },
+  { school: "대답초등학교", grade: "4", className: "2", averagePoints: 29.5 },
+  { school: "대답초등학교", grade: "4", className: "3", averagePoints: 27.5 },
+  { school: "대답초등학교", grade: "4", className: "4", averagePoints: 23.5 },
+  { school: "대답초등학교", grade: "4", className: "5", averagePoints: 19.5 },
+  { school: "탐구초등학교", grade: "4", className: "1", averagePoints: 32.5 },
+  { school: "탐구초등학교", grade: "4", className: "2", averagePoints: 30.5 },
+  { school: "탐구초등학교", grade: "4", className: "3", averagePoints: 25.5 },
+  { school: "탐구초등학교", grade: "4", className: "4", averagePoints: 22.5 },
+  { school: "탐구초등학교", grade: "4", className: "5", averagePoints: 20.5 },
+];
+
+const RANKING_STUDENT_SURNAMES = [
+  "김", "이", "박", "최", "정", "강", "조", "윤",
+  "장", "임", "한", "오", "서", "신", "권", "황",
+  "안", "송", "전", "홍", "문", "양", "손", "배",
+];
+const RANKING_STUDENT_GIVEN_NAMES = [
+  "가온", "나윤", "다온", "라희", "민재", "서윤", "예준",
+];
+const RANKING_POINT_OFFSETS = [
+  -10.5, -8.5, -6.5, -4.5, -2.5, -0.5,
+  0.5, 2.5, 4.5, 6.5, 8.5, 10.5,
+];
+
 export const DEMO_SESSION_BLUEPRINTS = [
   {
     key: "pastKorean",
@@ -128,6 +158,33 @@ function pad(value) {
 
 function studentId(number) {
   return `usb-demo-student-${pad(number)}`;
+}
+
+export function buildDemoRankingStudents() {
+  let studentIndex = 0;
+  return DEMO_RANKING_CLASS_BLUEPRINTS.flatMap((blueprint, classIndex) =>
+    RANKING_POINT_OFFSETS.map((pointOffset, index) => {
+      const number = index + 1;
+      const name = `${
+        RANKING_STUDENT_SURNAMES[studentIndex % RANKING_STUDENT_SURNAMES.length]
+      }${
+        RANKING_STUDENT_GIVEN_NAMES[
+          Math.floor(studentIndex / RANKING_STUDENT_SURNAMES.length)
+          % RANKING_STUDENT_GIVEN_NAMES.length
+        ]
+      }`;
+      studentIndex += 1;
+      return {
+        id: `usb-demo-rank-${pad(classIndex + 1)}-${pad(number)}`,
+        name,
+        school: blueprint.school,
+        grade: blueprint.grade,
+        className: blueprint.className,
+        studentNumber: String(number),
+        totalPoints: blueprint.averagePoints + pointOffset,
+      };
+    }),
+  );
 }
 
 function koreanDate(date) {
@@ -1330,6 +1387,12 @@ async function removePreviousDemoData(tx, studentIds) {
   await tx.demoAiDailyUsage.deleteMany({
     where: { userId: { in: studentIds } },
   });
+  await tx.user.deleteMany({
+    where: {
+      id: { startsWith: "usb-demo-rank-" },
+      isDemo: true,
+    },
+  });
 }
 
 async function createClassAccounts(tx, passwordHash) {
@@ -1400,6 +1463,35 @@ async function createClassAccounts(tx, passwordHash) {
       },
     });
   }
+}
+
+async function createRankingAccounts(tx, passwordHash, rankingStudents) {
+  await tx.user.createMany({
+    data: rankingStudents.map((student) => ({
+      id: student.id,
+      password: passwordHash,
+      name: student.name,
+      role: "STUDENT",
+      school: student.school,
+      grade: student.grade,
+      className: student.className,
+      studentNumber: student.studentNumber,
+      totalPoints: student.totalPoints,
+      isDemo: true,
+    })),
+  });
+  await tx.pointLog.createMany({
+    data: rankingStudents.map((student) => ({
+      id: `point-${student.id}`,
+      studentId: student.id,
+      gameId: "DEMO_RANKING",
+      bonusType: "DEMO_RANKING",
+      points: student.totalPoints,
+      reason: "순위 시연 활동 포인트",
+      status: "APPROVED",
+      activityDedupeKey: `ranking:${student.id}`,
+    })),
+  });
 }
 
 async function createInquiryLearningData(tx, studentIds) {
@@ -1841,12 +1933,19 @@ export async function seedUsbDemo() {
 
   const prisma = new PrismaClient();
   try {
+    const rankingStudents = buildDemoRankingStudents();
+    const demoSchoolNames = [
+      ...new Set([
+        DEMO.school,
+        ...DEMO_RANKING_CLASS_BLUEPRINTS.map(({ school }) => school),
+      ]),
+    ];
     const conflictingUsers = await prisma.user.count({
-      where: { school: DEMO.school, isDemo: false },
+      where: { school: { in: demoSchoolNames }, isDemo: false },
     });
     if (conflictingUsers > 0) {
       throw new Error(
-        "질문초등학교 이름을 사용하는 일반 계정이 있어 시연 자료를 만들지 않았습니다.",
+        "시연 학교 이름을 사용하는 일반 계정이 있어 시연 자료를 만들지 않았습니다.",
       );
     }
 
@@ -1856,12 +1955,14 @@ export async function seedUsbDemo() {
     await prisma.$transaction(async (tx) => {
       await removePreviousDemoData(tx, studentIds);
       await createClassAccounts(tx, passwordHash);
+      await createRankingAccounts(tx, passwordHash, rankingStudents);
       await createInquiryLearningData(tx, studentIds);
       await createQuestionGameData(tx, studentIds);
     }, { timeout: 120_000 });
 
     const [
       count,
+      rankingStudentCount,
       sessionCount,
       unitDesignCount,
       sharedQuestionCount,
@@ -1879,6 +1980,12 @@ export async function seedUsbDemo() {
           school: DEMO.school,
           grade: DEMO.grade,
           className: DEMO.className,
+          isDemo: true,
+        },
+      }),
+      prisma.user.count({
+        where: {
+          id: { startsWith: "usb-demo-rank-" },
           isDemo: true,
         },
       }),
@@ -1900,6 +2007,11 @@ export async function seedUsbDemo() {
     if (count !== STUDENT_NAMES.length) {
       throw new Error(`시연 학생 수가 ${count}명으로 확인되었습니다.`);
     }
+    if (rankingStudentCount !== rankingStudents.length) {
+      throw new Error(
+        `순위 비교 학생 수가 ${rankingStudentCount}명으로 확인되었습니다.`,
+      );
+    }
     if (
       sessionCount !== DEMO_SESSION_BLUEPRINTS.length
       || unitDesignCount !== DEMO_UNIT_DESIGN_BLUEPRINTS.length
@@ -1918,7 +2030,7 @@ export async function seedUsbDemo() {
     }
 
     console.log(
-      `시연 학급 생성 완료: 김교사, 학생 ${count}명, 질문수업 ${sessionCount}개, 참고자료 ${unitDesignCount}개, 김질문 질문 ${kimQuestionCount}개, 댓글 ${kimCommentCount}개, 좋아요 ${kimLikeCount}개, 수업 분석 ${analysisCount}개`,
+      `시연 학급 생성 완료: 김교사, 학생 ${count}명, 순위 비교 학생 ${rankingStudentCount}명, 질문수업 ${sessionCount}개, 참고자료 ${unitDesignCount}개, 김질문 질문 ${kimQuestionCount}개, 댓글 ${kimCommentCount}개, 좋아요 ${kimLikeCount}개, 수업 분석 ${analysisCount}개`,
     );
   } finally {
     await prisma.$disconnect();

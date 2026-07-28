@@ -5,7 +5,9 @@ import {
   buildDemoClassInquiryQuestions,
   buildDemoLearningActivityPlans,
   buildDemoQuestionGamePointProfiles,
+  buildDemoRankingStudents,
   DEMO_RECENT_CONTENT_POINT_PLANS,
+  DEMO_RANKING_CLASS_BLUEPRINTS,
   DEMO_SESSION_BLUEPRINTS,
   DEMO_STUDENT_POINT_TOTALS,
   DEMO_UNIT_DESIGN_BLUEPRINTS,
@@ -200,6 +202,87 @@ describe("USB 시연 학급 자료 생성 명령", () => {
         profile.gamePoints + profile.contentPoints,
       );
     }
+  });
+
+  it("세 학교의 4학년 반과 학생을 추가해 교내와 전체 순위를 고르게 구성한다", () => {
+    const rankingStudents = buildDemoRankingStudents();
+    const questionSchoolClasses = DEMO_RANKING_CLASS_BLUEPRINTS
+      .filter(({ school }) => school === "질문초등학교")
+      .map(({ className }) => className);
+    const answerSchoolClasses = DEMO_RANKING_CLASS_BLUEPRINTS
+      .filter(({ school }) => school === "대답초등학교")
+      .map(({ className }) => className);
+    const inquirySchoolClasses = DEMO_RANKING_CLASS_BLUEPRINTS
+      .filter(({ school }) => school === "탐구초등학교")
+      .map(({ className }) => className);
+
+    expect(questionSchoolClasses).toEqual(["2", "3", "4", "5"]);
+    expect(answerSchoolClasses).toEqual(["1", "2", "3", "4", "5"]);
+    expect(inquirySchoolClasses).toEqual(["1", "2", "3", "4", "5"]);
+    expect(rankingStudents).toHaveLength(168);
+    expect(new Set(rankingStudents.map(({ id }) => id)).size).toBe(168);
+
+    for (const blueprint of DEMO_RANKING_CLASS_BLUEPRINTS) {
+      const classStudents = rankingStudents.filter((student) => (
+        student.school === blueprint.school
+        && student.grade === blueprint.grade
+        && student.className === blueprint.className
+      ));
+      const average = classStudents.reduce(
+        (sum, student) => sum + student.totalPoints,
+        0,
+      ) / classStudents.length;
+
+      expect(classStudents).toHaveLength(12);
+      expect(average).toBe(blueprint.averagePoints);
+      expect(classStudents.every(({ totalPoints }) => (
+        Number.isInteger(totalPoints) && totalPoints > 0
+      ))).toBe(true);
+    }
+
+    const mainClassAverage = DEMO_STUDENT_POINT_TOTALS.reduce(
+      (sum, points) => sum + points,
+      0,
+    ) / DEMO_STUDENT_POINT_TOTALS.length;
+    const rankIn = (points: number[], target: number) =>
+      points.filter((pointsValue) => pointsValue > target).length + 1;
+    const questionSchoolStudents = rankingStudents.filter(
+      ({ school }) => school === "질문초등학교",
+    );
+
+    expect(rankIn(DEMO_STUDENT_POINT_TOTALS, 35)).toBe(6);
+    expect(rankIn(
+      [
+        ...DEMO_STUDENT_POINT_TOTALS,
+        ...questionSchoolStudents.map(({ totalPoints }) => totalPoints),
+      ],
+      35,
+    )).toBe(12);
+    expect(rankIn(
+      [
+        ...DEMO_STUDENT_POINT_TOTALS,
+        ...rankingStudents.map(({ totalPoints }) => totalPoints),
+      ],
+      35,
+    )).toBe(30);
+    expect(rankIn(
+      [
+        mainClassAverage,
+        ...DEMO_RANKING_CLASS_BLUEPRINTS
+          .filter(({ school }) => school === "질문초등학교")
+          .map(({ averagePoints }) => averagePoints),
+      ],
+      mainClassAverage,
+    )).toBe(3);
+    expect(rankIn(
+      [
+        mainClassAverage,
+        ...DEMO_RANKING_CLASS_BLUEPRINTS.map(
+          ({ averagePoints }) => averagePoints,
+        ),
+      ],
+      mainClassAverage,
+    )).toBe(8);
   });
 
   it("김질문의 최근 질문과 댓글 작성 포인트를 제공한다", () => {
