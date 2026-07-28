@@ -47,11 +47,6 @@ export function StudentAskResultCard({
             className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sky-900 dark:border-sky-400/30 dark:bg-sky-950/40 dark:text-sky-100"
           >
             <p className="text-sm font-semibold">{t("aiAnalysisComplete")}</p>
-            {result.analysisModel && (
-              <p className="mt-1 text-xs text-sky-700 dark:text-sky-300">
-                {t("analysisModel", { model: result.analysisModel })}
-              </p>
-            )}
           </div>
         )}
 
@@ -125,9 +120,9 @@ export function StudentAskResultCard({
 
         {result.improvedExample && result.improvedExample.trim() && (
           <div className="p-4 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-500/30 rounded-lg">
-            <div className="text-sm font-medium text-green-800 mb-2">{t("improvedTitle")}</div>
-            <p className="text-green-900 font-medium">&ldquo;{result.improvedExample}&rdquo;</p>
-            <p className="text-xs text-green-600 mt-1">{t("improveHint")}</p>
+            <div className="mb-2 text-sm font-medium text-green-800 dark:text-green-200">{t("improvedTitle")}</div>
+            <p className="font-medium text-green-900 dark:text-green-100">&ldquo;{result.improvedExample}&rdquo;</p>
+            <p className="mt-1 text-xs text-green-600 dark:text-green-300">{t("improveHint")}</p>
             <Button
               type="button"
               variant="outline"

@@ -661,7 +661,32 @@ describe("학생 질문 분석 결과", () => {
     expect(onUseImprovedExample).toHaveBeenCalledWith(result.improvedExample);
   });
 
-  it("인공지능 분석이면 완료 상태와 실제 사용 모델을 보여준다", () => {
+  it("추천 질문 영역에 어두운 테마용 고대비 글자색을 적용한다", () => {
+    renderWithIntl(
+      <StudentAskResultCard
+        result={result}
+        analyzedContent="왜 비가 올까요?"
+        analysisCurrent
+        saveComplete={false}
+        isSaving={false}
+        onRewrite={() => {}}
+        onUseImprovedExample={() => {}}
+        onSave={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("이렇게 바꿔보면 어떨까요?")).toHaveClass(
+      "dark:text-green-200",
+    );
+    expect(screen.getByText((text) => text.includes(result.improvedExample!))).toHaveClass(
+      "dark:text-green-100",
+    );
+    expect(
+      screen.getByText("이 질문을 참고해서 더 깊이 생각할 수 있는 질문을 만들어보세요!"),
+    ).toHaveClass("dark:text-green-300");
+  });
+
+  it("인공지능 분석이면 완료 상태만 보여주고 분석 모델은 숨긴다", () => {
     renderWithIntl(
       <StudentAskResultCard
         result={{
@@ -680,7 +705,9 @@ describe("학생 질문 분석 결과", () => {
     );
 
     expect(screen.getByText("인공지능 질문 분석 완료")).toBeInTheDocument();
-    expect(screen.getByText("분석 모델: gemini-2.5-flash")).toBeInTheDocument();
+    expect(
+      screen.queryByText("분석 모델: gemini-2.5-flash"),
+    ).not.toBeInTheDocument();
   });
 
   it("기본 분석이면 인공지능 분석이 아님을 분명하게 안내한다", () => {
