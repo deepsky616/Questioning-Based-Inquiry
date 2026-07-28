@@ -92,6 +92,8 @@ export interface ReportViewProps {
   bulkSessions?: SessionMeta[];
   /** ReportView 자체 인쇄 버튼 노출 여부(교사 페이지는 별도 출력 버튼을 쓰므로 숨김). 기본 true. */
   showPrintButton?: boolean;
+  /** 분석에 사용한 모델 이름 표시 여부. 학생 본인 화면에서는 숨긴다. 기본 true. */
+  showAnalysisModel?: boolean;
   /** 교사가 수정한 분석 결과를 저장하는 콜백. 주어지면 분석 블록에 '수정'이 나타난다. */
   onSaveAnalysis?: (sessionId: string, result: SessionAnalysisResult) => Promise<void>;
   /** 전체 학생 일괄 분석 완료 후 현재 화면을 갱신하기 위한 콜백(예: 선택 학생 리포트 재조회). */
@@ -145,7 +147,7 @@ function sessionPeriod(dateStr: string, mode: ReportRange, otherLabel: string, w
 
 export function ReportView({
   scope, title, subtitle, totals, weekly, monthly, classification, perStudent, sessions, analyzeSession, analysisCacheKey,
-  participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze, bulkSessions, showPrintButton = true, onSaveAnalysis, onBulkComplete,
+  participationLabel, receptionLabel, canAnalyze = true, bulkAnalyze, bulkSessions, showPrintButton = true, showAnalysisModel = true, onSaveAnalysis, onBulkComplete,
 }: ReportViewProps) {
   const { toast } = useToast();
   const [range, setRange] = useState<ReportRange>("week");
@@ -652,14 +654,14 @@ export function ReportView({
                               )}
                             </div>
                           )}
-                          {(rv?.analyzedAt || rv?.analysisModel) && (
+                          {(rv?.analyzedAt || (showAnalysisModel && rv?.analysisModel)) && (
                             <div className="flex flex-wrap gap-2 text-xs">
                               {rv.analyzedAt && (
                                 <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
                                   {t("analysisTime", { time: formatDateTime(rv.analyzedAt) })}
                                 </span>
                               )}
-                              {rv.analysisModel && (
+                              {showAnalysisModel && rv.analysisModel && (
                                 <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200">
                                   {t("analysisModel", { model: rv.analysisModel })}
                                 </span>

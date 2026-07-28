@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { ReportView, type ReportViewProps, type SessionMeta, type SessionAnalysisResult } from "@/components/reports/ReportView";
 import { formatClock } from "@/lib/datetime";
 import { visibleReportRefetchInterval } from "@/lib/query-refresh";
+import { hideStudentReportAnalysisModels } from "@/lib/student-report-visibility";
 
 interface StudentReport extends Omit<ReportViewProps, "scope" | "title" | "subtitle" | "analyzeSession"> {
   student: { name: string; grade?: string | null; className?: string | null; studentNumber?: string | null };
@@ -30,7 +31,6 @@ async function analyzeStudentSession(sessionId: string, failMsg: string): Promis
     totalComments: d.totals?.comments,
     totalLikes: d.totals?.likesGiven,
     analyzedAt: d.analyzedAt,
-    analysisModel: d.analysisModel,
   };
 }
 
@@ -78,10 +78,11 @@ export function StudentReportView() {
         weekly={data.weekly}
         monthly={data.monthly}
         classification={data.classification}
-        sessions={data.sessions}
+        sessions={hideStudentReportAnalysisModels(data.sessions)}
         analyzeSession={(id) => analyzeStudentSession(id, t("analysisFailed"))}
         analysisCacheKey="student-self"
         canAnalyze={false}
+        showAnalysisModel={false}
         showPrintButton={false}
       />
     </div>
