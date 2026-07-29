@@ -9,13 +9,15 @@ const DEMO_LAUNCH_URL =
   "https://questioning-based-inquiry.vercel.app/demo/launch";
 
 const SOURCE_DIRECTORIES = [
-  ".github/",
-  "e2e/",
   "messages/",
   "prisma/",
   "public/",
   "scripts/",
   "src/",
+];
+
+const EXCLUDED_SOURCE_DIRECTORIES = [
+  "src/__tests__/",
 ];
 
 const SOURCE_ROOT_FILES = new Set([
@@ -27,21 +29,20 @@ const SOURCE_ROOT_FILES = new Set([
   "next.config.js",
   "package-lock.json",
   "package.json",
-  "playwright.config.ts",
   "postcss.config.js",
   "sentry.edge.config.ts",
   "sentry.server.config.ts",
   "tailwind.config.ts",
   "tsconfig.json",
   "vercel.json",
-  "vitest.config.ts",
 ]);
 
 function sourceFileAllowed(relativePath) {
   if (
     relativePath.startsWith("/") ||
     relativePath.split("/").includes("..") ||
-    (relativePath.startsWith(".env") && relativePath !== ".env.example")
+    (relativePath.startsWith(".env") && relativePath !== ".env.example") ||
+    EXCLUDED_SOURCE_DIRECTORIES.some((directory) => relativePath.startsWith(directory))
   ) {
     return false;
   }

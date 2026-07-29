@@ -70,6 +70,11 @@ describe("윈도우 USB 제출 묶음", () => {
     expect(existsSync(join(sourceDir, ".env.example"))).toBe(true);
     expect(existsSync(join(sourceDir, ".env.local"))).toBe(false);
     expect(existsSync(join(sourceDir, ".git"))).toBe(false);
+    expect(existsSync(join(sourceDir, ".github"))).toBe(false);
+    expect(existsSync(join(sourceDir, "e2e"))).toBe(false);
+    expect(existsSync(join(sourceDir, "src", "__tests__"))).toBe(false);
+    expect(existsSync(join(sourceDir, "playwright.config.ts"))).toBe(false);
+    expect(existsSync(join(sourceDir, "vitest.config.ts"))).toBe(false);
     expect(existsSync(join(sourceDir, "node_modules"))).toBe(false);
     expect(result.ticketHash).toMatch(/^[a-f0-9]{64}$/);
   });
