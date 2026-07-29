@@ -5,6 +5,7 @@ import {
   type LocalizedText,
 } from "@/lib/question-game-i18n";
 import { isKabaQuestionRewrite } from "@/lib/question-game-kaba-rules";
+import { getQuestionInputQualityIssue } from "@/lib/question-game-question-quality";
 import { evaluateStoryDiceAnswerQuality } from "@/lib/question-game-story-answer-quality";
 import type {
   StoryDiceAnswerReviewRequest,
@@ -1262,6 +1263,8 @@ function submitStoryQuestion(
   if (!isCurrentTurn(context, state)) return forbidden(context, "현재 질문자만 질문할 수 있습니다");
   const parsed = parseQuestionBody(context, [...COMMON_ROUND_BODY_KEYS, "locale", "question"]);
   if (!parsed) return invalid(context, "질문을 이백 자 이내의 물음형으로 써 주세요");
+  const qualityIssue = getQuestionInputQualityIssue(parsed.question, parsed.locale);
+  if (qualityIssue) return invalid(context, qualityIssue);
   if (state.pairs.some(({ question }) =>
     normalizedQuestion(question) === normalizedQuestion(parsed.question))) {
     return invalid(context, "이미 나온 질문과 다른 질문을 써 주세요");
@@ -1478,6 +1481,8 @@ function applyDiceCommand(context: QuestionGameRoomEngineContext): QuestionGameE
   if (!isCurrentTurn(context, state)) return forbidden(context, "현재 참가자만 질문할 수 있습니다");
   const parsed = parseQuestionBody(context, [...COMMON_ROUND_BODY_KEYS, "locale", "question"]);
   if (!parsed) return invalid(context, "질문을 이백 자 이내의 물음형으로 써 주세요");
+  const qualityIssue = getQuestionInputQualityIssue(parsed.question, parsed.locale);
+  if (qualityIssue) return invalid(context, qualityIssue);
   if (state.questions.some(({ question }) => normalizedQuestion(question) === normalizedQuestion(parsed.question))) {
     return invalid(context, "이미 나온 질문과 다른 질문을 써 주세요");
   }
@@ -1580,6 +1585,8 @@ function applyRelayCommand(context: QuestionGameRoomEngineContext): QuestionGame
   if (!isCurrentTurn(context, state)) return forbidden(context, "현재 참가자만 질문을 이을 수 있습니다");
   const parsed = parseQuestionBody(context, [...COMMON_ROUND_BODY_KEYS, "locale", "question"]);
   if (!parsed) return invalid(context, "질문을 이백 자 이내의 물음형으로 써 주세요");
+  const qualityIssue = getQuestionInputQualityIssue(parsed.question, parsed.locale);
+  if (qualityIssue) return invalid(context, qualityIssue);
   if (state.questions.some(({ question }) => normalizedQuestion(question) === normalizedQuestion(parsed.question))) {
     return invalid(context, "이미 나온 질문과 다른 질문을 써 주세요");
   }
@@ -1678,6 +1685,8 @@ function applyKabaCommand(context: QuestionGameRoomEngineContext): QuestionGameE
   if (!isStoredText(question, QUESTION_GAME_LIMITS.question) || checkProfanity(question).flagged) {
     return invalid(context, "바꾼 문장을 이백 자 이내의 알맞은 표현으로 써 주세요");
   }
+  const qualityIssue = getQuestionInputQualityIssue(question, context.body.locale);
+  if (qualityIssue) return invalid(context, qualityIssue);
   const prompt = state.sentencePlan[state.attempts.length];
   if (!prompt) return corrupt(context, "카바 문장 순서가 손상되었습니다");
   const correct = isKabaQuestionRewrite(

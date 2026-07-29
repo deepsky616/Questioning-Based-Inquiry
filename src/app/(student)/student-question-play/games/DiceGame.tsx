@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useEffectEvent, useRef } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useAIPlay } from "./useAIPlay";
@@ -64,6 +64,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
   } = useGameRun();
   const aiRequestRef = useRef(0);
   const rollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const aiRollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentPlayer = players[currentPlayerIdx] ?? text.me;
   const isAITurn = isAI && currentPlayerIdx === 1;
@@ -80,7 +81,9 @@ export default function DiceGame({ game, onBack, config }: Props) {
     if (backBlocked) return;
     aiRequestRef.current += 1;
     if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+    if (aiRollTimerRef.current) clearTimeout(aiRollTimerRef.current);
     rollTimerRef.current = null;
+    aiRollTimerRef.current = null;
     resetRun();
     onBack();
   }
@@ -88,6 +91,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
   useEffect(() => () => {
     aiRequestRef.current += 1;
     if (rollTimerRef.current) clearInterval(rollTimerRef.current);
+    if (aiRollTimerRef.current) clearTimeout(aiRollTimerRef.current);
   }, []);
 
   async function recordAiQuestion(activeRun: GameRunSnapshot) {
@@ -146,6 +150,32 @@ export default function DiceGame({ game, onBack, config }: Props) {
       }
     }, 100);
   }
+
+  const runAutomaticRoll = useEffectEvent(() => {
+    void roll();
+  });
+
+  useEffect(() => {
+    if (
+      !isAITurn ||
+      phase !== "idle" ||
+      run?.nextStep !== "AI_ROLL" ||
+      runBusy ||
+      runConflict !== null ||
+      runError ||
+      aiRollTimerRef.current
+    ) return;
+
+    aiRollTimerRef.current = setTimeout(() => {
+      aiRollTimerRef.current = null;
+      runAutomaticRoll();
+    }, 500);
+
+    return () => {
+      if (aiRollTimerRef.current) clearTimeout(aiRollTimerRef.current);
+      aiRollTimerRef.current = null;
+    };
+  }, [isAITurn, phase, run?.nextStep, runBusy, runConflict, runError]);
 
   async function retryAiQuestion() {
     if (!run || run.nextStep !== "AI_QUESTION" || runBusy) return;
@@ -314,7 +344,7 @@ export default function DiceGame({ game, onBack, config }: Props) {
         </div>
       )}
 
-      {!runConflict && runError && phase !== "ai-turn" && (
+      {!runConflict && runError && phase !== "ai-turn" && !(phase === "idle" && isAITurn) && (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200 px-3 py-2 text-sm">
           {runError}
         </div>
@@ -354,7 +384,9 @@ export default function DiceGame({ game, onBack, config }: Props) {
 
         {phase === "idle" && (
           <p className="text-muted-foreground text-sm text-center">
-            {isMulti ? `${text.turnOf(currentPlayer)}!` : text.diceIdleSolo}
+            {isAITurn
+              ? text.diceAiRollPreparing
+              : isMulti ? `${text.turnOf(currentPlayer)}!` : text.diceIdleSolo}
           </p>
         )}
 
@@ -372,13 +404,33 @@ export default function DiceGame({ game, onBack, config }: Props) {
           </div>
         )}
 
-        {phase === "idle" && (
+        {phase === "idle" && !isAITurn && (
           <Button onClick={() => void roll()}
             className="w-full py-4 text-lg font-black text-white rounded-xl"
             style={{ background: "linear-gradient(135deg, #4338CA, #6D28D9)" }}
             disabled={runBusy || runConflict !== null}>
             {runPending === "create" || runPending === "action" ? text.loading : text.diceRoll}
           </Button>
+        )}
+
+        {phase === "idle" && isAITurn && runError && (
+          <div className="w-full space-y-3">
+            <div
+              role="alert"
+              className="rounded-xl border border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200 px-3 py-2 text-sm"
+            >
+              {runError}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full font-bold"
+              disabled={runBusy || runConflict !== null}
+              onClick={() => void roll()}
+            >
+              {text.diceAiRollRetry}
+            </Button>
+          </div>
         )}
 
         {phase === "ai-turn" && (

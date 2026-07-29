@@ -5,6 +5,7 @@ import {
   getQuestionGameRoomTarget,
 } from "@/lib/question-game-rules";
 import { isQuestionFormForLocale } from "@/lib/question-game-i18n";
+import { getQuestionInputQualityIssue } from "@/lib/question-game-question-quality";
 import {
   assignLadderTopics,
   generateLadderGrid,
@@ -681,6 +682,8 @@ function submitLadderQuestion(
   if (checkProfanity(question).flagged) {
     return invalid(context, "비속어가 없는 질문으로 고쳐 주세요");
   }
+  const qualityIssue = getQuestionInputQualityIssue(question, locale);
+  if (qualityIssue) return invalid(context, qualityIssue);
 
   const questions: LadderQuestion[] = [
     ...state.questions,

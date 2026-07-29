@@ -708,6 +708,7 @@ describe("질문 사다리 방 판정기", () => {
       ["언어", { locale: "fr", question: "Why is it useful?" }],
       ["빈 질문", { question: "   " }],
       ["질문 모양", { question: "중요한 주제입니다" }],
+      ["내용 없는 질문", { question: "왜요?" }],
       ["길이", { question: `${"가".repeat(200)}?` }],
       ["비속어", { question: "왜 시발이라고 말하나요?" }],
     ] as const)("잘못된 %s을 거절한다", (_name, options) => {

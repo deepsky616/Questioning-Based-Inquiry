@@ -23,6 +23,7 @@ import {
 } from "@/lib/question-game-ai-proof";
 import { isQuestionFormForLocale } from "@/lib/question-game-i18n";
 import { isKabaQuestionRewrite } from "@/lib/question-game-kaba-rules";
+import { getQuestionInputQualityIssue } from "@/lib/question-game-question-quality";
 import {
   isQuestionGameRunRecord as isRecord,
   QUESTION_GAME_REQUEST_ID_PATTERN,
@@ -387,13 +388,17 @@ function validateQuestionText(value: unknown, locale: RunLocale) {
   if (!isQuestionFormForLocale(question, locale)) {
     throw new QuestionGameRunError("질문 형태로 입력해 주세요", 400);
   }
+  const qualityIssue = getQuestionInputQualityIssue(question, locale);
+  if (qualityIssue) {
+    throw new QuestionGameRunError(qualityIssue, 400);
+  }
   if (checkProfanity(question).flagged) {
     throw new QuestionGameRunError("질문에 사용할 수 없는 표현이 있습니다", 400);
   }
   return { question, questionLength };
 }
 
-function validateKabaAttemptText(value: unknown) {
+function validateKabaAttemptText(value: unknown, locale: RunLocale) {
   const question = typeof value === "string" ? value.trim() : "";
   const questionLength = [...question].length;
   if (!question || questionLength > QUESTION_GAME_LIMITS.question) {
@@ -402,6 +407,10 @@ function validateKabaAttemptText(value: unknown) {
   const meaningfulCharacterCount = question.match(/[\p{L}\p{N}]/gu)?.length ?? 0;
   if (meaningfulCharacterCount < 2) {
     throw new QuestionGameRunError("바꾼 문장에는 글자나 숫자를 두 글자 이상 넣어 주세요", 400);
+  }
+  const qualityIssue = getQuestionInputQualityIssue(question, locale);
+  if (qualityIssue) {
+    throw new QuestionGameRunError(qualityIssue, 400);
   }
   if (checkProfanity(question).flagged) {
     throw new QuestionGameRunError("바꾼 문장에 사용할 수 없는 표현이 있습니다", 400);
@@ -3819,7 +3828,7 @@ async function submitKabaAttempt(
   now: Date,
 ) {
   const locale = parseLocale(input.locale);
-  const { question, questionLength } = validateKabaAttemptText(input.question);
+  const { question, questionLength } = validateKabaAttemptText(input.question, locale);
   const requestInputHash = hashActivityText("question", question);
   const requestFingerprint = fingerprint({
     action: input.action,

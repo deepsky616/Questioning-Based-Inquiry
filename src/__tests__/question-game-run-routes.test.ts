@@ -1430,9 +1430,14 @@ describe("질문놀이 서버 실행 경로", () => {
 
     const punctuationOnly = await submitQuestion(0, "???");
     const oneMeaningfulCharacter = await submitQuestion(0, "별?");
+    const lowEffortQuestion = await submitQuestion(0, "그냥요?");
 
     expect(punctuationOnly.status).toBe(400);
     expect(oneMeaningfulCharacter.status).toBe(400);
+    expect(lowEffortQuestion.status).toBe(400);
+    await expect(lowEffortQuestion.json()).resolves.toMatchObject({
+      error: "주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요",
+    });
     expect(activities).toHaveLength(0);
     expect((runs.get("run-1")?.state as { questionCount: number }).questionCount).toBe(0);
   });
@@ -3145,6 +3150,7 @@ describe("까바놀이 서버 실행 경로", () => {
   it("빈 입력과 문장 부호 및 비속어와 다른 실행 언어는 활동으로 기록하지 않는다", async () => {
     await createKaba();
     const punctuation = await submitKabaAttempt(0, "???");
+    const lowEffort = await submitKabaAttempt(0, "몰라요?");
     const profanity = await submitKabaAttempt(0, "fuck인가요?");
     const wrongLocale = await submitKabaAttempt(
       0,
@@ -3155,6 +3161,7 @@ describe("까바놀이 서버 실행 경로", () => {
     );
 
     expect(punctuation.status).toBe(400);
+    expect(lowEffort.status).toBe(400);
     expect(profanity.status).toBe(400);
     expect(wrongLocale.status).toBe(409);
     expect(activities).toHaveLength(0);

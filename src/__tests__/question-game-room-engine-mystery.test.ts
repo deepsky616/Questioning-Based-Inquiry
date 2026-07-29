@@ -434,6 +434,26 @@ describe("미스터리 박스 방 판정기", () => {
     expect(state.private).toEqual({ itemId: "apple" });
   });
 
+  it("내용이 없는 질문은 활동과 차례에 반영하지 않는다", () => {
+    const room = prepareRoom();
+    const result = applyMystery(room, "mystery-ask", {
+      locale: "ko",
+      question: "그냥요?",
+    });
+
+    expect(result).toMatchObject({
+      kind: "invalid",
+      room,
+      message: "주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요",
+    });
+    expect(readMysteryState(result.room.gameState)).toMatchObject({
+      round: 1,
+      currentTurnIdx: 0,
+      history: [],
+      scores: { host: 0, guest: 0 },
+    });
+  });
+
   it("친구 방에서 사과는 동물 질문에 아니오로 답한다", () => {
     const result = applyMystery(
       prepareRoom(),

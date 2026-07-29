@@ -195,6 +195,19 @@ describe("참여 인원별 공유 라운드", () => {
 });
 
 describe("질문 주사위 판정기", () => {
+  it("내용이 없는 질문은 차례와 기록에 반영하지 않는다", () => {
+    const room = start("dice", 2);
+    const rolled = changed(run(room, "host", "dice-roll", 8));
+    const result = run(rolled, "host", "dice-submit-question", 9, {
+      locale: "ko",
+      question: "그냥요?",
+    });
+
+    expect(result.kind).toBe("invalid");
+    expect(result.message).toBe("주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요");
+    expect(readDicePublicState(result.room.gameState)?.questions).toEqual([]);
+  });
+
   it("서버가 면을 정하고 모두 한 번씩 하면 다음 라운드로 넘긴다", () => {
     let room = start("dice", 2);
     room = submitDiceTurn(room, 10);
@@ -256,6 +269,18 @@ describe("질문 주사위 판정기", () => {
 });
 
 describe("질문 릴레이 판정기", () => {
+  it("내용이 없는 질문은 질문 흐름에 추가하지 않는다", () => {
+    const room = setRelayTopic();
+    const result = run(room, "host", "relay-submit-question", 58, {
+      locale: "ko",
+      question: "왜요?",
+    });
+
+    expect(result.kind).toBe("invalid");
+    expect(result.message).toBe("주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요");
+    expect(readRelayPublicState(result.room.gameState)?.questions).toEqual([]);
+  });
+
   it("라운드 필드가 없던 옛 방 체인도 계속 읽는다", () => {
     const oldRoom = waiting("relay", 2);
     oldRoom.chain = [{
@@ -383,6 +408,21 @@ describe("질문 릴레이 판정기", () => {
 });
 
 describe("카바 판정기", () => {
+  it("내용이 없는 질문은 틀린 시도로도 기록하지 않는다", () => {
+    const room = preparedKaba(2);
+    const result = run(room, "host", "kaba-submit-question", 89, {
+      locale: "ko",
+      question: "아무거나요?",
+    });
+
+    expect(result).toMatchObject({
+      kind: "invalid",
+      room,
+      message: "주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요",
+    });
+    expect(readKabaPublicState(result.room.gameState)?.attempts).toEqual([]);
+  });
+
   it.each([[2, 6], [8, 16]])("참가자 %i명에게 겹치지 않는 문장 %i개를 서버가 배정한다", (count, total) => {
     const room = preparedKaba(count, () => 0.37);
     const state = readKabaPublicState(room.gameState)!;

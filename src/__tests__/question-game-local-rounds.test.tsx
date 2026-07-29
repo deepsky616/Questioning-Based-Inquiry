@@ -448,7 +448,7 @@ function diceRunSnapshot(
 
 function installDiceRunServer(
   mode: LocalMode,
-  options: { failFirstAiTurn?: boolean } = {},
+  options: { failFirstAiRoll?: boolean; failFirstAiTurn?: boolean } = {},
 ) {
   const runId = `dice-${mode}`;
   let version = 1;
@@ -457,6 +457,7 @@ function installDiceRunServer(
   let nextStep: "STUDENT_ROLL" | "STUDENT_QUESTION" | "AI_ROLL" | "AI_QUESTION" | "COMPLETE" = "STUDENT_ROLL";
   let pendingRoll: { actor: "STUDENT" | "AI"; face: number } | null = null;
   let status = "ACTIVE";
+  let failedAiRoll = false;
   let failedAiTurn = false;
   let result: Record<string, unknown> | null = null;
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -505,6 +506,10 @@ function installDiceRunServer(
     }
     if (url.endsWith("/actions") && body.action === "dice-roll") {
       const actor = nextStep === "AI_ROLL" ? "AI" : "STUDENT";
+      if (actor === "AI" && options.failFirstAiRoll && !failedAiRoll) {
+        failedAiRoll = true;
+        return Response.json({ error: "인공지능 주사위 응답이 지연되고 있습니다" }, { status: 503 });
+      }
       pendingRoll = { actor, face: (version % 6) + 1 };
       nextStep = actor === "AI" ? "AI_QUESTION" : "STUDENT_QUESTION";
       version += 1;
@@ -1049,20 +1054,24 @@ describe("질문 주사위 지역 목표", () => {
     expect(screen.getByText("+5점 적립!")).toBeVisible();
   });
 
-  it("인공지능 질문을 기록하고 학생에게 돌려보낸 뒤 학생 질문 셋에서 끝난다", async () => {
+  it("학생 질문 뒤 인공지능이 주사위를 자동으로 굴리고 질문한 뒤 학생 질문 셋에서 끝난다", async () => {
     const fetchMock = installDiceRunServer("ai");
     aiMocks.ask.mockResolvedValue({ text: "질문을 잘 만들었어요." });
     renderLocalGame("dice", DiceGame, "ai");
 
     await rollQuestionDice();
     await submitDiceQuestion("첫째 학생 질문은 무엇인가요?");
-    await rollQuestionDice();
+    expect(screen.queryByRole("button", { name: /주사위.*굴리기/ })).not.toBeInTheDocument();
+    expect(screen.getByText("인공지능이 주사위를 준비하고 있어요...")).toBeVisible();
+    await advance(2100);
+    await flushPromises();
     expect(screen.getByText("인공지능 예시 질문 1은 무엇인가요?")).toBeVisible();
     expect(screen.getByText(/민준.*🎲/)).toBeVisible();
 
     await rollQuestionDice();
     await submitDiceQuestion("둘째 학생 질문은 무엇인가요?");
-    await rollQuestionDice();
+    await advance(2100);
+    await flushPromises();
     expect(screen.getByText("인공지능 예시 질문 2은 무엇인가요?")).toBeVisible();
 
     await rollQuestionDice();
@@ -1078,7 +1087,8 @@ describe("질문 주사위 지역 목표", () => {
     renderLocalGame("dice", DiceGame, "ai");
     await rollQuestionDice();
     await submitDiceQuestion("첫째 학생 질문은 무엇인가요?");
-    await rollQuestionDice();
+    await advance(2100);
+    await flushPromises();
 
     expect(screen.getByRole("button", { name: /인공지능 질문 다시 만들기/ })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /인공지능 질문 다시 만들기/ }));
@@ -1087,6 +1097,33 @@ describe("질문 주사위 지역 목표", () => {
     expect(screen.getByText("인공지능 예시 질문 1은 무엇인가요?")).toBeVisible();
     expect(screen.getByText(/민준.*🎲/)).toBeVisible();
     expect(screen.getByRole("button", { name: /주사위.*굴리기/ })).toBeEnabled();
+  });
+
+  it("인공지능 자동 굴리기가 실패하면 반복 요청하지 않고 직접 다시 시도한다", async () => {
+    const fetchMock = installDiceRunServer("ai", { failFirstAiRoll: true });
+    renderLocalGame("dice", DiceGame, "ai");
+    await rollQuestionDice();
+    await submitDiceQuestion("첫째 학생 질문은 무엇인가요?");
+
+    await advance(800);
+    await flushPromises();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "인공지능 주사위 응답이 지연되고 있습니다",
+    );
+    expect(screen.getByRole("button", { name: "인공지능 주사위 다시 굴리기" }))
+      .toBeVisible();
+
+    await advance(5000);
+    const rollRequestsBeforeRetry = fetchMock.mock.calls.filter(([, init]) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      return body.action === "dice-roll";
+    });
+    expect(rollRequestsBeforeRetry).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "인공지능 주사위 다시 굴리기" }));
+    await advance(1600);
+    await flushPromises();
+    expect(screen.getByText("인공지능 예시 질문 1은 무엇인가요?")).toBeVisible();
   });
 
   it("셋째 학생 질문은 끝나지 않는 피드백을 기다리지 않고 바로 끝난다", async () => {
@@ -1103,10 +1140,12 @@ describe("질문 주사위 지역 목표", () => {
 
     await rollQuestionDice();
     await submitDiceQuestion("첫째 학생 질문은 무엇인가요?");
-    await rollQuestionDice();
+    await advance(2100);
+    await flushPromises();
     await rollQuestionDice();
     await submitDiceQuestion("둘째 학생 질문은 무엇인가요?");
-    await rollQuestionDice();
+    await advance(2100);
+    await flushPromises();
     await rollQuestionDice();
 
     fireEvent.change(screen.getByRole("textbox"), {

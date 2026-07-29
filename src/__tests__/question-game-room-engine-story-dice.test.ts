@@ -143,6 +143,21 @@ function completePair(
 }
 
 describe("이야기 주사위 방 판정기", () => {
+  it("내용이 없는 질문은 대답 차례로 넘기지 않는다", () => {
+    const room = storyReady();
+    const result = run(room, "guest-1", "story-submit-question", 7, {
+      locale: "ko",
+      question: "몰라요?",
+    });
+
+    expect(result).toMatchObject({
+      kind: "invalid",
+      room,
+      message: "주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요",
+    });
+    expect(readStoryDiceState(result.room.gameState)?.phase).toBe("question");
+  });
+
   it("참가자가 세 명까지면 세 순환, 네 명부터면 두 순환으로 정한다", () => {
     expect(started(2).gameState.maxRounds).toBe(3);
     expect(started(3).gameState.maxRounds).toBe(3);
