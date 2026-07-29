@@ -27,6 +27,14 @@ const NATURAL_INFORMAL_QUESTIONS = [
   "햇빛이 따뜻하니?", "구름이 하얗니?", "고래가 바다에 사니?", "개구리가 우니?", "아기 새가 둥지에 있니?",
 ] as const;
 
+const NATURAL_GGALKKA_QUESTIONS = [
+  "고양이가 잘까?", "개미가 걸을까?", "토끼가 뛸까?", "꽃이 예쁠까?", "사과가 빨갈까?",
+  "하늘이 파랄까?", "비가 올까?", "새가 날아갈까?", "강아지가 짖을까?", "물고기가 헤엄칠까?",
+  "아이가 웃을까?", "나무가 흔들릴까?", "별이 빛날까?", "바람이 불까?", "눈이 내릴까?",
+  "나비가 날개를 펼까?", "달이 밝을까?", "파도가 칠까?", "벌이 꿀을 모을까?", "원숭이가 나무에 오를까?",
+  "햇빛이 따뜻할까?", "구름이 하얄까?", "고래가 바다에 살까?", "개구리가 울까?", "아기 새가 둥지에 있을까?",
+] as const;
+
 describe("까바놀이 내용 보존 판정", () => {
   it.each(["ko", "en"] as const)("%s 문장 스물다섯 개의 알맞은 질문을 모두 인정한다", (locale) => {
     KABA_SENTENCES[locale].forEach((sentence, index) => {
@@ -46,6 +54,15 @@ describe("까바놀이 내용 보존 판정", () => {
     });
   });
 
+  it("한국어 문장 스물다섯 개의 자연스러운 -ㄹ까 질문을 모두 인정한다", () => {
+    KABA_SENTENCES.ko.forEach((sentence, index) => {
+      expect(
+        isKabaQuestionRewrite(sentence, NATURAL_GGALKKA_QUESTIONS[index], "ko"),
+        `${sentence} -> ${NATURAL_GGALKKA_QUESTIONS[index]}`,
+      ).toBe(true);
+    });
+  });
+
   it.each([
     ["사과가 빨갛다", "사과가 빨갛냐?"],
     ["하늘이 파랗다", "하늘이 파랗냐?"],
@@ -58,6 +75,7 @@ describe("까바놀이 내용 보존 판정", () => {
 
   it.each([
     ["개구리가 울다", "개구리가 노나요?", "ko"],
+    ["하늘이 파랗다", "하늘이 맑을까?", "ko"],
     ["벌이 꿀을 모은다", "벌이 모으나요?", "ko"],
     ["달이 밝다", "달팽이가 밝은가요?", "ko"],
     ["눈이 내린다", "눈사람이 내리나요?", "ko"],
