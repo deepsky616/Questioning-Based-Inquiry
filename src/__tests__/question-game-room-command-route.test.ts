@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   applyQuestionGameRoomCommand: vi.fn(),
   findMysteryAiAnswerRequest: vi.fn(),
   generateMysteryAiAnswer: vi.fn(),
+  generateStoryDiceAnswerReview: vi.fn(),
+  fallbackStoryDiceAnswerReview: vi.fn(),
   leaveQuestionGameRoom: vi.fn(),
   restartQuestionGameRoom: vi.fn(),
   hasQuestionGameRoomEngine: vi.fn(() => false),
@@ -69,6 +71,15 @@ vi.mock("@/lib/question-game-room-engine", () => ({
 vi.mock("@/lib/mystery-box-ai-answer", () => ({
   findMysteryAiAnswerRequest: mocks.findMysteryAiAnswerRequest,
   generateMysteryAiAnswer: mocks.generateMysteryAiAnswer,
+}));
+vi.mock("@/lib/question-game-story-answer-review", () => ({
+  isStoryDiceAnswerReviewRequest: (value: unknown) =>
+    typeof value === "object" &&
+    value !== null &&
+    "reviewType" in value &&
+    value.reviewType === "story-dice-answer",
+  generateStoryDiceAnswerReview: mocks.generateStoryDiceAnswerReview,
+  fallbackStoryDiceAnswerReview: mocks.fallbackStoryDiceAnswerReview,
 }));
 vi.mock("@/lib/logger", () => ({
   logger: { warn: mocks.loggerWarn },
@@ -195,6 +206,15 @@ beforeEach(() => {
   mocks.applyQuestionGameRoomCommand.mockReset();
   mocks.findMysteryAiAnswerRequest.mockReset();
   mocks.generateMysteryAiAnswer.mockReset();
+  mocks.generateStoryDiceAnswerReview.mockReset();
+  mocks.fallbackStoryDiceAnswerReview.mockReset().mockImplementation(
+    (request: Record<string, unknown>) => ({
+      ...request,
+      decision: "accept",
+      confidence: "low",
+      source: "FALLBACK",
+    }),
+  );
   mocks.leaveQuestionGameRoom.mockReset();
   mocks.restartQuestionGameRoom.mockReset();
   mocks.hasQuestionGameRoomEngine.mockReset().mockReturnValue(false);
@@ -1031,6 +1051,140 @@ describe("미스터리 박스 에이아이 해결 경계", () => {
     );
     expect(mocks.generateMysteryAiAnswer).toHaveBeenCalledOnce();
     expect(mocks.saveGameRoom).toHaveBeenCalledOnce();
+  });
+});
+
+describe("이야기 주사위 대답 관련성 해결 경계", () => {
+  const request = {
+    reviewType: "story-dice-answer" as const,
+    scope: "room" as const,
+    requestId: COMMAND_ID,
+    expectedVersion: 1,
+    ownerId: "user-1",
+    locale: "ko" as const,
+    story: "토끼가 학교에서 책을 찾았어요.",
+    question: "토끼는 왜 책을 찾았나요?",
+    answer: "피자가 맛있어요.",
+    intent: "reason" as const,
+    message: "이유를 묻는 질문이에요. 까닭을 넣어 한 문장으로 답해 보세요.",
+    roomCode: "1234",
+    playId: PLAY_ID,
+    roundId: ROUND_ID,
+  };
+
+  function resolutionRequired(room: GameRoom) {
+    return {
+      kind: "resolution-required" as const,
+      room,
+      resolution: request,
+      message: request.message,
+    };
+  }
+
+  it("관련성이 확인된 대답만 같은 명령으로 다시 판정해 저장한다", async () => {
+    const room = makeV2Room({ gameId: "story-dice" });
+    const candidate = makeV2Room({
+      gameId: "story-dice",
+      gameState: {
+        stateVersion: 2,
+        phase: "question",
+        recentCommandIds: [COMMAND_ID],
+      },
+    });
+    const resolution = {
+      ...request,
+      decision: "accept" as const,
+      confidence: "high" as const,
+      source: "AI" as const,
+    };
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.applyQuestionGameRoomCommand
+      .mockReturnValueOnce(resolutionRequired(room))
+      .mockReturnValueOnce({ kind: "changed", room: candidate });
+    mocks.generateStoryDiceAnswerReview.mockResolvedValue(resolution);
+    mocks.saveGameRoom.mockResolvedValue({
+      kind: "saved",
+      room: { ...candidate, version: 2 },
+    });
+
+    const response = await patch(commandBody({
+      action: "story-submit-answer",
+      answer: request.answer,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "game-room-story-answer:user-1",
+      20,
+    );
+    expect(mocks.generateStoryDiceAnswerReview).toHaveBeenCalledWith(
+      "user-1",
+      request,
+    );
+    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ storyAnswerReviewResolution: resolution }),
+    );
+    expect(mocks.saveGameRoom).toHaveBeenCalledWith(candidate);
+  });
+
+  it("관련 없는 대답은 같은 차례에서 다시 쓰도록 하고 저장하지 않는다", async () => {
+    const room = makeV2Room({ gameId: "story-dice" });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.applyQuestionGameRoomCommand.mockReturnValueOnce(
+      resolutionRequired(room),
+    );
+    mocks.generateStoryDiceAnswerReview.mockResolvedValue({
+      ...request,
+      decision: "retry",
+      confidence: "high",
+      source: "AI",
+    });
+
+    const response = await patch(commandBody({
+      action: "story-submit-answer",
+      answer: request.answer,
+    }));
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      error: request.message,
+      storyAnswerRewriteRequired: true,
+    });
+    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenCalledOnce();
+    expect(mocks.saveGameRoom).not.toHaveBeenCalled();
+  });
+
+  it("인공지능 확인이 실패하면 명확한 규칙 판정을 유지하며 놀이를 막지 않는다", async () => {
+    const room = makeV2Room({ gameId: "story-dice" });
+    const candidate = makeV2Room({ gameId: "story-dice" });
+    mocks.loadGameRoom.mockResolvedValue(room);
+    mocks.applyQuestionGameRoomCommand
+      .mockReturnValueOnce(resolutionRequired(room))
+      .mockReturnValueOnce({ kind: "changed", room: candidate });
+    mocks.generateStoryDiceAnswerReview.mockRejectedValue(
+      new Error("제공자 응답 오류"),
+    );
+    mocks.saveGameRoom.mockResolvedValue({
+      kind: "saved",
+      room: { ...candidate, version: 2 },
+    });
+
+    const response = await patch(commandBody({
+      action: "story-submit-answer",
+      answer: request.answer,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.fallbackStoryDiceAnswerReview).toHaveBeenCalledWith(request);
+    expect(mocks.applyQuestionGameRoomCommand).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        storyAnswerReviewResolution: expect.objectContaining({
+          source: "FALLBACK",
+        }),
+      }),
+    );
   });
 });
 

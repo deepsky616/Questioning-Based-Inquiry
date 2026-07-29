@@ -8,6 +8,10 @@ import type {
   MysterySelectionProfile,
 } from "@/lib/mystery-box-rules";
 import type {
+  StoryDiceAnswerReviewRequest,
+  StoryDiceAnswerReviewResolution,
+} from "@/lib/question-game-story-answer-review";
+import type {
   GameRoom,
   RoomCommandResult,
 } from "@/lib/question-games-data";
@@ -49,6 +53,7 @@ export interface QuestionGameRoomCommandInput {
   randomUUID: () => string;
   mysteryAnswerResolution?: MysteryAnswerResolution;
   mysterySelectionProfile?: MysterySelectionProfile;
+  storyAnswerReviewResolution?: StoryDiceAnswerReviewResolution;
 }
 
 export interface QuestionGameRoomEngineContext
@@ -72,7 +77,9 @@ export type QuestionGameEngineResult =
   | {
       kind: "resolution-required";
       room: GameRoom;
-      resolution: Omit<MysteryAnswerResolution, "answer">;
+      resolution:
+        | Omit<MysteryAnswerResolution, "answer">
+        | StoryDiceAnswerReviewRequest;
       message: string;
     }
   | QuestionGameEngineFailure<"invalid">
@@ -367,6 +374,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
     randomUUID,
     mysteryAnswerResolution,
     mysterySelectionProfile,
+    storyAnswerReviewResolution,
   } = input;
 
   if (!room.players.some(({ id }) => id === userId)) {
@@ -491,6 +499,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
         randomUUID: checkedRandomUUID,
         mysteryAnswerResolution,
         mysterySelectionProfile,
+        storyAnswerReviewResolution,
       });
     } catch {
       return unchanged(
@@ -526,6 +535,7 @@ function applyQuestionGameRoomCommandWithResolvedEngine(
       randomUUID: checkedRandomUUID,
       mysteryAnswerResolution,
       mysterySelectionProfile,
+      storyAnswerReviewResolution,
     });
   } catch {
     return unchanged(

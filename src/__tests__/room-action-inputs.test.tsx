@@ -252,6 +252,44 @@ describe("이야기 주사위 입력", () => {
       },
     ]);
   });
+
+  it("관련 없는 대답의 서버 안내를 입력창 아래에 보이고 작성 내용은 유지한다", async () => {
+    const room = storyRoom("answer");
+    const message =
+      "이유를 묻는 질문이에요. 까닭을 넣어 한 문장으로 답해 보세요.";
+    const onAction = vi.fn<RoomActionHandler>(async () => ({
+      ok: false,
+      room,
+      status: 422,
+      reason: "rejected",
+      error: message,
+    }));
+
+    render(
+      <RoomStoryDice
+        game={getGame("story-dice")}
+        room={room}
+        myId="user-1"
+        actionLoading={false}
+        onAction={onAction}
+        onLeave={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", {
+      name: "친구의 질문에 답해 보세요.",
+    });
+    fireEvent.change(input, { target: { value: "피자가 맛있어요." } });
+    fireEvent.click(screen.getByRole("button", { name: /대답 보내기/ }));
+
+    await waitFor(() => expect(onAction).toHaveBeenCalledOnce());
+    expect(input).toHaveValue("피자가 맛있어요.");
+    expect(screen.getByRole("alert")).toHaveTextContent(message);
+    expect(input).toHaveAttribute(
+      "aria-describedby",
+      "room-story-answer-error",
+    );
+  });
 });
 
 describe("게임 방 입력", () => {

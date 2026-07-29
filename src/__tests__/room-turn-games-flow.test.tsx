@@ -109,7 +109,7 @@ function run(
   const roundId = typeof room.gameState.roundId === "string"
     ? room.gameState.roundId
     : undefined;
-  return changed(applyQuestionGameRoomCommand({
+  const input = {
     room,
     userId,
     userName: player.name,
@@ -125,7 +125,24 @@ function run(
     now: ++idIndex,
     random: () => 0,
     randomUUID: () => uuid(),
-  }));
+  };
+  const result = applyQuestionGameRoomCommand(input);
+  if (
+    result.kind === "resolution-required" &&
+    "reviewType" in result.resolution &&
+    result.resolution.reviewType === "story-dice-answer"
+  ) {
+    return changed(applyQuestionGameRoomCommand({
+      ...input,
+      storyAnswerReviewResolution: {
+        ...result.resolution,
+        decision: "accept",
+        confidence: "low",
+        source: "FALLBACK",
+      },
+    }));
+  }
+  return changed(result);
 }
 
 function prepared(gameId: TurnGameId): GameRoom {
@@ -274,6 +291,83 @@ function renderGame(
 }
 
 describe("차례 놀이 명령 흐름", () => {
+  it("성의 없는 대답은 친구 방 기록과 차례를 진행하지 않는다", () => {
+    let room = prepared("story-dice");
+    room = run(room, "user-1", "story-roll");
+    room = run(room, "user-1", "story-submit-story", {
+      story: "토끼가 학교에서 책을 찾았다.",
+    });
+    room = run(room, "user-2", "story-submit-question", {
+      locale: "ko",
+      question: "토끼는 왜 책을 찾았나요?",
+    });
+    const before = structuredClone(room);
+    const result = applyQuestionGameRoomCommand({
+      room,
+      userId: "user-1",
+      userName: "서연",
+      action: "story-submit-answer",
+      body: {
+        commandId: uuid(),
+        expectedCreatedAt: room.createdAt,
+        expectedVersion: room.version,
+        playId: room.playId,
+        roundId: room.gameState.roundId,
+        answer: "몰라요",
+      },
+      now: ++idIndex,
+      random: () => 0,
+      randomUUID: () => uuid(),
+    });
+
+    expect(result).toMatchObject({
+      kind: "invalid",
+      message: expect.stringContaining("이유"),
+      room: before,
+    });
+  });
+
+  it("질문과 관련 없는 완성 문장은 친구 방에 저장하기 전에 확인을 요청한다", () => {
+    let room = prepared("story-dice");
+    room = run(room, "user-1", "story-roll");
+    room = run(room, "user-1", "story-submit-story", {
+      story: "토끼가 학교에서 책을 찾았다.",
+    });
+    room = run(room, "user-2", "story-submit-question", {
+      locale: "ko",
+      question: "토끼는 왜 책을 찾았나요?",
+    });
+    const result = applyQuestionGameRoomCommand({
+      room,
+      userId: "user-1",
+      userName: "서연",
+      action: "story-submit-answer",
+      body: {
+        commandId: uuid(),
+        expectedCreatedAt: room.createdAt,
+        expectedVersion: room.version,
+        playId: room.playId,
+        roundId: room.gameState.roundId,
+        answer: "피자가 맛있어요.",
+      },
+      now: ++idIndex,
+      random: () => 0,
+      randomUUID: () => uuid(),
+    });
+
+    expect(result).toMatchObject({
+      kind: "resolution-required",
+      room,
+      resolution: {
+        reviewType: "story-dice-answer",
+        scope: "room",
+        ownerId: "user-1",
+        question: "토끼는 왜 책을 찾았나요?",
+        answer: "피자가 맛있어요.",
+      },
+    });
+  });
+
   it("준비와 굴리기 명령은 좁은 이름과 본문만 보낸다", async () => {
     const story = start("story-dice");
     const storyAction = vi.fn<RoomActionHandler>(async () => success(story));

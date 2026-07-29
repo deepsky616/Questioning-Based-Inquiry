@@ -12,6 +12,7 @@ import {
   resolveQuestionGameLocale,
 } from "@/lib/question-game-i18n";
 import { isQuestionGameCommandId } from "@/lib/question-game-room-engine";
+import { evaluateStoryDiceAnswerQuality } from "@/lib/question-game-story-answer-quality";
 import {
   readStoryDicePublicState,
   type StoryDiceRoomState,
@@ -114,12 +115,15 @@ export default function RoomStoryDice({
     state?.rolledWords?.event ?? "",
   ].join(":");
   const [input, setInput] = useState("");
+  const [inputError, setInputError] = useState<string | null>(null);
   const retryRef = useRef<{ context: string; value: string } | null>(null);
   const acknowledgementRef = useRef(0);
   const {
     send,
     pendingKind,
     acknowledgementVersion,
+    requestError,
+    clearRequestError,
   } = useRoomCommandRequest({
     room,
     gameId: "story-dice",
@@ -129,9 +133,13 @@ export default function RoomStoryDice({
     lifetimeParts: [actorId, inputContext],
   });
   const requestPending = actionLoading || pendingKind !== null;
+  const answerError = state?.phase === "answer"
+    ? inputError ?? requestError
+    : inputError;
 
   useEffect(() => {
     setInput("");
+    setInputError(null);
     retryRef.current = null;
   }, [inputContext]);
 
@@ -239,12 +247,22 @@ export default function RoomStoryDice({
       action = "story-submit-question";
       body = { playId, roundId: activeState.roundId, locale, question: value };
     } else if (activeState.phase === "answer") {
+      const quality = evaluateStoryDiceAnswerQuality(
+        pendingQuestion,
+        value,
+        activeState.pendingQuestion?.locale ?? locale,
+      );
+      if (quality.decision === "retry") {
+        setInputError(quality.message);
+        return;
+      }
       action = "story-submit-answer";
       body = { playId, roundId: activeState.roundId, answer: value };
     } else {
       return;
     }
     retryRef.current = { context: inputContext, value };
+    setInputError(null);
     const outcome = await send(
       action,
       body,
@@ -374,9 +392,14 @@ export default function RoomStoryDice({
               <Textarea
                 id="story-turn-input"
                 value={input}
-                onChange={(event) => setInput(event.target.value)}
+                onChange={(event) => {
+                  setInput(event.target.value);
+                  setInputError(null);
+                  clearRequestError();
+                }}
                 placeholder={placeholder}
                 maxLength={state.phase === "question" ? 200 : 500}
+                aria-describedby={answerError ? "room-story-answer-error" : undefined}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
@@ -384,6 +407,15 @@ export default function RoomStoryDice({
                   }
                 }}
               />
+              {answerError && (
+                <p
+                  id="room-story-answer-error"
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200"
+                >
+                  {answerError}
+                </p>
+              )}
               <Button type="submit" disabled={!input.trim() || requestPending} className="w-full sm:w-auto">
                 <Send className="mr-2 h-4 w-4" aria-hidden="true" />
                 {pendingKind?.startsWith("story-submit") ? text.sending : submitLabel}

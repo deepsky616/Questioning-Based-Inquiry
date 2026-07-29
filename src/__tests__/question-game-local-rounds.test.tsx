@@ -732,7 +732,14 @@ describe("이야기 주사위 지역 목표", () => {
       .filter(([url]) => String(url).endsWith("/actions"))
       .map(([, init]) => JSON.parse(String(init?.body)));
     expect(actionBodies.filter((body) => body.action === "story-dice-submit-question")).toHaveLength(3);
-    expect(actionBodies.filter((body) => body.action === "story-dice-submit-answer")).toHaveLength(3);
+    expect(actionBodies.filter((body) => body.action === "story-dice-submit-answer")).toEqual(
+      questions.map((question, index) => expect.objectContaining({
+        action: "story-dice-submit-answer",
+        question,
+        story: "서버 해적이 서버 미래도시에서 서버 비밀지도를 찾았어요.",
+        answer: `${index + 1}번째 대답이에요.`,
+      })),
+    );
   });
 
   it("인공지능 모드는 서버 질문과 답변 세 묶음을 마치고 9점을 받는다", async () => {

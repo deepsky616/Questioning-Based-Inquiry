@@ -2310,6 +2310,7 @@ export function useGameRun() {
     text: string,
     locale: string,
     runOverride?: GameRunSnapshot,
+    answerContext?: { question: string; story: string },
   ): Promise<SubmittedStoryDiceAction | null> => {
     const activeRun = runOverride ?? run;
     const expectedStep = action === "story-dice-submit-story"
@@ -2327,7 +2328,15 @@ export function useGameRun() {
     ) return null;
     const generation = generationRef.current;
     const normalizedLocale = locale === "en" ? "en" : "ko";
-    const key = [activeRun.id, activeRun.version, action, normalizedLocale, text].join(":");
+    const key = [
+      activeRun.id,
+      activeRun.version,
+      action,
+      normalizedLocale,
+      text,
+      answerContext?.question ?? "",
+      answerContext?.story ?? "",
+    ].join(":");
     const request = actionRequestRef.current?.key === key
       ? actionRequestRef.current
       : { key, requestId: newRequestId(), question: text };
@@ -2354,6 +2363,9 @@ export function useGameRun() {
             expectedVersion: activeRun.version,
             [field]: text,
             locale: normalizedLocale,
+            ...(action === "story-dice-submit-answer" && answerContext
+              ? answerContext
+              : {}),
           }),
         },
       ));
@@ -3354,12 +3366,15 @@ export function useGameRun() {
   const submitStoryDiceAnswer = useCallback((
     answer: string,
     locale: string,
+    question: string,
+    story: string,
     runOverride?: GameRunSnapshot,
   ) => submitStoryDiceTextAction(
     "story-dice-submit-answer",
     answer,
     locale,
     runOverride,
+    { question, story },
   ), [submitStoryDiceTextAction]);
 
   const complete = useCallback(async (runOverride?: GameRunSnapshot) => {

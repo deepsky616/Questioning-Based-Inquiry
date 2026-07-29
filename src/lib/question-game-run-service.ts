@@ -98,6 +98,11 @@ import {
   type StoryDiceRolledWords,
   type StoryDiceRunState,
 } from "@/lib/question-game-story-dice-definition";
+import type {
+  StoryDiceAnswerReviewRequest,
+  StoryDiceAnswerReviewResolution,
+} from "@/lib/question-game-story-answer-review";
+import { evaluateStoryDiceAnswerQuality } from "@/lib/question-game-story-answer-quality";
 import { QUESTION_GAME_LIMITS } from "@/lib/question-game-rules";
 
 const RUN_LIFETIME_MS = 24 * 60 * 60 * 1_000;
@@ -173,6 +178,17 @@ export function isMysteryQuestionResolutionRequired(
   value: unknown,
 ): value is MysteryQuestionResolutionRequired {
   return isRecord(value) && value.kind === "mystery-resolution-required";
+}
+
+export interface StoryDiceAnswerReviewRequired {
+  kind: "story-dice-answer-review-required";
+  resolution: StoryDiceAnswerReviewRequest;
+}
+
+export function isStoryDiceAnswerReviewRequired(
+  value: unknown,
+): value is StoryDiceAnswerReviewRequired {
+  return isRecord(value) && value.kind === "story-dice-answer-review-required";
 }
 
 interface RelaySettlement {
@@ -4300,11 +4316,28 @@ async function submitStoryDiceAnswer(
   requestId: string,
   expectedVersion: number,
   now: Date,
+  reviewResolution?: StoryDiceAnswerReviewResolution,
 ) {
   const locale = parseLocale(input.locale);
   const { answer, answerLength } = validateStoryDiceAnswerText(input.answer);
+  const { question } = validateQuestionText(input.question, locale);
+  const { story } = validateStoryDiceStoryText(input.story);
+  const quality = evaluateStoryDiceAnswerQuality(question, answer, locale);
+  if (quality.decision === "retry") {
+    throw new QuestionGameRunError(quality.message, 422, {
+      storyAnswerRewriteRequired: true,
+    });
+  }
   const answerHash = hashActivityText("answer", answer);
-  const requestFingerprint = fingerprint({ action: input.action, locale, answerHash });
+  const storyHash = hashActivityText("story", story);
+  const questionContextHash = hashActivityText("question", question);
+  const requestFingerprint = fingerprint({
+    action: input.action,
+    locale,
+    storyHash,
+    questionContextHash,
+    answerHash,
+  });
   return serializable(async (tx) => {
     const actor = await loadActor(tx, actorId, "update");
     const run = await loadOwnedRun(tx, actor.id, runId);
@@ -4335,7 +4368,58 @@ async function submitStoryDiceAnswer(
     if (state.storyDiceNextStep !== "STUDENT_ANSWER" || !state.pendingQuestionHash) {
       throw new QuestionGameRunError("이야기 질문을 먼저 완성해 주세요", 409);
     }
-    const questionHash = state.pendingQuestionHash;
+    if (storyHash !== state.storyHash) {
+      throw new QuestionGameRunError("처음 작성한 이야기가 실행 상태와 일치하지 않습니다", 409);
+    }
+    const questionHash = hashActivityText(
+      mode === "AI" ? "ai-output" : "question",
+      question,
+    );
+    if (questionHash !== state.pendingQuestionHash) {
+      throw new QuestionGameRunError("대답할 질문이 실행 상태와 일치하지 않습니다", 409);
+    }
+    const expectedReview: StoryDiceAnswerReviewRequest = {
+      reviewType: "story-dice-answer",
+      scope: "run",
+      runId: run.id,
+      requestId,
+      expectedVersion,
+      ownerId: actor.id,
+      locale,
+      story,
+      question,
+      answer,
+      storyHash,
+      questionHash,
+      answerHash,
+      intent: quality.intent,
+      message: quality.message,
+    };
+    if (quality.decision === "review") {
+      if (!reviewResolution) {
+        return {
+          kind: "story-dice-answer-review-required",
+          resolution: expectedReview,
+        } satisfies StoryDiceAnswerReviewRequired;
+      }
+      const expectedEntries = Object.entries(expectedReview);
+      if (
+        !expectedEntries.every(([key, value]) =>
+          reviewResolution[key as keyof StoryDiceAnswerReviewRequest] === value) ||
+        (reviewResolution.decision !== "accept" && reviewResolution.decision !== "retry") ||
+        (reviewResolution.confidence !== "high" && reviewResolution.confidence !== "low") ||
+        (reviewResolution.source !== "AI" && reviewResolution.source !== "FALLBACK")
+      ) {
+        throw new QuestionGameRunError("이야기 대답 판정이 실행 상태와 일치하지 않습니다", 409);
+      }
+      if (reviewResolution.decision === "retry") {
+        throw new QuestionGameRunError(quality.message, 422, {
+          storyAnswerRewriteRequired: true,
+        });
+      }
+    } else if (reviewResolution) {
+      throw new QuestionGameRunError("이야기 대답 판정이 중복되었습니다", 409);
+    }
     const nextQuestionCount = state.questionCount + 1;
     const nextState: StoryDiceRunState = {
       ...state,
@@ -4660,6 +4744,7 @@ export async function applyQuestionGameRunAction(
   input: unknown,
   now = new Date(),
   mysteryResolution?: MysteryRunAnswerResolution,
+  storyAnswerReviewResolution?: StoryDiceAnswerReviewResolution,
 ) {
   if (!isRecord(input)) throw new QuestionGameRunError("요청 본문이 올바르지 않습니다", 400);
   const requestId = requireRequestId(input.requestId);
@@ -4724,7 +4809,15 @@ export async function applyQuestionGameRunAction(
     return recordStoryDiceAiQuestion(actorId, runId, input, requestId, expectedVersion, now);
   }
   if (input.action === "story-dice-submit-answer") {
-    return submitStoryDiceAnswer(actorId, runId, input, requestId, expectedVersion, now);
+    return submitStoryDiceAnswer(
+      actorId,
+      runId,
+      input,
+      requestId,
+      expectedVersion,
+      now,
+      storyAnswerReviewResolution,
+    );
   }
   if (input.action === "kaba-submit-attempt") {
     return submitKabaAttempt(

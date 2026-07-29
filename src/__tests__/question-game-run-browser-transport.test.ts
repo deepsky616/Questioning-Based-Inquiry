@@ -1299,6 +1299,8 @@ describe("브라우저 질문놀이 실행 전송기", () => {
         requestId: ids[144 + index * 2],
         expectedVersion: 4 + index * 2,
         answer,
+        question,
+        story,
         locale: "ko",
       };
       finalResponse = store.dispatch(studentA, {
@@ -1471,6 +1473,8 @@ describe("브라우저 질문놀이 실행 전송기", () => {
           requestId: ids[155 + index * 3],
           expectedVersion: expectedVersion + 1,
           answer: previousAnswer,
+          question: issuedBody.output,
+          story,
           locale: "ko",
         },
       });

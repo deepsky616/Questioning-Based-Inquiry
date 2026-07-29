@@ -5,6 +5,11 @@ import {
   type LocalizedText,
 } from "@/lib/question-game-i18n";
 import { isKabaQuestionRewrite } from "@/lib/question-game-kaba-rules";
+import { evaluateStoryDiceAnswerQuality } from "@/lib/question-game-story-answer-quality";
+import type {
+  StoryDiceAnswerReviewRequest,
+  StoryDiceAnswerReviewResolution,
+} from "@/lib/question-game-story-answer-review";
 import {
   QUESTION_GAME_LIMITS,
   QUESTION_GAME_RULES,
@@ -1289,6 +1294,63 @@ function submitStoryAnswer(
   const answer = context.body.answer.trim();
   if (!isStoredText(answer, QUESTION_GAME_LIMITS.answer) || checkProfanity(answer).flagged) {
     return invalid(context, "대답을 오백 자 이내의 알맞은 표현으로 써 주세요");
+  }
+  const quality = evaluateStoryDiceAnswerQuality(
+    state.pendingQuestion.question,
+    answer,
+    state.pendingQuestion.locale,
+  );
+  if (quality.decision === "retry") {
+    return invalid(context, quality.message);
+  }
+  if (!state.story) {
+    return corrupt(context, "이야기 기록을 확인할 수 없습니다");
+  }
+  const expectedReview: StoryDiceAnswerReviewRequest = {
+    reviewType: "story-dice-answer",
+    scope: "room",
+    requestId: String(context.body.commandId),
+    expectedVersion: context.room.version,
+    ownerId: context.userId,
+    locale: state.pendingQuestion.locale,
+    story: state.story.story,
+    question: state.pendingQuestion.question,
+    answer,
+    intent: quality.intent,
+    message: quality.message,
+    roomCode: context.room.code,
+    playId: context.room.playId ?? "",
+    roundId: state.roundId,
+  };
+  const reviewResolution = context.storyAnswerReviewResolution;
+  if (quality.decision === "review") {
+    if (!reviewResolution) {
+      return {
+        kind: "resolution-required",
+        room: context.room,
+        resolution: expectedReview,
+        message: quality.message,
+      };
+    }
+    const matching = Object.entries(expectedReview).every(([key, value]) =>
+      reviewResolution[key as keyof StoryDiceAnswerReviewResolution] === value
+    );
+    if (
+      !matching ||
+      (reviewResolution.decision !== "accept" &&
+        reviewResolution.decision !== "retry") ||
+      (reviewResolution.confidence !== "high" &&
+        reviewResolution.confidence !== "low") ||
+      (reviewResolution.source !== "AI" &&
+        reviewResolution.source !== "FALLBACK")
+    ) {
+      return conflict(context, "이야기 대답 판정이 현재 차례와 일치하지 않습니다");
+    }
+    if (reviewResolution.decision === "retry") {
+      return invalid(context, quality.message);
+    }
+  } else if (reviewResolution) {
+    return conflict(context, "이야기 대답 판정이 중복되었습니다");
   }
   const pair: StoryDicePair = {
     ...state.pendingQuestion,

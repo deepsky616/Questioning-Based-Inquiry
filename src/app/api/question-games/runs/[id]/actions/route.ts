@@ -7,8 +7,13 @@ import {
 } from "@/lib/question-game-run-route";
 import { generateMysteryAiAnswer } from "@/lib/mystery-box-ai-answer";
 import {
+  fallbackStoryDiceAnswerReview,
+  generateStoryDiceAnswerReview,
+} from "@/lib/question-game-story-answer-review";
+import {
   applyQuestionGameRunAction,
   isMysteryQuestionResolutionRequired,
+  isStoryDiceAnswerReviewRequired,
   QuestionGameRunError,
 } from "@/lib/question-game-run-service";
 
@@ -64,6 +69,31 @@ export async function POST(req: Request, { params }: Params) {
       );
       if (isMysteryQuestionResolutionRequired(result)) {
         throw new QuestionGameRunError("미스터리 박스 질문 판정을 확정할 수 없습니다", 409);
+      }
+    }
+    if (isStoryDiceAnswerReviewRequired(result)) {
+      const reviewRequest = result.resolution;
+      const aiLimited = checkRateLimit(`question-game-story-answer:${actorId}`, 20);
+      let review;
+      if (aiLimited) {
+        review = fallbackStoryDiceAnswerReview(reviewRequest);
+      } else {
+        try {
+          review = await generateStoryDiceAnswerReview(actorId, reviewRequest);
+        } catch {
+          review = fallbackStoryDiceAnswerReview(reviewRequest);
+        }
+      }
+      result = await applyQuestionGameRunAction(
+        actorId,
+        id,
+        body,
+        new Date(),
+        undefined,
+        review,
+      );
+      if (isStoryDiceAnswerReviewRequired(result)) {
+        throw new QuestionGameRunError("이야기 대답 판정을 확정할 수 없습니다", 409);
       }
     }
     return NextResponse.json(result);

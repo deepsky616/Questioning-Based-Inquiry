@@ -56,6 +56,12 @@ import {
   generateMysteryAiAnswer,
 } from "@/lib/mystery-box-ai-answer";
 import {
+  fallbackStoryDiceAnswerReview,
+  generateStoryDiceAnswerReview,
+  isStoryDiceAnswerReviewRequest,
+  type StoryDiceAnswerReviewResolution,
+} from "@/lib/question-game-story-answer-review";
+import {
   getMysteryItem,
   type MysteryAnswerResolution,
   type MysterySelectionProfile,
@@ -325,7 +331,7 @@ async function handleQuestionGameCommand({
 
   const applyCommand = (
     currentRoom: GameRoom,
-    mysteryAnswerResolution?: MysteryAnswerResolution,
+    resolution?: MysteryAnswerResolution | StoryDiceAnswerReviewResolution,
   ) =>
     applyQuestionGameRoomCommand({
       room: currentRoom,
@@ -336,7 +342,11 @@ async function handleQuestionGameCommand({
       now: Date.now(),
       random: Math.random,
       randomUUID: () => globalThis.crypto.randomUUID(),
-      ...(mysteryAnswerResolution ? { mysteryAnswerResolution } : {}),
+      ...(resolution && isStoryDiceAnswerReviewRequest(resolution)
+        ? { storyAnswerReviewResolution: resolution }
+        : resolution
+          ? { mysteryAnswerResolution: resolution }
+          : {}),
       ...(mysterySelectionProfile ? { mysterySelectionProfile } : {}),
     });
 
@@ -377,7 +387,10 @@ async function handleQuestionGameCommand({
   };
 
   let result: QuestionGameRoomResult;
-  let mysteryAnswerResolution: MysteryAnswerResolution | undefined;
+  let commandResolution:
+    | MysteryAnswerResolution
+    | StoryDiceAnswerReviewResolution
+    | undefined;
   try {
     result = applyCommand(room);
   } catch {
@@ -396,20 +409,48 @@ async function handleQuestionGameCommand({
     return replayedCommandSuccess(result.room, result.result);
   }
   if (result.kind === "resolution-required") {
-    const request = findMysteryAiAnswerRequest(result, userId);
-    if (!request) {
-      return NextResponse.json(
-        { error: "질문놀이 상태를 처리할 수 없습니다" },
-        { status: 500 },
-      );
-    }
-    const limited = checkRateLimit(`game-room-mystery-ai:${userId}`, 20);
-    if (limited) {
-      logger.warn("미스터리 박스 에이아이 요청 제한으로 질문 처리를 보류합니다");
-      return limited;
+    if (isStoryDiceAnswerReviewRequest(result.resolution)) {
+      const request = result.resolution;
+      if (request.scope !== "room" || request.ownerId !== userId) {
+        return NextResponse.json(
+          { error: "질문놀이 상태를 처리할 수 없습니다" },
+          { status: 500 },
+        );
+      }
+      const limited = checkRateLimit(`game-room-story-answer:${userId}`, 20);
+      if (limited) {
+        commandResolution = fallbackStoryDiceAnswerReview(request);
+      } else {
+        try {
+          commandResolution = await generateStoryDiceAnswerReview(userId, request);
+        } catch {
+          commandResolution = fallbackStoryDiceAnswerReview(request);
+        }
+      }
+      if (commandResolution.decision === "retry") {
+        return NextResponse.json(
+          {
+            error: request.message,
+            storyAnswerRewriteRequired: true,
+          },
+          { status: 422 },
+        );
+      }
     } else {
+      const request = findMysteryAiAnswerRequest(result, userId);
+      if (!request) {
+        return NextResponse.json(
+          { error: "질문놀이 상태를 처리할 수 없습니다" },
+          { status: 500 },
+        );
+      }
+      const limited = checkRateLimit(`game-room-mystery-ai:${userId}`, 20);
+      if (limited) {
+        logger.warn("미스터리 박스 에이아이 요청 제한으로 질문 처리를 보류합니다");
+        return limited;
+      }
       try {
-        mysteryAnswerResolution = await generateMysteryAiAnswer(userId, request);
+        commandResolution = await generateMysteryAiAnswer(userId, request);
       } catch {
         logger.warn("미스터리 박스 에이아이 답변 실패로 질문 처리를 보류합니다");
         return NextResponse.json(
@@ -417,18 +458,18 @@ async function handleQuestionGameCommand({
           { status: 503 },
         );
       }
-    }
-    if (mysteryAnswerResolution.answer === "unknown") {
-      return NextResponse.json(
-        {
-          error: "예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요",
-          mysteryRewriteRequired: true,
-        },
-        { status: 422 },
-      );
+      if (commandResolution.answer === "unknown") {
+        return NextResponse.json(
+          {
+            error: "예 또는 아니오로 답할 수 있게 질문을 다시 써 주세요",
+            mysteryRewriteRequired: true,
+          },
+          { status: 422 },
+        );
+      }
     }
     try {
-      result = applyCommand(room, mysteryAnswerResolution);
+      result = applyCommand(room, commandResolution);
     } catch {
       return NextResponse.json(
         { error: "질문놀이 상태를 처리할 수 없습니다" },
@@ -470,7 +511,7 @@ async function handleQuestionGameCommand({
   if (!isRoomMember(saved.room, userId)) return roomForbidden();
 
   try {
-    const replay = applyCommand(saved.room, mysteryAnswerResolution);
+    const replay = applyCommand(saved.room, commandResolution);
     if (replay.kind === "replayed") {
       if (!await ensureMysterySelectionRecorded(replay.room)) {
         return NextResponse.json(

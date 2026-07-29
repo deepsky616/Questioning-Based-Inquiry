@@ -209,6 +209,8 @@ const users = new Map<string, { id: string; role: string; totalPoints: number }>
 const runs = new Map<string, StoredRun>();
 const activities: StoredActivity[] = [];
 const pointLogs: StoredPointLog[] = [];
+const storyTextByRun = new Map<string, string>();
+const storyQuestionByRunAndIndex = new Map<string, string>();
 let userUpdateLock: Promise<void> = Promise.resolve();
 const runUpdateLocks = new Map<string, Promise<void>>();
 let databaseClock = new Date();
@@ -534,13 +536,15 @@ async function submitStoryDiceStory(
   id = "run-1",
   locale: "ko" | "en" = "ko",
 ) {
-  return postAction({
+  const response = await postAction({
     action: "story-dice-submit-story",
     requestId,
     expectedVersion,
     story,
     locale,
   }, id);
+  if (response.ok) storyTextByRun.set(id, story);
+  return response;
 }
 
 async function submitStoryDiceQuestion(
@@ -550,13 +554,17 @@ async function submitStoryDiceQuestion(
   id = "run-1",
   requestId = STORY_ACTION_IDS[2 + index * 2],
 ) {
-  return postAction({
+  const response = await postAction({
     action: "story-dice-submit-question",
     requestId,
     expectedVersion,
     question,
     locale: "ko",
   }, id);
+  if (response.ok) {
+    storyQuestionByRunAndIndex.set(`${id}:${index}`, question);
+  }
+  return response;
 }
 
 async function submitStoryDiceAnswer(
@@ -571,6 +579,8 @@ async function submitStoryDiceAnswer(
     requestId,
     expectedVersion,
     answer,
+    question: storyQuestionByRunAndIndex.get(`${id}:${index}`),
+    story: storyTextByRun.get(id),
     locale: "ko",
   }, id);
 }
@@ -598,7 +608,7 @@ async function recordStoryDiceAiQuestion(
   proof: string,
   id = "run-1",
 ) {
-  return postAction({
+  const response = await postAction({
     action: "story-dice-record-ai-question",
     requestId: STORY_AI_RECORD_IDS[index],
     generationRequestId: STORY_AI_TURN_IDS[index],
@@ -606,6 +616,10 @@ async function recordStoryDiceAiQuestion(
     output,
     proof,
   }, id);
+  if (response.ok) {
+    storyQuestionByRunAndIndex.set(`${id}:${index}`, output);
+  }
+  return response;
 }
 
 function storyForRolledWords(rolled: {
@@ -896,6 +910,8 @@ beforeEach(() => {
   runs.clear();
   activities.splice(0);
   pointLogs.splice(0);
+  storyTextByRun.clear();
+  storyQuestionByRunAndIndex.clear();
   userUpdateLock = Promise.resolve();
   runUpdateLocks.clear();
   databaseClock = new Date();
@@ -3321,6 +3337,81 @@ describe("이야기 주사위 서버 실행 경로", () => {
     });
   });
 
+  it("질문에 답하지 않는 짧은 표현은 활동과 차례를 진행하지 않는다", async () => {
+    await prepareStoryDice("solo");
+    await submitStoryDiceQuestion(0, 3, "비가 내려서 기분이 어떤가요?");
+
+    const response = await submitStoryDiceAnswer(0, 4, "그냥");
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      storyAnswerRewriteRequired: true,
+    });
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 4 });
+    expect(activities.filter((activity) =>
+      activity.type === "STORY_DICE_ANSWER"
+    )).toHaveLength(0);
+    expect(pointLogs).toHaveLength(0);
+  });
+
+  it("질문과 관련 없는 대답은 인공지능 확인 뒤 같은 차례에서 다시 쓰게 한다", async () => {
+    const prepared = await prepareStoryDice("solo");
+    const question = "하늘에서 비가 내려 기분이 어떤가요?";
+    await submitStoryDiceQuestion(0, 3, question);
+    mocks.generateJson.mockResolvedValueOnce({
+      decision: "retry",
+      intent: "feeling",
+      confidence: "high",
+    });
+
+    const response = await postAction({
+      action: "story-dice-submit-answer",
+      requestId: STORY_ACTION_IDS[3],
+      expectedVersion: 4,
+      answer: "피자가 맛있어요.",
+      question,
+      story: prepared.story,
+      locale: "ko",
+    });
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: expect.stringContaining("기분"),
+      storyAnswerRewriteRequired: true,
+    });
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 4 });
+    expect(activities.filter((activity) =>
+      activity.type === "STORY_DICE_ANSWER"
+    )).toHaveLength(0);
+    expect(pointLogs).toHaveLength(0);
+  });
+
+  it("다른 질문에 같은 대답과 이전 요청 식별값을 재사용해도 과거 응답을 재생하지 않는다", async () => {
+    await prepareStoryDice("solo");
+    const answer = "책을 찾아 친구에게 보여 주었어요.";
+    await submitStoryDiceQuestion(0, 3, "처음에는 무엇을 찾았나요?");
+    const first = await submitStoryDiceAnswer(0, 4, answer);
+    await submitStoryDiceQuestion(1, 5, "그다음에는 무엇을 했나요?");
+
+    const reused = await submitStoryDiceAnswer(
+      1,
+      6,
+      answer,
+      "run-1",
+      STORY_ACTION_IDS[3],
+    );
+
+    expect(first.status).toBe(200);
+    expect(reused.status).toBe(409);
+    await expect(reused.json()).resolves.toMatchObject({
+      error: expect.stringContaining("같은 요청 식별값"),
+    });
+    expect(runs.get("run-1")).toMatchObject({ status: "ACTIVE", version: 6 });
+    expect(activities.filter((activity) =>
+      activity.type === "STORY_DICE_ANSWER"
+    )).toHaveLength(1);
+  });
+
   it("앞 회차 질문과 기본 대체 질문이 겹쳐도 사용하지 않은 질문으로 다음 차례를 이어 간다", async () => {
     const prepared = await prepareStoryDice("ai");
     const firstQuestion = "주인공은 왜 그렇게 행동했나요?";
@@ -3403,6 +3494,8 @@ describe("이야기 주사위 서버 실행 경로", () => {
         requestId: STORY_ALTERNATE_FINAL_ACTION_ID,
         expectedVersion: 8,
         answer: "두 번째 마지막 대답입니다.",
+        question: storyQuestionByRunAndIndex.get("run-1:2"),
+        story: storyTextByRun.get("run-1"),
         locale: "ko",
       }),
     ]);

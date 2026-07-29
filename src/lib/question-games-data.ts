@@ -406,6 +406,7 @@ export interface RoomActionFailure {
   ok: false;
   room: GameRoom | null;
   status: number | null;
+  error?: string;
   reason:
     | "conflict"
     | "missing"

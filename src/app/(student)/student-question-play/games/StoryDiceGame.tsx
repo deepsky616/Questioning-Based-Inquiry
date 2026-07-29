@@ -15,6 +15,7 @@ import {
   isQuestionFormForLocale,
 } from "@/lib/question-game-i18n";
 import { QUESTION_GAME_LIMITS, QUESTION_GAME_RULES } from "@/lib/question-game-rules";
+import { evaluateStoryDiceAnswerQuality } from "@/lib/question-game-story-answer-quality";
 import type { BuiltInGame } from "@/lib/question-games-data";
 import type { GameStartConfig } from "../[gameId]/page";
 import { useGameRun, type GameRunSnapshot } from "./useGameRun";
@@ -209,9 +210,22 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
   async function submitAnswer() {
     const trimmed = (unconfirmedQuestion ?? input).trim();
     if (!trimmed || !run || runBusy || runConflict) return;
+    const story = chain.find((item) => item.type === "story")?.text ?? "";
+    const question = [...chain]
+      .reverse()
+      .find((item) => item.type === "question")?.text ?? "";
+    if (!story || !question) {
+      setLocalError(t("couldNotPrepareTheStory"));
+      return;
+    }
+    const quality = evaluateStoryDiceAnswerQuality(question, trimmed, locale === "en" ? "en" : "ko");
+    if (quality.decision === "retry") {
+      setLocalError(quality.message);
+      return;
+    }
     clearRunError();
     setLocalError(null);
-    const saved = await submitStoryDiceAnswer(trimmed, locale, run);
+    const saved = await submitStoryDiceAnswer(trimmed, locale, question, story, run);
     if (!saved) return;
     const item: ChainItem = { type: "answer", text: trimmed, author: myName };
     const newChain = [...chain, item];
@@ -346,6 +360,9 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
     nextAction === "question"
       ? text.storyQuestionPlaceholder
       : text.storyAnswerPlaceholder;
+  const answerError = nextAction === "answer" && !runConflict
+    ? localError ?? runError
+    : null;
 
   return (
     <div className="max-w-lg mx-auto space-y-5">
@@ -361,7 +378,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
           {runConflict}
         </div>
       )}
-      {!runConflict && (runError || localError) && (
+      {!runConflict && (runError || localError) && nextAction !== "answer" && (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200">
           {localError ?? runError}
         </div>
@@ -501,6 +518,7 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
                 maxLength={nextAction === "question" ? QUESTION_GAME_LIMITS.question : QUESTION_GAME_LIMITS.answer}
                 readOnly={runBusy || unconfirmedQuestion !== null}
                 aria-readonly={runBusy || unconfirmedQuestion !== null}
+                aria-describedby={answerError ? "story-dice-answer-error" : undefined}
                 onChange={(e) => {
                   if (!runBusy && unconfirmedQuestion === null) {
                     setInput(e.target.value);
@@ -509,6 +527,15 @@ export default function StoryDiceGame({ game, onBack, config }: Props) {
                   }
                 }}
                 autoFocus />
+              {answerError && (
+                <p
+                  id="story-dice-answer-error"
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-500/30 dark:bg-red-950/40 dark:text-red-200"
+                >
+                  {answerError}
+                </p>
+              )}
               <Button className="w-full font-bold text-white rounded-xl"
                 style={{ background: "linear-gradient(135deg, #C2410C, #B91C1C)" }}
                 disabled={!(unconfirmedQuestion ?? input).trim() || runBusy || Boolean(runConflict)}

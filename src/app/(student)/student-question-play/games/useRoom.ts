@@ -681,6 +681,7 @@ export function useRoom(gameId?: string): UseRoomResult {
         setConnectionState("connected");
         if (res.status === 409) {
           const responseRoom = data.room;
+          const message = responseError(data, "작업 실패");
           let hasApplicableRoom = false;
           let outcome = {
             room: roomRef.current,
@@ -703,12 +704,18 @@ export function useRoom(gameId?: string): UseRoomResult {
             responseMatchesCurrent ||
             !hasApplicableRoom
           ) {
-            setError(responseError(data, "작업 실패"));
+            setError(message);
           }
-          return { ok: false, room: outcome.room, status: 409, reason: "conflict" };
+          return {
+            ok: false,
+            room: outcome.room,
+            status: 409,
+            reason: "conflict",
+          };
         }
         if (res.status === 403 || res.status === 404) {
-          setError(responseError(data, "방을 찾을 수 없어요"));
+          const message = responseError(data, "방을 찾을 수 없어요");
+          setError(message);
           clearRoom();
           return {
             ok: false,
@@ -718,11 +725,13 @@ export function useRoom(gameId?: string): UseRoomResult {
           };
         }
         if (!res.ok || !isGameRoom(data.room) || data.room.code !== code) {
-          setError(responseError(data, "작업 실패"));
+          const message = responseError(data, "작업 실패");
+          if (res.status !== 422) setError(message);
           return {
             ok: false,
             room: roomRef.current,
             status: res.status,
+            ...(res.status === 422 ? { error: message } : {}),
             reason: "rejected",
           };
         }

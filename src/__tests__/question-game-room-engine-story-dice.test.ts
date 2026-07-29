@@ -59,7 +59,7 @@ function run(
   randomUUID = () => uuid(100 + index),
 ) {
   const user = room.players.find((player) => player.id === userId);
-  return applyQuestionGameRoomCommand({
+  const input = {
     room,
     userId,
     userName: user?.name ?? "요청 이름",
@@ -75,7 +75,24 @@ function run(
     now: 100 + index,
     random: () => 0.25,
     randomUUID,
-  });
+  };
+  const result = applyQuestionGameRoomCommand(input);
+  if (
+    result.kind === "resolution-required" &&
+    "reviewType" in result.resolution &&
+    result.resolution.reviewType === "story-dice-answer"
+  ) {
+    return applyQuestionGameRoomCommand({
+      ...input,
+      storyAnswerReviewResolution: {
+        ...result.resolution,
+        decision: "accept",
+        confidence: "low",
+        source: "FALLBACK",
+      },
+    });
+  }
+  return result;
 }
 
 function started(count = 3): GameRoom {

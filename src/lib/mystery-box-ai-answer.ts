@@ -250,6 +250,7 @@ export function findMysteryAiAnswerRequest(
 ): MysteryAiAnswerRequest | null {
   if (
     result.kind !== "resolution-required" ||
+    !("itemId" in result.resolution) ||
     result.resolution.playerId !== userId
   ) {
     return null;

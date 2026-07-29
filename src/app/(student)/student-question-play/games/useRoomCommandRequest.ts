@@ -61,6 +61,8 @@ export interface RoomCommandRequestController {
   ) => Promise<RoomCommandRequestOutcome>;
   pendingKind: string | null;
   acknowledgementVersion: number;
+  requestError: string | null;
+  clearRequestError: () => void;
 }
 
 const JSON_KEY_ERROR =
@@ -175,6 +177,8 @@ export function useRoomCommandRequest<
   const retriesRef = useRef(new Map<string, TrackedRequest>());
   const [pendingKind, setPendingKind] = useState<string | null>(null);
   const [acknowledgementVersion, setAcknowledgementVersion] = useState(0);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const clearRequestError = useCallback(() => setRequestError(null), []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -191,6 +195,7 @@ export function useRoomCommandRequest<
     pendingRef.current = null;
     retriesRef.current.clear();
     setPendingKind(null);
+    setRequestError(null);
   }, [currentExecutionKey, currentLifetimeKey]);
 
   useEffect(() => {
@@ -252,7 +257,10 @@ export function useRoomCommandRequest<
 
     retriesRef.current.set(signature, request);
     pendingRef.current = request;
-    if (mountedRef.current) setPendingKind(action);
+    if (mountedRef.current) {
+      setPendingKind(action);
+      setRequestError(null);
+    }
 
     let result: RoomActionResult | null = null;
     try {
@@ -300,6 +308,7 @@ export function useRoomCommandRequest<
     }
 
     if (confirmed) return "confirmed";
+    setRequestError(result?.ok === false ? result.error ?? null : null);
     return mismatchedResponse ? "stale" : "retryable";
   }, [
     createCommandId,
@@ -312,5 +321,11 @@ export function useRoomCommandRequest<
     room.createdAt,
   ]);
 
-  return { send, pendingKind, acknowledgementVersion };
+  return {
+    send,
+    pendingKind,
+    acknowledgementVersion,
+    requestError,
+    clearRequestError,
+  };
 }
