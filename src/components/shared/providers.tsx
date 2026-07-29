@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
 import { ConfirmProvider } from "@/components/shared/confirm-dialog";
+import { CurrentUserIdentityProvider } from "@/components/shared/current-user-identity";
 
 function AuthQueryCacheBoundary({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -33,7 +34,11 @@ function AuthQueryCacheBoundary({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  return children;
+  return (
+    <CurrentUserIdentityProvider userId={resolvedUserId ?? null}>
+      {children}
+    </CurrentUserIdentityProvider>
+  );
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {

@@ -25,6 +25,7 @@ vi.mock("@/components/shared/confirm-dialog", () => ({
 vi.mock("@/components/ui/toaster", () => ({ Toaster: () => null }));
 
 import { Providers } from "@/components/shared/providers";
+import { useCurrentUserIdentity } from "@/components/shared/current-user-identity";
 
 function QueryClientProbe({ onClient }: { onClient: (client: QueryClient) => void }) {
   const queryClient = useQueryClient();
@@ -38,6 +39,11 @@ function PrivateValueProbe() {
     queryFn: async () => authState.session?.user.id ?? "signed-out",
   });
   return <p>{privateValueQuery.data ?? "loading"}</p>;
+}
+
+function CurrentUserIdentityProbe() {
+  const userId = useCurrentUserIdentity();
+  return <p data-testid="current-user-identity">{userId ?? "none"}</p>;
 }
 
 describe("인증 사용자별 조회 캐시 경계", () => {
@@ -55,11 +61,13 @@ describe("인증 사용자별 조회 캐시 경계", () => {
       <Providers>
         <QueryClientProbe onClient={captureClient} />
         <PrivateValueProbe />
+        <CurrentUserIdentityProbe />
       </Providers>,
     );
 
     await waitFor(() => expect(renderedClient).toBeDefined());
     expect(await screen.findByText("teacher-1")).toBeInTheDocument();
+    expect(screen.getByTestId("current-user-identity")).toHaveTextContent("teacher-1");
     act(() => {
       renderedClient?.setQueryData(["app-notifications", "teacher"], [{ id: "private-alert" }]);
       renderedClient?.setQueryData(["teacher-students", "directory"], [{ id: "private-student" }]);
@@ -70,10 +78,12 @@ describe("인증 사용자별 조회 캐시 경계", () => {
       <Providers>
         <QueryClientProbe onClient={captureClient} />
         <PrivateValueProbe />
+        <CurrentUserIdentityProbe />
       </Providers>,
     );
 
     expect(await screen.findByText("teacher-2")).toBeInTheDocument();
+    expect(screen.getByTestId("current-user-identity")).toHaveTextContent("teacher-2");
     expect(screen.queryByText("teacher-1")).not.toBeInTheDocument();
     await waitFor(() => {
       expect(renderedClient?.getQueryData(["app-notifications", "teacher"])).toBeUndefined();

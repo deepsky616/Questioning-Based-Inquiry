@@ -1,20 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { useLearningSounds } from "@/lib/learning-sounds";
 import { cn } from "@/lib/utils";
+import { useCurrentUserIdentity } from "@/components/shared/current-user-identity";
 
 type LearningSoundAudience = "student" | "teacher";
 
-const GUIDE_SEEN_KEY = "question-learning-sound-guide-seen-v1";
-const guideSeenWithoutStorage = new Set<LearningSoundAudience>();
+const GUIDE_SEEN_KEY = "question-learning-sound-guide-seen-v2";
+const activeGuideKeys = new Set<string>();
+const guideSeenWithoutStorage = new Set<string>();
 
 function currentAudience(audience?: LearningSoundAudience): LearningSoundAudience {
   if (audience) return audience;
   return window.location.pathname.startsWith("/teacher") ? "teacher" : "student";
+}
+
+function guideKey(audience: LearningSoundAudience, userId: string | null): string {
+  const identity = userId?.trim() || "browser";
+  return `${GUIDE_SEEN_KEY}:${audience}:${encodeURIComponent(identity)}`;
 }
 
 export function LearningSoundToggle({
@@ -25,38 +32,61 @@ export function LearningSoundToggle({
   audience?: LearningSoundAudience;
 }) {
   const t = useTranslations("learningSound");
+  const userId = useCurrentUserIdentity();
   const { enabled, setSoundEnabled, toggle } = useLearningSounds();
   const [guideOpen, setGuideOpen] = useState(false);
+  const openGuideKeyRef = useRef<string | null>(null);
   const label = enabled ? t("turnOff") : t("turnOn");
 
   useEffect(() => {
     const resolvedAudience = currentAudience(audience);
-    const key = `${GUIDE_SEEN_KEY}:${resolvedAudience}`;
+    const key = guideKey(resolvedAudience, userId);
+    let seen = false;
 
     try {
-      if (window.localStorage.getItem(key) === "seen") return;
-      window.localStorage.setItem(key, "seen");
+      seen = window.localStorage.getItem(key) === "seen";
     } catch {
-      if (guideSeenWithoutStorage.has(resolvedAudience)) return;
-      guideSeenWithoutStorage.add(resolvedAudience);
+      seen = guideSeenWithoutStorage.has(key);
     }
+    if (seen || activeGuideKeys.has(key)) return;
 
+    activeGuideKeys.add(key);
+    openGuideKeyRef.current = key;
     setGuideOpen(true);
-  }, [audience]);
+
+    return () => {
+      activeGuideKeys.delete(key);
+      if (openGuideKeyRef.current === key) openGuideKeyRef.current = null;
+    };
+  }, [audience, userId]);
+
+  function confirmGuide() {
+    const key = openGuideKeyRef.current;
+    if (key) {
+      try {
+        window.localStorage.setItem(key, "seen");
+      } catch {
+        guideSeenWithoutStorage.add(key);
+      }
+      activeGuideKeys.delete(key);
+      openGuideKeyRef.current = null;
+    }
+    setGuideOpen(false);
+  }
 
   function handleToggle() {
     toggle();
-    setGuideOpen(false);
+    if (guideOpen) confirmGuide();
   }
 
   function handleGuideEnable() {
     if (!enabled) toggle();
-    setGuideOpen(false);
+    confirmGuide();
   }
 
   function handleGuideDismiss() {
     setSoundEnabled(false);
-    setGuideOpen(false);
+    confirmGuide();
   }
 
   return (
