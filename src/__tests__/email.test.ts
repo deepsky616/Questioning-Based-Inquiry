@@ -46,6 +46,10 @@ describe("canSendExternalEmail", () => {
     expect(canSendExternalEmail("s_한빛초_1_2_3@student.internal")).toBe(false);
   });
 
+  it("시연용 .invalid 이메일은 false를 반환한다", () => {
+    expect(canSendExternalEmail("usb-demo-teacher@questionlab.invalid")).toBe(false);
+  });
+
   it("빈 문자열은 false를 반환한다", () => {
     expect(canSendExternalEmail("")).toBe(false);
   });

@@ -13,13 +13,19 @@ type SendEmailResult =
   | { ok: false; error: string };
 
 const INTERNAL_EMAIL_DOMAIN = "@student.internal";
+const RESERVED_INVALID_DOMAIN_SUFFIX = ".invalid";
 
 export function isEmailEnabled(): boolean {
   return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 }
 
 export function canSendExternalEmail(email: string): boolean {
-  return Boolean(email && !email.endsWith(INTERNAL_EMAIL_DOMAIN));
+  const normalized = email.trim().toLowerCase();
+  return Boolean(
+    normalized &&
+    !normalized.endsWith(INTERNAL_EMAIL_DOMAIN) &&
+    !normalized.endsWith(RESERVED_INVALID_DOMAIN_SUFFIX)
+  );
 }
 
 function createTransporter() {
