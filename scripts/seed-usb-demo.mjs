@@ -46,6 +46,8 @@ const DEMO = {
     past: "usb-demo-unit-design-water-states",
     pastMath: "usb-demo-unit-design-data",
     today: "usb-demo-unit-design-temperature",
+    exploreKorean: "usb-demo-unit-design-explore-korean",
+    exploreMath: "usb-demo-unit-design-explore-math",
     future: "usb-demo-unit-design-environment",
   },
   sessionIds: {
@@ -54,6 +56,8 @@ const DEMO = {
     past: "usb-demo-session-past",
     pastMath: "usb-demo-session-past-math",
     today: "usb-demo-session-today",
+    exploreKorean: "usb-demo-session-explore-korean",
+    exploreMath: "usb-demo-session-explore-math",
     future: "usb-demo-session-future",
   },
 };
@@ -127,18 +131,46 @@ export const DEMO_SESSION_BLUEPRINTS = [
     unitDesignId: DEMO.unitDesignIds.today,
   },
   {
+    key: "exploreKorean",
+    id: DEMO.sessionIds.exploreKorean,
+    offsetDays: 1,
+    subject: "국어",
+    topic: "질문을 만들며 글 읽기",
+    semester: "1",
+    studentExplore: true,
+    unitDesignId: DEMO.unitDesignIds.exploreKorean,
+  },
+  {
+    key: "exploreMath",
+    id: DEMO.sessionIds.exploreMath,
+    offsetDays: 3,
+    subject: "수학",
+    topic: "각도를 비교하고 재기",
+    semester: "1",
+    studentExplore: true,
+    unitDesignId: DEMO.unitDesignIds.exploreMath,
+  },
+  {
     key: "future",
     id: DEMO.sessionIds.future,
     offsetDays: 5,
     subject: "사회",
     topic: "환경을 위한 생활 속 선택",
+    studentExplore: true,
     unitDesignId: DEMO.unitDesignIds.future,
   },
 ];
 
 const ACTIVITY_SESSION_BLUEPRINTS = DEMO_SESSION_BLUEPRINTS.filter(
-  ({ key }) => key !== "future",
+  ({ key, studentExplore }) => key !== "future" && !studentExplore,
 );
+const STUDENT_EXPLORE_SESSION_BLUEPRINTS = DEMO_SESSION_BLUEPRINTS.filter(
+  ({ key, studentExplore }) => key !== "future" && studentExplore,
+);
+const ANALYSIS_SESSION_BLUEPRINTS = [
+  ...ACTIVITY_SESSION_BLUEPRINTS,
+  ...STUDENT_EXPLORE_SESSION_BLUEPRINTS,
+];
 
 function loadLocalDatabaseUrl() {
   if (process.env.DATABASE_URL?.trim()) return;
@@ -638,6 +670,154 @@ export const DEMO_UNIT_DESIGN_BLUEPRINTS = [
     }),
   },
   {
+    key: "exploreKorean",
+    id: DEMO.unitDesignIds.exploreKorean,
+    title: "질문을 만들며 글을 읽어요",
+    subject: "국어",
+    gradeRange: "3-4",
+    grade: DEMO.grade,
+    area: "읽기",
+    coreIdea: "읽기 전과 읽는 중에 질문을 만들고 답을 예상하면 글의 내용을 깊이 이해하고 자신의 읽기 과정을 스스로 점검할 수 있다.",
+    achievements: [{
+      code: "[4국02-03]",
+      content: "질문을 활용하여 글을 예측하며 읽고 자신의 읽기 과정을 점검한다.",
+    }],
+    selectedKeywords: ["질문", "예측", "읽기 과정"],
+    coreSentences: [
+      "질문은 제목, 그림, 알고 있는 내용에서 궁금한 점을 찾아 만드는 것이다.",
+      "예상한 답과 글의 내용을 비교하면 이해한 부분과 더 살펴볼 부분을 찾을 수 있다.",
+    ],
+    essentialQuestions: [
+      "좋은 질문은 글을 이해하는 데 어떤 도움을 줄까?",
+      "읽는 사람에 따라 글에서 떠올리는 질문은 왜 달라질까?",
+    ],
+    inquiryQuestions: [
+      inquiryQuestion(
+        "factual",
+        "제목과 그림을 보고 글에서 알게 될 내용을 어떻게 예상할 수 있을까?",
+        "글을 읽기 전에 확인할 수 있는 정보를 찾아 내용을 예상하는 질문이에요.",
+        [["제목", "글의 중심 내용을 짧게 나타낸 말"], ["예측", "앞으로 알게 될 내용을 미리 생각하는 것"]],
+        "제목과 그림에서 눈에 띄는 낱말이나 모습을 세 가지 찾아 적어 보세요.",
+      ),
+      inquiryQuestion(
+        "factual",
+        "글을 읽다가 뜻을 모르거나 이해하기 어려운 부분은 어디일까?",
+        "읽는 동안 이해가 멈추는 부분을 직접 찾아 질문으로 바꾸는 활동이에요.",
+        [["읽기 과정", "글을 읽고 이해해 가는 순서와 방법"], ["점검", "잘 이해하고 있는지 살펴보는 것"]],
+        "읽다가 다시 읽은 문장이나 뜻을 확인하고 싶은 낱말에 표시해 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "질문을 만들며 읽으면 글의 내용을 이해하는 방법이 어떻게 달라질까?",
+        "질문과 글 이해가 서로 어떤 관계가 있는지 생각하는 질문이에요.",
+        [["이해", "내용의 뜻과 관계를 알아가는 것"], ["질문", "궁금하거나 더 알고 싶은 것을 묻는 말"]],
+        "질문 없이 읽었을 때와 질문을 적으며 읽었을 때 기억나는 내용을 비교해 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "예상한 답과 글에서 찾은 답을 비교하면 새로운 생각은 어떻게 생길까?",
+        "처음 예상과 실제 내용을 비교하는 일이 생각을 넓히는 까닭을 찾는 질문이에요.",
+        [["예상", "어떤 내용일지 미리 생각한 것"], ["근거", "생각을 뒷받침하는 글 속 내용"]],
+        "내 예상, 글에서 찾은 답, 생각이 달라진 까닭을 세 칸으로 나누어 적어 보세요.",
+      ),
+      inquiryQuestion(
+        "controversial",
+        "같은 글을 읽는 친구들은 모두 같은 질문을 만들어야 할까?",
+        "서로 다른 경험과 관심이 질문에 미치는 영향을 생각하고 판단하는 질문이에요.",
+        [["관점", "어떤 내용을 바라보는 생각이나 입장"], ["경험", "직접 보고 듣거나 해 본 일"]],
+        "친구와 만든 질문을 바꾸어 읽고 같거나 다른 까닭을 이야기해 보세요.",
+      ),
+    ],
+    learningGuides: learningGuide({
+      explanation: "글을 읽기 전과 읽는 중에 궁금한 점을 질문으로 만들면 내용을 예상하고 내가 제대로 이해했는지 확인할 수 있어요.",
+      lifeConnection: "설명서, 동화, 안내문을 읽을 때도 먼저 궁금한 점을 떠올리면 필요한 내용을 더 쉽게 찾을 수 있어요.",
+      keywords: [["질문", "궁금하거나 더 알고 싶은 것을 묻는 말"], ["예측", "글의 내용을 미리 생각하는 것"], ["읽기 과정", "글을 읽고 이해해 가는 순서와 방법"]],
+      achievementExplanations: ["글을 읽기 전이나 읽는 중에 질문을 만들고 답을 예상하며, 잘 이해되지 않는 부분을 스스로 찾아 다시 살펴볼 수 있어야 한다는 뜻이에요."],
+      sentenceExplanations: [
+        "제목과 그림, 내가 알고 있는 내용을 떠올리면 읽기 전에 질문을 만들 수 있어요.",
+        "예상한 답과 글에서 찾은 답을 비교하면 이해한 정도를 확인할 수 있어요.",
+      ],
+      essentialQuestionGuides: [
+        { thinkingFocus: "질문을 만들기 전과 만든 뒤 글에서 찾은 내용이 어떻게 달라지는지 비교해 보세요.", perspectives: ["내용 예상", "집중해서 읽기", "이해 점검"] },
+        { thinkingFocus: "친구의 경험과 관심이 어떤 질문으로 이어졌는지 살펴보세요.", perspectives: ["나의 경험", "친구의 관점", "글 속 정보"] },
+      ],
+    }),
+  },
+  {
+    key: "exploreMath",
+    id: DEMO.unitDesignIds.exploreMath,
+    title: "각도를 비교하고 재어 보아요",
+    subject: "수학",
+    gradeRange: "3-4",
+    grade: DEMO.grade,
+    area: "도형과 측정",
+    coreIdea: "각의 크기는 두 변이 벌어진 정도이며 각도기를 바르게 사용하면 각도를 수로 나타내고 여러 각을 정확하게 비교할 수 있다.",
+    achievements: [{
+      code: "[4수03-24]",
+      content: "각의 크기의 단위인 1도(°)를 알고, 각도기를 이용하여 각의 크기를 측정하고 어림할 수 있다.",
+    }],
+    selectedKeywords: ["각", "각도", "1도", "각도기"],
+    coreSentences: [
+      "각의 크기는 두 변의 길이가 아니라 두 변이 벌어진 정도로 정한다.",
+      "각도기의 중심과 밑금을 각의 꼭짓점과 한 변에 맞추면 각도를 잴 수 있다.",
+    ],
+    essentialQuestions: [
+      "각의 크기를 정확하게 비교하려면 무엇을 기준으로 해야 할까?",
+      "각도를 어림하고 재는 능력은 생활 속에서 어떻게 쓰일까?",
+    ],
+    inquiryQuestions: [
+      inquiryQuestion(
+        "factual",
+        "교실 물건에서 찾은 각은 각각 몇 도일까?",
+        "생활 속 여러 각을 찾아 각도기로 직접 재어 확인하는 질문이에요.",
+        [["각도", "각의 크기를 수로 나타낸 것"], ["1도", "각의 크기를 재는 기본 단위"]],
+        "책 모서리, 열린 문, 가위에서 각을 찾고 먼저 어림한 뒤 각도기로 재어 보세요.",
+      ),
+      inquiryQuestion(
+        "factual",
+        "각도기로 각을 잴 때 중심과 밑금은 어디에 맞추어야 할까?",
+        "각도기를 바르게 놓는 방법을 차례대로 확인하는 질문이에요.",
+        [["각도기", "각의 크기를 재는 도구"], ["꼭짓점", "각을 이루는 두 변이 만나는 점"]],
+        "각도기의 중심, 밑금, 숫자를 읽는 순서를 그림에 표시해 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "두 변의 길이가 달라져도 벌어진 정도가 같으면 각의 크기는 왜 같을까?",
+        "변의 길이와 각의 크기가 어떤 관계인지 탐구하는 질문이에요.",
+        [["변", "각을 이루는 두 반직선"], ["벌어진 정도", "두 변 사이가 열린 크기"]],
+        "변의 길이는 다르지만 벌어진 정도가 같은 각을 그려 겹쳐 보세요.",
+      ),
+      inquiryQuestion(
+        "conceptual",
+        "각도를 어림한 값과 실제로 잰 값의 차이는 어떻게 줄일 수 있을까?",
+        "기준이 되는 각을 이용하면 어림이 정확해지는 까닭을 찾는 질문이에요.",
+        [["어림", "정확한 값과 가까운 값을 짐작하는 것"], ["기준각", "다른 각의 크기를 짐작할 때 기준으로 삼는 각"]],
+        "직각과 반직각을 기준으로 여러 각을 어림한 뒤 잰 값과 차이를 기록해 보세요.",
+      ),
+      inquiryQuestion(
+        "controversial",
+        "생활 속 각도는 가까운 값으로 어림해도 될까, 언제나 정확하게 재야 할까?",
+        "사용 목적에 따라 어림과 정확한 측정 가운데 알맞은 방법을 판단하는 질문이에요.",
+        [["정확성", "실제 값에 맞는 정도"], ["측정 목적", "값을 재어 어디에 사용하려는지 정한 것"]],
+        "그림 그리기, 책상 만들기, 길 찾기처럼 서로 다른 상황에서 필요한 정확성을 비교해 보세요.",
+      ),
+    ],
+    learningGuides: learningGuide({
+      explanation: "각도는 두 변이 얼마나 벌어져 있는지를 나타낸 값이며, 각도기를 사용하면 눈으로만 비교하기 어려운 각도도 정확하게 잴 수 있어요.",
+      lifeConnection: "문이 열린 정도, 시계바늘 사이, 운동할 때 몸을 굽힌 정도처럼 생활 곳곳에서 각도를 찾을 수 있어요.",
+      keywords: [["각", "한 점에서 나온 두 반직선으로 이루어진 도형"], ["각도", "두 변이 벌어진 정도를 수로 나타낸 것"], ["1도", "각도를 재는 기본 단위"], ["각도기", "각도를 재거나 그릴 때 쓰는 도구"]],
+      achievementExplanations: ["1도를 각의 크기를 나타내는 단위로 알고, 각도기를 바르게 놓아 각도를 재며 재기 전에 가까운 값을 짐작할 수 있어야 한다는 뜻이에요."],
+      sentenceExplanations: [
+        "각의 크기는 변의 길이가 아니라 두 변이 벌어진 정도로 비교해요.",
+        "각도기의 중심과 밑금을 바르게 맞춘 뒤 시작한 쪽의 눈금을 읽어요.",
+      ],
+      essentialQuestionGuides: [
+        { thinkingFocus: "눈으로 비교한 결과와 각도기로 잰 결과를 비교해 보세요.", perspectives: ["벌어진 정도", "측정값", "도구 사용 방법"] },
+        { thinkingFocus: "정확한 각도가 필요한 상황과 어림으로 충분한 상황을 나누어 보세요.", perspectives: ["생활의 편리함", "안전", "정확성"] },
+      ],
+    }),
+  },
+  {
     key: "future",
     id: DEMO.unitDesignIds.future,
     title: "환경을 생각하는 생활 속 선택",
@@ -749,6 +929,20 @@ const SESSION_QUESTION_BANKS = {
     "그늘과 햇빛 아래에서 얼음이 녹는 속도는 얼마나 다를까요?",
     "상태 변화를 이용하면 생활 속 어떤 문제를 해결할 수 있을까요?",
   ],
+  exploreKorean: [
+    "제목을 보고 글의 내용을 어떻게 예상할 수 있을까요?",
+    "글을 읽기 전에 만든 질문은 읽는 동안 어떻게 달라질까요?",
+    "모르는 낱말을 질문으로 바꾸면 글을 이해하는 데 도움이 될까요?",
+    "같은 글을 읽어도 친구마다 질문이 다른 까닭은 무엇일까요?",
+    "답을 바로 찾을 수 없는 질문도 글 읽기에 도움이 될까요?",
+  ],
+  exploreMath: [
+    "두 변의 길이가 달라도 벌어진 정도가 같으면 각도도 같을까요?",
+    "각도기의 안쪽 눈금과 바깥쪽 눈금은 언제 골라 읽어야 할까요?",
+    "직각을 기준으로 각의 크기를 어떻게 어림할 수 있을까요?",
+    "생활 속에서 각도를 정확하게 재야 하는 경우는 언제일까요?",
+    "각도기를 놓는 위치가 달라지면 측정값은 어떻게 달라질까요?",
+  ],
 };
 
 const SESSION_QUESTION_TYPES = {
@@ -786,6 +980,20 @@ const SESSION_QUESTION_TYPES = {
     "conceptual",
     "factual",
     "conceptual",
+  ],
+  exploreKorean: [
+    "factual",
+    "conceptual",
+    "conceptual",
+    "controversial",
+    "controversial",
+  ],
+  exploreMath: [
+    "conceptual",
+    "factual",
+    "conceptual",
+    "controversial",
+    "factual",
   ],
 };
 
@@ -856,6 +1064,30 @@ const KIM_QUESTION_PLANS = [
     closure: "open",
     cognitive: "controversial",
   },
+  {
+    sessionKey: "exploreKorean",
+    content: "글을 읽기 전에 만든 질문은 글을 이해하는 방법을 어떻게 바꿀까요?",
+    closure: "open",
+    cognitive: "conceptual",
+  },
+  {
+    sessionKey: "exploreKorean",
+    content: "같은 글을 읽은 친구들이 서로 다른 질문을 만드는 까닭은 무엇일까요?",
+    closure: "open",
+    cognitive: "controversial",
+  },
+  {
+    sessionKey: "exploreMath",
+    content: "각의 두 변이 길어져도 벌어진 정도가 같으면 각도는 왜 같을까요?",
+    closure: "open",
+    cognitive: "conceptual",
+  },
+  {
+    sessionKey: "exploreMath",
+    content: "문이 열린 각도를 정확하게 재려면 각도기를 어떻게 놓아야 할까요?",
+    closure: "open",
+    cognitive: "factual",
+  },
 ];
 
 const STUDENT_ANALYSIS_COPY = {
@@ -894,6 +1126,20 @@ const STUDENT_ANALYSIS_COPY = {
     growthInsights: "지난 수학 수업에서는 질문 2개로 자료를 표현하고 해석하는 방법을 살펴봤는데, 이번에는 질문 3개를 만들며 과학 개념을 생활 문제와 환경까지 연결했네. 하나의 현상을 여러 조건과 관점에서 살피는 힘이 자랐어.",
     rewriteExample: "원래 질문: 온도가 높아질수록 물은 언제나 더 빨리 증발할까요? → 더 좋은 질문: 물의 양과 그릇의 넓이가 같을 때 온도가 높아질수록 물이 증발하는 속도는 어떻게 달라질까요? (같게 둘 조건과 바꿀 조건이 분명해서 직접 비교하고 확인할 수 있는 질문이야!)",
   },
+  exploreKorean: {
+    summary: "질문아, 이번 '질문을 만들며 글 읽기' 수업에서 읽기 전 질문과 친구마다 다른 질문이 생기는 까닭을 탐구했구나! 질문을 글 이해와 친구의 관점에 연결한 점이 좋아.",
+    insights: "다음에는 질문을 만든 때를 읽기 전, 읽는 중, 읽은 뒤로 나누고 각 질문이 어떤 도움을 주었는지 비교해 보자.",
+    relevanceInsights: "질문아, 두 질문 모두 질문을 활용해 글을 예측하고 읽기 과정을 점검하는 수업 목표에 잘 맞아. 다음에는 실제로 읽은 글의 제목이나 한 문장을 넣으면 질문이 더 구체적으로 드러날 거야.",
+    growthInsights: "지난 과학 수업에서 관찰 조건을 생각한 데 이어, 이번에는 내 생각이 글을 읽는 동안 어떻게 달라지는지 스스로 살펴봤네. 질문을 학습 방법으로 사용하는 힘이 자랐어.",
+    rewriteExample: "원래 질문: 글을 읽기 전에 만든 질문은 글을 이해하는 방법을 어떻게 바꿀까요? → 더 좋은 질문: 제목을 보고 만든 질문에 답을 예상한 뒤 글을 읽으면 중심 내용을 찾는 방법이 어떻게 달라질까요? (질문을 만든 때와 확인할 내용을 분명하게 비교할 수 있어!)",
+  },
+  exploreMath: {
+    summary: "질문아, 이번 '각도를 비교하고 재기' 수업에서 각의 크기와 각도기 사용 방법을 탐구했구나! 각의 모양을 생활 속 문과 연결해 직접 확인할 수 있게 질문한 점이 좋아.",
+    insights: "다음에는 먼저 각도를 어림하고 각도기로 잰 뒤 두 값의 차이가 생긴 까닭을 설명하는 질문으로 발전시켜 보자.",
+    relevanceInsights: "질문아, 두 질문 모두 각의 크기는 벌어진 정도로 정하고 각도기로 측정한다는 수업 내용에 잘 맞아. 다음에는 비교할 각이나 각도기의 기준선을 질문에 넣으면 더욱 정확하게 탐구할 수 있어.",
+    growthInsights: "지난 국어 수업에서는 질문으로 읽기 과정을 점검했고, 이번에는 예상한 각도와 실제 측정값을 비교하는 방법으로 생각을 확인했네. 교과가 달라도 예상하고 확인하는 탐구 흐름을 잘 이어 갔어.",
+    rewriteExample: "원래 질문: 문이 열린 각도를 정확하게 재려면 각도기를 어떻게 놓아야 할까요? → 더 좋은 질문: 문의 경첩을 각의 꼭짓점으로 볼 때 각도기의 중심과 밑금을 어디에 맞추어야 열린 각도를 정확하게 잴 수 있을까요? (측정할 각과 도구를 놓는 기준이 분명해!)",
+  },
 };
 
 const COMMENT_CONTENTS = [
@@ -919,7 +1165,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
   }
 
   const sessionByKey = new Map(
-    ACTIVITY_SESSION_BLUEPRINTS.map((blueprint) => [blueprint.key, blueprint]),
+    ANALYSIS_SESSION_BLUEPRINTS.map((blueprint) => [blueprint.key, blueprint]),
   );
   const questions = [];
 
@@ -960,6 +1206,24 @@ export function buildDemoLearningActivityPlans(studentIds) {
           0,
           session.offsetDays + 1 + (studentIndex % 2),
         ),
+      });
+    }
+  }
+
+  for (const [sessionIndex, session] of STUDENT_EXPLORE_SESSION_BLUEPRINTS.entries()) {
+    const bank = SESSION_QUESTION_BANKS[session.key];
+    for (const [questionIndex, content] of bank.entries()) {
+      const authorIndex = 1 + sessionIndex * bank.length + questionIndex;
+      questions.push({
+        id: `usb-demo-explore-question-${session.key}-${pad(questionIndex + 1)}`,
+        authorId: studentIds[authorIndex],
+        sessionId: session.id,
+        content,
+        context: session.topic,
+        closure: "open",
+        cognitive: SESSION_QUESTION_TYPES[session.key][questionIndex],
+        inquiryType: SESSION_QUESTION_TYPES[session.key][questionIndex],
+        createdDays: 0,
       });
     }
   }
@@ -1032,7 +1296,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
     [...questions, ...classInquiryQuestions]
       .map((question) => [question.id, question]),
   );
-  const analyses = ACTIVITY_SESSION_BLUEPRINTS.map((session, index) => {
+  const analyses = ANALYSIS_SESSION_BLUEPRINTS.map((session, index) => {
     const totalQuestions = questions.filter(
       ({ authorId, sessionId }) => authorId === studentIds[0] && sessionId === session.id,
     ).length;
@@ -1106,14 +1370,19 @@ function sharedQuestionId(sessionKey, index) {
   return `usb-demo-shared-question-${sessionKey}-${pad(index + 1)}`;
 }
 
+function buildPublishedClassInquiryQuestions(session, design, studentQuestions) {
+  if (session.studentExplore) return [];
+  return buildDemoClassInquiryQuestions(design, session.id, studentQuestions);
+}
+
 function buildDemoClassInquiryQuestionRefs(studentQuestions) {
   const designById = new Map(
     DEMO_UNIT_DESIGN_BLUEPRINTS.map((design) => [design.id, design]),
   );
-  return ACTIVITY_SESSION_BLUEPRINTS.flatMap((session, sessionIndex) => (
-    buildDemoClassInquiryQuestions(
+  return ACTIVITY_SESSION_BLUEPRINTS.flatMap((session, sessionIndex) => {
+    return buildPublishedClassInquiryQuestions(
+      session,
       designById.get(session.unitDesignId),
-      session.id,
       studentQuestions,
     ).map((question, index) => ({
       id: sharedQuestionId(session.key, index),
@@ -1121,8 +1390,8 @@ function buildDemoClassInquiryQuestionRefs(studentQuestions) {
       sessionIndex,
       type: question.type,
       priority: index + 1,
-    }))
-  ));
+    }));
+  });
 }
 
 function selectAvailableActivity(
@@ -1548,9 +1817,9 @@ async function createInquiryLearningData(tx, studentIds) {
   for (const blueprint of DEMO_SESSION_BLUEPRINTS) {
     const design = designById.get(blueprint.unitDesignId);
     const publishedAt = offsetDate(blueprint.offsetDays).toISOString();
-    const sharedQuestions = buildDemoClassInquiryQuestions(
+    const sharedQuestions = buildPublishedClassInquiryQuestions(
+      blueprint,
       design,
-      blueprint.id,
       activityPlans.questions,
     ).map((question) => ({
       ...question,

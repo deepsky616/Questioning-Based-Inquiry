@@ -54,16 +54,16 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     expect(source).toContain("`room:usb-demo:${pad(number)}`");
   });
 
-  it("질문수업 여섯 개와 풍부한 학생 참여 자료를 중복 없이 계획한다", () => {
+  it("질문수업 여덟 개와 풍부한 학생 참여 자료를 중복 없이 계획한다", () => {
     const studentIds = STUDENT_NAMES.map(
       (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
     );
     const plans = buildDemoLearningActivityPlans(studentIds);
 
-    expect(DEMO_SESSION_BLUEPRINTS).toHaveLength(6);
-    expect(new Set(DEMO_SESSION_BLUEPRINTS.map(({ id }) => id)).size).toBe(6);
+    expect(DEMO_SESSION_BLUEPRINTS).toHaveLength(8);
+    expect(new Set(DEMO_SESSION_BLUEPRINTS.map(({ id }) => id)).size).toBe(8);
     expect(plans.questions.filter(({ authorId }) => authorId === studentIds[0]))
-      .toHaveLength(11);
+      .toHaveLength(15);
     expect(plans.comments.filter(({ authorId }) => authorId === studentIds[0]))
       .toHaveLength(12);
     expect(plans.likes.filter(({ userId }) => userId === studentIds[0]))
@@ -137,10 +137,10 @@ describe("USB 시연 학급 자료 생성 명령", () => {
         )),
       ).toBe(true);
     }
-    expect(plans.analyses).toHaveLength(5);
+    expect(plans.analyses).toHaveLength(7);
     expect(
       new Set(plans.analyses.map(({ result }) => result.summary)).size,
-    ).toBe(5);
+    ).toBe(7);
     for (const analysis of plans.analyses) {
       expect(analysis.studentId).toBe(studentIds[0]);
       expect(analysis.result.summary).toContain("질문아");
@@ -201,6 +201,64 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       expect(profile.totalPoints).toBe(
         profile.gamePoints + profile.contentPoints,
       );
+    }
+  });
+
+  it("김질문 질문탐구에 4학년 1학기 국어와 수학 직접 탐구 수업을 제공한다", () => {
+    const studentIds = STUDENT_NAMES.map(
+      (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
+    );
+    const plans = buildDemoLearningActivityPlans(studentIds);
+    const expectedSessions = [
+      {
+        key: "exploreKorean",
+        subject: "국어",
+        topic: "질문을 만들며 글 읽기",
+        achievementCode: "[4국02-03]",
+      },
+      {
+        key: "exploreMath",
+        subject: "수학",
+        topic: "각도를 비교하고 재기",
+        achievementCode: "[4수03-24]",
+      },
+    ];
+
+    for (const expected of expectedSessions) {
+      const session = DEMO_SESSION_BLUEPRINTS.find(
+        ({ key }) => key === expected.key,
+      );
+      expect(session).toMatchObject({
+        key: expected.key,
+        subject: expected.subject,
+        topic: expected.topic,
+        semester: "1",
+        studentExplore: true,
+      });
+
+      const design = DEMO_UNIT_DESIGN_BLUEPRINTS.find(
+        ({ id }) => id === session?.unitDesignId,
+      );
+      expect(design).toMatchObject({
+        subject: expected.subject,
+        grade: "4",
+        achievements: [
+          expect.objectContaining({ code: expected.achievementCode }),
+        ],
+      });
+
+      const studentQuestions = plans.questions.filter(
+        ({ sessionId }) => sessionId === session?.id,
+      );
+      expect(studentQuestions.length).toBeGreaterThanOrEqual(4);
+      expect(
+        studentQuestions.filter(({ authorId }) => authorId === studentIds[0]),
+      ).toHaveLength(2);
+      expect(
+        plans.classInquiryQuestions.filter(
+          ({ sessionId }) => sessionId === session?.id,
+        ),
+      ).toEqual([]);
     }
   });
 
@@ -341,7 +399,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
   });
 
   it("모든 질문수업에 4학년 수준의 완전한 탐구 참고자료를 연결한다", () => {
-    expect(DEMO_UNIT_DESIGN_BLUEPRINTS).toHaveLength(6);
+    expect(DEMO_UNIT_DESIGN_BLUEPRINTS).toHaveLength(8);
     const designById = new Map(
       DEMO_UNIT_DESIGN_BLUEPRINTS.map((design) => [design.id, design]),
     );
