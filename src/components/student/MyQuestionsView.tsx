@@ -27,7 +27,7 @@ import {
   CLOSURE_STYLE,
   COGNITIVE_STYLE,
 } from "@/lib/question-labels";
-import { sortSessionsDesc, getSessionFilterOptions, filterSessions, isInquiryDesignSession } from "@/lib/sessions";
+import { sortSessionsDesc, getSessionFilterOptions, filterSessions } from "@/lib/sessions";
 import { SessionReferencePanel } from "@/components/shared/SessionReferencePanel";
 import { StudentMonthlyDateSelect, StudentMonthlySessionLookup } from "@/components/student/StudentMonthlySessionLookup";
 import {
@@ -203,9 +203,9 @@ export function MyQuestionsView() {
   };
 
   // 날짜·교과·주제로 세션 목록을 좁힌다(세션을 고르는 보조 필터, 교사 페이지와 동일)
-  // 질문 배포 세션(unitDesignId + 배포 질문)만 제외. 탐구질문 수업 세션(배포 질문 없음)은
-  // 학생이 직접 질문을 작성하므로 내 질문 조회에 노출한다.
-  const browsableSessions = sessions.filter((s) => !s.unitDesignId || isInquiryDesignSession(s));
+  // 배포 질문 유무와 관계없이 학생에게 배정된 모든 질문수업을 내 질문 조회에 노출한다.
+  // 교사가 질문을 묶어 배포한 뒤에도 학생이 앞서 작성한 원본 질문은 그대로 남아 있다.
+  const browsableSessions = sessions;
   const filterOptions = getSessionFilterOptions(browsableSessions);
   const filteredSessions = filterSessions(browsableSessions, {
     date: filterDate || undefined,
