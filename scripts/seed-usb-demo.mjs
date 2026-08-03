@@ -1324,6 +1324,28 @@ export function buildDemoLearningActivityPlans(studentIds) {
   return { questions, classInquiryQuestions, comments, likes, analyses };
 }
 
+export function buildDemoSeedExpectedCounts(studentIds) {
+  const activityPlans = buildDemoLearningActivityPlans(studentIds);
+  return {
+    sessionCount: DEMO_SESSION_BLUEPRINTS.length,
+    unitDesignCount: DEMO_UNIT_DESIGN_BLUEPRINTS.length,
+    sharedQuestionCount: activityPlans.classInquiryQuestions.length,
+    questionCount: activityPlans.questions.length,
+    commentCount: activityPlans.comments.length,
+    likeCount: activityPlans.likes.length,
+    analysisCount: activityPlans.analyses.length,
+    kimQuestionCount: activityPlans.questions.filter(
+      ({ authorId }) => authorId === studentIds[0],
+    ).length,
+    kimCommentCount: activityPlans.comments.filter(
+      ({ authorId }) => authorId === studentIds[0],
+    ).length,
+    kimLikeCount: activityPlans.likes.filter(
+      ({ userId }) => userId === studentIds[0],
+    ).length,
+  };
+}
+
 const CLASS_INQUIRY_FLOW = [
   {
     type: "factual",
@@ -1974,7 +1996,6 @@ export const DEMO_RECENT_CONTENT_POINT_PLANS = [
     bonusType: "QUESTION_WRITE",
     points: 2,
     reason: "질문수업 질문 작성",
-    sessionId: DEMO.sessionIds.today,
     relatedQuestionId: "usb-demo-question-01-09",
     createdDays: 0,
   },
@@ -1983,7 +2004,6 @@ export const DEMO_RECENT_CONTENT_POINT_PLANS = [
     bonusType: "QUESTION_WRITE",
     points: 2,
     reason: "질문수업 질문 작성",
-    sessionId: DEMO.sessionIds.today,
     relatedQuestionId: "usb-demo-question-01-10",
     createdDays: -0.01,
   },
@@ -1992,7 +2012,6 @@ export const DEMO_RECENT_CONTENT_POINT_PLANS = [
     bonusType: "COMMENT_WRITE",
     points: 1,
     reason: "친구 질문에 답변 작성",
-    sessionId: DEMO.sessionIds.today,
     relatedCommentId: "usb-demo-comment-01-03",
     createdDays: -0.02,
   },
@@ -2001,11 +2020,31 @@ export const DEMO_RECENT_CONTENT_POINT_PLANS = [
     bonusType: "COMMENT_WRITE",
     points: 1,
     reason: "친구 질문에 답변 작성",
-    sessionId: DEMO.sessionIds.today,
     relatedCommentId: "usb-demo-comment-01-09",
     createdDays: -0.03,
   },
 ];
+
+export function buildDemoRecentContentPointPlans(studentIds) {
+  const activityPlans = buildDemoLearningActivityPlans(studentIds);
+  const questionById = new Map(
+    [...activityPlans.questions, ...activityPlans.classInquiryQuestions]
+      .map((question) => [question.id, question]),
+  );
+  const commentById = new Map(
+    activityPlans.comments.map((comment) => [comment.id, comment]),
+  );
+
+  return DEMO_RECENT_CONTENT_POINT_PLANS.map((plan) => {
+    const relatedQuestionId = plan.relatedQuestionId
+      ?? commentById.get(plan.relatedCommentId)?.questionId;
+    const sessionId = questionById.get(relatedQuestionId)?.sessionId;
+    if (!sessionId) {
+      throw new Error(`최근 활동 포인트 ${plan.id}의 질문수업을 찾을 수 없습니다.`);
+    }
+    return { ...plan, sessionId };
+  });
+}
 
 export function buildDemoQuestionGamePointProfiles(studentIds) {
   if (studentIds.length !== DEMO_STUDENT_POINT_TOTALS.length) {
@@ -2049,8 +2088,9 @@ async function createQuestionGameData(tx, studentIds) {
   const pointProfileByStudent = new Map(
     pointProfiles.map((profile) => [profile.studentId, profile]),
   );
+  const recentContentPointPlans = buildDemoRecentContentPointPlans(studentIds);
 
-  for (const plan of DEMO_RECENT_CONTENT_POINT_PLANS) {
+  for (const plan of recentContentPointPlans) {
     await tx.pointLog.create({
       data: {
         id: plan.id,
@@ -2238,6 +2278,7 @@ export async function seedUsbDemo() {
 
     const passwordHash = await bcrypt.hash(randomBytes(32).toString("hex"), 12);
     const studentIds = STUDENT_NAMES.map((_, index) => studentId(index + 1));
+    const expectedCounts = buildDemoSeedExpectedCounts(studentIds);
 
     await prisma.$transaction(async (tx) => {
       await removePreviousDemoData(tx, studentIds);
@@ -2300,16 +2341,16 @@ export async function seedUsbDemo() {
       );
     }
     if (
-      sessionCount !== DEMO_SESSION_BLUEPRINTS.length
-      || unitDesignCount !== DEMO_UNIT_DESIGN_BLUEPRINTS.length
-      || sharedQuestionCount !== 25
-      || questionCount !== 92
-      || commentCount !== 120
-      || likeCount !== 180
-      || analysisCount !== ACTIVITY_SESSION_BLUEPRINTS.length
-      || kimQuestionCount !== 11
-      || kimCommentCount !== 12
-      || kimLikeCount !== 18
+      sessionCount !== expectedCounts.sessionCount
+      || unitDesignCount !== expectedCounts.unitDesignCount
+      || sharedQuestionCount !== expectedCounts.sharedQuestionCount
+      || questionCount !== expectedCounts.questionCount
+      || commentCount !== expectedCounts.commentCount
+      || likeCount !== expectedCounts.likeCount
+      || analysisCount !== expectedCounts.analysisCount
+      || kimQuestionCount !== expectedCounts.kimQuestionCount
+      || kimCommentCount !== expectedCounts.kimCommentCount
+      || kimLikeCount !== expectedCounts.kimLikeCount
     ) {
       throw new Error(
         `시연 자료 수가 예상과 다릅니다: 수업 ${sessionCount}, 참고자료 ${unitDesignCount}, 배포 질문 ${sharedQuestionCount}, 학생 질문 ${questionCount}, 댓글 ${commentCount}, 좋아요 ${likeCount}, 분석 ${analysisCount}`,

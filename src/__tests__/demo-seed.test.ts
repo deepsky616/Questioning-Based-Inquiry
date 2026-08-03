@@ -13,6 +13,7 @@ import {
   DEMO_UNIT_DESIGN_BLUEPRINTS,
   STUDENT_NAMES,
 } from "../../scripts/seed-usb-demo.mjs";
+import * as demoSeedModule from "../../scripts/seed-usb-demo.mjs";
 
 describe("USB 시연 학급 자료 생성 명령", () => {
   it("4학년 1반 학생 28명을 고정된 순서로 제공한다", () => {
@@ -396,6 +397,77 @@ describe("USB 시연 학급 자료 생성 명령", () => {
         );
       }
     }
+  });
+
+  it("최근 댓글 포인트의 수업은 댓글이 달린 질문수업에서 계산한다", () => {
+    const studentIds = STUDENT_NAMES.map(
+      (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
+    );
+    const activityPlans = buildDemoLearningActivityPlans(studentIds);
+    const resolver = (
+      demoSeedModule as unknown as {
+        buildDemoRecentContentPointPlans?: (
+          ids: string[],
+        ) => Array<{
+          sessionId: string;
+          relatedQuestionId?: string;
+          relatedCommentId?: string;
+        }>;
+      }
+    ).buildDemoRecentContentPointPlans;
+
+    expect(resolver).toBeTypeOf("function");
+    if (!resolver) return;
+
+    const questionById = new Map(
+      [...activityPlans.questions, ...activityPlans.classInquiryQuestions]
+        .map((question) => [question.id, question]),
+    );
+    const commentById = new Map(
+      activityPlans.comments.map((comment) => [comment.id, comment]),
+    );
+
+    for (const plan of resolver(studentIds)) {
+      const relatedQuestionId = plan.relatedQuestionId
+        ?? commentById.get(plan.relatedCommentId ?? "")?.questionId;
+      expect(plan.sessionId).toBe(
+        questionById.get(relatedQuestionId ?? "")?.sessionId,
+      );
+    }
+  });
+
+  it("자료 생성 완료 검사는 현재 수업과 활동 자료 수에서 기대값을 계산한다", () => {
+    const studentIds = STUDENT_NAMES.map(
+      (_, index) => `usb-demo-student-${String(index + 1).padStart(2, "0")}`,
+    );
+    const activityPlans = buildDemoLearningActivityPlans(studentIds);
+    const countBuilder = (
+      demoSeedModule as unknown as {
+        buildDemoSeedExpectedCounts?: (ids: string[]) => Record<string, number>;
+      }
+    ).buildDemoSeedExpectedCounts;
+
+    expect(countBuilder).toBeTypeOf("function");
+    if (!countBuilder) return;
+
+    expect(countBuilder(studentIds)).toEqual({
+      sessionCount: DEMO_SESSION_BLUEPRINTS.length,
+      unitDesignCount: DEMO_UNIT_DESIGN_BLUEPRINTS.length,
+      sharedQuestionCount: activityPlans.classInquiryQuestions.length,
+      questionCount: activityPlans.questions.length,
+      commentCount: activityPlans.comments.length,
+      likeCount: activityPlans.likes.length,
+      analysisCount: activityPlans.analyses.length,
+      kimQuestionCount: activityPlans.questions.filter(
+        ({ authorId }) => authorId === studentIds[0],
+      ).length,
+      kimCommentCount: activityPlans.comments.filter(
+        ({ authorId }) => authorId === studentIds[0],
+      ).length,
+      kimLikeCount: activityPlans.likes.filter(
+        ({ userId }) => userId === studentIds[0],
+      ).length,
+    });
   });
 
   it("모든 질문수업에 4학년 수준의 완전한 탐구 참고자료를 연결한다", () => {
