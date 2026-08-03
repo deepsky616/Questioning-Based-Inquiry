@@ -548,7 +548,9 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       expect(sharedQuestions.length).toBeGreaterThanOrEqual(4);
       expect(sharedQuestions.length).toBeLessThanOrEqual(7);
       expect(sharedQuestions).toHaveLength(
-        new Set(studentQuestions.map(({ content }) => content)).size,
+        new Set(studentQuestions.map(({ content, similarityKey }) => (
+          similarityKey ?? content.trim().replace(/\s+/g, " ")
+        ))).size,
       );
       expect(sharedQuestions.map(({ priority }) => priority)).toEqual(
         sharedQuestions.map((_, index) => index + 1),
@@ -571,6 +573,34 @@ describe("USB 시연 학급 자료 생성 명령", () => {
         )),
       ).toBe(true);
       expect(sharedQuestions.every(({ source }) => source === "student")).toBe(true);
+      expect(new Set(studentQuestions.map(({ content }) => content))).toHaveLength(
+        studentQuestions.length,
+      );
+      if (!session.studentExplore) {
+        expect(
+          sharedQuestions.some(({ mergedFrom }) => (
+            new Set(mergedFrom ?? []).size > 1
+          )),
+        ).toBe(true);
+      }
+      expect(
+        sharedQuestions.every(({ mergedFrom }) => (
+          new Set(mergedFrom ?? []).size === (mergedFrom?.length ?? 0)
+        )),
+      ).toBe(true);
+      const similarityKeyByContent = new Map(
+        studentQuestions.map(({ content, similarityKey }) => [
+          content,
+          similarityKey ?? content.trim().replace(/\s+/g, " "),
+        ]),
+      );
+      expect(
+        sharedQuestions.every(({ mergedFrom }) => (
+          new Set(
+            (mergedFrom ?? []).map((content) => similarityKeyByContent.get(content)),
+          ).size === 1
+        )),
+      ).toBe(true);
       expect(
         sharedQuestions.every(({ flowId }) => flowId === "cognitive-development"),
       ).toBe(true);

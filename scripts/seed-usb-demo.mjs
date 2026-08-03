@@ -1000,66 +1000,77 @@ const SESSION_QUESTION_TYPES = {
 const KIM_QUESTION_PLANS = [
   {
     sessionKey: "pastKorean",
+    similarityIndex: 1,
     content: "글쓴이의 주장을 믿으려면 어떤 근거를 먼저 살펴봐야 할까요?",
     closure: "open",
     cognitive: "conceptual",
   },
   {
     sessionKey: "pastKorean",
+    similarityIndex: 2,
     content: "같은 근거를 보고도 서로 다른 주장을 할 수 있을까요?",
     closure: "open",
     cognitive: "controversial",
   },
   {
     sessionKey: "pastSocial",
+    similarityIndex: 0,
     content: "우리 지역에서 어린이가 가장 불편해하는 문제는 무엇일까요?",
     closure: "open",
     cognitive: "factual",
   },
   {
     sessionKey: "pastSocial",
+    similarityIndex: 2,
     content: "지역 문제를 해결할 때 주민의 의견이 다르면 어떻게 정해야 할까요?",
     closure: "open",
     cognitive: "controversial",
   },
   {
     sessionKey: "past",
+    similarityIndex: 0,
     content: "물이 얼 때 부피가 커지는 까닭은 무엇일까요?",
     closure: "open",
     cognitive: "conceptual",
   },
   {
     sessionKey: "past",
+    similarityIndex: 4,
     content: "얼음이 녹은 물의 양은 녹기 전과 같을까요?",
     closure: "closed",
     cognitive: "factual",
   },
   {
     sessionKey: "pastMath",
+    similarityIndex: 0,
     content: "같은 자료도 표와 그래프에서 다르게 보일 수 있을까요?",
     closure: "open",
     cognitive: "conceptual",
   },
   {
     sessionKey: "pastMath",
+    similarityIndex: 1,
     content: "어떤 그래프를 써야 자료의 차이가 가장 잘 보일까요?",
     closure: "open",
     cognitive: "conceptual",
   },
   {
     sessionKey: "today",
+    similarityIndex: 0,
     content: "온도가 높아질수록 물은 언제나 더 빨리 증발할까요?",
     closure: "open",
     cognitive: "conceptual",
   },
   {
     sessionKey: "today",
+    similarityIndex: 2,
     content: "겨울철 수도관이 얼면 왜 터질 수 있을까요?",
     closure: "open",
     cognitive: "factual",
   },
   {
     sessionKey: "today",
+    similarityIndex: 4,
     content: "생활의 편리함을 위해 상태 변화를 이용할 때 환경도 고려해야 할까요?",
     closure: "open",
     cognitive: "controversial",
@@ -1151,6 +1162,25 @@ const COMMENT_CONTENTS = [
   "왜 그렇게 생각했는지 근거까지 물어보는 질문으로 넓혀 보면 좋겠어요.",
 ];
 
+const SIMILAR_QUESTION_OPENERS = [
+  "수업에서 ",
+  "자료를 찾아보면 ",
+  "친구들의 생각을 비교하면 ",
+  "실제 사례를 살펴보면 ",
+  "다른 조건에서도 ",
+  "우리 생활에서도 ",
+  "직접 확인해 보면 ",
+  "여러 관점에서 생각하면 ",
+];
+
+function buildSemanticallySimilarQuestion(baseQuestion, variantIndex) {
+  const opener = SIMILAR_QUESTION_OPENERS[variantIndex];
+  if (!opener) {
+    throw new Error("비슷한 학생 질문 문장 종류가 부족합니다.");
+  }
+  return `${opener}${baseQuestion}`;
+}
+
 function pickUniqueQuestion(candidates, usedQuestionIds, startIndex) {
   for (let offset = 0; offset < candidates.length; offset += 1) {
     const candidate = candidates[(startIndex + offset) % candidates.length];
@@ -1168,6 +1198,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
     ANALYSIS_SESSION_BLUEPRINTS.map((blueprint) => [blueprint.key, blueprint]),
   );
   const questions = [];
+  const similarQuestionUseCount = new Map();
 
   for (const [index, plan] of KIM_QUESTION_PLANS.entries()) {
     const session = sessionByKey.get(plan.sessionKey);
@@ -1180,6 +1211,9 @@ export function buildDemoLearningActivityPlans(studentIds) {
       closure: plan.closure,
       cognitive: plan.cognitive,
       inquiryType: plan.cognitive,
+      ...(typeof plan.similarityIndex === "number"
+        ? { similarityKey: `${plan.sessionKey}:${plan.similarityIndex}` }
+        : {}),
       createdDays: Math.min(0, session.offsetDays + 1),
     });
   }
@@ -1190,8 +1224,17 @@ export function buildDemoLearningActivityPlans(studentIds) {
         (studentIndex + questionIndex) % ACTIVITY_SESSION_BLUEPRINTS.length
       ];
       const bank = SESSION_QUESTION_BANKS[session.key];
-      const bankIndex = (studentIndex + questionIndex * 2) % bank.length;
-      const content = bank[bankIndex];
+      const bankIndex = (
+        Math.floor(studentIndex / ACTIVITY_SESSION_BLUEPRINTS.length)
+        + questionIndex
+      ) % bank.length;
+      const similarityKey = `${session.key}:${bankIndex}`;
+      const variantIndex = similarQuestionUseCount.get(similarityKey) ?? 0;
+      similarQuestionUseCount.set(similarityKey, variantIndex + 1);
+      const content = buildSemanticallySimilarQuestion(
+        bank[bankIndex],
+        variantIndex,
+      );
       const inquiryType = SESSION_QUESTION_TYPES[session.key][bankIndex];
       questions.push({
         id: `usb-demo-question-${pad(studentIndex + 1)}-${pad(questionIndex + 1)}`,
@@ -1202,6 +1245,7 @@ export function buildDemoLearningActivityPlans(studentIds) {
         closure: questionIndex === 0 && studentIndex % 4 === 0 ? "closed" : "open",
         cognitive: inquiryType,
         inquiryType,
+        similarityKey,
         createdDays: Math.min(
           0,
           session.offsetDays + 1 + (studentIndex % 2),
@@ -1553,7 +1597,8 @@ export function buildDemoClassInquiryQuestions(
   const groupedByContent = new Map();
 
   for (const [index, question] of questionsInSession.entries()) {
-    const key = question.content.trim().replace(/\s+/g, " ");
+    const key = question.similarityKey?.trim()
+      || question.content.trim().replace(/\s+/g, " ");
     const group = groupedByContent.get(key) ?? {
       firstIndex: index,
       questions: [],
