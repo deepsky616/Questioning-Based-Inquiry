@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense } from "react";
 import { MyQuestionsView } from "@/components/student/MyQuestionsView";
 import { ExploreQuestionsView } from "@/components/student/ExploreQuestionsView";
 import { UnitDesignView } from "@/components/student/UnitDesignView";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useTranslations } from "next-intl";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Tab = "mine" | "explore" | "design";
 
@@ -16,9 +17,31 @@ const TABS: { value: Tab; labelKey: "tabMine" | "tabExplore" | "tabDesign" }[] =
 ];
 
 export default function StudentQuestionsPage() {
+  return (
+    <Suspense fallback={null}>
+      <StudentQuestionsContent />
+    </Suspense>
+  );
+}
+
+function StudentQuestionsContent() {
   const tPages = useTranslations("pages");
   const t = useTranslations("studentQ");
-  const [tab, setTab] = useState<Tab>("explore");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const tab: Tab = requestedTab === "mine" || requestedTab === "design" ? requestedTab : "explore";
+
+  const setTab = (nextTab: Tab) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (nextTab === "explore") {
+      nextParams.delete("tab");
+    } else {
+      nextParams.set("tab", nextTab);
+    }
+    const query = nextParams.toString();
+    router.push(query ? `/student-questions?${query}` : "/student-questions", { scroll: false });
+  };
 
   return (
     <div className="space-y-5">

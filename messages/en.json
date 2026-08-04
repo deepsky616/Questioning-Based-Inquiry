@@ -1864,6 +1864,7 @@
     "empty": "No questions yet",
     "emptyDesc": "Write your first question!",
     "viewAll": "View all questions",
+    "viewAllMine": "View all my questions",
     "questionSummaryLoadError": "Could not load question statistics.",
     "questionSummaryRetry": "Reload question statistics",
     "todayTasksTitle": "What to do now",

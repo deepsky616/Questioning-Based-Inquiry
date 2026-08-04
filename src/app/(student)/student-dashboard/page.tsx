@@ -435,8 +435,8 @@ function StudentDashboard() {
             </div>
           )}
           <div className="mt-4">
-            <Link href="/student-questions">
-              <Button variant="outline" className="h-11 w-full sm:w-auto">{t("viewAll")}</Button>
+            <Link href="/student-questions?tab=mine">
+              <Button variant="outline" className="h-11 w-full sm:w-auto">{t("viewAllMine")}</Button>
             </Link>
           </div>
         </CardContent>
