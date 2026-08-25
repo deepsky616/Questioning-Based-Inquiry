@@ -281,19 +281,11 @@ function StudentDashboard() {
                 }}
               />
               <Card className="student-dashboard-question-summary border-indigo-100 bg-indigo-50/70 dark:border-indigo-500/30 dark:bg-indigo-950/20">
-                <CardContent className="flex items-center justify-between gap-3 p-4">
-                  <div>
-                    <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-200">{t("totalQuestions")}</p>
-                    <p className="mt-0.5 text-3xl font-black text-foreground">
-                      {isLoading ? "..." : questionsQuery.isError ? "--" : stats.total}
-                    </p>
-                  </div>
-                  <Link
-                    href="/student-questions"
-                    className="rounded-md border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 transition-colors hover:bg-indigo-100 dark:border-indigo-500/30 dark:bg-background/70 dark:text-indigo-200 dark:hover:bg-indigo-950/50"
-                  >
-                    {t("viewAll")}
-                  </Link>
+                <CardContent className="p-4">
+                  <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-200">{t("totalQuestions")}</p>
+                  <p className="mt-0.5 text-3xl font-black text-foreground">
+                    {isLoading ? "..." : questionsQuery.isError ? "--" : stats.total}
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -416,29 +408,40 @@ function StudentDashboard() {
         </CardHeader>
         <CardContent>
           {questions.length === 0 ? (
-            <EmptyState icon="✏️" title={t("empty")} description={t("emptyDesc")} />
+            <EmptyState
+              icon="✏️"
+              title={t("empty")}
+              description={t("emptyDesc")}
+              action={(
+                <Button asChild className="h-11">
+                  <Link href="/student-ask">{t("writeFirst")}</Link>
+                </Button>
+              )}
+            />
           ) : (
-            <div className="space-y-3">
-              {questions.map((q) => (
-                <div key={q.id} className="rounded-lg bg-muted/40 p-4">
-                  <p className="line-clamp-2 text-sm leading-6 text-foreground md:text-base">{q.content}</p>
-                  <div className="flex gap-2 mt-2">
-                    <span className={`text-xs px-2 py-1 rounded break-keep text-center ${CLOSURE_STYLE[q.closure]}`}>
-                      {closureLabel(q.closure)}
-                    </span>
-                    <span className={`text-xs px-2 py-1 rounded break-keep text-center ${COGNITIVE_STYLE[q.cognitive]}`}>
-                      {cognitiveLabel(q.cognitive)}
-                    </span>
+            <>
+              <div className="space-y-3">
+                {questions.map((q) => (
+                  <div key={q.id} className="rounded-lg bg-muted/40 p-4">
+                    <p className="line-clamp-2 text-sm leading-6 text-foreground md:text-base">{q.content}</p>
+                    <div className="flex gap-2 mt-2">
+                      <span className={`text-xs px-2 py-1 rounded break-keep text-center ${CLOSURE_STYLE[q.closure]}`}>
+                        {closureLabel(q.closure)}
+                      </span>
+                      <span className={`text-xs px-2 py-1 rounded break-keep text-center ${COGNITIVE_STYLE[q.cognitive]}`}>
+                        {cognitiveLabel(q.cognitive)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <div className="mt-4">
+                <Button asChild variant="outline" className="h-11 w-full sm:w-auto">
+                  <Link href="/student-questions?tab=mine">{t("viewAllMine")}</Link>
+                </Button>
+              </div>
+            </>
           )}
-          <div className="mt-4">
-            <Link href="/student-questions?tab=mine">
-              <Button variant="outline" className="h-11 w-full sm:w-auto">{t("viewAllMine")}</Button>
-            </Link>
-          </div>
         </CardContent>
       </Card>
         </>
