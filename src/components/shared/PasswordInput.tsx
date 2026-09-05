@@ -21,7 +21,7 @@ export function PasswordInput({ className = "", ...props }: Omit<ComponentProps<
         onClick={() => setShow((v) => !v)}
         aria-label={show ? t("hidePassword") : t("showPassword")}
         title={show ? t("hidePassword") : t("showPassword")}
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+        className="absolute right-0 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>

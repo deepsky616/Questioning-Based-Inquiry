@@ -152,7 +152,8 @@
     "changePassword": "Change password",
     "backToLogin": "Back to login",
     "showPassword": "Show password",
-    "hidePassword": "Hide password"
+    "hidePassword": "Hide password",
+    "studentPasswordHelp": "Forgot your password? Ask your teacher to reset it."
   },
   "pages": {
     "teacherDashboard": {
@@ -259,7 +260,7 @@
     "resultHeader": "Analysis result",
     "aiAnalysisComplete": "AI question analysis complete",
     "analysisModel": "Analysis model: {model}",
-    "fallbackAnalysisNotice": "AI analysis is unavailable, so this is a basic analysis. Please try analyzing again shortly.",
+    "fallbackAnalysisNotice": "AI analysis is unavailable. This is a tentative classification for reference only. Check it with your teacher or analyze again later.",
     "inappropriateDetected": "⚠️ Inappropriate content detected",
     "inappropriateDefault": "This contains expressions not suitable for learning.",
     "closureLabel": "Closed / Open",
@@ -289,7 +290,7 @@
     "loadSessionError": "Couldn't load question class info. Please refresh the page.",
     "questionSummaryLoadError": "Couldn't load your question status. Please try again.",
     "existingQuestionLoadError": "Couldn't load the question you wrote for this class.",
-    "aiNotConfigured": "Your teacher hasn't set up AI yet. Keyword-based classification is used instead of AI.",
+    "aiNotConfigured": "AI analysis is not available yet. You can still write and save your question, and review its classification with your teacher.",
     "sessionSelectLabel": "Select question class",
     "inappropriateAdvice": "We recommend editing and re-analyzing. If you save as is, your teacher will review it.",
     "confidence": "Confidence",
@@ -316,7 +317,12 @@
     "upcomingSessionsLabel": "Today & upcoming",
     "pastSessionsLabel": "Past classes",
     "helperTipFormula": "Controversial questions are easy to build with endings like 'Should we ~?', 'Is ~ fair?', or 'Which value matters more?'.",
-    "sessionCount": "{count}"
+    "sessionCount": "{count}",
+    "draft_saved": "Draft saved in this tab. You can resume within 8 hours.",
+    "draft_restored": "Your draft for this class has been restored. Keep writing!",
+    "draft_error": "Draft saving is unavailable. Copy your question before leaving this page.",
+    "draft_submitted": "Your question has been submitted.",
+    "showExample": "Try rewriting first, then view an example if needed"
   },
   "comment": {
     "loading": "Loading comments...",
@@ -1908,7 +1914,10 @@
     "taskCommentsTitle": "My questions with comments",
     "taskCommentsDesc": "Questions of mine that have received comments.",
     "taskPointsTitle": "Recent points",
-    "taskPointsDesc": "Point records from the last 7 days."
+    "taskPointsDesc": "Point records from the last 7 days.",
+    "draftTitle": "Continue your draft",
+    "draftContinue": "Continue writing",
+    "classificationDetails": "Explore my question types"
   },
   "studentQ": {
     "tabMine": "📝 My questions",

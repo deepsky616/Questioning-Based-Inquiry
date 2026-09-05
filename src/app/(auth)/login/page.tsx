@@ -138,7 +138,7 @@ function StudentLoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4" {...STUDENT_LOGIN_FORM_PROPS}>
       {error && (
-        <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
+        <div role="alert" className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
       )}
       <div className="space-y-2">
         <Label htmlFor="s-school">{t("school")}</Label>
@@ -188,7 +188,8 @@ function StudentLoginForm() {
       {/* 아이디 저장 */}
       <SaveIdCheckbox id="s-save-id" checked={saveId} onChange={handleSaveIdChange} />
 
-      <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
+      <p className="text-xs leading-5 text-muted-foreground">{t("studentPasswordHelp")}</p>
+      <Button type="submit" variant="gradient" className="h-12 w-full" disabled={isSubmitting}>
         {isSubmitting ? t("loggingIn") : t("studentLogin")}
       </Button>
     </form>
@@ -260,7 +261,7 @@ function TeacherLoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4" {...TEACHER_LOGIN_FORM_PROPS}>
       {error && (
-        <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
+        <div role="alert" className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">{error}</div>
       )}
       <div className="space-y-2">
         <Label htmlFor="t-email">{t("email")}</Label>
@@ -287,7 +288,7 @@ function TeacherLoginForm() {
         </Link>
       </div>
 
-      <Button type="submit" variant="gradient" className="w-full" disabled={isSubmitting}>
+      <Button type="submit" variant="gradient" className="h-12 w-full" disabled={isSubmitting}>
         {isSubmitting ? t("loggingIn") : t("teacherLogin")}
       </Button>
     </form>
@@ -344,7 +345,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 dark:bg-none dark:bg-background p-4">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="overflow-hidden rounded-2xl border border-white/70 bg-white/80 p-3 shadow-xl shadow-blue-100/70 sm:p-4">
+        <section className="hidden overflow-hidden rounded-2xl border border-white/70 bg-white/80 p-3 shadow-xl shadow-blue-100/70 lg:block lg:p-4">
           <div className="relative aspect-[3/2] rounded-xl bg-white">
             <Image
               src="/login-inquiry-hero.png"

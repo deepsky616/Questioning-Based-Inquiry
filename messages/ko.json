@@ -152,7 +152,8 @@
     "changePassword": "비밀번호 변경",
     "backToLogin": "로그인으로 돌아가기",
     "showPassword": "비밀번호 보기",
-    "hidePassword": "비밀번호 숨기기"
+    "hidePassword": "비밀번호 숨기기",
+    "studentPasswordHelp": "비밀번호를 잊었나요? 선생님에게 초기화를 요청하세요."
   },
   "pages": {
     "teacherDashboard": {
@@ -259,7 +260,7 @@
     "resultHeader": "분석 결과",
     "aiAnalysisComplete": "인공지능 질문 분석 완료",
     "analysisModel": "분석 모델: {model}",
-    "fallbackAnalysisNotice": "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
+    "fallbackAnalysisNotice": "지금은 인공지능 분석을 사용할 수 없어 참고용 임시 분류를 보여드려요. 분류가 달라질 수 있으니 선생님과 확인하거나 나중에 다시 분석해 주세요.",
     "inappropriateDetected": "⚠️ 부적절한 내용이 감지되었습니다",
     "inappropriateDefault": "학습에 적절하지 않은 표현이 포함되어 있어요.",
     "closureLabel": "닫힌 질문/열린 질문",
@@ -289,7 +290,7 @@
     "loadSessionError": "질문수업 정보를 불러오지 못했습니다. 페이지를 새로고침해 주세요.",
     "questionSummaryLoadError": "작성한 질문 상태를 불러오지 못했습니다. 다시 시도해 주세요.",
     "existingQuestionLoadError": "이 수업에 작성한 질문을 불러오지 못했습니다.",
-    "aiNotConfigured": "교사가 AI 설정을 아직 등록하지 않았습니다. AI 분류 대신 키워드 기반 분류가 사용됩니다.",
+    "aiNotConfigured": "아직 인공지능 분석을 사용할 수 없어요. 질문은 작성하고 저장할 수 있으며, 분류는 선생님과 함께 확인해 주세요.",
     "sessionSelectLabel": "질문수업 선택",
     "inappropriateAdvice": "질문을 수정해 다시 분석하는 것을 권장합니다. 이대로 저장하면 선생님이 검토하게 됩니다.",
     "confidence": "신뢰도",
@@ -316,7 +317,12 @@
     "upcomingSessionsLabel": "오늘·예정",
     "pastSessionsLabel": "지난 수업",
     "helperTipFormula": "논쟁이 되는 질문은 '~해야 할까?', '~은 정당한가?', '어떤 가치가 더 중요할까?'로 끝맺으면 쉽게 만들 수 있어요.",
-    "sessionCount": "{count}개"
+    "sessionCount": "{count}개",
+    "draft_saved": "이 탭에 임시 저장했어요. 8시간 안에 다시 이어 쓸 수 있어요.",
+    "draft_restored": "이 수업에서 쓰던 질문을 불러왔어요. 이어서 작성해 보세요.",
+    "draft_error": "임시 저장을 사용할 수 없어요. 화면을 떠나기 전에 질문을 복사해 주세요.",
+    "draft_submitted": "질문 제출을 완료했어요.",
+    "showExample": "먼저 직접 고쳐 보고, 필요하면 예시 보기"
   },
   "comment": {
     "loading": "댓글 불러오는 중...",
@@ -1908,7 +1914,10 @@
     "taskCommentsTitle": "댓글 받은 내 질문",
     "taskCommentsDesc": "내 질문에 댓글이 달린 항목입니다.",
     "taskPointsTitle": "최근 받은 포인트",
-    "taskPointsDesc": "최근 7일 동안 받은 포인트 기록입니다."
+    "taskPointsDesc": "최근 7일 동안 받은 포인트 기록입니다.",
+    "draftTitle": "쓰던 질문 이어 쓰기",
+    "draftContinue": "이어서 작성하기",
+    "classificationDetails": "내 질문 유형 살펴보기"
   },
   "studentQ": {
     "tabMine": "📝 내 질문",

@@ -228,7 +228,7 @@ describe("저장된 설계 학생용 설명 편집", () => {
     ), {
       target: { value: "생물 요소가 환경과 서로 영향을 주고받음을 설명할 수 있다." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "저장", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
     fireEvent.click(await screen.findByRole("button", { name: "설명 없이 저장하기" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());

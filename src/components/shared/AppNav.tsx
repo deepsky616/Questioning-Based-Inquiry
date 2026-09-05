@@ -11,6 +11,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { LanguageToggle } from "@/components/shared/LanguageToggle";
 import { cn } from "@/lib/utils";
+import { clearQuestionDrafts } from "@/lib/question-draft";
+
+function handleSignOut() {
+  try { clearQuestionDrafts(window.sessionStorage); } catch { /* 저장소 오류가 로그아웃을 막지 않게 한다. */ }
+  void signOut({ callbackUrl: "/login" });
+}
 
 export interface NavPage {
   href: string;
@@ -293,7 +299,7 @@ export function AppNav({
                   )}
                   <button
                     type="button"
-                    onClick={() => signOut({ callbackUrl: "/login" })}
+                    onClick={handleSignOut}
                     className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
                   >
                     <LogOut className="h-4 w-4 text-muted-foreground" />
@@ -340,7 +346,7 @@ export function AppNav({
             </div>
             <div className="flex items-center justify-between pt-2 mt-1 border-t">
               <span className="text-sm text-muted-foreground truncate">{userName} {roleSuffix}</span>
-              <Button variant="outline" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
                 {t("logout")}
               </Button>
             </div>

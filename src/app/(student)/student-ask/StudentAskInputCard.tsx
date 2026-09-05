@@ -25,6 +25,7 @@ interface StudentAskInputCardProps {
   existingQuestion: { id: string; content: string } | null;
   isCheckingExisting: boolean;
   content: string;
+  draftStatus?: "empty" | "saved" | "restored" | "error" | "submitted";
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   canAsk: boolean;
   isLoading: boolean;
@@ -45,6 +46,7 @@ export function StudentAskInputCard({
   existingQuestion,
   isCheckingExisting,
   content,
+  draftStatus = "empty",
   textareaRef,
   canAsk,
   isLoading,
@@ -135,6 +137,11 @@ export function StudentAskInputCard({
                 className="min-h-[10rem] resize-none text-base leading-7"
               />
               <p className="text-sm text-muted-foreground text-right">{content.length}/200</p>
+              {draftStatus !== "empty" && (
+                <p role="status" className={`text-xs leading-5 ${draftStatus === "error" ? "text-destructive" : "text-muted-foreground"}`}>
+                  {t(`draft_${draftStatus}`)}
+                </p>
+              )}
             </div>
 
             <Button

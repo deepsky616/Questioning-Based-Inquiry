@@ -20,10 +20,13 @@ Object.defineProperty(globalThis, "ResizeObserver", {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("교사 질문놀이 학습 현황", () => {
   it("담당 학급의 최근 14일 변화와 놀이별 참여 현황을 불러온다", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-07-25T00:00:00.000Z"));
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       totals: { plays: 3, points: 18, goodQuestions: 7 },
       modes: {

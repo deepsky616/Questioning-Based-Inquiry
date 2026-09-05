@@ -86,9 +86,6 @@ export function StudentAskResultCard({
             <div className="text-sm text-blue-600 mt-0.5">
               {result.closure === "closed" ? t("closedHint") : t("openHint")}
             </div>
-            <div className="text-sm text-muted-foreground mt-1">
-              {t("confidence")}: {Math.round(result.closureScore * 100)}%
-            </div>
           </div>
           <div className="p-4 bg-purple-50 dark:bg-purple-950/40 rounded-lg">
             <div className="text-sm text-muted-foreground">{t("cognitiveLevel")}</div>
@@ -99,9 +96,6 @@ export function StudentAskResultCard({
               {result.cognitive === "factual" && t("factualHint")}
               {result.cognitive === "conceptual" && t("conceptualHint")}
               {result.cognitive === "controversial" && t("controversialHint")}
-            </div>
-            <div className="text-sm text-muted-foreground mt-1">
-              {t("confidence")}: {Math.round(result.cognitiveScore * 100)}%
             </div>
           </div>
         </div>
@@ -119,7 +113,8 @@ export function StudentAskResultCard({
         )}
 
         {result.improvedExample && result.improvedExample.trim() && (
-          <div className="p-4 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-500/30 rounded-lg">
+          <details key={analyzedContent} className="p-4 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-500/30 rounded-lg">
+            <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-green-800 dark:text-green-200">{t("showExample")}</summary>
             <div className="mb-2 text-sm font-medium text-green-800 dark:text-green-200">{t("improvedTitle")}</div>
             <p className="font-medium text-green-900 dark:text-green-100">&ldquo;{result.improvedExample}&rdquo;</p>
             <p className="mt-1 text-xs text-green-600 dark:text-green-300">{t("improveHint")}</p>
@@ -131,7 +126,7 @@ export function StudentAskResultCard({
             >
               {t("useImprovedExample")}
             </Button>
-          </div>
+          </details>
         )}
 
         <div className="p-4 border rounded-lg bg-muted/40 text-sm text-muted-foreground">

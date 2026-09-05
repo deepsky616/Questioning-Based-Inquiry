@@ -14,6 +14,7 @@ export function PageNav({ pages }: PageNavProps) {
   const t = useTranslations("chrome");
   const pathname = usePathname();
   const currentIndex = pages.findIndex((page) => isNavPageActive(pathname, page));
+  if (currentIndex < 0) return null;
   const home = pages[0];
   const prev = currentIndex > 0 ? pages[currentIndex - 1] : null;
   const next = currentIndex < pages.length - 1 ? pages[currentIndex + 1] : null;
@@ -23,18 +24,14 @@ export function PageNav({ pages }: PageNavProps) {
     <div className="mt-8 pt-4 border-t border-border flex items-center justify-between">
       <div className="flex gap-2">
         {!isHome && (
-          <Link href={home.href}>
-            <Button variant="outline" size="sm">
-              {t("navHome")}
-            </Button>
-          </Link>
+          <Button asChild variant="outline" size="sm">
+            <Link href={home.href}>{t("navHome")}</Link>
+          </Button>
         )}
         {prev && (
-          <Link href={prev.href}>
-            <Button variant="outline" size="sm">
-              ← {prev.label}
-            </Button>
-          </Link>
+          <Button asChild variant="outline" size="sm">
+            <Link href={prev.href}>← {prev.label}</Link>
+          </Button>
         )}
       </div>
 
@@ -44,11 +41,9 @@ export function PageNav({ pages }: PageNavProps) {
 
       <div>
         {next && (
-          <Link href={next.href}>
-            <Button variant="outline" size="sm">
-              {next.label} →
-            </Button>
-          </Link>
+          <Button asChild variant="outline" size="sm">
+            <Link href={next.href}>{next.label} →</Link>
+          </Button>
         )}
       </div>
     </div>

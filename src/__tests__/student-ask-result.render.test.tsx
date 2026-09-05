@@ -157,6 +157,7 @@ const result: ClassificationResult = {
 
 afterEach(() => {
   cleanup();
+  window.sessionStorage.clear();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
   appState.search = "";
@@ -194,6 +195,16 @@ afterEach(() => {
 });
 
 describe("학생 질문 분석 결과", () => {
+  it("질문의 방향 점수를 확신도 백분율로 보여주지 않는다", () => {
+    renderWithIntl(<StudentAskResultCard
+      result={{ ...result, closureScore: 0.1 }} analyzedContent="조건이 바뀌면 어떻게 될까요?"
+      analysisCurrent saveComplete={false} isSaving={false}
+      onRewrite={vi.fn()} onUseImprovedExample={vi.fn()} onSave={vi.fn()}
+    />);
+    expect(screen.queryByText(/신뢰도|10%/)).not.toBeInTheDocument();
+    expect(screen.getByText(result.reasoning)).toBeInTheDocument();
+  });
+
   it("주소로 연 수업 뒤 학생이 직접 고른 수업을 다시 덮지 않고 주소를 맞춘다", async () => {
     Element.prototype.scrollIntoView = vi.fn();
     appState.search = "sessionId=session-2";
@@ -397,9 +408,9 @@ describe("학생 질문 분석 결과", () => {
     const coreIdea = container.querySelector('[data-design-reference-section="core-idea"]');
     const achievement = container.querySelector('[data-design-reference-section="achievement"]');
     const coreSentence = container.querySelector('[data-design-reference-section="core-sentence"]');
-    expect(coreIdea?.compareDocumentPosition(achievement as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect((coreIdea?.compareDocumentPosition(achievement as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
-    expect(achievement?.compareDocumentPosition(coreSentence as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect((achievement?.compareDocumentPosition(coreSentence as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
     expect(achievement).toHaveClass(
       "border-teal-200/80",
@@ -657,6 +668,7 @@ describe("학생 질문 분석 결과", () => {
     expect(screen.getByText("수정한 질문을 다시 분석해 주세요.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "질문 저장" })).toBeDisabled();
 
+    fireEvent.click(screen.getByText(ko.ask.showExample));
     fireEvent.click(screen.getByRole("button", { name: "예시를 초안으로 사용" }));
     expect(onUseImprovedExample).toHaveBeenCalledWith(result.improvedExample);
   });
@@ -729,7 +741,7 @@ describe("학생 질문 분석 결과", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent(
-      "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
+      "지금은 인공지능 분석을 사용할 수 없어 참고용 임시 분류를 보여드려요. 분류가 달라질 수 있으니 선생님과 확인하거나 나중에 다시 분석해 주세요.",
     );
     expect(screen.queryByText("인공지능 질문 분석 완료")).not.toBeInTheDocument();
   });
@@ -771,7 +783,7 @@ describe("학생 질문 분석 결과", () => {
       ).toBeInTheDocument();
       expect(classifyAttempts).toBe(2);
       expect(screen.queryByText(
-        "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
+        "지금은 인공지능 분석을 사용할 수 없어 참고용 임시 분류를 보여드려요. 분류가 달라질 수 있으니 선생님과 확인하거나 나중에 다시 분석해 주세요.",
       )).not.toBeInTheDocument();
     },
   );
@@ -803,7 +815,7 @@ describe("학생 질문 분석 결과", () => {
     fireEvent.click(screen.getByRole("button", { name: "질문 분석하기" }));
 
     expect(await screen.findByText(
-      "인공지능 분석을 사용할 수 없어 기본 분석 결과를 보여드려요. 잠시 후 다시 분석해 주세요.",
+      "지금은 인공지능 분석을 사용할 수 없어 참고용 임시 분류를 보여드려요. 분류가 달라질 수 있으니 선생님과 확인하거나 나중에 다시 분석해 주세요.",
     )).toBeInTheDocument();
     expect(classifyAttempts).toBe(1);
   });
