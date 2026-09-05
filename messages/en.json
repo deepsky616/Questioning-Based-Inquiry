@@ -1914,10 +1914,7 @@
     "taskCommentsTitle": "My questions with comments",
     "taskCommentsDesc": "Questions of mine that have received comments.",
     "taskPointsTitle": "Recent points",
-    "taskPointsDesc": "Point records from the last 7 days.",
-    "draftTitle": "Continue your draft",
-    "draftContinue": "Continue writing",
-    "classificationDetails": "Explore my question types"
+    "taskPointsDesc": "Point records from the last 7 days."
   },
   "studentQ": {
     "tabMine": "📝 My questions",

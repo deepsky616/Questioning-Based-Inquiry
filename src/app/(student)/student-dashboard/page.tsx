@@ -14,7 +14,6 @@ import { DashboardSkeleton } from "@/components/shared/DashboardSkeleton";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { getSessionUser } from "@/lib/auth-helpers";
 import { CLOSURE_STYLE, COGNITIVE_STYLE } from "@/lib/question-labels";
-import { StudentDraftResumeCard } from "./StudentDraftResumeCard";
 import PointsCard from "@/components/shared/PointsCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
@@ -250,8 +249,11 @@ function StudentDashboard() {
       ) : (
         <>
           <div className="student-dashboard-tablet-overview">
-            {/* 오늘 수업과 이어 쓰던 질문 */}
+            {/* 포인트 카드 */}
             <div className="student-dashboard-points-panel flex flex-col gap-4">
+              <div className="min-h-0 flex-1">
+                <PointsCard />
+              </div>
               <StudentDashboardTasksCard
                 status={taskStatus}
                 taskItems={taskItems}
@@ -278,7 +280,6 @@ function StudentDashboard() {
                   },
                 }}
               />
-              <StudentDraftResumeCard key={user.id} studentId={user.id} sessions={sessions} />
               <Card className="student-dashboard-question-summary border-indigo-100 bg-indigo-50/70 dark:border-indigo-500/30 dark:bg-indigo-950/20">
                 <CardContent className="p-4">
                   <p className="text-xs font-semibold text-indigo-700 dark:text-indigo-200">{t("totalQuestions")}</p>
@@ -305,53 +306,6 @@ function StudentDashboard() {
 
       {!isLoading && !questionsQuery.isError && (
         <>
-      {/* 최근 질문 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("recentTitle")}</CardTitle>
-          <CardDescription>{t("recentDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {questions.length === 0 ? (
-            <EmptyState
-              icon="✏️"
-              title={t("empty")}
-              description={t("emptyDesc")}
-              action={(
-                <Button asChild className="h-11">
-                  <Link href="/student-ask">{t("writeFirst")}</Link>
-                </Button>
-              )}
-            />
-          ) : (
-            <>
-              <div className="space-y-3">
-                {questions.map((q) => (
-                  <div key={q.id} className="rounded-lg bg-muted/40 p-4">
-                    <p className="line-clamp-2 text-sm leading-6 text-foreground md:text-base">{q.content}</p>
-                    <div className="flex gap-2 mt-2">
-                      <span className={`text-xs px-2 py-1 rounded break-keep text-center ${CLOSURE_STYLE[q.closure]}`}>
-                        {closureLabel(q.closure)}
-                      </span>
-                      <span className={`text-xs px-2 py-1 rounded break-keep text-center ${COGNITIVE_STYLE[q.cognitive]}`}>
-                        {cognitiveLabel(q.cognitive)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4">
-                <Button asChild variant="outline" className="h-11 w-full sm:w-auto">
-                  <Link href="/student-questions?tab=mine">{t("viewAllMine")}</Link>
-                </Button>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
-      <details className="rounded-xl border bg-card p-4">
-        <summary className="min-h-11 cursor-pointer py-2 text-base font-semibold">{t("classificationDetails")}</summary>
-        <div className="mt-4 space-y-4">
       {/* 분류 1 · 닫힌 질문 / 열린 질문 */}
       <Card>
         <CardHeader className="pb-3">
@@ -446,11 +400,52 @@ function StudentDashboard() {
         </CardContent>
       </Card>
 
-        </div>
-      </details>
+      {/* 최근 질문 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("recentTitle")}</CardTitle>
+          <CardDescription>{t("recentDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {questions.length === 0 ? (
+            <EmptyState
+              icon="✏️"
+              title={t("empty")}
+              description={t("emptyDesc")}
+              action={(
+                <Button asChild className="h-11">
+                  <Link href="/student-ask">{t("writeFirst")}</Link>
+                </Button>
+              )}
+            />
+          ) : (
+            <>
+              <div className="space-y-3">
+                {questions.map((q) => (
+                  <div key={q.id} className="rounded-lg bg-muted/40 p-4">
+                    <p className="line-clamp-2 text-sm leading-6 text-foreground md:text-base">{q.content}</p>
+                    <div className="flex gap-2 mt-2">
+                      <span className={`text-xs px-2 py-1 rounded break-keep text-center ${CLOSURE_STYLE[q.closure]}`}>
+                        {closureLabel(q.closure)}
+                      </span>
+                      <span className={`text-xs px-2 py-1 rounded break-keep text-center ${COGNITIVE_STYLE[q.cognitive]}`}>
+                        {cognitiveLabel(q.cognitive)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4">
+                <Button asChild variant="outline" className="h-11 w-full sm:w-auto">
+                  <Link href="/student-questions?tab=mine">{t("viewAllMine")}</Link>
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
         </>
       )}
-      <PointsCard />
       </>
       )}
     </div>
