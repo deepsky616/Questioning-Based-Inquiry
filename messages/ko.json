@@ -1914,10 +1914,7 @@
     "taskCommentsTitle": "댓글 받은 내 질문",
     "taskCommentsDesc": "내 질문에 댓글이 달린 항목입니다.",
     "taskPointsTitle": "최근 받은 포인트",
-    "taskPointsDesc": "최근 7일 동안 받은 포인트 기록입니다.",
-    "draftTitle": "쓰던 질문 이어 쓰기",
-    "draftContinue": "이어서 작성하기",
-    "classificationDetails": "내 질문 유형 살펴보기"
+    "taskPointsDesc": "최근 7일 동안 받은 포인트 기록입니다."
   },
   "studentQ": {
     "tabMine": "📝 내 질문",

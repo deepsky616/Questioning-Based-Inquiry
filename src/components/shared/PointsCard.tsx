@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -38,6 +37,9 @@ interface PointLog {
   createdAt: string;
 }
 
+interface LeaderboardMe { rank: number | null; totalPoints: number }
+interface LeaderboardResp { scope: string; me?: LeaderboardMe }
+
 function relativeTime(iso: string): { key: "justNow" | "minutesAgo" | "hoursAgo" | "daysAgo"; v: Record<string, number> } {
   const t = new Date(iso).getTime();
   const diff = Date.now() - t;
@@ -51,14 +53,29 @@ function relativeTime(iso: string): { key: "justNow" | "minutesAgo" | "hoursAgo"
 }
 
 async function fetchPointsCard() {
-  const me = await fetchJson<{ totalPoints?: number; recent?: PointLog[] }>("/api/points/me");
-  return { totalPoints: me.totalPoints ?? 0, recent: me.recent ?? [] };
+  const [meRes, classLb, schoolLb, allLb]: [
+    { totalPoints?: number; recent?: PointLog[] },
+    LeaderboardResp, LeaderboardResp, LeaderboardResp,
+  ] = await Promise.all([
+    fetchJson<{ totalPoints?: number; recent?: PointLog[] }>("/api/points/me"),
+    fetchJson<LeaderboardResp>("/api/points/leaderboard?scope=class"),
+    fetchJson<LeaderboardResp>("/api/points/leaderboard?scope=school"),
+    fetchJson<LeaderboardResp>("/api/points/leaderboard?scope=all"),
+  ]);
+  return {
+    totalPoints: meRes.totalPoints ?? 0,
+    recent: meRes.recent ?? [],
+    ranks: {
+      class: classLb?.me?.rank ?? null,
+      school: schoolLb?.me?.rank ?? null,
+      all: allLb?.me?.rank ?? null,
+    },
+  };
 }
 
 export default function PointsCard() {
   const t = useTranslations("points");
   const tc = useTranslations("common");
-  const tNav = useTranslations("nav");
   const tAward = useTranslations("pointLabel");
   const { label: bonusLabel, gameLabel } = usePointBonusLabel();
   const [showGuide, setShowGuide] = useState(false);
@@ -72,7 +89,11 @@ export default function PointsCard() {
   });
   const totalPoints = data?.totalPoints ?? 0;
   const recent = data?.recent ?? [];
+  const ranks = data?.ranks ?? { class: null, school: null, all: null };
   const loaded = isSuccess;
+
+  const rankText = (v: number | null) => (v != null ? t("rank", { v }) : "-");
+
   return (
     <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-3">
       {isError && (
@@ -92,7 +113,7 @@ export default function PointsCard() {
         </div>
       )}
 
-      {/* 내 포인트와 별도 순위 화면 */}
+      {/* 내 포인트 + 순위 */}
       <div className="relative overflow-hidden rounded-2xl p-6 text-white md:h-full"
         style={{ background: "linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)" }}>
         <span className="absolute top-2 right-3 text-3xl opacity-20">⭐</span>
@@ -101,13 +122,15 @@ export default function PointsCard() {
         <p className="text-5xl font-black mt-1 relative">
           {loaded ? totalPoints : isError ? "-" : "..."}
         </p>
-        <Link href="/student-points" className="relative mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-white underline underline-offset-4">
-          {tNav("rankings")}
-        </Link>
+        <div className="mt-3 relative flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/90">
+          <span>{t("ourClass")} <b className="font-black">{rankText(ranks.class)}</b></span>
+          <span>{t("school")} <b className="font-black">{rankText(ranks.school)}</b></span>
+          <span>{t("all")} <b className="font-black">{rankText(ranks.all)}</b></span>
+        </div>
         <button
           type="button"
           onClick={() => setShowGuide(true)}
-          className="mt-2 relative flex min-h-11 items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white hover:bg-white/30 transition-colors"
+          className="mt-3 relative inline-flex items-center gap-1 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white hover:bg-white/30 transition-colors"
         >
           {t("howToEarn")}
         </button>
