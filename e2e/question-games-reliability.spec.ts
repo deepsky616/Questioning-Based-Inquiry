@@ -187,6 +187,7 @@ async function completeStoryDice(
   await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("story");
   await host.page.locator("#story-turn-input").fill("별을 찾아 우주로 떠나는 이야기를 만들었어요.");
   await host.page.locator("#story-turn-input").press("Enter");
+  await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("question");
 
   let pairCount = 0;
   while (transport.getRoom(code)?.status !== "ended") {
@@ -204,11 +205,11 @@ async function completeStoryDice(
     const input = page.locator("#story-turn-input");
     await expect(input).toBeEnabled();
     if (state.phase === "question") {
-      await input.fill(`이 이야기에서 ${pairCount + 1}번째로 가장 궁금한 점은 무엇일까요?`);
+      await input.fill(`${pairCount + 1}번째 여행에서 주인공의 기분은 어땠나요?`);
       await input.press("Enter");
       await expect.poll(() => transport.getRoom(code)?.gameState.phase).toBe("answer");
     } else {
-      await input.fill(`${pairCount + 1}번째 궁금증은 새로운 별을 찾는 과정과 이어집니다.`);
+      await input.fill(`새로운 별을 발견해서 ${pairCount + 1}번째 여행이 즐거웠어요.`);
       await input.press("Enter");
       pairCount += 1;
       await expect.poll(
