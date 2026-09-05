@@ -18,6 +18,7 @@ import {
   useStudentSessions,
 } from "@/lib/app-queries";
 import { consumePracticeDraft } from "@/lib/practice-draft";
+import { useQuestionDraft } from "@/lib/use-question-draft";
 import { isAnalysisCurrent, type AnalysisSnapshot } from "@/lib/student-ask-analysis";
 import { isDashboardActionableSessionDate } from "@/lib/dashboard-priority-tasks";
 import { useLocalDateKey } from "@/lib/use-local-date-key";
@@ -87,7 +88,8 @@ function AskContent() {
       ? taskParam
       : null;
 
-  const [content, setContent] = useState("");
+  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
+  const { content, setContent, draftStatus, markSubmitted } = useQuestionDraft(user.id, selectedSessionId);
   const [draftAnnouncement, setDraftAnnouncement] = useState<string | null>(null);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -95,7 +97,6 @@ function AskContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveComplete, setSaveComplete] = useState(false);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
-  const [selectedSessionId, setSelectedSessionId] = useState<string>("");
   const sessionsQuery = useStudentSessions<QuestionSession>({ userId: user.id });
   const { data: sessions = [], isError: sessionsError } = sessionsQuery;
   const sessionsLoaded = Boolean(user.id) && sessionsQuery.isSuccess;
@@ -159,14 +160,14 @@ function AskContent() {
   }, [content]);
 
   useEffect(() => {
-    if (!user.id || draftAppliedRef.current || searchParams.get("draft") !== "practice") return;
+    if (!user.id || !selectedSessionId || draftAppliedRef.current || searchParams.get("draft") !== "practice") return;
     draftAppliedRef.current = true;
     const draft = consumePracticeDraft(window.sessionStorage, user.id);
     if (!draft) return;
     setContent(draft.content);
     setDraftAnnouncement(t("practiceDraftLoaded"));
     requestAnimationFrame(() => textareaRef.current?.focus());
-  }, [searchParams, t, user.id]);
+  }, [searchParams, t, user.id, selectedSessionId, setContent]);
 
   useEffect(() => {
     fetch("/api/config")
@@ -414,6 +415,7 @@ function AskContent() {
       });
 
       if (!res.ok) throw new Error(t("saveFailed"));
+      markSubmitted(savedAnalysis.content);
       const saved = await res.json().catch(() => null);
       const savedQuestion = {
         id: typeof saved?.id === "string" ? saved.id : existingQuestion?.id ?? "saved",
@@ -607,6 +609,7 @@ function AskContent() {
         existingQuestion={existingQuestion}
         isCheckingExisting={isCheckingExisting}
         content={content}
+        draftStatus={draftStatus}
         textareaRef={textareaRef}
         canAsk={canAsk}
         isLoading={isLoading}

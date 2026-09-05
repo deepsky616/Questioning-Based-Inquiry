@@ -15,6 +15,7 @@ jobs:
       DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public"
       NEXTAUTH_SECRET: "ci-dummy-secret"
       NEXTAUTH_URL: "http://localhost:3000"
+      GAME_ACTIVITY_HASH_SECRET: "ci-only-game-activity-hash-secret-00000000"
     steps:
       - uses: actions/checkout@v4
 

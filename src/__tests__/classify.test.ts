@@ -7,14 +7,19 @@ import {
 } from "@/lib/classify";
 
 describe("fallbackClassification", () => {
+  it("왜나 어떻게로 시작한다는 이유만으로 열린 쪽 점수를 높이지 않는다", () => {
+    for (const content of ["왜 식물은 초록색인가요?", "어떻게 비가 내리나요?"]) {
+      expect(fallbackClassification(content).closureScore).toBe(0.5);
+    }
+  });
   it("닫힌 질문 키워드가 있으면 closed를 반환한다", () => {
     const result = fallbackClassification("광합성이 무엇인지 설명해주세요");
     expect(result.closure).toBe("closed");
     expect(result.closureScore).toBeGreaterThan(0.5);
   });
 
-  it("열린 질문 키워드가 있으면 open을 반환한다", () => {
-    const result = fallbackClassification("왜 식물은 광합성을 하나요");
+  it("가정하는 질문에 열린 질문 단서를 반영한다", () => {
+    const result = fallbackClassification("광합성이 없다면 생태계는 어떻게 바뀔까요");
     expect(result.closure).toBe("open");
     expect(result.closureScore).toBeLessThan(0.5);
   });
@@ -59,7 +64,7 @@ describe("fallbackClassification", () => {
     expect(result.cognitive).toBe("factual");
     expect(result.closureScore).toBe(0.5);
     expect(result.cognitiveScore).toBe(0.5);
-    expect(result.reasoning).toBe("키워드 기반 자동 분류");
+    expect(result.reasoning).toContain("임시 분류");
   });
 
   it("fallback 분류는 항상 feedback 문자열을 반환한다", () => {
@@ -68,11 +73,11 @@ describe("fallbackClassification", () => {
     expect(result.feedback!.length).toBeGreaterThan(0);
   });
 
-  it("닫힌+사실적 질문이면 열린 질문으로 바꾸길 권장하는 피드백을 반환한다", () => {
+  it("사실적 질문도 탐구에 필요함을 안내한다", () => {
     const result = fallbackClassification("광합성이 무엇인지 설명해주세요");
     expect(result.closure).toBe("closed");
     expect(result.cognitive).toBe("factual");
-    expect(result.feedback).toContain("왜");
+    expect(result.feedback).toContain("모두 탐구에 필요해요");
   });
 
   it("열린+논쟁적 질문이면 긍정 피드백을 반환한다", () => {

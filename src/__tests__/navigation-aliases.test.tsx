@@ -98,6 +98,11 @@ function expectActive(link: HTMLElement) {
 }
 
 describe("내비게이션 주소 별칭", () => {
+  it.each(["/teacher-settings", "/teacher-students", "/student-settings"])("%s에는 학습 단계 이동을 표시하지 않는다", (pathname) => {
+    navigationState.pathname = pathname;
+    const { container } = renderWithMessages(<PageNav pages={pages} />);
+    expect(container).toBeEmptyDOMElement();
+  });
   beforeEach(() => {
     availableWidth = 10_000;
     navigationState.pathname = "/teacher-curriculum";

@@ -19,11 +19,11 @@ describe("USB 시연 학급 자료 생성 명령", () => {
   it("4학년 1반 학생 28명을 고정된 순서로 제공한다", () => {
     const source = readFileSync("scripts/seed-usb-demo.mjs", "utf8");
     const namesMatch = source.match(
-      /export const STUDENT_NAMES = \[(?<names>[\s\S]*?)\];/,
+      /export const STUDENT_NAMES = \[([\s\S]*?)\];/,
     );
-    expect(namesMatch?.groups?.names).toBeTruthy();
+    expect(namesMatch?.[1]).toBeTruthy();
 
-    const names = [...(namesMatch?.groups?.names.matchAll(/"([^"]+)"/g) ?? [])]
+    const names = [...(namesMatch?.[1].matchAll(/"([^"]+)"/g) ?? [])]
       .map((match) => match[1]);
 
     expect(names).toHaveLength(28);
@@ -191,12 +191,12 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       .toBe(6);
 
     for (const profile of profiles) {
-      const recognizedTotal = Object.values(profile.validQuestions).reduce(
-        (sum, count) => sum + count,
+      const recognizedTotal = Object.values(profile.validQuestions).reduce<number>(
+        (sum, count) => sum + Number(count),
         0,
       );
       expect(Object.values(profile.validQuestions).every(
-        (count) => count >= 1 && count <= 10,
+        (count) => Number(count) >= 1 && Number(count) <= 10,
       )).toBe(true);
       expect(profile.gamePoints).toBe(10 + recognizedTotal);
       expect(profile.totalPoints).toBe(
@@ -480,14 +480,15 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       expect(session.unitDesignId).toBeTruthy();
       const design = designById.get(session.unitDesignId);
       expect(design).toBeDefined();
+      if (!design) throw new Error("시연 단원 설계가 없습니다");
       expect(design?.grade).toBe("4");
       expect(design?.title.trim()).not.toBe("");
       expect(design?.coreIdea.trim()).not.toBe("");
       expect(design?.achievements.length).toBeGreaterThan(0);
       expect(design?.learningGuides.achievements).toHaveLength(
-        design?.achievements.length,
+        design.achievements.length,
       );
-      expect(design?.learningGuides.achievements.every((guide, index) => (
+      expect(design?.learningGuides.achievements.every((guide: { index: number; explanation: string }, index: number) => (
         guide.index === index && guide.explanation.trim()
       ))).toBe(true);
       expect(design?.coreSentences.length).toBeGreaterThan(0);
@@ -504,10 +505,10 @@ describe("USB 시연 학급 자료 생성 명령", () => {
         controversial: 1,
       });
       expect(design?.learningGuides.coreSentences).toHaveLength(
-        design?.coreSentences.length,
+        design.coreSentences.length,
       );
       expect(design?.learningGuides.essentialQuestions).toHaveLength(
-        design?.essentialQuestions.length,
+        design.essentialQuestions.length,
       );
       expect(
         design?.inquiryQuestions.every(({ studentGuide }) => (
@@ -531,6 +532,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
     for (const session of DEMO_SESSION_BLUEPRINTS) {
       const design = designById.get(session.unitDesignId);
       expect(design).toBeDefined();
+      if (!design) throw new Error("시연 단원 설계가 없습니다");
       const studentQuestions = activityPlans.questions.filter(
         (question) => question.sessionId === session.id,
       );
@@ -597,7 +599,7 @@ describe("USB 시연 학급 자료 생성 명령", () => {
       expect(
         sharedQuestions.every(({ mergedFrom }) => (
           new Set(
-            (mergedFrom ?? []).map((content) => similarityKeyByContent.get(content)),
+            (mergedFrom ?? []).map((content: string) => similarityKeyByContent.get(content)),
           ).size === 1
         )),
       ).toBe(true);

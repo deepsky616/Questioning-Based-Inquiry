@@ -204,7 +204,7 @@ describe("질문 주사위 판정기", () => {
     });
 
     expect(result.kind).toBe("invalid");
-    expect(result.message).toBe("주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요");
+    expect("message" in result ? result.message : undefined).toBe("주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요");
     expect(readDicePublicState(result.room.gameState)?.questions).toEqual([]);
   });
 
@@ -277,7 +277,7 @@ describe("질문 릴레이 판정기", () => {
     });
 
     expect(result.kind).toBe("invalid");
-    expect(result.message).toBe("주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요");
+    expect("message" in result ? result.message : undefined).toBe("주제에 맞는 궁금한 내용을 넣어 질문을 한 문장으로 써 주세요");
     expect(readRelayPublicState(result.room.gameState)?.questions).toEqual([]);
   });
 

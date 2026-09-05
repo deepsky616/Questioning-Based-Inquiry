@@ -87,7 +87,8 @@ export function parseClassificationResponse(text: string): ClassificationResult 
 export function fallbackClassification(content: string): ClassificationResult {
   // "무슨"/"어떤"은 닫힌 질문("무슨 색이에요?")과 열린 질문("어떤 방법이 좋을까?") 모두에 나타나므로 제외
   const closedKeywords = ["무엇", "언제", "몇", "어디", "누구", "얼마"];
-  const openKeywords = ["왜", "어떻게"];
+  // 문장 첫말만으로 열린 질문이라고 단정하지 않는다. 가정·판단의 단서만 참고한다.
+  const openKeywords = ["없다면", "된다면", "바뀐다면", "어떨까", "어떻게 생각", "가장 좋은", "더 나은", "찬성", "반대"];
 
   const factualKeywords = ["정의", "설명해", "알려줘", "뭐야", "무엇인가"];
   const conceptualKeywords = ["비교해", "분석해", "추론해", "차이", "왜냐면", "관계", "원리"];
@@ -118,27 +119,13 @@ export function fallbackClassification(content: string): ClassificationResult {
   for (const kw of controversialKeywords) {
     if (content.includes(kw)) { cognitive = "controversial"; cognitiveScore = Math.min(1, cognitiveScore + 0.2); }
   }
-
-  const feedbackMap: Record<string, Record<string, string>> = {
-    closed: {
-      factual: "정답이 하나인 닫힌 질문입니다. '왜' 또는 '어떻게'로 바꾸면 다양한 생각을 이끌어내는 열린 질문이 됩니다.",
-      conceptual: "'왜 그럴까요?'처럼 이유와 관계를 탐색하는 형태로 바꾸면 더 깊은 이해를 이끌어낼 수 있습니다.",
-      controversial: "판단을 묻는 질문입니다. 열린 형태로 바꾸면 더 다양한 관점의 의견을 이끌어낼 수 있습니다.",
-    },
-    open: {
-      factual: "열린 질문입니다. '왜' 또는 '어떻게'를 추가해 이유와 과정까지 탐구해보세요.",
-      conceptual: "훌륭한 개념적 질문입니다! 구체적인 비교 대상이나 관점을 추가하면 더욱 풍부해집니다.",
-      controversial: "훌륭한 논쟁적 질문입니다! 판단의 기준을 함께 제시하면 더 깊은 논의가 가능해집니다.",
-    },
-  };
-
   return {
     closure,
     cognitive,
     closureScore,
     cognitiveScore,
-    reasoning: "키워드 기반 자동 분류",
-    feedback: feedbackMap[closure][cognitive],
+    reasoning: "표현의 단서만 참고한 임시 분류입니다. 질문의 맥락에 따라 달라질 수 있어요.",
+    feedback: "궁금한 점을 질문으로 적었어요. 무엇을 알고 싶은지, 어떤 근거로 답을 찾을지 생각해 보세요. 사실을 확인하는 질문과 여러 생각을 나누는 질문 모두 탐구에 필요해요.",
     inappropriate: false,
     inappropriateReason: "",
   };

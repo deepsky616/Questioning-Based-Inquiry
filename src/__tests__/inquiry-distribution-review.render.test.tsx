@@ -77,9 +77,9 @@ describe("학생 배포 자료 확인", () => {
     expect(achievement).toHaveTextContent("[6과05-01]");
     expect(achievement).toHaveTextContent("생태계 구성 요소를 조사하고");
     expect(achievement).toHaveTextContent("생태계를 이루는 생물과 환경을 찾아");
-    expect(coreIdea?.compareDocumentPosition(achievement as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect((coreIdea?.compareDocumentPosition(achievement as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
-    expect(achievement?.compareDocumentPosition(coreSentence as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect((achievement?.compareDocumentPosition(coreSentence as Node) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
     expect(achievement?.querySelector("[data-student-guide-number]")).toHaveTextContent("2");
     expect(coreSentence?.querySelector("[data-student-guide-number]")).toHaveTextContent("3");

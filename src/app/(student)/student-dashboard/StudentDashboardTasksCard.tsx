@@ -64,7 +64,7 @@ export function StudentDashboardTasksCard({
           </div>
         )}
 
-        {status === "ready" && taskItems.length === 0 && (
+        {status === "ready" && schedule.status === "ready" && !schedule.item && taskItems.length === 0 && (
           <p className="py-3 text-sm text-muted-foreground">{t("taskDone")}</p>
         )}
 

@@ -120,7 +120,7 @@ describe("POST /api/classify", () => {
     expect(data).toMatchObject({
       analysisSource: "fallback",
       fallbackReason: "missing-key",
-      reasoning: "키워드 기반 자동 분류",
+      reasoning: expect.stringContaining("임시 분류"),
     });
     expect(data.analysisModel).toBeUndefined();
   });
@@ -135,7 +135,7 @@ describe("POST /api/classify", () => {
     expect(data).toMatchObject({
       analysisSource: "fallback",
       fallbackReason: "busy",
-      reasoning: "키워드 기반 자동 분류",
+      reasoning: expect.stringContaining("임시 분류"),
     });
     expect(mWarn).toHaveBeenCalledWith(
       "질문 분석이 기본 분석으로 전환됐습니다",
