@@ -38,9 +38,9 @@ describe("USB 시연 실행 화면", () => {
     expect(validationRouteSource).not.toContain("ticket,");
   });
 
-  it("실행 화면에는 질문연구소 이미지와 김질문 안내가 있다", () => {
+  it("실행 화면에는 질문연구소 이미지와 시연 학생 안내가 있다", () => {
     expect(pageSource).toContain("DemoLaunchClient");
     expect(clientSource).toContain("/login-inquiry-hero.png");
-    expect(clientSource).toContain("김질문");
+    expect(clientSource).toContain("학생1");
   });
 });

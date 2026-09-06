@@ -37,7 +37,7 @@ export function LanguageToggle({
       <div
         title={t("language")}
         className={cn(
-          "relative inline-flex h-11 items-center rounded-md text-sm text-muted-foreground hover:bg-muted",
+          "relative inline-flex h-11 items-center rounded-md text-base text-muted-foreground hover:bg-muted",
           compactOnMobile
             ? "w-11 justify-center sm:w-auto sm:gap-1 sm:px-2"
             : "w-auto gap-1 px-2",
@@ -49,7 +49,7 @@ export function LanguageToggle({
           value={locale}
           onChange={(e) => change(e.target.value)}
           className={cn(
-            "cursor-pointer bg-transparent pr-1 text-sm outline-none",
+            "cursor-pointer bg-transparent pr-1 text-base outline-none",
             compactOnMobile && "absolute inset-0 h-full w-full opacity-0 sm:static sm:h-auto sm:w-auto sm:opacity-100",
           )}
         >

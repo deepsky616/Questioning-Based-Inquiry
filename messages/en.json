@@ -1122,6 +1122,8 @@
     "createActionsLabel": "Create a question class",
     "createInquiryQuestionClass": "Create from an inquiry question",
     "createQuickQuestionClass": "Create a quick question class",
+    "createInquiryQuestionClassHelp": "Build essential and inquiry questions step by step using the curriculum and achievement standards. Choose this when you want to prepare questions and reference materials together.",
+    "createQuickQuestionClassHelp": "Set the date, subject, topic, and students to start collecting questions right away. Choose this for a short activity or questions that come up during a lesson.",
     "closeQuickQuestionClass": "Close quick question class",
     "workspaceNavLabel": "Question class workspace",
     "listViewTitle": "Question class list",

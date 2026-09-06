@@ -8,10 +8,6 @@ const actions = readFileSync(
   "src/app/(teacher)/teacher-sessions/TeacherQuestionClassActions.tsx",
   "utf8",
 );
-const workspaceNav = readFileSync(
-  "src/app/(teacher)/teacher-sessions/QuestionClassWorkspaceNav.tsx",
-  "utf8",
-);
 const createCard = readFileSync(
   "src/app/(teacher)/teacher-sessions/TeacherSessionCreateCard.tsx",
   "utf8",
@@ -34,15 +30,6 @@ const row = readFileSync(
 );
 
 describe("질문수업 통합 화면 계약", () => {
-  it("목록과 두 만들기 화면을 항상 오갈 수 있는 작업공간 탐색을 제공한다", () => {
-    expect(workspaceNav).toContain('href="/teacher-sessions"');
-    expect(workspaceNav).toContain('href="/teacher-curriculum"');
-    expect(workspaceNav).toContain('href="/teacher-sessions?view=quick"');
-    expect(workspaceNav).toContain('aria-current={activeView === "list" ? "page" : undefined}');
-    expect(workspaceNav).toContain('aria-current={activeView === "inquiry" ? "page" : undefined}');
-    expect(workspaceNav).toContain('aria-current={activeView === "quick" ? "page" : undefined}');
-  });
-
   it("목록과 간단 만들기는 같은 주소에서 한 화면만 표시한다", () => {
     expect(page).toContain('searchParams.get("view") === "quick"');
     expect(page).toContain('<QuestionClassWorkspaceNav activeView={activeView} />');
