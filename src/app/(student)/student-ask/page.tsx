@@ -131,7 +131,7 @@ function AskContent() {
   );
 
   const transitionSession = useCallback((id: string, focusInput = false) => {
-    if (id !== selectedSessionId) {
+    if (id !== selectedSessionIdRef.current) {
       analysisRequestRef.current += 1;
       selectedSessionIdRef.current = id;
       setIsLoading(false);
@@ -140,7 +140,7 @@ function AskContent() {
       setSaveComplete(false);
     }
     if (focusInput) requestAnimationFrame(() => textareaRef.current?.focus());
-  }, [selectedSessionId]);
+  }, []);
 
   const replaceSessionInUrl = useCallback((sessionId: string) => {
     const params = new URLSearchParams(searchParamString);
@@ -176,33 +176,6 @@ function AskContent() {
       .catch(() => setAiConfigured(false));
 
   }, []);
-
-  useEffect(() => {
-    if (!sessionsLoaded || sessionsError || needsQuestionScope) return;
-    const currentSessionId = selectedSessionIdRef.current;
-    const requestedSessionChanged = appliedRequestedSessionRef.current !== requestedSessionId;
-    if (requestedSessionChanged) {
-      appliedRequestedSessionRef.current = requestedSessionId;
-      const requestedSession = requestedSessionId
-        ? sessions.find((item) => item.id === requestedSessionId)
-        : null;
-      const nextSessionId = requestedSession?.id ?? (
-        currentSessionId && sessions.some((item) => item.id === currentSessionId)
-          ? currentSessionId
-          : sessions[0]?.id ?? ""
-      );
-      transitionSession(nextSessionId);
-      if (requestedSessionId && !requestedSession && nextSessionId) {
-        replaceSessionInUrl(nextSessionId);
-      }
-      return;
-    }
-
-    if (currentSessionId && sessions.some((item) => item.id === currentSessionId)) return;
-    const nextSessionId = sessions[0]?.id ?? "";
-    transitionSession(nextSessionId);
-    if (requestedSessionId && nextSessionId) replaceSessionInUrl(nextSessionId);
-  }, [needsQuestionScope, replaceSessionInUrl, requestedSessionId, sessions, sessionsError, sessionsLoaded, transitionSession]);
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId) ?? null;
   const hasDesignReference = Boolean(selectedSession?.unitDesignId);
@@ -310,18 +283,26 @@ function AskContent() {
     return t("pastBadge");
   };
 
-  // 필터 변경 시 선택 세션 보정: 목록에 없으면 첫 세션으로, 목록이 비면 선택 해제
+  // 주소 복원과 필터 보정을 한 번에 처리한다. 결과가 없으면 선택을 비운 채 유지한다.
+  // 전체 목록의 첫 수업을 따로 복원하면 필터의 선택 해제와 충돌해 무한 갱신이 발생한다.
   useEffect(() => {
-    if (!sessionsLoaded || !scopedTaskDataReady) return;
+    if (!sessionsLoaded || sessionsError || !scopedTaskDataReady) return;
     const currentSessionId = selectedSessionIdRef.current;
-    if (filteredSessions.length === 0) {
-      if (currentSessionId) selectSession("", false);
-      return;
+    const requestedSessionChanged = appliedRequestedSessionRef.current !== requestedSessionId;
+    appliedRequestedSessionRef.current = requestedSessionId;
+    const requestedSession = requestedSessionChanged && !needsQuestionScope
+      ? filteredSessions.find((session) => session.id === requestedSessionId)
+      : undefined;
+    const nextSessionId = requestedSession?.id ?? (
+      filteredSessions.some((session) => session.id === currentSessionId)
+        ? currentSessionId
+        : filteredSessions[0]?.id ?? ""
+    );
+    if (nextSessionId !== currentSessionId) {
+      transitionSession(nextSessionId, Boolean(nextSessionId && !requestedSessionChanged));
     }
-    if (!filteredSessions.some((s) => s.id === currentSessionId)) {
-      selectSession(filteredSessions[0].id, true);
-    }
-  }, [filterDate, filterSubject, filterTopic, sessionsLoaded, scopedTaskDataReady, filteredSessions, selectSession]);
+    if (requestedSessionId !== (nextSessionId || null)) replaceSessionInUrl(nextSessionId);
+  }, [filteredSessions, needsQuestionScope, replaceSessionInUrl, requestedSessionId, scopedTaskDataReady, sessionsError, sessionsLoaded, transitionSession]);
 
   const canAsk = sessionsLoaded && scopedTaskDataReady && !sessionsError && sessions.length > 0 && !!selectedSessionId;
   const currentStep = analysisCurrent ? 3 : content.trim().length > 0 ? 2 : 1;

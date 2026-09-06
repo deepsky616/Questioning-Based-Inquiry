@@ -72,6 +72,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Question session filter regression E2E
+        run: npx playwright test e2e/question-session-filters.spec.ts --project=chromium
+
       - name: Question games desktop reliability E2E
         run: npm run test:e2e:question-games
 
