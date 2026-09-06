@@ -432,15 +432,15 @@ function QuestionsContent() {
         filterSubject={filterSubject}
         filterTopic={filterTopic}
         onFilterDateChange={(value) => {
-          updateViewState({ date: value, page: 1 });
+          updateViewState({ date: value, session: "all", page: 1 });
           resetBulkState();
         }}
         onFilterSubjectChange={(value) => {
-          updateViewState({ subject: value, page: 1 });
+          updateViewState({ subject: value, session: "all", page: 1 });
           resetBulkState();
         }}
         onFilterTopicChange={(value) => {
-          updateViewState({ topic: value, page: 1 });
+          updateViewState({ topic: value, session: "all", page: 1 });
           resetBulkState();
         }}
         onSessionChange={handleSessionChange}
