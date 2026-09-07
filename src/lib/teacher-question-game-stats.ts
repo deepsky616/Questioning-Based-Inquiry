@@ -129,6 +129,7 @@ export async function loadTeacherQuestionGameStats(
   ]);
 
   const byGame: Record<string, TeacherQuestionGameStat> = {};
+  const settledRunIds = new Set(runs.map((run) => run.id));
   const perStudent: Record<
     string,
     Map<string, TeacherQuestionGameStudentStat>
@@ -200,7 +201,8 @@ export async function loadTeacherQuestionGameStats(
       (log.gameId === "ACTIVITY_AI" && bonusSpec.mode === "ai")
     );
 
-    if (isVerifiedRunLog && log.gameRunId) continue;
+    // 이전 형식의 포인트 기록도 완료 실행과 연결되어 있으면 아래 실행 집계에서 한 번만 센다.
+    if (log.gameRunId && (isVerifiedRunLog || settledRunIds.has(log.gameRunId))) continue;
 
     const gameId = isVerifiedRunLog ? bonusSpec.gameId : log.gameId;
     if (!isBuiltInQuestionGameId(gameId)) continue;
