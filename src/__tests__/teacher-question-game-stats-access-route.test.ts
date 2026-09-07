@@ -235,6 +235,24 @@ describe("교사 질문놀이 통계 접근 경계", () => {
     ]);
   });
 
+  it("이전 형식의 혼자 놀이 포인트를 친구 놀이로 중복 집계하지 않는다", async () => {
+    mockStudents.mockResolvedValue([{ id: "student-1", name: "학생1", studentNumber: "1" }]);
+    mockLogs.mockResolvedValue([
+      { studentId: "student-1", gameId: "relay", gameRunId: "legacy-run", bonusType: "PARTICIPATION", points: 3, createdAt: new Date("2026-07-17T03:00:00Z") },
+      { studentId: "student-1", gameId: "relay", gameRunId: "legacy-run", bonusType: "VALID_QUESTIONS", points: 2, reason: "유효 질문 2개", createdAt: new Date("2026-07-17T03:00:00Z") },
+    ]);
+    mockRuns.mockResolvedValue([{
+      id: "legacy-run", gameId: "relay", mode: "SOLO", ownerId: "student-1", settledAt: new Date("2026-07-17T03:00:00Z"),
+      activities: [{ actorId: "student-1", validQuestionCount: 2 }],
+      pointLogs: [{ studentId: "student-1", points: 3 }, { studentId: "student-1", points: 2 }],
+    }]);
+    const body = await (await GET()).json();
+    expect(body.byGame.relay.students[0]).toMatchObject({
+      plays: 1, completions: 1, points: 5, goodQuestions: 2,
+      modes: { solo: { plays: 1, points: 5, goodQuestions: 2 }, friend: { plays: 0, points: 0, goodQuestions: 0 } },
+    });
+  });
+
   it("새 방식의 상한 기록이 기본 기록과 함께 있어도 친구 놀이를 한 판만 집계한다", async () => {
     mockStudents.mockResolvedValue([
       { id: "student-1", name: "학생1", studentNumber: "1" },
