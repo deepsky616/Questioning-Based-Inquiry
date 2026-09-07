@@ -26,7 +26,7 @@ export async function readPointPreservingSnapshot(db) {
 }
 
 export async function preparePointPreservingPlan(db, snapshot) {
-  const plan = buildGradeFiveMigration(snapshot);
+  const plan = { ...buildGradeFiveMigration(snapshot), pointLogs: [], awardClaims: [] };
   const inputs = ["questions","comments"].flatMap((kind)=>plan[kind].map(({id,data})=>({kind,id,content:data.content})));
   const normalized = await db.$queryRaw`
     SELECT item->>'kind' AS kind, item->>'id' AS id,
@@ -52,8 +52,6 @@ export async function preparePointPreservingPlan(db, snapshot) {
   }
   const questionById=new Map(plan.questions.map((change)=>[change.id,change]));
   const commentById=new Map(plan.comments.map((change)=>[change.id,change]));
-  plan.pointLogs=[];
-  plan.awardClaims=[];
   for(const log of snapshot.pointLogs) {
     let scopeId;
     let content;
