@@ -55,8 +55,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <ThemeProvider>
-      <SessionProvider>
+    <SessionProvider>
+      <ThemeProvider>
         <QueryClientProvider client={queryClient}>
           <AuthQueryCacheBoundary>
             <ConfirmProvider>
@@ -65,7 +65,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             </ConfirmProvider>
           </AuthQueryCacheBoundary>
         </QueryClientProvider>
-      </SessionProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </SessionProvider>
   );
 }
